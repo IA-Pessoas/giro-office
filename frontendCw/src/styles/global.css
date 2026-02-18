@@ -1,0 +1,87 @@
+:root {
+    --main: #2f406a;
+    --main-integracao: #ef5a8b;
+    --main-comercial: #990033;
+    --main-regularize: #cf6363;
+}
+
+/* Gerais */
+.hide-on-print {
+    display: flex;
+}
+
+.main {
+    margin-left: 100px;
+    margin-top: 10px;
+    width: calc(100% - 100px);
+    min-height: 90vh;
+}
+
+.box {
+    border: 1px solid #676767;
+    border-radius: 10px;
+}
+
+.custom-tab {
+  color: var(--main);
+  display: flex;
+  align-items: center;
+}
+
+
+/* icons */
+.icon-integracao {
+  color: var(--main-integracao);
+  fill: var(--main-integracao);
+  stroke: var(--main-integracao);
+  margin-right: 8px;
+}
+.icon-comercial {
+  color: var(--main-comercial);
+  fill: var(--main-comercial);
+  stroke: var(--main-comercial);
+  margin-right: 8px;
+}
+.icon-regularize {
+  color: var(--main-regularize);
+  fill: var(--main-regularize);
+  stroke: var(--main-regularize);
+  margin-right: 8px;
+}
+
+@media (max-width: 800px) {
+    .main {
+        margin-left: 0px;
+        padding: 10px;
+        width: 100%;
+    }
+}
+
+@media print {
+    .hide-on-print {
+        display: none !important;
+    }
+}
+  
+/* Animação de piscar */
+@keyframes blink {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* Animação de rotação do spinner */
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
