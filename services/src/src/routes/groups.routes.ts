@@ -2,7 +2,7 @@ import { Router } from "express"
 import { isAuthenticated } from "../middlewares/isAuthenticated"
 import { GroupController } from "../controllers/GroupController"
 
-const router = Router()
+const router: Router = Router()
 
 const gc = new GroupController()
 

@@ -1,7 +1,8 @@
 {
-  "name": "cwbackend",
+  "name": "@workspace/api",
   "version": "1.0.0",
-  "main": "index.js",
+  "private": true,
+  "main": "dist/server.js",
   "author": "Mauricio Júnior <51757509+Mauricio-Jr-LP@users.noreply.github.com>",
   "license": "MIT",
   "engines": {
@@ -12,7 +13,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.10.2",
@@ -42,11 +44,8 @@
     "@types/multer": "^1.4.12",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.17",
-    "ts-node-dev": "^2.0.0"
-  },
-  "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src"
+    "ts-node-dev": "^2.0.0",
+    "ts-node": "^10.9.2"
   },
   "resolutions": {
     "@types/express": "^4.17.21",

@@ -1,0 +1,19 @@
+{
+  "name": "@workspace/root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "dev:app": "turbo run dev --filter=@workspace/app",
+    "dev:api": "turbo run dev --filter=@workspace/api",
+    "prisma:generate": "turbo run prisma:generate --filter=@workspace/api",
+    "prisma:migrate": "turbo run prisma:migrate --filter=@workspace/api"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

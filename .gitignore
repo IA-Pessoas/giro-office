@@ -1,0 +1,21 @@
+**/node_modules
+*.env
+.env.*
+
+# Turborepo
+.turbo/
+
+# PNPM
+.pnpm-store/
+
+# Build outputs
+**/dist
+**/.next
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+!.vscode/extensions.json

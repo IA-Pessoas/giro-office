@@ -26,7 +26,7 @@ import rhRoutes from "./modules/rh.routes"
 import tiRoutes from "./modules/ti.routes"
 import triagemRoutes from "./modules/triagem.routes"
 
-const router = Router()
+const router: Router = Router()
 
 router.use(agendaRoutes)
 router.use(budgetRoutes)
