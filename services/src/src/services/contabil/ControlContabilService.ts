@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import prismaClient from "../../prisma";
 import { LogService } from '../LogService'
 
 interface GetOrCreateDTO {
@@ -35,7 +35,7 @@ const updatableFields: Set<string> = new Set([
 ]);
 
 class ControlContabilService {
-    private prisma = new PrismaClient();
+    private prisma = prismaClient;
 
     public async create({ my_id, clientId, competence }: GetOrCreateDTO) {
         if (!clientId || !competence) {

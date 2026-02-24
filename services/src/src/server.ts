@@ -1,3 +1,4 @@
+import 'dotenv/config';
 // Importações do Express e da sua aplicação
 import express, { Request, Response, NextFunction } from "express";
 import 'express-async-errors';
@@ -6,13 +7,12 @@ import { ChatController } from "./controllers/chat/ChatController";
 import { router } from "./routes";
 import { chatRoutes } from "./routes/chat.routes";
 
-require('dotenv').config();
-import prismaClient from "./prisma"; // Assumindo que você exporta o prismaClient daqui
+import prismaClient from "./prisma";
 
 // Importações para o Servidor Híbrido e Socket.IO
 import http from 'http';
 import { Server, Socket } from 'socket.io'; // Importando o tipo Socket
-import { verify } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 
 // Importe seu serviço de mensagem que criamos
 import { MessageService } from "./services/chat/MessageService";
@@ -86,7 +86,7 @@ io.use((socket: SocketWithAuth, next) => {
     }
 
     try {
-        const payload = verify(token, secret) as { sub: string };
+        const payload = jwt.verify(token, secret) as { sub: string };
         socket.user_id = payload.sub; // Anexa o ID do usuário ao socket
         next();
     } catch (err) {
@@ -268,4 +268,10 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 
 // --- INICIALIZAÇÃO DO SERVIDOR ---
-server.listen(3333, () => console.log('🚀 Server is running on port 3333'));
+const PORT = 3333;
+server.listen(PORT, () => {
+  console.log('🚀 Server is running on port', PORT);
+});
+server.on('error', (err) => {
+  console.error('❌ Server error:', err);
+});

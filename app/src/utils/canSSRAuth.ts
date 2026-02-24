@@ -29,8 +29,14 @@ export function canSSRAuth<P>(fn: GetServerSideProps<P>) {
             permanent: false
           }
         }
-
       }
+      // Qualquer outro erro: redireciona para login
+      return {
+        redirect: {
+          destination: '/login',
+          permanent: false
+        }
+      };
     }
 
   }

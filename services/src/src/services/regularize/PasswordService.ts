@@ -1,8 +1,6 @@
-import { PrismaClient } from "@prisma/client";
+import prismaClient from "../../prisma";
 import { EncryptionService } from "../EncryptionService";
-import { LogService } from "../LogService"; 
-
-const prismaClient = new PrismaClient();
+import { LogService } from "../LogService";
 
 interface CreateDTO {
     my_id: string

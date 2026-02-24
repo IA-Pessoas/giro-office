@@ -1,7 +1,7 @@
 import prismaClient from "../../prisma";
 import { LogService } from "../LogService";
 import { CONTABIL_FIELDS, FISCAL_FIELDS, TriageStatus } from "../../types/TriageTypes";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "../../generated/prisma/client.js";
 
 interface UpsertConfigDTO {
     my_id: string;

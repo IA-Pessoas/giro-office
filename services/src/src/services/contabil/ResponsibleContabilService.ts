@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import prismaClient from "../../prisma";
 import { LogService } from '../LogService'
 
 interface ResponsibleDTO {
@@ -9,7 +9,7 @@ interface ResponsibleDTO {
 }
 
 class ResponsibleContabilService {
-    private prisma = new PrismaClient();
+    private prisma = prismaClient;
 
     public async create(my_id: string, data: ResponsibleDTO) {
         const {

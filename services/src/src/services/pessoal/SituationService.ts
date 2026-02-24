@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-import { LogService } from '../LogService'
-
-const prismaClient = new PrismaClient();
+import prismaClient from "../../prisma";
+import { LogService } from '../LogService';
 
 interface CreateRequest {
     my_id: string

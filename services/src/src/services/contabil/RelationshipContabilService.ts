@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import prismaClient from "../../prisma";
 import { LogService } from '../LogService'
 
 interface RelationshipDTO {
@@ -11,7 +11,7 @@ interface RelationshipDTO {
 }
 
 class RelationshipContabilService {
-    private prisma = new PrismaClient();
+    private prisma = prismaClient;
 
     // 1. Criar
     public async create(my_id: string, data: RelationshipDTO) {
