@@ -1,5 +1,5 @@
 import prismaClient from "../../prisma"
-import { ChatType, Role } from '@prisma/client'
+import { ChatType, Role } from "../../generated/prisma/client.js"
 type MulterFile = Express.Multer.File;
 import { bucket } from '../../config/firebase'; // Importa a configuração do Firebase
 

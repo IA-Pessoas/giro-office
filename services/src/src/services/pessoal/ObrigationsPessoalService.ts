@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import prismaClient from "../../prisma";
 import { LogService } from '../LogService'
 
 interface CreateDTO {
@@ -26,7 +26,7 @@ const updatableFields: Set<string> = new Set([
 ]);
 
 class ObrigationsPessoalService {
-    private prisma = new PrismaClient();
+    private prisma = prismaClient;
 
     public async create({ my_id, clientId, competence }: CreateDTO) {
         if (!clientId || !competence)

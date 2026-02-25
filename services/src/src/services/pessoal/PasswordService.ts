@@ -1,9 +1,6 @@
-
-import { PrismaClient } from "@prisma/client";
+import prismaClient from "../../prisma";
 import { LogService } from '../LogService'
 import { EncryptionService } from "../EncryptionService";
-
-const prismaClient = new PrismaClient();
 
 interface CreatePasswordDTO {
     client_id: string;

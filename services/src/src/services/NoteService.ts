@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { startOfWeek, addDays } from 'date-fns';
-import { LogService } from './LogService'; // Supondo o caminho
-
-const prisma = new PrismaClient();
+import { LogService } from './LogService';
+import prisma from '../prisma';
 
 // Interfaces para os métodos
 interface CreateNoteRequest {

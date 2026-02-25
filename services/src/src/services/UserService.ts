@@ -1,7 +1,7 @@
 // import { File as MulterFile } from 'multer';
 type MulterFile = Express.Multer.File;
-import { hash, compare } from "bcryptjs"
-import { sign } from 'jsonwebtoken'
+import bcrypt from "bcryptjs"
+import jwt from 'jsonwebtoken'
 
 import prismaClient from "../prisma"
 import { bucket } from '../config/firebase'; // Importa a configuração do Firebase
@@ -153,7 +153,7 @@ class UserService {
             throw new Error("Login/Senha Incorreto!")
         }
 
-        const passwordMatch = await compare(password, user?.password)
+        const passwordMatch = await bcrypt.compare(password, user?.password)
         if (!passwordMatch) {
             throw new Error("Login/Senha Incorreto!")
         }
@@ -162,7 +162,7 @@ class UserService {
         if (!jwtSecret) {
             throw new Error("JWT_SECRET não está definido nas variáveis de ambiente.");
         }
-        const token = sign(
+        const token = jwt.sign(
             {
                 name: user.name,
                 login: user.login,

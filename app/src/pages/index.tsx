@@ -21,11 +21,10 @@ export default function Home() {
 export const getServerSideProps = canSSRGuest(async(ctx) => {
     try {
         return {
-            props: {
-    
-            }
+            props: {}
         }
     } catch (error) {
         console.log(error);
+        return { props: {} };
     }
 })

@@ -1,4 +1,5 @@
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "../generated/prisma/client.js";
+import prismaClient from "../prisma";
 import { randomUUID } from "crypto";
 
 interface BudgetItem {
@@ -42,7 +43,7 @@ interface AddItemDTO {
 }
 
 class BudgetService {
-    private prisma = new PrismaClient();
+    private prisma = prismaClient;
 
     public async create({ department_id, title, items }: CreateBudgetDTO) {
         if (!title || items.length === 0) {

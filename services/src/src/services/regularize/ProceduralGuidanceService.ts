@@ -1,8 +1,8 @@
-import { PrismaClient, Prisma } from "@prisma/client"
+import { Prisma } from "../../generated/prisma/client.js";
+import prismaClient from "../../prisma"
 import { LogService } from "../LogService"
 import { randomUUID } from "crypto"
 
-const prismaClient = new PrismaClient();
 
 export interface EconomicActivityItem {
     id?: string;

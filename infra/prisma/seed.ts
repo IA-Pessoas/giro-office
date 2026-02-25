@@ -1,7 +1,12 @@
-import { PrismaClient } from '@prisma/client';
-import { hash } from 'bcryptjs';
+import "dotenv/config";
+import { PrismaClient } from "../src/generated/prisma/client.js";
+import { PrismaPg } from "@prisma/adapter-pg";
+import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL!,
+});
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...\n');
@@ -72,7 +77,7 @@ async function main() {
   ];
 
   const users: Record<string, any> = {};
-  const hashedPassword = await hash('senha123', 8);
+  const hashedPassword = await bcrypt.hash('senha123', 8);
 
   for (const user of usersData) {
     const created = await prisma.user.upsert({

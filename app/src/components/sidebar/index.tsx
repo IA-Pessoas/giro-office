@@ -6,6 +6,7 @@ import { IconType } from "react-icons";
 import { FiHome, FiUser, FiUsers, FiLogOut, FiSettings } from "react-icons/fi";
 import { FiMessageSquare } from "react-icons/fi";
 import { useChat } from "../../context/ChatContext";
+import { useAuth } from "../../context/AuthContext";
 import { MoonIcon, SunIcon } from "@chakra-ui/icons";
 import { setupAPIClient } from '../../services/api'; // Importar API
 
@@ -141,6 +142,7 @@ function NavItemAction({ label, icon, onClick, children = null }) {
 
 export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
   const router = useRouter();
+  const { logoutUser } = useAuth();
   const [perms, setPerms] = useState<any>(null);
 
   useEffect(() => {
@@ -314,9 +316,10 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
             onClick={toggleColorMode}
           />
           <Divider borderColor="borderColor" opacity={.5} my={4} />
-          <NavItem
-            item={{ label: "Sair", link: "/logout", icon: FiLogOut, requiredPermission: 0 }}
-            isActive={router.pathname === "/logout"}
+          <NavItemAction
+            label="Sair"
+            icon={FiLogOut}
+            onClick={logoutUser}
           />
         </Box>
       </VStack>

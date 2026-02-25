@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verify } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 
 interface PayLoad{
     sub: string;
@@ -25,7 +25,7 @@ export function isAuthenticated(
             throw new Error("JWT_SECRET is not defined in environment variables");
         }
         
-        const { sub } = verify(
+        const { sub } = jwt.verify(
             token, 
             jwtSecret
         ) as PayLoad;
