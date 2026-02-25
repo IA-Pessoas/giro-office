@@ -8,7 +8,7 @@
 .turbo/
 
 # PNPM
-.pnpm-store/
+.pnpm-store/        
 
 # Build outputs
 **/dist
@@ -21,3 +21,7 @@ Thumbs.db
 # IDE
 .vscode/
 !.vscode/extensions.json
+
+
+# docs
+docs/
