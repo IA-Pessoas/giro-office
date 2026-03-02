@@ -13,11 +13,13 @@ function normalizeClaims(payload: string | JwtPayload): AuthClaims {
   }
 
   const permission = typeof payload.permission === "number" ? payload.permission : undefined;
+  const organization_id = typeof payload.organization_id === "string" ? payload.organization_id : undefined;
 
   return {
     ...payload,
     sub: subject,
     permission,
+    organization_id,
     name: typeof payload.name === "string" ? payload.name : undefined,
     login: typeof payload.login === "string" ? payload.login : undefined
   };
@@ -48,9 +50,12 @@ export function authenticateFromAuthHeader(
   const token = extractBearerToken(authorizationHeader);
   const claims = verifyJwtToken(token, jwtSecret);
 
+  const organization_id = typeof claims.organization_id === "string" ? claims.organization_id : "";
+
   return {
     token,
     userId: claims.sub,
+    organization_id,
     claims
   };
 }
