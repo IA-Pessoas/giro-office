@@ -1,39 +1,36 @@
 import "dotenv/config";
+import { z } from "zod";
 
-export interface GatewayEnv {
-  port: number;
-  legacyApiUrl: string;
-  jwtSecret: string;
-  allowedOrigins: string[];
-}
+const gatewayEnvSchema = z.object({
+  port: z
+    .string()
+    .optional()
+    .default("3334")
+    .transform((val: string) => {
+      const parsed = Number.parseInt(val, 10);
+      return Number.isNaN(parsed) ? 3334 : parsed;
+    }),
+  legacyApiUrl: z.string().url().default("http://localhost:3333"),
+  jwtSecret: z.string().min(1, "JWT_SECRET não definido para o gateway."),
+  allowedOrigins: z
+    .string()
+    .optional()
+    .default("*")
+    .transform((val: string) =>
+      val
+        .split(",")
+        .map((origin: string) => origin.trim())
+        .filter(Boolean)
+    )
+});
 
-function parsePort(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isNaN(parsed) ? fallback : parsed;
-}
-
-function parseAllowedOrigins(value: string | undefined): string[] {
-  if (!value) {
-    return ["*"];
-  }
-
-  return value
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-}
+export type GatewayEnv = z.infer<typeof gatewayEnvSchema>;
 
 export function getGatewayEnv(): GatewayEnv {
-  const jwtSecret = process.env.JWT_SECRET;
-  if (!jwtSecret) {
-    throw new Error("JWT_SECRET não definido para o gateway.");
-  }
-
-  return {
-    port: parsePort(process.env.GATEWAY_PORT, 3334),
-    legacyApiUrl: process.env.LEGACY_API_URL ?? "http://localhost:3333",
-    jwtSecret,
-    allowedOrigins: parseAllowedOrigins(process.env.GATEWAY_ALLOWED_ORIGINS)
-  };
+  return gatewayEnvSchema.parse({
+    port: process.env.GATEWAY_PORT,
+    legacyApiUrl: process.env.LEGACY_API_URL,
+    jwtSecret: process.env.JWT_SECRET,
+    allowedOrigins: process.env.GATEWAY_ALLOWED_ORIGINS
+  });
 }
