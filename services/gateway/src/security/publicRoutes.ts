@@ -1,19 +1,17 @@
-interface PublicRoute {
-  method?: string;
-  pathRegex: RegExp;
+const publicPathsAnyMethod = new Set<string>(["/health", "/ready"]);
+
+const publicRoutesWithMethod = new Set<string>([
+  "POST /session",
+  "POST /start-config"
+]);
+
+function isSocketIoPath(path: string): boolean {
+  return path === "/socket.io" || path.startsWith("/socket.io/");
 }
 
-const publicRoutes: PublicRoute[] = [
-  { pathRegex: /^\/health$/ },
-  { pathRegex: /^\/ready$/ },
-  { method: "POST", pathRegex: /^\/session$/ },
-  { method: "POST", pathRegex: /^\/start-config$/ },
-  { pathRegex: /^\/socket\.io(?:\/.*)?$/ }
-];
-
 export function isPublicRoute(method: string, path: string): boolean {
-  return publicRoutes.some((route) => {
-    const methodMatches = !route.method || route.method === method.toUpperCase();
-    return methodMatches && route.pathRegex.test(path);
-  });
+  if (isSocketIoPath(path)) return true;
+  if (publicPathsAnyMethod.has(path)) return true;
+  const key = `${method.toUpperCase()} ${path}`;
+  return publicRoutesWithMethod.has(key);
 }
