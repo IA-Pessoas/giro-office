@@ -1,25 +1,28 @@
 import jwt, { JwtPayload } from "jsonwebtoken";
 
-import type { AuthClaims, AuthContext } from "./types.js";
+import type { AuthIdentity, AuthContext } from "./types.js";
 
-function normalizeClaims(payload: string | JwtPayload): AuthClaims {
+/**
+ * Extrai e normaliza os claims do payload JWT para AuthIdentity.
+ * Aceita user_id ou sub (padrão JWT) como identificador do usuário.
+ */
+function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
   if (typeof payload === "string") {
     throw new Error("Token JWT inválido: payload em formato inesperado.");
   }
 
-  const subject = payload.sub;
-  if (!subject || typeof subject !== "string") {
-    throw new Error("Token JWT inválido: claim 'sub' ausente.");
+  const user_id =
+    (typeof payload.user_id === "string" ? payload.user_id : undefined) ??
+    (typeof payload.sub === "string" ? payload.sub : undefined);
+
+  if (!user_id) {
+    throw new Error("Token JWT inválido: claim 'user_id' ou 'sub' ausente.");
   }
 
-  const permission = typeof payload.permission === "number" ? payload.permission : undefined;
-  const organization_id = typeof payload.organization_id === "string" ? payload.organization_id : undefined;
-
   return {
-    ...payload,
-    sub: subject,
-    permission,
-    organization_id,
+    user_id,
+    organization_id: typeof payload.organization_id === "string" ? payload.organization_id : undefined,
+    permission: typeof payload.permission === "number" ? payload.permission : undefined,
     name: typeof payload.name === "string" ? payload.name : undefined,
     login: typeof payload.login === "string" ? payload.login : undefined
   };
@@ -38,9 +41,9 @@ export function extractBearerToken(authorizationHeader: string | undefined): str
   return token;
 }
 
-export function verifyJwtToken(token: string, jwtSecret: string): AuthClaims {
+export function verifyJwtToken(token: string, jwtSecret: string): AuthIdentity {
   const decoded = jwt.verify(token, jwtSecret);
-  return normalizeClaims(decoded);
+  return normalizeAuthIdentity(decoded);
 }
 
 export function authenticateFromAuthHeader(
@@ -50,12 +53,12 @@ export function authenticateFromAuthHeader(
   const token = extractBearerToken(authorizationHeader);
   const claims = verifyJwtToken(token, jwtSecret);
 
-  const organization_id = typeof claims.organization_id === "string" ? claims.organization_id : "";
+  const organizationId = typeof claims.organization_id === "string" ? claims.organization_id : "";
 
   return {
     token,
-    userId: claims.sub,
-    organization_id,
+    userId: claims.user_id,
+    organizationId,
     claims
   };
 }

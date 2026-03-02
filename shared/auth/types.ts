@@ -1,7 +1,7 @@
-export interface AuthClaims {
-  sub: string;
-  permission?: number;
+export interface AuthIdentity {
+  user_id: string;
   organization_id?: string;
+  permission?: number;
   name?: string;
   login?: string;
   [key: string]: unknown;
@@ -10,8 +10,8 @@ export interface AuthClaims {
 export interface AuthContext {
   token: string;
   userId: string;
-  organization_id: string;
-  claims: AuthClaims;
+  organizationId: string;
+  claims: AuthIdentity;
 }
 
 export interface AuthPolicy {
