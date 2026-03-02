@@ -6,8 +6,7 @@ import { isPublicRoute } from "../security/publicRoutes.js";
 export function buildAuthenticateMiddleware(jwtSecret: string) {
   return function authenticate(request: Request, response: Response, next: NextFunction): void {
     if (isPublicRoute(request.method, request.path)) {
-      next();
-      return;
+      return next();
     }
 
     try {

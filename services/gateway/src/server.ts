@@ -1,5 +1,7 @@
 import { createServer } from "node:http";
 
+import { serverError, serverStart } from "@workspace/shared";
+
 import { createApp } from "./app.js";
 import { getGatewayEnv } from "./config/env.js";
 import { proxyWebSocketUpgrade } from "./proxy/wsProxy.js";
@@ -18,10 +20,9 @@ server.on("upgrade", (request, socket, head) => {
 });
 
 server.listen(env.port, () => {
-  console.log(`Gateway ativo na porta ${env.port}`);
-  console.log(`Upstream legado configurado em ${env.legacyApiUrl}`);
+  serverStart({ port: env.port, upstream: env.legacyApiUrl });
 });
 
-server.on("error", (error) => {
-  console.error("Erro no servidor gateway:", error);
+server.on("error", (err) => {
+  serverError("Erro no servidor gateway", err);
 });

@@ -1,10 +1,11 @@
 import cors from "cors";
 import express, { NextFunction, Request, Response } from "express";
 
+import { gatewayError } from "@workspace/shared";
+
 import type { GatewayEnv } from "./config/env.js";
 import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
-import { requestLogger } from "./middlewares/logger.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
 
@@ -37,7 +38,6 @@ export function createApp(env: GatewayEnv): express.Express {
   app.options("*", cors(createCorsOptions(env)));
 
   app.use(requestContext);
-  app.use(requestLogger);
   app.use(buildAuthenticateMiddleware(env.jwtSecret));
   app.use(authorizeRequest);
 
@@ -52,13 +52,10 @@ export function createApp(env: GatewayEnv): express.Express {
   app.use(buildHttpProxyMiddleware(env.legacyApiUrl));
 
   app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
-    console.error(
-      JSON.stringify({
-        type: "gateway_error",
-        requestId: request.requestId,
-        message: error.message
-      })
-    );
+    gatewayError({
+      requestId: request.requestId ?? "",
+      message: error.message
+    });
 
     response.status(500).json({ error: "Erro interno no gateway." });
   });
