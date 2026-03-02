@@ -17,8 +17,8 @@ function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
         return;
       }
 
-      if (env.allowedOrigins.includes(origin)) {
-        callback(null, true);
+      if (env.allowedOrigins.includes("*") || env.allowedOrigins.includes(origin)) {
+        callback(null, origin);
         return;
       }
 

@@ -15,11 +15,7 @@ function parsePort(value: string | undefined, fallback: number): number {
 
 function parseAllowedOrigins(value: string | undefined): string[] {
   if (!value) {
-    return [
-      "https://frontend-cw.vercel.app",
-      "http://localhost:3000",
-      "http://192.168.1.81:3000"
-    ];
+    return ["*"];
   }
 
   return value
