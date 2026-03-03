@@ -55,8 +55,7 @@ export function buildHttpProxyMiddleware(legacyApiUrl: string) {
       const upstreamResponse = await fetch(targetUrl, {
         method: request.method,
         headers: buildForwardHeaders(request),
-        body,
-        redirect: "manual"
+        body
       });
 
       response.status(upstreamResponse.status);
