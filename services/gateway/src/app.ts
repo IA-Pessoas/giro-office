@@ -47,7 +47,7 @@ export function createApp(env: GatewayEnv): express.Express {
   });
 
   app.get("/ready", (_request, response) => {
-    response.status(200).json({ status: "ready", upstream: env.legacyApiUrl });
+    response.status(200).json({ status: "ready", url: env.legacyApiUrl });
   });
 
   app.use(buildHttpProxyMiddleware(env.legacyApiUrl));
