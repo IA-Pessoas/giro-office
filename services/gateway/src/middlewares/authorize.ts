@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+
 import { canAccessRoute } from "@workspace/shared";
 
 import { getRoutePolicy } from "../security/policies.js";

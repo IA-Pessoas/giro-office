@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+
 import { authenticateFromAuthHeader } from "@workspace/shared";
 
 import { isPublicRoute } from "../security/publicRoutes.js";

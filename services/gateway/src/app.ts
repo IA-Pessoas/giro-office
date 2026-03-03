@@ -1,7 +1,7 @@
 import cors from "cors";
 import express, { NextFunction, Request, Response } from "express";
 
-import { gatewayError } from "@workspace/shared";
+import { gatewayError } from "@workspace/shared/logger";
 
 import type { GatewayEnv } from "./config/env.js";
 import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";

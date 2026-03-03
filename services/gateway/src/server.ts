@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 
-import { serverError, serverStart } from "@workspace/shared";
+import { serverError, serverStart } from "@workspace/shared/logger";
 
 import { createApp } from "./app.js";
 import { getGatewayEnv } from "./config/env.js";
