@@ -27,12 +27,14 @@ export function proxyWebSocketUpgrade(
   upstreamUrl: string
 ): void {
   const target = new URL(upstreamUrl);
-  const transport = target.protocol === "https:" ? https : http;
+  const isSecure = target.protocol === "wss:" || target.protocol === "https:";
+  const transport = isSecure ? https : http;
+  const defaultPort = isSecure ? 443 : 80;
 
   const upstreamRequest = transport.request({
     protocol: target.protocol,
     hostname: target.hostname,
-    port: target.port ? Number.parseInt(target.port, 10) : target.protocol === "https:" ? 443 : 80,
+    port: target.port ? Number.parseInt(target.port, 10) : defaultPort,
     method: request.method,
     path: request.url,
     headers: request.headers
