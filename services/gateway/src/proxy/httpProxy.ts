@@ -1,4 +1,3 @@
-import { Readable } from "node:stream";
 import type { NextFunction, Request, Response } from "express";
 
 function hasRequestBody(method: string): boolean {
@@ -6,17 +5,11 @@ function hasRequestBody(method: string): boolean {
   return upperMethod !== "GET" && upperMethod !== "HEAD";
 }
 
-async function readRawBody(request: Request): Promise<Buffer | undefined> {
-  if (!hasRequestBody(request.method)) {
+function getRequestBody(request: Request): string | undefined {
+  if (!hasRequestBody(request.method) || request.body === undefined) {
     return undefined;
   }
-
-  const chunks: Buffer[] = [];
-  for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  return chunks.length > 0 ? Buffer.concat(chunks) : undefined;
+  return JSON.stringify(request.body);
 }
 
 function buildForwardHeaders(request: Request): Headers {
@@ -57,12 +50,12 @@ export function buildHttpProxyMiddleware(legacyApiUrl: string) {
   return async function httpProxy(request: Request, response: Response, next: NextFunction): Promise<void> {
     try {
       const targetUrl = new URL(request.originalUrl, legacyApiUrl).toString();
-      const rawBody = await readRawBody(request);
+      const body = getRequestBody(request);
 
       const upstreamResponse = await fetch(targetUrl, {
         method: request.method,
         headers: buildForwardHeaders(request),
-        body: rawBody,
+        body,
         redirect: "manual"
       });
 
@@ -73,12 +66,13 @@ export function buildHttpProxyMiddleware(legacyApiUrl: string) {
         response.setHeader(key, value);
       });
 
-      if (!upstreamResponse.body) {
+      if (!upstreamResponse.body || [204, 205].includes(upstreamResponse.status)) {
         response.end();
         return;
       }
 
-      Readable.fromWeb(upstreamResponse.body as never).pipe(response);
+      const data = await upstreamResponse.json();
+      response.json(data);
     } catch (error) {
       next(error);
     }

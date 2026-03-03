@@ -36,6 +36,7 @@ export function createApp(env: GatewayEnv): express.Express {
   app.set("trust proxy", true);
   app.use(cors(createCorsOptions(env)));
   app.options("*", cors(createCorsOptions(env)));
+  app.use(express.json());
 
   app.use(requestContext);
   app.use(buildAuthenticateMiddleware(env.jwtSecret));
