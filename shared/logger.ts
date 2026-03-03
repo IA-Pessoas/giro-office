@@ -24,9 +24,9 @@ function formatEntry(level: LogLevel, payload: Record<string, unknown>): string 
 function write(level: LogLevel, payload: Record<string, unknown>): void {
   const line = formatEntry(level, payload);
   if (level === "error") {
-    process.stderr.write(line + "\n");
+    console.error(line);
   } else {
-    process.stdout.write(line + "\n");
+    console.log(line);
   }
 }
 
