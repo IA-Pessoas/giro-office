@@ -8,6 +8,8 @@
     "lint": "turbo run lint",
     "dev:app": "turbo run dev --filter=@workspace/app",
     "dev:api": "turbo run dev --filter=@workspace/api",
+    "dev:gateway": "turbo run dev --filter=@workspace/gateway",
+    "build:gateway": "turbo run build --filter=@workspace/gateway",
     "prisma:generate": "turbo run prisma:generate --filter=@workspace/api",
     "prisma:migrate": "turbo run prisma:migrate --filter=@workspace/api"
   },
