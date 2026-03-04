@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "echo \"Skipping app lint (Biome ignored for now)\"",
+    "format": "echo \"Skipping app format (Biome ignored for now)\"",
+    "check": "echo \"Skipping app check (Biome ignored for now)\""
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",

@@ -1,7 +1,6 @@
-import cors from "cors";
-import express, { NextFunction, Request, Response } from "express";
-
 import { gatewayError } from "@workspace/shared/logger";
+import cors from "cors";
+import express, { type NextFunction, type Request, type Response } from "express";
 
 import type { GatewayEnv } from "./config/env.js";
 import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
@@ -26,7 +25,7 @@ function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
     },
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     allowedHeaders: ["Content-Type", "Authorization", "x-request-id"],
-    credentials: true
+    credentials: true,
   };
 }
 
@@ -55,7 +54,7 @@ export function createApp(env: GatewayEnv): express.Express {
   app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
     gatewayError({
       requestId: request.requestId ?? "",
-      message: error.message
+      message: error.message,
     });
 
     response.status(500).json({ error: "Erro interno no gateway." });

@@ -5,15 +5,24 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "lint": "turbo run lint",
+    "lint": "biome lint .",
     "dev:app": "turbo run dev --filter=@workspace/app",
     "dev:api": "turbo run dev --filter=@workspace/api",
     "dev:gateway": "turbo run dev --filter=@workspace/gateway",
     "build:gateway": "turbo run build --filter=@workspace/gateway",
     "prisma:generate": "turbo run prisma:generate --filter=@workspace/api",
-    "prisma:migrate": "turbo run prisma:migrate --filter=@workspace/api"
+    "prisma:migrate": "turbo run prisma:migrate --filter=@workspace/api",
+    "prepare": "husky",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "fix:unsafe": "biome check --write --unsafe ."
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.5",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.2",
     "turbo": "^2.3.0",
     "typescript": "^5.3.3"
   },
@@ -26,5 +35,11 @@
       "prisma": "7.4.1",
       "@prisma/client": "7.4.1"
     }
+  },
+  "lint-staged": {
+    "{shared,services/gateway}/**/*.{ts,tsx,js,json}": [
+      "biome format --write",
+      "biome lint"
+    ]
   }
 }

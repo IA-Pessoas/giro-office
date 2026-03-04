@@ -1,6 +1,6 @@
+import type { IncomingHttpHeaders, IncomingMessage } from "node:http";
 import * as http from "node:http";
 import * as https from "node:https";
-import type { IncomingHttpHeaders, IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 
 function serializeHeaders(headers: IncomingHttpHeaders): string {
@@ -10,7 +10,9 @@ function serializeHeaders(headers: IncomingHttpHeaders): string {
     if (typeof value === "undefined") return;
 
     if (Array.isArray(value)) {
-      value.forEach((item) => lines.push(`${name}: ${item}`));
+      value.forEach((item) => {
+        lines.push(`${name}: ${item}`);
+      });
       return;
     }
 
@@ -24,7 +26,7 @@ export function proxyWebSocketUpgrade(
   request: IncomingMessage,
   socket: Duplex,
   head: Buffer,
-  upstreamUrl: string
+  upstreamUrl: string,
 ): void {
   const target = new URL(upstreamUrl);
   const isSecure = target.protocol === "wss:" || target.protocol === "https:";
@@ -37,7 +39,7 @@ export function proxyWebSocketUpgrade(
     port: target.port ? Number.parseInt(target.port, 10) : defaultPort,
     method: request.method,
     path: request.url,
-    headers: request.headers
+    headers: request.headers,
   });
 
   upstreamRequest.on("upgrade", (upstreamResponse, upstreamSocket, upstreamHead) => {

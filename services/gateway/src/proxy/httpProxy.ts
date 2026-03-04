@@ -47,7 +47,11 @@ function buildForwardHeaders(request: Request): Headers {
 }
 
 export function buildHttpProxyMiddleware(legacyApiUrl: string) {
-  return async function httpProxy(request: Request, response: Response, next: NextFunction): Promise<void> {
+  return async function httpProxy(
+    request: Request,
+    response: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const targetUrl = new URL(request.originalUrl, legacyApiUrl).toString();
       const body = getRequestBody(request);
@@ -55,7 +59,7 @@ export function buildHttpProxyMiddleware(legacyApiUrl: string) {
       const upstreamResponse = await fetch(targetUrl, {
         method: request.method,
         headers: buildForwardHeaders(request),
-        body
+        body,
       });
 
       response.status(upstreamResponse.status);
