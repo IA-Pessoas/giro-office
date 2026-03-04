@@ -10,13 +10,22 @@
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^lint"],
+      "outputs": []
     },
     "prisma:generate": {
       "cache": false
     },
     "prisma:migrate": {
       "cache": false
+    },
+    "format": {
+      "dependsOn": ["^format"],
+      "outputs": []
+    },
+    "check": {
+      "dependsOn": ["^check"],
+      "outputs": []
     }
   }
 }

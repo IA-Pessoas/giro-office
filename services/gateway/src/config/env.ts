@@ -21,8 +21,8 @@ const gatewayEnvSchema = z.object({
       val
         .split(",")
         .map((origin: string) => origin.trim())
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
 });
 
 export type GatewayEnv = z.infer<typeof gatewayEnvSchema>;
@@ -32,6 +32,6 @@ export function getGatewayEnv(): GatewayEnv {
     port: process.env.GATEWAY_PORT,
     legacyApiUrl: process.env.LEGACY_API_URL,
     jwtSecret: process.env.JWT_SECRET,
-    allowedOrigins: process.env.GATEWAY_ALLOWED_ORIGINS
+    allowedOrigins: process.env.GATEWAY_ALLOWED_ORIGINS,
   });
 }

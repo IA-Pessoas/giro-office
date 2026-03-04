@@ -1,6 +1,6 @@
-import jwt, { JwtPayload } from "jsonwebtoken";
+import jwt, { type JwtPayload } from "jsonwebtoken";
 
-import type { AuthIdentity, AuthContext } from "./types.js";
+import type { AuthContext, AuthIdentity } from "./types.js";
 
 /**
  * Extrai e normaliza os claims do payload JWT para AuthIdentity.
@@ -21,10 +21,11 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
 
   return {
     user_id,
-    organization_id: typeof payload.organization_id === "string" ? payload.organization_id : undefined,
+    organization_id:
+      typeof payload.organization_id === "string" ? payload.organization_id : undefined,
     permission: typeof payload.permission === "number" ? payload.permission : undefined,
     name: typeof payload.name === "string" ? payload.name : undefined,
-    login: typeof payload.login === "string" ? payload.login : undefined
+    login: typeof payload.login === "string" ? payload.login : undefined,
   };
 }
 
@@ -48,7 +49,7 @@ export function verifyJwtToken(token: string, jwtSecret: string): AuthIdentity {
 
 export function authenticateFromAuthHeader(
   authorizationHeader: string | undefined,
-  jwtSecret: string
+  jwtSecret: string,
 ): AuthContext {
   const token = extractBearerToken(authorizationHeader);
   const claims = verifyJwtToken(token, jwtSecret);
@@ -59,6 +60,6 @@ export function authenticateFromAuthHeader(
     token,
     userId: claims.user_id,
     organizationId,
-    claims
+    claims,
   };
 }

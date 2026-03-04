@@ -16,7 +16,7 @@ function formatEntry(level: LogLevel, payload: Record<string, unknown>): string 
   const entry: LogEntry = {
     timestamp: new Date().toISOString(),
     level,
-    ...payload
+    ...payload,
   };
   return JSON.stringify(entry);
 }
@@ -77,7 +77,7 @@ export function httpRequest(payload: {
 }): void {
   write("info", {
     type: "http_request",
-    ...payload
+    ...payload,
   });
 }
 
@@ -87,7 +87,7 @@ export function httpRequest(payload: {
 export function gatewayError(payload: { requestId: string; message: string }): void {
   write("error", {
     type: "gateway_error",
-    ...payload
+    ...payload,
   });
 }
 
@@ -98,7 +98,7 @@ export function serverStart(payload: { port: number; upstream?: string }): void 
   write("info", {
     type: "server_start",
     message: `Gateway ativo na porta ${payload.port}`,
-    ...payload
+    ...payload,
   });
 }
 
