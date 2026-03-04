@@ -9,14 +9,26 @@ datasource db {
 }
 
 // ------------ Organization (Multi-Tenancy Root) ------------
+enum status {
+  trial
+  past_due
+  active
+  suspended
+  cancelled
+}
 model Organization {
   id         String   @id @default(uuid())
   name       String
   slug       String   @unique
-  logo       String?
-  status     String   @default("active")
+  logo_url       String?
+  status     status   @default(active)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+  email_created_by String 
+  cnpj String
+  subscription_plan String @default("trial")
+
+
 
   departments                   Department[]
   users                         User[]
@@ -24,7 +36,6 @@ model Organization {
   permissionsSpecifics          PermissionSpecific[]
   permissionsProjects           PermissionProject[]
   logs                          Logs[]
-  logsPessoal                   LogsPessoal[]
   certificateNotifications      CertificateNotification[]
   pessoalNotifications          PessoalNotification[]
   regularizeNotifications       RegularizeNotification[]
@@ -112,8 +123,40 @@ model Organization {
   triageMonthlys                TriageMonthly[]
   clientClouds                  ClientClouds[]
   triageResponsibles            TriageResponsible[]
-
+  organizationUsers             OrganizationUser[]
+  organizationInvites           OrganizationInvite[]
   @@map("organizations")
+}
+
+
+
+enum enumType {
+  admin
+  owner
+  normal
+}
+model OrganizationUser {
+  id String @id @default(uuid())
+  organization_id String
+  user_id String
+  type enumType @default(normal)
+  organization Organization @relation(fields: [organization_id], references: [id])
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("organization_users")
+}
+
+model OrganizationInvite {
+  id String @id @default(uuid())
+  organization_id String
+  email_user String
+  token String
+  expires_at DateTime
+  accepted_at DateTime?
+  role enumType @default(normal)
+  organization Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("organization_invites")
 }
 
 // ------------ Organization (Multi-Tenancy Root) ------------ //
@@ -151,13 +194,15 @@ model User {
   department_id   String
   permission      Int
   status          String
-  photo           String?
+  photo_url          String?
+  invited_by         String?
+  joined_at          DateTime? @default(now())
 
   organization         Organization         @relation(fields: [organization_id], references: [id])
+  organizationUsers    OrganizationUser[]
   permissions          Permission[]
   permissionsSpecifics PermissionSpecific[]
   logs                 Logs[]
-  logsPessoal          LogsPessoal[]
 
   department            Department             @relation(fields: [department_id], references: [id])
   sponso                Project[]              @relation("sponsor")
@@ -297,21 +342,6 @@ model Logs {
   @@map("logs")
 }
 
-model LogsPessoal {
-  id              String   @id @default(uuid())
-  organization_id String
-  user_id         String
-  action          String
-  referring       String
-  referring_id    String
-  changes         Json
-  date            DateTime @default(now())
-
-  organization Organization @relation(fields: [organization_id], references: [id])
-  user         User         @relation(fields: [user_id], references: [id])
-
-  @@map("logs.pessoal")
-}
 
 // ------------ Logs ------------ //
 
