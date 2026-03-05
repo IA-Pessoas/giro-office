@@ -5,4 +5,3 @@ coverage
 .turbo
 services/src
 app/
-infra/
