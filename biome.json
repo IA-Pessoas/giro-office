@@ -15,7 +15,8 @@
       "!**/coverage",
       "!**/.turbo",
       "!services/src",
-      "!app"
+      "!app",
+      "!infra"
     ]
   },
   "formatter": {
