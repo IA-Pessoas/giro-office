@@ -12,6 +12,8 @@ const gatewayEnvSchema = z.object({
       return Number.isNaN(parsed) ? 3334 : parsed;
     }),
   legacyApiUrl: z.string().url().default("http://localhost:3333"),
+  userServiceUrl: z.string().url().default("http://localhost:3335"),
+
   jwtSecret: z.string().min(1, "JWT_SECRET não definido para o gateway."),
   allowedOrigins: z
     .string()
@@ -31,6 +33,7 @@ export function getGatewayEnv(): GatewayEnv {
   return gatewayEnvSchema.parse({
     port: process.env.GATEWAY_PORT,
     legacyApiUrl: process.env.LEGACY_API_URL,
+    userServiceUrl: process.env.USER_SERVICE_URL,
     jwtSecret: process.env.JWT_SECRET,
     allowedOrigins: process.env.GATEWAY_ALLOWED_ORIGINS,
   });

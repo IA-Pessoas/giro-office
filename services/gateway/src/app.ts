@@ -6,7 +6,7 @@ import type { GatewayEnv } from "./config/env.js";
 import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
 import { requestContext } from "./middlewares/requestContext.js";
-import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
+import { buildHttpProxyMiddleware, type UpstreamResolver } from "./proxy/httpProxy.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
   return {
@@ -49,8 +49,15 @@ export function createApp(env: GatewayEnv): express.Express {
     response.status(200).json({ status: "ready", url: env.legacyApiUrl });
   });
 
-  app.use(buildHttpProxyMiddleware(env.legacyApiUrl));
+  const userServiceRoutes = new Set(["POST /session", "POST /start-config"]);
 
+  const resolveUpstream: UpstreamResolver = (method, path) => {
+    const key = `${method.toUpperCase()} ${path}`;
+    if (userServiceRoutes.has(key)) return env.userServiceUrl;
+    return env.legacyApiUrl;
+  };
+
+  app.use(buildHttpProxyMiddleware(resolveUpstream));
   app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
     gatewayError({
       requestId: request.requestId ?? "",

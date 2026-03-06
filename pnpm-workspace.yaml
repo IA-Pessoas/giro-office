@@ -4,3 +4,4 @@ packages:
   - "services/src"
   - "services/gateway"
   - "shared"
+  - "services/user-service"

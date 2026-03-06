@@ -46,14 +46,17 @@ function buildForwardHeaders(request: Request): Headers {
   return headers;
 }
 
-export function buildHttpProxyMiddleware(legacyApiUrl: string) {
+export type UpstreamResolver = (method: string, path: string) => string;
+
+export function buildHttpProxyMiddleware(resolveUpstream: UpstreamResolver) {
   return async function httpProxy(
     request: Request,
     response: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const targetUrl = new URL(request.originalUrl, legacyApiUrl).toString();
+      const upstream = resolveUpstream(request.method, request.path);
+      const targetUrl = new URL(request.originalUrl, upstream).toString();
       const body = getRequestBody(request);
 
       const upstreamResponse = await fetch(targetUrl, {
