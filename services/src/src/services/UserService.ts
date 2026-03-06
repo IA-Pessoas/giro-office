@@ -54,23 +54,28 @@ interface PermissionSpecificRequest {
 
 class UserService {
     private async findUser(field: string, value: string) {
-        if (field === 'login') {
-            const user = await prismaClient.user.findFirst({
-                where:{
-                    login: value
-                }
-            })
-            return user
+        try {
+            if (field === 'login') {
+                const user = await prismaClient.user.findFirst({
+                    where:{
+                        login: value
+                    }
+                })
+                return user
 
-        } else if (field === 'id') {
-            const user = await prismaClient.user.findFirst({
-                where:{
-                    id: value
-                }
-            })
-            return user
+            } else if (field === 'id') {
+                const user = await prismaClient.user.findFirst({
+                    where:{
+                        id: value
+                    }
+                })
+                return user
+            }
+        } catch (error) {
+            console.error('Erro ao buscar usuário no banco de dados:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+            throw new Error(`Erro de conexão com o banco de dados: ${errorMessage}`);
         }
-
     }
     private async findPermission(value: string) {
         const permission = await prismaClient.permission.findFirst({
@@ -147,62 +152,79 @@ class UserService {
         return { user }
     }
     async login({ login, password }: LoginRequest) {
-        
-        const user = await this.findUser('login', login);
-        if (!user) {
-            throw new Error("Login/Senha Incorreto!")
-        }
-
-        const passwordMatch = await bcrypt.compare(password, user?.password)
-        if (!passwordMatch) {
-            throw new Error("Login/Senha Incorreto!")
-        }
-
-        const jwtSecret = process.env.JWT_SECRET;
-        if (!jwtSecret) {
-            throw new Error("JWT_SECRET não está definido nas variáveis de ambiente.");
-        }
-        const token = jwt.sign(
-            {
-                name: user.name,
-                login: user.login,
-                permission: user.permission
-            },
-            jwtSecret,
-            {
-                subject: user.id,
-                expiresIn: '365d'
+        try {
+            const user = await this.findUser('login', login);
+            if (!user) {
+                throw new Error("Login/Senha Incorreto!")
             }
-        )
 
-        return { 
-            id: user?.id,
-            name: user?.name,
-            login: user?.login,
-            permission: user?.permission,
-            department_id: user?.department_id,
-            token: token,   
+            const passwordMatch = await bcrypt.compare(password, user?.password)
+            if (!passwordMatch) {
+                throw new Error("Login/Senha Incorreto!")
+            }
+
+            const jwtSecret = process.env.JWT_SECRET;
+            if (!jwtSecret) {
+                throw new Error("JWT_SECRET não está definido nas variáveis de ambiente.");
+            }
+            const token = jwt.sign(
+                {
+                    name: user.name,
+                    login: user.login,
+                    permission: user.permission
+                },
+                jwtSecret,
+                {
+                    subject: user.id,
+                    expiresIn: '365d'
+                }
+            )
+
+            return { 
+                id: user?.id,
+                name: user?.name,
+                login: user?.login,
+                permission: user?.permission,
+                department_id: user?.department_id,
+                token: token,   
+            }
+        } catch (error) {
+            console.error('Erro no login:', error);
+            // Re-lança o erro para ser capturado pelo controller
+            throw error;
         }
     }
+    
     async detail(user_id: string) {
+        if (!user_id) {
+            throw new Error('user_id é obrigatório');
+        }
 
-        const user = await prismaClient.user.findFirst({
-            where:{
-                id: user_id
-            },
-            select:{
-                id: true,
-                name: true,
-                login: true,
-                password: true,
-                permission: true,
-                department_id: true,
-                status: true,
-                photo: true,
+        try {
+            const user = await prismaClient.user.findFirst({
+                where:{
+                    id: user_id
+                },
+                select:{
+                    id: true,
+                    name: true,
+                    login: true,
+                    password: true,
+                    permission: true,
+                    department_id: true,
+                    status: true,
+                    photo_url: true,
+                }
+            })
+
+            if (!user) {
+                throw new Error('Usuário não encontrado');
             }
-        })
 
-        return { user }
+            return { user }
+        } catch (error) {
+            throw error;
+        }
     }
     async update({ my_id, user_id, name, password, permission, status, department_id, photo }: UpdateRequest) {
         try{

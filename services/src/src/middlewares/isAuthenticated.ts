@@ -25,16 +25,16 @@ export function isAuthenticated(
             throw new Error("JWT_SECRET is not defined in environment variables");
         }
         
-        const { sub } = jwt.verify(
-            token, 
-            jwtSecret
-        ) as PayLoad;
+        const decoded = jwt.verify(token, jwtSecret) as PayLoad;
+        
+        if (!decoded || !decoded.sub) {
+            return response.status(401).json({ error: 'Token inválido' });
+        }
 
-        request.user_id = sub;
-
+        request.user_id = decoded.sub;
         return next();
         
     } catch (error) {
-        return response.status(401).end();
+        return response.status(401).json({ error: 'Token inválido ou expirado' });
     }
 }
