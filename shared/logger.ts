@@ -114,3 +114,28 @@ export function serverError(message: string, err?: unknown): void {
   }
   write("error", { message, ...context });
 }
+
+/**
+ * Log estruturado de startup de microservice.
+ */
+export function serviceStart(payload: { service: string; port: number }): void {
+  write("info", {
+    type: "service_start",
+    message: `${payload.service} ativo na porta ${payload.port}`,
+    ...payload,
+  });
+}
+
+/**
+ * Log estruturado de erro em microservice.
+ */
+export function serviceError(payload: {
+  service: string;
+  requestId?: string;
+  message: string;
+}): void {
+  write("error", {
+    type: "service_error",
+    ...payload,
+  });
+}

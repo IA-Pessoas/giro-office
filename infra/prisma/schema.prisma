@@ -4,6 +4,12 @@ generator client {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator organizationClient {
+  provider        = "prisma-client"
+  output          = "../../services/organization-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
   

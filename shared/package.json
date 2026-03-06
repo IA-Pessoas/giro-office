@@ -13,6 +13,10 @@
     "./logger": {
       "types": "./dist/logger.d.ts",
       "default": "./dist/logger.js"
+    },
+    "./routes/services": {
+      "types": "./dist/routes/services.d.ts",
+      "default": "./dist/routes/services.js"
     }
   },
   "scripts": {
