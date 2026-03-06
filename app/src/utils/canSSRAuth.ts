@@ -20,16 +20,18 @@ export function canSSRAuth<P>(fn: GetServerSideProps<P>) {
     try{
       return await fn(ctx);
     }catch(err){
-      if(err instanceof AuthTokenError){
-        destroyCookie(ctx, '@cw.token', { path: '/' });
-
+      // Sempre destrói o cookie em caso de erro para evitar loops
+      destroyCookie(ctx, '@cw.token', { path: '/' });
+      
+      if(err instanceof AuthTokenError || (err instanceof Error && (err.message === 'Unauthorized' || err.message.includes('401')))){
         return{
           redirect:{
-            destination: '/',
+            destination: '/login',
             permanent: false
           }
         }
       }
+      
       // Qualquer outro erro: redireciona para login
       return {
         redirect: {

@@ -16,9 +16,18 @@ import Navbar from "../components/sidebar";
 
 function AppLayout({ children }) {
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
-  if (!user) return <>{children}</>; // Se não há usuário, não mostra layout
+  // Se está na página de login ou index, não mostra layout
+  if (router.pathname === '/login' || router.pathname === '/') {
+    return <>{children}</>;
+  }
+
+  // Se está carregando ou não há usuário, mostra apenas children
+  if (loading || !user) {
+    return <>{children}</>;
+  }
 
   return (
     <Flex>
