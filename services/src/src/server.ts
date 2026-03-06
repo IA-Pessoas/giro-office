@@ -1,4 +1,13 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Carregar .env da raiz do workspace
+// Primeiro tenta carregar da raiz (assumindo que o processo é iniciado da raiz)
+const rootEnvPath = path.resolve(process.cwd(), '.env');
+dotenv.config({ path: rootEnvPath });
+
+// Fallback: tenta carregar do diretório atual (caso o .env esteja em services/src)
+dotenv.config();
 // Importações do Express e da sua aplicação
 import express, { Request, Response, NextFunction } from "express";
 import 'express-async-errors';
@@ -107,7 +116,7 @@ io.on('connection', (socket: SocketWithAuth) => {
         return;
     }
 
-    console.log(`✅ Usuário ONLINE: ${user_id}`);
+    console.log(`Usuário ONLINE: ${user_id}`);
     onlineUsers.set(user_id, socket.id); // Adiciona ao mapa de usuários online
 
 
@@ -250,7 +259,7 @@ io.on('connection', (socket: SocketWithAuth) => {
     });
 
     socket.on('disconnect', () => {
-        console.log(`❌ Usuário OFFLINE: ${user_id}`);
+        console.log(`Usuário OFFLINE: ${user_id}`);
         onlineUsers.delete(user_id);
         socket.broadcast.emit('user_offline', { user_id });
     });
@@ -270,8 +279,8 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 // --- INICIALIZAÇÃO DO SERVIDOR ---
 const PORT = 3333;
 server.listen(PORT, () => {
-  console.log('🚀 Server is running on port', PORT);
+  console.log('Server is running on port', PORT);
 });
 server.on('error', (err) => {
-  console.error('❌ Server error:', err);
+  console.error('Server error:', err);
 });

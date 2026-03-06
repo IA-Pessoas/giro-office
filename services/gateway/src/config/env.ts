@@ -1,6 +1,20 @@
-import "dotenv/config";
-
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { z } from "zod";
+
+// Carregar .env da raiz do workspace
+// services/gateway/src/config/env.ts -> workspace/.env (4 níveis acima)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootEnvPath = path.resolve(__dirname, '../../../../.env');
+
+// Tenta carregar da raiz do workspace
+dotenv.config({ path: rootEnvPath });
+// Fallback: tenta do diretório atual
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+// Fallback final: tenta do diretório atual sem especificar caminho
+dotenv.config();
 
 const gatewayEnvSchema = z.object({
   port: z
