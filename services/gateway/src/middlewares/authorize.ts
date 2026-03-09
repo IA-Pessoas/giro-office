@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from "express";
 import { getRoutePolicy } from "../security/policies.js";
 import { isPublicRoute } from "../security/publicRoutes.js";
 
-export function authorizeRequest(request: Request, response: Response, next: NextFunction): void {
+export function authorizeRequest(request: Request, _response: Response, next: NextFunction): void {
   if (isPublicRoute(request.method, request.path)) {
     next();
     return;

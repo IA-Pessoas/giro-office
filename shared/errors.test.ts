@@ -12,6 +12,7 @@ test("serializeError preserves service errors", () => {
   assert.deepEqual(result, {
     statusCode: 401,
     body: {
+      success: false,
       error: "Não autenticado.",
       code: "UNAUTHORIZED",
       requestId: "req-1",
@@ -50,6 +51,7 @@ test("serializeError normalizes unknown errors", () => {
   assert.deepEqual(result, {
     statusCode: 500,
     body: {
+      success: false,
       error: "Erro interno no gateway.",
       code: "INTERNAL_ERROR",
       requestId: "req-2",
