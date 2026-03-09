@@ -13,9 +13,9 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:generate": "pnpm --filter @workspace/infra run prisma:generate",
+    "prisma:migrate": "pnpm --filter @workspace/infra run prisma:migrate",
+    "prisma:seed": "pnpm --filter @workspace/infra run prisma:seed"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",

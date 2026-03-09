@@ -166,7 +166,8 @@ class UserService {
             {
                 name: user.name,
                 login: user.login,
-                permission: user.permission
+                permission: user.permission,
+                organization_id: user.organization_id,
             },
             jwtSecret,
             {

@@ -1,4 +1,5 @@
 import { gatewayError } from "@workspace/shared/logger";
+import { getServiceUrls } from "@workspace/shared/routes/services";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
@@ -49,6 +50,7 @@ export function createApp(env: GatewayEnv): express.Express {
     response.status(200).json({ status: "ready", url: env.legacyApiUrl });
   });
 
+  app.use("/organizations", buildHttpProxyMiddleware(getServiceUrls().organizationServiceUrl));
   app.use(buildHttpProxyMiddleware(env.legacyApiUrl));
 
   app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
