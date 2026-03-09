@@ -1,7 +1,14 @@
-import "dotenv/config";
-
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import type { LoggerLevel } from "@workspace/shared";
 import { z } from "zod";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootEnvPath = path.resolve(__dirname, "../../../../.env");
+
+dotenv.config({ path: rootEnvPath });
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";

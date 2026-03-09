@@ -1,9 +1,15 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import prismaClient from "../prisma"
 import { LogService } from "./LogService"
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootEnvPath = path.resolve(__dirname, '../../../../.env');
+
+dotenv.config({ path: rootEnvPath });
 
 // Configuração do "Transporte" do Nodemailer
 // Usamos o objeto createTransport que irá de fato enviar o email
