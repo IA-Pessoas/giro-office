@@ -52,8 +52,9 @@ export function buildHttpProxyMiddleware(legacyApiUrl: string) {
     response: Response,
     next: NextFunction,
   ): Promise<void> {
+    const targetUrl = new URL(request.originalUrl, legacyApiUrl);
+
     try {
-      const targetUrl = new URL(request.originalUrl, legacyApiUrl).toString();
       const body = getRequestBody(request);
 
       const upstreamResponse = await fetch(targetUrl, {
