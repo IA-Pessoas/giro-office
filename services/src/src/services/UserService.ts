@@ -1,11 +1,11 @@
-// import { File as MulterFile } from 'multer';
 type MulterFile = Express.Multer.File;
 import bcrypt from "bcryptjs"
 import jwt from 'jsonwebtoken'
 
 import prismaClient from "../prisma"
-import { bucket } from '../config/firebase'; // Importa a configuração do Firebase
+import { bucket } from '../config/firebase';
 import { LogService } from './LogService';
+import { error as logError } from "@workspace/shared";
 interface CreateRequest {
     my_id: string
     name: string
@@ -72,7 +72,7 @@ class UserService {
                 return user
             }
         } catch (error) {
-            console.error('Erro ao buscar usuário no banco de dados:', error);
+            logError('Erro ao buscar usuário no banco de dados', { field, value, error });
             const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
             throw new Error(`Erro de conexão com o banco de dados: ${errorMessage}`);
         }
@@ -158,7 +158,7 @@ class UserService {
                 throw new Error("Login/Senha Incorreto!")
             }
 
-            const passwordMatch = await bcrypt.compare(password, user?.password)
+            const passwordMatch = await bcrypt.compare(password, user.password)
             if (!passwordMatch) {
                 throw new Error("Login/Senha Incorreto!")
             }
@@ -171,7 +171,8 @@ class UserService {
                 {
                     name: user.name,
                     login: user.login,
-                    permission: user.permission
+                    permission: user.permission,
+                    organization_id: user.organization_id
                 },
                 jwtSecret,
                 {
@@ -181,16 +182,15 @@ class UserService {
             )
 
             return { 
-                id: user?.id,
-                name: user?.name,
-                login: user?.login,
-                permission: user?.permission,
-                department_id: user?.department_id,
+                id: user.id,
+                name: user.name,
+                login: user.login,
+                permission: user.permission,
+                department_id: user.department_id,
                 token: token,   
             }
         } catch (error) {
-            console.error('Erro no login:', error);
-            // Re-lança o erro para ser capturado pelo controller
+            logError('Erro no login', { login, error });
             throw error;
         }
     }
@@ -257,7 +257,7 @@ class UserService {
                 }
             })
 
-            const oldData = await userExists
+            const oldData = userExists
             const updatedData = userUpdated
             const ls = new LogService()
             const changes: Record<string, any> = {}
@@ -273,7 +273,6 @@ class UserService {
                 }
             }
 
-            // Se tiver alguma alteração
             if (Object.keys(changes).length > 0) {
                 await ls.createLog({
                     my_id,
@@ -309,7 +308,6 @@ class UserService {
                 });
 
                 blobStream.on("finish", async () => {
-                    // Torar o arquivo publico
                     blob.makePublic()
                         .then(() => {
                             const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
@@ -487,16 +485,6 @@ class UserService {
                     wiki: true,
                 }
             })
-
-            // const ls = new LogService();
-            // await ls.logUpdateIfChanged({
-            //     my_id,
-            //     action: "Atualização",
-            //     referring: "integracao.tasksModel",
-            //     referring_id: task_id,
-            //     oldData: exists,
-            //     updatedData: updated,
-            // });
 
             return updated;
         } catch (error) {

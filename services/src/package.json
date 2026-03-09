@@ -18,6 +18,7 @@
     "prisma:seed": "pnpm --filter @workspace/infra run prisma:seed"
   },
   "dependencies": {
+    "@workspace/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "7.4.1",
     "@types/bcryptjs": "^2.4.6",

@@ -5,34 +5,14 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../../services/src/src/generated/prisma/client.js";
 
-// Carregar .env da raiz do workspace
-// infra/prisma/seed.ts -> workspace/.env (2 níveis acima)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootEnvPath = path.resolve(__dirname, '../../.env');
 
-// Tenta carregar da raiz do workspace
-let envLoaded = false;
-const result1 = dotenv.config({ path: rootEnvPath });
-if (result1.parsed) {
-    console.log('✅ .env carregado de:', rootEnvPath);
-    envLoaded = true;
-} else {
-    // Fallback: tenta do diretório atual
-    const cwdEnvPath = path.resolve(process.cwd(), '.env');
-    const result2 = dotenv.config({ path: cwdEnvPath });
-    if (result2.parsed) {
-        console.log('✅ .env carregado de:', cwdEnvPath);
-        envLoaded = true;
-    } else {
-        // Fallback final
-        dotenv.config();
-    }
-}
+dotenv.config({ path: rootEnvPath });
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  console.error('❌ DATABASE_URL não encontrada. Procurando em:', rootEnvPath);
   throw new Error("DATABASE_URL is not set");
 }
 const adapter = new PrismaPg({

@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 
 interface PayLoad{
     sub: string;
+    organization_id?: string;
 }
 
 export function isAuthenticated(
@@ -17,7 +18,7 @@ export function isAuthenticated(
         return 
     }
 
-    const [, token] = authToken.split(" "); //ignorando o "bearer" do da string do token
+    const [, token] = authToken.split(" ");
 
     try {
         const jwtSecret = process.env.JWT_SECRET;
@@ -31,7 +32,12 @@ export function isAuthenticated(
             return response.status(401).json({ error: 'Token inválido' });
         }
 
+        if (!decoded.organization_id) {
+            return response.status(401).json({ error: 'Organization ID não encontrado no token' });
+        }
+
         request.user_id = decoded.sub;
+        request.organization_id = decoded.organization_id;
         return next();
         
     } catch (error) {
