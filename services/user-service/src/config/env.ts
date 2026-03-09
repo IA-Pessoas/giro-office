@@ -13,6 +13,7 @@ const envSchema = z.object({
     }),
   databaseUrl: z.string().url("DATABASE_URL não definida."),
   jwtSecret: z.string().min(1, "JWT_SECRET não definido."),
+  adminPassword: z.string().min(1, "ADMIN_PASSWORD não definido."),
 });
 
 export type UserServiceEnv = z.infer<typeof envSchema>;
@@ -22,5 +23,6 @@ export function getUserServiceEnv(): UserServiceEnv {
     port: process.env.PORT,
     databaseUrl: process.env.DATABASE_URL,
     jwtSecret: process.env.JWT_SECRET,
+    adminPassword: process.env.ADMIN_PASSWORD,
   });
 }

@@ -1,5 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { getUserServiceEnv } from "../config/env.js";
+
 
 import prismaClient from "../prisma/index.js";
 
@@ -23,7 +25,7 @@ class AuthService {
       throw new Error("Login/Senha Incorreto!");
     }
 
-    const jwtSecret = process.env.JWT_SECRET;
+    const jwtSecret = getUserServiceEnv().jwtSecret;
     if (!jwtSecret) {
       throw new Error("JWT_SECRET não está definido nas variáveis de ambiente.");
     }
@@ -37,7 +39,7 @@ class AuthService {
       jwtSecret,
       {
         subject: user.id,
-        expiresIn: "365d",
+        expiresIn: "1d",
       },
     );
 
@@ -69,7 +71,8 @@ class AuthService {
       throw new Error("Execute o seed do banco antes de usar o firstCreate.");
     }
 
-    const passwordHash = await bcrypt.hash("Admin", 8);
+    const { adminPassword } = getUserServiceEnv();
+    const passwordHash = await bcrypt.hash(adminPassword, 8);
 
     try {
       const user = await prismaClient.user.create({
