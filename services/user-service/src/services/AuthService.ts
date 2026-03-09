@@ -71,26 +71,35 @@ class AuthService {
 
     const passwordHash = await bcrypt.hash("Admin", 8);
 
-    const user = await prismaClient.user.create({
-      data: {
-        organization_id: org.id,
-        name: "Admin",
-        login: "Admin",
-        password: passwordHash,
-        permission: 2,
-        status: "Ativo",
-        department_id: dep.id,
-      },
-      select: {
-        id: true,
-        name: true,
-        login: true,
-        permission: true,
-        department_id: true,
-      },
-    });
+    try {
+      const user = await prismaClient.user.create({
+        data: {
+          organization_id: org.id,
+          name: "Admin",
+          login: "Admin",
+          password: passwordHash,
+          permission: 2,
+          status: "Ativo",
+          department_id: dep.id,
+        },
+        select: {
+          id: true,
+          name: true,
+          login: true,
+          permission: true,
+          department_id: true,
+        },
+      });
 
-    return { user };
+      return { user };
+    } catch (err: unknown) {
+      const isUniqueViolation =
+        err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002";
+      if (isUniqueViolation) {
+        throw new Error("Login já cadastrado");
+      }
+      throw err;
+    }
   }
 }
 

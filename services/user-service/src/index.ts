@@ -5,6 +5,8 @@ import "express-async-errors";
 import cors from "cors";
 import type { Request, Response, NextFunction } from "express";
 
+import { info } from "@workspace/shared/logger";
+
 import { getUserServiceEnv } from "./config/env.js";
 import { authRoutes } from "./routes/auth.routes.js";
 
@@ -29,5 +31,5 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 app.listen(env.port, () => {
-  console.log(`user-service rodando na porta ${env.port}`);
+  info(`user-service rodando na porta ${env.port}`);
 });
