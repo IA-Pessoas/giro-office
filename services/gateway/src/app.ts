@@ -1,4 +1,4 @@
-import type { AuthLogContext } from "@workspace/shared";
+import { createExpressErrorHandler, ServiceError, type AuthLogContext } from "@workspace/shared";
 import type { Logger, LogLevel } from "@workspace/shared/logger";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
@@ -22,7 +22,7 @@ function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
         return;
       }
 
-      callback(new Error("Origin não permitida pelo gateway."));
+      callback(new ServiceError(403, "Origin não permitida pelo gateway."));
     },
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     allowedHeaders: ["Content-Type", "Authorization", "x-request-id"],
@@ -155,12 +155,11 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   const app = express();
 
   app.set("trust proxy", true);
+  app.use(buildRequestContextMiddleware(logger));
+  app.use(buildRequestLifecycleMiddleware(logger));
   app.use(cors(createCorsOptions(env)));
   app.options("*", cors(createCorsOptions(env)));
   app.use(express.json());
-
-  app.use(buildRequestContextMiddleware(logger));
-  app.use(buildRequestLifecycleMiddleware(logger));
   app.use(buildAuthenticateMiddleware(env.jwtSecret));
   app.use(authorizeRequest);
 
@@ -173,18 +172,17 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   });
 
   app.use(buildHttpProxyMiddleware(env.legacyApiUrl));
-
-  app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
-    getRequestLogger(request, logger).error({
+  app.use(
+    createExpressErrorHandler({
+      logger,
       event: "gateway.error",
-      message: "Gateway request failed",
-      auth: getAuthLogContext(request),
-      upstream: getUpstreamContext(env.legacyApiUrl, request),
-      err: error,
-    });
-
-    response.status(500).json({ error: "Erro interno no gateway." });
-  });
+      fallbackMessage: "Erro interno no gateway.",
+      getContext: (request) => ({
+        auth: getAuthLogContext(request),
+        upstream: getUpstreamContext(env.legacyApiUrl, request),
+      }),
+    }),
+  );
 
   return app;
 }

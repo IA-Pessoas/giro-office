@@ -1,3 +1,4 @@
+import { ServiceError } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 
 function hasRequestBody(method: string): boolean {
@@ -78,7 +79,7 @@ export function buildHttpProxyMiddleware(legacyApiUrl: string) {
       const data = await upstreamResponse.json();
       response.json(data);
     } catch (error) {
-      next(error);
+      next(new ServiceError(502, "Erro ao comunicar com o serviço upstream.", error));
     }
   };
 }

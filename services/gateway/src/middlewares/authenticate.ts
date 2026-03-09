@@ -1,4 +1,4 @@
-import { authenticateFromAuthHeader } from "@workspace/shared";
+import { authenticateFromAuthHeader, ServiceError } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 
 import { isPublicRoute } from "../security/publicRoutes.js";
@@ -15,7 +15,7 @@ export function buildAuthenticateMiddleware(jwtSecret: string) {
       next();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Não autenticado.";
-      response.status(401).json({ error: message });
+      next(new ServiceError(401, message, error));
     }
   };
 }
