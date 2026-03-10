@@ -21,9 +21,7 @@ import { IoCreate } from "react-icons/io5";
 import { canSSRAuth } from '../../utils/canSSRAuth';
 import { setupAPIClient } from '../../services/api';
 import LogDrawer from '@/components/LogDrawer';
-import type { DepItem } from '../../features/departments/types';
-
-import { useDepForm } from '../../hooks/departments/useDepForm';
+import { useDepForm, departmentService, type DepItem } from '@features/departments';
 interface Props {
     dep: DepItem
 }
