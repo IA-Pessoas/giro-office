@@ -20,15 +20,11 @@ import { IoCreate } from "react-icons/io5";
 
 import { canSSRAuth } from '@features/auth';
 import { setupAPIClient } from '@shared/services/api';
-import { UserProfile, type UserItem } from '@features/users';
+import { useUserForm, type UserItem } from '@features/users';
 import type { DepItem } from '@features/departments';
-import { useUserForm } from '../../hooks/users/useUserForm'; // Importando o nosso hook!
 import LogDrawer from '@/components/LogDrawer';
 
-// Interfaces (idealmente, mova-as para um arquivo compartilhado types.ts)
-interface UserItem { id: string; name: string; login: string; password: string; permission: number; department_id: string; status: string; photo: string | null; }
-interface DepItem { id: string; name: string; color: string; status: string; }
-interface MeItem { id: string; name: string; permission: number; /* ... */ }
+interface MeItem { id: string; name: string; permission: number; }
 interface Props { me: MeItem; user: UserItem; deps: DepItem[]; }
 
 export default function User({ me, user, deps }: Props) {
