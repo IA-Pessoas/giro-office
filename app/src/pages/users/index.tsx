@@ -6,15 +6,9 @@ import { FaUsers } from 'react-icons/fa';
 
 import { canSSRAuth } from '@features/auth';
 import { setupAPIClient } from '@shared/services/api';
+import { UserFilters, UserList, CreateUserModal, UserDetailsView, userService, type UserItem } from '@features/users';
+import type { DepItem } from '@features/departments';
 
-// Components
-import { UserFilters } from '../../components/users/UserFilters';
-import { UserList } from '../../components/users/UserList';
-import { CreateUserModal } from '../../components/users/CreateUserModal';
-import { UserDetailsView } from '../../components/users/UserDetailsView';
-
-export interface UserItem { id: string; name: string; permission: number; departament_id: string; department: { name: string; color: string; }; status: string; }
-export interface DepItem { id: string; name: string; color: string; status: string; }
 interface Props { users: UserItem[]; deps: DepItem[]; me: any; }
 
 export default function Users({ users, deps, me }: Props) {
@@ -47,9 +41,8 @@ export default function Users({ users, deps, me }: Props) {
   const handleFilterChange = async (status: string) => {
     setIsListLoading(true);
     try {
-      const apiClient = setupAPIClient();
-      const response = await apiClient.get('/users', { params: { status } });
-      setUsersList(response.data);
+      const users = await userService.list({ status });
+      setUsersList(users);
       setFilterStatus(status);
       toast.success(`Filtro '${status}' aplicado.`);
     } catch (error) {

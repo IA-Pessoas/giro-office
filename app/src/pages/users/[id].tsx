@@ -20,6 +20,8 @@ import { IoCreate } from "react-icons/io5";
 
 import { canSSRAuth } from '@features/auth';
 import { setupAPIClient } from '@shared/services/api';
+import { UserProfile, type UserItem } from '@features/users';
+import type { DepItem } from '@features/departments';
 import { useUserForm } from '../../hooks/users/useUserForm'; // Importando o nosso hook!
 import LogDrawer from '@/components/LogDrawer';
 
