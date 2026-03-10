@@ -112,10 +112,10 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
         }
 
     } catch (error) {
-        console.log(error);
+        // Em caso de erro, redirecionar para login para evitar loop
         return {
             redirect: {
-                destination: '/home',
+                destination: '/login',
                 permanent: false
             }
         }

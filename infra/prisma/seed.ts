@@ -1,7 +1,15 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../../services/src/src/generated/prisma/client.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootEnvPath = path.resolve(__dirname, '../../.env');
+
+dotenv.config({ path: rootEnvPath });
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -24,8 +32,11 @@ async function main() {
     create: {
       name: "Castelo Contabilidade",
       slug: "castelo-contabilidade",
-      logo: null,
+      logo_url: null,
       status: "active",
+      email_created_by: "admin@castelo.com",
+      cnpj: "00000000000000",
+      subscription_plan: "trial",
     },
   });
 
@@ -138,7 +149,7 @@ async function main() {
         password: hashedPassword,
         permission: user.permission,
         status: "active",
-        photo: null,
+        photo_url: null,
       },
     });
     users[user.id] = created;

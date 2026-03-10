@@ -39,15 +39,21 @@ class UserController {
         response.json(session)
     }
     public detail = async (request: Request, response: Response): Promise<void> => {
-
         const user_id = request.user_id
-        // console.log(user_id)
+        
+        if (!user_id) {
+            response.status(400).json({ error: 'User ID não encontrado na requisição' });
+            return;
+        }
 
         const userService = new UserService()
 
-        const detailUser = await userService.detail(user_id)
-
-        response.json(detailUser)
+        try {
+            const detailUser = await userService.detail(user_id)
+            response.json(detailUser)
+        } catch (error) {
+            response.status(400).json({ error: error instanceof Error ? error.message : 'Erro ao buscar usuário' });
+        }
     }
     public details = async (request: Request, response: Response): Promise<void> => {
         let { user_id } = request.body

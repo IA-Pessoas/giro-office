@@ -1,3 +1,4 @@
+import { ServiceError } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 
 function hasRequestBody(method: string): boolean {
@@ -54,9 +55,10 @@ export function buildHttpProxyMiddleware(resolveUpstream: UpstreamResolver) {
     response: Response,
     next: NextFunction,
   ): Promise<void> {
+    const baseUrl = resolveUpstream(request.method, request.path);
+    const targetUrl = new URL(request.originalUrl, baseUrl);
+
     try {
-      const upstream = resolveUpstream(request.method, request.path);
-      const targetUrl = new URL(request.originalUrl, upstream).toString();
       const body = getRequestBody(request);
 
       const upstreamResponse = await fetch(targetUrl, {
@@ -80,7 +82,7 @@ export function buildHttpProxyMiddleware(resolveUpstream: UpstreamResolver) {
       const data = await upstreamResponse.json();
       response.json(data);
     } catch (error) {
-      next(error);
+      next(new ServiceError(502, "Erro ao comunicar com o serviço upstream.", error));
     }
   };
 }

@@ -1,3 +1,4 @@
+import { createSuccessResponse } from "@workspace/shared";
 import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
 
@@ -12,7 +13,7 @@ router.post("/session", async (request: Request, response: Response, next: NextF
 
     const session = await authService.login({ login, password });
 
-    response.json(session);
+    response.json(createSuccessResponse(session));
   } catch (err) {
     next(err);
   }
@@ -22,7 +23,7 @@ router.post("/start-config", async (request: Request, response: Response, next: 
   try {
     const user = await authService.firstCreate();
 
-    response.json(user);
+    response.json(createSuccessResponse(user));
   } catch (err) {
     next(err);
   }

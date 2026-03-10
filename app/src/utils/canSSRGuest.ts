@@ -8,7 +8,7 @@ export function canSSRGuest<P>(fn: GetServerSideProps<P>) {
         if (cookies['@cw.token']) {
             return {
                 redirect: {
-                    destination: '/home',
+                    destination: '/dashboard',
                     permanent: false,
                 }
             }

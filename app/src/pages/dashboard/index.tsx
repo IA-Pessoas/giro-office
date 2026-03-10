@@ -36,13 +36,22 @@ export default function Dashboard({ me }: Props) {
 export const getServerSideProps = canSSRAuth(async (ctx) => {
     const apiClient = setupAPIClient(ctx);
     
-    const [meResponse] = await Promise.all([
-      apiClient.get('/me')
-    ]);
+    try {
+        const meResponse = await apiClient.get('/me');
 
-    return {
-      props: {
-        me: meResponse.data.user,
-      }
-    };
+        return {
+          props: {
+            me: meResponse.data.user,
+          }
+        };
+    } catch (error: any) {
+        // Se for erro 401, lança AuthTokenError para ser capturado pelo canSSRAuth
+        if (error?.response?.status === 401 || error?.message === 'Unauthorized') {
+            const { AuthTokenError } = await import('../../services/errors/AuthTokenError');
+            throw new AuthTokenError();
+        }
+        
+        // Para outros erros, também lança para ser tratado pelo canSSRAuth
+        throw error;
+    }
 })

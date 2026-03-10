@@ -18,6 +18,7 @@
     "prisma:seed": "pnpm --filter @workspace/infra run prisma:seed"
   },
   "dependencies": {
+    "@workspace/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "7.4.1",
     "@types/bcryptjs": "^2.4.6",
@@ -44,6 +45,7 @@
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
+    "@types/express-serve-static-core": "^4.19.6",
     "@types/multer": "^1.4.12",
     "@types/node": "^25.3.0",
     "@types/node-cron": "^3.0.11",
