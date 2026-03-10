@@ -6,7 +6,7 @@ import {
 } from '@chakra-ui/react';
 import { IoAdd, IoTrash } from "react-icons/io5";
 import { toast } from 'react-toastify';
-import { setupAPIClient } from '../../../services/api'; // Ajuste o caminho conforme sua estrutura
+import { setupAPIClient } from '@shared/services/api'; // Ajuste o caminho conforme sua estrutura
 import { TaskModel } from '../../../hooks/integracao/useTaskModels'; // Ajuste o caminho
 
 interface ModalProps {

@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 import { SearchIcon } from '@chakra-ui/icons';
 import axios from 'axios';
 
-import { setupAPIClient } from '../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import { ClientItem } from '../../pages/clients';
 import { Perms } from '../../services/types/clientTabs';
 

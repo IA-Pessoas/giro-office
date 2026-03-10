@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import { FaUsers } from 'react-icons/fa';
 
 import { canSSRAuth } from '@features/auth';
-import { setupAPIClient } from '../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 
 // Components
 import { UserFilters } from '../../components/users/UserFilters';

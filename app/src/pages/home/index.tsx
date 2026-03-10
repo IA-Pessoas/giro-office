@@ -10,7 +10,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { ModuleCard } from '../../components/ModulosCards'
 
 import { canSSRAuth } from '@features/auth'
-import { setupAPIClient } from '../../services/api'
+import { setupAPIClient } from '@shared/services/api'
 
 import LogoTI from '../../../public/logos/lions/Tecnologia.png';
 import LogoIntegracao from '../../../public/logos/lions/Integracao.png';

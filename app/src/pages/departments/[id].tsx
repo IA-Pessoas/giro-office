@@ -19,7 +19,7 @@ import { LuFolder } from "react-icons/lu";
 import { IoCreate } from "react-icons/io5";
 
 import { canSSRAuth } from '@features/auth';
-import { setupAPIClient } from '../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import LogDrawer from '@/components/LogDrawer';
 import { useDepForm, departmentService, type DepItem } from '@features/departments';
 interface Props {

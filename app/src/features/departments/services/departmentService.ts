@@ -1,4 +1,4 @@
-import { setupAPIClient } from '../../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import type { DepItem, CreateDepData, UpdateDepData } from '../types';
 
 export const departmentService = {

@@ -6,7 +6,7 @@ import LogDrawer from '@/components/LogDrawer';
 import { LoadingSpinner } from '../../layout/LoadingSpinner';
 
 import { useClientFormRegularize } from '../../../hooks/clients/useFormRegularize';
-import { setupAPIClient } from '../../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import { Client, Perms } from '../../../services/types/clientTabs';
 
 interface ClientTabProps {

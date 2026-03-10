@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useRe
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
 import { parseCookies } from 'nookies';
-import { setupAPIClient } from '../services/api'
+import { setupAPIClient } from '@shared/services/api'
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 

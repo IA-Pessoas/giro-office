@@ -17,7 +17,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { canSSRAuth } from "@features/auth";
 import { IoIosArrowForward } from 'react-icons/io'
 import { AuthContext } from "../../context/AuthContext";
-import { setupAPIClient } from "../../services/api";
+import { setupAPIClient } from "@shared/services/api";
 
 interface UserProps {
     id: string;

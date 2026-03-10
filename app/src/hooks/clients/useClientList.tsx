@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { setupAPIClient } from '../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 
 interface ClientItem {
     id: string;

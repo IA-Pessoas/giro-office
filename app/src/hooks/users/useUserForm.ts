@@ -1,7 +1,7 @@
 // src/hooks/useUserForm.ts
 import { useState, ChangeEvent } from 'react';
 import { toast } from 'react-toastify';
-import { setupAPIClient } from '../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 
 // Reutilize a interface UserItem aqui ou mova para um arquivo de tipos
 interface UserItem {

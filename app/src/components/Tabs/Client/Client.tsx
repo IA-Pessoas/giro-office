@@ -4,7 +4,7 @@ import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 import { IoCreate } from "react-icons/io5";
 
-import { setupAPIClient } from '../../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import { Client, Perms } from '../../../services/types/clientTabs';
 
 import { ActionButton } from '../../Infos/ActionButton';

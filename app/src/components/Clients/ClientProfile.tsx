@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Box } from "@chakra-ui/react";
 import { ClientTabs } from '../Tabs/ClientTabs';
 import { LoadingSpinner } from '../layout/LoadingSpinner';
-import { setupAPIClient } from '../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 
 interface ClientProfileProps {
     clientId: string;

@@ -9,7 +9,7 @@ import LogDrawer from '@/components/LogDrawer';
 import { LoadingSpinner } from '../../layout/LoadingSpinner';
 
 import { useClientFormIntegracao } from '../../../hooks/clients/useFormIntegracao';
-import { setupAPIClient } from '../../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import { Client, Perms } from '../../../services/types/clientTabs';
 import { ProjectCreateModal } from '../../../components/Configs/integracao/ProjectCreateModal';
 

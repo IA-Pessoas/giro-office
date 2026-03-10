@@ -19,7 +19,7 @@ import { IoCreate } from "react-icons/io5";
 
 import LogDrawer from '@/components/LogDrawer';
 import { LoadingSpinner } from '../../../components/layout/LoadingSpinner';
-import { setupAPIClient } from '../../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import { useDepForm } from '../hooks/useDepForm';
 
 interface DepartmentProfileProps {

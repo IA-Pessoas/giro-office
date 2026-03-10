@@ -19,7 +19,7 @@ import { FaComputer } from "react-icons/fa6";
 import { IoCreate } from "react-icons/io5";
 
 import { canSSRAuth } from '@features/auth';
-import { setupAPIClient } from '../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import { useUserForm } from '../../hooks/users/useUserForm'; // Importando o nosso hook!
 import LogDrawer from '@/components/LogDrawer';
 

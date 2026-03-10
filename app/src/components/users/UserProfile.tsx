@@ -7,7 +7,7 @@ import {
 import { LuFolder } from "react-icons/lu";
 import { FaComputer } from "react-icons/fa6";
 import { IoCreate } from "react-icons/io5";
-import { setupAPIClient } from '../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import { useUserForm } from '../../hooks/users/useUserForm';
 import LogDrawer from '@/components/LogDrawer';
 import { LoadingSpinner } from '../layout/LoadingSpinner';

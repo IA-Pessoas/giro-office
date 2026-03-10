@@ -16,7 +16,7 @@ import { FiClock } from 'react-icons/fi'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale';
 
-import { setupAPIClient } from '../../services/api'
+import { setupAPIClient } from '@shared/services/api'
 
 interface LogDrawerProps {
     referring: string

@@ -6,7 +6,7 @@ import LogDrawer from '@/components/LogDrawer';
 import { LoadingSpinner } from '../../layout/LoadingSpinner';
 
 import { useClientFormComercial } from '../../../hooks/clients/useFormComercial';
-import { setupAPIClient } from '../../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import { Client, Perms } from '../../../services/types/clientTabs';
 import { formatDateToInput } from '@/utils/formatters';
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal, FormControl, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, Button, Flex, FormLabel, Input, Select } from '@chakra-ui/react';
 import { toast } from 'react-toastify';
 
-import { setupAPIClient } from '../../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import type { DepItem } from '../types';
 
 interface CreateDepModalProps {

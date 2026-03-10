@@ -6,7 +6,7 @@ import {
 } from '@chakra-ui/react';
 import { IoAdd, IoTrash } from "react-icons/io5";
 
-import { setupAPIClient } from '../../../services/api';
+import { setupAPIClient } from '@shared/services/api';
 import { useTaskModels, TaskModel } from '../../../hooks/integracao/useTaskModels';
 
 interface ProjectCreateModalProps {

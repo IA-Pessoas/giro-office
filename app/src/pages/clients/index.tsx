@@ -6,7 +6,7 @@ import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
 import { canSSRAuth } from '@features/auth'
-import { setupAPIClient } from '../../services/api'
+import { setupAPIClient } from '@shared/services/api'
 
 import { Perms } from '../../services/types/clientTabs';
 

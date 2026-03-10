@@ -19,7 +19,7 @@ import {
 } from '@chakra-ui/react';
 import { IoCreate } from 'react-icons/io5';
 import { toast } from 'react-toastify';
-import { setupAPIClient } from '@/services/api';
+import { setupAPIClient } from '@shared/services/api';
 import { formatDateToInput } from '@/utils/formatters';
 
 export default function DataTabComercial({ client }) {

@@ -4,7 +4,7 @@ import Router from "next/router";
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
-import { api } from '../services/apiClient'
+import { api } from '@shared/services/apiClient'
 
 interface AuthContextData {
     user: UserProps;
