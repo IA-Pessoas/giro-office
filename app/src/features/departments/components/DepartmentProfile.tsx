@@ -18,7 +18,7 @@ import { LuFolder } from "react-icons/lu";
 import { IoCreate } from "react-icons/io5";
 
 import LogDrawer from '@/components/LogDrawer';
-import { LoadingSpinner } from '../../../components/layout/LoadingSpinner';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 import { setupAPIClient } from '@shared/services/api';
 import { useDepForm } from '../hooks/useDepForm';
 

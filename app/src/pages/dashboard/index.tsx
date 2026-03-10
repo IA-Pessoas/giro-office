@@ -6,7 +6,7 @@ import {
 } from '@chakra-ui/react'
 import 'react-toastify/dist/ReactToastify.css';
 
-import Navbar from "../../components/sidebar"
+import Navbar from "@shared/components/sidebar"
 import { canSSRAuth } from '@features/auth'
 import { setupAPIClient } from '@shared/services/api'
 

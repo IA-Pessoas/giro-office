@@ -5,7 +5,7 @@ import { Box } from '@chakra-ui/react';
 import dynamic from 'next/dynamic';
 
 import { Client, Perms } from '../../services/types/clientTabs';
-import { LoadingSpinner } from '../../components/layout/LoadingSpinner';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
 const DadosGeraisTab = dynamic(() => import('../../components/Tabs/Client/Client').then(mod => mod.clientTab), {
   loading: () => <LoadingSpinner />,
