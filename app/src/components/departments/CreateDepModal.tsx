@@ -3,7 +3,7 @@ import { Modal, FormControl, ModalOverlay, ModalContent, ModalHeader, ModalFoote
 import { toast } from 'react-toastify';
 
 import { setupAPIClient } from '../../services/api';
-import { DepItem } from '../../pages/departments';
+import type { DepItem } from '../../features/departments/types';
 
 interface CreateDepModalProps {
   isOpen: boolean;

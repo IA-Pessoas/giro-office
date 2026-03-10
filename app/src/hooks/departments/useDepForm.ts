@@ -1,14 +1,7 @@
 import { useState, ChangeEvent } from 'react';
 import { toast } from 'react-toastify';
 import { setupAPIClient } from '../../services/api';
-
-interface DepItem {
-  id: string
-  name: string
-  color: string
-  solution: boolean
-  status: string
-}
+import type { DepItem } from '../../features/departments/types';
 
 const getInitialState = (dep: DepItem) => ({
   name: dep?.name || '',

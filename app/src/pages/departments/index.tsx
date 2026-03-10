@@ -7,20 +7,12 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import { canSSRAuth } from '../../utils/canSSRAuth'
 import { setupAPIClient } from '../../services/api'
+import type { DepItem } from '../../features/departments/types'
 
-// Components
 import { DepFilters } from '../../components/departments/DepFilters';
 import { DepList } from '../../components/departments/DepList';
 import { DepDetailsView } from '../../components/departments/DepDetailsView';
 import { CreateDepModal } from '../../components/departments/CreateDepModal';
-
-export interface DepItem {
-    id: string
-    name: string
-    color: string
-    status: string
-    solution: boolean
-}
 interface Props {
     deps: DepItem[]
 }

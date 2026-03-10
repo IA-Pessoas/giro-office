@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Flex, Card, CardBody, Text } from '@chakra-ui/react';
 
-import { DepItem } from '../../pages/departments';
+import type { DepItem } from '../../features/departments/types';
 
 interface ListProps {
   deps: DepItem[];
