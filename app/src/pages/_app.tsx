@@ -12,7 +12,7 @@ import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ChatProvider, useChat } from "../context/ChatContext";
 import { ChatControllerUI } from '../components/layout/ChatControllerUI'; // O controlador do Overlay
 import { SocketProvider } from '../context/SocketContext'
-import Navbar from "../components/sidebar";
+import Navbar from "@shared/components/sidebar";
 
 function AppLayout({ children }) {
   const [isChatOpen, setIsChatOpen] = useState(false);
