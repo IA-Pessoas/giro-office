@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Modal, FormControl, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, Button, Flex, FormLabel, Input, Select } from '@chakra-ui/react';
 import { toast } from 'react-toastify';
 import { setupAPIClient } from '@shared/services/api';
-import { DepItem, UserItem } from '../../pages/users';
+import type { UserItem } from '../types';
+import type { DepItem } from '@features/departments';
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -27,10 +28,10 @@ export function CreateUserModal({ isOpen, onClose, onUserCreated, departments }:
     }
     setIsLoading(true);
     try {
-      const apiClient = setupAPIClient();
-      const response = await apiClient.post('/users', formData);
+      const { userService } = await import('../services/userService');
+      const newUser = await userService.create(formData);
       toast.success("Usuário cadastrado com sucesso!");
-      onUserCreated(response.data.user); // Notifica a página pai com o novo usuário
+      onUserCreated(newUser); // Notifica a página pai com o novo usuário
       onClose(); // Fecha o modal
       setFormData({ name: '', login: '', password: '', department_id: '', permission: 0 }); // Limpa o formulário
     } catch (err) {

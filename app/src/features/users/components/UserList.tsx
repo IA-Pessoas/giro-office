@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Flex, Card, CardBody, Text } from '@chakra-ui/react';
-import { UserItem } from '../../pages/users';
+import type { UserItem } from '../types';
 
 interface UserListProps {
   users: UserItem[];

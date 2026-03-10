@@ -8,9 +8,9 @@ import { LuFolder } from "react-icons/lu";
 import { FaComputer } from "react-icons/fa6";
 import { IoCreate } from "react-icons/io5";
 import { setupAPIClient } from '@shared/services/api';
-import { useUserForm } from '../../hooks/users/useUserForm';
+import { useUserForm } from '../hooks/useUserForm';
 import LogDrawer from '@/components/LogDrawer';
-import { LoadingSpinner } from '../layout/LoadingSpinner';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
 interface UserProfileProps {
     userId: string;
@@ -27,11 +27,9 @@ export function UserProfile({ userId, me, departments }: UserProfileProps) {
         async function loadData() {
             try {
                 setLoadingData(true);
-                const apiClient = setupAPIClient();
-                const response = await apiClient.get('/users-detail', {
-                    params: { user_id: userId }
-                });
-                setUser(response.data.user);
+                const { userService } = await import('../services/userService');
+                const userData = await userService.getById(userId);
+                setUser(userData);
             } catch (error) {
                 console.error("Erro ao carregar usuário", error);
             } finally {
