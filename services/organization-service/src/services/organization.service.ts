@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { createSuccessResponse } from "@workspace/shared";
 import { type status } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 
@@ -47,7 +48,7 @@ class OrganizationService {
         },
       });
 
-      response.status(201).json(organization);
+      response.status(201).json(createSuccessResponse(organization));
     } catch (err) {
       if (err instanceof Error) throw err;
       throw new Error("Erro interno ao criar organização.");
@@ -78,7 +79,7 @@ class OrganizationService {
         throw new Error("Organização não encontrada.");
       }
 
-      response.json(organization);
+      response.json(createSuccessResponse(organization));
     } catch (err) {
       if (err instanceof Error) throw err;
       throw new Error("Erro interno ao buscar organização.");
@@ -110,7 +111,7 @@ class OrganizationService {
         },
       });
 
-      response.json(updated);
+      response.json(createSuccessResponse(updated));
     } catch (err) {
       if (err instanceof Error) throw err;
       throw new Error("Erro interno ao atualizar status.");
@@ -142,7 +143,7 @@ class OrganizationService {
         },
       });
 
-      response.json(updated);
+      response.json(createSuccessResponse(updated));
     } catch (err) {
       if (err instanceof Error) throw err;
       throw new Error("Erro interno ao atualizar plano de assinatura.");
@@ -174,7 +175,7 @@ class OrganizationService {
         },
       });
 
-      response.json(updated);
+      response.json(createSuccessResponse(updated));
     } catch (err) {
       if (err instanceof Error) throw err;
       throw new Error("Erro interno ao atualizar logo.");

@@ -60,10 +60,15 @@ export function AuthProvider({ children }: AuthProviderProps){
                 if (userData && userData.id) {
                     setUser(userData);
                 } else {
-                    signOut();
+                    // Não chama signOut aqui para evitar redirecionamento durante SSR
+                    destroyCookie(null, '@cw.token', { path: '/' });
+                    setUser(null);
                 }
-            }).catch(() => {
-                signOut();
+            }).catch((error) => {
+                // Não chama signOut aqui para evitar redirecionamento durante SSR
+                console.error('Erro ao verificar token:', error);
+                destroyCookie(null, '@cw.token', { path: '/' });
+                setUser(null);
             }).finally(() => {
                 setLoading(false);
             });
@@ -97,8 +102,12 @@ export function AuthProvider({ children }: AuthProviderProps){
 
             toast.success("Login Feito!")
 
-
-            Router.push('/dashboard')
+            // Usar window.location para forçar recarregamento completo e evitar problemas de navegação
+            if (typeof window !== 'undefined') {
+                window.location.href = '/dashboard';
+            } else {
+                Router.push('/dashboard');
+            }
 
         } catch (error) {
             toast.error("Usuário e/ou senha incorretos!")

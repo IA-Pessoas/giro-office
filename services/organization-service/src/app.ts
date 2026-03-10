@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createSuccessResponse } from "@workspace/shared";
 import { serviceError } from "@workspace/shared/logger";
 import express, { type Request, type Response, type NextFunction } from "express";
 import "express-async-errors";
@@ -14,7 +15,9 @@ app.use(express.json());
 app.use(requestContext);
 
 app.get("/health", (_request: Request, response: Response) => {
-  response.status(200).json({ status: "ok", service: "organization-service" });
+  response.status(200).json(
+    createSuccessResponse({ status: "ok", service: "organization-service" }),
+  );
 });
 
 app.use(organizationRoutes);

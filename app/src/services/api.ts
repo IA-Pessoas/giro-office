@@ -6,11 +6,12 @@ import { signOut } from "../context/AuthContext";
 
 export function setupAPIClient(ctx = undefined) {
     let cookies = parseCookies(ctx);
+    const token = cookies['@cw.token'];
 
     const api = axios.create({
         baseURL: process.env.NEXT_PUBLIC_API_URL,
         headers:{
-            Authorization: `Bearer ${cookies['@cw.token']}`
+            Authorization: token ? `Bearer ${token}` : undefined
         }
     })
 
@@ -23,8 +24,8 @@ export function setupAPIClient(ctx = undefined) {
                 // Executar apenas no lado do navegador
                 signOut();
             } else {
-                // No lado do servidor, rejeita com um erro específico
-                return Promise.reject(new Error('Unauthorized'));
+                // No lado do servidor, rejeita com AuthTokenError para ser capturado pelo canSSRAuth
+                return Promise.reject(new AuthTokenError());
             }
         }
         return Promise.reject(error);

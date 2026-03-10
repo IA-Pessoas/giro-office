@@ -1,13 +1,31 @@
 import { createServer } from "node:http";
 
-import { serverError, serverStart } from "@workspace/shared/logger";
+import { createLogger } from "@workspace/shared/logger";
 
 import { createApp } from "./app.js";
 import { getGatewayEnv } from "./config/env.js";
 import { proxyWebSocketUpgrade } from "./proxy/wsProxy.js";
 
+function getUpstreamContext(url: string): { host?: string; path?: string } {
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.host,
+      path: parsed.pathname,
+    };
+  } catch {
+    return {};
+  }
+}
+
 const env = getGatewayEnv();
-const app = createApp(env);
+const logger = createLogger({
+  service: "gateway",
+  env: env.nodeEnv,
+  level: env.logLevel,
+  pretty: env.logPretty,
+});
+const app = createApp(env, logger);
 const server = createServer(app);
 
 server.on("upgrade", (request, socket, head) => {
@@ -20,9 +38,21 @@ server.on("upgrade", (request, socket, head) => {
 });
 
 server.listen(env.port, () => {
-  serverStart({ port: env.port, upstream: env.legacyApiUrl });
+  logger.info({
+    event: "server.start",
+    message: "Gateway server started",
+    upstream: getUpstreamContext(env.legacyApiUrl),
+    data: {
+      port: env.port,
+    },
+  });
 });
 
 server.on("error", (err) => {
-  serverError("Erro no servidor gateway", err);
+  logger.error({
+    event: "server.error",
+    message: "Gateway server error",
+    upstream: getUpstreamContext(env.legacyApiUrl),
+    err,
+  });
 });
