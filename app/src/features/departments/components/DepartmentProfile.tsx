@@ -18,9 +18,9 @@ import { LuFolder } from "react-icons/lu";
 import { IoCreate } from "react-icons/io5";
 
 import LogDrawer from '@/components/LogDrawer';
-import { LoadingSpinner } from '../layout/LoadingSpinner';
-import { setupAPIClient } from '../../services/api';
-import { useDepForm } from '../../hooks/departments/useDepForm';
+import { LoadingSpinner } from '../../../components/layout/LoadingSpinner';
+import { setupAPIClient } from '../../../services/api';
+import { useDepForm } from '../hooks/useDepForm';
 
 interface DepartmentProfileProps {
     depId: string;
