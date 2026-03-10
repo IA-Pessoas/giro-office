@@ -1,4 +1,9 @@
-import { createExpressErrorHandler, ServiceError, type AuthLogContext } from "@workspace/shared";
+import {
+  type AuthLogContext,
+  createExpressErrorHandler,
+  createSuccessResponse,
+  ServiceError,
+} from "@workspace/shared";
 import type { Logger, LogLevel } from "@workspace/shared/logger";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
@@ -164,11 +169,21 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   app.use(authorizeRequest);
 
   app.get("/health", (_request, response) => {
-    response.status(200).json({ status: "ok", service: "gateway" });
+    response.status(200).json(
+      createSuccessResponse({
+        status: "ok",
+        service: "gateway",
+      }),
+    );
   });
 
   app.get("/ready", (_request, response) => {
-    response.status(200).json({ status: "ready", url: env.legacyApiUrl });
+    response.status(200).json(
+      createSuccessResponse({
+        status: "ready",
+        url: env.legacyApiUrl,
+      }),
+    );
   });
 
   app.use(buildHttpProxyMiddleware(env.legacyApiUrl));

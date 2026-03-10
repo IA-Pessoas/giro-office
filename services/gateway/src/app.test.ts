@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { createServer, type Server } from "node:http";
 import { once } from "node:events";
+import { createServer, type Server } from "node:http";
 import { Writable } from "node:stream";
 import test from "node:test";
 
@@ -80,9 +80,10 @@ test("returns shared unauthorized response when token is missing", async () => {
 
   try {
     const response = await fetch(`${baseUrl}/users`);
-    const body = (await response.json()) as Record<string, string>;
+    const body = (await response.json()) as Record<string, unknown>;
 
     assert.equal(response.status, 401);
+    assert.equal(body.success, false);
     assert.equal(body.error, "Cabeçalho Authorization não informado.");
     assert.equal(body.code, "UNAUTHORIZED");
     assert.ok(body.requestId);
@@ -108,9 +109,10 @@ test("returns shared forbidden response when permission is insufficient", async 
         Authorization: `Bearer ${token}`,
       },
     });
-    const body = (await response.json()) as Record<string, string>;
+    const body = (await response.json()) as Record<string, unknown>;
 
     assert.equal(response.status, 403);
+    assert.equal(body.success, false);
     assert.equal(body.error, "Acesso negado para esta rota.");
     assert.equal(body.code, "FORBIDDEN");
     assert.ok(body.requestId);
@@ -137,9 +139,10 @@ test("returns shared upstream error when the upstream service is unreachable", a
       },
       body: JSON.stringify({ login: "user", password: "secret" }),
     });
-    const body = (await response.json()) as Record<string, string>;
+    const body = (await response.json()) as Record<string, unknown>;
 
     assert.equal(response.status, 502);
+    assert.equal(body.success, false);
     assert.equal(body.error, "Erro ao comunicar com o serviço upstream.");
     assert.equal(body.code, "BAD_GATEWAY");
     assert.ok(body.requestId);
@@ -175,5 +178,27 @@ test("passes upstream error responses through unchanged", async () => {
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
+  }
+});
+
+test("returns the shared success envelope for gateway health", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/health`);
+    const body = (await response.json()) as Record<string, unknown>;
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(body, {
+      success: true,
+      data: {
+        status: "ok",
+        service: "gateway",
+      },
+    });
+  } finally {
+    await stopServer(server);
   }
 });

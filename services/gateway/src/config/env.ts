@@ -1,7 +1,7 @@
-import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { LoggerLevel } from "@workspace/shared";
+import dotenv from "dotenv";
 import { z } from "zod";
 
 const __filename = fileURLToPath(import.meta.url);
