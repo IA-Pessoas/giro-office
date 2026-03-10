@@ -11,9 +11,7 @@ generator organizationClient {
 }
 
 datasource db {
-  provider = "postgresql"
-  
-  
+  provider = "postgresql"  
 }
 
 // ------------ Organization (Multi-Tenancy Root) ------------
@@ -33,7 +31,7 @@ model Organization {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
   email_created_by String 
-  cnpj String
+  cnpj String @unique
   subscription_plan String @default("trial")
 
 
@@ -141,13 +139,14 @@ model Organization {
 enum enumType {
   admin
   owner
-  normal
+  user
 }
 model OrganizationUser {
   id String @id @default(uuid())
   organization_id String
   user_id String
-  type enumType @default(normal)
+  type enumType @default(user)
+  first_owner_flag Boolean? @default(false)
   organization Organization @relation(fields: [organization_id], references: [id])
   user User @relation(fields: [user_id], references: [id])
 
@@ -161,7 +160,7 @@ model OrganizationInvite {
   token String
   expires_at DateTime
   accepted_at DateTime?
-  role enumType @default(normal)
+  role enumType @default(user)
   organization Organization @relation(fields: [organization_id], references: [id])
 
   @@map("organization_invites")
