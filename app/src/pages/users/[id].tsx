@@ -18,7 +18,7 @@ import { LuFolder } from "react-icons/lu";
 import { FaComputer } from "react-icons/fa6";
 import { IoCreate } from "react-icons/io5";
 
-import { canSSRAuth } from '../../utils/canSSRAuth';
+import { canSSRAuth } from '@features/auth';
 import { setupAPIClient } from '../../services/api';
 import { useUserForm } from '../../hooks/users/useUserForm'; // Importando o nosso hook!
 import LogDrawer from '@/components/LogDrawer';

@@ -5,7 +5,7 @@ import { FaUsers } from 'react-icons/fa';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
-import { canSSRAuth } from '../../utils/canSSRAuth'
+import { canSSRAuth } from '@features/auth'
 import { setupAPIClient } from '../../services/api'
 import { 
   DepList, 

@@ -6,7 +6,7 @@ import { Flex, Center, Text, Input, Button } from "@chakra-ui/react"
 import { setupAPIClient } from "@/services/api"
 
 import { AuthContext } from "../../context/AuthContext"
-import { canSSRGuest } from "../../utils/canSSRGuest"
+import { canSSRGuest } from "@features/auth"
 
 export default function Login() {
     const { signIn } = useContext(AuthContext)

@@ -25,7 +25,7 @@ import {
     AlertDialogOverlay,
 } from '@chakra-ui/react';
 import { IoAdd, IoPencil, IoTrash, IoSearch } from 'react-icons/io5';
-import { canSSRAuth } from '../../../../utils/canSSRAuth';
+import { canSSRAuth } from '@features/auth';
 import { TaskModel, useTaskModels } from '../../../../hooks/integracao/useTaskModels';
 import { TaskModelModal } from '../../../../components/Configs/integracao/TaskModelModal';
 

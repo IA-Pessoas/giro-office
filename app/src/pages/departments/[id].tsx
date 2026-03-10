@@ -18,7 +18,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { LuFolder } from "react-icons/lu";
 import { IoCreate } from "react-icons/io5";
 
-import { canSSRAuth } from '../../utils/canSSRAuth';
+import { canSSRAuth } from '@features/auth';
 import { setupAPIClient } from '../../services/api';
 import LogDrawer from '@/components/LogDrawer';
 import { useDepForm, departmentService, type DepItem } from '@features/departments';

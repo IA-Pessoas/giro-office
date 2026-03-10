@@ -5,7 +5,7 @@ import { FaUsers } from 'react-icons/fa';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
-import { canSSRAuth } from '../../utils/canSSRAuth'
+import { canSSRAuth } from '@features/auth'
 import { setupAPIClient } from '../../services/api'
 
 import { Perms } from '../../services/types/clientTabs';
@@ -35,7 +35,7 @@ export default function clients({ clients, permList }: Props) {
     const [selected, setSelected] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('Ativo');
-    const [filterLabel, setFilterLabel] = useState('Ativo');
+    const [filterLabel, setFilterLabel] = useState('Ativo');    
     const [isListLoading, setIsListLoading] = useState(false);
 
     const { isOpen: isModalOpen, onOpen: onModalOpen, onClose: onModalClose } = useDisclosure();

@@ -4,7 +4,7 @@ import { Box, Flex, useDisclosure, Spinner, Icon } from '@chakra-ui/react';
 import { toast } from "react-toastify";
 import { FaUsers } from 'react-icons/fa';
 
-import { canSSRAuth } from '../../utils/canSSRAuth';
+import { canSSRAuth } from '@features/auth';
 import { setupAPIClient } from '../../services/api';
 
 // Components
