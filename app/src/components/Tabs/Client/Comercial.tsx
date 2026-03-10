@@ -8,7 +8,7 @@ import { LoadingSpinner } from '../../layout/LoadingSpinner';
 import { useClientFormComercial } from '../../../hooks/clients/useFormComercial';
 import { setupAPIClient } from '@shared/services/api';
 import { Client, Perms } from '../../../services/types/clientTabs';
-import { formatDateToInput } from '@/utils/formatters';
+import { formatDateToInput } from '@shared/utils/formatters';
 
 interface ClientTabProps {
   client: Client;

@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Flex, Grid, Card, CardBody, Text, useBreakpointValue } from '@chakra-ui/react';
 
 import { ClientItem } from '../../pages/clients';
-import { formatCPF_CNPJ } from '../../utils/formatters';
+import { formatCPF_CNPJ } from '@shared/utils/formatters';
 
 interface ListProps {
   clients: ClientItem[];

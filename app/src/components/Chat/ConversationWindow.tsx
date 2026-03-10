@@ -19,7 +19,7 @@ import { FaPencilRuler } from "react-icons/fa";
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
 import * as styles from '../../styles/chat'
-import { useClickOutside } from '../../hooks/useClickOutside';
+import { useClickOutside } from '@shared/hooks/useClickOutside';
 
 import { GroupInfoSidebar } from './GroupInfoSidebar';
 

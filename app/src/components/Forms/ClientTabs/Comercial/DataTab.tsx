@@ -20,7 +20,7 @@ import {
 import { IoCreate } from 'react-icons/io5';
 import { toast } from 'react-toastify';
 import { setupAPIClient } from '@shared/services/api';
-import { formatDateToInput } from '@/utils/formatters';
+import { formatDateToInput } from '@shared/utils/formatters';
 
 export default function DataTabComercial({ client }) {
     const [id, setId] = useState(client && client?.id)

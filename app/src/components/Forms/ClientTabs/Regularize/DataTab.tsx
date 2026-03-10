@@ -12,7 +12,7 @@ import { toast } from 'react-toastify';
 import { setupAPIClient } from '@shared/services/api';
 
 import StateCity from '../../StateCity';
-import { formatDateToInput } from '@/utils/formatters';
+import { formatDateToInput } from '@shared/utils/formatters';
 
 export default function DataTabRegularize({ client }) {
     const [id, setId] = useState(client && client?.id)
