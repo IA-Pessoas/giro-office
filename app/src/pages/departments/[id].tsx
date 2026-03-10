@@ -111,14 +111,12 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
 
     try {
         const apiClient = setupAPIClient(ctx);
-        const responseMe = await apiClient.get('/me')
-        const response = await apiClient.get('/department', {
-            params: {
-                dep_id: id,
-            },
-        });
+        const [meResponse, dep] = await Promise.all([
+            apiClient.get('/me'),
+            departmentService.getById(id as string)
+        ]);
 
-        if (response.data === null || responseMe.data.user.permission === 0) {
+        if (!dep || meResponse.data.user.permission === 0) {
             return {
                 redirect: {
                     destination: '/dashboard',
@@ -129,8 +127,8 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
 
         return {
             props: {
-                me: responseMe.data.user,
-                dep: response.data.dep,
+                me: meResponse.data.user,
+                dep,
             },
         };
     } catch (error) {
