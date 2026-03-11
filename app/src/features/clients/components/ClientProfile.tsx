@@ -1,17 +1,18 @@
-// src/components/Clients/ClientProfile.tsx
 import React, { useEffect, useState } from 'react';
 import { Box } from "@chakra-ui/react";
-import { ClientTabs } from '../Tabs/ClientTabs';
-import { LoadingSpinner } from '../layout/LoadingSpinner';
+import { ClientTabs } from '../../components/Tabs/ClientTabs';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
+import { clientService } from '../services/clientService';
 import { setupAPIClient } from '@shared/services/api';
+import type { Client, Perms } from '../types';
 
 interface ClientProfileProps {
     clientId: string;
 }
 
 export function ClientProfile({ clientId }: ClientProfileProps) {
-    const [clientData, setClientData] = useState(null);
-    const [perms, setPerms] = useState(null);
+    const [clientData, setClientData] = useState<Client | null>(null);
+    const [perms, setPerms] = useState<Perms | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -20,13 +21,12 @@ export function ClientProfile({ clientId }: ClientProfileProps) {
                 setLoading(true);
                 const apiClient = setupAPIClient();
                 
-                // Busca em paralelo: Dados do Cliente e Permissões do Usuário
-                const [clientRes, permRes] = await Promise.all([
-                    apiClient.get('/client', { params: { client_id: clientId } }),
+                const [clientData, permRes] = await Promise.all([
+                    clientService.getById(clientId),
                     apiClient.get('/permission')
                 ]);
 
-                setClientData(clientRes.data.client);
+                setClientData(clientData);
                 setPerms(permRes.data.permission);
             } catch (error) {
                 console.error("Erro ao carregar dados do cliente", error);

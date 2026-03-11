@@ -6,9 +6,8 @@ import { toast } from 'react-toastify';
 import { SearchIcon } from '@chakra-ui/icons';
 import axios from 'axios';
 
-import { setupAPIClient } from '@shared/services/api';
-import { ClientItem } from '../../pages/clients';
-import { Perms } from '../../services/types/clientTabs';
+import { clientService } from '../services/clientService';
+import type { ClientItem, Perms } from '../types';
 
 interface CreateModalProps {
     isOpen: boolean;

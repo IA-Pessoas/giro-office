@@ -1,15 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { setupAPIClient } from '@shared/services/api';
-
-interface ClientItem {
-    id: string;
-    name: string;
-    company_name: string;
-    fantasy_name: string;
-    cnpj: string;
-    status: string;
-}
+import { clientService } from '../services/clientService';
+import type { ClientItem } from '../types';
 
 interface Filters {
     status: string;
@@ -31,15 +23,13 @@ export const useClientList = (initialFilters: Filters) => {
         setIsLoading(true);
 
         try {
-            const response = await apiClient.get('/clients', {
-                params: {
-                    ...filters,
-                    page: currentPage,
-                    limit: 10 // Ou o limite que preferir
-                }
+            const response = await clientService.list({
+                ...filters,
+                page: currentPage,
+                limit: 10
             });
 
-            const { data, hasMore: newHasMore } = response.data;
+            const { data, hasMore: newHasMore } = response;
             
             setClients(prev => shouldReset ? data : [...prev, ...data]);
             setHasMore(newHasMore);
@@ -50,7 +40,7 @@ export const useClientList = (initialFilters: Filters) => {
         } finally {
             setIsLoading(false);
         }
-    }, [apiClient, filters, isLoading]);
+    }, [filters, isLoading]);
 
     // Efeito para refazer a busca quando os filtros mudam
     useEffect(() => {
