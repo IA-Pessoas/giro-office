@@ -9,7 +9,7 @@ import {
 } from '@chakra-ui/react';
 
 import { useAuth } from '../../context/AuthContext';
-import { useChat } from '../../context/ChatContext';
+import { useChat } from '../context/ChatContext';
 import * as styles from '../../styles/chat'
 
 import { BsFillPersonPlusFill } from "react-icons/bs";

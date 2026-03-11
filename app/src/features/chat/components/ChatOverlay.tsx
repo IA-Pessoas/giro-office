@@ -1,6 +1,6 @@
 // src/components/Chat/ChatOverlay.tsx
 import React from 'react';
-import { ChatProvider } from '../../context/ChatContext';
+import { ChatProvider } from '../context/ChatContext';
 import { ChatLayout } from './ChatLayout';
 import { IoMdCloseCircleOutline } from "react-icons/io";
 import { Box } from '@chakra-ui/react';

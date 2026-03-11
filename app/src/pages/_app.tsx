@@ -9,8 +9,8 @@ import '../styles/global.css'
 import theme from '../styles/theme'
 
 import { AuthProvider, useAuth } from "../context/AuthContext";
-import { ChatProvider, useChat } from "../context/ChatContext";
-import { ChatControllerUI } from '@shared/components/ChatControllerUI'; // O controlador do Overlay
+import { ChatProvider } from "@features/chat";
+import { ChatControllerUI } from '@shared/components/ChatControllerUI';
 import { SocketProvider } from '../context/SocketContext'
 import Navbar from "@shared/components/sidebar";
 
