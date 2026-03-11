@@ -9,9 +9,9 @@ import { IoMdArrowRoundBack } from "react-icons/io";
 import { MdGroupAdd } from "react-icons/md";
 import { CiCirclePlus } from "react-icons/ci";
 
-import { useChat } from '../context/ChatContext';
-import { useAuth } from '../../context/AuthContext';
-import * as styles from '../../styles/chat'
+import { useChat } from '../../../context/ChatContext';
+import { useAuth } from '../../../context/AuthContext';
+import * as styles from '../../../styles/chat'
 
 const NewChatView = ({ onBack, onSelectUser, onNewGroupClick }) => {
     const { fetchAllUsers } = useChat();

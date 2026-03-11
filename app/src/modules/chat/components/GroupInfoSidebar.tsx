@@ -8,9 +8,9 @@ import {
     Checkbox
 } from '@chakra-ui/react';
 
-import { useAuth } from '../../context/AuthContext';
-import { useChat } from '../context/ChatContext';
-import * as styles from '../../styles/chat'
+import { useAuth } from '../../../context/AuthContext';
+import { useChat } from '../../../context/ChatContext';
+import * as styles from '../../../styles/chat'
 
 import { BsFillPersonPlusFill } from "react-icons/bs";
 import { MdGroups } from "react-icons/md";
