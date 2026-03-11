@@ -5,11 +5,11 @@ import { Writable } from "node:stream";
 import test from "node:test";
 
 import {
-  type CreateAuditRequestPayload,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
-} from "@workspace/shared";
+} from "@workspace/shared/http";
+import type { CreateAuditRequestPayload } from "@workspace/shared/audit";
 import { createLogger } from "@workspace/shared/logger";
 import jwt from "jsonwebtoken";
 import { createApp } from "./app.js";

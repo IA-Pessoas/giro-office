@@ -1,8 +1,8 @@
 import Head from "next/head"
 import { Flex, Text } from "@chakra-ui/react"
 
-import { setupAPIClient } from "@/services/api"
-import { canSSRGuest } from "../utils/canSSRGuest"
+import { setupAPIClient } from "@shared/services/api"
+import { canSSRGuest } from "@modules/auth"
 
 export default function Home() {
     return(

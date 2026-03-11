@@ -10,19 +10,27 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./logger": {
-      "types": "./dist/logger.d.ts",
-      "default": "./dist/logger.js"
+    "./auth": {
+      "types": "./dist/auth/index.d.ts",
+      "default": "./dist/auth/index.js"
     },
-    "./services": {
-      "types": "./dist/services.d.ts",
-      "default": "./dist/services.js"
+    "./audit": {
+      "types": "./dist/audit/index.d.ts",
+      "default": "./dist/audit/index.js"
+    },
+    "./http": {
+      "types": "./dist/http/index.d.ts",
+      "default": "./dist/http/index.js"
+    },
+    "./logger": {
+      "types": "./dist/logger/index.d.ts",
+      "default": "./dist/logger/index.js"
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"import('node:fs').then((fs) => { fs.rmSync('dist', { recursive: true, force: true }); fs.rmSync('tsconfig.tsbuildinfo', { force: true }); })\" && tsc -p tsconfig.json",
     "dev": "tsc --watch",
-    "test": "tsx --test ./**/*.test.ts",
+    "test": "pnpm run build && tsx --test tests/**/*.test.ts",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check ."

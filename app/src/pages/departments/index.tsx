@@ -5,28 +5,21 @@ import { FaUsers } from 'react-icons/fa';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
-import { canSSRAuth } from '../../utils/canSSRAuth'
-import { setupAPIClient } from '../../services/api'
-
-// Components
-import { DepFilters } from '../../components/departments/DepFilters';
-import { DepList } from '../../components/departments/DepList';
-import { DepDetailsView } from '../../components/departments/DepDetailsView';
-import { CreateDepModal } from '../../components/departments/CreateDepModal';
-
-export interface DepItem {
-    id: string
-    name: string
-    color: string
-    status: string
-    solution: boolean
-}
+import { canSSRAuth } from '@modules/auth'
+import { setupAPIClient } from '@shared/services/api'
+import { 
+  DepList, 
+  DepFilters, 
+  DepDetailsView, 
+  CreateDepModal,
+  departmentService,
+  type DepItem 
+} from '@modules/departments';
 interface Props {
     deps: DepItem[]
 }
 
 export default function Departaments({ deps }: Props) {
-    const apiClient = setupAPIClient();
     const [depsList, setDepsList] = useState<DepItem[]>(deps || [])
     const [selected, setSelected] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -54,9 +47,8 @@ export default function Departaments({ deps }: Props) {
     const handleFilterChange = async (status: string) => {
         setIsListLoading(true);
         try {
-            const apiClient = setupAPIClient();
-            const response = await apiClient.get('/departments', { params: { status } });
-            setDepsList(response.data);
+            const deps = await departmentService.list({ status });
+            setDepsList(deps);
             setFilterStatus(status);
             toast.success(`Filtro '${status}' aplicado.`);
         } catch (error) {
@@ -174,7 +166,7 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
 
         return {
             props: {
-                deps: depsResponse.data,
+                deps,
             }
         }
 

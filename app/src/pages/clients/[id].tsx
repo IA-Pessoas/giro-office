@@ -4,8 +4,8 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import { ClientTabs } from '../../components/Tabs/ClientTabs';
 
-import { canSSRAuth } from '../../utils/canSSRAuth';
-import { setupAPIClient } from '../../services/api';
+import { canSSRAuth } from '@modules/auth';
+import { setupAPIClient } from '@shared/services/api';
 
 interface ClientItem {
     id: string

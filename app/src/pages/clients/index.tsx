@@ -5,26 +5,10 @@ import { FaUsers } from 'react-icons/fa';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
-import { canSSRAuth } from '../../utils/canSSRAuth'
-import { setupAPIClient } from '../../services/api'
+import { canSSRAuth } from '@modules/auth'
+import { setupAPIClient } from '@shared/services/api'
+import { ClientFilters, ClientList, ClientDetailsView, ClientCreateModal, clientService, type ClientItem, type Perms } from '@modules/clients'
 
-import { Perms } from '../../services/types/clientTabs';
-
-// Components
-import { ClientFilters } from '../../components/Clients/ClientFilters';
-import { ClientList } from '../../components/Clients/ClientList';
-import { ClientDetailsView } from '../../components/Clients/ClientDetails';
-import { ClientCreateModal } from '../../components/Clients/ClientCreateModal';
-
-export interface ClientItem {
-    id: string
-    dominio_code: string
-    name: string
-    company_name: string
-    fantasy_name: string
-    cpf_cnpj: string
-    status: string
-}
 interface Props {
     clients: ClientItem[]
     permList: Perms
@@ -35,7 +19,7 @@ export default function clients({ clients, permList }: Props) {
     const [selected, setSelected] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('Ativo');
-    const [filterLabel, setFilterLabel] = useState('Ativo');
+    const [filterLabel, setFilterLabel] = useState('Ativo');    
     const [isListLoading, setIsListLoading] = useState(false);
 
     const { isOpen: isModalOpen, onOpen: onModalOpen, onClose: onModalClose } = useDisclosure();
@@ -59,9 +43,8 @@ export default function clients({ clients, permList }: Props) {
 
         setIsListLoading(true);
         try {
-            const apiClient = setupAPIClient();
-            const response = await apiClient.get('/clients', { params: { status, page: 1, limit: 20 } });
-            setclientsList(response.data.data);
+            const response = await clientService.list({ status, page: 1, limit: 20 });
+            setclientsList(response.data);
             setFilterStatus(status);
             setFilterLabel(newLabel);
             toast.success(`Filtro aplicado.`);

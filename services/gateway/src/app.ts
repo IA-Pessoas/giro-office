@@ -1,12 +1,11 @@
+import { createAuditRecorder } from "@workspace/shared/audit";
 import {
-  type AuthLogContext,
-  createAuditRecorder,
   createExpressErrorHandler,
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
-} from "@workspace/shared";
-import type { Logger, LogLevel } from "@workspace/shared/logger";
+} from "@workspace/shared/http";
+import type { AuthLogContext, Logger, LogLevel } from "@workspace/shared/logger";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
