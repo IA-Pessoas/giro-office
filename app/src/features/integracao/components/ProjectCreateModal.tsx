@@ -7,7 +7,9 @@ import {
 import { IoAdd, IoTrash } from "react-icons/io5";
 
 import { setupAPIClient } from '@shared/services/api';
-import { useTaskModels, TaskModel } from '../../../hooks/integracao/useTaskModels';
+import { integracaoService } from '../services/integracaoService';
+import { useTaskModels } from '../hooks/useTaskModels';
+import type { TaskModel, ProjectTaskItem } from '../types';
 
 interface ProjectCreateModalProps {
     isOpen: boolean;

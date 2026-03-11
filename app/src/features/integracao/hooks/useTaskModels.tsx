@@ -1,46 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { setupAPIClient } from '@shared/services/api';
-
-export interface TaskModel {
-    id: string
-    name: string
-    department_id: string
-    responsible_id: string
-    responsible2_id: string
-    responsible3_id: string
-    observations: string
-    billing: string
-    prevision: number
-    type: "Projeto"
-    department: {
-        id: string
-        name: string
-    }
-}
+import { integracaoService } from '../services/integracaoService';
+import type { TaskModel, CreateTaskModelData, UpdateTaskModelData } from '../types';
 
 export const useTaskModels = () => {
     const [models, setModels] = useState<TaskModel[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const apiClient = setupAPIClient();
 
     const fetchModels = useCallback(async () => {
         setIsLoading(true);
         try {
-            // Ajuste a rota conforme seu backend
-            const response = await apiClient.get('/integracao-tasksModel');
-            setModels(response.data);
+            const data = await integracaoService.taskModels.list();
+            setModels(data);
         } catch (error) {
             console.error(error);
-            toast.error("Erro ao buscar modelos."); // Opcional
+            toast.error("Erro ao buscar modelos.");
         } finally {
             setIsLoading(false);
         }
     }, []);
 
-    const createModel = async (data: Omit<TaskModel, 'id'>) => {
+    const createModel = async (data: CreateTaskModelData) => {
         try {
-            await apiClient.post('/integracao-tasksModel', data);
+            await integracaoService.taskModels.create(data);
             toast.success("Modelo criado com sucesso!");
             fetchModels();
             return true;
@@ -50,9 +32,9 @@ export const useTaskModels = () => {
         }
     };
 
-    const updateModel = async (data: TaskModel) => {
+    const updateModel = async (data: UpdateTaskModelData) => {
         try {
-            await apiClient.put('/integracao-tasksModel', data);
+            await integracaoService.taskModels.update(data);
             toast.success("Modelo atualizado!");
             fetchModels();
             return true;
@@ -64,7 +46,7 @@ export const useTaskModels = () => {
 
     const deleteModel = async (id: string) => {
         try {
-            await apiClient.delete('/integracao-taskModel', { data: { task_id: id } });
+            await integracaoService.taskModels.delete(id);
             toast.success("Removido!");
             fetchModels();
             return true;
@@ -78,3 +60,5 @@ export const useTaskModels = () => {
 
     return { models, isLoading, createModel, updateModel, deleteModel, refresh: fetchModels };
 };
+
+export type { TaskModel } from '../types';
