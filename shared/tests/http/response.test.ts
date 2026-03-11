@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createSuccessResponse } from "./response.js";
+import { createSuccessResponse } from "../../src/http/response.js";
 
 test("createSuccessResponse wraps data in the shared success envelope", () => {
   const response = createSuccessResponse({

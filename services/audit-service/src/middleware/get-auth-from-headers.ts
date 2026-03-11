@@ -1,11 +1,13 @@
 import {
   AUDIT_ADMIN_PERMISSION,
+  type ForwardedAuditAuthContext,
+} from "@workspace/shared/audit";
+import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
-  type ForwardedAuditAuthContext,
   ServiceError,
-} from "@workspace/shared";
+} from "@workspace/shared/http";
 import type { Request } from "express";
 
 function parsePermission(value: string | undefined): number | undefined {

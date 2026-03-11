@@ -4,7 +4,7 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   REQUEST_ID_HEADER,
   ServiceError,
-} from "@workspace/shared";
+} from "@workspace/shared/http";
 import type { NextFunction, Request, Response } from "express";
 
 function hasRequestBody(method: string): boolean {

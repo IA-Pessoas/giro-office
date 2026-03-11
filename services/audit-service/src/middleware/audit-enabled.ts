@@ -1,4 +1,4 @@
-import { ServiceError } from "@workspace/shared";
+import { ServiceError } from "@workspace/shared/http";
 import type { RequestHandler } from "express";
 
 export function createAuditEnabledMiddleware(auditEnabled: boolean): RequestHandler {

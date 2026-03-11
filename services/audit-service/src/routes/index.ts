@@ -1,10 +1,10 @@
 import {
   createSuccessResponse,
-  type ForwardedAuditAuthContext,
   isServiceError,
   REQUEST_ID_HEADER,
   ServiceError,
-} from "@workspace/shared";
+} from "@workspace/shared/http";
+import type { ForwardedAuditAuthContext } from "@workspace/shared/audit";
 import type { Logger } from "@workspace/shared/logger";
 import { type RequestHandler, Router } from "express";
 

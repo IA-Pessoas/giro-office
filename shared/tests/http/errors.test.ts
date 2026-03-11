@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ServiceError, serializeError } from "./errors.js";
+import { ServiceError, serializeError } from "../../src/http/errors.js";
 
 test("serializeError preserves service errors", () => {
   const result = serializeError(new ServiceError(401, "Não autenticado."), {
