@@ -28,15 +28,15 @@ enum status {
   cancelled
 }
 model Organization {
-  id         String   @id @default(uuid())
-  name       String
-  slug       String   @unique
-  logo_url       String?
-  status     status   @default(active)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  email_created_by String 
-  cnpj String @unique
+  id                String   @id @default(uuid())
+  name              String
+  slug              String   @unique
+  logo_url          String?
+  status            status   @default(active)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  email_created_by  String 
+  cnpj              String @unique
   subscription_plan String @default("trial")
 
 
@@ -148,26 +148,26 @@ enum enumType {
   user
 }
 model OrganizationUser {
-  id String @id @default(uuid())
-  organization_id String
-  user_id String
-  type enumType @default(user)
+  id               String @id @default(uuid())
+  organization_id  String
+  user_id          String
+  type             enumType @default(user)
   first_owner_flag Boolean? @default(false)
-  organization Organization @relation(fields: [organization_id], references: [id])
-  user User @relation(fields: [user_id], references: [id])
+  organization     Organization @relation(fields: [organization_id], references: [id])
+  user             User @relation(fields: [user_id], references: [id])
 
   @@map("organization_users")
 }
 
 model OrganizationInvite {
-  id String @id @default(uuid())
+  id              String @id @default(uuid())
   organization_id String
-  email_user String
-  token String
-  expires_at DateTime
-  accepted_at DateTime?
-  role enumType @default(user)
-  organization Organization @relation(fields: [organization_id], references: [id])
+  email_user      String
+  token           String
+  expires_at      DateTime
+  accepted_at     DateTime?
+  role            enumType @default(user)
+  organization    Organization @relation(fields: [organization_id], references: [id])
 
   @@map("organization_invites")
 }

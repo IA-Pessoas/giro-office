@@ -3,4 +3,5 @@ packages:
   - "infra"
   - "services/gateway"
   - "services/organization-service"
+  - "services/audit-service"
   - "shared"

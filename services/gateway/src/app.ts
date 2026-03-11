@@ -222,6 +222,7 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   });
 
   app.use("/organizations", buildHttpProxyMiddleware(getServiceUrls().organizationServiceUrl));
+  app.use("/organization-users", buildHttpProxyMiddleware(getServiceUrls().organizationServiceUrl));
   if (env.auditEnabled) {
     app.use(
       "/audit",

@@ -7,6 +7,7 @@ import cors from "cors";
 
 import { requestContext } from "./middlewares/requestContext.js";
 import organizationRoutes from "./routes/organization.routes.js";
+import organizationUserRoutes from "./routes/organizationUser.routes.js";
 
 const app: express.Express = express();
 
@@ -21,6 +22,7 @@ app.get("/health", (_request: Request, response: Response) => {
 });
 
 app.use(organizationRoutes);
+app.use(organizationUserRoutes);
 
 app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
   serviceError({

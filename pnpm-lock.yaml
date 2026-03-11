@@ -136,6 +136,43 @@ importers:
         specifier: ^4.19.0
         version: 4.21.0
 
+  services/audit-service:
+    dependencies:
+      '@prisma/adapter-pg':
+        specifier: ^7.4.1
+        version: 7.4.1
+      '@prisma/client':
+        specifier: 7.4.1
+        version: 7.4.1(prisma@7.4.1(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3))(typescript@5.9.3)
+      '@workspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      dotenv:
+        specifier: ^16.6.1
+        version: 16.6.1
+      express:
+        specifier: ^4.18.2
+        version: 4.22.1
+      pg:
+        specifier: ^8.13.0
+        version: 8.19.0
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.3.3
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   services/gateway:
     dependencies:
       '@workspace/shared':
