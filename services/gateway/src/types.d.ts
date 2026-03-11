@@ -7,6 +7,8 @@ declare global {
       auth?: AuthContext;
       log?: Logger;
       requestId?: string;
+      auditErrorCode?: string;
+      auditErrorMessage?: string;
     }
   }
 }
