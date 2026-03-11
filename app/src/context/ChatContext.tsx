@@ -2,41 +2,12 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useRe
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
 import { parseCookies } from 'nookies';
-import { setupAPIClient } from '@shared/services/api'
+import { chatService } from '../features/chat/services/chatService';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
+import type { ChatParticipant, User, Message, Chat, ChatContextType } from '../features/chat/types';
 
-// --- INTERFACES ---
-interface ChatParticipant {
-    user: User;
-    unreadCount: number;
-}
-interface User { 
-    id: string;
-    name: string;
-}
-interface Message { 
-    id: string;
-    content: string;
-    fileUrl: string;
-    type: 'TEXT' | 'IMAGE' | 'AUDIO' | 'DELETED';
-    createdAt: string;
-    chat_id: string;
-    sender_id: string;
-    sender: User;
-    chat?: Chat;
-    isEdited?: boolean;
-}
-interface Chat { 
-    id: string;
-    type: 'DIRECT' | 'GROUP';
-    name?: string;
-    participants: ChatParticipant[];
-    messages: Message[];
-    myUnreadCount?: number;
-    firstUnreadMessageId?: string | null;
-}
-interface ChatContextType {
+export interface ChatContextType {
     chats: Chat[];
     selectedChat: Chat | null;
     messages: Message[];
@@ -79,8 +50,6 @@ const MESSAGES_PER_PAGE = 30;
 export function ChatProvider({ children }: { children: ReactNode }) {
     const { user, isAuthenticated } = useAuth(); 
     const { socket } = useSocket();
-    
-    const apiClient = setupAPIClient();
 
     const [chats, setChats] = useState<Chat[]>([]);
     const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
@@ -499,8 +468,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     const fetchAllUsers = async (): Promise<User[]> => {
         try {
-            const response = await apiClient.get('/chat/contacts')
-            return response.data
+            return await chatService.fetchContacts();
         } catch (error) {
             console.error("Erro ao buscar usuários:", error);
             return [];
@@ -509,13 +477,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     
     const createDirectChat = async (partnerId: string) => {
         try {
-            const response = await apiClient.post('/chat/direct', {
-                user_id_2: partnerId
-            })
+            const newChat = await chatService.createDirectChat({ partnerId });
 
-            const newChat = await response.data;
-
-            // ATUALIZAÇÃO: Após receber o novo chat, emite o evento
             if (socket) {
                 socket.emit('joinRoom', newChat.id);
             }
@@ -529,12 +492,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     const createGroupChat = async (name: string, memberIds: string[]) => {
         try {
-            const response = await apiClient.post('/chat/group', {
-                name,
-                member_ids: memberIds
-            })
-
-            const newGroup = await response.data;
+            const newGroup = await chatService.createGroupChat({ name, memberIds });
 
             if (socket) {
                 socket.emit('joinRoom', newGroup.id);
@@ -547,32 +505,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
     }
     const updateGroupDetails = async (chatId: string, data: { name: string; photo?: File }) => {
-        // Usamos FormData porque estamos enviando um arquivo
-        const formData = new FormData();
-        
-        // Adiciona o nome ao FormData
-        formData.append('name', data.name);
-        
-        // Se uma nova foto foi selecionada, adiciona ao FormData
-        if (data.photo) {
-            formData.append('file', data.photo);
-        }
-
         try {
             setIsUploading(true);
-            // Chama a nova rota unificada
-            await apiClient.post(`/chat/${chatId}/group`, formData, {
-                headers: {
-                    // O navegador definirá o 'Content-Type' como 'multipart/form-data' automaticamente
-                },
-            });
+            await chatService.updateGroupDetails(chatId, data);
             toast.success("Atualizado com sucesso!")
-            // A UI será atualizada pelo evento de socket 'chat_updated'
         } catch (error) {
             console.error("Erro ao atualizar grupo:", error);
             alert("Não foi possível atualizar os detalhes do grupo.");
         } finally {
-            setIsUploading(false); // Desativa o feedback de loading
+            setIsUploading(false);
         }
     };
 
@@ -708,19 +649,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
     };
     const getSignedMediaUrl = async (filePath: string): Promise<string | null> => {
-        try {
-            const response = await apiClient.get('/chat/media/link', {
-                params: { filePath },
-            });
-
-            if (response.data && response.data.url) {
-                return response.data.url;
-            }
-            return null;
-        } catch (error) {
-            console.error("Erro ao obter URL assinada:", error);
-            return null;
-        }
+        return await chatService.getSignedMediaUrl(filePath);
     };
 
     const updateUnreadBadge = (currentChats: Chat[]) => {
@@ -760,22 +689,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     const addMembersToGroup = async (chatId: string, userIdsToAdd: string[]) => {
         try {
-            await apiClient.post(`/chat/${chatId}/participants`, { userIdsToAdd });
+            await chatService.addMembersToGroup(chatId, userIdsToAdd);
             toast.success("Adicionado com sucesso!")
         } catch (error) { console.error("Erro ao adicionar membros:", error); }
     };
 
     const removeMemberFromGroup = async (chatId: string, userIdToRemove: string) => {
         try {
-            await apiClient.delete(`/chat/participants`, { data: { chat_id: chatId, user_id_to_remove: userIdToRemove } });
+            await chatService.removeMemberFromGroup(chatId, userIdToRemove);
             toast.success("Removido com sucesso!")
         } catch (error) { console.error("Erro ao remover participante:", error); }
     };
 
     const updateMemberRole = async (chatId: string, targetUserId: string, role: 'ADMIN' | 'MEMBER') => {
         try {
-            // Usamos a rota que definimos com o ID do usuário nela
-            await apiClient.patch(`/chat/${chatId}/participants/${targetUserId}/role`, { role });
+            await chatService.updateMemberRole(chatId, targetUserId, role);
             toast.success("Atualizado com sucesso!")
         } catch (error) { console.error("Erro ao atualizar permissão:", error); }
     };
