@@ -1,4 +1,5 @@
-import { authenticateFromAuthHeader, ServiceError } from "@workspace/shared";
+import { authenticateFromAuthHeader } from "@workspace/shared/auth";
+import { ServiceError } from "@workspace/shared/http";
 import type { NextFunction, Request, Response } from "express";
 
 import { isPublicRoute } from "../security/publicRoutes.js";

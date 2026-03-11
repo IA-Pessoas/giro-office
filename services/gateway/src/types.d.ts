@@ -1,4 +1,4 @@
-import type { AuthContext } from "@workspace/shared";
+import type { AuthContext } from "@workspace/shared/auth";
 import type { Logger } from "@workspace/shared/logger";
 
 declare global {

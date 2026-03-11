@@ -1,4 +1,5 @@
-import { canAccessRoute, ServiceError } from "@workspace/shared";
+import { canAccessRoute } from "@workspace/shared/auth";
+import { ServiceError } from "@workspace/shared/http";
 import type { NextFunction, Request, Response } from "express";
 
 import { getRoutePolicy } from "../security/policies.js";

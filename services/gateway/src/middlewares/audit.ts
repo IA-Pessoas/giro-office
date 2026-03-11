@@ -3,7 +3,7 @@ import type {
   AuditQuery,
   AuditRecorder,
   CreateAuditRequestPayload,
-} from "@workspace/shared";
+} from "@workspace/shared/audit";
 import type { Logger } from "@workspace/shared/logger";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 

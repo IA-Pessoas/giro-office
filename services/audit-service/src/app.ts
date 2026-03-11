@@ -1,4 +1,4 @@
-import { createExpressErrorHandler } from "@workspace/shared";
+import { createExpressErrorHandler } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import express from "express";
 

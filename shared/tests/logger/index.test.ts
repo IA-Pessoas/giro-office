@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { Writable } from "node:stream";
 import test from "node:test";
 
-import { createLogger } from "./logger.js";
+import { createLogger } from "../../src/logger/index.js";
 
 class MemoryLogStream extends Writable {
   private readonly chunks: string[] = [];

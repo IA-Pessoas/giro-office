@@ -1,7 +1,4 @@
 import { STATUS_CODES } from "node:http";
-import type { ErrorRequestHandler, Request } from "express";
-
-import type { Logger } from "./logger.js";
 
 export interface ErrorResponseBody {
   success: false;
@@ -19,18 +16,6 @@ interface SerializeErrorOptions {
   requestId?: string;
   fallbackMessage: string;
 }
-
-interface CreateExpressErrorHandlerOptions {
-  logger: Logger;
-  event: string;
-  fallbackMessage: string;
-  getContext?: (request: Request) => Record<string, unknown> | undefined;
-}
-
-type RequestWithLogger = Request & {
-  log?: Logger;
-  requestId?: string;
-};
 
 const ERROR_CODE_BY_STATUS = new Map<number, string>([
   [400, "BAD_REQUEST"],
@@ -115,35 +100,5 @@ export function serializeError(
       code: "INTERNAL_ERROR",
       ...(requestId ? { requestId } : {}),
     },
-  };
-}
-
-export function createExpressErrorHandler({
-  logger,
-  event,
-  fallbackMessage,
-  getContext,
-}: CreateExpressErrorHandlerOptions): ErrorRequestHandler {
-  return function expressErrorHandler(error, request, response, next) {
-    if (response.headersSent) {
-      next(error);
-      return;
-    }
-
-    const requestWithLogger = request as RequestWithLogger;
-    const requestLogger = requestWithLogger.log ?? logger;
-    const serialized = serializeError(error, {
-      requestId: requestWithLogger.requestId,
-      fallbackMessage,
-    });
-
-    requestLogger.error({
-      event,
-      message: serialized.body.error,
-      ...getContext?.(request),
-      err: error,
-    });
-
-    response.status(serialized.statusCode).json(serialized.body);
   };
 }

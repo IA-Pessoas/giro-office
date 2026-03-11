@@ -5,15 +5,17 @@ import { Writable } from "node:stream";
 import test from "node:test";
 
 import {
-  type AuditRequestRecord,
-  type AuditSearchFilters,
-  type AuditSearchResult,
-  type CreateAuditRequestPayload,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
-} from "@workspace/shared";
+} from "@workspace/shared/http";
+import type {
+  AuditRequestRecord,
+  AuditSearchFilters,
+  AuditSearchResult,
+  CreateAuditRequestPayload,
+} from "@workspace/shared/audit";
 import { createLogger } from "@workspace/shared/logger";
 import { createApp } from "../src/app.js";
 import type { AuditServiceEnv } from "../src/config/env.js";

@@ -4,13 +4,15 @@ import {
   type AuditSearchResult,
   type CreateAuditRequestPayload,
   DEFAULT_AUDIT_PAGE_SIZE,
-  getSingleQueryValue,
   MAX_AUDIT_PAGE_SIZE,
+} from "@workspace/shared/audit";
+import {
+  getSingleQueryValue,
   parseOptionalDate,
   parseOptionalInteger,
   parsePositiveInteger,
   ServiceError,
-} from "@workspace/shared";
+} from "@workspace/shared/http";
 import { z } from "zod";
 
 import type { AuditRequestRepository } from "../integrations/prisma/audit-request-repository.js";
