@@ -14,7 +14,7 @@ import {
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
-import { canSSRAuth } from "@features/auth";
+import { canSSRAuth } from "@modules/auth";
 import { IoIosArrowForward } from 'react-icons/io'
 import { AuthContext } from "../../context/AuthContext";
 import { setupAPIClient } from "@shared/services/api";

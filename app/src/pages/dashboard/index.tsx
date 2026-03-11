@@ -7,7 +7,7 @@ import {
 import 'react-toastify/dist/ReactToastify.css';
 
 import Navbar from "@shared/components/sidebar"
-import { canSSRAuth } from '@features/auth'
+import { canSSRAuth } from '@modules/auth'
 import { setupAPIClient } from '@shared/services/api'
 
 export interface MeItem { id: string; name: string; permission: number; department_id: string; status: string; photo: string | null; }

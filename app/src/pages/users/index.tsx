@@ -4,10 +4,10 @@ import { Box, Flex, useDisclosure, Spinner, Icon } from '@chakra-ui/react';
 import { toast } from "react-toastify";
 import { FaUsers } from 'react-icons/fa';
 
-import { canSSRAuth } from '@features/auth';
+import { canSSRAuth } from '@modules/auth';
 import { setupAPIClient } from '@shared/services/api';
-import { UserFilters, UserList, CreateUserModal, UserDetailsView, userService, type UserItem } from '@features/users';
-import type { DepItem } from '@features/departments';
+import { UserFilters, UserList, CreateUserModal, UserDetailsView, userService, type UserItem } from '@modules/users';
+import type { DepItem } from '@modules/departments';
 
 interface Props { users: UserItem[]; deps: DepItem[]; me: any; }
 

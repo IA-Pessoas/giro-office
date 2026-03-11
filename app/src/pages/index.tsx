@@ -2,7 +2,7 @@ import Head from "next/head"
 import { Flex, Text } from "@chakra-ui/react"
 
 import { setupAPIClient } from "@shared/services/api"
-import { canSSRGuest } from "@features/auth"
+import { canSSRGuest } from "@modules/auth"
 
 export default function Home() {
     return(
