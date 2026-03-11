@@ -9,7 +9,7 @@ import { FaComputer } from "react-icons/fa6";
 import { IoCreate } from "react-icons/io5";
 import { setupAPIClient } from '@shared/services/api';
 import { useUserForm } from '../hooks/useUserForm';
-import LogDrawer from '@/components/LogDrawer';
+import LogDrawer from '@shared/components/LogDrawer';
 import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
 interface UserProfileProps {

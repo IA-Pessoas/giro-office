@@ -22,7 +22,7 @@ import { canSSRAuth } from '@features/auth';
 import { setupAPIClient } from '@shared/services/api';
 import { useUserForm, type UserItem } from '@features/users';
 import type { DepItem } from '@features/departments';
-import LogDrawer from '@/components/LogDrawer';
+import LogDrawer from '@shared/components/LogDrawer';
 
 interface MeItem { id: string; name: string; permission: number; }
 interface Props { me: MeItem; user: UserItem; deps: DepItem[]; }

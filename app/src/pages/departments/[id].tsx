@@ -20,7 +20,7 @@ import { IoCreate } from "react-icons/io5";
 
 import { canSSRAuth } from '@features/auth';
 import { setupAPIClient } from '@shared/services/api';
-import LogDrawer from '@/components/LogDrawer';
+import LogDrawer from '@shared/components/LogDrawer';
 import { useDepForm, departmentService, type DepItem } from '@features/departments';
 interface Props {
     dep: DepItem

@@ -5,7 +5,7 @@ import {
 } from '@chakra-ui/react';
 import { IoCreate, IoAddCircleOutline, IoPencil, IoFolderOpen } from "react-icons/io5";
 
-import LogDrawer from '@/components/LogDrawer';
+import LogDrawer from '@shared/components/LogDrawer';
 import { LoadingSpinner } from '../../layout/LoadingSpinner';
 
 import { useClientFormIntegracao } from '@features/clients';

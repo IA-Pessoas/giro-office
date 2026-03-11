@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Flex, FormControl, FormLabel, Input, Switch, SimpleGrid, Select, Button } from '@chakra-ui/react';
 import { IoCreate } from "react-icons/io5";
 
-import LogDrawer from '@/components/LogDrawer';
+import LogDrawer from '@shared/components/LogDrawer';
 import { LoadingSpinner } from '../../layout/LoadingSpinner';
 
 import { useClientFormRegularize } from '@features/clients';
