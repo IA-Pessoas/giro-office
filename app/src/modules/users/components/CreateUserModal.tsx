@@ -3,7 +3,7 @@ import { Modal, FormControl, ModalOverlay, ModalContent, ModalHeader, ModalFoote
 import { toast } from 'react-toastify';
 import { setupAPIClient } from '@shared/services/api';
 import type { UserItem } from '../types';
-import type { DepItem } from '@features/departments';
+import type { DepItem } from '@modules/departments';
 
 interface CreateUserModalProps {
   isOpen: boolean;

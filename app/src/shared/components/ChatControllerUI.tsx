@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { ChatOverlay } from '@features/chat';
+import { ChatOverlay } from '@modules/chat';
 
 interface ChatControllerUIProps {
   isOpen: boolean;

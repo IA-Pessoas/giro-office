@@ -36,7 +36,7 @@ Cada pasta dentro de `features/` deve ser tratada como um mini-app:
 - `types/`: Interfaces e tipos exclusivos do dominio.
 - `index.ts` (Public API): O unico ponto de saida. So exportamos o que o resto do app pode ver.
 
-**IMPORTANTE**: Nunca importe de `@features/domain/components/X`. Importe sempre de `@features/domain`.
+**IMPORTANTE**: Nunca importe de `@modules/domain/components/X`. Importe sempre de `@modules/domain`.
 
 ## Guia de Decisao: Onde colocar meu codigo?
 
@@ -50,9 +50,9 @@ Cada pasta dentro de `features/` deve ser tratada como um mini-app:
 
 ## Fluxo de Desenvolvimento
 
-1. **Criacao**: Ao adicionar uma nova funcionalidade, crie uma nova pasta em `features/`.
-2. **Encapsulamento**: Mantenha o maximo de logica possivel dentro da pasta da feature.
-3. **Promocao**: Se perceber que um componente de uma feature esta sendo copiado para outra, "promova-o" para a pasta `shared/`.
+1. **Criacao**: Ao adicionar uma nova funcionalidade, crie uma nova pasta em `modules/`.
+2. **Encapsulamento**: Mantenha o maximo de logica possivel dentro da pasta do module.
+3. **Promocao**: Se perceber que um componente de um module esta sendo copiado para outro, "promova-o" para a pasta `shared/`.
 
 ## Exemplo de Uso
 
@@ -60,26 +60,26 @@ Cada pasta dentro de `features/` deve ser tratada como um mini-app:
 
 ```typescript
 // Correto
-import { UserList, userService, type UserItem } from '@features/users';
+import { UserList, userService, type UserItem } from '@modules/users';
 
 // Errado
-import { UserList } from '@features/users/components/UserList';
+import { UserList } from '@modules/users/components/UserList';
 ```
 
-### Passando Dados entre Features
+### Passando Dados entre Modules
 
 ```typescript
 // Na Page (orquestrador)
-import { ChatUserList } from '@features/chat';
-import { userService } from '@features/users';
+import { ChatUserList } from '@modules/chat';
+import { userService } from '@modules/users';
 
 const users = await userService.list();
 <ChatUserList users={users} />
 ```
 
-### Criando uma Nova Feature
+### Criando um Novo Module
 
-1. Criar estrutura de pastas em `features/[nome-da-feature]/`
+1. Criar estrutura de pastas em `modules/[nome-do-module]/`
 2. Definir tipos em `types/index.ts`
 3. Criar service em `services/[nome]Service.ts`
 4. Criar componentes em `components/`

@@ -5,7 +5,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { IoCreate } from "react-icons/io5";
 
 import { setupAPIClient } from '@shared/services/api';
-import type { Client, Perms } from '@features/clients';
+import type { Client, Perms } from '@modules/clients';
 
 import { ActionButton } from '../../Infos/ActionButton';
 import { DataRow } from '../../Infos/DataRow';

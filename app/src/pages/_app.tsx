@@ -9,7 +9,7 @@ import '../styles/global.css'
 import theme from '../styles/theme'
 
 import { AuthProvider, useAuth } from "../context/AuthContext";
-import { ChatProvider } from "@features/chat";
+import { ChatProvider } from "@modules/chat";
 import { ChatControllerUI } from '@shared/components/ChatControllerUI';
 import { SocketProvider } from '../context/SocketContext'
 import Navbar from "@shared/components/sidebar";

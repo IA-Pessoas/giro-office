@@ -18,10 +18,10 @@ import { LuFolder } from "react-icons/lu";
 import { FaComputer } from "react-icons/fa6";
 import { IoCreate } from "react-icons/io5";
 
-import { canSSRAuth } from '@features/auth';
+import { canSSRAuth } from '@modules/auth';
 import { setupAPIClient } from '@shared/services/api';
-import { useUserForm, type UserItem } from '@features/users';
-import type { DepItem } from '@features/departments';
+import { useUserForm, type UserItem } from '@modules/users';
+import type { DepItem } from '@modules/departments';
 import LogDrawer from '@shared/components/LogDrawer';
 
 interface MeItem { id: string; name: string; permission: number; }

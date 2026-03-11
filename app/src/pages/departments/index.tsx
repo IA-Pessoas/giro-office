@@ -5,7 +5,7 @@ import { FaUsers } from 'react-icons/fa';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
-import { canSSRAuth } from '@features/auth'
+import { canSSRAuth } from '@modules/auth'
 import { setupAPIClient } from '@shared/services/api'
 import { 
   DepList, 
@@ -14,7 +14,7 @@ import {
   CreateDepModal,
   departmentService,
   type DepItem 
-} from '@features/departments';
+} from '@modules/departments';
 interface Props {
     deps: DepItem[]
 }

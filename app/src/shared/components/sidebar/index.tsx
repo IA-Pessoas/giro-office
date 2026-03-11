@@ -5,7 +5,7 @@ import { Link as ChakraLink, Box, IconButton, useColorMode, Text, Tooltip, VStac
 import { IconType } from "react-icons";
 import { FiHome, FiUser, FiUsers, FiLogOut, FiSettings } from "react-icons/fi";
 import { FiMessageSquare } from "react-icons/fi";
-import { useChat } from "@features/chat";
+import { useChat } from "@modules/chat";
 import { useAuth } from "../../../context/AuthContext";
 import { MoonIcon, SunIcon } from "@chakra-ui/icons";
 import { setupAPIClient } from '@shared/services/api';

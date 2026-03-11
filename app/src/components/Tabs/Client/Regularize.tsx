@@ -5,9 +5,9 @@ import { IoCreate } from "react-icons/io5";
 import LogDrawer from '@shared/components/LogDrawer';
 import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
-import { useClientFormRegularize } from '@features/clients';
+import { useClientFormRegularize } from '@modules/clients';
 import { setupAPIClient } from '@shared/services/api';
-import type { Client, Perms } from '@features/clients';
+import type { Client, Perms } from '@modules/clients';
 
 interface ClientTabProps {
   client: Client;

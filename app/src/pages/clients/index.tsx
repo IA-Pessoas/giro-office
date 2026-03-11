@@ -5,9 +5,9 @@ import { FaUsers } from 'react-icons/fa';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
-import { canSSRAuth } from '@features/auth'
+import { canSSRAuth } from '@modules/auth'
 import { setupAPIClient } from '@shared/services/api'
-import { ClientFilters, ClientList, ClientDetailsView, ClientCreateModal, clientService, type ClientItem, type Perms } from '@features/clients'
+import { ClientFilters, ClientList, ClientDetailsView, ClientCreateModal, clientService, type ClientItem, type Perms } from '@modules/clients'
 
 interface Props {
     clients: ClientItem[]

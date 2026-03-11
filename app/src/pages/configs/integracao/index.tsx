@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { Box, Button, SimpleGrid, Heading, Text, Icon } from '@chakra-ui/react';
 import { FaTasks } from 'react-icons/fa';
 import Link from 'next/link';
-import { canSSRAuth } from '@features/auth';
+import { canSSRAuth } from '@modules/auth';
 
 export default function IntegracaoConfig() {
     return (

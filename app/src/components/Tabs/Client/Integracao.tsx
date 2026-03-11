@@ -8,10 +8,10 @@ import { IoCreate, IoAddCircleOutline, IoPencil, IoFolderOpen } from "react-icon
 import LogDrawer from '@shared/components/LogDrawer';
 import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
-import { useClientFormIntegracao } from '@features/clients';
+import { useClientFormIntegracao } from '@modules/clients';
 import { setupAPIClient } from '@shared/services/api';
-import type { Client, Perms } from '@features/clients';
-import { ProjectCreateModal } from '@features/integracao';
+import type { Client, Perms } from '@modules/clients';
+import { ProjectCreateModal } from '@modules/integracao';
 
 interface ClientTabProps {
     client: Client;

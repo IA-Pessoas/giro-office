@@ -2,10 +2,10 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useRe
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
 import { parseCookies } from 'nookies';
-import { chatService } from '../features/chat/services/chatService';
+import { chatService } from '../modules/chat/services/chatService';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
-import type { ChatParticipant, User, Message, Chat, ChatContextType } from '../features/chat/types';
+import type { ChatParticipant, User, Message, Chat, ChatContextType } from '../modules/chat/types';
 
 export interface ChatContextType {
     chats: Chat[];

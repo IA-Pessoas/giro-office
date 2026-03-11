@@ -18,10 +18,10 @@ import 'react-toastify/dist/ReactToastify.css';
 import { LuFolder } from "react-icons/lu";
 import { IoCreate } from "react-icons/io5";
 
-import { canSSRAuth } from '@features/auth';
+import { canSSRAuth } from '@modules/auth';
 import { setupAPIClient } from '@shared/services/api';
 import LogDrawer from '@shared/components/LogDrawer';
-import { useDepForm, departmentService, type DepItem } from '@features/departments';
+import { useDepForm, departmentService, type DepItem } from '@modules/departments';
 interface Props {
     dep: DepItem
 }
