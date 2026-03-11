@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box } from "@chakra-ui/react";
-import { ClientTabs } from '../../components/Tabs/ClientTabs';
+import { ClientTabs } from '../../../components/Tabs/ClientTabs';
 import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 import { clientService } from '../services/clientService';
 import { setupAPIClient } from '@shared/services/api';
