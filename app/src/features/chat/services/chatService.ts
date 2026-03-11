@@ -60,4 +60,9 @@ export const chatService = {
       data: { chat_id: chatId, user_id_to_remove: userIdToRemove }
     });
   },
+
+  updateMemberRole: async (chatId: string, targetUserId: string, role: 'ADMIN' | 'MEMBER'): Promise<void> => {
+    const api = setupAPIClient();
+    await api.patch(`/chat/${chatId}/participants/${targetUserId}/role`, { role });
+  },
 };
