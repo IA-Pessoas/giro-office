@@ -17,7 +17,7 @@ export function createApp({ env, logger, repository }: CreateAppOptions): expres
 
   app.set("trust proxy", true);
   app.use(express.json());
-  app.use(createAuditRouter({ env, repository }));
+  app.use(createAuditRouter({ env, logger, repository }));
   app.use(
     createExpressErrorHandler({
       logger,
