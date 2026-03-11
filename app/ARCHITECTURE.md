@@ -28,7 +28,7 @@ Para manter a escalabilidade, seguimos a hierarquia de camadas:
 
 ## Anatomia de um Module (@modules/)
 
-Cada pasta dentro de `features/` deve ser tratada como um mini-app:
+Cada pasta dentro de `modules/` deve ser tratada como um mini-app:
 
 - `components/`: UI especifica deste dominio.
 - `hooks/`: Logica de estado e efeitos deste dominio.
@@ -43,10 +43,10 @@ Cada pasta dentro de `features/` deve ser tratada como um mini-app:
 | Pergunta | Destino |
 |----------|---------|
 | E um botao, input ou modal generico? | `shared/components/` |
-| E uma chamada de API de um micro-servico? | `features/[domain]/services/` |
+| E uma chamada de API de um micro-servico? | `modules/[domain]/services/` |
 | E um formatador de data usado em todo o app? | `shared/utils/` |
-| E um tipo que 3+ features utilizam? | `shared/types/` |
-| E a logica de um formulario especifico? | `features/[domain]/hooks/` |
+| E um tipo que 3+ modules utilizam? | `shared/types/` |
+| E a logica de um formulario especifico? | `modules/[domain]/hooks/` |
 
 ## Fluxo de Desenvolvimento
 
@@ -56,7 +56,7 @@ Cada pasta dentro de `features/` deve ser tratada como um mini-app:
 
 ## Exemplo de Uso
 
-### Importando de uma Feature
+### Importando de um Module
 
 ```typescript
 // Correto
