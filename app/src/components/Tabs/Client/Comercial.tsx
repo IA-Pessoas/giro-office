@@ -5,9 +5,9 @@ import { IoCreate } from "react-icons/io5";
 import LogDrawer from '@/components/LogDrawer';
 import { LoadingSpinner } from '../../layout/LoadingSpinner';
 
-import { useClientFormComercial } from '../../../hooks/clients/useFormComercial';
+import { useClientFormComercial } from '@features/clients';
 import { setupAPIClient } from '@shared/services/api';
-import { Client, Perms } from '../../../services/types/clientTabs';
+import type { Client, Perms } from '@features/clients';
 import { formatDateToInput } from '@shared/utils/formatters';
 
 interface ClientTabProps {
