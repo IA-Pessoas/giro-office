@@ -3,15 +3,16 @@ import type { ErrorRequestHandler, Request } from "express";
 
 import type { Logger } from "./logger.js";
 
-interface SerializedErrorBody {
+export interface ErrorResponseBody {
+  success: false;
   error: string;
   code: string;
   requestId?: string;
 }
 
-interface SerializedErrorResult {
+export interface SerializedErrorResult {
   statusCode: number;
-  body: SerializedErrorBody;
+  body: ErrorResponseBody;
 }
 
 interface SerializeErrorOptions {
@@ -98,6 +99,7 @@ export function serializeError(
     return {
       statusCode: error.statusCode,
       body: {
+        success: false,
         error: error.message,
         code: error.code,
         ...(requestId ? { requestId } : {}),
@@ -108,6 +110,7 @@ export function serializeError(
   return {
     statusCode: 500,
     body: {
+      success: false,
       error: fallbackMessage,
       code: "INTERNAL_ERROR",
       ...(requestId ? { requestId } : {}),

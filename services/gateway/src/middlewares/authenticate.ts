@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from "express";
 import { isPublicRoute } from "../security/publicRoutes.js";
 
 export function buildAuthenticateMiddleware(jwtSecret: string) {
-  return function authenticate(request: Request, response: Response, next: NextFunction): void {
+  return function authenticate(request: Request, _response: Response, next: NextFunction): void {
     if (isPublicRoute(request.method, request.path)) {
       next();
       return;
