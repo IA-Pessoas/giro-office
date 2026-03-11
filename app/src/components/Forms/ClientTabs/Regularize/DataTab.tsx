@@ -9,10 +9,10 @@ import {
 } from '@chakra-ui/react';
 import { IoCreate } from 'react-icons/io5';
 import { toast } from 'react-toastify';
-import { setupAPIClient } from '@/services/api';
+import { setupAPIClient } from '@shared/services/api';
 
 import StateCity from '../../StateCity';
-import { formatDateToInput } from '@/utils/formatters';
+import { formatDateToInput } from '@shared/utils/formatters';
 
 export default function DataTabRegularize({ client }) {
     const [id, setId] = useState(client && client?.id)

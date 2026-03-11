@@ -10,6 +10,8 @@
     "jsx": "preserve",
     "incremental": true,
     "paths": {
+      "@modules/*": ["./src/modules/*"],
+      "@shared/*": ["./src/shared/*"],
       "@/*": ["./src/*"]
     }
   },

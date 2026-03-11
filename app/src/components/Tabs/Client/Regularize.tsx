@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Box, Flex, FormControl, FormLabel, Input, Switch, SimpleGrid, Select, Button } from '@chakra-ui/react';
 import { IoCreate } from "react-icons/io5";
 
-import LogDrawer from '@/components/LogDrawer';
-import { LoadingSpinner } from '../../layout/LoadingSpinner';
+import LogDrawer from '@shared/components/LogDrawer';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
-import { useClientFormRegularize } from '../../../hooks/clients/useFormRegularize';
-import { setupAPIClient } from '../../../services/api';
-import { Client, Perms } from '../../../services/types/clientTabs';
+import { useClientFormRegularize } from '@modules/clients';
+import { setupAPIClient } from '@shared/services/api';
+import type { Client, Perms } from '@modules/clients';
 
 interface ClientTabProps {
   client: Client;

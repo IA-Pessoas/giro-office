@@ -8,7 +8,7 @@ import { FiMessageSquare } from "react-icons/fi";
 import { useChat } from "../../context/ChatContext";
 import { useAuth } from "../../context/AuthContext";
 import { MoonIcon, SunIcon } from "@chakra-ui/icons";
-import { setupAPIClient } from '../../services/api'; // Importar API
+import { setupAPIClient } from '@shared/services/api';
 
 // Dados estáticos fora do componente
 interface NavItemProps {

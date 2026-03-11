@@ -6,9 +6,9 @@ import {
 } from '@chakra-ui/react'
 import 'react-toastify/dist/ReactToastify.css';
 
-import Navbar from "../../components/sidebar"
-import { canSSRAuth } from '../../utils/canSSRAuth'
-import { setupAPIClient } from '../../services/api'
+import Navbar from "@shared/components/sidebar"
+import { canSSRAuth } from '@modules/auth'
+import { setupAPIClient } from '@shared/services/api'
 
 export interface MeItem { id: string; name: string; permission: number; department_id: string; status: string; photo: string | null; }
 interface Props { me: MeItem; }
@@ -47,7 +47,7 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
     } catch (error: any) {
         // Se for erro 401, lança AuthTokenError para ser capturado pelo canSSRAuth
         if (error?.response?.status === 401 || error?.message === 'Unauthorized') {
-            const { AuthTokenError } = await import('../../services/errors/AuthTokenError');
+            const { AuthTokenError } = await import('@shared/services/errors/AuthTokenError');
             throw new AuthTokenError();
         }
         

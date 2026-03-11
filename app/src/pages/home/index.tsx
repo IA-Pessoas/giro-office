@@ -7,14 +7,14 @@ import {
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 
-import { ModuleCard } from '../../components/ModulosCards'
+import { ModuleCard } from '@shared/components/ModulosCards'
 
-import { canSSRAuth } from '../../utils/canSSRAuth'
-import { setupAPIClient } from '../../services/api'
+import { canSSRAuth } from '@modules/auth'
+import { setupAPIClient } from '@shared/services/api'
 
 import LogoTI from '../../../public/logos/lions/Tecnologia.png';
 import LogoIntegracao from '../../../public/logos/lions/Integracao.png';
-import { ToggleThemeButton } from '../../components/ToggleThemeButton';
+import { ToggleThemeButton } from '@shared/components/ToggleThemeButton';
 
 
 interface PermsItem {
