@@ -2,15 +2,15 @@
 
 ## Visao Geral
 
-Este projeto utiliza uma arquitetura baseada em Dominios (Features) e Modulos. O objetivo e garantir o baixo acoplamento entre as funcionalidades de negocio (micro-servicos no backend) e alta coesao interna.
+Este projeto utiliza uma arquitetura baseada em Dominios (Modules) e Modulos. O objetivo e garantir o baixo acoplamento entre as funcionalidades de negocio (micro-servicos no backend) e alta coesao interna.
 
 ## Estrutura de Pastas
 
 ```
 src/
-├── features/         # Dominios de negocio isolados (Ex: auth, chat, sales)
+├── modules/          # Dominios de negocio isolados (Ex: auth, chat, sales)
 ├── shared/           # Infraestrutura e UI agnostica (UI Kit, API, Utils)
-├── pages/            # Rotas do Next.js (Orquestradores de Features)
+├── pages/            # Rotas do Next.js (Orquestradores de Modules)
 └── styles/           # Design System Global
 ```
 
@@ -18,15 +18,15 @@ src/
 
 Para manter a escalabilidade, seguimos a hierarquia de camadas:
 
-- **Pages → Features**: As paginas importam componentes e servicos das features.
-- **Features → Shared**: As features utilizam ferramentas e componentes globais do shared.
-- **Features ↛ Features**: Uma feature nunca deve importar arquivos internos de outra feature.
+- **Pages → Modules**: As paginas importam componentes e servicos dos modules.
+- **Modules → Shared**: Os modules utilizam ferramentas e componentes globais do shared.
+- **Modules ↛ Modules**: Um module nunca deve importar arquivos internos de outro module.
   - **Solucao**: Se Chat precisa de dados de User, passe via Props na Page ou mova a entidade para `@shared/types`.
-- **Shared ↛ Features**: O codigo compartilhado deve ser "burro" em relacao ao negocio. Ele nao conhece as features.
+- **Shared ↛ Modules**: O codigo compartilhado deve ser "burro" em relacao ao negocio. Ele nao conhece os modules.
 
-**Regra de Ouro**: Se voce esta em `@features/A` e sente que precisa importar algo de `@features/B`, pare. Ou voce passa o dado via Props, ou esse 'algo' deve ser promovido para `@shared`.
+**Regra de Ouro**: Se voce esta em `@modules/A` e sente que precisa importar algo de `@modules/B`, pare. Ou voce passa o dado via Props, ou esse 'algo' deve ser promovido para `@shared`.
 
-## Anatomia de uma Feature (@features/)
+## Anatomia de um Module (@modules/)
 
 Cada pasta dentro de `features/` deve ser tratada como um mini-app:
 
