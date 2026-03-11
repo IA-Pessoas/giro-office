@@ -43,6 +43,7 @@ const gatewayEnvSchema = z
         return Number.isNaN(parsed) ? 3334 : parsed;
       }),
     legacyApiUrl: z.string().url().default("http://localhost:3333"),
+    userServiceUrl: z.string().url().default("http://localhost:3335"),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o gateway."),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
@@ -76,6 +77,7 @@ export function getGatewayEnv(): GatewayEnv {
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     port: process.env.GATEWAY_PORT,
     legacyApiUrl: process.env.LEGACY_API_URL,
+    userServiceUrl: process.env.USER_SERVICE_URL,
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,

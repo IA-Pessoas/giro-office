@@ -5,7 +5,12 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
 } from "@workspace/shared/http";
-import type { AuthLogContext, Logger, LogLevel } from "@workspace/shared/logger";
+import {
+  gatewayError,
+  type AuthLogContext,
+  type Logger,
+  type LogLevel,
+} from "@workspace/shared/logger";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
@@ -17,7 +22,7 @@ import {
 import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
-import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
+import { buildHttpProxyMiddleware, type UpstreamResolver } from "./proxy/httpProxy.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
   return {
@@ -230,7 +235,15 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     );
   }
 
-  app.use(buildHttpProxyMiddleware(env.legacyApiUrl));
+  const userServiceRoutes = new Set(["POST /session", "POST /start-config"]);
+  const resolveUpstream: UpstreamResolver = (method, path) => {
+    const key = `${method.toUpperCase()} ${path}`;
+    if (userServiceRoutes.has(key)) return env.userServiceUrl;
+    if (path === "/users" || path.startsWith("/users/")) return env.userServiceUrl;
+    return env.legacyApiUrl;
+  };
+
+  app.use(buildHttpProxyMiddleware(resolveUpstream));
   app.use(buildAuditErrorCaptureMiddleware());
   app.use(
     createExpressErrorHandler({
@@ -243,6 +256,14 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
       }),
     }),
   );
+  app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
+    gatewayError({
+      requestId: request.requestId ?? "",
+      message: error.message,
+    });
+
+    response.status(500).json({ error: "Erro interno no gateway." });
+  });
 
   return app;
 }
