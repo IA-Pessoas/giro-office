@@ -223,16 +223,16 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
 
             // A) Salvar/Criar Projeto
             if (isEditing) {
-                await apiClient.put('/integracao-projects', {
-                    project_id: projectId,
+                await integracaoService.projects.update({
+                    id: projectId,
                     ...projectData
                 });
             } else {
-                const projectRes = await apiClient.post('/integracao-projects', {
+                const newProject = await integracaoService.projects.create({
                     client_id: clientId,
                     ...projectData
                 });
-                projectId = projectRes.data.create?.id || projectRes.data.id;
+                projectId = newProject.id;
             }
 
             if (!projectId) throw new Error("ID do projeto inválido.");

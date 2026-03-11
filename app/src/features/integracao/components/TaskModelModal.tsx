@@ -130,12 +130,8 @@ export function TaskModelModal({ isOpen, onClose, initialData, onSave }: ModalPr
 
     const fetchDependents = async (taskId: string) => {
         try {
-            const apiClient = setupAPIClient();
-            // Rota: router.get('/integracao-tasksModel-dependent', ...)
-            const response = await apiClient.get('/integracao-tasksModel-dependent', {
-                params: { task_id: taskId }
-            });
-            setDependents(response.data);
+            const dependentsData = await integracaoService.taskModels.getDependents(taskId);
+            setDependents(dependentsData);
         } catch (error) {
             console.error("Erro ao buscar dependentes:", error);
         }
@@ -153,10 +149,8 @@ export function TaskModelModal({ isOpen, onClose, initialData, onSave }: ModalPr
 
         setLoadingDependents(true);
         try {
-            const apiClient = setupAPIClient();
-            // Rota: router.post('/integracao-tasksModel-dependent', ...)
-            await apiClient.post('/integracao-tasksModel-dependent', {
-                task_id: initialData.id,
+            await integracaoService.taskModels.createDependent({
+                task_model_id: initialData.id,
                 dependent_id: newDep.dependent_id,
                 wait: newDep.wait,
                 observation: newDep.observation
@@ -178,12 +172,7 @@ export function TaskModelModal({ isOpen, onClose, initialData, onSave }: ModalPr
         if (!confirm("Remover este dependente?")) return;
 
         try {
-            const apiClient = setupAPIClient();
-            // Rota: router.delete('/integracao-taskModel-dependent', ...)
-            // O backend espera { task_id: string } no body, onde task_id é o ID DO VÍNCULO (relationId)
-            await apiClient.delete('/integracao-taskModel-dependent', {
-                data: { task_id: relationId } 
-            });
+            await integracaoService.taskModels.deleteDependent(relationId);
 
             toast.success("Removido com sucesso!");
             if (initialData?.id) fetchDependents(initialData.id);
