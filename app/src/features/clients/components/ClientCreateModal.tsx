@@ -179,10 +179,7 @@ export function ClientCreateModal({ isOpen, onClose, onCreated, perm }: CreateMo
         const cleanCpfResp = formData.cpf_responsible.replace(/[^\d]/g, '');
         const cleanCpfAgent = formData.cpf_agent.replace(/[^\d]/g, '');
         
-        const endpoint = '/clients-integracao';
-
         try {
-            const apiClient = setupAPIClient();
             const payload = {
                 ...formData,
                 cpf_cnpj: cleanDoc,
@@ -190,9 +187,9 @@ export function ClientCreateModal({ isOpen, onClose, onCreated, perm }: CreateMo
                 cpf_agent: cleanCpfAgent,
                 opening_date: formData.opening_date ? new Date(formData.opening_date) : null,
             };
-            const response = await apiClient.post(endpoint, payload);
+            const newClient = await clientService.create(payload);
             toast.success("Cliente cadastrado com sucesso!");
-            onCreated(response.data.client);
+            onCreated(newClient);
             onClose();
         } catch (err: any) {
             const errorMsg = err.response?.data?.error || 'Erro ao cadastrar cliente.';

@@ -3,7 +3,7 @@ import { Flex, Input, InputGroup, InputLeftElement, Menu, MenuButton, MenuItem, 
 import { IoMdSearch, IoIosArrowForward } from 'react-icons/io';
 import { CiCirclePlus } from "react-icons/ci";
 
-import { Perms } from '../../services/types/clientTabs';
+import type { Perms } from '../types';
 
 interface FiltersProps {
   initialLabel: string;
