@@ -9,7 +9,7 @@ import type { Client, Perms } from '@features/clients';
 
 import { ActionButton } from '../../Infos/ActionButton';
 import { DataRow } from '../../Infos/DataRow';
-import { LoadingSpinner } from '../../layout/LoadingSpinner';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
 interface ClientTabProps {
     client: Client;

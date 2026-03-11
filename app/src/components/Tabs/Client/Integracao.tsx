@@ -6,7 +6,7 @@ import {
 import { IoCreate, IoAddCircleOutline, IoPencil, IoFolderOpen } from "react-icons/io5";
 
 import LogDrawer from '@shared/components/LogDrawer';
-import { LoadingSpinner } from '../../layout/LoadingSpinner';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
 import { useClientFormIntegracao } from '@features/clients';
 import { setupAPIClient } from '@shared/services/api';

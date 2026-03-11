@@ -3,7 +3,7 @@ import { Box, Flex, FormControl, FormLabel, Input, Switch, SimpleGrid, Select, B
 import { IoCreate } from "react-icons/io5";
 
 import LogDrawer from '@shared/components/LogDrawer';
-import { LoadingSpinner } from '../../layout/LoadingSpinner';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
 import { useClientFormRegularize } from '@features/clients';
 import { setupAPIClient } from '@shared/services/api';
