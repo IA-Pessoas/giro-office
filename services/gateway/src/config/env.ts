@@ -36,6 +36,7 @@ const gatewayEnvSchema = z
         return Number.isNaN(parsed) ? 3334 : parsed;
       }),
     legacyApiUrl: z.string().url().default("http://localhost:3333"),
+    userServiceUrl: z.string().url().default("http://localhost:3335"),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o gateway."),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z

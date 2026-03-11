@@ -58,6 +58,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     nodeEnv: "test",
     port: 0,
     legacyApiUrl: "http://127.0.0.1:3333",
+    userServiceUrl: "http://127.0.0.1:3335",
     jwtSecret: "test-secret",
     logLevel: "silent",
     logPretty: false,
@@ -124,7 +125,7 @@ test("returns shared forbidden response when permission is insufficient", async 
 test("returns shared upstream error when the upstream service is unreachable", async () => {
   const app = createApp(
     createEnv({
-      legacyApiUrl: "http://127.0.0.1:1",
+      userServiceUrl: "http://127.0.0.1:1",
     }),
     createTestLogger(),
   );
@@ -157,9 +158,9 @@ test("passes upstream error responses through unchanged", async () => {
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ error: "Teapot upstream" }));
   });
-  const legacyApiUrl = await startServer(upstream);
+  const userServiceUrl = await startServer(upstream);
 
-  const app = createApp(createEnv({ legacyApiUrl }), createTestLogger());
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
   const gateway = createServer(app);
   const gatewayUrl = await startServer(gateway);
 

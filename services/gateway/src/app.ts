@@ -186,7 +186,14 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     );
   });
 
-  app.use(buildHttpProxyMiddleware(() => env.legacyApiUrl));
+  function resolveUpstream(_method: string, path: string): string {
+    if (path === "/session" || path === "/start-config" || path.startsWith("/users")) {
+      return env.userServiceUrl;
+    }
+    return env.legacyApiUrl;
+  }
+
+  app.use(buildHttpProxyMiddleware(resolveUpstream));
   app.use(
     createExpressErrorHandler({
       logger,

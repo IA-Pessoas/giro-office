@@ -8,6 +8,7 @@ import "express-async-errors";
 
 import { getUserServiceEnv } from "./config/env.js";
 import { authRoutes } from "./routes/auth.routes.js";
+import { userRoutes } from "./routes/user.routes.js";
 
 const env = getUserServiceEnv();
 const logger = createLogger({
@@ -27,6 +28,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use(authRoutes);
+app.use("/users", userRoutes);
 
 app.use(
   createExpressErrorHandler({

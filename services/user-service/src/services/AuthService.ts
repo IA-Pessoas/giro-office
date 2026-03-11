@@ -80,7 +80,7 @@ class AuthService {
           login: "Admin",
           password: passwordHash,
           permission: 2,
-          status: "Ativo",
+          status: "active",
           department_id: dep.id,
         },
         select: {
