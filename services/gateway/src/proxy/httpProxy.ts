@@ -1,4 +1,10 @@
-import { ServiceError } from "@workspace/shared";
+import {
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  REQUEST_ID_HEADER,
+  ServiceError,
+} from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 
 function hasRequestBody(method: string): boolean {
@@ -33,32 +39,33 @@ function buildForwardHeaders(request: Request): Headers {
   headers.set("x-forwarded-for", request.ip ?? "");
 
   if (request.requestId) {
-    headers.set("x-request-id", request.requestId);
+    headers.set(REQUEST_ID_HEADER, request.requestId);
   }
 
   if (request.auth) {
-    headers.set("x-auth-user-id", request.auth.userId);
+    headers.set(FORWARDED_AUTH_USER_ID_HEADER, request.auth.userId);
+    headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, request.auth.organizationId);
 
     if (typeof request.auth.claims.permission === "number") {
-      headers.set("x-auth-permission", String(request.auth.claims.permission));
+      headers.set(FORWARDED_AUTH_PERMISSION_HEADER, String(request.auth.claims.permission));
     }
   }
 
   return headers;
 }
 
-export function buildHttpProxyMiddleware(legacyApiUrl: string) {
+export function buildHttpProxyMiddleware(targetUrl: string) {
   return async function httpProxy(
     request: Request,
     response: Response,
     next: NextFunction,
   ): Promise<void> {
-    const targetUrl = new URL(request.originalUrl, legacyApiUrl);
+    const upstreamUrl = new URL(request.originalUrl, targetUrl);
 
     try {
       const body = getRequestBody(request);
 
-      const upstreamResponse = await fetch(targetUrl, {
+      const upstreamResponse = await fetch(upstreamUrl, {
         method: request.method,
         headers: buildForwardHeaders(request),
         body,
