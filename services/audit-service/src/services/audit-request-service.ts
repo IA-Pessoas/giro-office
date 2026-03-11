@@ -4,7 +4,11 @@ import {
   type AuditSearchResult,
   type CreateAuditRequestPayload,
   DEFAULT_AUDIT_PAGE_SIZE,
+  getSingleQueryValue,
   MAX_AUDIT_PAGE_SIZE,
+  parseOptionalDate,
+  parseOptionalInteger,
+  parsePositiveInteger,
   ServiceError,
 } from "@workspace/shared";
 import { z } from "zod";
@@ -38,75 +42,6 @@ const createAuditRequestPayloadSchema = z.object({
   finishedAt: z.string().datetime().optional().nullable(),
   metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 });
-
-function getSingleQueryValue(value: unknown): string | undefined {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (Array.isArray(value) && typeof value[0] === "string") {
-    return value[0];
-  }
-
-  return undefined;
-}
-
-function parsePositiveInteger(
-  value: unknown,
-  fieldName: string,
-  fallback: number,
-  max?: number,
-): number {
-  const rawValue = getSingleQueryValue(value);
-
-  if (!rawValue) {
-    return fallback;
-  }
-
-  const parsed = Number.parseInt(rawValue, 10);
-
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    throw new ServiceError(400, `Parâmetro '${fieldName}' inválido.`);
-  }
-
-  if (typeof max === "number" && parsed > max) {
-    return max;
-  }
-
-  return parsed;
-}
-
-function parseOptionalInteger(value: unknown, fieldName: string): number | undefined {
-  const rawValue = getSingleQueryValue(value);
-
-  if (!rawValue) {
-    return undefined;
-  }
-
-  const parsed = Number.parseInt(rawValue, 10);
-
-  if (!Number.isInteger(parsed)) {
-    throw new ServiceError(400, `Parâmetro '${fieldName}' inválido.`);
-  }
-
-  return parsed;
-}
-
-function parseOptionalDate(value: unknown, fieldName: string): string | undefined {
-  const rawValue = getSingleQueryValue(value);
-
-  if (!rawValue) {
-    return undefined;
-  }
-
-  const parsed = new Date(rawValue);
-
-  if (Number.isNaN(parsed.getTime())) {
-    throw new ServiceError(400, `Parâmetro '${fieldName}' inválido.`);
-  }
-
-  return parsed.toISOString();
-}
 
 function parseCreateAuditRequestPayload(body: unknown): CreateAuditRequestPayload {
   try {
