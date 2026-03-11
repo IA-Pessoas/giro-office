@@ -26,8 +26,7 @@ import {
 } from '@chakra-ui/react';
 import { IoAdd, IoPencil, IoTrash, IoSearch } from 'react-icons/io5';
 import { canSSRAuth } from '@features/auth';
-import { TaskModel, useTaskModels } from '../../../../hooks/integracao/useTaskModels';
-import { TaskModelModal } from '../../../../components/Configs/integracao/TaskModelModal';
+import { useTaskModels, TaskModelModal, type TaskModel } from '@features/integracao';
 
 export default function TaskModelsConfig() {
     const { models, isLoading, createModel, updateModel, deleteModel } = useTaskModels();
