@@ -4,3 +4,4 @@ packages:
   - "services/gateway"
   - "shared"
   - "services/user-service"
+  - "services/audit-service"
