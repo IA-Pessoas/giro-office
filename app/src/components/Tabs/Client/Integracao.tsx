@@ -5,13 +5,13 @@ import {
 } from '@chakra-ui/react';
 import { IoCreate, IoAddCircleOutline, IoPencil, IoFolderOpen } from "react-icons/io5";
 
-import LogDrawer from '@/components/LogDrawer';
-import { LoadingSpinner } from '../../layout/LoadingSpinner';
+import LogDrawer from '@shared/components/LogDrawer';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
-import { useClientFormIntegracao } from '../../../hooks/clients/useFormIntegracao';
-import { setupAPIClient } from '../../../services/api';
-import { Client, Perms } from '../../../services/types/clientTabs';
-import { ProjectCreateModal } from '../../../components/Configs/integracao/ProjectCreateModal';
+import { useClientFormIntegracao } from '@modules/clients';
+import { setupAPIClient } from '@shared/services/api';
+import type { Client, Perms } from '@modules/clients';
+import { ProjectCreateModal } from '@modules/integracao';
 
 interface ClientTabProps {
     client: Client;

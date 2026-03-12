@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { Logger } from "@workspace/shared/logger";
+import type { Logger } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 
 export function buildRequestContextMiddleware(logger: Logger) {

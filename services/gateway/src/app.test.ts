@@ -5,12 +5,12 @@ import { Writable } from "node:stream";
 import test from "node:test";
 
 import {
-  type CreateAuditRequestPayload,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
+  createLogger,
 } from "@workspace/shared";
-import { createLogger } from "@workspace/shared/logger";
+import type { CreateAuditRequestPayload } from "@workspace/shared";
 import jwt from "jsonwebtoken";
 import { createApp } from "./app.js";
 import type { GatewayEnv } from "./config/env.js";

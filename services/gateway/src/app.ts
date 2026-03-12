@@ -1,13 +1,12 @@
-import { getServiceUrls } from "@workspace/shared/routes/services";
 import {
-  type AuthLogContext,
   createAuditRecorder,
   createExpressErrorHandler,
   createSuccessResponse,
+  getServiceUrls,
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
 } from "@workspace/shared";
-import type { Logger, LogLevel } from "@workspace/shared/logger";
+import type { AuthLogContext, Logger, LogLevel } from "@workspace/shared";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 

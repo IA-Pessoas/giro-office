@@ -4,7 +4,7 @@ import type {
   AuditSearchFilters,
   AuditSearchResult,
   CreateAuditRequestPayload,
-} from "@workspace/shared";
+} from "@workspace/shared/audit";
 
 import {
   Prisma,

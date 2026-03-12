@@ -3,10 +3,10 @@ import Head from "next/head"
 import Image from "next/image"
 import { Flex, Center, Text, Input, Button } from "@chakra-ui/react"
 
-import { setupAPIClient } from "@/services/api"
+import { setupAPIClient } from "@shared/services/api"
 
 import { AuthContext } from "../../context/AuthContext"
-import { canSSRGuest } from "../../utils/canSSRGuest"
+import { canSSRGuest } from "@modules/auth"
 
 export default function Login() {
     const { signIn } = useContext(AuthContext)

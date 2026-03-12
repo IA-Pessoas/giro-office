@@ -3,8 +3,8 @@ import type {
   AuditQuery,
   AuditRecorder,
   CreateAuditRequestPayload,
+  Logger,
 } from "@workspace/shared";
-import type { Logger } from "@workspace/shared/logger";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
 interface BuildAuditLifecycleMiddlewareOptions {
