@@ -67,7 +67,6 @@ export const useOrganizationForm = () => {
     } catch (error: any) {
       const errorMessage = error?.response?.data?.error || 'Erro ao cadastrar organização.';
       toast.error(errorMessage);
-      console.error(error);
       return null;
     } finally {
       setIsLoading(false);

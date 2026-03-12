@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text, Flex, Spinner, Badge } from '@chakra-ui/react';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { organizationService } from '../services/organizationService';
 import type { Organization } from '../types';
 
@@ -17,8 +19,9 @@ export function OrganizationProfile({ organizationId }: OrganizationProfileProps
       try {
         const data = await organizationService.getById(organizationId);
         setOrganization(data);
-      } catch (error) {
-        console.error('Erro ao buscar organização:', error);
+      } catch (error: any) {
+        const errorMessage = error?.response?.data?.error || 'Erro ao buscar organização.';
+        toast.error(errorMessage);
       } finally {
         setIsLoading(false);
       }
