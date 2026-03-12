@@ -16,9 +16,9 @@ import { GiConfirmed } from "react-icons/gi";
 import { CiCircleInfo } from "react-icons/ci";
 import { FaPencilRuler } from "react-icons/fa";
 
-import { useChat } from '../context/ChatContext';
-import { useAuth } from '../../context/AuthContext';
-import * as styles from '../../styles/chat'
+import { useChat } from '../../../context/ChatContext';
+import { useAuth } from '../../../context/AuthContext';
+import * as styles from '../../../styles/chat'
 import { useClickOutside } from '@shared/hooks/useClickOutside';
 
 import { GroupInfoSidebar } from './GroupInfoSidebar';
