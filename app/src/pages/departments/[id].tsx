@@ -18,19 +18,10 @@ import 'react-toastify/dist/ReactToastify.css';
 import { LuFolder } from "react-icons/lu";
 import { IoCreate } from "react-icons/io5";
 
-import { canSSRAuth } from '../../utils/canSSRAuth';
-import { setupAPIClient } from '../../services/api';
-import LogDrawer from '@/components/LogDrawer';
-
-import { useDepForm } from '../../hooks/departments/useDepForm';
-
-interface DepItem {
-    id: string
-    name: string
-    color: string
-    status: string
-    solution: boolean
-}
+import { canSSRAuth } from '@modules/auth';
+import { setupAPIClient } from '@shared/services/api';
+import LogDrawer from '@shared/components/LogDrawer';
+import { useDepForm, departmentService, type DepItem } from '@modules/departments';
 interface Props {
     dep: DepItem
 }
@@ -118,14 +109,12 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
 
     try {
         const apiClient = setupAPIClient(ctx);
-        const responseMe = await apiClient.get('/me')
-        const response = await apiClient.get('/department', {
-            params: {
-                dep_id: id,
-            },
-        });
+        const [meResponse, dep] = await Promise.all([
+            apiClient.get('/me'),
+            departmentService.getById(id as string)
+        ]);
 
-        if (response.data === null || responseMe.data.user.permission === 0) {
+        if (!dep || meResponse.data.user.permission === 0) {
             return {
                 redirect: {
                     destination: '/dashboard',
@@ -136,8 +125,8 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
 
         return {
             props: {
-                me: responseMe.data.user,
-                dep: response.data.dep,
+                me: meResponse.data.user,
+                dep,
             },
         };
     } catch (error) {

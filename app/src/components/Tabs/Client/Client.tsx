@@ -4,12 +4,12 @@ import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 import { IoCreate } from "react-icons/io5";
 
-import { setupAPIClient } from '../../../services/api';
-import { Client, Perms } from '../../../services/types/clientTabs';
+import { setupAPIClient } from '@shared/services/api';
+import type { Client, Perms } from '@modules/clients';
 
 import { ActionButton } from '../../Infos/ActionButton';
 import { DataRow } from '../../Infos/DataRow';
-import { LoadingSpinner } from '../../layout/LoadingSpinner';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
 interface ClientTabProps {
     client: Client;

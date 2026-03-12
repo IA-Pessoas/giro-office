@@ -1,15 +1,20 @@
-import { getServiceUrls } from "@workspace/shared/routes/services";
 import {
-  type AuthLogContext,
+  createAuditRecorder,
   createExpressErrorHandler,
   createSuccessResponse,
+  getServiceUrls,
+  INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
 } from "@workspace/shared";
-import type { Logger, LogLevel } from "@workspace/shared/logger";
+import type { AuthLogContext, Logger, LogLevel } from "@workspace/shared";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
 import type { GatewayEnv } from "./config/env.js";
+import {
+  buildAuditErrorCaptureMiddleware,
+  buildAuditLifecycleMiddleware,
+} from "./middlewares/audit.js";
 import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
@@ -77,6 +82,14 @@ function getUpstreamContext(url: string, request: Request) {
   } catch {
     return undefined;
   }
+}
+
+function getProxyTargetUrl(env: GatewayEnv, request: Request): string {
+  if (env.auditEnabled && request.originalUrl.startsWith("/audit")) {
+    return env.auditServiceUrl;
+  }
+
+  return env.legacyApiUrl;
 }
 
 function getResponseSizeBytes(response: Response): number | undefined {
@@ -159,13 +172,33 @@ function buildRequestLifecycleMiddleware(logger: Logger) {
 
 export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   const app = express();
+  const recordAuditRequest = createAuditRecorder({
+    enabled: env.auditEnabled,
+    serviceUrl: env.auditServiceUrl,
+    serviceToken: env.auditServiceToken,
+    logger,
+  });
 
   app.set("trust proxy", true);
   app.use(buildRequestContextMiddleware(logger));
+  app.use(
+    buildAuditLifecycleMiddleware({
+      enabled: env.auditEnabled,
+      logger,
+      recordAuditRequest,
+    }),
+  );
   app.use(buildRequestLifecycleMiddleware(logger));
   app.use(cors(createCorsOptions(env)));
   app.options("*", cors(createCorsOptions(env)));
   app.use(express.json());
+
+  if (!env.auditEnabled) {
+    app.use("/audit", (_request, _response, next) => {
+      next(new ServiceError(404, "Recurso não encontrado."));
+    });
+  }
+
   app.use(buildAuthenticateMiddleware(env.jwtSecret));
   app.use(authorizeRequest);
 
@@ -188,7 +221,19 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   });
 
   app.use("/organizations", buildHttpProxyMiddleware(getServiceUrls().organizationServiceUrl));
+  if (env.auditEnabled) {
+    app.use(
+      "/audit",
+      (request, _response, next) => {
+        request.headers[INTERNAL_SERVICE_TOKEN_HEADER] = env.auditServiceToken;
+        next();
+      },
+      buildHttpProxyMiddleware(env.auditServiceUrl),
+    );
+  }
+
   app.use(buildHttpProxyMiddleware(env.legacyApiUrl));
+  app.use(buildAuditErrorCaptureMiddleware());
   app.use(
     createExpressErrorHandler({
       logger,
@@ -196,7 +241,7 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
       fallbackMessage: "Erro interno no gateway.",
       getContext: (request) => ({
         auth: getAuthLogContext(request),
-        upstream: getUpstreamContext(env.legacyApiUrl, request),
+        upstream: getUpstreamContext(getProxyTargetUrl(env, request), request),
       }),
     }),
   );

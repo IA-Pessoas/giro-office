@@ -19,8 +19,8 @@ import {
 } from '@chakra-ui/react';
 import { IoCreate } from 'react-icons/io5';
 import { toast } from 'react-toastify';
-import { setupAPIClient } from '@/services/api';
-import { formatDateToInput } from '@/utils/formatters';
+import { setupAPIClient } from '@shared/services/api';
+import { formatDateToInput } from '@shared/utils/formatters';
 
 export default function DataTabComercial({ client }) {
     const [id, setId] = useState(client && client?.id)

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, } from '@chakra-ui/react';
-import Loader from '../Loader';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
 interface DetailsViewProps {
   id: string | null;
@@ -41,7 +41,7 @@ export function DetailsView({ id, link }: DetailsViewProps) {
       borderColor={'borderColorDarkOnly'}
       shadow={'md'}
     >
-      {isLoading && <Loader />}
+      {isLoading && <LoadingSpinner />}
 
       <iframe
         key={id}

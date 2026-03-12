@@ -1,5 +1,4 @@
-import type { AuthContext } from "@workspace/shared";
-import type { Logger } from "@workspace/shared/logger";
+import type { AuthContext, Logger } from "@workspace/shared";
 
 declare global {
   namespace Express {
@@ -7,6 +6,8 @@ declare global {
       auth?: AuthContext;
       log?: Logger;
       requestId?: string;
+      auditErrorCode?: string;
+      auditErrorMessage?: string;
     }
   }
 }

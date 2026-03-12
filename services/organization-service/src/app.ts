@@ -1,6 +1,5 @@
 import "dotenv/config";
-import { createSuccessResponse } from "@workspace/shared";
-import { serviceError } from "@workspace/shared/logger";
+import { createSuccessResponse, serviceError } from "@workspace/shared";
 import express, { type Request, type Response, type NextFunction } from "express";
 import "express-async-errors";
 import cors from "cors";

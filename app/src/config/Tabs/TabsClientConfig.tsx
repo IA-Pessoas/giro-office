@@ -4,8 +4,8 @@ import { LuFolder, LuPlug, LuBriefcase, LuFileText } from 'react-icons/lu';
 import { Box } from '@chakra-ui/react';
 import dynamic from 'next/dynamic';
 
-import { Client, Perms } from '../../services/types/clientTabs';
-import { LoadingSpinner } from '../../components/layout/LoadingSpinner';
+import type { Client, Perms } from '@modules/clients';
+import { LoadingSpinner } from '@shared/components/LoadingSpinner';
 
 const DadosGeraisTab = dynamic(() => import('../../components/Tabs/Client/Client').then(mod => mod.clientTab), {
   loading: () => <LoadingSpinner />,

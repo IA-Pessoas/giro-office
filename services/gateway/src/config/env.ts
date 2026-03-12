@@ -27,6 +27,13 @@ const loggerLevelSchema = z.enum([
 const gatewayEnvSchema = z
   .object({
     nodeEnv: z.string().optional().default("development"),
+    auditEnabled: z
+      .string()
+      .optional()
+      .default("false")
+      .transform((value) => parseBoolean(value)),
+    auditServiceToken: z.string().optional().default("audit-service-token"),
+    auditServiceUrl: z.string().url().default("http://localhost:3335"),
     port: z
       .string()
       .optional()
@@ -64,6 +71,9 @@ export type GatewayEnv = z.infer<typeof gatewayEnvSchema>;
 export function getGatewayEnv(): GatewayEnv {
   return gatewayEnvSchema.parse({
     nodeEnv: process.env.NODE_ENV,
+    auditEnabled: process.env.AUDIT_ENABLED,
+    auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
+    auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     port: process.env.GATEWAY_PORT,
     legacyApiUrl: process.env.LEGACY_API_URL,
     jwtSecret: process.env.JWT_SECRET,

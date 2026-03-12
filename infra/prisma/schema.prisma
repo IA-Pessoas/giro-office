@@ -9,11 +9,14 @@ generator organizationClient {
   output          = "../../services/organization-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
+generator audit_service_client {
+  provider        = "prisma-client"
+  output          = "../../services/audit-service/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
 
 datasource db {
-  provider = "postgresql"
-  
-  
+  provider = "postgresql"  
 }
 
 // ------------ Organization (Multi-Tenancy Root) ------------
@@ -43,6 +46,7 @@ model Organization {
   permissions                   Permission[]
   permissionsSpecifics          PermissionSpecific[]
   permissionsProjects           PermissionProject[]
+  auditRequests                 AuditRequest[]
   logs                          Logs[]
   certificateNotifications      CertificateNotification[]
   pessoalNotifications          PessoalNotification[]
@@ -208,6 +212,7 @@ model User {
 
   organization         Organization         @relation(fields: [organization_id], references: [id])
   organizationUsers    OrganizationUser[]
+  auditRequests        AuditRequest[]
   permissions          Permission[]
   permissionsSpecifics PermissionSpecific[]
   logs                 Logs[]
@@ -348,6 +353,38 @@ model Logs {
   user         User         @relation(fields: [user_id], references: [id])
 
   @@map("logs")
+}
+
+model AuditRequest {
+  id              String   @id @default(uuid())
+  request_id      String   @unique
+  organization_id String?
+  user_id         String?
+  permission      Int?
+  method          String
+  path            String
+  query_json      Json?
+  status_code     Int?
+  outcome         String
+  duration_ms     Int?
+  ip              String?
+  user_agent      String?
+  origin          String?
+  error_code      String?
+  error_message   String?
+  service_source  String
+  metadata_json   Json?
+  created_at      DateTime @default(now())
+  finished_at     DateTime?
+
+  organization Organization? @relation(fields: [organization_id], references: [id])
+  user         User?         @relation(fields: [user_id], references: [id])
+
+  @@index([organization_id, created_at(sort: Desc)])
+  @@index([user_id, created_at(sort: Desc)])
+  @@index([path, created_at(sort: Desc)])
+  @@index([status_code, created_at(sort: Desc)])
+  @@map("audit_requests")
 }
 
 

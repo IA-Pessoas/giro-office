@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { serverError, serviceStart } from "@workspace/shared/logger";
+import { serverError, serviceStart } from "@workspace/shared";
 import http from "node:http";
 import { app } from "./app.js";
 
