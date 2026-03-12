@@ -6,7 +6,6 @@ import prismaClient from "../prisma/index.js";
 
 const USER_PUBLIC_SELECT = {
   id: true,
-  organization_id: true,
   name: true,
   login: true,
   permission: true,
@@ -48,15 +47,12 @@ class UserService {
   async list({ organizationId, skip = 0, take = 20 }: ListUsersParams) {
     const [users, total] = await Promise.all([
       prismaClient.user.findMany({
-        where: { organization_id: organizationId },
         select: USER_PUBLIC_SELECT,
         skip,
         take,
         orderBy: { name: "asc" },
       }),
-      prismaClient.user.count({
-        where: { organization_id: organizationId },
-      }),
+      prismaClient.user.count(),
     ]);
 
     return { users, total, skip, take };
@@ -81,7 +77,6 @@ class UserService {
     try {
       const user = await prismaClient.user.create({
         data: {
-          organization_id: data.organization_id,
           name: data.name,
           login: data.login,
           password: passwordHash,

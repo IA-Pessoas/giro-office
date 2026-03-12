@@ -7,6 +7,8 @@ import type {
 import type { Logger } from "@workspace/shared/logger";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
+import { isUserServiceRoute } from "../utils/routeUtils.js";
+
 interface BuildAuditLifecycleMiddlewareOptions {
   enabled: boolean;
   logger: Logger;
@@ -65,14 +67,7 @@ function getOutcome(statusCode: number): AuditOutcome {
 
 function getRouteTarget(request: Request): string {
   if (request.originalUrl.startsWith("/audit")) return "audit-service";
-  if (
-    request.path === "/session" ||
-    request.path === "/start-config" ||
-    request.path === "/users" ||
-    request.path.startsWith("/users/")
-  ) {
-    return "user-service";
-  }
+  if (isUserServiceRoute(request.path)) return "user-service";
   return "legacy-api";
 }
 

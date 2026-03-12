@@ -4,10 +4,21 @@ import pino, {
   type Logger as PinoLogger,
   type LoggerOptions as PinoLoggerOptions,
 } from "pino";
+import { z } from "zod";
 
 export type Logger = PinoLogger;
 export type LoggerLevel = LevelWithSilent;
 export type LogLevel = Exclude<LoggerLevel, "silent">;
+
+export const loggerLevelSchema = z.enum([
+  "trace",
+  "debug",
+  "info",
+  "warn",
+  "error",
+  "fatal",
+  "silent",
+]) satisfies z.ZodType<LoggerLevel>;
 
 export interface RequestLogContext {
   id?: string;

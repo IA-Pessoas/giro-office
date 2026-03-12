@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { LoggerLevel } from "@workspace/shared/logger";
+import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -14,16 +14,6 @@ dotenv.config({ path: rootEnvPath });
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
 }
-
-const loggerLevelSchema = z.enum([
-  "trace",
-  "debug",
-  "info",
-  "warn",
-  "error",
-  "fatal",
-  "silent",
-]) satisfies z.ZodType<LoggerLevel>;
 
 const auditServiceEnvSchema = z
   .object({

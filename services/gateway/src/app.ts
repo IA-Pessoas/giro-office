@@ -18,6 +18,7 @@ import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
+import { isUserServiceRoute } from "./utils/routeUtils.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
   return {
@@ -81,15 +82,6 @@ function getUpstreamContext(url: string, request: Request) {
   } catch {
     return undefined;
   }
-}
-
-function isUserServiceRoute(path: string): boolean {
-  return (
-    path === "/session" ||
-    path === "/start-config" ||
-    path === "/users" ||
-    path.startsWith("/users/")
-  );
 }
 
 function getProxyTargetUrl(env: GatewayEnv, request: Request): string {

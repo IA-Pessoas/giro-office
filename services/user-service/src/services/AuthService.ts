@@ -75,7 +75,6 @@ class AuthService {
     try {
       const user = await prismaClient.user.create({
         data: {
-          organization_id: org.id,
           name: "Admin",
           login: "Admin",
           password: passwordHash,
