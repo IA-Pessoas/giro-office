@@ -5,7 +5,12 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
 } from "@workspace/shared/http";
-import type { AuthLogContext, Logger, LogLevel } from "@workspace/shared/logger";
+import {
+  gatewayError,
+  type AuthLogContext,
+  type Logger,
+  type LogLevel,
+} from "@workspace/shared/logger";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
@@ -251,6 +256,14 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
       }),
     }),
   );
+  app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
+    gatewayError({
+      requestId: request.requestId ?? "",
+      message: error.message,
+    });
+
+    response.status(500).json({ error: "Erro interno no gateway." });
+  });
 
   return app;
 }
