@@ -42,7 +42,6 @@ model Organization {
 
 
   departments                   Department[]
-  users                         User[]
   permissions                   Permission[]
   permissionsSpecifics          PermissionSpecific[]
   permissionsProjects           PermissionProject[]
@@ -150,7 +149,7 @@ enum enumType {
 model OrganizationUser {
   id               String @id @default(uuid())
   organization_id  String
-  user_id          String
+  user_id          String @unique
   type             enumType @default(user)
   first_owner_flag Boolean? @default(false)
   organization     Organization @relation(fields: [organization_id], references: [id])
@@ -200,7 +199,6 @@ model Department {
 
 model User {
   id              String  @id @default(uuid())
-  organization_id String
   name            String
   login           String
   password        String
@@ -211,7 +209,6 @@ model User {
   invited_by         String?
   joined_at          DateTime? @default(now())
 
-  organization         Organization         @relation(fields: [organization_id], references: [id])
   organizationUsers    OrganizationUser[]
   auditRequests        AuditRequest[]
   permissions          Permission[]
