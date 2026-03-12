@@ -6,7 +6,6 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { canSSRAuth } from '@modules/auth';
-import { setupAPIClient } from '@shared/services/api';
 import {
   OrganizationFilters,
   OrganizationList,
@@ -158,25 +157,9 @@ export default function Organizations({ organizations }: Props) {
 }
 
 export const getServerSideProps = canSSRAuth(async (ctx) => {
-  try {
-    const apiClient = setupAPIClient(ctx);
-
-    const organizationsResponse = await apiClient.get('/organizations', {
-      params: { status: 'active' },
-    });
-
-    return {
-      props: {
-        organizations: organizationsResponse.data || [],
-      },
-    };
-  } catch (error) {
-    console.log(error);
-    return {
-      redirect: {
-        destination: '/dashboard',
-        permanent: false,
-      },
-    };
-  }
+  return {
+    props: {
+      organizations: [],
+    },
+  };
 });

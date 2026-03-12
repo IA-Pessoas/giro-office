@@ -12,7 +12,6 @@ import {
   FormControl,
   FormLabel,
   Input,
-  Select,
 } from '@chakra-ui/react';
 import { useOrganizationForm } from '../hooks/useOrganizationForm';
 import type { Organization } from '../types';
@@ -107,22 +106,6 @@ export function CreateOrganizationModal({
                 color="bodyText"
                 placeholder="https://exemplo.com/logo.png"
               />
-            </FormControl>
-
-            <FormControl>
-              <FormLabel>Status</FormLabel>
-              <Select
-                name="status"
-                value={formData.status}
-                onChange={handleInputChange}
-                color="bodyText"
-              >
-                <option value="trial">Trial</option>
-                <option value="active">Ativo</option>
-                <option value="past_due">Atrasado</option>
-                <option value="suspended">Suspenso</option>
-                <option value="cancelled">Cancelado</option>
-              </Select>
             </FormControl>
 
             <FormControl>
