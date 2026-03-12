@@ -22,7 +22,8 @@ import {
 import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
-import { buildHttpProxyMiddleware, type UpstreamResolver } from "./proxy/httpProxy.js";
+import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
+import { isUserServiceRoute } from "./utils/routeUtils.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
   return {
@@ -91,6 +92,10 @@ function getUpstreamContext(url: string, request: Request) {
 function getProxyTargetUrl(env: GatewayEnv, request: Request): string {
   if (env.auditEnabled && request.originalUrl.startsWith("/audit")) {
     return env.auditServiceUrl;
+  }
+
+  if (isUserServiceRoute(request.path)) {
+    return env.userServiceUrl;
   }
 
   return env.legacyApiUrl;
@@ -235,15 +240,10 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     );
   }
 
-  const userServiceRoutes = new Set(["POST /session", "POST /start-config"]);
-  const resolveUpstream: UpstreamResolver = (method, path) => {
-    const key = `${method.toUpperCase()} ${path}`;
-    if (userServiceRoutes.has(key)) return env.userServiceUrl;
-    if (path === "/users" || path.startsWith("/users/")) return env.userServiceUrl;
-    return env.legacyApiUrl;
-  };
-
-  app.use(buildHttpProxyMiddleware(resolveUpstream));
+  app.use((request, response, next) => {
+    const targetUrl = getProxyTargetUrl(env, request);
+    return buildHttpProxyMiddleware(targetUrl)(request, response, next);
+  });
   app.use(buildAuditErrorCaptureMiddleware());
   app.use(
     createExpressErrorHandler({

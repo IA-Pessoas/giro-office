@@ -1,8 +1,9 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+
+import { ServiceError } from "@workspace/shared";
+
 import { getUserServiceEnv } from "../config/env.js";
-
-
 import prismaClient from "../prisma/index.js";
 
 interface LoginRequest {
@@ -17,18 +18,15 @@ class AuthService {
     });
 
     if (!user) {
-      throw new Error("Login/Senha Incorreto!");
+      throw new ServiceError(401, "Usuario nao existe no sistema");
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
-      throw new Error("Login/Senha Incorreto!");
+      throw new ServiceError(401, "Login/Senha Incorreto!");
     }
 
     const jwtSecret = getUserServiceEnv().jwtSecret;
-    if (!jwtSecret) {
-      throw new Error("JWT_SECRET não está definido nas variáveis de ambiente.");
-    }
 
     const token = jwt.sign(
       {
@@ -56,19 +54,19 @@ class AuthService {
   async firstCreate() {
     const userExists = await prismaClient.user.findFirst();
     if (userExists) {
-      throw new Error("Login já cadastrado");
+      throw new ServiceError(409, "Login já cadastrado");
     }
 
     const org = await prismaClient.organization.findFirst();
     if (!org) {
-      throw new Error("Execute o seed do banco antes de usar o firstCreate.");
+      throw new ServiceError(400, "Execute o seed do banco antes de usar o firstCreate.");
     }
 
     const dep = await prismaClient.department.findFirst({
       where: { organization_id: org.id },
     });
     if (!dep) {
-      throw new Error("Execute o seed do banco antes de usar o firstCreate.");
+      throw new ServiceError(400, "Execute o seed do banco antes de usar o firstCreate.");
     }
 
     const { adminPassword } = getUserServiceEnv();
@@ -77,12 +75,11 @@ class AuthService {
     try {
       const user = await prismaClient.user.create({
         data: {
-          organization_id: org.id,
           name: "Admin",
           login: "Admin",
           password: passwordHash,
           permission: 2,
-          status: "Ativo",
+          status: "active",
           department_id: dep.id,
         },
         select: {
@@ -99,7 +96,7 @@ class AuthService {
       const isUniqueViolation =
         err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002";
       if (isUniqueViolation) {
-        throw new Error("Login já cadastrado");
+        throw new ServiceError(409, "Login já cadastrado");
       }
       throw err;
     }
