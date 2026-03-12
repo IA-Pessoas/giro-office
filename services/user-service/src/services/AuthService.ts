@@ -18,7 +18,7 @@ class AuthService {
     });
 
     if (!user) {
-      throw new ServiceError(401, "Login/Senha Incorreto!");
+      throw new ServiceError(401, "Usuario nao existe no sistema");
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);

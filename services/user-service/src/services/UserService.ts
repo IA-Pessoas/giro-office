@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 
-import { ServiceError } from "@workspace/shared";
+import { error as logError, ServiceError } from "@workspace/shared";
 
 import prismaClient from "../prisma/index.js";
 
@@ -16,7 +16,6 @@ const USER_PUBLIC_SELECT = {
 } as const;
 
 interface CreateUserInput {
-  organization_id: string;
   name: string;
   login: string;
   password: string;
@@ -38,13 +37,12 @@ interface UpdateUserInput {
 }
 
 interface ListUsersParams {
-  organizationId: string;
   skip?: number;
   take?: number;
 }
 
 class UserService {
-  async list({ organizationId, skip = 0, take = 20 }: ListUsersParams) {
+  async list({ skip = 0, take = 20 }: ListUsersParams) {
     const [users, total] = await Promise.all([
       prismaClient.user.findMany({
         select: USER_PUBLIC_SELECT,
@@ -96,6 +94,7 @@ class UserService {
       if (isUniqueViolation) {
         throw new ServiceError(409, "Login já cadastrado.");
       }
+      logError("Erro ao criar usuário", { err });
       throw err;
     }
   }
@@ -130,6 +129,7 @@ class UserService {
       if (isUniqueViolation) {
         throw new ServiceError(409, "Login já cadastrado.");
       }
+      logError("Erro ao atualizar usuário", { err });
       throw err;
     }
   }
@@ -147,6 +147,7 @@ class UserService {
       if (prismaErr?.code === "P2003") {
         throw new ServiceError(409, "Não é possível desativar: usuário possui vínculos.");
       }
+      logError("Erro ao desativar usuário", { err });
       throw new ServiceError(500, "Erro ao desativar usuário.", err);
     }
   }
