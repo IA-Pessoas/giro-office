@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { createSuccessResponse } from "@workspace/shared";
+import { createSuccessResponse, ServiceError } from "@workspace/shared";
 import { type enumType } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 
@@ -9,7 +9,8 @@ class OrganizationUserService {
       const { organization_id, user_id, type, first_owner_flag } = request.body;
 
       if (first_owner_flag === true && type !== "owner") {
-        throw new Error(
+        throw new ServiceError(
+          400,
           "first_owner_flag só pode ser true quando type for owner.",
         );
       }
@@ -19,7 +20,7 @@ class OrganizationUserService {
       });
 
       if (exists) {
-        throw new Error("Usuário já vinculado a esta organização.");
+        throw new ServiceError(409, "Usuário já vinculado a esta organização.");
       }
 
       const organizationUser = await prismaClient.organizationUser.create({
@@ -40,8 +41,8 @@ class OrganizationUserService {
 
       response.status(201).json(createSuccessResponse(organizationUser));
     } catch (err) {
-      if (err instanceof Error) throw err;
-      throw new Error("Erro interno ao criar vínculo de usuário na organização.");
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao criar vínculo de usuário na organização.");
     }
   }
 
@@ -49,6 +50,10 @@ class OrganizationUserService {
     try {
       const { organization_id } = request.params;
       const { type, first_owner_flag } = request.query;
+
+      if (!organization_id?.trim()) {
+        throw new ServiceError(400, "organization_id é obrigatório.");
+      }
 
       const where: Record<string, unknown> = { organization_id };
 
@@ -73,8 +78,8 @@ class OrganizationUserService {
 
       response.json(createSuccessResponse(organizationUsers));
     } catch (err) {
-      if (err instanceof Error) throw err;
-      throw new Error("Erro interno ao buscar usuários da organização.");
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao buscar usuários da organização.");
     }
   }
 
@@ -82,6 +87,10 @@ class OrganizationUserService {
     try {
       const { user_id } = request.params;
       const { type, first_owner_flag } = request.query;
+
+      if (!user_id?.trim()) {
+        throw new ServiceError(400, "user_id é obrigatório.");
+      }
 
       const where: Record<string, unknown> = { user_id };
 
@@ -106,14 +115,18 @@ class OrganizationUserService {
 
       response.json(createSuccessResponse(organizationUsers));
     } catch (err) {
-      if (err instanceof Error) throw err;
-      throw new Error("Erro interno ao buscar organizações do usuário.");
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao buscar organizações do usuário.");
     }
   }
 
   async findById(request: Request, response: Response) {
     try {
       const { id } = request.params;
+
+      if (!id?.trim()) {
+        throw new ServiceError(400, "id é obrigatório.");
+      }
 
       const organizationUser = await prismaClient.organizationUser.findUnique({
         where: { id },
@@ -127,13 +140,13 @@ class OrganizationUserService {
       });
 
       if (!organizationUser) {
-        throw new Error("Vínculo de usuário na organização não encontrado.");
+        throw new ServiceError(404, "Vínculo de usuário na organização não encontrado.");
       }
 
       response.json(createSuccessResponse(organizationUser));
     } catch (err) {
-      if (err instanceof Error) throw err;
-      throw new Error("Erro interno ao buscar vínculo de usuário na organização.");
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao buscar vínculo de usuário na organização.");
     }
   }
 
@@ -145,19 +158,24 @@ class OrganizationUserService {
         first_owner_flag?: boolean;
       };
 
+      if (!id?.trim()) {
+        throw new ServiceError(400, "id é obrigatório.");
+      }
+
       const organizationUser = await prismaClient.organizationUser.findUnique({
         where: { id },
       });
 
       if (!organizationUser) {
-        throw new Error("Vínculo de usuário na organização não encontrado.");
+        throw new ServiceError(404, "Vínculo de usuário na organização não encontrado.");
       }
 
       const effectiveType = type ?? organizationUser.type;
       const effectiveFirstOwnerFlag =
         first_owner_flag ?? organizationUser.first_owner_flag ?? false;
       if (effectiveFirstOwnerFlag === true && effectiveType !== "owner") {
-        throw new Error(
+        throw new ServiceError(
+          400,
           "first_owner_flag só pode ser true quando type for owner.",
         );
       }
@@ -180,8 +198,8 @@ class OrganizationUserService {
 
       response.json(createSuccessResponse(updated));
     } catch (err) {
-      if (err instanceof Error) throw err;
-      throw new Error("Erro interno ao atualizar vínculo de usuário na organização.");
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao atualizar vínculo de usuário na organização.");
     }
   }
 }
