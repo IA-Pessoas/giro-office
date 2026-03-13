@@ -2,10 +2,13 @@ import { createSuccessResponse, error as logError, ServiceError } from "@workspa
 import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
 
+import { upload } from "../middlewares/upload.js";
+import { StorageService } from "../services/StorageService.js";
 import { UserService } from "../services/UserService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const userService = new UserService();
+const storageService = new StorageService();
 
 router.get("/", async (request: Request, response: Response, next: NextFunction) => {
   try {
@@ -136,6 +139,36 @@ router.patch("/:id", async (request: Request, response: Response, next: NextFunc
     response.json(createSuccessResponse(user));
   } catch (err) {
     logError("Erro ao atualizar usuário", { err });
+    next(err);
+  }
+});
+
+router.post("/:id/photo", upload.single("file"), async (request: Request, response: Response, next: NextFunction) => {
+  try {
+    if (!request.file) {
+      throw new ServiceError(400, "Arquivo de imagem é obrigatório.");
+    }
+
+    const photoUrl = await storageService.uploadUserPhoto(request.file, request.params.id);
+    const user = await userService.update(request.params.id, { photo_url: photoUrl });
+
+    response.json(createSuccessResponse(user));
+  } catch (err) {
+    logError("Erro ao fazer upload de foto", { err });
+    next(err);
+  }
+});
+
+router.delete("/:id/photo", async (request: Request, response: Response, next: NextFunction) => {
+  try {
+    const { id } = request.params;
+
+    await storageService.deleteUserPhoto(id);
+    const user = await userService.update(id, { photo_url: null });
+
+    response.json(createSuccessResponse(user));
+  } catch (err) {
+    logError("Erro ao excluir foto", { err });
     next(err);
   }
 });

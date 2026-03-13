@@ -22,6 +22,8 @@ const envSchema = z
     adminPassword: z.string().min(1, "ADMIN_PASSWORD não definido."),
     nodeEnv: z.string().optional().default("development"),
     logLevel: loggerLevelSchema.optional().default("info"),
+    supabaseUrl: z.string().url("SUPABASE_URL não definida."),
+    supabaseServiceRoleKey: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY não definida."),
     logPretty: z
       .string()
       .optional()
@@ -42,6 +44,8 @@ export function getUserServiceEnv(): UserServiceEnv {
     jwtSecret: process.env.JWT_SECRET,
     adminPassword: process.env.ADMIN_PASSWORD,
     nodeEnv: process.env.NODE_ENV,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
   });
