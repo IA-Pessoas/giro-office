@@ -1,5 +1,4 @@
-import { createExpressErrorHandler } from "@workspace/shared/http";
-import type { Logger } from "@workspace/shared/logger";
+import { createExpressErrorHandler, type Logger } from "@workspace/shared";
 import express from "express";
 
 import type { AuditServiceEnv } from "./config/env.js";

@@ -1,4 +1,4 @@
-import type { AuthPolicy } from "@workspace/shared/auth";
+import type { AuthPolicy } from "@workspace/shared";
 
 const routePolicies = new Map<string, AuthPolicy>([
   ["POST /users", { minPermission: 2 }],

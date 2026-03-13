@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 
-import { createLogger } from "@workspace/shared/logger";
+import { createLogger } from "@workspace/shared";
 
 import { createApp } from "./app.js";
 import { getAuditServiceEnv } from "./config/env.js";

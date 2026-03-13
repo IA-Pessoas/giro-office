@@ -1,11 +1,12 @@
-import { createAuditRecorder } from "@workspace/shared/audit";
 import {
+  createAuditRecorder,
   createExpressErrorHandler,
   createSuccessResponse,
+  getServiceUrls,
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
-} from "@workspace/shared/http";
-import type { AuthLogContext, Logger, LogLevel } from "@workspace/shared/logger";
+} from "@workspace/shared";
+import type { AuthLogContext, Logger, LogLevel } from "@workspace/shared";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
@@ -219,6 +220,7 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     );
   });
 
+  app.use("/organizations", buildHttpProxyMiddleware(getServiceUrls().organizationServiceUrl));
   if (env.auditEnabled) {
     app.use(
       "/audit",

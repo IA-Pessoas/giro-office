@@ -4,6 +4,11 @@ generator client {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator organizationClient {
+  provider        = "prisma-client"
+  output          = "../../services/organization-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
 generator audit_service_client {
   provider        = "prisma-client"
   output          = "../../services/audit-service/generated/prisma"
@@ -11,9 +16,7 @@ generator audit_service_client {
 }
 
 datasource db {
-  provider = "postgresql"
-  
-  
+  provider = "postgresql"  
 }
 
 // ------------ Organization (Multi-Tenancy Root) ------------

@@ -2,4 +2,6 @@ packages:
   - "app"
   - "infra"
   - "services/gateway"
+  - "services/organization-service"
+  - "services/audit-service"
   - "shared"
