@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { createSuccessResponse } from "@workspace/shared";
-import { type status } from "../generated/prisma/client.js";
+import { createSuccessResponse, ServiceError } from "@workspace/shared";
+import { status as statusEnum, type status } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 
 function generateSlug(name: string): string {
@@ -18,6 +18,16 @@ class OrganizationService {
     try {
       const { name, email_created_by, cnpj } = request.body;
 
+      if (!name?.trim()) {
+        throw new ServiceError(400, "name é obrigatório.");
+      }
+      if (!email_created_by?.trim()) {
+        throw new ServiceError(400, "email_created_by é obrigatório.");
+      }
+      if (!cnpj?.trim()) {
+        throw new ServiceError(400, "cnpj é obrigatório.");
+      }
+
       const slug = generateSlug(name);
 
       const slugExists = await prismaClient.organization.findUnique({
@@ -25,7 +35,7 @@ class OrganizationService {
       });
 
       if (slugExists) {
-        throw new Error("Já existe uma organização com esse nome/slug.");
+        throw new ServiceError(409, "Já existe uma organização com esse nome/slug.");
       }
 
       const organization = await prismaClient.organization.create({
@@ -50,14 +60,19 @@ class OrganizationService {
 
       response.status(201).json(createSuccessResponse(organization));
     } catch (err) {
-      if (err instanceof Error) throw err;
-      throw new Error("Erro interno ao criar organização.");
+      if (err instanceof ServiceError) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao criar organização. ${msg}`, err);
     }
   }
 
   async findByCnpj(request: Request, response: Response) {
     try {
       const { cnpj } = request.params;
+
+      if (!cnpj?.trim()) {
+        throw new ServiceError(400, "cnpj é obrigatório.");
+      }
 
       const organization = await prismaClient.organization.findFirst({
         where: { cnpj },
@@ -76,13 +91,14 @@ class OrganizationService {
       });
 
       if (!organization) {
-        throw new Error("Organização não encontrada.");
+        throw new ServiceError(404, "Organização não encontrada.");
       }
 
       response.json(createSuccessResponse(organization));
     } catch (err) {
-      if (err instanceof Error) throw err;
-      throw new Error("Erro interno ao buscar organização.");
+      if (err instanceof ServiceError) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao buscar organização. ${msg}`, err);
     }
   }
 
@@ -91,12 +107,20 @@ class OrganizationService {
       const { cnpj } = request.params;
       const { status } = request.body as { status: status };
 
+      if (!cnpj?.trim()) {
+        throw new ServiceError(400, "cnpj é obrigatório.");
+      }
+      const validStatuses = Object.values(statusEnum);
+      if (status === undefined || status === null || !validStatuses.includes(status)) {
+        throw new ServiceError(400, "status é obrigatório e deve ser trial, past_due, active, suspended ou cancelled.");
+      }
+
       const organization = await prismaClient.organization.findFirst({
         where: { cnpj },
       });
 
       if (!organization) {
-        throw new Error("Organização não encontrada.");
+        throw new ServiceError(404, "Organização não encontrada.");
       }
 
       const updated = await prismaClient.organization.update({
@@ -113,8 +137,9 @@ class OrganizationService {
 
       response.json(createSuccessResponse(updated));
     } catch (err) {
-      if (err instanceof Error) throw err;
-      throw new Error("Erro interno ao atualizar status.");
+      if (err instanceof ServiceError) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao atualizar status. ${msg}`, err);
     }
   }
 
@@ -123,12 +148,19 @@ class OrganizationService {
       const { cnpj } = request.params;
       const { subscription_plan } = request.body;
 
+      if (!cnpj?.trim()) {
+        throw new ServiceError(400, "cnpj é obrigatório.");
+      }
+      if (typeof subscription_plan !== "string" || !subscription_plan.trim()) {
+        throw new ServiceError(400, "subscription_plan é obrigatório e deve ser uma string não vazia.");
+      }
+
       const organization = await prismaClient.organization.findFirst({
         where: { cnpj },
       });
 
       if (!organization) {
-        throw new Error("Organização não encontrada.");
+        throw new ServiceError(404, "Organização não encontrada.");
       }
 
       const updated = await prismaClient.organization.update({
@@ -145,8 +177,9 @@ class OrganizationService {
 
       response.json(createSuccessResponse(updated));
     } catch (err) {
-      if (err instanceof Error) throw err;
-      throw new Error("Erro interno ao atualizar plano de assinatura.");
+      if (err instanceof ServiceError) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao atualizar plano de assinatura. ${msg}`, err);
     }
   }
 
@@ -155,12 +188,16 @@ class OrganizationService {
       const { cnpj } = request.params;
       const { logo_url } = request.body;
 
+      if (!cnpj?.trim()) {
+        throw new ServiceError(400, "cnpj é obrigatório.");
+      }
+
       const organization = await prismaClient.organization.findFirst({
         where: { cnpj },
       });
 
       if (!organization) {
-        throw new Error("Organização não encontrada.");
+        throw new ServiceError(404, "Organização não encontrada.");
       }
 
       const updated = await prismaClient.organization.update({
@@ -177,8 +214,9 @@ class OrganizationService {
 
       response.json(createSuccessResponse(updated));
     } catch (err) {
-      if (err instanceof Error) throw err;
-      throw new Error("Erro interno ao atualizar logo.");
+      if (err instanceof ServiceError) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao atualizar logo. ${msg}`, err);
     }
   }
 }
