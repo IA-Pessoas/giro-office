@@ -34,10 +34,39 @@ router.get("/:id", async (request: Request, response: Response, next: NextFuncti
 
 router.post("/", async (request: Request, response: Response, next: NextFunction) => {
   try {
-    const { name, login, password, department_id, permission, status, photo_url, invited_by } = request.body;
+    const {
+      name,
+      login,
+      password,
+      department_id,
+      permission,
+      status,
+      photo_url,
+      invited_by,
+      organization_id,
+      type,
+      first_owner_flag,
+      modules,
+    } = request.body;
 
     if (!name || !login || !password || !department_id || permission === undefined) {
       throw new ServiceError(400, "Campos obrigatórios: name, login, password, department_id, permission.");
+    }
+
+    if ((type || modules) && !organization_id) {
+      throw new ServiceError(400, "organization_id é obrigatório quando type ou modules forem enviados.");
+    }
+
+    const validTypes = ["admin", "owner", "user"] as const;
+    if (type && !validTypes.includes(type)) {
+      throw new ServiceError(400, "type deve ser admin, owner ou user.");
+    }
+
+    if (first_owner_flag === true && type !== "owner") {
+      throw new ServiceError(
+        400,
+        "first_owner_flag só pode ser true quando type for owner.",
+      );
     }
 
     const user = await userService.create({
@@ -49,6 +78,10 @@ router.post("/", async (request: Request, response: Response, next: NextFunction
       status,
       photo_url,
       invited_by,
+      organization_id,
+      type,
+      first_owner_flag: first_owner_flag ?? false,
+      modules,
     });
 
     response.status(201).json(createSuccessResponse(user));
@@ -60,7 +93,31 @@ router.post("/", async (request: Request, response: Response, next: NextFunction
 
 router.patch("/:id", async (request: Request, response: Response, next: NextFunction) => {
   try {
-    const { name, login, password, department_id, permission, status, photo_url } = request.body;
+    const {
+      name,
+      login,
+      password,
+      department_id,
+      permission,
+      status,
+      photo_url,
+      organization_id,
+      type,
+      first_owner_flag,
+      modules,
+    } = request.body;
+
+    const validTypes = ["admin", "owner", "user"] as const;
+    if (type !== undefined && type !== null && !validTypes.includes(type)) {
+      throw new ServiceError(400, "type deve ser admin, owner ou user.");
+    }
+
+    if (first_owner_flag === true && type !== "owner") {
+      throw new ServiceError(
+        400,
+        "first_owner_flag só pode ser true quando type for owner.",
+      );
+    }
 
     const user = await userService.update(request.params.id, {
       name,
@@ -70,6 +127,10 @@ router.patch("/:id", async (request: Request, response: Response, next: NextFunc
       permission,
       status,
       photo_url,
+      organization_id,
+      type,
+      first_owner_flag,
+      modules,
     });
 
     response.json(createSuccessResponse(user));
