@@ -66,16 +66,16 @@ class OrganizationService {
     }
   }
 
-  async findByCnpj(request: Request, response: Response) {
+  async findById(request: Request, response: Response) {
     try {
-      const { cnpj } = request.params;
+      const { id } = request.params;
 
-      if (!cnpj?.trim()) {
-        throw new ServiceError(400, "cnpj é obrigatório.");
+      if (!id?.trim()) {
+        throw new ServiceError(400, "id é obrigatório.");
       }
 
-      const organization = await prismaClient.organization.findFirst({
-        where: { cnpj },
+      const organization = await prismaClient.organization.findUnique({
+        where: { id },
         select: {
           id: true,
           name: true,
@@ -104,27 +104,19 @@ class OrganizationService {
 
   async updateStatus(request: Request, response: Response) {
     try {
-      const { cnpj } = request.params;
+      const { id } = request.params;
       const { status } = request.body as { status: status };
 
-      if (!cnpj?.trim()) {
-        throw new ServiceError(400, "cnpj é obrigatório.");
+      if (!id?.trim()) {
+        throw new ServiceError(400, "id é obrigatório.");
       }
       const validStatuses = Object.values(statusEnum);
       if (status === undefined || status === null || !validStatuses.includes(status)) {
         throw new ServiceError(400, "status é obrigatório e deve ser trial, past_due, active, suspended ou cancelled.");
       }
 
-      const organization = await prismaClient.organization.findFirst({
-        where: { cnpj },
-      });
-
-      if (!organization) {
-        throw new ServiceError(404, "Organização não encontrada.");
-      }
-
       const updated = await prismaClient.organization.update({
-        where: { id: organization.id },
+        where: { id },
         data: { status },
         select: {
           id: true,
@@ -145,26 +137,18 @@ class OrganizationService {
 
   async updateSubscriptionPlan(request: Request, response: Response) {
     try {
-      const { cnpj } = request.params;
+      const { id } = request.params;
       const { subscription_plan } = request.body;
 
-      if (!cnpj?.trim()) {
-        throw new ServiceError(400, "cnpj é obrigatório.");
+      if (!id?.trim()) {
+        throw new ServiceError(400, "id é obrigatório.");
       }
       if (typeof subscription_plan !== "string" || !subscription_plan.trim()) {
         throw new ServiceError(400, "subscription_plan é obrigatório e deve ser uma string não vazia.");
       }
 
-      const organization = await prismaClient.organization.findFirst({
-        where: { cnpj },
-      });
-
-      if (!organization) {
-        throw new ServiceError(404, "Organização não encontrada.");
-      }
-
       const updated = await prismaClient.organization.update({
-        where: { id: organization.id },
+        where: { id },
         data: { subscription_plan },
         select: {
           id: true,
@@ -185,23 +169,15 @@ class OrganizationService {
 
   async updateLogoUrl(request: Request, response: Response) {
     try {
-      const { cnpj } = request.params;
+      const { id } = request.params;
       const { logo_url } = request.body;
 
-      if (!cnpj?.trim()) {
-        throw new ServiceError(400, "cnpj é obrigatório.");
-      }
-
-      const organization = await prismaClient.organization.findFirst({
-        where: { cnpj },
-      });
-
-      if (!organization) {
-        throw new ServiceError(404, "Organização não encontrada.");
+      if (!id?.trim()) {
+        throw new ServiceError(400, "id é obrigatório.");
       }
 
       const updated = await prismaClient.organization.update({
-        where: { id: organization.id },
+        where: { id },
         data: { logo_url },
         select: {
           id: true,
