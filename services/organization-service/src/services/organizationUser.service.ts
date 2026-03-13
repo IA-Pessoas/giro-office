@@ -1,12 +1,23 @@
 import type { Request, Response } from "express";
 import { createSuccessResponse, ServiceError } from "@workspace/shared";
-import { type enumType } from "../generated/prisma/client.js";
+import { enumType, type enumType as EnumType } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 
 class OrganizationUserService {
   async create(request: Request, response: Response) {
     try {
       const { organization_id, user_id, type, first_owner_flag } = request.body;
+
+      if (!organization_id?.trim()) {
+        throw new ServiceError(400, "organization_id é obrigatório.");
+      }
+      if (!user_id?.trim()) {
+        throw new ServiceError(400, "user_id é obrigatório.");
+      }
+      const validTypes = Object.values(enumType);
+      if (!type || !validTypes.includes(type as EnumType)) {
+        throw new ServiceError(400, "type é obrigatório e deve ser admin, owner ou user.");
+      }
 
       if (first_owner_flag === true && type !== "owner") {
         throw new ServiceError(
@@ -42,7 +53,8 @@ class OrganizationUserService {
       response.status(201).json(createSuccessResponse(organizationUser));
     } catch (err) {
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao criar vínculo de usuário na organização.");
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao criar vínculo de usuário na organização. ${msg}`, err);
     }
   }
 
@@ -58,7 +70,7 @@ class OrganizationUserService {
       const where: Record<string, unknown> = { organization_id };
 
       if (type) {
-        where.type = type as enumType;
+        where.type = type as EnumType;
       }
 
       if (first_owner_flag !== undefined) {
@@ -79,7 +91,8 @@ class OrganizationUserService {
       response.json(createSuccessResponse(organizationUsers));
     } catch (err) {
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao buscar usuários da organização.");
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao buscar usuários da organização. ${msg}`, err);
     }
   }
 
@@ -95,7 +108,7 @@ class OrganizationUserService {
       const where: Record<string, unknown> = { user_id };
 
       if (type) {
-        where.type = type as enumType;
+        where.type = type as EnumType;
       }
 
       if (first_owner_flag !== undefined) {
@@ -116,7 +129,8 @@ class OrganizationUserService {
       response.json(createSuccessResponse(organizationUsers));
     } catch (err) {
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao buscar organizações do usuário.");
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao buscar organizações do usuário. ${msg}`, err);
     }
   }
 
@@ -146,7 +160,8 @@ class OrganizationUserService {
       response.json(createSuccessResponse(organizationUser));
     } catch (err) {
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao buscar vínculo de usuário na organização.");
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao buscar vínculo de usuário na organização. ${msg}`, err);
     }
   }
 
@@ -154,7 +169,7 @@ class OrganizationUserService {
     try {
       const { id } = request.params;
       const { type, first_owner_flag } = request.body as {
-        type?: enumType;
+        type?: EnumType;
         first_owner_flag?: boolean;
       };
 
@@ -199,7 +214,8 @@ class OrganizationUserService {
       response.json(createSuccessResponse(updated));
     } catch (err) {
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao atualizar vínculo de usuário na organização.");
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao atualizar vínculo de usuário na organização. ${msg}`, err);
     }
   }
 }

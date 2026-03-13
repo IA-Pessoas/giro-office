@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { createSuccessResponse, ServiceError } from "@workspace/shared";
-import { type status } from "../generated/prisma/client.js";
+import { status as statusEnum, type status } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 
 function generateSlug(name: string): string {
@@ -17,6 +17,16 @@ class OrganizationService {
   async create(request: Request, response: Response) {
     try {
       const { name, email_created_by, cnpj } = request.body;
+
+      if (!name?.trim()) {
+        throw new ServiceError(400, "name é obrigatório.");
+      }
+      if (!email_created_by?.trim()) {
+        throw new ServiceError(400, "email_created_by é obrigatório.");
+      }
+      if (!cnpj?.trim()) {
+        throw new ServiceError(400, "cnpj é obrigatório.");
+      }
 
       const slug = generateSlug(name);
 
@@ -51,7 +61,8 @@ class OrganizationService {
       response.status(201).json(createSuccessResponse(organization));
     } catch (err) {
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao criar organização.");
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao criar organização. ${msg}`, err);
     }
   }
 
@@ -86,7 +97,8 @@ class OrganizationService {
       response.json(createSuccessResponse(organization));
     } catch (err) {
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao buscar organização.");
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao buscar organização. ${msg}`, err);
     }
   }
 
@@ -97,6 +109,10 @@ class OrganizationService {
 
       if (!cnpj?.trim()) {
         throw new ServiceError(400, "cnpj é obrigatório.");
+      }
+      const validStatuses = Object.values(statusEnum);
+      if (status === undefined || status === null || !validStatuses.includes(status)) {
+        throw new ServiceError(400, "status é obrigatório e deve ser trial, past_due, active, suspended ou cancelled.");
       }
 
       const organization = await prismaClient.organization.findFirst({
@@ -122,7 +138,8 @@ class OrganizationService {
       response.json(createSuccessResponse(updated));
     } catch (err) {
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao atualizar status.");
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao atualizar status. ${msg}`, err);
     }
   }
 
@@ -133,6 +150,9 @@ class OrganizationService {
 
       if (!cnpj?.trim()) {
         throw new ServiceError(400, "cnpj é obrigatório.");
+      }
+      if (typeof subscription_plan !== "string" || !subscription_plan.trim()) {
+        throw new ServiceError(400, "subscription_plan é obrigatório e deve ser uma string não vazia.");
       }
 
       const organization = await prismaClient.organization.findFirst({
@@ -158,7 +178,8 @@ class OrganizationService {
       response.json(createSuccessResponse(updated));
     } catch (err) {
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao atualizar plano de assinatura.");
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao atualizar plano de assinatura. ${msg}`, err);
     }
   }
 
@@ -194,7 +215,8 @@ class OrganizationService {
       response.json(createSuccessResponse(updated));
     } catch (err) {
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao atualizar logo.");
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao atualizar logo. ${msg}`, err);
     }
   }
 }
