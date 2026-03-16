@@ -1,6 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loggerLevelSchema } from "@workspace/shared/logger";
+import { loggerLevelSchema, type LoggerLevel } from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -57,7 +57,19 @@ const gatewayEnvSchema = z
     logPretty: env.nodeEnv !== "production" && env.logPretty,
   }));
 
-export type GatewayEnv = z.infer<typeof gatewayEnvSchema>;
+export interface GatewayEnv {
+  nodeEnv: string;
+  auditEnabled: boolean;
+  auditServiceToken: string;
+  auditServiceUrl: string;
+  port: number;
+  legacyApiUrl: string;
+  userServiceUrl: string;
+  jwtSecret: string;
+  logLevel: LoggerLevel;
+  logPretty: boolean;
+  allowedOrigins: string[];
+}
 
 export function getGatewayEnv(): GatewayEnv {
   return gatewayEnvSchema.parse({
@@ -72,5 +84,5 @@ export function getGatewayEnv(): GatewayEnv {
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
     allowedOrigins: process.env.GATEWAY_ALLOWED_ORIGINS,
-  });
+  }) as GatewayEnv;
 }

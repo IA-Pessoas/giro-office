@@ -242,3 +242,34 @@ function safePathFromUrl(url: string): string | undefined {
     return undefined;
   }
 }
+
+export function serviceStart(payload: { service: string; port: number }): void {
+  getDefaultLogger().info(
+    {
+      event: "service.start",
+      data: {
+        service: payload.service,
+        port: payload.port,
+      },
+    },
+    `${payload.service} ativo na porta ${payload.port}`,
+    payload,
+  );
+}
+
+export function serviceError(payload: {
+  service: string;
+  requestId?: string;
+  message: string;
+}): void {
+  getDefaultLogger().error(
+    {
+      event: "service.error",
+      data: {
+        service: payload.service,
+      },
+      ...(payload.requestId ? { request: { id: payload.requestId } } : {}),
+    },
+    payload.message,
+  );
+}

@@ -5,7 +5,7 @@ import {
   ServiceError,
 } from "@workspace/shared/http";
 import type { ForwardedAuditAuthContext } from "@workspace/shared/audit";
-import type { Logger } from "@workspace/shared/logger";
+import type { Logger } from "@workspace/shared";
 import { type RequestHandler, Router } from "express";
 
 import type { AuditServiceEnv } from "../config/env.js";

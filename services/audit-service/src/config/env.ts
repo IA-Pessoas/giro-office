@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loggerLevelSchema } from "@workspace/shared/logger";
+import { loggerLevelSchema } from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
 
