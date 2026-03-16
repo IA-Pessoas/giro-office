@@ -4,6 +4,7 @@ export function isUserServiceRoute(path: string): boolean {
     path === "/start-config" ||
     path === "/me" ||
     path === "/users" ||
-    path.startsWith("/users/")
+    path.startsWith("/users/") ||
+    path.startsWith("/permission/")
   );
 }
