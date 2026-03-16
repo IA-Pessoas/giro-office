@@ -66,7 +66,7 @@ model Organization {
   pessoalNotifications          PessoalNotification[]
   regularizeNotifications       RegularizeNotification[]
   organizationInvites           OrganizationInvite[]
-  organizationUsers             OrganizationUser[]
+  usersWithOrg                  User[]              @relation("UserOrganization")
   installments                  Installment[]
   installmentCompetencies       InstallmentCompetencies[]
   panoramasParcelamento         PanoramaParcelameto[]
@@ -124,17 +124,7 @@ model Organization {
   @@map("organizations")
 }
 
-model OrganizationUser {
-  id               String       @id @default(uuid())
-  organization_id  String
-  user_id          String       @unique
-  type             enumType     @default(user)
-  first_owner_flag Boolean?     @default(false)
-  organization     Organization @relation(fields: [organization_id], references: [id])
-  user             User         @relation(fields: [user_id], references: [id])
 
-  @@map("organization_users")
-}
 
 model OrganizationInvite {
   id              String       @id @default(uuid())
@@ -177,6 +167,10 @@ model User {
   password                    String
   permission                  Int
   status                      String
+  organization_id             String?
+  type                        enumType?
+  first_owner_flag            Boolean?               @default(false)
+  permission_id               String?                @unique
   department_id               String
   invited_by                  String?
   joined_at                   DateTime?              @default(now())
@@ -203,7 +197,8 @@ model User {
   tasksModel                  TaskModel[]            @relation("responsible")
   logs                        Logs[]
   notes                       Note[]
-  organizationUsers           OrganizationUser?
+  organization                Organization?         @relation("UserOrganization", fields: [organization_id], references: [id])
+  permissionRef               Permission?           @relation("UserPrimaryPermission", fields: [permission_id], references: [id])
   panoramasParcelameto        PanoramaParcelameto[]  @relation("responsavelPanorama")
   permissions                 Permission[]
   permissionsSpecifics        PermissionSpecific?
@@ -271,6 +266,7 @@ model Permission {
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
   user            User         @relation(fields: [user_id], references: [id])
+  userPrimary     User?        @relation("UserPrimaryPermission")
 
   @@map("permissions")
 }

@@ -8,6 +8,7 @@ import "express-async-errors";
 
 import { getUserServiceEnv } from "./config/env.js";
 import { authRoutes } from "./routes/auth.routes.js";
+import { permissionRoutes } from "./routes/permission.routes.js";
 import { userRoutes } from "./routes/user.routes.js";
 
 const env = getUserServiceEnv();
@@ -29,6 +30,7 @@ app.get("/health", (_req, res) => {
 
 app.use(authRoutes);
 app.use("/users", userRoutes);
+app.use("/permission", permissionRoutes);
 
 app.use(
   createExpressErrorHandler({
