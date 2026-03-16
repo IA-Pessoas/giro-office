@@ -2,7 +2,6 @@
 *.env
 .env.local
 *generated/
-*.cursor/
 
 # Turborepo
 .turbo/
