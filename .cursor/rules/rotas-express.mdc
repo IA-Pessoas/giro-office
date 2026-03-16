@@ -1,0 +1,24 @@
+---
+description: Padrões de rotas Express
+globs: **/routes/**/*.ts
+alwaysApply: false
+---
+
+# Rotas Express
+
+## Padrão de handler
+```typescript
+router.METODO("/path", async (request, response, next) => {
+  try {
+    // lógica
+    response.json(createSuccessResponse(result));
+  } catch (err) {
+    logError("Contexto", { err });
+    next(err);
+  }
+});
+```
+
+## Validação
+- Validar body/params antes de chamar services
+- Usar ServiceError(400, "mensagem") para validação
