@@ -92,9 +92,6 @@ model Organization {
   passwordsRegularize           PasswordRegularize[]
   proceduralGuidances           ProceduralGuidance[]
   processes                     Process[]
-  allergies                     Allergies[]
-  colaborators                  Colaborators[]
-  emergencyContacts             EmergencyContacts[]
   holidays                      Holidays[]
   pointsConfig                  PointsConfig[]
   points                        Point[]
@@ -180,6 +177,19 @@ model User {
   invited_by                  String?
   joined_at                   DateTime?              @default(now())
   photo_url                   String?
+  full_name                   String?
+  gender                      String?
+  birth_date                  DateTime?
+  cpf                         String?                 @unique
+  rg                          String?                 @unique
+  address                     String?
+  job_title                   String?
+  email                       String?
+  phone                       String?
+  hire_date                   DateTime?
+  termination_date            DateTime?
+  allergies                   Json?
+  emergency_contacts          Json?
   agenda2                     Agenda[]               @relation("participant2")
   agenda3                     Agenda[]               @relation("participant3")
   agenda                      Agenda[]               @relation("participant")
@@ -216,9 +226,6 @@ model User {
   processResp1                Process[]              @relation("responsible1")
   processResp2                Process[]              @relation("responsible2")
   processResp3                Process[]              @relation("responsible3")
-  allergies                   Allergies[]
-  colaborator                 Colaborators?
-  emergencyContacts           EmergencyContacts[]
   pointConfig                 PointsConfig?
   points                      Point[]
   senderMsgRH                 RhMessage[]
@@ -332,6 +339,11 @@ model AuditRequest {
   metadata_json   Json?
   created_at      DateTime      @default(now())
   finished_at     DateTime?
+  action          String?
+  referring       String?
+  referring_id    String?
+  changes_json    Json?
+  department      String?
   organization    Organization? @relation(fields: [organization_id], references: [id])
   user            User?         @relation(fields: [user_id], references: [id])
 
@@ -339,6 +351,7 @@ model AuditRequest {
   @@index([user_id, created_at(sort: Desc)])
   @@index([path, created_at(sort: Desc)])
   @@index([status_code, created_at(sort: Desc)])
+  @@index([organization_id, referring, referring_id, created_at(sort: Desc)])
   @@map("audit_requests")
 }
 
@@ -1525,51 +1538,8 @@ model TasksIntegrationRegularize {
   @@map("integracao.tasksIntegrationRegularize")
 }
 
-model Colaborators {
-  user_id          String       @id @unique
-  full_name        String
-  gender           String?
-  birth_date       DateTime?
-  cpf              String?
-  rg               String?
-  address          String?
-  job_title        String?
-  email            String?
-  phone            String?
-  hire_date        String?
-  termination_date String?
-  organization_id  String
-  organization     Organization @relation(fields: [organization_id], references: [id])
-  user             User         @relation(fields: [user_id], references: [id])
 
-  @@map("rh.colaborators")
-}
 
-model EmergencyContacts {
-  id              String       @id @default(uuid())
-  user_id         String
-  name            String
-  reference       String
-  phone           String
-  organization_id String
-  organization    Organization @relation(fields: [organization_id], references: [id])
-  user            User         @relation(fields: [user_id], references: [id])
-
-  @@map("rh.emergencyContacts")
-}
-
-model Allergies {
-  id              String       @id @default(uuid())
-  user_id         String
-  name            String
-  fonts           String
-  action          String
-  organization_id String
-  organization    Organization @relation(fields: [organization_id], references: [id])
-  user            User         @relation(fields: [user_id], references: [id])
-
-  @@map("rh.allergies")
-}
 
 model PointsConfig {
   id              String       @id @default(uuid())
