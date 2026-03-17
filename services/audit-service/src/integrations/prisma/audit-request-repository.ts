@@ -63,7 +63,42 @@ function normalizeMetadata(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+function normalizeChanges(
+  value: Record<string, unknown> | string | undefined | null,
+): Prisma.InputJsonValue | typeof Prisma.JsonNull | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return Prisma.JsonNull;
+  }
+
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value) as Prisma.InputJsonValue;
+    } catch {
+      return { raw: value } as Prisma.InputJsonValue;
+    }
+  }
+
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
 function toAuditRequest(record: PrismaAuditRequest): AuditRequestRecord {
+  const rec = record as PrismaAuditRequest & {
+    action?: string | null;
+    referring?: string | null;
+    referring_id?: string | null;
+    changes_json?: unknown;
+    department?: string | null;
+  };
+  const changes = rec.changes_json;
+  const changesNormalized =
+    changes !== null && typeof changes === "object" && !Array.isArray(changes)
+      ? (changes as Record<string, unknown>)
+      : null;
+
   return {
     id: record.id,
     requestId: record.request_id,
@@ -85,6 +120,11 @@ function toAuditRequest(record: PrismaAuditRequest): AuditRequestRecord {
     createdAt: record.created_at.toISOString(),
     finishedAt: record.finished_at?.toISOString() ?? null,
     metadata: normalizeMetadata(record.metadata_json),
+    action: rec.action ?? null,
+    referring: rec.referring ?? null,
+    referringId: rec.referring_id ?? null,
+    changes: changesNormalized,
+    department: rec.department ?? null,
   };
 }
 
@@ -117,15 +157,26 @@ function buildWhere(filters: AuditSearchFilters): Prisma.AuditRequestWhereInput 
   }
 
   if (filters.dateFrom || filters.dateTo) {
-    where.created_at = {};
-
+    const createdAt: Prisma.DateTimeFilter<"AuditRequest"> = {};
     if (filters.dateFrom) {
-      where.created_at.gte = new Date(filters.dateFrom);
+      createdAt.gte = new Date(filters.dateFrom);
     }
-
     if (filters.dateTo) {
-      where.created_at.lte = new Date(filters.dateTo);
+      createdAt.lte = new Date(filters.dateTo);
     }
+    where.created_at = createdAt;
+  }
+
+  if (filters.referring) {
+    (where as Record<string, unknown>).referring = filters.referring;
+  }
+
+  if (filters.referringId) {
+    (where as Record<string, unknown>).referring_id = filters.referringId;
+  }
+
+  if (filters.department) {
+    (where as Record<string, unknown>).department = filters.department;
   }
 
   return where;
@@ -136,28 +187,34 @@ export function createAuditRequestRepository(
 ): AuditRequestRepository {
   return {
     async create(payload) {
+      const createData = {
+        request_id: payload.requestId,
+        organization_id: payload.organizationId ?? null,
+        user_id: payload.userId ?? null,
+        permission: payload.permission ?? null,
+        method: payload.method.toUpperCase(),
+        path: payload.path,
+        query_json: toJsonValue(payload.query),
+        status_code: payload.statusCode ?? null,
+        outcome: payload.outcome,
+        duration_ms: payload.durationMs ?? null,
+        ip: payload.ip ?? null,
+        user_agent: payload.userAgent ?? null,
+        origin: payload.origin ?? null,
+        error_code: payload.errorCode ?? null,
+        error_message: payload.errorMessage ?? null,
+        service_source: payload.serviceSource,
+        metadata_json: toJsonValue(payload.metadata),
+        created_at: new Date(payload.createdAt),
+        finished_at: payload.finishedAt ? new Date(payload.finishedAt) : null,
+        action: payload.action ?? null,
+        referring: payload.referring ?? null,
+        referring_id: payload.referringId ?? null,
+        changes_json: normalizeChanges(payload.changes),
+        department: payload.department ?? null,
+      };
       await client.auditRequest.create({
-        data: {
-          request_id: payload.requestId,
-          organization_id: payload.organizationId ?? null,
-          user_id: payload.userId ?? null,
-          permission: payload.permission ?? null,
-          method: payload.method.toUpperCase(),
-          path: payload.path,
-          query_json: toJsonValue(payload.query),
-          status_code: payload.statusCode ?? null,
-          outcome: payload.outcome,
-          duration_ms: payload.durationMs ?? null,
-          ip: payload.ip ?? null,
-          user_agent: payload.userAgent ?? null,
-          origin: payload.origin ?? null,
-          error_code: payload.errorCode ?? null,
-          error_message: payload.errorMessage ?? null,
-          service_source: payload.serviceSource,
-          metadata_json: toJsonValue(payload.metadata),
-          created_at: new Date(payload.createdAt),
-          finished_at: payload.finishedAt ? new Date(payload.finishedAt) : null,
-        },
+        data: createData as Parameters<typeof client.auditRequest.create>[0]["data"],
       });
     },
     async search(filters) {

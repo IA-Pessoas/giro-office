@@ -23,6 +23,12 @@ export interface CreateAuditRequestPayload {
   createdAt: string;
   finishedAt?: string | null;
   metadata?: Record<string, unknown> | null;
+  /** Auditoria de alterações de entidades (LogService) */
+  action?: string | null;
+  referring?: string | null;
+  referringId?: string | null;
+  changes?: Record<string, unknown> | string | null;
+  department?: string | null;
 }
 
 export interface AuditRequestRecord {
@@ -46,6 +52,12 @@ export interface AuditRequestRecord {
   createdAt: string;
   finishedAt?: string | null;
   metadata?: Record<string, unknown> | null;
+  /** Auditoria de alterações de entidades (LogService) */
+  action?: string | null;
+  referring?: string | null;
+  referringId?: string | null;
+  changes?: Record<string, unknown> | null;
+  department?: string | null;
 }
 
 export interface AuditSearchFilters {
@@ -57,6 +69,10 @@ export interface AuditSearchFilters {
   statusCode?: number;
   dateFrom?: string;
   dateTo?: string;
+  /** Filtros para auditoria de alterações de entidades (LogService) */
+  referring?: string;
+  referringId?: string;
+  department?: string;
   page: number;
   pageSize: number;
 }
