@@ -15,6 +15,7 @@ class AuthService {
   async login({ login, password }: LoginRequest) {
     const user = await prismaClient.user.findFirst({
       where: { login },
+      include: { department: { select: { organization_id: true } } },
     });
 
     if (!user) {
@@ -26,10 +27,17 @@ class AuthService {
       throw new ServiceError(401, "Login/Senha Incorreto!");
     }
 
+    const organizationId = user.organization_id ?? user.department.organization_id;
+    if (!organizationId) {
+      throw new ServiceError(400, "Usuario sem organizacao vinculada.");
+    }
+
     const jwtSecret = getUserServiceEnv().jwtSecret;
 
     const token = jwt.sign(
       {
+        user_id: user.id,
+        organization_id: organizationId,
         name: user.name,
         login: user.login,
         permission: user.permission,
@@ -47,6 +55,7 @@ class AuthService {
       login: user.login,
       permission: user.permission,
       department_id: user.department_id,
+      organization_id: organizationId,
       token,
     };
   }
