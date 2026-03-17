@@ -5,3 +5,4 @@ packages:
   - "services/organization-service"
   - "services/audit-service"
   - "shared"
+  - "services/user-service"

@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { createSuccessResponse, serviceError } from "@workspace/shared";
+import { createSuccessResponse, serializeError, serviceError } from "@workspace/shared";
 import express, { type Request, type Response, type NextFunction } from "express";
 import "express-async-errors";
 import cors from "cors";
@@ -28,12 +28,11 @@ app.use((error: Error, request: Request, response: Response, _next: NextFunction
     message: error.message,
   });
 
-  if (error.message) {
-    response.status(400).json({ error: error.message });
-    return;
-  }
-
-  response.status(500).json({ error: "Erro interno no organization-service." });
+  const { statusCode, body } = serializeError(error, {
+    requestId: request.requestId,
+    fallbackMessage: "Erro interno no organization-service.",
+  });
+  response.status(statusCode).json(body);
 });
 
 export { app };

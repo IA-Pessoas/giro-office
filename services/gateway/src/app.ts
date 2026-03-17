@@ -3,10 +3,13 @@ import {
   createExpressErrorHandler,
   createSuccessResponse,
   getServiceUrls,
+  gatewayError,
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
+  type AuthLogContext,
+  type Logger,
+  type LogLevel,
 } from "@workspace/shared";
-import type { AuthLogContext, Logger, LogLevel } from "@workspace/shared";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
@@ -19,6 +22,7 @@ import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
+import { isUserServiceRoute } from "./utils/routeUtils.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
   return {
@@ -87,6 +91,10 @@ function getUpstreamContext(url: string, request: Request) {
 function getProxyTargetUrl(env: GatewayEnv, request: Request): string {
   if (env.auditEnabled && request.originalUrl.startsWith("/audit")) {
     return env.auditServiceUrl;
+  }
+
+  if (isUserServiceRoute(request.path)) {
+    return env.userServiceUrl;
   }
 
   return env.legacyApiUrl;
@@ -232,7 +240,10 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     );
   }
 
-  app.use(buildHttpProxyMiddleware(env.legacyApiUrl));
+  app.use((request, response, next) => {
+    const targetUrl = getProxyTargetUrl(env, request);
+    return buildHttpProxyMiddleware(targetUrl)(request, response, next);
+  });
   app.use(buildAuditErrorCaptureMiddleware());
   app.use(
     createExpressErrorHandler({
@@ -245,6 +256,14 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
       }),
     }),
   );
+  app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
+    gatewayError({
+      requestId: request.requestId ?? "",
+      message: error.message,
+    });
+
+    response.status(500).json({ error: "Erro interno no gateway." });
+  });
 
   return app;
 }
