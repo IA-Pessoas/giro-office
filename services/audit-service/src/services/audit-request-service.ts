@@ -28,11 +28,11 @@ const createAuditRequestPayloadSchema = z.object({
   organizationId: z.string().min(1).optional().nullable(),
   userId: z.string().min(1).optional().nullable(),
   permission: z.number().int().optional().nullable(),
-  method: z.string().min(1),
-  path: z.string().min(1),
+  method: z.string().min(1).default("ENTITY_CHANGE"),
+  path: z.string().min(1).default("/"),
   query: z.record(z.string(), z.union([z.string(), z.array(z.string())])).optional(),
   statusCode: z.number().int().optional().nullable(),
-  outcome: z.enum(["success", "error", "aborted"]),
+  outcome: z.enum(["success", "error", "aborted"]).default("success"),
   durationMs: z.number().int().optional().nullable(),
   ip: z.string().optional().nullable(),
   userAgent: z.string().optional().nullable(),
@@ -43,6 +43,17 @@ const createAuditRequestPayloadSchema = z.object({
   createdAt: z.string().datetime(),
   finishedAt: z.string().datetime().optional().nullable(),
   metadata: z.record(z.string(), z.unknown()).optional().nullable(),
+  action: z.string().optional().nullable(),
+  referring: z.string().optional().nullable(),
+  referringId: z.string().optional().nullable(),
+  changes: z
+    .union([
+      z.record(z.string(), z.unknown()),
+      z.string(),
+    ])
+    .optional()
+    .nullable(),
+  department: z.string().optional().nullable(),
 });
 
 function parseCreateAuditRequestPayload(body: unknown): CreateAuditRequestPayload {
@@ -73,6 +84,9 @@ function buildAuditSearchFilters(
     statusCode: parseOptionalInteger(query.statusCode, "statusCode"),
     dateFrom,
     dateTo,
+    referring: getSingleQueryValue(query.referring),
+    referringId: getSingleQueryValue(query.referringId),
+    department: getSingleQueryValue(query.department),
     page: parsePositiveInteger(query.page, "page", 1),
     pageSize: parsePositiveInteger(
       query.pageSize,
