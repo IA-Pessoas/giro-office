@@ -2,6 +2,7 @@
 *.env
 .env.local
 *generated/
+tsconfig.tsbuildinfo
 
 # Turborepo
 .turbo/

@@ -78,8 +78,8 @@ class OrganizationService {
 
       return organization;
     } catch (err: unknown) {
-      if (err instanceof ServiceError) throw err;
       logError("Erro ao criar organização", { err });
+      if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao criar organização. ${msg}`, err);
     }
@@ -102,8 +102,8 @@ class OrganizationService {
 
       return organization;
     } catch (err: unknown) {
-      if (err instanceof ServiceError) throw err;
       logError("Erro ao buscar organização", { err });
+      if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao buscar organização. ${msg}`, err);
     }
@@ -136,8 +136,8 @@ class OrganizationService {
 
       return updated;
     } catch (err: unknown) {
-      if (err instanceof ServiceError) throw err;
       logError("Erro ao atualizar status da organização", { err });
+      if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao atualizar status. ${msg}`, err);
     }
@@ -166,8 +166,8 @@ class OrganizationService {
 
       return updated;
     } catch (err: unknown) {
-      if (err instanceof ServiceError) throw err;
       logError("Erro ao atualizar plano de assinatura", { err });
+      if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao atualizar plano de assinatura. ${msg}`, err);
     }
@@ -193,8 +193,8 @@ class OrganizationService {
 
       return updated;
     } catch (err: unknown) {
-      if (err instanceof ServiceError) throw err;
       logError("Erro ao atualizar logo da organização", { err });
+      if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao atualizar logo. ${msg}`, err);
     }
