@@ -32,7 +32,7 @@ alwaysApply: true
 ## Arquitetura e Estrutura
 
 - **Microservices**: O projeto está em refatoração para microservices. O padrão de estrutura está em `services/`.
-- **Serviços atuais**: user-service, audit-service, gateway (cada um em `services/<nome>/src/`).
+- **Serviços atuais**: user-service, audit-service, organization-service, gateway (cada um em `services/<nome>/src/`).
 - **Legado**: A estrutura monorepo antiga (ex: `services/src`, `app`, etc.) não deve mais ser usada como referência.
 - **Novos serviços**: Seguir o padrão dos microservices existentes em `services/`.
 - Código compartilhado em `shared`.

@@ -14,6 +14,7 @@ alwaysApply: false
 - Uma responsabilidade por service
 - StorageService: apenas operações de storage
 - UserService: lógica de usuário e banco
+- OrganizationService: lógica de organização e banco
 - Rotas coordenam chamadas entre services
 
 ## Erros em services
