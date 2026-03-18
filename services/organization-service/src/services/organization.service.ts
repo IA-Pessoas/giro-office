@@ -1,5 +1,4 @@
-import type { Request, Response } from "express";
-import { createSuccessResponse, ServiceError } from "@workspace/shared";
+import { error as logError, ServiceError } from "@workspace/shared";
 import { status as statusEnum, type status } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 
@@ -13,10 +12,29 @@ function generateSlug(name: string): string {
     .replace(/\s+/g, "-");
 }
 
+interface CreateOrganizationInput {
+  name: string;
+  email_created_by: string;
+  cnpj: string;
+}
+
+const ORGANIZATION_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  status: true,
+  subscription_plan: true,
+  logo_url: true,
+  cnpj: true,
+  email_created_by: true,
+  created_at: true,
+  updated_at: true,
+} as const;
+
 class OrganizationService {
-  async create(request: Request, response: Response) {
+  async create(data: CreateOrganizationInput) {
     try {
-      const { name, email_created_by, cnpj } = request.body;
+      const { name, email_created_by, cnpj } = data;
 
       if (!name?.trim()) {
         throw new ServiceError(400, "name é obrigatório.");
@@ -58,66 +76,55 @@ class OrganizationService {
         },
       });
 
-      response.status(201).json(createSuccessResponse(organization));
-    } catch (err) {
+      return organization;
+    } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
+      logError("Erro ao criar organização", { err });
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao criar organização. ${msg}`, err);
     }
   }
 
-  async findById(request: Request, response: Response) {
+  async findById(id: string) {
     try {
-      const { id } = request.params;
-
       if (!id?.trim()) {
         throw new ServiceError(400, "id é obrigatório.");
       }
 
       const organization = await prismaClient.organization.findUnique({
         where: { id },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          logo_url: true,
-          status: true,
-          subscription_plan: true,
-          email_created_by: true,
-          cnpj: true,
-          created_at: true,
-          updated_at: true,
-        },
+        select: ORGANIZATION_SELECT,
       });
 
       if (!organization) {
         throw new ServiceError(404, "Organização não encontrada.");
       }
 
-      response.json(createSuccessResponse(organization));
-    } catch (err) {
+      return organization;
+    } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
+      logError("Erro ao buscar organização", { err });
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao buscar organização. ${msg}`, err);
     }
   }
 
-  async updateStatus(request: Request, response: Response) {
+  async updateStatus(id: string, statusValue: string) {
     try {
-      const { id } = request.params;
-      const { status } = request.body as { status: status };
-
       if (!id?.trim()) {
         throw new ServiceError(400, "id é obrigatório.");
       }
       const validStatuses = Object.values(statusEnum);
-      if (status === undefined || status === null || !validStatuses.includes(status)) {
-        throw new ServiceError(400, "status é obrigatório e deve ser trial, past_due, active, suspended ou cancelled.");
+      if (statusValue === undefined || statusValue === null || !validStatuses.includes(statusValue as status)) {
+        throw new ServiceError(
+          400,
+          "status é obrigatório e deve ser trial, past_due, active, suspended ou cancelled.",
+        );
       }
 
       const updated = await prismaClient.organization.update({
         where: { id },
-        data: { status },
+        data: { status: statusValue as status },
         select: {
           id: true,
           name: true,
@@ -127,19 +134,17 @@ class OrganizationService {
         },
       });
 
-      response.json(createSuccessResponse(updated));
-    } catch (err) {
+      return updated;
+    } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
+      logError("Erro ao atualizar status da organização", { err });
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao atualizar status. ${msg}`, err);
     }
   }
 
-  async updateSubscriptionPlan(request: Request, response: Response) {
+  async updateSubscriptionPlan(id: string, subscription_plan: string) {
     try {
-      const { id } = request.params;
-      const { subscription_plan } = request.body;
-
       if (!id?.trim()) {
         throw new ServiceError(400, "id é obrigatório.");
       }
@@ -159,19 +164,17 @@ class OrganizationService {
         },
       });
 
-      response.json(createSuccessResponse(updated));
-    } catch (err) {
+      return updated;
+    } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
+      logError("Erro ao atualizar plano de assinatura", { err });
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao atualizar plano de assinatura. ${msg}`, err);
     }
   }
 
-  async updateLogoUrl(request: Request, response: Response) {
+  async updateLogoUrl(id: string, logo_url: string | null | undefined) {
     try {
-      const { id } = request.params;
-      const { logo_url } = request.body;
-
       if (!id?.trim()) {
         throw new ServiceError(400, "id é obrigatório.");
       }
@@ -188,9 +191,10 @@ class OrganizationService {
         },
       });
 
-      response.json(createSuccessResponse(updated));
-    } catch (err) {
+      return updated;
+    } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
+      logError("Erro ao atualizar logo da organização", { err });
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao atualizar logo. ${msg}`, err);
     }
