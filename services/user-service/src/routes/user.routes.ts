@@ -1,12 +1,12 @@
 import { createSuccessResponse, error as logError, ServiceError } from "@workspace/shared";
+import { createPhotoUploadMiddleware } from "@workspace/shared/upload";
 import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
-
-import { upload } from "../middlewares/upload.js";
 import { StorageService } from "../services/StorageService.js";
 import { UserService } from "../services/UserService.js";
 
 const router: ReturnType<typeof Router> = Router();
+const upload = createPhotoUploadMiddleware();
 const userService = new UserService();
 const storageService = new StorageService();
 
