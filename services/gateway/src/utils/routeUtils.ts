@@ -8,3 +8,7 @@ export function isUserServiceRoute(path: string): boolean {
     path.startsWith("/permission/")
   );
 }
+
+export function isTaskServiceRoute(path: string): boolean {
+  return path === "/integracao-tasksModel" || path === "/integracao-taskModel";
+}
