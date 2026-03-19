@@ -56,7 +56,7 @@ export function RecentClientsTable({ data }: RecentClientsTableProps) {
           <Tr>
             <Th>Nome</Th>
             <Th>Status</Th>
-            <Th>Cidade/UF</Th>
+            <Th>Segmento</Th>
             <Th>Entrada</Th>
           </Tr>
         </Thead>
@@ -75,7 +75,7 @@ export function RecentClientsTable({ data }: RecentClientsTableProps) {
                   {row.status}
                 </Badge>
               </Td>
-              <Td>{row.city}/{row.state}</Td>
+              <Td>{row.segmento}</Td>
               <Td>{formatDate(row.entryDate)}</Td>
             </Tr>
           ))}

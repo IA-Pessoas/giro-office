@@ -11,8 +11,7 @@ export interface RecentClientRow {
   id: string;
   name: string;
   status: string;
-  city: string;
-  state: string;
+  segmento: string;
   entryDate: string;
 }
 
