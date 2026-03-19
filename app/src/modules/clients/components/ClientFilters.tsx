@@ -76,16 +76,14 @@ export function ClientFilters({ initialLabel, perm, onFilterChange, onSearchChan
             )}
           </MenuList>
         </Menu>
-        <Menu>
-          <MenuButton as={Button} w="5%" _hover={{ bg: 'componentColor', color: 'secondaryText' }}>
-            <CiCirclePlus size={30} />
-          </MenuButton>
-          <MenuList zIndex={10}>
-            {perm.integracao === 2 && (
-              <MenuItem onClick={() => onOpenCreateModal()}>Novo Cliente (Integração)</MenuItem>
-            )}
-          </MenuList>
-        </Menu>
+        <Button
+          w="5%"
+          _hover={{ bg: 'componentColor', color: 'secondaryText' }}
+          onClick={onOpenCreateModal}
+          aria-label="Novo Cliente"
+        >
+          <CiCirclePlus size={30} />
+        </Button>
       </Flex>
     </Flex>
   );

@@ -200,12 +200,12 @@ export function ClientCreateModal({ isOpen, onClose, onCreated, perm }: CreateMo
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} size="xl">
+        <Modal isOpen={isOpen} onClose={onClose} size="6xl">
             <ModalOverlay />
-            <ModalContent maxWidth="1000px">
+            <ModalContent maxWidth="1400px" mx="auto">
                 <ModalHeader color='primaryText'>Cadastrar Novo Cliente</ModalHeader>
                 <ModalCloseButton />
-                <ModalBody>
+                <ModalBody maxHeight="70vh" overflowY="auto">
                     <IntegracaoForm
                         formData={formData}
                         handleInputChange={handleInputChange}
