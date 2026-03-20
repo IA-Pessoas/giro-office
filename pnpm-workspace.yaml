@@ -6,3 +6,4 @@ packages:
   - "services/audit-service"
   - "shared"
   - "services/user-service"
+  - "services/task-service"
