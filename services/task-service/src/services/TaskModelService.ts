@@ -4,7 +4,7 @@ import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 
 export interface CreateModelRequest {
-  my_id: string;
+  user_id: string;
   organization_id: string;
   name: string;
   department_id: string;
@@ -18,7 +18,7 @@ export interface CreateModelRequest {
 }
 
 export interface UpdateModelRequest {
-  my_id: string;
+  user_id: string;
   organization_id?: string | null;
   task_id: string;
   name: string;
@@ -34,7 +34,7 @@ export interface UpdateModelRequest {
 
 export interface DeleteModelRequest {
   task_id: string;
-  my_id: string;
+  user_id: string;
   organization_id?: string | null;
 }
 
@@ -62,10 +62,7 @@ export class TaskModelService {
     });
 
     if (exists) {
-      throw new ServiceError(
-        409,
-        "Tarefa com esse nome nesse departamento já foi cadastrada.",
-      );
+      throw new ServiceError(409, "Tarefa com esse nome nesse departamento já foi cadastrada.");
     }
 
     const create = await prismaClient.taskModel.create({
@@ -85,7 +82,7 @@ export class TaskModelService {
     });
 
     await audit.createLog({
-      userId: data.my_id,
+      userId: data.user_id,
       organizationId: data.organization_id,
       action: "Cadastro",
       referring: "integracao.tasksModel",
@@ -136,7 +133,7 @@ export class TaskModelService {
     });
 
     await audit.logUpdateIfChanged({
-      userId: data.my_id,
+      userId: data.user_id,
       organizationId: data.organization_id,
       action: "Atualização",
       referring: "integracao.tasksModel",
@@ -177,7 +174,7 @@ export class TaskModelService {
     }
 
     const user = await prismaClient.user.findFirst({
-      where: { id: data.my_id },
+      where: { id: data.user_id },
     });
 
     if (!user) {
