@@ -2,6 +2,7 @@
 *.env
 .env.local
 *generated/
+tsconfig.tsbuildinfo
 
 # Turborepo
 .turbo/
@@ -21,6 +22,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
 
 
 # docs
