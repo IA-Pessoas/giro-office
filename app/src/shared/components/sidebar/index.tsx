@@ -3,7 +3,7 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { Link as ChakraLink, Box, IconButton, useColorMode, Text, Tooltip, VStack, HStack, Flex, Icon, Divider } from "@chakra-ui/react";
 import { IconType } from "react-icons";
-import { FiHome, FiUser, FiUsers, FiLogOut, FiSettings } from "react-icons/fi";
+import { FiHome, FiUser, FiUsers, FiLogOut, FiSettings, FiBriefcase } from "react-icons/fi";
 import { FiMessageSquare } from "react-icons/fi";
 import { useChat } from "@modules/chat";
 import { useAuth } from "../../../context/AuthContext";
@@ -32,6 +32,7 @@ const navItensPorModulo: Record<string, NavItemProps[]> = {
     { label: "Usuários", link: "/users", icon: FiUser, requiredPermission: 0 },
     { label: "Departamentos", link: "/departments", icon: FiUsers, requiredPermission: 0 },
     { label: "Clientes", link: "/clients", icon: FiUsers, requiredPermission: 0 },
+    { label: "Organização", link: "/organizations", icon: FiBriefcase, requiredPermission: 0 },
     { 
       label: "Configurações", 
       link: "/configs/integracao", 
