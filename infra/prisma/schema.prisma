@@ -15,6 +15,12 @@ generator audit_service_client {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator rh_service_client {
+  provider        = "prisma-client"
+  output          = "../../services/rh-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }
