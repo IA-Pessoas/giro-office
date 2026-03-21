@@ -22,7 +22,10 @@ function isValidClaims(claims: unknown): claims is JwtClaims {
     return false;
   }
 
-  if (value.organization_id !== undefined && typeof value.organization_id !== "string") {
+  if (
+    value.organization_id !== undefined &&
+    (typeof value.organization_id !== "string" || value.organization_id.length === 0)
+  ) {
     return false;
   }
 
@@ -77,11 +80,11 @@ export async function isAuthenticated(
 
     next();
   } catch (err: unknown) {
+    logError("Erro ao validar autenticação no rh-service", { err });
     if (err instanceof ServiceError) {
       next(err);
       return;
     }
-    logError("Erro ao validar autenticação no rh-service", { err });
     next(new ServiceError(401, "Não autenticado.", err));
   }
 }

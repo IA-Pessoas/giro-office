@@ -1,4 +1,4 @@
-import { createSuccessResponse, error as logError } from "@workspace/shared";
+import { createSuccessResponse, error as logError, ServiceError } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
@@ -15,12 +15,7 @@ router.put(
     try {
       const organizationId = req.organization_id;
       if (!organizationId) {
-        res.status(400).json({
-          success: false,
-          error: "organization_id é obrigatório.",
-          code: "BAD_REQUEST",
-        });
-        return;
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
 
       const targetUserId = (req.body.target_user_id as string | undefined) ?? req.user_id;
@@ -54,12 +49,7 @@ router.get(
     try {
       const organizationId = req.organization_id;
       if (!organizationId) {
-        res.status(400).json({
-          success: false,
-          error: "organization_id é obrigatório.",
-          code: "BAD_REQUEST",
-        });
-        return;
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
 
       const result = await pointConfigService.getByUserId(req.user_id, organizationId);
@@ -78,12 +68,7 @@ router.get(
     try {
       const organizationId = req.organization_id;
       if (!organizationId) {
-        res.status(400).json({
-          success: false,
-          error: "organization_id é obrigatório.",
-          code: "BAD_REQUEST",
-        });
-        return;
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
 
       const result = await pointConfigService.getByUserId(req.params.userId, organizationId);
