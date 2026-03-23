@@ -94,6 +94,65 @@ body {
     }
 }
 
+@layer components {
+    .ui-surface {
+        border-radius: var(--radii-2xl);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 10%, transparent);
+        box-shadow: var(--shadows-md);
+        background: color-mix(in srgb, var(--colors-white) 96%, transparent);
+    }
+
+    .ui-panel {
+        padding: var(--space-4);
+        border-radius: var(--radii-xl);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 8%, transparent);
+    }
+
+    .ui-title {
+        font-size: 1.125rem;
+        line-height: 1.4;
+        font-weight: 700;
+    }
+
+    .ui-subtitle {
+        font-size: 0.875rem;
+        line-height: 1.4;
+        opacity: 0.85;
+    }
+
+    .ui-button-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-4);
+        border-radius: var(--radii-lg);
+        border: 1px solid transparent;
+        background: var(--colors-blue-500);
+        color: var(--colors-white);
+        transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+
+    .ui-button-primary:hover {
+        transform: translateY(-1px);
+        opacity: 0.95;
+    }
+
+    .ui-input {
+        width: 100%;
+        border-radius: var(--radii-lg);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 16%, transparent);
+        padding: var(--space-2) var(--space-3);
+        background: var(--colors-white);
+        color: color-mix(in srgb, var(--colors-black) 84%, transparent);
+    }
+
+    .ui-input:focus-visible {
+        outline: 2px solid var(--colors-blue-500);
+        outline-offset: 1px;
+    }
+}
+
 :root {
     --main: #2f406a;
     --main-integracao: #ef5a8b;
