@@ -43,7 +43,7 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
     <section className="dashboard-shell u-stack u-gap-4 p-4 md:p-6">
       <QuickActions />
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="u-grid-kpi">
         <StatCard
           data={{
             title: 'Total de Clientes',
@@ -74,7 +74,7 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="u-grid-two-up">
         <FiscalObligationsChart data={stats.fiscal.obligations} />
         <InsightsPanel insights={stats.insights} />
       </div>
@@ -83,7 +83,7 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
         <RecentClientsTable data={stats.recentClients} />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="u-grid-two-up">
         <ServiceDistributionChart data={stats.clientsByService} />
         <ClientTrendsChart data={stats.monthlyTrends} />
       </div>

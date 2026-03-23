@@ -40,7 +40,7 @@ export function RecentClientsTable({ data }: RecentClientsTableProps) {
         </thead>
         <tbody>
           {data.map((row) => (
-            <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50">
+            <tr key={row.id} className="u-table-row">
               <td className="py-2 font-medium">
                 <Link href={`/clients/${row.id}`}>
                   <span className="text-[var(--colors-blue-500)] hover:underline">
