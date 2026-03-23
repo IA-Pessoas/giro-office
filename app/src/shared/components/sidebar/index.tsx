@@ -60,7 +60,11 @@ const navItensPorModulo: Record<string, NavItemProps[]> = {
 function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive: boolean; currentPath: string }) {
   return (
     <Box>
-      <ChakraLink href={item.link} _hover={{ textDecoration: 'none' }}>
+      <ChakraLink
+        href={item.link}
+        aria-expanded={item.subItems?.length ? isActive : undefined}
+        _hover={{ textDecoration: 'none' }}
+      >
         <HStack
           w="full"
           p={1}
@@ -104,39 +108,17 @@ function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive
       </ChakraLink>
       {item.subItems?.length ? (
         <VStack
-          align="stretch"
-          spacing={1.5}
-          mt={1}
-          ml={12}
-          mr={3}
-          opacity={0}
-          maxH={0}
-          overflow="hidden"
-          transition="all 0.25s ease-in-out"
-          _groupHover={{ opacity: 1, maxH: "320px" }}
+          className="ml-12 mr-3 mt-1 max-h-0 items-stretch gap-1.5 overflow-hidden opacity-0 transition-all duration-200 ease-in-out group-hover:max-h-80 group-hover:opacity-100"
         >
           {item.subItems.map((sub) => (
             <ChakraLink
               key={sub.link}
               href={sub.link}
-              fontSize="sm"
-              color="componentColor"
-              borderRadius="lg"
-              px={2.5}
-              py={1.5}
-              borderWidth="1px"
-              borderColor={currentPath === sub.link ? "borderColor" : "transparent"}
-              bg={currentPath === sub.link ? "borderColor" : "whiteAlpha.100"}
-              boxShadow="sm"
-              transition="all 0.2s ease"
-              _hover={{
-                bg: "borderColorReverse",
-                color: "white",
-                textDecoration: "none",
-                transform: "translateX(2px)",
-              }}
+              className={`rounded-lg border px-2.5 py-1.5 text-sm shadow-sm transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--colors-blue-500)] ${currentPath === sub.link ? "border-[var(--colors-blue-500)] bg-[var(--colors-blue-500)] text-white" : "border-transparent bg-white/10 text-[var(--colors-blue-500)] hover:translate-x-0.5 hover:bg-[var(--colors-blue-500)] hover:text-white"}`}
+              aria-current={currentPath === sub.link ? "page" : undefined}
+              _hover={{ textDecoration: "none" }}
             >
-              <HStack spacing={1.5}>
+              <HStack className="gap-1.5">
                 <Icon as={FiChevronRight} boxSize={3} opacity={0.8} />
                 <Text>{sub.label}</Text>
               </HStack>
