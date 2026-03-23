@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "migration:audit:chakra": "node scripts/audit-chakra-usage.mjs",
+    "migration:validate:criteria": "node scripts/validate-acceptance-criteria.mjs",
     "lint": "echo \"Skipping app lint (Biome ignored for now)\"",
     "format": "echo \"Skipping app format (Biome ignored for now)\"",
     "check": "echo \"Skipping app check (Biome ignored for now)\""
