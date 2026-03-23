@@ -38,6 +38,7 @@ export function UserFilters({ initialStatus, onFilterChange, onSearchChange, onO
           type="button"
           onClick={onOpenCreateModal}
           className="ui-button-primary w-1/2"
+          aria-label="Cadastrar usuário"
         >
           Cadastrar <IoIosArrowForward />
         </button>

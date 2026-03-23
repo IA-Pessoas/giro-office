@@ -14,9 +14,17 @@ export function UserList({ users, onUserSelect }: UserListProps) {
           users.map((user) => (
             <article
               key={user.id}
-              className="mr-3 mb-0 w-[200px] min-w-[200px] cursor-pointer rounded-md bg-white shadow-sm transition-transform hover:scale-[1.01] md:mr-0 md:mb-2 md:w-full md:min-w-0"
+              className="mr-3 mb-0 w-[200px] min-w-[200px] cursor-pointer rounded-md bg-white shadow-sm transition-transform hover:scale-[1.01] focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-[var(--colors-blue-500)] md:mr-0 md:mb-2 md:w-full md:min-w-0"
               style={{ borderLeft: `5px solid ${user.department?.color || '#ccc'}` }}
+              role="button"
+              tabIndex={0}
               onClick={() => onUserSelect(user.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onUserSelect(user.id);
+                }
+              }}
             >
               <div className="p-4">
                 <p className="text-md truncate font-bold">{user.name}</p>

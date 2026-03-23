@@ -12,7 +12,7 @@ export function UserDetailsView({ userId, me, departments }: UserDetailsViewProp
   if (!userId) {
     return (
       <div className="u-flex h-[90vh] w-full items-center justify-center">
-        <div className="u-stack items-center">
+        <div className="u-stack items-center" aria-live="polite">
           <p className="text-lg text-[var(--colors-blue-500)]">Selecione um usuário na lista para ver os detalhes.</p>
         </div>
       </div>
