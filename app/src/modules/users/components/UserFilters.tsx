@@ -1,6 +1,5 @@
 // src/components/users/UserFilters.tsx
 import React from 'react';
-import { Flex, Input, InputGroup, InputLeftElement, Menu, MenuButton, MenuItem, MenuList, Button, Box } from '@chakra-ui/react';
 import { IoMdSearch, IoIosArrowForward } from 'react-icons/io';
 
 interface UserFiltersProps {
@@ -12,36 +11,37 @@ interface UserFiltersProps {
 
 export function UserFilters({ initialStatus, onFilterChange, onSearchChange, onOpenCreateModal }: UserFiltersProps) {
   return (
-    <Flex direction={'column'} w="100%" gap={3} p={2}>
-      <InputGroup>
-        <InputLeftElement pointerEvents='none'>
-          <Box color='primaryText'>
-            <IoMdSearch />
-          </Box>
-        </InputLeftElement>
-        <Input
+    <div className="u-stack u-gap-3 w-full p-2">
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--colors-blue-500)]">
+          <IoMdSearch />
+        </span>
+        <input
           type="text"
-          bg='componentBg'
+          className="ui-input pl-9"
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder='Buscar por nome...'
-          _placeholder={{ color: 'primaryText' }}
+          placeholder="Buscar por nome..."
         />
-      </InputGroup>
-      
-      <Flex w="100%" flexDirection={'row'} gap={3}>
-        <Menu>
-          <MenuButton as={Button} w="50%" rightIcon={<IoIosArrowForward />}>
-            Filtro - {initialStatus}
-          </MenuButton>
-          <MenuList bg='bodyBg' border={'1px solid'} borderColor={'borderColorDarkOnly'}>
-            <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange('Ativo')}>Ativos</MenuItem>
-            <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange('Inativo')}>Inativos</MenuItem>
-          </MenuList>
-        </Menu>
-        <Button onClick={onOpenCreateModal} w="50%"  _hover={{ bg: 'componentColor', color: 'secondaryText' }}>
-          Cadastrar
-        </Button>
-      </Flex>
-    </Flex>
+      </div>
+
+      <div className="u-flex u-gap-3 w-full">
+        <select
+          className="ui-input w-1/2 cursor-pointer"
+          value={initialStatus}
+          onChange={(e) => onFilterChange(e.target.value)}
+          aria-label="Filtro de status"
+        >
+          <option value="Ativo">Filtro - Ativo</option>
+          <option value="Inativo">Filtro - Inativo</option>
+        </select>
+        <button
+          type="button"
+          onClick={onOpenCreateModal}
+          className="ui-button-primary w-1/2"
+        >
+          Cadastrar <IoIosArrowForward />
+        </button>
+      </div>
+    </div>
   );
 }
