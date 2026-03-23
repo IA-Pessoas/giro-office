@@ -16,6 +16,143 @@ body {
     padding: 0;
 }
 
+/*
+  Stage 3 - Styling conventions baseline
+  - HTML-first structure with semantic class names
+  - Keep layout primitives minimal and reusable
+*/
+@layer base {
+    .app-shell {}
+
+    .page-section {
+        width: 100%;
+    }
+
+    .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+    }
+
+    .section-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .card-surface {
+        border-radius: var(--radii-xl);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 12%, transparent);
+        box-shadow: var(--shadows-sm);
+    }
+}
+
+@layer utilities {
+    .u-flex {
+        display: flex;
+    }
+
+    .u-stack {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .u-grid {
+        display: grid;
+    }
+
+    .u-items-center {
+        align-items: center;
+    }
+
+    .u-justify-between {
+        justify-content: space-between;
+    }
+
+    .u-gap-2 {
+        gap: var(--space-2);
+    }
+
+    .u-gap-3 {
+        gap: var(--space-3);
+    }
+
+    .u-gap-4 {
+        gap: var(--space-4);
+    }
+
+    .u-grid-auto {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    @media (max-width: 800px) {
+        .u-mobile-stack {
+            display: flex;
+            flex-direction: column;
+        }
+    }
+}
+
+@layer components {
+    .ui-surface {
+        border-radius: var(--radii-2xl);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 10%, transparent);
+        box-shadow: var(--shadows-md);
+        background: color-mix(in srgb, var(--colors-white) 96%, transparent);
+    }
+
+    .ui-panel {
+        padding: var(--space-4);
+        border-radius: var(--radii-xl);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 8%, transparent);
+    }
+
+    .ui-title {
+        font-size: 1.125rem;
+        line-height: 1.4;
+        font-weight: 700;
+    }
+
+    .ui-subtitle {
+        font-size: 0.875rem;
+        line-height: 1.4;
+        opacity: 0.85;
+    }
+
+    .ui-button-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-4);
+        border-radius: var(--radii-lg);
+        border: 1px solid transparent;
+        background: var(--colors-blue-500);
+        color: var(--colors-white);
+        transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+
+    .ui-button-primary:hover {
+        transform: translateY(-1px);
+        opacity: 0.95;
+    }
+
+    .ui-input {
+        width: 100%;
+        border-radius: var(--radii-lg);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 16%, transparent);
+        padding: var(--space-2) var(--space-3);
+        background: var(--colors-white);
+        color: color-mix(in srgb, var(--colors-black) 84%, transparent);
+    }
+
+    .ui-input:focus-visible {
+        outline: 2px solid var(--colors-blue-500);
+        outline-offset: 1px;
+    }
+}
+
 :root {
     --main: #2f406a;
     --main-integracao: #ef5a8b;
