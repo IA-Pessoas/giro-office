@@ -7,6 +7,7 @@ import "express-async-errors";
 
 import { requestContext } from "./middlewares/requestContext.js";
 import pointConfigRoutes from "./routes/point-config.routes.js";
+import pointRoutes from "./routes/point.routes.js";
 
 export function createApp(logger: Logger): express.Express {
   const app = express();
@@ -21,6 +22,7 @@ export function createApp(logger: Logger): express.Express {
   });
 
   app.use("/rh", pointConfigRoutes);
+  app.use("/rh", pointRoutes);
 
   app.use(
     createExpressErrorHandler({

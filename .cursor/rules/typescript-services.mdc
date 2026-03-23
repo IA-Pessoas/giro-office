@@ -22,8 +22,8 @@ alwaysApply: false
 
 ```typescript
 } catch (err: unknown) {
-  if (err instanceof ServiceError) throw err;
   logError("Contexto do erro", { err });
+  if (err instanceof ServiceError) throw err;
   throw new ServiceError(500, "Mensagem amigável.", err);
 }
 ```

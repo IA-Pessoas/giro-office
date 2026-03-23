@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { PointConfigService } from "../services/pointConfigService.js";
+import { PointConfigService } from "../services/PointConfigService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const pointConfigService = new PointConfigService();
