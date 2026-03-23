@@ -10,5 +10,10 @@ export function isUserServiceRoute(path: string): boolean {
 }
 
 export function isTaskServiceRoute(path: string): boolean {
-  return path === "/integracao-tasksModel" || path === "/integracao-taskModel";
+  return (
+    path === "/integracao-tasksModel" ||
+    path === "/integracao-taskModel" ||
+    path === "/integracao-tasksModel-dependent" ||
+    path === "/integracao-taskModel-dependent"
+  );
 }
