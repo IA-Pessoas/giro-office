@@ -5,11 +5,6 @@ import {
     FormLabel,
     FormControl,
     Input,
-    Tabs,
-    TabList,
-    TabPanels,
-    Tab,
-    TabPanel,
     Select,
     Switch, 
     HStack
@@ -21,6 +16,7 @@ import { IoCreate } from "react-icons/io5";
 import { canSSRAuth } from '@modules/auth';
 import { setupAPIClient } from '@shared/services/api';
 import LogDrawer from '@shared/components/LogDrawer';
+import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@shared/components';
 import { useDepForm, departmentService, type DepItem } from '@modules/departments';
 interface Props {
     dep: DepItem
@@ -36,13 +32,17 @@ export default function Department({ dep }: Props) {
 
     return (
         <>
-            <Tabs>
-                <TabList>
-                    <Tab color={'primaryText'}><LuFolder style={{ marginRight: 8 }} /> Dados</Tab>
-                </TabList>
+            <TabsRoot defaultValue="dados">
+                <TabsList>
+                    <TabsTrigger value="dados">
+                        <span className="inline-flex items-center gap-2 text-sm">
+                            <LuFolder />
+                            Dados
+                        </span>
+                    </TabsTrigger>
+                </TabsList>
 
-                <TabPanels>
-                    <TabPanel>
+                <TabsContent value="dados">
                         <Flex direction="column" alignItems="center" pt={4} pb={8} w="100%" maxWidth="900px" mx="auto">
                             <Flex as="form" direction="column" w="100%" gap={4} onSubmit={(e) => { e.preventDefault(); handleUpdate(); }}>
                                 <Flex direction={{ base: "column", md: "row" }} gap={4}>
@@ -94,12 +94,8 @@ export default function Department({ dep }: Props) {
                                 </Flex>
                             </Flex>
                         </Flex>
-                    </TabPanel>
-                    <TabPanel>
-                        <p>Aqui ficará o inventário do usuário...</p>
-                    </TabPanel>
-                </TabPanels>
-            </Tabs>
+                </TabsContent>
+            </TabsRoot>
         </>
     );
 }
