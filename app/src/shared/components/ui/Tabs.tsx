@@ -15,7 +15,11 @@ interface TabsListProps {
 }
 
 export function TabsList({ children }: TabsListProps) {
-  return <TabsPrimitive.List className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white p-1 shadow-sm">{children}</TabsPrimitive.List>;
+  return (
+    <TabsPrimitive.List className="inline-flex items-center gap-1 rounded-lg border border-black/10 bg-white p-1 shadow-sm" aria-label="Section tabs">
+      {children}
+    </TabsPrimitive.List>
+  );
 }
 
 interface TabsTriggerProps {
@@ -27,7 +31,7 @@ export function TabsTrigger({ value, children }: TabsTriggerProps) {
   return (
     <TabsPrimitive.Trigger
       value={value}
-      className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition-colors data-[state=active]:bg-[var(--colors-blue-500)] data-[state=active]:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--colors-blue-500)]"
+      className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 data-[state=active]:bg-[var(--colors-blue-500)] data-[state=active]:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--colors-blue-500)]"
     >
       {children}
     </TabsPrimitive.Trigger>
