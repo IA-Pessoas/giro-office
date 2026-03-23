@@ -9,11 +9,13 @@ export function isUserServiceRoute(path: string): boolean {
   );
 }
 
+const TASK_SERVICE_EXACT_PATHS = new Set([
+  "/integracao-tasksModel",
+  "/integracao-taskModel",
+  "/integracao-tasksModel-dependent",
+  "/integracao-taskModel-dependent",
+]);
+
 export function isTaskServiceRoute(path: string): boolean {
-  return (
-    path === "/integracao-tasksModel" ||
-    path === "/integracao-taskModel" ||
-    path === "/integracao-tasksModel-dependent" ||
-    path === "/integracao-taskModel-dependent"
-  );
+  return TASK_SERVICE_EXACT_PATHS.has(path);
 }
