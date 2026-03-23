@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { AppProps } from "next/app";
 import { useRouter } from 'next/router';
-import { ChakraProvider, Box, Flex } from '@chakra-ui/react';
+import { ChakraProvider, Box, Flex, useColorMode } from '@chakra-ui/react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -51,6 +51,16 @@ function AppLayout({ children }) {
   );
 }
 
+function ColorModeBridge() {
+  const { colorMode } = useColorMode();
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", colorMode);
+  }, [colorMode]);
+
+  return null;
+}
+
 function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter(); // 2. Use o hook do router
 
@@ -59,6 +69,7 @@ function MyApp({ Component, pageProps }: AppProps) {
 
   return (
     <ChakraProvider theme={theme}>
+      <ColorModeBridge />
       <AuthProvider>
         <SocketProvider>
           <ChatProvider>

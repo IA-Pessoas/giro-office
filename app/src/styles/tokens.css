@@ -1,0 +1,33 @@
+:root {
+  --colors-blue-500: #2f406a;
+  --colors-pink-500: #ef5a8b;
+  --colors-red-700: #990033;
+  --colors-red-400: #cf6363;
+  --colors-white: #ffffff;
+  --colors-black: #000000;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+
+  --radii-sm: 0.125rem;
+  --radii-md: 0.375rem;
+  --radii-lg: 0.5rem;
+  --radii-xl: 0.75rem;
+  --radii-2xl: 1rem;
+
+  --shadows-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadows-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadows-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+[data-theme="dark"],
+.chakra-ui-dark {
+  --colors-blue-500: #6078ad;
+  --colors-pink-500: #ff7aa8;
+  --colors-red-700: #d24a75;
+  --colors-red-400: #e58d8d;
+}
