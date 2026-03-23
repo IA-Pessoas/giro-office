@@ -60,7 +60,11 @@ const navItensPorModulo: Record<string, NavItemProps[]> = {
 function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive: boolean; currentPath: string }) {
   return (
     <Box>
-      <ChakraLink href={item.link} _hover={{ textDecoration: 'none' }}>
+      <ChakraLink
+        href={item.link}
+        aria-expanded={item.subItems?.length ? isActive : undefined}
+        _hover={{ textDecoration: 'none' }}
+      >
         <HStack
           w="full"
           p={1}
@@ -110,7 +114,7 @@ function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive
             <ChakraLink
               key={sub.link}
               href={sub.link}
-              className={`rounded-lg border px-2.5 py-1.5 text-sm shadow-sm transition-all duration-200 ${currentPath === sub.link ? "border-[var(--colors-blue-500)] bg-[var(--colors-blue-500)] text-white" : "border-transparent bg-white/10 text-[var(--colors-blue-500)] hover:translate-x-0.5 hover:bg-[var(--colors-blue-500)] hover:text-white"}`}
+              className={`rounded-lg border px-2.5 py-1.5 text-sm shadow-sm transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--colors-blue-500)] ${currentPath === sub.link ? "border-[var(--colors-blue-500)] bg-[var(--colors-blue-500)] text-white" : "border-transparent bg-white/10 text-[var(--colors-blue-500)] hover:translate-x-0.5 hover:bg-[var(--colors-blue-500)] hover:text-white"}`}
               aria-current={currentPath === sub.link ? "page" : undefined}
               _hover={{ textDecoration: "none" }}
             >
