@@ -1,5 +1,4 @@
 import React from 'react';
-import { Box, Text, useColorModeValue } from '@chakra-ui/react';
 import {
   BarChart,
   Bar,
@@ -24,11 +23,11 @@ const STATUS_LABEL: Record<FiscalObligationStatus, string> = {
 };
 
 export function FiscalObligationsChart({ data }: FiscalObligationsChartProps) {
-  const textColor = useColorModeValue('bodyText', 'bodyText');
-  const gridColor = useColorModeValue('#e2e8f0', '#2d3748');
-  const pendingColor = useColorModeValue('#2f406a', '#d0ab70');
-  const issuedColor = useColorModeValue('#48BB78', '#48BB78');
-  const overdueColor = useColorModeValue('#EF4444', '#F87171');
+  const textColor = '#334155';
+  const gridColor = '#e2e8f0';
+  const pendingColor = '#2f406a';
+  const issuedColor = '#48BB78';
+  const overdueColor = '#EF4444';
 
   const chartData = data.map((item) => ({
     status: STATUS_LABEL[item.status],
@@ -46,36 +45,22 @@ export function FiscalObligationsChart({ data }: FiscalObligationsChartProps) {
     if (!active || !payload?.length) return null;
     const p = payload[0];
     return (
-      <Box
-        bg={useColorModeValue('white', 'gray.800')}
-        p={3}
-        borderRadius="md"
-        boxShadow="lg"
-        border="1px solid"
-        borderColor={useColorModeValue('gray.200', 'gray.600')}
-      >
-        <Text fontWeight="bold" color={textColor}>
+      <div className="rounded-md border border-slate-200 bg-white p-3 shadow-lg">
+        <p className="font-bold" style={{ color: textColor }}>
           {p.payload.status}
-        </Text>
-        <Text fontSize="sm" color={textColor}>
+        </p>
+        <p className="text-sm" style={{ color: textColor }}>
           Quantidade: {p.value}
-        </Text>
-      </Box>
+        </p>
+      </div>
     );
   };
 
   return (
-    <Box
-      bg={useColorModeValue('white', 'componentBg')}
-      p={6}
-      borderRadius="md"
-      boxShadow="md"
-      borderLeft="4px solid"
-      borderColor={useColorModeValue('main.main', 'main.mainDourado')}
-    >
-      <Text fontSize="lg" fontWeight="bold" mb={4} color={textColor}>
+    <section className="dashboard-card">
+      <h3 className="dashboard-card-title mb-4" style={{ color: textColor }}>
         Fiscal: Obrigações/Guias
-      </Text>
+      </h3>
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -89,20 +74,20 @@ export function FiscalObligationsChart({ data }: FiscalObligationsChartProps) {
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      <Box mt={3} display="flex" gap={3} flexWrap="wrap">
-        <Box display="flex" alignItems="center" gap={2}>
-          <Box w="10px" h="10px" bg={pendingColor} borderRadius="full" />
-          <Text fontSize="xs" color="gray.500">Pendentes</Text>
-        </Box>
-        <Box display="flex" alignItems="center" gap={2}>
-          <Box w="10px" h="10px" bg={issuedColor} borderRadius="full" />
-          <Text fontSize="xs" color="gray.500">Emitidas</Text>
-        </Box>
-        <Box display="flex" alignItems="center" gap={2}>
-          <Box w="10px" h="10px" bg={overdueColor} borderRadius="full" />
-          <Text fontSize="xs" color="gray.500">Atrasadas</Text>
-        </Box>
-      </Box>
-    </Box>
+      <div className="mt-3 flex flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <span className="h-[10px] w-[10px] rounded-full" style={{ background: pendingColor }} />
+          <span className="text-xs text-slate-500">Pendentes</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="h-[10px] w-[10px] rounded-full" style={{ background: issuedColor }} />
+          <span className="text-xs text-slate-500">Emitidas</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="h-[10px] w-[10px] rounded-full" style={{ background: overdueColor }} />
+          <span className="text-xs text-slate-500">Atrasadas</span>
+        </div>
+      </div>
+    </section>
   );
 }

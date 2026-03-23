@@ -1,5 +1,4 @@
 import React from 'react';
-import { Grid, Box, Spinner, Text, useColorModeValue } from '@chakra-ui/react';
 import { FiUsers, FiTrendingUp, FiActivity } from 'react-icons/fi';
 import { StatCard } from './StatCard';
 import { ServiceDistributionChart } from './ServiceDistributionChart';
@@ -17,22 +16,21 @@ interface DashboardGridProps {
 }
 
 export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
-  const bgColor = useColorModeValue('bodyBg', 'bodyBg');
-  const cardColor = useColorModeValue('#2f406a', '#d0ab70');
+  const cardColor = 'var(--colors-blue-500)';
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minH="400px">
+      <div className="u-flex u-items-center u-justify-between" style={{ minHeight: 400, justifyContent: 'center' }}>
         <LoadingSpinner />
-      </Box>
+      </div>
     );
   }
 
   if (!stats) {
     return (
-      <Box textAlign="center" py={10}>
-        <Text color="gray.500">Nenhum dado disponível</Text>
-      </Box>
+      <div className="py-10 text-center">
+        <p className="text-sm text-slate-500">Nenhum dado disponível</p>
+      </div>
     );
   }
 
@@ -42,18 +40,10 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
     : 0;
 
   return (
-    <Box bg={bgColor} p={{ base: 4, md: 6 }} minH="100vh">
+    <section className="dashboard-shell u-stack u-gap-4 p-4 md:p-6">
       <QuickActions />
-      
-      <Grid
-        templateColumns={{
-          base: '1fr',
-          md: 'repeat(2, 1fr)',
-          lg: 'repeat(3, 1fr)',
-        }}
-        gap={6}
-        mb={6}
-      >
+
+      <div className="u-grid-kpi">
         <StatCard
           data={{
             title: 'Total de Clientes',
@@ -82,34 +72,21 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
           }}
           delay={0.2}
         />
-      </Grid>
+      </div>
 
-      <Grid
-        templateColumns={{
-          base: '1fr',
-          lg: 'repeat(2, 1fr)',
-        }}
-        gap={6}
-        mb={6}
-      >
+      <div className="u-grid-two-up">
         <FiscalObligationsChart data={stats.fiscal.obligations} />
         <InsightsPanel insights={stats.insights} />
-      </Grid>
+      </div>
 
-      <Box mb={6}>
+      <div>
         <RecentClientsTable data={stats.recentClients} />
-      </Box>
+      </div>
 
-      <Grid
-        templateColumns={{
-          base: '1fr',
-          lg: 'repeat(2, 1fr)',
-        }}
-        gap={6}
-      >
+      <div className="u-grid-two-up">
         <ServiceDistributionChart data={stats.clientsByService} />
         <ClientTrendsChart data={stats.monthlyTrends} />
-      </Grid>
-    </Box>
+      </div>
+    </section>
   );
 }

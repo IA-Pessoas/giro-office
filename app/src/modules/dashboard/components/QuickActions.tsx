@@ -1,5 +1,4 @@
 import React from 'react';
-import { Flex, Button, Icon, Text, useColorModeValue, Box } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/router';
 import {
@@ -18,15 +17,11 @@ interface QuickAction {
   color?: string;
 }
 
-const MotionBox = motion(Box);
+const MotionDiv = motion.div;
 
 export function QuickActions() {
   const router = useRouter();
-  const bgColor = useColorModeValue('white', 'componentBg');
-  const borderColor = useColorModeValue('gray.200', 'borderColor');
-  const textColor = useColorModeValue('bodyText', 'bodyText');
-  const hoverBg = useColorModeValue('gray.50', 'mainOpacity');
-  const primaryColor = useColorModeValue('#2f406a', '#d0ab70');
+  const primaryColor = 'var(--colors-blue-500)';
 
   const actions: QuickAction[] = [
     {
@@ -53,67 +48,38 @@ export function QuickActions() {
     {
       label: 'Departamentos',
       icon: FiLayers,
-      href: '/departments',
+      href: '/triagem',
     },
   ];
 
   return (
-    <Box
-      bg={bgColor}
-      p={4}
-      borderRadius="md"
-      boxShadow="md"
-      borderLeft="4px solid"
-      borderColor={primaryColor}
-      mb={6}
-    >
-      <Text
-        fontSize="sm"
-        fontWeight="bold"
-        color="gray.500"
-        mb={4}
-        textTransform="uppercase"
-        letterSpacing="wide"
-      >
+    <section className="dashboard-card dashboard-quick-actions p-4" style={{ borderLeftColor: primaryColor }}>
+      <p className="dashboard-card-subtitle mb-4 text-xs font-bold uppercase tracking-wider">
         Ações Rápidas
-      </Text>
-      <Flex
-        direction={{ base: 'column', sm: 'row' }}
-        gap={3}
-        wrap="wrap"
-      >
+      </p>
+      <div className="flex flex-col flex-wrap gap-3 sm:flex-row">
         {actions.map((action, index) => (
-          <MotionBox
+          <MotionDiv
             key={action.href + index}
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: index * 0.05 }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            flex={{ base: '1', sm: '0 1 auto' }}
-            minW={{ base: 'full', sm: 'auto' }}
+            className="min-w-full flex-1 sm:min-w-0 sm:flex-none"
           >
-            <Button
-              leftIcon={<Icon as={action.icon} boxSize={5} />}
-              variant="outline"
-              color={action.color || textColor}
-              borderColor={borderColor}
-              bg={bgColor}
-              size={{ base: 'md', sm: 'sm' }}
-              w="100%"
+            <button
+              type="button"
+              className="u-flex u-items-center u-gap-2 w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--colors-blue-500)]"
+              style={{ color: action.color || 'var(--colors-blue-500)' }}
               onClick={() => router.push(action.href)}
-              _hover={{
-                bg: hoverBg,
-                borderColor: action.color || primaryColor,
-                color: action.color || primaryColor,
-                boxShadow: 'md',
-              }}
             >
+              <action.icon size={18} />
               {action.label}
-            </Button>
-          </MotionBox>
+            </button>
+          </MotionDiv>
         ))}
-      </Flex>
-    </Box>
+      </div>
+    </section>
   );
 }

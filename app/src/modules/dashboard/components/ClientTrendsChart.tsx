@@ -1,8 +1,5 @@
 import React from 'react';
-import { Box, Text, useColorModeValue } from '@chakra-ui/react';
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -19,49 +16,35 @@ interface ClientTrendsChartProps {
 }
 
 export function ClientTrendsChart({ data }: ClientTrendsChartProps) {
-  const textColor = useColorModeValue('bodyText', 'bodyText');
-  const gridColor = useColorModeValue('#e2e8f0', '#2d3748');
-  const areaColor = useColorModeValue('#2f406a', '#d0ab70');
-  const lineColor = useColorModeValue('#d0ab70', '#2f406a');
+  const textColor = '#334155';
+  const gridColor = '#e2e8f0';
+  const areaColor = '#2f406a';
+  const lineColor = '#d0ab70';
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <Box
-          bg={useColorModeValue('white', 'gray.800')}
-          p={3}
-          borderRadius="md"
-          boxShadow="lg"
-          border="1px solid"
-          borderColor={useColorModeValue('gray.200', 'gray.600')}
-        >
-          <Text fontWeight="bold" mb={2} color={textColor}>
+        <div className="rounded-md border border-slate-200 bg-white p-3 shadow-lg">
+          <p className="mb-2 font-bold" style={{ color: textColor }}>
             {payload[0].payload.month}
-          </Text>
-          <Text fontSize="sm" color={textColor}>
+          </p>
+          <p className="text-sm" style={{ color: textColor }}>
             Novos Clientes: {payload[0].value}
-          </Text>
-        </Box>
+          </p>
+        </div>
       );
     }
     return null;
   };
 
   return (
-    <Box
-      bg={useColorModeValue('white', 'componentBg')}
-      p={6}
-      borderRadius="md"
-      boxShadow="md"
-      borderLeft="4px solid"
-      borderColor={useColorModeValue('main.main', 'main.mainDourado')}
-    >
-      <Text fontSize="lg" fontWeight="bold" mb={4} color={textColor}>
+    <section className="dashboard-card">
+      <h3 className="dashboard-card-title mb-4" style={{ color: textColor }}>
         Tendência de Novos Clientes
-      </Text>
-      <Text fontSize="sm" color="gray.500" mb={4}>
+      </h3>
+      <p className="dashboard-card-subtitle mb-4">
         Últimos {data.length} meses
-      </Text>
+      </p>
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data}>
           <defs>
@@ -92,6 +75,6 @@ export function ClientTrendsChart({ data }: ClientTrendsChartProps) {
           />
         </AreaChart>
       </ResponsiveContainer>
-    </Box>
+    </section>
   );
 }
