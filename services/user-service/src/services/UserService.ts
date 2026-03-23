@@ -1,7 +1,7 @@
+import { error as logError, ServiceError } from "@workspace/shared";
 import bcrypt from "bcryptjs";
 
-import { error as logError, ServiceError } from "@workspace/shared";
-
+import type { Prisma } from "../generated/prisma/client.js";
 import prismaClient from "../prisma/index.js";
 import { PermissionService } from "./PermissionService.js";
 
@@ -47,7 +47,7 @@ const MODULE_FIELDS = [
   "wiki",
 ] as const;
 const MAX_MODULES = Object.fromEntries(
-  MODULE_FIELDS.map((f) => [f, OWNER_MAX_MODULE_VALUE])
+  MODULE_FIELDS.map((f) => [f, OWNER_MAX_MODULE_VALUE]),
 ) as Record<string, number>;
 
 interface CreateUserInput {
@@ -84,8 +84,16 @@ interface ListUsersParams {
   take?: number;
 }
 
+type UserPublicRow = Prisma.UserGetPayload<{ select: typeof USER_PUBLIC_SELECT }>;
+type UserCreateRow = Prisma.UserGetPayload<{ select: typeof USER_CREATE_SELECT }>;
+
 class UserService {
-  async list({ skip = 0, take = 20 }: ListUsersParams) {
+  async list({ skip = 0, take = 20 }: ListUsersParams): Promise<{
+    users: UserPublicRow[];
+    total: number;
+    skip: number;
+    take: number;
+  }> {
     const [users, total] = await Promise.all([
       prismaClient.user.findMany({
         select: USER_PUBLIC_SELECT,
@@ -99,7 +107,7 @@ class UserService {
     return { users, total, skip, take };
   }
 
-  async getById(id: string) {
+  async getById(id: string): Promise<UserPublicRow> {
     const user = await prismaClient.user.findUnique({
       where: { id },
       select: USER_PUBLIC_SELECT,
@@ -112,7 +120,7 @@ class UserService {
     return user;
   }
 
-  async create(data: CreateUserInput) {
+  async create(data: CreateUserInput): Promise<UserPublicRow | UserCreateRow> {
     const passwordHash = await bcrypt.hash(data.password, 8);
 
     try {
@@ -166,7 +174,10 @@ class UserService {
       return user;
     } catch (err: unknown) {
       const isUniqueViolation =
-        err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002";
+        err &&
+        typeof err === "object" &&
+        "code" in err &&
+        (err as { code: string }).code === "P2002";
       if (isUniqueViolation) {
         throw new ServiceError(409, "Login já cadastrado.");
       }
@@ -175,7 +186,7 @@ class UserService {
     }
   }
 
-  async update(id: string, data: UpdateUserInput) {
+  async update(id: string, data: UpdateUserInput): Promise<UserPublicRow> {
     const existingUser = await prismaClient.user.findUnique({
       where: { id },
       select: { ...USER_PUBLIC_SELECT, permission_id: true },
@@ -226,7 +237,10 @@ class UserService {
     } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
       const isUniqueViolation =
-        err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002";
+        err &&
+        typeof err === "object" &&
+        "code" in err &&
+        (err as { code: string }).code === "P2002";
       if (isUniqueViolation) {
         throw new ServiceError(409, "Login já cadastrado.");
       }
@@ -235,7 +249,7 @@ class UserService {
     }
   }
 
-  async delete(id: string) {
+  async delete(id: string): Promise<void> {
     await this.getById(id);
 
     try {
@@ -252,6 +266,6 @@ class UserService {
       throw new ServiceError(500, "Erro ao desativar usuário.", err);
     }
   }
-} 
+}
 
 export { UserService };

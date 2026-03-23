@@ -13,6 +13,13 @@ export interface RegisterPointInput {
 
 export type RegisterPointAction = "Entrada" | "Saída almoço" | "Volta almoço" | "Saída";
 
+export type CalculateDailyHoursResult = {
+  point_id: string;
+  total_worked_minutes: number;
+  expected_minutes: number;
+  day_balance_minutes: number;
+};
+
 const POINT_SELECT = {
   id: true,
   user_id: true,
@@ -26,13 +33,15 @@ const POINT_SELECT = {
   signature: true,
 } as const;
 
-type PointSnapshot = Prisma.PointGetPayload<{ select: typeof POINT_SELECT }>;
+export type PointSnapshot = Prisma.PointGetPayload<{ select: typeof POINT_SELECT }>;
+
+export type RegisterPointResult = {
+  action: RegisterPointAction;
+  point: PointSnapshot;
+};
 
 class PointService {
-  async registerPoint(input: RegisterPointInput): Promise<{
-    action: RegisterPointAction;
-    point: PointSnapshot;
-  }> {
+  async registerPoint(input: RegisterPointInput): Promise<RegisterPointResult> {
     try {
       if (!input.user_id?.trim()) {
         throw new ServiceError(400, "user_id é obrigatório.");
@@ -121,7 +130,10 @@ class PointService {
     }
   }
 
-  async calculateDailyHours(pointId: string, organizationId: string) {
+  async calculateDailyHours(
+    pointId: string,
+    organizationId: string,
+  ): Promise<CalculateDailyHoursResult> {
     try {
       if (!pointId?.trim()) {
         throw new ServiceError(400, "point_id é obrigatório.");

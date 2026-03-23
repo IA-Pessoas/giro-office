@@ -51,3 +51,4 @@ Imports: `debug`, `info`, `warn`, `error` de `@workspace/shared` (logger baseado
 - **Novos serviços**: Seguir o padrão dos microservices existentes em `services/`.
 - Código compartilhado em `shared`.
 - Rotas orquestram services; services não chamam rotas.
+- **Services (TypeScript)**: métodos públicos de service com tipo de retorno explícito; detalhes em `typescript-services.mdc`.
