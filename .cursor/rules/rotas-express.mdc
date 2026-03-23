@@ -19,6 +19,16 @@ router.METODO("/path", async (request, response, next) => {
 });
 ```
 
-## Validação
-- Validar body/params antes de chamar services
-- Usar ServiceError(400, "mensagem") para validação
+## Validação e erros 4xx nas rotas
+- Validar body/query/params e pré-requisitos (ex.: `req.organization_id`) **antes** de chamar services.
+- **Não** responder validação com `response.status(400).json({ success: false, error: "...", code: "BAD_REQUEST" })`. Usar **`throw new ServiceError(400, "mensagem clara")`**; o handler global monta `success`, `error` e `code` de forma consistente.
+- Exemplo:
+```typescript
+const organizationId = request.organization_id;
+if (!organizationId) {
+  throw new ServiceError(400, "organization_id é obrigatório.");
+}
+```
+
+## Middlewares (mesmo arquivo ou importados)
+- Se o middleware tiver `try`/`catch`, aplicar a regra do workspace: **`logError` primeiro no `catch`**, depois tratar `ServiceError` vs erro genérico.

@@ -27,3 +27,8 @@ alwaysApply: false
   throw new ServiceError(500, "Mensagem amigável.", err);
 }
 ```
+
+## Middlewares (`**/middlewares/**/*.ts` em services)
+- No `catch`, **registrar antes de ramificar**: `logError("contexto", { err })` como primeira linha útil, **antes** de `if (err instanceof ServiceError)`. Assim erros já classificados como `ServiceError` também ficam no log quando fizer sentido para diagnóstico. 
+<!-- (ajuste a mensagem de log se for ruído em produção). -->
+- Encaminhar com `next(err)` ou `next(new ServiceError(...))` conforme o caso; não misturar com `response.status(...).json(...)` para o mesmo fluxo de erro.
