@@ -129,6 +129,44 @@ body {
     .u-table-row:hover {
         background: #f8fafc;
     }
+
+    .u-split-panel {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    @media (min-width: 768px) {
+        .u-split-panel {
+            flex-direction: row;
+            height: 90vh;
+        }
+    }
+
+    .u-responsive-3cols {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+    }
+
+    @media (min-width: 768px) {
+        .u-responsive-3cols {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    .u-horizontal-scroll-cards {
+        display: flex;
+        width: 100%;
+        flex-direction: row;
+        padding-bottom: var(--space-2);
+    }
+
+    @media (min-width: 768px) {
+        .u-horizontal-scroll-cards {
+            flex-direction: column;
+        }
+    }
 }
 
 @layer components {

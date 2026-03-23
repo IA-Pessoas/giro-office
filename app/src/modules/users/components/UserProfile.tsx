@@ -84,7 +84,7 @@ function UserFormContent({ user, me, departments }) {
                     <input id="photo-upload" type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
 
                     <form className="u-stack u-gap-4 w-full" onSubmit={(e) => { e.preventDefault(); handleUpdate(); }}>
-                        <div className="users-form-grid cols-3">
+                        <div className="u-responsive-3cols">
                             <div className="u-stack u-gap-2">
                                 <label className="users-section-title">Login</label>
                                 <input value={user?.login || ''} readOnly className="ui-input bg-slate-100" />
@@ -99,7 +99,7 @@ function UserFormContent({ user, me, departments }) {
                             </div>
                         </div>
 
-                        <div className="users-form-grid cols-3">
+                        <div className="u-responsive-3cols">
                             <div className="u-stack u-gap-2">
                                 <label className="users-section-title">Departamento</label>
                                 <select name="department_id" value={formData.department_id} onChange={handleInputChange} className="ui-input">

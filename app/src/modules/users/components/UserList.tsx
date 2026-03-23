@@ -9,7 +9,7 @@ interface UserListProps {
 export function UserList({ users, onUserSelect }: UserListProps) {
   return (
     <div className="h-[170px] w-full overflow-x-auto overflow-y-hidden bg-[var(--colors-white)] p-2 md:h-full md:overflow-x-hidden md:overflow-y-auto">
-      <div className="flex w-full flex-row pb-2 md:flex-col">
+      <div className="u-horizontal-scroll-cards">
         {users.length > 0 ? (
           users.map((user) => (
             <article
