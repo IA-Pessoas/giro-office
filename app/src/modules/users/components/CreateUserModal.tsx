@@ -67,19 +67,19 @@ export function CreateUserModal({ isOpen, onClose, onUserCreated, departments }:
     >
       <div className="u-stack u-gap-4">
         <div className="u-stack u-gap-2">
-          <label htmlFor="user-name" className="text-sm font-medium text-[var(--colors-blue-500)]">Nome</label>
+          <label htmlFor="user-name" className="users-section-title">Nome</label>
           <input id="user-name" name="name" value={formData.name} onChange={handleInputChange} className="ui-input" required />
         </div>
         <div className="u-stack u-gap-2">
-          <label htmlFor="user-login" className="text-sm font-medium text-[var(--colors-blue-500)]">Login</label>
+          <label htmlFor="user-login" className="users-section-title">Login</label>
           <input id="user-login" name="login" value={formData.login} onChange={handleInputChange} className="ui-input" required />
         </div>
         <div className="u-stack u-gap-2">
-          <label htmlFor="user-password" className="text-sm font-medium text-[var(--colors-blue-500)]">Senha</label>
+          <label htmlFor="user-password" className="users-section-title">Senha</label>
           <input id="user-password" type="password" name="password" value={formData.password} onChange={handleInputChange} className="ui-input" required />
         </div>
         <div className="u-stack u-gap-2">
-          <label htmlFor="user-department" className="text-sm font-medium text-[var(--colors-blue-500)]">Departamento</label>
+          <label htmlFor="user-department" className="users-section-title">Departamento</label>
           <select
             id="user-department"
             name="department_id"

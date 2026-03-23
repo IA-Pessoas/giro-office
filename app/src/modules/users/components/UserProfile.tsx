@@ -84,24 +84,24 @@ function UserFormContent({ user, me, departments }) {
                     <input id="photo-upload" type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
 
                     <form className="u-stack u-gap-4 w-full" onSubmit={(e) => { e.preventDefault(); handleUpdate(); }}>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div className="users-form-grid cols-3">
                             <div className="u-stack u-gap-2">
-                                <label className="text-sm font-medium text-[var(--colors-blue-500)]">Login</label>
+                                <label className="users-section-title">Login</label>
                                 <input value={user?.login || ''} readOnly className="ui-input bg-slate-100" />
                             </div>
                             <div className="u-stack u-gap-2">
-                                <label className="text-sm font-medium text-[var(--colors-blue-500)]">Nome</label>
+                                <label className="users-section-title">Nome</label>
                                 <input name="name" value={formData.name} onChange={handleInputChange} className="ui-input" />
                             </div>
                             <div className="u-stack u-gap-2">
-                                <label className="text-sm font-medium text-[var(--colors-blue-500)]">Nova Senha</label>
+                                <label className="users-section-title">Nova Senha</label>
                                 <input type="password" name="password" placeholder="Deixe em branco para manter" value={formData.password} onChange={handleInputChange} className="ui-input" />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div className="users-form-grid cols-3">
                             <div className="u-stack u-gap-2">
-                                <label className="text-sm font-medium text-[var(--colors-blue-500)]">Departamento</label>
+                                <label className="users-section-title">Departamento</label>
                                 <select name="department_id" value={formData.department_id} onChange={handleInputChange} className="ui-input">
                                     {departments.map(dep => <option key={dep.id} value={dep.id}>{dep.name}</option>)}
                                 </select>
@@ -110,13 +110,13 @@ function UserFormContent({ user, me, departments }) {
                             {me.permission >= 1 && (
                                 <>
                                     <div className="u-stack u-gap-2">
-                                        <label className="text-sm font-medium text-[var(--colors-blue-500)]">Permissão</label>
+                                        <label className="users-section-title">Permissão</label>
                                         <select name="permission" value={formData.permission} onChange={handleInputChange} className="ui-input">
                                             {permissoes.filter(p => p.id <= me.permission).map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
                                         </select>
                                     </div>
                                     <div className="u-stack u-gap-2">
-                                        <label className="text-sm font-medium text-[var(--colors-blue-500)]">Status</label>
+                                        <label className="users-section-title">Status</label>
                                         <select name="status" value={formData.status} onChange={handleInputChange} className="ui-input">
                                             <option value='Ativo'>Ativo</option>
                                             <option value='Inativo'>Inativo</option>

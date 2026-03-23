@@ -20,7 +20,7 @@ export function UserDetailsView({ userId, me, departments }: UserDetailsViewProp
   }
 
   return (
-    <section className="relative ml-2 h-[90vh] w-full overflow-y-auto rounded-lg border border-black/10 bg-white shadow-md">
+    <section className="users-detail-panel relative ml-2 h-[90vh] w-full overflow-y-auto">
       {/* Renderização Nativa em vez de Iframe */}
       <UserProfile 
         key={userId} // A key força o componente a recarregar quando muda o ID
