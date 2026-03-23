@@ -16,6 +16,38 @@ body {
     padding: 0;
 }
 
+/*
+  Stage 3 - Styling conventions baseline
+  - HTML-first structure with semantic class names
+  - Keep layout primitives minimal and reusable
+*/
+@layer base {
+    .app-shell {}
+
+    .page-section {
+        width: 100%;
+    }
+
+    .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+    }
+
+    .section-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .card-surface {
+        border-radius: var(--radii-xl);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 12%, transparent);
+        box-shadow: var(--shadows-sm);
+    }
+}
+
 :root {
     --main: #2f406a;
     --main-integracao: #ef5a8b;
