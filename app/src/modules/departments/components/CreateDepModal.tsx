@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Modal, FormControl, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, Button, Flex, FormLabel, Input, Select } from '@chakra-ui/react';
+import { Button } from '@chakra-ui/react';
 import { toast } from 'react-toastify';
 
 import { setupAPIClient } from '@shared/services/api';
+import { Dialog } from '@shared/components';
 import type { DepItem } from '../types';
 
 interface CreateDepModalProps {
@@ -42,34 +43,62 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader color='primaryText'>Cadastrar Novo Departamento</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <Flex direction="column" gap={4}>
-            <FormControl isRequired><FormLabel>Nome</FormLabel><Input name="name" value={formData.name} onChange={handleInputChange} color={'bodyText'} /></FormControl>
-            <FormControl isRequired><FormLabel>Cor</FormLabel><Input name="color" type="color" value={formData.color} onChange={handleInputChange} color={'bodyText'} /></FormControl>
-          </Flex>
-        </ModalBody>
-        <ModalFooter>
-          <Button colorScheme="gray"  mr={3} onClick={onClose}>Cancelar</Button>
-          <Button 
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title="Cadastrar Novo Departamento"
+      footer={(
+        <>
+          <Button colorScheme="gray" mr={3} onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
             bg="componentColor"
-            color={'secondaryText'}
-            border={'1px solid transparent'} 
-            _hover={{ 
-              bg: 'white', 
-              color: 'main.main', 
-            }} 
-            isLoading={isLoading} 
+            color="secondaryText"
+            border="1px solid transparent"
+            _hover={{
+              bg: 'white',
+              color: 'main.main',
+            }}
+            isLoading={isLoading}
             onClick={handleCadastrar}
           >
             Salvar
           </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+        </>
+      )}
+    >
+      <div className="u-stack u-gap-4">
+        <div className="u-stack u-gap-2">
+          <label htmlFor="dep-name" className="text-sm font-medium text-[var(--colors-blue-500)]">
+            Nome
+          </label>
+          <input
+            id="dep-name"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            className="ui-input"
+            required
+          />
+        </div>
+        <div className="u-stack u-gap-2">
+          <label htmlFor="dep-color" className="text-sm font-medium text-[var(--colors-blue-500)]">
+            Cor
+          </label>
+          <input
+            id="dep-color"
+            name="color"
+            type="color"
+            value={formData.color}
+            onChange={handleInputChange}
+            className="h-10 w-full rounded-lg border border-black/15 bg-white p-1"
+            required
+          />
+        </div>
+      </div>
+    </Dialog>
   );
 }
