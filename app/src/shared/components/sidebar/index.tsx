@@ -3,7 +3,7 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { Link as ChakraLink, Box, IconButton, useColorMode, Text, Tooltip, VStack, HStack, Flex, Icon, Divider } from "@chakra-ui/react";
 import { IconType } from "react-icons";
-import { FiHome, FiUser, FiUsers, FiLogOut, FiSettings, FiBriefcase } from "react-icons/fi";
+import { FiHome, FiUser, FiUsers, FiLogOut, FiSettings, FiBriefcase, FiChevronRight } from "react-icons/fi";
 import { FiMessageSquare } from "react-icons/fi";
 import { useChat } from "@modules/chat";
 import { useAuth } from "../../../context/AuthContext";
@@ -18,6 +18,7 @@ interface NavItemProps {
   requiredPermission: number; // Permissão Geral
   permissionKey?: string;     // Chave específica (ex: 'integracao')
   minLevel?: number;          // Nível mínimo específico
+  subItems?: Array<{ label: string; link: string }>;
 }
 
 interface NavbarProps {
@@ -30,7 +31,19 @@ const navItensPorModulo: Record<string, NavItemProps[]> = {
   castelo: [
     { label: "Dashboard", link: "/dashboard", icon: FiHome, requiredPermission: 0 },
     { label: "Usuários", link: "/users", icon: FiUser, requiredPermission: 0 },
-    { label: "Departamentos", link: "/departments", icon: FiUsers, requiredPermission: 0 },
+    {
+      label: "Departamentos",
+      link: "/triagem",
+      icon: FiUsers,
+      requiredPermission: 0,
+      subItems: [
+        { label: "Triagem", link: "/triagem" },
+        { label: "Contabil", link: "/contabil" },
+        { label: "Fiscal", link: "/fiscal" },
+        { label: "Regularize", link: "/regularize" },
+        { label: "RH", link: "/rh" },
+      ],
+    },
     { label: "Clientes", link: "/clients", icon: FiUsers, requiredPermission: 0 },
     { label: "Organização", link: "/organizations", icon: FiBriefcase, requiredPermission: 0 },
     { 
@@ -44,50 +57,94 @@ const navItensPorModulo: Record<string, NavItemProps[]> = {
   ],
 };
 
-function NavItem({ item, isActive }: { item: NavItemProps; isActive: boolean }) {
+function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive: boolean; currentPath: string }) {
   return (
-    <ChakraLink href={item.link} _hover={{ textDecoration: 'none' }}>
-      <HStack
-        w="full"
-        p={1}
-        mx={2}
-        my={1}
-        borderRadius="md"
-        cursor="pointer"
-        transition="all 0.2s ease"
-        bg={isActive ? "borderColor" : "transparent"}
-        color={isActive ? "componentColorReverse" : "componentColor"}
-        _hover={{
-          bg: "borderColorReverse",
-          color: "white",
-        }}
-      >
-        <IconButton
-          aria-label={item.label}
-          icon={<item.icon size="22px" />}
-          variant="unstyled"
-          color="currentColor"
-          isRound
-          display="flex"
-        />
-        <Text
-          fontSize="md"
-          fontWeight="medium"
-          opacity={0}
-          w={0}
-          pointerEvents="none"
-          transition="opacity 0.2s ease-in-out"
-          _groupHover={{
-            opacity: 1,
-            w: 'auto',
-            pointerEvents: 'auto',
-            ml: 2,
+    <Box>
+      <ChakraLink href={item.link} _hover={{ textDecoration: 'none' }}>
+        <HStack
+          w="full"
+          p={1}
+          mx={2}
+          my={1}
+          borderRadius="md"
+          cursor="pointer"
+          transition="all 0.2s ease"
+          bg={isActive ? "borderColor" : "transparent"}
+          color={isActive ? "componentColorReverse" : "componentColor"}
+          _hover={{
+            bg: "borderColorReverse",
+            color: "white",
           }}
         >
-          {item.label}
-        </Text>
-      </HStack>
-    </ChakraLink>
+          <IconButton
+            aria-label={item.label}
+            icon={<item.icon size="22px" />}
+            variant="unstyled"
+            color="currentColor"
+            isRound
+            display="flex"
+          />
+          <Text
+            fontSize="md"
+            fontWeight="medium"
+            opacity={0}
+            w={0}
+            pointerEvents="none"
+            transition="opacity 0.2s ease-in-out"
+            _groupHover={{
+              opacity: 1,
+              w: 'auto',
+              pointerEvents: 'auto',
+              ml: 2,
+            }}
+          >
+            {item.label}
+          </Text>
+        </HStack>
+      </ChakraLink>
+      {item.subItems?.length ? (
+        <VStack
+          align="stretch"
+          spacing={1.5}
+          mt={1}
+          ml={12}
+          mr={3}
+          opacity={0}
+          maxH={0}
+          overflow="hidden"
+          transition="all 0.25s ease-in-out"
+          _groupHover={{ opacity: 1, maxH: "320px" }}
+        >
+          {item.subItems.map((sub) => (
+            <ChakraLink
+              key={sub.link}
+              href={sub.link}
+              fontSize="sm"
+              color="componentColor"
+              borderRadius="lg"
+              px={2.5}
+              py={1.5}
+              borderWidth="1px"
+              borderColor={currentPath === sub.link ? "borderColor" : "transparent"}
+              bg={currentPath === sub.link ? "borderColor" : "whiteAlpha.100"}
+              boxShadow="sm"
+              transition="all 0.2s ease"
+              _hover={{
+                bg: "borderColorReverse",
+                color: "white",
+                textDecoration: "none",
+                transform: "translateX(2px)",
+              }}
+            >
+              <HStack spacing={1.5}>
+                <Icon as={FiChevronRight} boxSize={3} opacity={0.8} />
+                <Text>{sub.label}</Text>
+              </HStack>
+            </ChakraLink>
+          ))}
+        </VStack>
+      ) : null}
+    </Box>
   );
 }
 function NavItemAction({ label, icon, onClick, children = null }) {
@@ -185,7 +242,8 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
     <NavItem
       key={item.link}
       item={item}
-      isActive={router.pathname === item.link}
+      isActive={router.pathname === item.link || item.subItems?.some((sub) => sub.link === router.pathname) === true}
+      currentPath={router.asPath}
     />
   ));
 
