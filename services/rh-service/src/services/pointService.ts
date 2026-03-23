@@ -1,21 +1,17 @@
 import { error as logError, ServiceError } from "@workspace/shared";
+import { getRhEnv } from "../config/env.js";
 import type { Prisma } from "../generated/prisma/client.js";
-
 import { prismaClient } from "../integrations/prisma.js";
 import { TimeUtils } from "../utils/timeUtils.js";
 
-const MIN_INTERVAL_MINUTES = 1;
+const { pointMinIntervalMinutes } = getRhEnv();
 
 export interface RegisterPointInput {
   user_id: string;
   organization_id: string;
 }
 
-export type RegisterPointAction =
-  | "Entrada"
-  | "Saída almoço"
-  | "Volta almoço"
-  | "Saída";
+export type RegisterPointAction = "Entrada" | "Saída almoço" | "Volta almoço" | "Saída";
 
 const POINT_SELECT = {
   id: true,
@@ -58,10 +54,10 @@ class PointService {
       });
 
       const assertMinInterval = (last: Date) => {
-        if (TimeUtils.diffMinutes(last, now) < MIN_INTERVAL_MINUTES) {
+        if (TimeUtils.diffMinutes(last, now) < pointMinIntervalMinutes) {
           throw new ServiceError(
             400,
-            `Intervalo mínimo de ${MIN_INTERVAL_MINUTES} minutos entre registros não respeitado.`,
+            `Intervalo mínimo de ${pointMinIntervalMinutes} minutos entre registros não respeitado.`,
           );
         }
       };
@@ -77,7 +73,7 @@ class PointService {
         });
         return { action: "Entrada", point: created };
       }
-      
+
       if (existing.clock_out) {
         throw new ServiceError(400, "Jornada do dia já concluída.");
       }
@@ -157,7 +153,10 @@ class PointService {
         throw new ServiceError(400, "Registro incompleto para cálculo (exige entrada e saída).");
       }
       if (!point.lunch_out || !point.lunch_in) {
-        throw new ServiceError(400, "Registro incompleto para cálculo (intervalo de almoço ausente).");
+        throw new ServiceError(
+          400,
+          "Registro incompleto para cálculo (intervalo de almoço ausente).",
+        );
       }
 
       const config = await prismaClient.pointsConfig.findUnique({
