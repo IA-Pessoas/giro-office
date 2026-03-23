@@ -17,18 +17,21 @@ alwaysApply: false
 - OrganizationService: lógica de organização e banco
 - Rotas coordenam chamadas entre services
 
+## Tipos de retorno
+- Métodos públicos de classes de serviço devem declarar **tipo de retorno explícito** (`Promise<...>` quando `async`).
+- Preferir tipos derivados do Prisma quando o retorno vier do banco: `TaskModelGetPayload<{ select: typeof MEU_SELECT }>`, etc.; exportar o alias (`type TaskModelRow = ...`) quando for reutilizado nas rotas ou em outros módulos.
+
 ## Erros em services
-- Logs de erro detalhados
+- `logError` como **primeira linha útil** do `catch`, **antes** de ramificar com `if (err instanceof ServiceError)`.
 
 ```typescript
 } catch (err: unknown) {
-  if (err instanceof ServiceError) throw err;
   logError("Contexto do erro", { err });
+  if (err instanceof ServiceError) throw err;
   throw new ServiceError(500, "Mensagem amigável.", err);
 }
 ```
 
 ## Middlewares (`**/middlewares/**/*.ts` em services)
-- No `catch`, **registrar antes de ramificar**: `logError("contexto", { err })` como primeira linha útil, **antes** de `if (err instanceof ServiceError)`. Assim erros já classificados como `ServiceError` também ficam no log quando fizer sentido para diagnóstico. 
-<!-- (ajuste a mensagem de log se for ruído em produção). -->
+- No `catch`, **registrar antes de ramificar**: `logError("contexto", { err })` como primeira linha útil, **antes** de `if (err instanceof ServiceError)`. Assim erros já classificados como `ServiceError` também ficam no log quando fizer sentido para diagnóstico.
 - Encaminhar com `next(err)` ou `next(new ServiceError(...))` conforme o caso; não misturar com `response.status(...).json(...)` para o mesmo fluxo de erro.

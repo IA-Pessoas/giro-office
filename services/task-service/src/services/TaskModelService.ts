@@ -1,4 +1,5 @@
 import { error as logError, ServiceError } from "@workspace/shared";
+import type { TaskModelGetPayload } from "../generated/prisma/models/TaskModel.js";
 
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
@@ -51,8 +52,17 @@ const TASK_MODEL_SELECT = {
   type: true,
 } as const;
 
+const TASK_MODEL_LIST_SELECT = {
+  id: true,
+  name: true,
+  department_id: true,
+} as const;
+
+export type TaskModelRow = TaskModelGetPayload<{ select: typeof TASK_MODEL_SELECT }>;
+export type TaskModelListItem = TaskModelGetPayload<{ select: typeof TASK_MODEL_LIST_SELECT }>;
+
 export class TaskModelService {
-  async createModel(data: CreateModelRequest) {
+  async createModel(data: CreateModelRequest): Promise<{ create: TaskModelRow }> {
     try {
       const exists = await prismaClient.taskModel.findFirst({
         where: {
@@ -99,7 +109,7 @@ export class TaskModelService {
     }
   }
 
-  async detailModel(taskId: string, organizationId: string) {
+  async detailModel(taskId: string, organizationId: string): Promise<{ detail: TaskModelRow }> {
     try {
       const detail = await prismaClient.taskModel.findFirst({
         where: { id: taskId, organization_id: organizationId },
@@ -118,7 +128,7 @@ export class TaskModelService {
     }
   }
 
-  async updateModel(data: UpdateModelRequest) {
+  async updateModel(data: UpdateModelRequest): Promise<TaskModelRow> {
     try {
       const organizationId = data.organization_id ?? "";
       const exists = await prismaClient.taskModel.findFirst({
@@ -163,7 +173,11 @@ export class TaskModelService {
     }
   }
 
-  async listModel(type: string, billing: string, organizationId: string) {
+  async listModel(
+    type: string,
+    billing: string,
+    organizationId: string,
+  ): Promise<TaskModelListItem[]> {
     try {
       const list = await prismaClient.taskModel.findMany({
         where: {
@@ -171,11 +185,7 @@ export class TaskModelService {
           billing,
           organization_id: organizationId,
         },
-        select: {
-          id: true,
-          name: true,
-          department_id: true,
-        },
+        select: TASK_MODEL_LIST_SELECT,
         orderBy: { name: "asc" },
       });
 
@@ -187,7 +197,7 @@ export class TaskModelService {
     }
   }
 
-  async deleteModel(data: DeleteModelRequest) {
+  async deleteModel(data: DeleteModelRequest): Promise<{ response: true }> {
     try {
       const organizationId = data.organization_id ?? "";
       const exists = await prismaClient.taskModel.findFirst({

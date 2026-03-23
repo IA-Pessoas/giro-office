@@ -1,4 +1,5 @@
 import { error as logError, ServiceError } from "@workspace/shared";
+import type { TaskDependentGetPayload } from "../generated/prisma/models/TaskDependent.js";
 
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
@@ -29,8 +30,12 @@ const TASK_DEPENDENT_SELECT = {
   },
 } as const;
 
+export type TaskDependentSelected = TaskDependentGetPayload<{
+  select: typeof TASK_DEPENDENT_SELECT;
+}>;
+
 export class TaskDependentService {
-  async addDependent(data: AddDependentRequest) {
+  async addDependent(data: AddDependentRequest): Promise<{ created: TaskDependentSelected }> {
     try {
       if (data.task_model_id === data.dependent_id) {
         throw new ServiceError(400, "Uma tarefa não pode depender de si mesma.");
@@ -92,7 +97,10 @@ export class TaskDependentService {
     }
   }
 
-  async listDependents(taskModelId: string, organizationId: string) {
+  async listDependents(
+    taskModelId: string,
+    organizationId: string,
+  ): Promise<TaskDependentSelected[]> {
     try {
       const list = await prismaClient.taskDependent.findMany({
         where: {
@@ -110,7 +118,7 @@ export class TaskDependentService {
     }
   }
 
-  async deleteDependent(data: DeleteDependentRequest) {
+  async deleteDependent(data: DeleteDependentRequest): Promise<{ deleted: true }> {
     try {
       const exists = await prismaClient.taskDependent.findFirst({
         where: { id: data.id, organization_id: data.organization_id },
