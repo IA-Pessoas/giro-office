@@ -53,8 +53,8 @@ export function QuickActions() {
   ];
 
   return (
-    <section className="ui-surface mb-6 border-l-4 p-4" style={{ borderLeftColor: primaryColor }}>
-      <p className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+    <section className="dashboard-card dashboard-quick-actions p-4" style={{ borderLeftColor: primaryColor }}>
+      <p className="dashboard-card-subtitle mb-4 text-xs font-bold uppercase tracking-wider">
         Ações Rápidas
       </p>
       <div className="flex flex-col flex-wrap gap-3 sm:flex-row">

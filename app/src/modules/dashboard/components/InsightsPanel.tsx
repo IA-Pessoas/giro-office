@@ -13,8 +13,8 @@ function schemeFromType(type: DashboardInsight['type']) {
 
 export function InsightsPanel({ insights }: InsightsPanelProps) {
   return (
-    <section className="rounded-md border-l-4 border-[var(--colors-blue-500)] bg-white p-6 shadow-md">
-      <h3 className="mb-4 text-lg font-bold text-slate-700">
+    <section className="dashboard-card">
+      <h3 className="dashboard-card-title mb-4">
         Insights e Alertas
       </h3>
 

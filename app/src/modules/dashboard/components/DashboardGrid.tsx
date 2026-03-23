@@ -40,7 +40,7 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
     : 0;
 
   return (
-    <section className="u-stack u-gap-4 min-h-screen p-4 md:p-6">
+    <section className="dashboard-shell u-stack u-gap-4 p-4 md:p-6">
       <QuickActions />
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">

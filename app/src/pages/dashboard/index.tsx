@@ -14,10 +14,10 @@ export default function Dashboard({ me }: Props) {
             <Head>
                 <title>Dashboard</title>
             </Head>
-            <main className="u-stack u-gap-4">
-                <section className="ui-surface p-6">
-                    <h1 className="ui-title">Dashboard</h1>
-                    <p className="ui-subtitle">Bem-vindo, {me.name}.</p>
+            <main className="dashboard-shell u-stack u-gap-4">
+                <section className="dashboard-card">
+                    <h1 className="dashboard-card-title">Dashboard</h1>
+                    <p className="dashboard-card-subtitle">Bem-vindo, {me.name}.</p>
                 </section>
             </main>
         </>

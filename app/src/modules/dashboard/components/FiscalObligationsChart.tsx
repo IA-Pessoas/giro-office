@@ -57,8 +57,8 @@ export function FiscalObligationsChart({ data }: FiscalObligationsChartProps) {
   };
 
   return (
-    <section className="rounded-md border-l-4 border-[var(--colors-blue-500)] bg-white p-6 shadow-md">
-      <h3 className="mb-4 text-lg font-bold" style={{ color: textColor }}>
+    <section className="dashboard-card">
+      <h3 className="dashboard-card-title mb-4" style={{ color: textColor }}>
         Fiscal: Obrigações/Guias
       </h3>
       <ResponsiveContainer width="100%" height={280}>

@@ -20,12 +20,12 @@ export function StatCard({ data, delay = 0 }: StatCardProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay }}
       whileHover={{ scale: 1.02 }}
-      className="relative cursor-pointer overflow-hidden rounded-lg border-l-4 bg-white p-6 shadow-md"
+      className="dashboard-card relative cursor-pointer overflow-hidden"
       style={{ borderLeftColor: cardColor }}
     >
       <div className="u-flex u-justify-between mb-4 items-start">
         <div>
-          <p className="mb-1 text-sm font-medium text-slate-500">
+          <p className="dashboard-card-subtitle mb-1 font-medium">
             {title}
           </p>
           <p className="text-3xl font-bold text-slate-800">

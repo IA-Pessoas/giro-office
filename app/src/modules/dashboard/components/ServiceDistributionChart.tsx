@@ -78,11 +78,11 @@ export function ServiceDistributionChart({ data }: ServiceDistributionChartProps
   };
 
   return (
-    <section className="rounded-md border-l-4 border-[var(--colors-blue-500)] bg-white p-6 shadow-md">
-      <h3 className="mb-4 text-lg font-bold" style={{ color: textColor }}>
+    <section className="dashboard-card">
+      <h3 className="dashboard-card-title mb-4" style={{ color: textColor }}>
         Distribuição por Serviços
       </h3>
-      <p className="mb-4 text-sm text-slate-500">
+      <p className="dashboard-card-subtitle mb-4">
         Total: {total} clientes
       </p>
       <ResponsiveContainer width="100%" height={300}>

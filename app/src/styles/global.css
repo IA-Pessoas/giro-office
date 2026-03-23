@@ -151,6 +151,44 @@ body {
         outline: 2px solid var(--colors-blue-500);
         outline-offset: 1px;
     }
+
+    .dashboard-shell {
+        width: 100%;
+        min-height: 100vh;
+    }
+
+    .dashboard-card {
+        background: var(--colors-white);
+        border-left: 4px solid var(--colors-blue-500);
+        border-radius: var(--radii-lg);
+        box-shadow: var(--shadows-md);
+        padding: var(--space-6);
+    }
+
+    .dashboard-card-title {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: #334155;
+    }
+
+    .dashboard-card-subtitle {
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+
+    .dashboard-quick-actions {
+        margin-bottom: var(--space-6);
+    }
+
+    .dashboard-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .dashboard-table th,
+    .dashboard-table td {
+        padding: var(--space-2) 0;
+    }
 }
 
 :root {

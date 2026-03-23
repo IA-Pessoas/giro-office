@@ -24,12 +24,12 @@ function statusColor(status: string) {
 
 export function RecentClientsTable({ data }: RecentClientsTableProps) {
   return (
-    <section className="overflow-x-auto rounded-md border-l-4 border-[var(--colors-blue-500)] bg-white p-6 shadow-md">
-      <h3 className="mb-4 text-lg font-bold text-slate-700">
+    <section className="dashboard-card overflow-x-auto">
+      <h3 className="dashboard-card-title mb-4">
         Últimos Clientes
       </h3>
 
-      <table className="min-w-full text-sm">
+      <table className="dashboard-table min-w-full text-sm">
         <thead>
           <tr className="text-left text-slate-500">
             <th className="py-2">Nome</th>
