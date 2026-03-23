@@ -1,9 +1,7 @@
 import React from 'react';
-import { Box, Text, useColorModeValue } from '@chakra-ui/react';
 import {
   BarChart,
   Bar,
-  LineChart,
   Line,
   XAxis,
   YAxis,
@@ -20,10 +18,10 @@ interface ServiceDistributionChartProps {
 }
 
 export function ServiceDistributionChart({ data }: ServiceDistributionChartProps) {
-  const textColor = useColorModeValue('bodyText', 'bodyText');
-  const gridColor = useColorModeValue('#e2e8f0', '#2d3748');
-  const barColor = useColorModeValue('#2f406a', '#d0ab70');
-  const lineColor = useColorModeValue('#d0ab70', '#2f406a');
+  const textColor = '#334155';
+  const gridColor = '#e2e8f0';
+  const barColor = '#2f406a';
+  const lineColor = '#d0ab70';
 
   const chartData = [
     {
@@ -63,44 +61,30 @@ export function ServiceDistributionChart({ data }: ServiceDistributionChartProps
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <Box
-          bg={useColorModeValue('white', 'gray.800')}
-          p={3}
-          borderRadius="md"
-          boxShadow="lg"
-          border="1px solid"
-          borderColor={useColorModeValue('gray.200', 'gray.600')}
-        >
-          <Text fontWeight="bold" mb={2} color={textColor}>
+        <div className="rounded-md border border-slate-200 bg-white p-3 shadow-lg">
+          <p className="mb-2 font-bold" style={{ color: textColor }}>
             {payload[0].payload.name}
-          </Text>
-          <Text fontSize="sm" color={textColor}>
+          </p>
+          <p className="text-sm" style={{ color: textColor }}>
             Clientes: {payload[0].value}
-          </Text>
-          <Text fontSize="sm" color={textColor}>
+          </p>
+          <p className="text-sm" style={{ color: textColor }}>
             Percentual: {payload[0].payload.percentage}%
-          </Text>
-        </Box>
+          </p>
+        </div>
       );
     }
     return null;
   };
 
   return (
-    <Box
-      bg={useColorModeValue('white', 'componentBg')}
-      p={6}
-      borderRadius="md"
-      boxShadow="md"
-      borderLeft="4px solid"
-      borderColor={useColorModeValue('main.main', 'main.mainDourado')}
-    >
-      <Text fontSize="lg" fontWeight="bold" mb={4} color={textColor}>
+    <section className="rounded-md border-l-4 border-[var(--colors-blue-500)] bg-white p-6 shadow-md">
+      <h3 className="mb-4 text-lg font-bold" style={{ color: textColor }}>
         Distribuição por Serviços
-      </Text>
-      <Text fontSize="sm" color="gray.500" mb={4}>
+      </h3>
+      <p className="mb-4 text-sm text-slate-500">
         Total: {total} clientes
-      </Text>
+      </p>
       <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -133,6 +117,6 @@ export function ServiceDistributionChart({ data }: ServiceDistributionChartProps
           />
         </ComposedChart>
       </ResponsiveContainer>
-    </Box>
+    </section>
   );
 }

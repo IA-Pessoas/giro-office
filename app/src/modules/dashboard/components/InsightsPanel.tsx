@@ -1,5 +1,4 @@
 import React from 'react';
-import { Box, Grid, Text, useColorModeValue, Alert, AlertIcon, AlertTitle, AlertDescription } from '@chakra-ui/react';
 import type { DashboardStats, DashboardInsight } from '../types';
 
 interface InsightsPanelProps {
@@ -7,44 +6,31 @@ interface InsightsPanelProps {
 }
 
 function schemeFromType(type: DashboardInsight['type']) {
-  if (type === 'warning') return { status: 'warning' as const };
-  if (type === 'success') return { status: 'success' as const };
-  return { status: 'info' as const };
+  if (type === 'warning') return 'border-yellow-300 bg-yellow-50 text-yellow-900';
+  if (type === 'success') return 'border-green-300 bg-green-50 text-green-900';
+  return 'border-sky-300 bg-sky-50 text-sky-900';
 }
 
 export function InsightsPanel({ insights }: InsightsPanelProps) {
-  const textColor = useColorModeValue('bodyText', 'bodyText');
-
   return (
-    <Box
-      bg={useColorModeValue('white', 'componentBg')}
-      p={6}
-      borderRadius="md"
-      boxShadow="md"
-      borderLeft="4px solid"
-      borderColor={useColorModeValue('main.main', 'main.mainDourado')}
-    >
-      <Text fontSize="lg" fontWeight="bold" mb={4} color={textColor}>
+    <section className="rounded-md border-l-4 border-[var(--colors-blue-500)] bg-white p-6 shadow-md">
+      <h3 className="mb-4 text-lg font-bold text-slate-700">
         Insights e Alertas
-      </Text>
+      </h3>
 
-      <Grid templateColumns={{ base: '1fr', md: '1fr' }} gap={3}>
+      <div className="grid grid-cols-1 gap-3">
         {insights.map((insight, idx) => (
-          <Alert
+          <article
             key={`${insight.title}-${idx}`}
-            {...schemeFromType(insight.type)}
-            variant={useColorModeValue('subtle', 'left-accent')}
-            borderRadius="md"
+            className={`rounded-md border p-3 ${schemeFromType(insight.type)}`}
+            role="status"
           >
-            <AlertIcon />
-            <Box>
-              <AlertTitle fontSize="sm">{insight.title}</AlertTitle>
-              <AlertDescription fontSize="sm">{insight.description}</AlertDescription>
-            </Box>
-          </Alert>
+            <p className="text-sm font-semibold">{insight.title}</p>
+            <p className="text-sm">{insight.description}</p>
+          </article>
         ))}
-      </Grid>
-    </Box>
+      </div>
+    </section>
   );
 }
 
