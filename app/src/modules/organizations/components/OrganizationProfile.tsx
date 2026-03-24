@@ -65,7 +65,7 @@ export function OrganizationProfile({ organizationId }: OrganizationProfileProps
           <p className="text-2xl font-bold text-[var(--colors-blue-500)]">
             {organization.name}
           </p>
-          <span className={`rounded-md px-3 py-1 text-sm font-medium ${
+          <span className={`organization-status-badge ${
             getStatusColor(organization.status) === 'green' ? 'bg-green-100 text-green-700' :
             getStatusColor(organization.status) === 'yellow' ? 'bg-yellow-100 text-yellow-700' :
             getStatusColor(organization.status) === 'orange' ? 'bg-orange-100 text-orange-700' :

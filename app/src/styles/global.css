@@ -300,6 +300,24 @@ body {
         font-weight: 600;
         color: var(--colors-blue-500);
     }
+
+    .organizations-shell {
+        width: 99%;
+        position: relative;
+    }
+
+    .organizations-sidebar {
+        border-radius: var(--radii-md);
+        background: var(--colors-white);
+        box-shadow: var(--shadows-md);
+    }
+
+    .organization-status-badge {
+        border-radius: var(--radii-md);
+        padding: 0.25rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
 }
 
 :root {

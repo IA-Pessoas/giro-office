@@ -73,9 +73,9 @@ export default function Organizations({ organizations }: Props) {
         <title>Organizações</title>
       </Head>
 
-      <section className="users-shell u-split-panel relative">
+      <section className="organizations-shell u-split-panel relative">
         <aside
-          className={`users-sidebar group relative z-20 flex flex-col items-center justify-center overflow-hidden transition-all duration-300 md:h-[90vh] ${isDesktopListCollapsed ? 'md:absolute md:w-[80px] md:min-w-[80px]' : 'md:w-[350px] md:min-w-[350px]'}`}
+          className={`organizations-sidebar group relative z-20 flex flex-col items-center justify-center overflow-hidden transition-all duration-300 md:h-[90vh] ${isDesktopListCollapsed ? 'md:absolute md:w-[80px] md:min-w-[80px]' : 'md:w-[350px] md:min-w-[350px]'}`}
         >
           <div className={`absolute hidden h-20 w-20 items-center justify-center transition-opacity md:flex ${isDesktopListCollapsed ? 'opacity-100 group-hover:opacity-0' : 'opacity-0'}`}>
             <FaBuilding size={28} color="var(--colors-blue-500)" />
