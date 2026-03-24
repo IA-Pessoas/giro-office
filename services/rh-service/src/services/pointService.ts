@@ -1,8 +1,8 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import { error as logError, ServiceError, TimeUtils } from "@workspace/shared";
 import { getRhEnv } from "../config/env.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
-import { TimeUtils } from "../utils/timeUtils.js";
+import { expectedMinutesFromPointConfig } from "../utils/rhPointTimeUtils.js";
 
 const { pointMinIntervalMinutes } = getRhEnv();
 
@@ -206,7 +206,7 @@ class PointService {
       } else if (!TimeUtils.isWorkDayUtc(config.work_days, point.clock_in)) {
         expectedMinutes = 0;
       } else {
-        expectedMinutes = TimeUtils.expectedMinutesFromConfig(config);
+        expectedMinutes = expectedMinutesFromPointConfig(config);
       }
 
       const morningWorked = TimeUtils.diffMinutes(point.clock_in, point.lunch_out);
