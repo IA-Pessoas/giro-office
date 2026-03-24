@@ -58,12 +58,26 @@ const navItensPorModulo: Record<string, NavItemProps[]> = {
 };
 
 function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive: boolean; currentPath: string }) {
+  const isParentActive = isActive || item.subItems?.some((sub) => currentPath.startsWith(sub.link));
+  const [isSubMenuOpen, setIsSubMenuOpen] = useState(Boolean(isParentActive));
+
+  useEffect(() => {
+    setIsSubMenuOpen(Boolean(isParentActive));
+  }, [isParentActive]);
+
   return (
     <Box>
       <ChakraLink
         href={item.link}
-        aria-expanded={item.subItems?.length ? isActive : undefined}
+        aria-expanded={item.subItems?.length ? isSubMenuOpen : undefined}
+        aria-controls={item.subItems?.length ? `submenu-${item.label.toLowerCase()}` : undefined}
         _hover={{ textDecoration: 'none' }}
+        onClick={(e) => {
+          if (item.subItems?.length) {
+            e.preventDefault();
+            setIsSubMenuOpen((prev) => !prev);
+          }
+        }}
       >
         <HStack
           w="full"
@@ -73,8 +87,8 @@ function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive
           borderRadius="md"
           cursor="pointer"
           transition="all 0.2s ease"
-          bg={isActive ? "borderColor" : "transparent"}
-          color={isActive ? "componentColorReverse" : "componentColor"}
+          bg={isParentActive ? "borderColor" : "transparent"}
+          color={isParentActive ? "componentColorReverse" : "componentColor"}
           _hover={{
             bg: "borderColorReverse",
             color: "white",
@@ -108,17 +122,43 @@ function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive
       </ChakraLink>
       {item.subItems?.length ? (
         <VStack
-          className="ml-12 mr-3 mt-1 max-h-0 items-stretch gap-1.5 overflow-hidden opacity-0 transition-all duration-200 ease-in-out group-hover:max-h-80 group-hover:opacity-100"
+          id={`submenu-${item.label.toLowerCase()}`}
+          align="stretch"
+          spacing={1.5}
+          mt={1}
+          ml={7}
+          mr={3}
+          className={`overflow-hidden transition-all duration-200 ease-in-out ${isSubMenuOpen ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'}`}
         >
           {item.subItems.map((sub) => (
             <ChakraLink
               key={sub.link}
               href={sub.link}
-              className={`rounded-lg border px-2.5 py-1.5 text-sm shadow-sm transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--colors-blue-500)] ${currentPath === sub.link ? "border-[var(--colors-blue-500)] bg-[var(--colors-blue-500)] text-white" : "border-transparent bg-white/10 text-[var(--colors-blue-500)] hover:translate-x-0.5 hover:bg-[var(--colors-blue-500)] hover:text-white"}`}
+              w="full"
+              display="block"
+              fontSize="sm"
+              borderRadius="lg"
+              px={2.5}
+              py={1.5}
+              borderWidth="1px"
+              borderColor={currentPath === sub.link ? "borderColor" : "transparent"}
+              bg={currentPath === sub.link ? "borderColor" : "whiteAlpha.100"}
+              color={currentPath === sub.link ? "white" : "componentColor"}
+              boxShadow="sm"
+              transition="all 0.2s ease"
+              _hover={{
+                bg: "borderColorReverse",
+                color: "white",
+                textDecoration: "none",
+                transform: "translateX(2px)",
+              }}
+              _focusVisible={{
+                outline: "2px solid var(--colors-blue-500)",
+                outlineOffset: "1px",
+              }}
               aria-current={currentPath === sub.link ? "page" : undefined}
-              _hover={{ textDecoration: "none" }}
             >
-              <HStack className="gap-1.5">
+              <HStack spacing={1.5}>
                 <Icon as={FiChevronRight} boxSize={3} opacity={0.8} />
                 <Text>{sub.label}</Text>
               </HStack>

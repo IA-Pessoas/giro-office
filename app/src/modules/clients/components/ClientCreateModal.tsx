@@ -53,7 +53,7 @@ interface City {
 // --- SUB-COMPONENTS FOR FORMS ---
 
 const IntegracaoForm = ({ formData, handleInputChange, isSearchingCnpj, handleSearchCNPJ, states, cities }: { formData: any, handleInputChange: any, isSearchingCnpj: boolean, handleSearchCNPJ: any, states: State[], cities: City[] }) => (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <label className="u-stack u-gap-2"><span className="users-section-title">Tipo de Pessoa</span><select className="ui-input" name="type" value={formData.type} onChange={handleInputChange}><option value="PJ">Pessoa Jurídica (PJ)</option><option value="PF">Pessoa Física (PF)</option></select></label>
         <label className="u-stack u-gap-2"><span className="users-section-title">Tipo de Registro</span><select className="ui-input" name="type_registration" value={formData.type_registration} onChange={handleInputChange}><option value="Existente">Existente</option><option value="Novo">Novo</option><option value="Constituição de Empresa">Constituição de Empresa</option></select></label>
         <label className="u-stack u-gap-2"><span className="users-section-title">{formData.type === 'PJ' ? 'CNPJ' : 'CPF'}</span><div className="u-flex u-gap-2"><input className="ui-input" name="cpf_cnpj" value={formData.cpf_cnpj} onChange={handleInputChange} placeholder="Apenas números" />{formData.type === 'PJ' && (<button type="button" className="rounded-md border px-3" onClick={handleSearchCNPJ} disabled={isSearchingCnpj} title="Buscar dados na Receita">{isSearchingCnpj ? '...' : <IoSearch />}</button>)}</div></label>
@@ -65,14 +65,14 @@ const IntegracaoForm = ({ formData, handleInputChange, isSearchingCnpj, handleSe
         <label className="u-stack u-gap-2"><span className="users-section-title">Estado</span><select className="ui-input" name="state" value={formData.state} onChange={handleInputChange}><option value="">Selecione o estado</option>{states.map(state => (<option key={state.id} value={state.sigla}>{state.nome}</option>))}</select></label>
         <label className="u-stack u-gap-2"><span className="users-section-title">Cidade</span><select className="ui-input" name="city" value={formData.city} onChange={handleInputChange} disabled={!formData.state}><option value="">Selecione a cidade</option>{cities.map(city => (<option key={city.id} value={city.nome}>{city.nome}</option>))}</select></label>
         <label className="u-stack u-gap-2"><span className="users-section-title">Telefone</span><input className="ui-input" name="number" value={formData.number} onChange={handleInputChange} /></label>
-        <label className="u-stack u-gap-2 md:col-span-2"><span className="users-section-title">E-mail</span><input className="ui-input" type="email" name="email" value={formData.email} onChange={handleInputChange} /></label>
+        <label className="u-stack u-gap-2 md:col-span-2 xl:col-span-2"><span className="users-section-title">E-mail</span><input className="ui-input" type="email" name="email" value={formData.email} onChange={handleInputChange} /></label>
         <label className="u-stack u-gap-2"><span className="users-section-title">Responsável Legal</span><input className="ui-input" name="responsible" value={formData.responsible} onChange={handleInputChange} /></label>
         <label className="u-stack u-gap-2"><span className="users-section-title">CPF Responsável</span><input className="ui-input" name="cpf_responsible" value={formData.cpf_responsible} onChange={handleInputChange} /></label>
         <label className="u-stack u-gap-2"><span className="users-section-title">Preposto</span><input className="ui-input" name="agent" value={formData.agent} onChange={handleInputChange} /></label>
         <label className="u-stack u-gap-2"><span className="users-section-title">CPF Preposto</span><input className="ui-input" name="cpf_agent" value={formData.cpf_agent} onChange={handleInputChange} /></label>
         <label className="u-stack u-gap-2"><span className="users-section-title">Instagram</span><input className="ui-input" name="instagram" value={formData.instagram} onChange={handleInputChange} /></label>
         <label className="u-stack u-gap-2"><span className="users-section-title">Indicação</span><input className="ui-input" name="indication" value={formData.indication} onChange={handleInputChange} /></label>
-        <label className="u-flex u-items-center u-gap-2"><span className="users-section-title">Serviço Único?</span><input id="service_unique" name="service_unique" type="checkbox" checked={formData.service_unique} onChange={handleInputChange} /></label>
+        <label className="u-flex u-items-center u-gap-2 md:col-span-2 xl:col-span-3"><span className="users-section-title">Serviço Único?</span><input id="service_unique" name="service_unique" type="checkbox" checked={formData.service_unique} onChange={handleInputChange} /></label>
     </div>
 );
 
@@ -155,7 +155,8 @@ export function ClientCreateModal({ isOpen, onClose, onCreated, perm }: CreateMo
             onOpenChange={(open) => { if (!open) onClose(); }}
             title="Cadastrar Novo Cliente"
             description="Formulário para cadastro de cliente"
-            contentClassName="max-w-[1400px]"
+            contentClassName="w-[min(96vw,1280px)] max-h-[92vh]"
+            bodyClassName="pb-0"
             footer={(
                 <>
                     <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100" onClick={onClose}>Cancelar</button>
@@ -163,7 +164,7 @@ export function ClientCreateModal({ isOpen, onClose, onCreated, perm }: CreateMo
                 </>
             )}
         >
-                <div className="max-h-[70vh] overflow-y-auto">
+                <div className="max-h-[72vh] overflow-y-auto pr-1">
                     <IntegracaoForm
                         formData={formData}
                         handleInputChange={handleInputChange}
