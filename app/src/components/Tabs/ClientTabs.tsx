@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { Tabs, TabList, Tab, TabPanels, TabPanel, Icon } from '@chakra-ui/react';
 import { tabsConfig } from '../../config/Tabs/TabsClientConfig';
+import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@shared/components';
 
 interface ClientTabsProps {
   client: any; 
@@ -43,22 +43,24 @@ export const ClientTabs = ({ client, perms }: ClientTabsProps) => {
 
   // O resto do componente não muda
   return (
-    <Tabs size='md' isLazy lazyBehavior='keepMounted'>
-      <TabList>
+    <TabsRoot defaultValue={visibleTabs[0]?.id ?? 'tab-0'}>
+      <TabsList>
         {visibleTabs.map(tab => (
-          <Tab key={tab.id} color={'primaryText'}>
-            <Icon as={tab.icon} mr={2} />
-            {tab.title}
-          </Tab>
+          <TabsTrigger key={tab.id} value={tab.id}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <tab.icon />
+              {tab.title}
+            </span>
+          </TabsTrigger>
         ))}
-      </TabList>
-      <TabPanels>
-        {visibleTabs.map(tab => (
-          <TabPanel key={tab.id} p={0}>
+      </TabsList>
+      {visibleTabs.map(tab => (
+        <TabsContent key={tab.id} value={tab.id}>
+          <div style={{ padding: 0 }}>
             <tab.component client={client} perms={perms} />
-          </TabPanel>
-        ))}
-      </TabPanels>
-    </Tabs>
+          </div>
+        </TabsContent>
+      ))}
+    </TabsRoot>
   );
 };
