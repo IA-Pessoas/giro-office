@@ -1,7 +1,6 @@
 import React from 'react';
 import { IconType } from 'react-icons';
 import { LuFolder, LuPlug, LuBriefcase, LuFileText } from 'react-icons/lu';
-import { Box } from '@chakra-ui/react';
 import dynamic from 'next/dynamic';
 
 import type { Client, Perms } from '@modules/clients';

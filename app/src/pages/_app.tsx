@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import type { AppProps } from "next/app";
 import { useRouter } from 'next/router';
-import { ChakraProvider, Box, Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@shared/ui/chakraShims';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import '../styles/global.css'
-import theme from '../styles/theme'
 
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ChatProvider } from "@modules/chat";
@@ -68,7 +67,7 @@ function MyApp({ Component, pageProps }: AppProps) {
   const isIframeView = router.query.view === 'iframe';
 
   return (
-    <ChakraProvider theme={theme}>
+    <>
       <ColorModeBridge />
       <AuthProvider>
         <SocketProvider>
@@ -86,7 +85,7 @@ function MyApp({ Component, pageProps }: AppProps) {
           </ChatProvider>
         </SocketProvider>
       </AuthProvider>
-    </ChakraProvider>
+    </>
   );
 }
 

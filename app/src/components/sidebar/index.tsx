@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'; // Importar hooks
 import Image from "next/image";
 import { useRouter } from "next/router";
-import { Link as ChakraLink, Box, IconButton, Text, Tooltip, VStack, HStack, Flex, Icon, Divider } from "@chakra-ui/react";
+import { Link as ChakraLink, Box, IconButton, Text, Tooltip, VStack, HStack, Flex, Icon, Divider } from "@shared/ui/chakraShims";
 import { IconType } from "react-icons";
 import { FiHome, FiUser, FiUsers, FiLogOut, FiSettings } from "react-icons/fi";
 import { FiMessageSquare } from "react-icons/fi";
