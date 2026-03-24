@@ -167,6 +167,22 @@ body {
             flex-direction: column;
         }
     }
+
+    .u-grid-clients-desktop {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+    }
+
+    @media (min-width: 768px) {
+        .u-grid-clients-desktop {
+            grid-template-columns: 1fr 4fr 3fr 2fr;
+        }
+    }
+
+    .u-scroll-y-panel {
+        overflow-y: auto;
+    }
 }
 
 @layer components {
@@ -299,6 +315,34 @@ body {
         font-size: 0.875rem;
         font-weight: 600;
         color: var(--colors-blue-500);
+    }
+
+    .clients-shell {
+        width: 99%;
+        position: relative;
+    }
+
+    .clients-sidebar {
+        border-radius: var(--radii-md);
+        background: var(--colors-white);
+        box-shadow: var(--shadows-md);
+    }
+
+    .clients-table-header {
+        position: sticky;
+        top: 0;
+        background: var(--colors-white);
+        border-bottom: 2px solid var(--colors-blue-500);
+    }
+
+    .clients-table-row {
+        border-bottom: 1px solid #e2e8f0;
+        border-radius: var(--radii-md);
+        transition: background-color 0.2s ease;
+    }
+
+    .clients-table-row:hover {
+        background: #f8fafc;
     }
 }
 
