@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import Head from 'next/head'
-import { useDisclosure } from '@chakra-ui/react';
+import { Box, Flex, useDisclosure, Spinner, Icon } from '@chakra-ui/react';
 import { FaUsers } from 'react-icons/fa';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
@@ -61,15 +61,53 @@ export default function clients({ clients, permList }: Props) {
                 <title>Clientes</title>
             </Head>
 
-            <section className="users-shell u-split-panel relative">
-                <aside
-                    className={`users-sidebar group relative z-20 flex flex-col items-center justify-center overflow-hidden transition-all duration-300 md:h-[95vh] ${isDesktopListCollapsed ? 'md:absolute md:w-[80px] md:min-w-[80px]' : 'md:w-[90%] md:min-w-[90%]'}`}
+            <Flex
+                direction={{ base: 'column', md: 'row' }}
+                w="99%"
+                h={{ md: "95vh" }}
+                gap={3}
+                position="relative"
+            >
+                <Flex
+                    direction="column"
+                    role="group"
+                    position={{ base: 'relative', md: isDesktopListCollapsed ? 'absolute' : 'relative' }}
+                    w={{ base: '90%', md: isDesktopListCollapsed ? '80px' : '90%' }}
+                    minW={{ md: isDesktopListCollapsed ? '80px' : '90%' }}
+                    h={{ base: 'auto', md: '95vh' }}
+                    zIndex="20"
+                    bg="componentColorDarkOnly"
+                    boxShadow="md"
+                    borderRadius="md"
+                    justifyContent={'center'}
+                    alignItems={'center'}
+                    transition="all 0.3s ease-in-out"
+                    _hover={{ w: { md: '90%' }, }}
+                    overflow="hidden"
                 >
-                    <div className={`absolute hidden h-20 w-20 items-center justify-center transition-opacity md:flex ${isDesktopListCollapsed ? 'opacity-100 group-hover:opacity-0' : 'opacity-0'}`}>
-                        <FaUsers size={28} color="var(--colors-blue-500)" />
-                    </div>
+                    <Flex
+                        position="absolute"
+                        w="80px" h="80px"
+                        align="center" justify="center"
+                        display={{ base: 'none', md: 'flex' }}
+                        opacity={isDesktopListCollapsed ? 1 : 0}
+                        pointerEvents="none"
+                        _groupHover={{ opacity: 0 }}
+                        transition="opacity 0.2s"
+                    >
+                        <Icon as={FaUsers} boxSize={7} color="primaryText" />
+                    </Flex>
 
-                    <div className={`h-full w-full transition-opacity duration-300 ${isDesktopListCollapsed ? 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto' : 'opacity-100'}`}>
+                    <Flex
+                        direction="column"
+                        w={{ base: '100%', md: '100%' }}
+                        h="100%"
+                        opacity={isDesktopListCollapsed ? 0 : 1}
+                        pointerEvents={isDesktopListCollapsed ? 'none' : 'auto'}
+                        _groupHover={{ opacity: 1, pointerEvents: 'auto' }}
+                        transition="opacity 0.3s ease-in-out"
+                        bg={'componentColorDarkOnly'}
+                    >
                         <ClientFilters
                             initialLabel={filterLabel}
                             perm={permList}
@@ -78,22 +116,24 @@ export default function clients({ clients, permList }: Props) {
                             onOpenCreateModal={onModalOpen}
                         />
                         {isListLoading ? (
-                            <div className="u-flex h-[150px] items-center justify-center">
-                                <span className="text-sm text-slate-500">Carregando...</span>
-                            </div>
+                            <Flex justify="center" align="center" h="150px"><Spinner size="xl" /></Flex>
                         ) : (
                             <ClientList
                                 clients={filtered}
                                 onSelect={setSelected}
                             />
                         )}
-                    </div>
-                </aside>
+                    </Flex>
+                </Flex>
 
-                <section className={`flex-1 transition-all duration-300 ${isDesktopListCollapsed ? 'md:pl-[80px]' : 'md:pl-0'}`}>
+                <Box
+                    flex="1"
+                    pl={{ base: 0, md: isDesktopListCollapsed ? '80px' : 0 }}
+                    transition="padding-left 0.3s ease-in-out"
+                >
                     <ClientDetailsView clientId={selected} />                
-                </section>
-            </section>
+                </Box>
+            </Flex>
 
             <ClientCreateModal
                 isOpen={isModalOpen}

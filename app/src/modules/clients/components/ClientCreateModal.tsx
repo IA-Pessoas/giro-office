@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import {
+    Modal, FormControl, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, Button, Flex, FormLabel, Input, SimpleGrid, Switch, Select, InputGroup, InputRightElement, IconButton, Spinner
+} from '@chakra-ui/react';
 import { toast } from 'react-toastify';
-import { IoSearch } from 'react-icons/io5';
+import { SearchIcon } from '@chakra-ui/icons';
 import axios from 'axios';
 
 import { clientService } from '../services/clientService';
-import { Dialog } from '@shared/components';
 import type { ClientItem, Perms } from '../types';
 
 interface CreateModalProps {
@@ -53,27 +55,75 @@ interface City {
 // --- SUB-COMPONENTS FOR FORMS ---
 
 const IntegracaoForm = ({ formData, handleInputChange, isSearchingCnpj, handleSearchCNPJ, states, cities }: { formData: any, handleInputChange: any, isSearchingCnpj: boolean, handleSearchCNPJ: any, states: State[], cities: City[] }) => (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <label className="u-stack u-gap-2"><span className="users-section-title">Tipo de Pessoa</span><select className="ui-input" name="type" value={formData.type} onChange={handleInputChange}><option value="PJ">Pessoa Jurídica (PJ)</option><option value="PF">Pessoa Física (PF)</option></select></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">Tipo de Registro</span><select className="ui-input" name="type_registration" value={formData.type_registration} onChange={handleInputChange}><option value="Existente">Existente</option><option value="Novo">Novo</option><option value="Constituição de Empresa">Constituição de Empresa</option></select></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">{formData.type === 'PJ' ? 'CNPJ' : 'CPF'}</span><div className="u-flex u-gap-2"><input className="ui-input" name="cpf_cnpj" value={formData.cpf_cnpj} onChange={handleInputChange} placeholder="Apenas números" />{formData.type === 'PJ' && (<button type="button" className="rounded-md border px-3" onClick={handleSearchCNPJ} disabled={isSearchingCnpj} title="Buscar dados na Receita">{isSearchingCnpj ? '...' : <IoSearch />}</button>)}</div></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">Nome / Apelido</span><input className="ui-input" name="name" value={formData.name} onChange={handleInputChange} /></label>
-        {formData.type === 'PJ' && (<><label className="u-stack u-gap-2"><span className="users-section-title">Razão Social</span><input className="ui-input" name="company_name" value={formData.company_name} onChange={handleInputChange} /></label><label className="u-stack u-gap-2"><span className="users-section-title">Nome Fantasia</span><input className="ui-input" name="fantasy_name" value={formData.fantasy_name} onChange={handleInputChange} /></label><label className="u-stack u-gap-2"><span className="users-section-title">Data de Abertura</span><input className="ui-input" type="date" name="opening_date" value={formData.opening_date} onChange={handleInputChange} /></label></>)}
-        <label className="u-stack u-gap-2"><span className="users-section-title">CEP</span><input className="ui-input" name="cep" value={formData.cep} onChange={handleInputChange} /></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">Endereço Completo</span><input className="ui-input" name="address" value={formData.address} onChange={handleInputChange} /></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">Bairro</span><input className="ui-input" name="neighborhood" value={formData.neighborhood} onChange={handleInputChange} /></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">Estado</span><select className="ui-input" name="state" value={formData.state} onChange={handleInputChange}><option value="">Selecione o estado</option>{states.map(state => (<option key={state.id} value={state.sigla}>{state.nome}</option>))}</select></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">Cidade</span><select className="ui-input" name="city" value={formData.city} onChange={handleInputChange} disabled={!formData.state}><option value="">Selecione a cidade</option>{cities.map(city => (<option key={city.id} value={city.nome}>{city.nome}</option>))}</select></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">Telefone</span><input className="ui-input" name="number" value={formData.number} onChange={handleInputChange} /></label>
-        <label className="u-stack u-gap-2 md:col-span-2"><span className="users-section-title">E-mail</span><input className="ui-input" type="email" name="email" value={formData.email} onChange={handleInputChange} /></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">Responsável Legal</span><input className="ui-input" name="responsible" value={formData.responsible} onChange={handleInputChange} /></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">CPF Responsável</span><input className="ui-input" name="cpf_responsible" value={formData.cpf_responsible} onChange={handleInputChange} /></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">Preposto</span><input className="ui-input" name="agent" value={formData.agent} onChange={handleInputChange} /></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">CPF Preposto</span><input className="ui-input" name="cpf_agent" value={formData.cpf_agent} onChange={handleInputChange} /></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">Instagram</span><input className="ui-input" name="instagram" value={formData.instagram} onChange={handleInputChange} /></label>
-        <label className="u-stack u-gap-2"><span className="users-section-title">Indicação</span><input className="ui-input" name="indication" value={formData.indication} onChange={handleInputChange} /></label>
-        <label className="u-flex u-items-center u-gap-2"><span className="users-section-title">Serviço Único?</span><input id="service_unique" name="service_unique" type="checkbox" checked={formData.service_unique} onChange={handleInputChange} /></label>
-    </div>
+    <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
+        <FormControl isRequired>
+            <FormLabel>Tipo de Pessoa</FormLabel>
+            <Select name="type" value={formData.type} onChange={handleInputChange} color={'bodyText'}>
+                <option value="PJ">Pessoa Jurídica (PJ)</option>
+                <option value="PF">Pessoa Física (PF)</option>
+            </Select>
+        </FormControl>
+        <FormControl isRequired>
+            <FormLabel>Tipo de Registro</FormLabel>
+            <Select name="type_registration" value={formData.type_registration} onChange={handleInputChange} color={'bodyText'}>
+                <option value="Existente">Existente</option>
+                <option value="Novo">Novo</option>
+                <option value="Constituição de Empresa">Constituição de Empresa</option>
+            </Select>
+        </FormControl>
+        <FormControl isRequired>
+            <FormLabel>{formData.type === 'PJ' ? 'CNPJ' : 'CPF'}</FormLabel>
+            <InputGroup>
+                <Input name="cpf_cnpj" value={formData.cpf_cnpj} onChange={handleInputChange} color={'bodyText'} placeholder="Apenas números" />
+                {formData.type === 'PJ' && (
+                    <InputRightElement>
+                        <IconButton aria-label="Buscar CNPJ" icon={isSearchingCnpj ? <Spinner size="sm" /> : <SearchIcon />} size="sm" onClick={handleSearchCNPJ} isLoading={isSearchingCnpj} title="Buscar dados na Receita" />
+                    </InputRightElement>
+                )}
+            </InputGroup>
+        </FormControl>
+        <FormControl isRequired>
+            <FormLabel>Nome / Apelido</FormLabel>
+            <Input name="name" value={formData.name} onChange={handleInputChange} color={'bodyText'} />
+        </FormControl>
+        {formData.type === 'PJ' && (
+            <>
+                <FormControl><FormLabel>Razão Social</FormLabel><Input name="company_name" value={formData.company_name} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+                <FormControl><FormLabel>Nome Fantasia</FormLabel><Input name="fantasy_name" value={formData.fantasy_name} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+                <FormControl><FormLabel>Data de Abertura</FormLabel><Input type="date" name="opening_date" value={formData.opening_date} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+            </>
+        )}
+        <FormControl><FormLabel>CEP</FormLabel><Input name="cep" value={formData.cep} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+        <FormControl><FormLabel>Endereço Completo</FormLabel><Input name="address" value={formData.address} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+        <FormControl><FormLabel>Bairro</FormLabel><Input name="neighborhood" value={formData.neighborhood} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+        <FormControl>
+            <FormLabel>Estado</FormLabel>
+            <Select name="state" value={formData.state} onChange={handleInputChange} color={'bodyText'}>
+                <option value="">Selecione o estado</option>
+                {states.map(state => (
+                    <option key={state.id} value={state.sigla}>{state.nome}</option>
+                ))}
+            </Select>
+        </FormControl>
+        <FormControl>
+            <FormLabel>Cidade</FormLabel>
+            <Select name="city" value={formData.city} onChange={handleInputChange} color={'bodyText'} isDisabled={!formData.state}>
+                <option value="">Selecione a cidade</option>
+                {cities.map(city => (
+                    <option key={city.id} value={city.nome}>{city.nome}</option>
+                ))}
+            </Select>
+        </FormControl>
+        <FormControl><FormLabel>Telefone</FormLabel><Input name="number" value={formData.number} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+        <FormControl gridColumn={{ md: "span 2" }}><FormLabel>E-mail</FormLabel><Input type="email" name="email" value={formData.email} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+        <FormControl><FormLabel>Responsável Legal</FormLabel><Input name="responsible" value={formData.responsible} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+        <FormControl><FormLabel>CPF Responsável</FormLabel><Input name="cpf_responsible" value={formData.cpf_responsible} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+        <FormControl><FormLabel>Preposto</FormLabel><Input name="agent" value={formData.agent} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+        <FormControl><FormLabel>CPF Preposto</FormLabel><Input name="cpf_agent" value={formData.cpf_agent} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+        <FormControl><FormLabel>Instagram</FormLabel><Input name="instagram" value={formData.instagram} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+        <FormControl><FormLabel>Indicação</FormLabel><Input name="indication" value={formData.indication} onChange={handleInputChange} color={'bodyText'} /></FormControl>
+        <FormControl display="flex" alignItems="center"><FormLabel htmlFor="service_unique" mb="0">Serviço Único?</FormLabel><Switch id="service_unique" name="service_unique" isChecked={formData.service_unique} onChange={handleInputChange} colorScheme="green" /></FormControl>
+    </SimpleGrid>
 );
 
 
@@ -150,20 +200,12 @@ export function ClientCreateModal({ isOpen, onClose, onCreated, perm }: CreateMo
     };
 
     return (
-        <Dialog
-            open={isOpen}
-            onOpenChange={(open) => { if (!open) onClose(); }}
-            title="Cadastrar Novo Cliente"
-            description="Formulário para cadastro de cliente"
-            contentClassName="max-w-[1400px]"
-            footer={(
-                <>
-                    <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100" onClick={onClose}>Cancelar</button>
-                    <button type="button" className="ui-button-primary" disabled={isLoading} onClick={handleCadastrar}>{isLoading ? 'Salvando...' : 'Salvar'}</button>
-                </>
-            )}
-        >
-                <div className="max-h-[70vh] overflow-y-auto">
+        <Modal isOpen={isOpen} onClose={onClose} size="6xl">
+            <ModalOverlay />
+            <ModalContent maxWidth="1400px" mx="auto">
+                <ModalHeader color='primaryText'>Cadastrar Novo Cliente</ModalHeader>
+                <ModalCloseButton />
+                <ModalBody maxHeight="70vh" overflowY="auto">
                     <IntegracaoForm
                         formData={formData}
                         handleInputChange={handleInputChange}
@@ -172,7 +214,19 @@ export function ClientCreateModal({ isOpen, onClose, onCreated, perm }: CreateMo
                         states={states}
                         cities={cities}
                     />
-                </div>
-        </Dialog>
+                </ModalBody>
+                <ModalFooter>
+                    <Button colorScheme="gray" mr={3} onClick={onClose}>Cancelar</Button>
+                    <Button
+                        bg="componentColor" color={'secondaryText'} border={'1px solid transparent'}
+                        _hover={{ bg: 'white', color: 'main.main' }}
+                        isLoading={isLoading}
+                        onClick={handleCadastrar}
+                    >
+                        Salvar
+                    </Button>
+                </ModalFooter>
+            </ModalContent>
+        </Modal>
     );
 }

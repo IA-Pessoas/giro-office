@@ -1,4 +1,5 @@
 import React from 'react';
+import { Box } from "@chakra-ui/react";
 import 'react-toastify/dist/ReactToastify.css';
 
 import { ClientTabs } from '../../components/Tabs/ClientTabs';
@@ -88,9 +89,9 @@ interface Props {
 export default function Client({ client, perms }: Props) {
     return (
         <>
-            <div className="p-4">
+            <Box p={4}>                
                 <ClientTabs client={client} perms={perms} />
-            </div>
+            </Box>
         </>
     );
 }
