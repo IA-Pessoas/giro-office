@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Text, Flex, Spinner, Badge } from '@chakra-ui/react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { organizationService } from '../services/organizationService';
@@ -34,17 +33,17 @@ export function OrganizationProfile({ organizationId }: OrganizationProfileProps
 
   if (isLoading) {
     return (
-      <Flex justify="center" align="center" h="100%" minH="400px">
-        <Spinner size="xl" />
-      </Flex>
+      <div className="u-flex min-h-[400px] h-full items-center justify-center">
+        <span className="text-sm text-slate-500">Carregando...</span>
+      </div>
     );
   }
 
   if (!organization) {
     return (
-      <Box p={4}>
-        <Text color="red.500">Erro ao carregar organização.</Text>
-      </Box>
+      <div className="p-4">
+        <p className="text-red-500">Erro ao carregar organização.</p>
+      </div>
     );
   }
 
@@ -60,60 +59,51 @@ export function OrganizationProfile({ organizationId }: OrganizationProfileProps
   };
 
   return (
-    <Box p={6}>
-      <Flex direction="column" gap={4}>
-        <Flex justify="space-between" align="center">
-          <Text fontSize="2xl" fontWeight="bold" color="primaryText">
+    <div className="p-6">
+      <div className="u-stack u-gap-4">
+        <div className="u-flex u-justify-between u-items-center">
+          <p className="text-2xl font-bold text-[var(--colors-blue-500)]">
             {organization.name}
-          </Text>
-          <Badge colorScheme={getStatusColor(organization.status)} fontSize="md" p={2}>
+          </p>
+          <span className={`rounded-md px-3 py-1 text-sm font-medium ${
+            getStatusColor(organization.status) === 'green' ? 'bg-green-100 text-green-700' :
+            getStatusColor(organization.status) === 'yellow' ? 'bg-yellow-100 text-yellow-700' :
+            getStatusColor(organization.status) === 'orange' ? 'bg-orange-100 text-orange-700' :
+            getStatusColor(organization.status) === 'red' ? 'bg-red-100 text-red-700' :
+            'bg-slate-100 text-slate-700'
+          }`}>
             {organization.status}
-          </Badge>
-        </Flex>
+          </span>
+        </div>
 
-        <Box>
-          <Text fontSize="sm" color="gray.500" mb={1}>Slug</Text>
-          <Text color="bodyText">{organization.slug}</Text>
-        </Box>
-
-        <Box>
-          <Text fontSize="sm" color="gray.500" mb={1}>CNPJ</Text>
-          <Text color="bodyText">{organization.cnpj}</Text>
-        </Box>
-
-        <Box>
-          <Text fontSize="sm" color="gray.500" mb={1}>Email do Criador</Text>
-          <Text color="bodyText">{organization.email_created_by}</Text>
-        </Box>
-
-        <Box>
-          <Text fontSize="sm" color="gray.500" mb={1}>Plano de Assinatura</Text>
-          <Text color="bodyText">{organization.subscription_plan}</Text>
-        </Box>
+        <section><p className="mb-1 text-sm text-slate-500">Slug</p><p>{organization.slug}</p></section>
+        <section><p className="mb-1 text-sm text-slate-500">CNPJ</p><p>{organization.cnpj}</p></section>
+        <section><p className="mb-1 text-sm text-slate-500">Email do Criador</p><p>{organization.email_created_by}</p></section>
+        <section><p className="mb-1 text-sm text-slate-500">Plano de Assinatura</p><p>{organization.subscription_plan}</p></section>
 
         {organization.logo_url && (
-          <Box>
-            <Text fontSize="sm" color="gray.500" mb={1}>Logo</Text>
-            <Box mt={2}>
+          <section>
+            <p className="mb-1 text-sm text-slate-500">Logo</p>
+            <div className="mt-2">
               <img src={organization.logo_url} alt={organization.name} style={{ maxWidth: '200px', maxHeight: '200px' }} />
-            </Box>
-          </Box>
+            </div>
+          </section>
         )}
 
-        <Box>
-          <Text fontSize="sm" color="gray.500" mb={1}>Criado em</Text>
-          <Text color="bodyText">
+        <section>
+          <p className="mb-1 text-sm text-slate-500">Criado em</p>
+          <p>
             {new Date(organization.created_at).toLocaleString('pt-BR')}
-          </Text>
-        </Box>
+          </p>
+        </section>
 
-        <Box>
-          <Text fontSize="sm" color="gray.500" mb={1}>Atualizado em</Text>
-          <Text color="bodyText">
+        <section>
+          <p className="mb-1 text-sm text-slate-500">Atualizado em</p>
+          <p>
             {new Date(organization.updated_at).toLocaleString('pt-BR')}
-          </Text>
-        </Box>
-      </Flex>
-    </Box>
+          </p>
+        </section>
+      </div>
+    </div>
   );
 }

@@ -1,5 +1,4 @@
 import React from 'react';
-import { Box, Text } from '@chakra-ui/react';
 import { OrganizationProfile } from './OrganizationProfile';
 
 interface OrganizationDetailsViewProps {
@@ -9,28 +8,17 @@ interface OrganizationDetailsViewProps {
 export function OrganizationDetailsView({ organizationId }: OrganizationDetailsViewProps) {
   if (!organizationId) {
     return (
-      <Box w="100%" h="90vh" display="flex" alignItems="center" justifyContent="center">
-        <Text color="main.main" fontSize="lg">
+      <div className="u-flex h-[90vh] w-full items-center justify-center">
+        <p className="text-lg text-[var(--colors-blue-500)]">
           Selecione uma organização na lista para ver os detalhes.
-        </Text>
-      </Box>
+        </p>
+      </div>
     );
   }
 
   return (
-    <Box 
-      w="100%" 
-      h="90vh" 
-      ml={2}
-      position="relative"
-      borderRadius={'8px'}
-      border={'1px solid'}
-      borderColor={'borderColorDarkOnly'}
-      shadow={'md'}
-      overflowY="auto"
-      bg="bodyBg"
-    >
+    <section className="users-detail-panel relative ml-2 h-[90vh] w-full overflow-y-auto">
       <OrganizationProfile key={organizationId} organizationId={organizationId} />
-    </Box>
+    </section>
   );
 }
