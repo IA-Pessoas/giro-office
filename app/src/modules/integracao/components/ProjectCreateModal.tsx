@@ -1,15 +1,189 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter,
-    FormControl, FormLabel, Input, Button, VStack, Box, Text, 
-    useToast, Spinner, Select, Table, Thead, Tbody, Tr, Th, Td, IconButton, Flex, Badge, Textarea, SimpleGrid
-} from '@chakra-ui/react';
 import { IoAdd, IoTrash } from "react-icons/io5";
 
 import { setupAPIClient } from '@shared/services/api';
 import { integracaoService } from '../services/integracaoService';
 import { useTaskModels } from '../hooks/useTaskModels';
 import type { TaskModel, ProjectTaskItem } from '../types';
+import { toast as toastifyToast } from 'react-toastify';
+
+// --- Chakra shims local (para remover dependência de @chakra-ui/react sem reescrever toda a UI) ---
+type AnyProps = Record<string, any>;
+
+const Modal = ({ isOpen, children }: AnyProps) => {
+    if (!isOpen) return null;
+    return <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>{children}</div>;
+};
+const ModalOverlay = () => <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />;
+const ModalContent = ({ children, ...rest }: AnyProps) => (
+    <div
+        style={{
+            position: 'relative',
+            margin: '5vh auto',
+            maxWidth: rest.maxW ?? 900,
+            background: '#fff',
+            color: '#0f172a',
+            borderRadius: 12,
+            overflow: 'hidden',
+        }}
+    >
+        {children}
+    </div>
+);
+const ModalHeader = ({ children }: AnyProps) => (
+    <div style={{ padding: '1rem', fontWeight: 800, borderBottom: '1px solid #e2e8f0' }}>{children}</div>
+);
+const ModalBody = ({ children }: AnyProps) => <div style={{ padding: '1rem' }}>{children}</div>;
+const ModalFooter = ({ children }: AnyProps) => <div style={{ padding: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>{children}</div>;
+
+const Box = ({ children, style, ...props }: AnyProps) => (
+    <div style={{ ...(style ?? {}) }} {...props}>
+        {children}
+    </div>
+);
+const Text = ({ children, style, ...props }: AnyProps) => (
+    <p style={{ margin: 0, ...(style ?? {}) }} {...props}>
+        {children}
+    </p>
+);
+const Badge = ({ children, colorScheme, style, ...props }: AnyProps) => (
+    <span
+        style={{
+            display: 'inline-block',
+            padding: '0.15rem 0.55rem',
+            borderRadius: 8,
+            fontSize: '0.8rem',
+            background: colorScheme === 'green' ? '#dcfce7' : colorScheme === 'purple' ? '#f5f3ff' : '#dbeafe',
+            color: '#1f2937',
+            ...(style ?? {}),
+        }}
+        {...props}
+    >
+        {children}
+    </span>
+);
+
+const Flex = ({ children, style, direction, gap, ...props }: AnyProps) => (
+    <div
+        style={{
+            display: 'flex',
+            flexDirection: direction ?? props.flexDirection ?? 'row',
+            gap: typeof gap === 'number' ? `${gap}px` : gap,
+            alignItems: props.alignItems,
+            ...(style ?? {}),
+        }}
+        {...props}
+    >
+        {children}
+    </div>
+);
+
+const VStack = ({ children, spacing, ...props }: AnyProps) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing ?? 12 }} {...props}>
+        {children}
+    </div>
+);
+
+const SimpleGrid = ({ children, columns, ...props }: AnyProps) => {
+    const cols = typeof columns === 'number' ? columns : columns?.md ?? columns?.base ?? 2;
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 12 }} {...props}>
+            {children}
+        </div>
+    );
+};
+
+const FormControl = ({ children, ...props }: AnyProps) => <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }} {...props}>{children}</div>;
+const FormLabel = ({ children, ...props }: AnyProps) => <label style={{ fontWeight: 700, fontSize: '0.9rem' }}>{children}</label>;
+
+const Input = React.forwardRef<HTMLInputElement, AnyProps>(({ style, ...props }, ref) => (
+    <input
+        ref={ref}
+        style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 8, padding: '0.55rem 0.7rem', ...(style ?? {}) }}
+        {...props}
+    />
+));
+Input.displayName = 'InputShim';
+
+const Select = React.forwardRef<HTMLSelectElement, AnyProps>(({ style, ...props }, ref) => (
+    <select
+        ref={ref}
+        style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 8, padding: '0.55rem 0.7rem', background: '#fff', ...(style ?? {}) }}
+        {...props}
+    />
+));
+Select.displayName = 'SelectShim';
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, AnyProps>(({ style, ...props }, ref) => (
+    <textarea
+        ref={ref}
+        style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 8, padding: '0.55rem 0.7rem', ...(style ?? {}) }}
+        {...props}
+    />
+));
+Textarea.displayName = 'TextareaShim';
+
+const Button = ({ children, style, isLoading, isDisabled, disabled, ...props }: AnyProps) => (
+    <button
+        type={props.type ?? 'button'}
+        disabled={disabled || isDisabled || isLoading}
+        onClick={props.onClick}
+        style={{
+            border: '1px solid transparent',
+            borderRadius: 8,
+            padding: '0.6rem 0.85rem',
+            background: props.bg ?? '#ef5a8b',
+            color: props.color ?? '#fff',
+            cursor: disabled || isDisabled || isLoading ? 'not-allowed' : 'pointer',
+            opacity: disabled || isDisabled || isLoading ? 0.7 : 1,
+            ...(style ?? {}),
+        }}
+        {...props}
+    >
+        {isLoading ? '...' : children}
+    </button>
+);
+
+const Spinner = ({ ...props }: AnyProps) => <div style={{ padding: 8 }}>Carregando...</div>;
+
+const Table = ({ children, ...props }: AnyProps) => (
+    <table style={{ width: '100%', borderCollapse: 'collapse' }} {...props}>
+        {children}
+    </table>
+);
+const Thead = ({ children, ...props }: AnyProps) => <thead {...props}>{children}</thead>;
+const Tbody = ({ children, ...props }: AnyProps) => <tbody {...props}>{children}</tbody>;
+const Tr = ({ children, ...props }: AnyProps) => <tr {...props}>{children}</tr>;
+const Th = ({ children, ...props }: AnyProps) => (
+    <th style={{ textAlign: 'left', padding: '0.5rem 0.35rem', borderBottom: '1px solid #e2e8f0' }} {...props}>
+        {children}
+    </th>
+);
+const Td = ({ children, ...props }: AnyProps) => (
+    <td style={{ textAlign: 'left', padding: '0.5rem 0.35rem', borderBottom: '1px solid #f1f5f9' }} {...props}>
+        {children}
+    </td>
+);
+
+const IconButton = ({ icon, ...props }: AnyProps) => (
+    <button
+        type="button"
+        aria-label={props['aria-label']}
+        onClick={props.onClick}
+        style={{
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: props.colorScheme === 'red' ? '#dc2626' : '#2f406a',
+            padding: 4,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+        }}
+    >
+        {icon}
+    </button>
+);
 
 interface ProjectCreateModalProps {
     isOpen: boolean;
@@ -38,7 +212,29 @@ interface UserOption {
 }
 
 export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectingStatus, onSuccess, initialData }: ProjectCreateModalProps) {
-    const toast = useToast();
+    // Compat: o código foi escrito para `useToast()` do Chakra (toast({ title, status, description }))
+    // Então mapeamos as opções para o `react-toastify`.
+    const toast = (opts: any) => {
+        const title = opts?.title ?? '';
+        const description = opts?.description ?? '';
+        const status = opts?.status ?? '';
+
+        const text = description ? `${title}: ${description}` : title;
+
+        switch (status) {
+            case 'success':
+                return toastifyToast.success(text);
+            case 'error':
+                return toastifyToast.error(text);
+            case 'warning':
+                // react-toastify usa `warn`
+                return toastifyToast.warn(text);
+            case 'info':
+                return toastifyToast.info(text);
+            default:
+                return toastifyToast(text);
+        }
+    };
     const { models, isLoading: isLoadingModels } = useTaskModels();
     
     // --- ESTADOS DO PROJETO ---
