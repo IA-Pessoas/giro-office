@@ -1,8 +1,7 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import { error as logError, parseTimeToDate, ServiceError } from "@workspace/shared";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
-import { parseTimeToDate } from "../utils/parseTimeToDate.js";
 
 export interface PointConfigUpsertInput {
   user_id: string;

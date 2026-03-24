@@ -1,8 +1,7 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import { assertNonEmptyString, error as logError, ServiceError } from "@workspace/shared";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
-import { assertNonEmptyString } from "../utils/assertNonEmptyString.js";
 import { PointService } from "./pointService.js";
 
 export interface TimeClockRequestCreateInput {

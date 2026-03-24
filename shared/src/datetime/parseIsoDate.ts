@@ -1,4 +1,4 @@
-import { ServiceError } from "@workspace/shared";
+import { ServiceError } from "../http/errors.js";
 
 /**
  * Converte valor de body/query em Date; falha com ServiceError 400 se ausente ou inválido.

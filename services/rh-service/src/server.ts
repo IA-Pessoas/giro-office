@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { createLogger } from "@workspace/shared/logger";
 import http from "node:http";
+import { createLogger } from "@workspace/shared/logger";
 
 import { createApp } from "./app.js";
 import { getRhEnv } from "./config/env.js";

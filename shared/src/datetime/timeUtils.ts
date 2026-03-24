@@ -1,5 +1,6 @@
-import { ServiceError } from "@workspace/shared";
-
+/**
+ * Utilitários genéricos de data/hora (UTC) e dias úteis em formato "1,2,3,4,5".
+ */
 export const TimeUtils = {
   diffMinutes(from: Date, to: Date): number {
     return Math.floor((to.getTime() - from.getTime()) / 60_000);
@@ -36,19 +37,5 @@ export const TimeUtils = {
     }
     const key = String(TimeUtils.utcWeekdayMon1ToSun7(reference));
     return set.has(key);
-  },
-
-  expectedMinutesFromConfig(config: {
-    start_time: Date;
-    lunch_break: Date;
-    lunch_return: Date;
-    end_time: Date;
-  }): number {
-    const morning = TimeUtils.diffMinutes(config.start_time, config.lunch_break);
-    const afternoon = TimeUtils.diffMinutes(config.lunch_return, config.end_time);
-    if (morning < 0 || afternoon < 0) {
-      throw new ServiceError(500, "Configuração de ponto com horários inconsistentes.");
-    }
-    return morning + afternoon;
   },
 };

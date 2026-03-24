@@ -1,4 +1,4 @@
-import { ServiceError } from "@workspace/shared";
+import { ServiceError } from "../http/errors.js";
 
 /**
  * Valida string não vazia após trim; retorna o valor trimado ou lança ServiceError 400.
