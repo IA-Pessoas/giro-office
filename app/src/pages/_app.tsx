@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { AppProps } from "next/app";
 import { useRouter } from 'next/router';
-import { ChakraProvider, Box, Flex, useColorMode } from '@chakra-ui/react';
+import { ChakraProvider, Box, Flex } from '@chakra-ui/react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -52,11 +52,11 @@ function AppLayout({ children }) {
 }
 
 function ColorModeBridge() {
-  const { colorMode } = useColorMode();
-
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", colorMode);
-  }, [colorMode]);
+    const storedMode = localStorage.getItem("chakra-ui-color-mode");
+    const initialTheme = storedMode === "dark" ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", initialTheme);
+  }, []);
 
   return null;
 }
