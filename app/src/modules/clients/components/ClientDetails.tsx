@@ -16,7 +16,7 @@ export function ClientDetailsView({ clientId }: DetailsViewProps) {
   }
 
   return (
-    <section className="users-detail-panel relative ml-2 h-[95vh] w-full overflow-y-auto">
+    <section className="users-detail-panel u-scroll-y-panel relative ml-2 h-[95vh] w-full">
       {/* Renderização nativa com Key para forçar remontagem ao trocar de cliente */}
       <ClientProfile key={clientId} clientId={clientId} />
     </section>
