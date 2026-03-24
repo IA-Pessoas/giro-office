@@ -1,20 +1,8 @@
-import {
-    Drawer,
-    DrawerOverlay,
-    DrawerContent,
-    DrawerHeader,
-    DrawerBody,
-    DrawerCloseButton,
-    Button,
-    useDisclosure,
-    Spinner,
-    Text,
-    Box
-} from '@chakra-ui/react'
 import { useState } from 'react'
 import { FiClock } from 'react-icons/fi'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale';
+import styles from './LogDrawer.module.css'
 
 import { setupAPIClient } from '@shared/services/api'
 
@@ -40,13 +28,13 @@ const permissionMap: Record<number, string> = {
 
 export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
     const apiClient = setupAPIClient()
-    const { isOpen, onOpen, onClose } = useDisclosure()
+    const [isOpen, setIsOpen] = useState(false)
     const [logs, setLogs] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
 
     const handleOpen = async () => {
         setLoading(true)
-        onOpen()
+        setIsOpen(true)
 
         try {
             const response = await apiClient.get('/logs', {
@@ -68,37 +56,34 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
     return (
         <>
             <Button
-                leftIcon={<FiClock />}
-                w="auto"
-                mt={3}
-                mb={4}
-                size="lg"
-                onClick={handleOpen}
-            >
+            <button className={styles.trigger} onClick={handleOpen}>
+                <FiClock />
                 Histórico
-            </Button>
+            </button>
 
-            <Drawer isOpen={isOpen} placement="right" onClose={onClose} size="md">
-                <DrawerOverlay />
-                <DrawerContent>
-                    <DrawerCloseButton />
-                    <DrawerHeader bg={'bodyBg'}>Histórico de alterações</DrawerHeader>
-                    <DrawerBody bg={'bodyBg'}>
+            {isOpen && (
+                <div className={styles.overlay} onClick={() => setIsOpen(false)}>
+                    <aside className={styles.drawer} onClick={(e) => e.stopPropagation()}>
+                        <button className={styles.closeBtn} onClick={() => setIsOpen(false)} aria-label="Fechar histórico">
+                            x
+                        </button>
+                        <div className={styles.header}>Histórico de alterações</div>
+                        <div className={styles.body}>
                         {loading ? (
-                            <Spinner />
+                            <div className={styles.spinner}>Carregando...</div>
                         ) : logs.length === 0 ? (
-                            <Text color={'bodyText'}>Nenhuma alteração registrada.</Text>
+                            <p className={styles.text}>Nenhuma alteração registrada.</p>
                         ) : (
                             logs.map((log, index) => (
-                                <Box key={index} mb={4} p={3} bg="componentColorReverse" borderRadius="md">
-                                    <Text fontWeight="bold">{log.action}</Text>
-                                    <Text fontSize="sm" color={'bodyText'}>
+                                <div key={index} className={styles.logCard}>
+                                    <p className={styles.logTitle}>{log.action}</p>
+                                    <p className={styles.text}>
                                         Em: {format(new Date(log.date), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                                    </Text>
-                                    <Text fontSize="sm" color={'bodyText'}>
+                                    </p>
+                                    <p className={styles.text}>
                                         Por: {log.user.name}
-                                    </Text>
-                                    <Box mt={2}>
+                                    </p>
+                                    <div className={styles.changes}>
                                         {log.action !== "Cadastro" && (
                                             Object.entries(log.changes).map(([key, value]: any) => {
                                                 if (key === "photo") return null
@@ -108,19 +93,20 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
                                                 const to = value.to !== undefined ? formatValue(key, value.to) : "-"
 
                                                 return (
-                                                    <Text key={key} fontSize="sm" color={'bodyText'}>
+                                                    <p key={key} className={styles.text}>
                                                         <strong>{label}:</strong> De: {from} → Para: {to}
-                                                    </Text>
+                                                    </p>
                                                 )
                                             })
                                         )}
-                                    </Box>
-                                </Box>
+                                    </div>
+                                </div>
                             ))
                         )}
-                    </DrawerBody>
-                </DrawerContent>
-            </Drawer>
+                        </div>
+                    </aside>
+                </div>
+            )}
         </>
     )
 }
