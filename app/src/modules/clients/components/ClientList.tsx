@@ -9,14 +9,26 @@ interface ListProps {
 }
 
 export function ClientList({ clients, onSelect }: ListProps) {
-  const [isDesktop, setIsDesktop] = React.useState(false);
+  const [isDesktop, setIsDesktop] = React.useState<boolean | null>(null);
   React.useEffect(() => {
     const mq = window.matchMedia('(min-width: 768px)');
     const sync = () => setIsDesktop(mq.matches);
     sync();
-    mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
+
+    // Fallback for environments that may not support addEventListener on MediaQueryList
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', sync);
+      return () => mq.removeEventListener('change', sync);
+    }
+
+    mq.addListener(sync);
+    return () => mq.removeListener(sync);
   }, []);
+
+  // Avoid rendering the mobile list before media query is resolved on desktop.
+  if (isDesktop === null) {
+    return <section className="w-full" />;
+  }
 
   return (
     <section className={`w-full overflow-y-auto bg-white ${isDesktop ? 'h-full p-0' : 'h-[calc(100vh-220px)] p-2'}`}>
@@ -47,8 +59,8 @@ export function ClientList({ clients, onSelect }: ListProps) {
                 }}
               >
                 <p className="text-sm text-slate-500">{client.dominio_code}</p>
-                <p className="truncate text-md">{client.company_name}</p>
-                <p className="truncate text-md">{client.fantasy_name}</p>
+                <p className="truncate text-md">{client.company_name || client.name || '-'}</p>
+                <p className="truncate text-md">{client.fantasy_name || client.name || '-'}</p>
                 <p className="text-sm text-slate-500">{formatCPF_CNPJ(client.cpf_cnpj)}</p>
               </article>
             ) : (

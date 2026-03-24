@@ -9,15 +9,26 @@ interface DialogProps {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
+  contentClassName?: string;
+  bodyClassName?: string;
 }
 
-export function Dialog({ open, onOpenChange, title, description = "Dialog content", children, footer }: DialogProps) {
+export function Dialog({
+  open,
+  onOpenChange,
+  title,
+  description = "Dialog content",
+  children,
+  footer,
+  contentClassName = "",
+  bodyClassName = "",
+}: DialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm" />
         <DialogPrimitive.Content
-          className="fixed left-1/2 top-1/2 z-[1500] w-[min(92vw,680px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-black/10 bg-white p-0 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out"
+          className={`fixed left-1/2 top-1/2 z-[1500] w-[min(92vw,680px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-black/10 bg-white p-0 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out ${contentClassName}`}
         >
           <header className="flex items-center justify-between border-b border-black/10 px-5 py-4">
             <DialogPrimitive.Title className="text-lg font-semibold text-[var(--colors-blue-500)]">
@@ -31,7 +42,7 @@ export function Dialog({ open, onOpenChange, title, description = "Dialog conten
               <IoClose className="h-5 w-5" />
             </DialogPrimitive.Close>
           </header>
-          <div className="px-5 py-4">{children}</div>
+          <div className={`px-5 py-4 ${bodyClassName}`}>{children}</div>
           {footer ? <footer className="flex justify-end gap-2 border-t border-black/10 px-5 py-4">{footer}</footer> : null}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

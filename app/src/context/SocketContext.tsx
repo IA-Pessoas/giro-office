@@ -9,7 +9,7 @@ interface SocketContextType {
 
 const SocketContext = createContext<SocketContextType | null>(null);
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
+const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3334';
 
 export const SocketProvider = ({ children }: { children: ReactNode }) => {
     const { isAuthenticated } = useAuth();

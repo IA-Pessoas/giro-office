@@ -1,5 +1,6 @@
 packages:
   - "app"
   - "infra"
+  - "services/src"
   - "services/gateway"
   - "shared"

@@ -29,21 +29,22 @@ export function OrganizationFilters({
       </div>
 
       <div className="u-flex w-full gap-3">
-        <label className="u-stack w-1/2 u-gap-1">
-          <span className="text-xs text-slate-500">Filtro - {initialStatus}</span>
-          <select
-            className="ui-input"
-            value={initialStatus}
-            onChange={(e) => onFilterChange(e.target.value)}
-            aria-label="Filtro de organizações"
-          >
-            <option value="active">Ativos</option>
-            <option value="trial">Trial</option>
-            <option value="suspended">Suspensos</option>
-            <option value="cancelled">Cancelados</option>
-          </select>
-        </label>
-        <button type="button" onClick={onOpenCreateModal} className="ui-button-primary w-1/2">
+        <select
+          className="ui-input h-[42px] w-1/2"
+          value={initialStatus}
+          onChange={(e) => onFilterChange(e.target.value)}
+          aria-label="Filtro de organizações"
+        >
+          <option value="active">Ativos</option>
+          <option value="trial">Trial</option>
+          <option value="suspended">Suspensos</option>
+          <option value="cancelled">Cancelados</option>
+        </select>
+        <button
+          type="button"
+          onClick={onOpenCreateModal}
+          className="ui-button-primary h-[42px] w-1/2"
+        >
           <span className="sr-only">Abrir modal para cadastrar organização</span>
           Cadastrar <IoIosArrowForward />
         </button>
