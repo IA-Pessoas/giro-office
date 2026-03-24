@@ -167,6 +167,22 @@ body {
             flex-direction: column;
         }
     }
+
+    .u-grid-clients-desktop {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+    }
+
+    @media (min-width: 768px) {
+        .u-grid-clients-desktop {
+            grid-template-columns: 1fr 4fr 3fr 2fr;
+        }
+    }
+
+    .u-scroll-y-panel {
+        overflow-y: auto;
+    }
 }
 
 @layer components {
@@ -328,7 +344,6 @@ body {
     .clients-table-row:hover {
         background: #f8fafc;
     }
-
     .organizations-shell {
         width: 99%;
         position: relative;
