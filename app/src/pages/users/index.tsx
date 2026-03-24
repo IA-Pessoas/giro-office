@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import Head from 'next/head';
-import { Box, Flex, useDisclosure, Spinner, Icon } from '@chakra-ui/react';
+import { useDisclosure } from '@chakra-ui/react';
 import { toast } from "react-toastify";
 import { FaUsers } from 'react-icons/fa';
 
@@ -58,53 +58,15 @@ export default function Users({ users, deps, me }: Props) {
         <title>Usuários</title>
       </Head>
 
-        <Flex
-          direction={{ base: 'column', md: 'row' }}
-          w="99%"
-          h={{ md: "90vh" }}
-          gap={3}
-          position="relative"
-        >
-          <Flex
-            direction="column"
-            role="group"
-            position={{ base: 'relative', md: isDesktopListCollapsed ? 'absolute' : 'relative' }}
-            w={{ base: '100%', md: isDesktopListCollapsed ? '80px' : '350px' }}
-            minW={{ md: isDesktopListCollapsed ? '80px' : '350px' }}
-            h={{ base: 'auto', md: '90vh' }}
-            zIndex="20"
-            bg="componentColorDarkOnly"
-            boxShadow="md"
-            borderRadius="md"
-            justifyContent={'center'}
-            alignItems={'center'}
-            transition="all 0.3s ease-in-out"
-            _hover={{ w: { md: '350px' }, }}
-            overflow="hidden"
+      <section className="users-shell u-split-panel relative">
+          <aside
+            className={`users-sidebar group relative z-20 flex flex-col items-center justify-center overflow-hidden transition-all duration-300 md:h-[90vh] ${isDesktopListCollapsed ? 'md:absolute md:w-[80px] md:min-w-[80px]' : 'md:w-[350px] md:min-w-[350px]'}`}
           >
-            <Flex
-              position="absolute"
-              w="80px" h="80px"
-              align="center" justify="center"
-              display={{ base: 'none', md: 'flex' }}
-              opacity={isDesktopListCollapsed ? 1 : 0}
-              pointerEvents="none"
-              _groupHover={{ opacity: 0 }}
-              transition="opacity 0.2s"
-            >
-              <Icon as={FaUsers} boxSize={7} color="primaryText" />
-            </Flex>
+            <div className={`absolute hidden h-20 w-20 items-center justify-center transition-opacity md:flex ${isDesktopListCollapsed ? 'opacity-100 group-hover:opacity-0' : 'opacity-0'}`}>
+              <FaUsers size={28} color="var(--colors-blue-500)" />
+            </div>
 
-            <Flex
-              direction="column"
-              w={{ base: '100%', md: '350px' }}
-              h="100%"
-              opacity={isDesktopListCollapsed ? 0 : 1}
-              pointerEvents={isDesktopListCollapsed ? 'none' : 'auto'}
-              _groupHover={{ opacity: 1, pointerEvents: 'auto' }}
-              transition="opacity 0.3s ease-in-out"
-              bg={'componentColorDarkOnly'}
-            >
+            <div className={`h-full w-full transition-opacity duration-300 md:w-[350px] ${isDesktopListCollapsed ? 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto' : 'opacity-100'}`}>
               <UserFilters
                 initialStatus={filterStatus}
                 onFilterChange={handleFilterChange}
@@ -112,29 +74,27 @@ export default function Users({ users, deps, me }: Props) {
                 onOpenCreateModal={onModalOpen}
               />
               {isListLoading ? (
-                <Flex justify="center" align="center" h="150px"><Spinner size="xl" /></Flex>
+                <div className="u-flex h-[150px] items-center justify-center">
+                  <span className="text-sm text-slate-500">Carregando...</span>
+                </div>
               ) : (
                 <UserList
                   users={filteredUsers}
                   onUserSelect={setSelectedUserId}
                 />
               )}
-            </Flex>
-          </Flex>
+            </div>
+          </aside>
 
-          <Box
-            flex="1"
-            pl={{ base: 0, md: isDesktopListCollapsed ? '80px' : 0 }}
-            transition="padding-left 0.3s ease-in-out"
-          >
+          <section className={`flex-1 transition-all duration-300 ${isDesktopListCollapsed ? 'md:pl-[80px]' : 'md:pl-0'}`}>
             {/* Passamos as novas props aqui */}
             <UserDetailsView 
                 userId={selectedUserId} 
                 me={me} 
                 departments={deps} 
             />
-          </Box>
-        </Flex>
+          </section>
+      </section>
 
       <CreateUserModal
         isOpen={isModalOpen}
