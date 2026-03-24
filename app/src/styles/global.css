@@ -344,6 +344,42 @@ body {
     .clients-table-row:hover {
         background: #f8fafc;
     }
+    .organizations-shell {
+        width: 99%;
+        position: relative;
+    }
+
+    .organizations-sidebar {
+        border-radius: var(--radii-md);
+        background: var(--colors-white);
+        box-shadow: var(--shadows-md);
+    }
+
+    .organization-status-badge {
+        border-radius: var(--radii-md);
+        padding: 0.25rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    .u-content-stack {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    .u-sidebar-card-list {
+        display: flex;
+        width: 100%;
+        flex-direction: row;
+        padding-bottom: var(--space-2);
+    }
+
+    @media (min-width: 768px) {
+        .u-sidebar-card-list {
+            flex-direction: column;
+        }
+    }
 }
 
 :root {
