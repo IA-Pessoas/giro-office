@@ -1,5 +1,4 @@
 import {
-  assertNonEmptyString,
   createSuccessResponse,
   error as logError,
   parseIsoDate,
@@ -9,6 +8,11 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import {
+  approveAdjustmentBodySchema,
+  createAdjustmentRequestBodySchema,
+  parseWithZod,
+} from "../schemas/timeClockRequest.schemas.js";
 import { TimeClockRequestService } from "../services/timeClockRequestService.js";
 
 const router: ReturnType<typeof Router> = Router();
@@ -28,33 +32,20 @@ router.post(
         throw new ServiceError(400, "user_id é obrigatório.");
       }
 
-      const body = req.body as Record<string, unknown>;
-      const point_id = assertNonEmptyString(
-        body.point_id !== undefined && body.point_id !== null ? String(body.point_id) : undefined,
-        "point_id",
-      );
-      const lunchIn = body.lunch_in ?? body.launch_in;
-      const justification = assertNonEmptyString(
-        body.justification !== undefined && body.justification !== null
-          ? String(body.justification)
-          : undefined,
-        "justification",
-      );
-      const attachment =
-        body.attachment !== undefined && body.attachment !== null
-          ? String(body.attachment)
-          : undefined;
+      const parsed = parseWithZod(createAdjustmentRequestBodySchema, req.body);
+      const lunchInRaw = parsed.lunch_in ?? parsed.launch_in;
+      const lunch_in = parseIsoDate(lunchInRaw, "lunch_in");
 
       const result = await timeClockRequestService.create({
         user_id: userId,
         organization_id: organizationId,
-        point_id,
-        clock_in: parseIsoDate(body.clock_in, "clock_in"),
-        lunch_out: parseIsoDate(body.lunch_out, "lunch_out"),
-        lunch_in: parseIsoDate(lunchIn, "lunch_in"),
-        clock_out: parseIsoDate(body.clock_out, "clock_out"),
-        justification,
-        attachment,
+        point_id: parsed.point_id,
+        clock_in: parsed.clock_in,
+        lunch_out: parsed.lunch_out,
+        lunch_in,
+        clock_out: parsed.clock_out,
+        justification: parsed.justification,
+        attachment: parsed.attachment,
       });
 
       res.status(200).json(createSuccessResponse(result));
@@ -79,21 +70,13 @@ router.put(
         throw new ServiceError(400, "user_id é obrigatório.");
       }
 
-      const body = req.body as Record<string, unknown>;
-      const request_id = body.request_id !== undefined ? String(body.request_id) : "";
-
-      const obs_approver =
-        body.obs_approver === undefined
-          ? undefined
-          : body.obs_approver === null
-            ? null
-            : String(body.obs_approver);
+      const body = parseWithZod(approveAdjustmentBodySchema, req.body);
 
       const result = await timeClockRequestService.approve({
-        request_id,
+        request_id: body.request_id,
         approver_user_id: userId,
         organization_id: organizationId,
-        obs_approver,
+        obs_approver: body.obs_approver,
       });
 
       res.status(200).json(createSuccessResponse(result));
