@@ -55,7 +55,6 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
 
     return (
         <>
-            <Button
             <button className={styles.trigger} onClick={handleOpen}>
                 <FiClock />
                 Histórico

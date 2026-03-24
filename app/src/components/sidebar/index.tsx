@@ -234,24 +234,18 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
         justifyContent="space-between"
       >
         <Box w="full" pt={0}>
-          <Flex>
-            <Flex
-              align="center"
-              w="full"
-              h="60px"
-              px={3}
-              mx={2}
-              my={1}
-              borderRadius="md"
-              _hover={{ textDecoration: 'none' }}
-            >
-              <Flex
-                w="55px"
-                h="full"
-                align="center"
-                justify="center"
-                flexShrink={0}
-              >
+          <Flex
+            align="center"
+            justify="center"
+            w="full"
+            h="60px"
+            px={3}
+            my={1}
+            borderRadius="md"
+            transition="all 0.3s ease"
+          >
+            <Flex align="center" justify="center" w="full" minW="55px">
+              <Box flexShrink={0} display="flex" justifyContent="center" alignItems="center" w="55px">
                 <Image
                   src={`/logos/lions/Castelo.webp`}
                   alt="Logo da Castelo"
@@ -259,27 +253,28 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
                   height={25}
                   style={{ objectFit: 'contain' }}
                 />
-              </Flex>
+              </Box>
 
               <Text
                 fontSize="md"
-                fontWeight="medium"
+                fontWeight="bold"
+                whiteSpace="nowrap"
                 opacity={0}
                 w={0}
                 pointerEvents="none"
-                transition="opacity 0.2s 0.1s ease, width 0.2s 0.1s ease" // Adiciona um pequeno delay
+                transition="opacity 0.2s ease, width 0.2s ease, margin 0.2s ease"
                 _groupHover={{
                   opacity: 1,
                   w: 'auto',
+                  ml: 3,
                   pointerEvents: 'auto',
-                  ml: 2,
                 }}
               >
                 Castelo Workspace
               </Text>
             </Flex>
           </Flex>
-          <Divider borderColor="borderColor" opacity={.5} my={4} />
+          <Divider borderColor="borderColor" opacity={0.5} my={4} />
         </Box>
 
         <VStack

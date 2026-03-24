@@ -50,19 +50,23 @@ const tokenToColor = (token: any): string | undefined => {
   if (token === undefined || token === null) return undefined;
   if (typeof token !== 'string') return undefined;
   const t = token;
+  const isDark =
+    typeof document !== 'undefined' &&
+    document.documentElement.getAttribute('data-theme') === 'dark';
+
   const map: Record<string, string> = {
-    bodyBg: '#fafafa',
-    bodyText: '#010e30',
-    primaryText: '#2f406a',
-    secondaryText: '#d0ab70',
-    componentColor: '#2f406a',
-    componentColorReverse: '#d0ab70',
-    componentColorDarkOnly: '#fafafa',
-    borderColor: '#676767',
+    bodyBg: isDark ? '#010e30' : '#fafafa',
+    bodyText: isDark ? '#fafafa' : '#010e30',
+    primaryText: isDark ? '#d0ab70' : '#2f406a',
+    secondaryText: isDark ? '#2f406a' : '#d0ab70',
+    componentColor: isDark ? '#d0ab70' : '#2f406a',
+    componentColorReverse: isDark ? '#2f406a' : '#d0ab70',
+    componentColorDarkOnly: isDark ? '#2f406a' : '#fafafa',
+    borderColor: isDark ? '#d0ab70' : '#676767',
     borderColorReverse: '#d0ab70',
-    borderColorDarkOnly: '#d0ab70',
-    mainOpacity: 'rgba(47,64,106,0.3)',
-    mainOpacityReverse: 'rgba(208,171,112,0.3)',
+    borderColorDarkOnly: isDark ? '#d0ab70' : '#fafafa',
+    mainOpacity: isDark ? 'rgba(208,171,112,0.3)' : 'rgba(47,64,106,0.3)',
+    mainOpacityReverse: isDark ? 'rgba(47,64,106,0.3)' : 'rgba(208,171,112,0.3)',
     integracao: '#ef5a8b',
     'integracao.main': '#ef5a8b',
     'integracao.sub': '#c3476f',
@@ -72,7 +76,7 @@ const tokenToColor = (token: any): string | undefined => {
     'colors.grey': '#A0AEC0',
     'red.500': '#ef4444',
     'whiteAlpha.100': 'rgba(255,255,255,0.1)',
-    'componentColorReberse': '#2f406a',
+    'componentColorReberse': isDark ? '#d0ab70' : '#2f406a',
   };
   if (map[t]) return map[t];
   // Accept raw CSS colors/hex
@@ -101,12 +105,12 @@ const styleFromChakraProps = (props: AnyProps): React.CSSProperties => {
   if (minH !== undefined) style.minHeight = minH;
   if (maxH !== undefined) style.maxHeight = maxH;
 
-  style.display = props.display;
-  if (props.flexDirection || props.direction) {
+  if (props.display !== undefined) style.display = resolveResponsive(props.display);
+  if (props.flexDirection !== undefined || props.direction !== undefined) {
     style.flexDirection = props.flexDirection ?? resolveResponsive(props.direction);
   }
-  if (props.alignItems) style.alignItems = props.alignItems;
-  if (props.justifyContent) style.justifyContent = props.justifyContent;
+  if (props.alignItems !== undefined) style.alignItems = props.alignItems;
+  if (props.justifyContent !== undefined) style.justifyContent = props.justifyContent;
 
   const p = resolveSpace(props.p);
   const px = resolveSpace(props.px);
@@ -159,8 +163,8 @@ const styleFromChakraProps = (props: AnyProps): React.CSSProperties => {
     if (borderColor) style.borderColor = borderColor;
   }
 
-  if (props.borderBottom) style.borderBottom = `1px solid ${borderColor ?? '#e2e8f0'}`;
-  if (props.borderTop) style.borderTop = `1px solid ${borderColor ?? '#e2e8f0'}`;
+  if (props.borderBottom !== undefined) style.borderBottom = `1px solid ${borderColor ?? '#e2e8f0'}`;
+  if (props.borderTop !== undefined) style.borderTop = `1px solid ${borderColor ?? '#e2e8f0'}`;
 
   if (props.boxShadow) {
     // Best-effort mapping
@@ -170,8 +174,8 @@ const styleFromChakraProps = (props: AnyProps): React.CSSProperties => {
   const border = props.border;
   if (border && typeof border === 'string') style.border = border;
 
-  if (props.position) style.position = props.position;
-  if (props.pos) style.position = props.pos;
+  if (props.position !== undefined) style.position = props.position;
+  if (props.pos !== undefined) style.position = props.pos;
   if (props.top !== undefined) style.top = resolveSpace(props.top) ?? props.top;
   if (props.left !== undefined) style.left = resolveSpace(props.left) ?? props.left;
   if (props.right !== undefined) style.right = resolveSpace(props.right) ?? props.right;
@@ -179,20 +183,20 @@ const styleFromChakraProps = (props: AnyProps): React.CSSProperties => {
 
   if (props.zIndex !== undefined) style.zIndex = props.zIndex;
 
-  if (props.overflow) style.overflow = props.overflow;
-  if (props.overflowX) style.overflowX = props.overflowX;
-  if (props.overflowY) style.overflowY = props.overflowY;
+  if (props.overflow !== undefined) style.overflow = props.overflow;
+  if (props.overflowX !== undefined) style.overflowX = props.overflowX;
+  if (props.overflowY !== undefined) style.overflowY = props.overflowY;
 
-  if (props.transition) style.transition = props.transition;
+  if (props.transition !== undefined) style.transition = props.transition;
 
-  if (props.cursor) style.cursor = props.cursor;
+  if (props.cursor !== undefined) style.cursor = props.cursor;
   if (props.opacity !== undefined) style.opacity = props.opacity;
 
   const fs = resolveResponsive(props.fontSize);
   if (fs !== undefined) style.fontSize = typeof fs === 'number' ? `${fs}px` : fs;
-  if (props.fontWeight) style.fontWeight = props.fontWeight;
-  if (props.lineHeight) style.lineHeight = props.lineHeight;
-  if (props.textAlign) style.textAlign = props.textAlign;
+  if (props.fontWeight !== undefined) style.fontWeight = props.fontWeight;
+  if (props.lineHeight !== undefined) style.lineHeight = props.lineHeight;
+  if (props.textAlign !== undefined) style.textAlign = props.textAlign;
 
   if (props.boxSize !== undefined) {
     const size = resolveSpace(props.boxSize) ?? resolveResponsive(props.boxSize);
@@ -305,12 +309,17 @@ export function IconButton({ icon, children, style, ...props }: AnyProps) {
 }
 
 export function Link({ href, children, onClick, style, ...props }: AnyProps) {
+  const { _hover, _focusVisible, _groupHover, sx, ...rest } = props;
   return (
     <NextLink href={href} legacyBehavior>
       <a
         onClick={onClick}
-        style={{ textDecoration: 'none', ...(style ?? {}) }}
-        {...props}
+        style={{
+          textDecoration: 'none',
+          ...(styleFromChakraProps(rest) as any),
+          ...(style ?? {}),
+        }}
+        {...rest}
       >
         {children}
       </a>
