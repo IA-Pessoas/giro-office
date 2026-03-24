@@ -1,13 +1,14 @@
 import "dotenv/config";
-import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
 import type { Logger } from "@workspace/shared";
+import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
 import cors from "cors";
 import express, { type Request, type Response } from "express";
 import "express-async-errors";
 
 import { requestContext } from "./middlewares/requestContext.js";
-import pointConfigRoutes from "./routes/point-config.routes.js";
 import pointRoutes from "./routes/point.routes.js";
+import pointConfigRoutes from "./routes/point-config.routes.js";
+import timeClockRequestRoutes from "./routes/timeClockRequest.routes.js";
 
 export function createApp(logger: Logger): express.Express {
   const app = express();
@@ -23,6 +24,7 @@ export function createApp(logger: Logger): express.Express {
 
   app.use("/rh", pointConfigRoutes);
   app.use("/rh", pointRoutes);
+  app.use("/rh", timeClockRequestRoutes);
 
   app.use(
     createExpressErrorHandler({
