@@ -1,21 +1,8 @@
 // src/components/departments/DepartmentProfile.tsx
 import React, { useEffect, useState } from 'react';
-import {
-    Button,
-    Flex,
-    FormLabel,
-    FormControl,
-    Input,
-    Tabs,
-    TabList,
-    TabPanels,
-    Tab,
-    TabPanel,
-    Select,
-    Switch,
-} from "@chakra-ui/react";
 import { LuFolder } from "react-icons/lu";
 import { IoCreate } from "react-icons/io5";
+import styles from './DepartmentProfile.module.css';
 
 import LogDrawer from '@shared/components/LogDrawer';
 import { LoadingSpinner } from '@shared/components/LoadingSpinner';
@@ -68,66 +55,59 @@ function DepartmentFormContent({ dep }) {
     } = useDepForm(dep);
 
     return (
-        <Tabs>
-            <TabList>
-                <Tab color={'primaryText'}><LuFolder style={{ marginRight: 8 }} /> Dados</Tab>
-            </TabList>
+        <div className={styles.root}>
+            <div className={styles.tabHeader}>
+                <span className={styles.tab}><LuFolder style={{ marginRight: 8 }} /> Dados</span>
+            </div>
 
-            <TabPanels>
-                <TabPanel>
-                    <Flex direction="column" alignItems="center" pt={4} pb={8} w="100%" maxWidth="900px" mx="auto">
-                        <Flex as="form" direction="column" w="100%" gap={4} onSubmit={(e) => { e.preventDefault(); handleUpdate(); }}>
-                            <Flex direction={{ base: "column", md: "row" }} gap={4}>
-                                <FormControl>
-                                    <FormLabel>Nome</FormLabel>
-                                    <Input name="name" value={formData.name} onChange={handleInputChange} color={'bodyText'} />
-                                </FormControl>
-                                <FormControl>
-                                    <FormLabel>Cor</FormLabel>
-                                    <Input type="color" name="color" value={formData.color} onChange={handleInputChange} color={'bodyText'} />
-                                </FormControl>
-                            </Flex>
+            <div className={styles.panel}>
+                <div className={styles.wrapper}>
+                    <form className={styles.form} onSubmit={(e) => { e.preventDefault(); handleUpdate(); }}>
+                        <div className={styles.row}>
+                            <div className={styles.field}>
+                                <label>Nome</label>
+                                <input name="name" value={formData.name} onChange={handleInputChange} />
+                            </div>
+                            <div className={styles.field}>
+                                <label>Cor</label>
+                                <input type="color" name="color" value={formData.color} onChange={handleInputChange} />
+                            </div>
+                        </div>
 
-                            <Flex direction={{ base: "column", md: "row" }} gap={4}>
-                                <FormControl>
-                                    <FormLabel htmlFor="solution" mb="0">
-                                        Solução?
-                                    </FormLabel>
-                                    <Switch
-                                        id="solution"
-                                        name="solution"
-                                        isChecked={formData.solution}
-                                        onChange={handleInputChange}
-                                        colorScheme="green"
-                                    />
-                                </FormControl>
-                                <FormControl>
-                                    <FormLabel>Status</FormLabel>
-                                    <Select name="status" value={formData.status} onChange={handleInputChange} color={'bodyText'}>
-                                        <option value="Ativo">Ativo</option>
-                                        <option value="Inativo">Inativo</option>
-                                    </Select>
-                                </FormControl>
-                            </Flex>
+                        <div className={styles.row}>
+                            <div className={styles.field}>
+                                <label htmlFor="solution">Solução?</label>
+                                <input
+                                    id="solution"
+                                    name="solution"
+                                    type="checkbox"
+                                    checked={formData.solution}
+                                    onChange={handleInputChange}
+                                />
+                            </div>
+                            <div className={styles.field}>
+                                <label>Status</label>
+                                <select name="status" value={formData.status} onChange={handleInputChange}>
+                                    <option value="Ativo">Ativo</option>
+                                    <option value="Inativo">Inativo</option>
+                                </select>
+                            </div>
+                        </div>
 
-                            <Flex mt={6} justify="space-between" align="center">
-                                <LogDrawer referring="departments" referringId={dep.id} />
-                                <Button
-                                    type="submit"
-                                    leftIcon={<IoCreate />}
-                                    size="lg"
-                                    bg="componentColor"
-                                    color="white"
-                                    isLoading={isLoading}
-                                    _hover={{ bg: 'componentColorReverse' }}
-                                >
-                                    Salvar Alterações
-                                </Button>
-                            </Flex>
-                        </Flex>
-                    </Flex>
-                </TabPanel>
-            </TabPanels>
-        </Tabs>
+                        <div className={styles.actions}>
+                            <LogDrawer referring="departments" referringId={dep.id} />
+                            <button
+                                type="submit"
+                                className={styles.saveButton}
+                                disabled={isLoading}
+                            >
+                                <IoCreate />
+                                Salvar Alterações
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     );
 }
