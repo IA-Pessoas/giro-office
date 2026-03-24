@@ -29,7 +29,8 @@ router.post(
 
       const body = req.body as Record<string, unknown>;
       const point_id = body.point_id !== undefined ? String(body.point_id) : "";
-      const launchIn = body.lunch_in ?? body.launch_in;
+      const lunchIn = body.lunch_in ?? body.launch_in;
+`
       const justification = body.justification !== undefined ? String(body.justification) : "";
       const attachment =
         body.attachment !== undefined && body.attachment !== null
