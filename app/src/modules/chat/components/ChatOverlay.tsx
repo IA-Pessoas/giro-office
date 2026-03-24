@@ -3,7 +3,6 @@ import React from 'react';
 import { ChatProvider } from '../../../context/ChatContext';
 import { ChatLayout } from './ChatLayout';
 import { IoMdCloseCircleOutline } from "react-icons/io";
-import { Box } from '@chakra-ui/react';
 
 import * as styles from '../../../styles/chat'
 
@@ -18,30 +17,34 @@ export const ChatOverlay = ({ isOpen, onClose }: ChatOverlayProps) => {
     }
 
     return (
-        <Box 
+        <div
             onClick={onClose}
-            pos={'fixed'}
-            top={0}
-            left={0}
-            w={'100vw'}
-            h={'100vh'}
-            bg={'rgba(0, 0, 0, 0.6)'}
-            display={'flex'}
-            justifyContent={'center'}
-            alignItems={'center'}
-            zIndex={1000}
-            backdropFilter={'blur(5px)'}
+            style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100vw',
+                height: '100vh',
+                background: 'rgba(0, 0, 0, 0.6)',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1000,
+                backdropFilter: 'blur(5px)',
+            }}
         >
-            <Box 
+            <div
                 onClick={(e) => e.stopPropagation()}
-                pos={'relative'}
-                w={'clamp(320px, 90vw, 1400px)'}
-                h={'clamp(400px, 90vh, 1000px)'}
-                bg={'bodyBg'}
-                borderRadius={'8px'}
-                display={'flex'}
-                flexDirection={'column'}
-                boxShadow={'0 10px 30px rgba(0,0,0,0.01)'}
+                style={{
+                    position: 'relative',
+                    width: 'clamp(320px, 90vw, 1400px)',
+                    height: 'clamp(400px, 90vh, 1000px)',
+                    background: 'var(--colors-body-bg, #fff)',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.01)',
+                }}
             >
                 <button onClick={onClose} style={{
                     position: 'fixed', 
@@ -65,7 +68,7 @@ export const ChatOverlay = ({ isOpen, onClose }: ChatOverlayProps) => {
                 <ChatProvider>
                     <ChatLayout />
                 </ChatProvider>
-            </Box>
-        </Box>
+            </div>
+        </div>
     );
 };
