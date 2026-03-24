@@ -1,4 +1,5 @@
 import {
+  assertNonEmptyString,
   createSuccessResponse,
   error as logError,
   parseIsoDate,
@@ -28,9 +29,17 @@ router.post(
       }
 
       const body = req.body as Record<string, unknown>;
-      const point_id = body.point_id !== undefined ? String(body.point_id) : "";
+      const point_id = assertNonEmptyString(
+        body.point_id !== undefined && body.point_id !== null ? String(body.point_id) : undefined,
+        "point_id",
+      );
       const lunchIn = body.lunch_in ?? body.launch_in;
-      const justification = body.justification !== undefined ? String(body.justification) : "";
+      const justification = assertNonEmptyString(
+        body.justification !== undefined && body.justification !== null
+          ? String(body.justification)
+          : undefined,
+        "justification",
+      );
       const attachment =
         body.attachment !== undefined && body.attachment !== null
           ? String(body.attachment)
