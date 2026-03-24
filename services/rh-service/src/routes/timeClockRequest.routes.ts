@@ -30,7 +30,6 @@ router.post(
       const body = req.body as Record<string, unknown>;
       const point_id = body.point_id !== undefined ? String(body.point_id) : "";
       const lunchIn = body.lunch_in ?? body.launch_in;
-`
       const justification = body.justification !== undefined ? String(body.justification) : "";
       const attachment =
         body.attachment !== undefined && body.attachment !== null
@@ -43,7 +42,7 @@ router.post(
         point_id,
         clock_in: parseIsoDate(body.clock_in, "clock_in"),
         lunch_out: parseIsoDate(body.lunch_out, "lunch_out"),
-        lunch_in: parseIsoDate(launchIn, "lunch_in"),
+        lunch_in: parseIsoDate(lunchIn, "lunch_in"),
         clock_out: parseIsoDate(body.clock_out, "clock_out"),
         justification,
         attachment,
