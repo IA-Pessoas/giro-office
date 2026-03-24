@@ -91,7 +91,7 @@ export default function Organizations({ organizations }: Props) {
               onOpenCreateModal={onModalOpen}
             />
             {isListLoading ? (
-              <div className="u-flex h-[150px] items-center justify-center">
+              <div className="u-flex h-[150px] items-center justify-center" aria-live="polite">
                 <span className="text-sm text-slate-500">Carregando...</span>
               </div>
             ) : (

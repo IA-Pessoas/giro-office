@@ -17,6 +17,14 @@ export function OrganizationList({ organizations, onOrganizationSelect }: Organi
               className="mr-3 mb-0 w-[200px] min-w-[200px] cursor-pointer rounded-md bg-white shadow-sm transition-transform hover:scale-[1.01] md:mr-0 md:mb-2 md:w-full md:min-w-0"
               style={{ borderLeft: `5px solid ${org.status === 'active' ? '#10B981' : org.status === 'trial' ? '#F59E0B' : '#EF4444'}` }}
               onClick={() => onOrganizationSelect(org.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onOrganizationSelect(org.id);
+                }
+              }}
             >
               <div className="p-4">
                 <p className="truncate text-md font-bold">{org.name}</p>

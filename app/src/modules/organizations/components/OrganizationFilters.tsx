@@ -44,6 +44,7 @@ export function OrganizationFilters({
           </select>
         </label>
         <button type="button" onClick={onOpenCreateModal} className="ui-button-primary w-1/2">
+          <span className="sr-only">Abrir modal para cadastrar organização</span>
           Cadastrar <IoIosArrowForward />
         </button>
       </div>
