@@ -47,10 +47,7 @@ const createAuditRequestPayloadSchema = z.object({
   referring: z.string().optional().nullable(),
   referringId: z.string().optional().nullable(),
   changes: z
-    .union([
-      z.record(z.string(), z.unknown()),
-      z.string(),
-    ])
+    .union([z.record(z.string(), z.unknown()), z.string()])
     .optional()
     .nullable(),
   department: z.string().optional().nullable(),
@@ -99,16 +96,22 @@ function buildAuditSearchFilters(
 
 export function createAuditRequestService(repository: AuditRequestRepository): AuditRequestService {
   return {
-    async create(body) {
+    async create(body: unknown): Promise<string> {
       const payload = parseCreateAuditRequestPayload(body);
       await repository.create(payload);
       return payload.requestId;
     },
-    async search(query, organizationId) {
+    async search(
+      query: Record<string, unknown>,
+      organizationId: string,
+    ): Promise<AuditSearchResult> {
       const filters = buildAuditSearchFilters(query, organizationId);
       return repository.search(filters);
     },
-    async findByRequestId(requestId, organizationId) {
+    async findByRequestId(
+      requestId: string,
+      organizationId: string,
+    ): Promise<AuditRequestRecord | null> {
       return repository.findByRequestId(requestId, organizationId);
     },
   };

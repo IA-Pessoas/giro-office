@@ -1,7 +1,6 @@
+import { ServiceError } from "@workspace/shared";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-
-import { ServiceError } from "@workspace/shared";
 
 import { getUserServiceEnv } from "../config/env.js";
 import prismaClient from "../prisma/index.js";
@@ -11,8 +10,28 @@ interface LoginRequest {
   password: string;
 }
 
+export interface LoginResult {
+  id: string;
+  name: string;
+  login: string;
+  permission: number;
+  department_id: string;
+  organization_id: string;
+  token: string;
+}
+
+export interface FirstCreateResult {
+  user: {
+    id: string;
+    name: string;
+    login: string;
+    permission: number;
+    department_id: string;
+  };
+}
+
 class AuthService {
-  async login({ login, password }: LoginRequest) {
+  async login({ login, password }: LoginRequest): Promise<LoginResult> {
     const user = await prismaClient.user.findFirst({
       where: { login },
       include: { department: { select: { organization_id: true } } },
@@ -60,7 +79,7 @@ class AuthService {
     };
   }
 
-  async firstCreate() {
+  async firstCreate(): Promise<FirstCreateResult> {
     const userExists = await prismaClient.user.findFirst();
     if (userExists) {
       throw new ServiceError(409, "Login já cadastrado");
@@ -103,7 +122,10 @@ class AuthService {
       return { user };
     } catch (err: unknown) {
       const isUniqueViolation =
-        err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002";
+        err &&
+        typeof err === "object" &&
+        "code" in err &&
+        (err as { code: string }).code === "P2002";
       if (isUniqueViolation) {
         throw new ServiceError(409, "Login já cadastrado");
       }

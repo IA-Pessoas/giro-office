@@ -20,20 +20,35 @@ alwaysApply: true
 - Line width: 100
 - Semicolons sempre
 
+## Logging (`@workspace/shared`)
+
+Imports: `debug`, `info`, `warn`, `error` de `@workspace/shared` (logger baseado em Pino). Assinatura: `(message: string, context?: Record<string, unknown>)`. Opcional: `import { error as logError }` quando `error` conflitar com nome de variável (ex.: `catch (err)`).
+
+| Nível | Uso |
+|-------|-----|
+| **`debug`** | Detalhe de diagnóstico em desenvolvimento (fluxos internos, payloads não sensíveis, ramos raros). Em produção só aparece se `LOG_LEVEL` permitir. |
+| **`info`** | Eventos esperados e rastreáveis: início/fim de operação relevante, decisões de negócio auditáveis em alto nível; requisições HTTP completas quando usar helpers como `httpRequest`. |
+| **`warn`** | Situação anormal mas recuperável: retry, fallback, validação que não quebra o fluxo, recurso próximo do limite. |
+| **`error`** | Falha que exige atenção: exceções em `catch`, falha de I/O, erro de integração, estado inconsistente. Em rotas/middlewares/services, no `catch` usar **`error` / `logError` como primeira linha útil** antes de ramificar (`ServiceError` re-lançado também pode ser logado para diagnóstico). |
+
+**Serviços com `createLogger`**: preferir o logger da instância (`logger.info`, `logger.error`, …) para incluir `service`/`env` no `base`; as funções globais acima usam o logger padrão (`LOG_SERVICE`, `LOG_LEVEL`).
+
 ## Tratamento de erros
-- Usar `ServiceError` do @workspace/shared para erros de negócio
-- Usar `logError` (error do shared) para logging
-- Em rotas: try/catch, logError e next(err)
-- Em services: `if (err instanceof ServiceError) throw err` antes de re-throw genérico
+- Usar `ServiceError` do @workspace/shared para erros HTTP 4xx/5xx (validação, negócio, não encontrado, etc.). O construtor é `new ServiceError(statusCode, message?, cause?)`; o campo `code` (ex.: `BAD_REQUEST` para 400) é derivado do status — **não** duplicar `code`/`success`/`error` manualmente em JSON.
+- **Rotas**: `try`/`catch` com `error`/`logError` e `next(err)` para erros não tratados; para condições esperadas (parâmetro obrigatório ausente, regra de negócio), **preferir `throw new ServiceError(400, "mensagem")`** em vez de `res.status(400).json({ success: false, error: "...", code: "..." })`, para uma única forma de resposta de erro via handler global.
+- **Middlewares**: no `catch`, chamar `error`/`logError` **no início do bloco**, **antes** de `if (err instanceof ServiceError)` ou outros ramos — todo erro passa pelo log de diagnóstico; em seguida encaminhar com `next(err)` ou encapsular.
+- **Services**: no `catch`, mesma ordem — `error`/`logError` primeiro, depois `if (err instanceof ServiceError) throw err`, depois `throw new ServiceError(500, …)` se aplicável.
 
 ## Respostas da API
-- Usar `createSuccessResponse` do @workspace/shared para respostas JSON
+- Sucesso: `createSuccessResponse` do @workspace/shared para JSON de sucesso.
+- Erro: deixar o handler de erro serializar (via `ServiceError` / `serializeError`); não montar corpo de erro à mão nas rotas salvo exceção documentada no projeto.
 
 ## Arquitetura e Estrutura
 
 - **Microservices**: O projeto está em refatoração para microservices. O padrão de estrutura está em `services/`.
-- **Serviços atuais**: user-service, audit-service, organization-service, gateway (cada um em `services/<nome>/src/`).
+- **Serviços atuais**: user-service, audit-service, organization-service, rh-service,task-service, gateway (cada um em `services/<nome>/src/`).
 - **Legado**: A estrutura monorepo antiga (ex: `services/src`, `app`, etc.) não deve mais ser usada como referência.
 - **Novos serviços**: Seguir o padrão dos microservices existentes em `services/`.
 - Código compartilhado em `shared`.
 - Rotas orquestram services; services não chamam rotas.
+- **Services (TypeScript)**: métodos públicos de service com tipo de retorno explícito; detalhes em `typescript-services.mdc`.
