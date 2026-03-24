@@ -8,6 +8,7 @@ import "express-async-errors";
 
 import { getTaskServiceEnv } from "./config/env.js";
 import { taskDependentRoutes } from "./routes/task-dependent.routes.js";
+import { taskIntegrationRegularizeRoutes } from "./routes/task-integration-regularize.routes.js";
 import { taskModelRoutes } from "./routes/task-model.routes.js";
 
 const env = getTaskServiceEnv();
@@ -29,6 +30,7 @@ app.get("/health", (_req, res) => {
 
 app.use(taskModelRoutes);
 app.use(taskDependentRoutes);
+app.use(taskIntegrationRegularizeRoutes);
 
 app.use(
   createExpressErrorHandler({
