@@ -16,7 +16,7 @@ interface ClientTrendsChartProps {
 }
 
 export function ClientTrendsChart({ data }: ClientTrendsChartProps) {
-  const textColor = '#334155';
+  const textColor = 'var(--dashboard-text-color, #334155)';
   const gridColor = '#e2e8f0';
   const areaColor = '#2f406a';
   const lineColor = '#d0ab70';

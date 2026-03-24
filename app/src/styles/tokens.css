@@ -26,12 +26,14 @@
   --shadows-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadows-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadows-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --dashboard-text-color: #334155;
 }
 
 [data-theme="dark"],
 .chakra-ui-dark {
   /* Keep typography in the same gold tone used by the dark sidebar */
   --colors-blue-500: var(--colors-gold-500);
+  --dashboard-text-color: var(--colors-gold-500);
   /* Use the exact same dark blue tone used by the sidebar across all surfaces */
   --colors-surface-dark: #010e30ff;
   --colors-surface-dark-soft: #010e30ff;

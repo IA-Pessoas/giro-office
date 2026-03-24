@@ -436,13 +436,26 @@ body {
 /* Dark-mode typographic refinement: softer golden secondary text */
 html[data-theme="dark"] .text-slate-500,
 html[data-theme="dark"] .text-slate-400,
+html[data-theme="dark"] .text-slate-700,
+html[data-theme="dark"] .text-slate-800,
 html[data-theme="dark"] .text-gray-500,
 html[data-theme="dark"] .text-gray-400,
 .chakra-ui-dark .text-slate-500,
 .chakra-ui-dark .text-slate-400,
+.chakra-ui-dark .text-slate-700,
+.chakra-ui-dark .text-slate-800,
 .chakra-ui-dark .text-gray-500,
 .chakra-ui-dark .text-gray-400 {
     color: var(--colors-text-secondary-dark) !important;
+}
+
+html[data-theme="dark"] .dashboard-shell,
+html[data-theme="dark"] .dashboard-card-title,
+html[data-theme="dark"] .dashboard-card-subtitle,
+.chakra-ui-dark .dashboard-shell,
+.chakra-ui-dark .dashboard-card-title,
+.chakra-ui-dark .dashboard-card-subtitle {
+    color: var(--colors-gold-500) !important;
 }
 
 html[data-theme="dark"] .ui-input::placeholder,

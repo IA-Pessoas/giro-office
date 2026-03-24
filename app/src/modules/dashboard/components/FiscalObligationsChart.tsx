@@ -23,7 +23,7 @@ const STATUS_LABEL: Record<FiscalObligationStatus, string> = {
 };
 
 export function FiscalObligationsChart({ data }: FiscalObligationsChartProps) {
-  const textColor = '#334155';
+  const textColor = 'var(--dashboard-text-color, #334155)';
   const gridColor = '#e2e8f0';
   const pendingColor = '#2f406a';
   const issuedColor = '#48BB78';
