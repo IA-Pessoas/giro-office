@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { Button } from '@chakra-ui/react';
+import styles from './redirect.module.css';
 
 export function Redirect ({ nome, rota }) {
   const router = useRouter();
@@ -15,6 +15,8 @@ export function Redirect ({ nome, rota }) {
   };
 
   return (
-      <Button onClick={gerarPDFGeral}>{nome}</Button>
+      <button type="button" className={styles.button} onClick={gerarPDFGeral}>
+        {nome}
+      </button>
     );
 };
