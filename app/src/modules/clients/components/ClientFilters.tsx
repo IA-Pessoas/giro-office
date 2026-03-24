@@ -31,7 +31,7 @@ export function ClientFilters({ initialLabel, perm, onFilterChange, onSearchChan
       </div>
 
       <div className="u-flex w-full gap-3">
-        <details className="w-[90%] rounded-md border border-slate-200 bg-white">
+        <details className="w-[90%] rounded-md border border-slate-200 bg-white" aria-label="Menu de filtros de clientes">
           <summary className="u-flex cursor-pointer list-none items-center justify-between px-4 py-2 font-medium text-slate-700">
             <span className="truncate">Filtro: {initialLabel}</span>
             <IoIosArrowForward />
@@ -78,6 +78,7 @@ export function ClientFilters({ initialLabel, perm, onFilterChange, onSearchChan
           className="u-flex w-[5%] items-center justify-center rounded-md border border-slate-200 hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]"
           onClick={onOpenCreateModal}
           aria-label="Novo Cliente"
+          title="Cadastrar cliente"
         >
           <CiCirclePlus size={30} />
         </button>
