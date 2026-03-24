@@ -21,7 +21,7 @@ export function ClientList({ clients, onSelect }: ListProps) {
   return (
     <section className={`w-full overflow-y-auto bg-white ${isDesktop ? 'h-full p-0' : 'h-[calc(100vh-220px)] p-2'}`}>
       {isDesktop && (
-        <header className="clients-table-header u-grid-clients-desktop w-full px-4 py-2">
+        <header className="clients-table-header grid w-full grid-cols-[1fr_4fr_3fr_2fr] gap-4 px-4 py-2">
           <p className="font-bold text-[var(--colors-blue-500)]">Código</p>
           <p className="font-bold text-[var(--colors-blue-500)]">Razão Social</p>
           <p className="font-bold text-[var(--colors-blue-500)]">Nome Fantasia</p>
@@ -35,7 +35,7 @@ export function ClientList({ clients, onSelect }: ListProps) {
             isDesktop ? (
               <article
                 key={client.id}
-                className="clients-table-row u-grid-clients-desktop w-full cursor-pointer items-center px-4 py-3"
+                className="clients-table-row grid w-full cursor-pointer grid-cols-[1fr_4fr_3fr_2fr] items-center gap-4 px-4 py-3"
                 onClick={() => onSelect(client.id)}
                 role="button"
                 tabIndex={0}
