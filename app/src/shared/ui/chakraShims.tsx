@@ -5,6 +5,13 @@ type AnyProps = Record<string, any>;
 
 const resolveResponsive = (v: any) => {
   if (v && typeof v === 'object' && ('base' in v || 'md' in v || 'lg' in v)) {
+    // Mimic Chakra's default breakpoints used in this migration:
+    // base < 768, md >= 768, lg >= 1024
+    if (typeof window !== 'undefined') {
+      const width = window.innerWidth;
+      if (width >= 1024 && v.lg !== undefined) return v.lg;
+      if (width >= 768 && v.md !== undefined) return v.md;
+    }
     return v.base ?? v.md ?? v.lg;
   }
   return v;
