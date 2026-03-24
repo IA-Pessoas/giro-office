@@ -57,14 +57,6 @@ export function ClientList({ clients, onSelect }: ListProps) {
                 className="mb-2 w-full cursor-pointer rounded-md bg-white"
                 style={{ borderLeft: `4px solid ${client.status.toLowerCase() === 'ativo' ? '#4ade80' : '#facc15'}` }}
                 onClick={() => onSelect(client.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onSelect(client.id);
-                  }
-                }}
               >
                 <div className="p-3">
                   <div className="u-flex u-justify-between u-items-center">
