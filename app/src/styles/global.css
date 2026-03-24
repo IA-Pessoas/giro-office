@@ -433,6 +433,60 @@ body {
   margin-right: 8px;
 }
 
+/* Dark-mode typographic refinement: softer golden secondary text */
+html[data-theme="dark"] .text-slate-500,
+html[data-theme="dark"] .text-slate-400,
+html[data-theme="dark"] .text-gray-500,
+html[data-theme="dark"] .text-gray-400,
+.chakra-ui-dark .text-slate-500,
+.chakra-ui-dark .text-slate-400,
+.chakra-ui-dark .text-gray-500,
+.chakra-ui-dark .text-gray-400 {
+    color: var(--colors-text-secondary-dark) !important;
+}
+
+html[data-theme="dark"] .ui-input::placeholder,
+.chakra-ui-dark .ui-input::placeholder {
+    color: var(--colors-text-muted-dark);
+}
+
+/* Dark-mode surface background: default system blue */
+html[data-theme="dark"],
+html[data-theme="dark"] body,
+.chakra-ui-dark,
+.chakra-ui-dark body {
+    background: var(--colors-surface-dark);
+}
+
+html[data-theme="dark"] .users-sidebar,
+html[data-theme="dark"] .clients-sidebar,
+html[data-theme="dark"] .organizations-sidebar,
+html[data-theme="dark"] .users-detail-panel,
+html[data-theme="dark"] .dashboard-card,
+html[data-theme="dark"] .ui-surface,
+html[data-theme="dark"] .ui-panel,
+html[data-theme="dark"] .clients-table-header,
+html[data-theme="dark"] .clients-table-row,
+html[data-theme="dark"] .ui-input,
+.chakra-ui-dark .users-sidebar,
+.chakra-ui-dark .clients-sidebar,
+.chakra-ui-dark .organizations-sidebar,
+.chakra-ui-dark .users-detail-panel,
+.chakra-ui-dark .dashboard-card,
+.chakra-ui-dark .ui-surface,
+.chakra-ui-dark .ui-panel,
+.chakra-ui-dark .clients-table-header,
+.chakra-ui-dark .clients-table-row,
+.chakra-ui-dark .ui-input {
+    background: var(--colors-surface-dark-soft) !important;
+    border-color: color-mix(in srgb, var(--colors-gold-500) 30%, transparent) !important;
+}
+
+html[data-theme="dark"] .clients-table-row:hover,
+.chakra-ui-dark .clients-table-row:hover {
+    background: color-mix(in srgb, var(--colors-brand-blue) 78%, #ffffff 22%) !important;
+}
+
 @media (max-width: 800px) {
     .main {
         margin-left: 0px;
