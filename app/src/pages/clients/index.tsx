@@ -61,9 +61,9 @@ export default function clients({ clients, permList }: Props) {
                 <title>Clientes</title>
             </Head>
 
-            <section className="clients-shell u-split-panel relative">
+            <section className="users-shell u-split-panel relative">
                 <aside
-                    className={`clients-sidebar group relative z-20 flex flex-col items-center justify-center overflow-hidden transition-all duration-300 md:h-[95vh] ${isDesktopListCollapsed ? 'md:absolute md:w-[80px] md:min-w-[80px]' : 'md:w-[90%] md:min-w-[90%]'}`}
+                    className={`users-sidebar group relative z-20 flex flex-col items-center justify-center overflow-hidden transition-all duration-300 md:h-[95vh] ${isDesktopListCollapsed ? 'md:absolute md:w-[80px] md:min-w-[80px]' : 'md:w-[90%] md:min-w-[90%]'}`}
                 >
                     <div className={`absolute hidden h-20 w-20 items-center justify-center transition-opacity md:flex ${isDesktopListCollapsed ? 'opacity-100 group-hover:opacity-0' : 'opacity-0'}`}>
                         <FaUsers size={28} color="var(--colors-blue-500)" />
