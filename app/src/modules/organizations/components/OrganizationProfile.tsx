@@ -60,7 +60,7 @@ export function OrganizationProfile({ organizationId }: OrganizationProfileProps
 
   return (
     <div className="p-6">
-      <div className="u-stack u-gap-4">
+      <div className="u-content-stack">
         <div className="u-flex u-justify-between u-items-center">
           <p className="text-2xl font-bold text-[var(--colors-blue-500)]">
             {organization.name}

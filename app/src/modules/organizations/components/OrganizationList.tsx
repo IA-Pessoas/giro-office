@@ -9,7 +9,7 @@ interface OrganizationListProps {
 export function OrganizationList({ organizations, onOrganizationSelect }: OrganizationListProps) {
   return (
     <div className="h-[170px] w-full overflow-x-auto overflow-y-hidden bg-white p-2 md:h-full md:overflow-x-hidden md:overflow-y-auto">
-      <div className="u-horizontal-scroll-cards">
+      <div className="u-sidebar-card-list">
         {organizations.length > 0 ? (
           organizations.map((org) => (
             <article
