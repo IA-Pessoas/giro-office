@@ -1,9 +1,6 @@
 import { useState, useContext } from "react"
 import Head from "next/head"
-import Image from "next/image"
-import { Flex, Center, Text, Input, Button } from "@chakra-ui/react"
-
-import { setupAPIClient } from "@shared/services/api"
+import styles from "./LoginPage.module.css"
 
 import { AuthContext } from "../../context/AuthContext"
 import { canSSRGuest } from "@modules/auth"
@@ -36,56 +33,36 @@ export default function Login() {
             <Head>
                 <title>Login - cw</title>
             </Head>
-            <Flex background={"main.900"} height="100vh" alignItems="center" justifyContent="center" >
-                
-                <Flex width={640} direction="column" p={14} rounded={8}>
-                    <Center p={4}>
-                        <Text 
-                            fontSize={100}    
-                            color='orange.900'
-                        >
-                            cw
-                        </Text>
-                    </Center>
+            <div className={styles.page}>
+                <div className={styles.card}>
+                    <div className={styles.logoWrap}>
+                        <p className={styles.logoText}>cw</p>
+                    </div>
 
-                    <Input
-                        background="main.400"
-                        variant="filled"
-                        size="lg"
+                    <input
+                        className={styles.input}
                         placeholder="Digite seu Login"
                         type="text"
-                        mb={3}
                         value={login}
                         onChange={ (e) => setLogin(e.target.value) }
-                        onKeyPress={handleKeyPress}
+                        onKeyDown={handleKeyPress}
                     />
 
-                    <Input
-                        background="main.400"
-                        variant="filled"
-                        size="lg"
+                    <input
+                        className={styles.input}
                         placeholder="Digite sua senha"
                         type="password"
-                        mb={6}
                         value={password}
                         onChange={ (e) => setPassword(e.target.value) }
-                        onKeyPress={handleKeyPress}
+                        onKeyDown={handleKeyPress}
                     />
 
-                    <Button 
-                        background="button.cta"
-                        mb={6}
-                        color="grey.900"
-                        size="lg"
-                        _hover={{ bg: "#ffb13e" }}
-                        onClick={handleLogin}
-                    >
+                    <button className={styles.button} onClick={handleLogin}>
                         Acessar
-                    </Button>
+                    </button>
 
-                </Flex>
-
-            </Flex>
+                </div>
+            </div>
         </>
     )
 }
