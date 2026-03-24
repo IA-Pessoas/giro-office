@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'; // Importar hooks
 import Image from "next/image";
 import { useRouter } from "next/router";
-import { Link as ChakraLink, Box, IconButton, useColorMode, Text, Tooltip, VStack, HStack, Flex, Icon, Divider } from "@chakra-ui/react";
+import { Link as ChakraLink, Box, IconButton, Text, Tooltip, VStack, HStack, Flex, Icon, Divider } from "@chakra-ui/react";
 import { IconType } from "react-icons";
 import { FiHome, FiUser, FiUsers, FiLogOut, FiSettings } from "react-icons/fi";
 import { FiMessageSquare } from "react-icons/fi";
 import { useChat } from "../../context/ChatContext";
 import { useAuth } from "../../context/AuthContext";
-import { MoonIcon, SunIcon } from "@chakra-ui/icons";
+import { FiMoon, FiSun } from "react-icons/fi";
 import { setupAPIClient } from '@shared/services/api';
 
 // Dados estáticos fora do componente
@@ -144,6 +144,7 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
   const router = useRouter();
   const { logoutUser } = useAuth();
   const [perms, setPerms] = useState<any>(null);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     async function fetchPerms() {
@@ -178,7 +179,17 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
   
   const { totalUnreadCount } = useChat();
 
-  const { colorMode, toggleColorMode } = useColorMode();
+  useEffect(() => {
+    const current = document.documentElement.getAttribute("data-theme");
+    setTheme(current === "dark" ? "dark" : "light");
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("chakra-ui-color-mode", next);
+  };
 
   const navLinks = filteredNavItems.map((item) => (
     <NavItem
@@ -311,9 +322,9 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
             )}
           </NavItemAction>
           <NavItemAction
-            label={colorMode === 'light' ? 'Modo Escuro' : 'Modo Claro'}
-            icon={colorMode === 'light' ? MoonIcon : SunIcon}
-            onClick={toggleColorMode}
+            label={theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}
+            icon={theme === 'light' ? FiMoon : FiSun}
+            onClick={toggleTheme}
           />
           <Divider borderColor="borderColor" opacity={.5} my={4} />
           <NavItemAction
