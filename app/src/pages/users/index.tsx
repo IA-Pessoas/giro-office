@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import Head from 'next/head';
-import { useDisclosure } from '@chakra-ui/react';
 import { toast } from "react-toastify";
 import { FaUsers } from 'react-icons/fa';
 
@@ -18,8 +17,10 @@ export default function Users({ users, deps, me }: Props) {
   const [filterStatus, setFilterStatus] = useState('Ativo');
   const [isListLoading, setIsListLoading] = useState(false);
 
-  // Controle do Modal
-  const { isOpen: isModalOpen, onOpen: onModalOpen, onClose: onModalClose } = useDisclosure();
+  // Controle do Modal sem Chakra
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const onModalOpen = () => setIsModalOpen(true);
+  const onModalClose = () => setIsModalOpen(false);
 
   const isDesktopListCollapsed = !!selectedUserId;
 
