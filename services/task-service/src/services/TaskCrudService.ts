@@ -1,6 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
+import type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracao-task.js";
+import type { ProspectingStatus } from "../constants/prospecting-status.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
-
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 
@@ -79,13 +80,18 @@ export type TaskDetailRow = TaskGetPayload<{ select: typeof TASK_DETAIL_SELECT }
 export type TaskCreateRow = TaskGetPayload<{ select: typeof TASK_CREATE_SELECT }>;
 export type TaskListRow = TaskGetPayload<{ select: typeof TASK_LIST_SELECT }>;
 
+export type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracao-task.js";
+export { INTEGRACAO_TASK_STATUS_VALUES } from "../constants/integracao-task.js";
+export type { ProspectingStatus } from "../constants/prospecting-status.js";
+export { PROSPECTING_STATUS_VALUES } from "../constants/prospecting-status.js";
+
 export interface CreateTaskCrudRequest {
   user_id: string;
   organization_id: string;
   model_id: string;
   project_id: string;
   client_id: string;
-  prospecting_status: string;
+  prospecting_status: ProspectingStatus;
   observations: string;
   urgency: string;
 }
@@ -96,10 +102,10 @@ export interface UpdateTaskCrudRequest {
   organization_id: string;
   task_id: string;
   name?: string;
-  status?: string;
+  status?: IntegracaoTaskStatus;
   department_id?: string;
   observations?: string;
-  billing?: string;
+  billing?: TaskBilling;
   urgency?: string;
   responsible_id?: string;
   responsible2_id?: string | null;

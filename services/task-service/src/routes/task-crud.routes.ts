@@ -1,8 +1,15 @@
-import { createSuccessResponse, error as logError, ServiceError } from "@workspace/shared";
+import {
+  createSuccessResponse,
+  error as logError,
+  parseWithZod,
+  ServiceError,
+} from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { TaskCrudService, type UpdateTaskCrudRequest } from "../services/TaskCrudService.js";
+import { integracaoTaskCreateBodySchema } from "../schemas/integracao-task-create.schema.js";
+import { integracaoTaskUpdateBodySchema } from "../schemas/integracao-task-update.schema.js";
+import { TaskCrudService } from "../services/TaskCrudService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const taskCrudService = new TaskCrudService();
@@ -16,87 +23,23 @@ function requireAuthContext(req: Request): { user_id: string; organization_id: s
   return { user_id, organization_id };
 }
 
-/** Campos opcionais vindos do JSON; chave ausente = não altera o valor no banco. */
-function parseIntegracaoTaskUpdateBody(
-  body: Record<string, unknown>,
-): Omit<UpdateTaskCrudRequest, "user_id" | "organization_id" | "task_id"> {
-  const patch: Omit<UpdateTaskCrudRequest, "user_id" | "organization_id" | "task_id"> = {};
-  if ("name" in body) {
-    patch.name = String(body.name ?? "");
-  }
-  if ("status" in body) {
-    patch.status = String(body.status ?? "");
-  }
-  if ("department_id" in body) {
-    patch.department_id = String(body.department_id ?? "");
-  }
-  if ("observations" in body) {
-    patch.observations = String(body.observations ?? "");
-  }
-  if ("billing" in body) {
-    patch.billing = String(body.billing ?? "");
-  }
-  if ("urgency" in body) {
-    patch.urgency = String(body.urgency ?? "");
-  }
-  if ("responsible_id" in body) {
-    patch.responsible_id = String(body.responsible_id ?? "");
-  }
-  if ("responsible2_id" in body) {
-    const v = body.responsible2_id;
-    patch.responsible2_id = v === null ? null : String(v);
-  }
-  if ("responsible3_id" in body) {
-    const v = body.responsible3_id;
-    patch.responsible3_id = v === null ? null : String(v);
-  }
-  if ("prevision_date" in body) {
-    const v = body.prevision_date;
-    if (v === null) {
-      patch.prevision_date = null;
-    } else if (v instanceof Date) {
-      patch.prevision_date = v;
-    } else if (typeof v === "string") {
-      patch.prevision_date = v;
-    } else {
-      throw new ServiceError(400, "prevision_date deve ser string ISO, Date ou null.");
-    }
-  }
-  return patch;
-}
-
 router.post(
   "/integracao-tasks",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { model_id, project_id, client_id, prospecting_status, observations, urgency } =
-        req.body;
       const { user_id, organization_id } = requireAuthContext(req);
-
-      if (
-        !model_id ||
-        !project_id ||
-        !client_id ||
-        prospecting_status === undefined ||
-        observations === undefined ||
-        urgency === undefined
-      ) {
-        throw new ServiceError(
-          400,
-          "Campos obrigatórios: model_id, project_id, client_id, prospecting_status, observations, urgency.",
-        );
-      }
+      const body = parseWithZod(integracaoTaskCreateBodySchema, req.body);
 
       const result = await taskCrudService.createTask({
         user_id,
         organization_id,
-        model_id,
-        project_id,
-        client_id,
-        prospecting_status: String(prospecting_status),
-        observations: String(observations),
-        urgency: String(urgency),
+        model_id: body.model_id,
+        project_id: body.project_id,
+        client_id: body.client_id,
+        prospecting_status: body.prospecting_status,
+        observations: body.observations,
+        urgency: body.urgency,
       });
 
       res.status(201).json(createSuccessResponse(result));
@@ -146,20 +89,9 @@ router.put(
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const body = req.body as Record<string, unknown>;
-      const rawTaskId = body.task_id;
       const { user_id, organization_id } = requireAuthContext(req);
-
-      if (
-        rawTaskId === undefined ||
-        rawTaskId === null ||
-        (typeof rawTaskId === "string" && rawTaskId.trim() === "")
-      ) {
-        throw new ServiceError(400, "task_id é obrigatório.");
-      }
-
-      const task_id = String(rawTaskId);
-      const patch = parseIntegracaoTaskUpdateBody(body);
+      const parsed = parseWithZod(integracaoTaskUpdateBodySchema, req.body);
+      const { task_id, ...patch } = parsed;
 
       const result = await taskCrudService.updateTask({
         user_id,
