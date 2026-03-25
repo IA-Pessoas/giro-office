@@ -2,16 +2,15 @@ import {
   createSuccessResponse,
   error as logError,
   parseIsoDate,
+  parseWithZod,
   ServiceError,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   approveAdjustmentBodySchema,
   createAdjustmentRequestBodySchema,
-  parseWithZod,
 } from "../schemas/timeClockRequest.schemas.js";
 import { TimeClockRequestService } from "../services/timeClockRequestService.js";
 
@@ -19,7 +18,7 @@ const router: ReturnType<typeof Router> = Router();
 const timeClockRequestService = new TimeClockRequestService();
 
 router.post(
-  "/point/adjustment/request",
+  "/adjustment/request",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -33,8 +32,7 @@ router.post(
       }
 
       const parsed = parseWithZod(createAdjustmentRequestBodySchema, req.body);
-      const lunchInRaw = parsed.lunch_in ?? parsed.launch_in;
-      const lunch_in = parseIsoDate(lunchInRaw, "lunch_in");
+      const lunch_in = parseIsoDate(parsed.lunch_in, "lunch_in");
 
       const result = await timeClockRequestService.create({
         user_id: userId,
@@ -57,7 +55,7 @@ router.post(
 );
 
 router.put(
-  "/point/adjustment/approve",
+  "/adjustment/approve",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
