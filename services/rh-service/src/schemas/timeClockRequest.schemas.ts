@@ -6,7 +6,7 @@ export const createAdjustmentRequestBodySchema = z
     point_id: zNonEmptyText("point_id"),
     clock_in: zIsoDate("clock_in"),
     lunch_out: zIsoDate("lunch_out"),
-    lunch_in: z.unknown().optional(),
+    lunch_in: zIsoDate("lunch_in"),
     clock_out: zIsoDate("clock_out"),
     justification: zNonEmptyText("justification"),
     attachment: z
