@@ -1,14 +1,191 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter,
-    FormControl, FormLabel, Input, Select, Button, Textarea, Flex, SimpleGrid,
-    Divider, Heading, Table, Thead, Tbody, Tr, Th, Td, IconButton, Checkbox, Box, Text
-} from '@chakra-ui/react';
 import { IoAdd, IoTrash } from "react-icons/io5";
 import { toast } from 'react-toastify';
 import { setupAPIClient } from '@shared/services/api';
 import { integracaoService } from '../services/integracaoService';
 import type { TaskModel, TaskDependent } from '../types';
+
+// --- Chakra shims local (para remover dependência de @chakra-ui/react sem reescrever toda a UI) ---
+// Observação: estes shims aplicam apenas um subconjunto de estilo via inline; a lógica/estrutura permanece.
+type AnyProps = Record<string, any>;
+
+const Modal = ({ isOpen, children }: AnyProps) => {
+    if (!isOpen) return null;
+    return <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>{children}</div>;
+};
+const ModalOverlay = () => (
+    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
+);
+const ModalContent = ({ children, ...rest }: AnyProps) => (
+    <div
+        style={{
+            position: 'relative',
+            margin: '5vh auto',
+            maxWidth: rest.maxW ?? 800,
+            background: '#fff',
+            color: '#0f172a',
+            borderRadius: 12,
+            overflow: 'hidden',
+        }}
+    >
+        {children}
+    </div>
+);
+const ModalHeader = ({ children, ...rest }: AnyProps) => (
+    <div style={{ padding: '1rem', fontWeight: 800, borderBottom: '1px solid #e2e8f0' }}>{children}</div>
+);
+const ModalBody = ({ children, ...rest }: AnyProps) => <div style={{ padding: '1rem' }}>{children}</div>;
+const ModalFooter = ({ children, ...rest }: AnyProps) => <div style={{ padding: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>{children}</div>;
+
+const Box = ({ children, style, ...props }: AnyProps) => (
+    <div style={{ ...(style ?? {}), ...(props.style ?? {}) }} {...props}>
+        {children}
+    </div>
+);
+const Text = ({ children, style, ...props }: AnyProps) => (
+    <p style={{ margin: 0, ...(style ?? {}) }} {...props}>
+        {children}
+    </p>
+);
+const Heading = ({ children, style, ...props }: AnyProps) => (
+    <h3 style={{ margin: 0, fontWeight: 800, ...(style ?? {}) }} {...props}>
+        {children}
+    </h3>
+);
+
+const Flex = ({ children, style, direction, gap, ...props }: AnyProps) => {
+    const flexDirection = direction || props.flexDirection;
+    return (
+        <div
+            style={{
+                display: 'flex',
+                flexDirection: flexDirection ?? 'row',
+                gap: typeof gap === 'number' ? `${gap}px` : gap,
+                ...(style ?? {}),
+            }}
+            {...props}
+        >
+            {children}
+        </div>
+    );
+};
+
+const SimpleGrid = ({ children, columns, ...props }: AnyProps) => {
+    // columns pode ser número ou objeto { base, md }
+    const cols =
+        typeof columns === 'number'
+            ? columns
+            : columns?.md ?? columns?.base ?? 2;
+    return (
+        <div
+            style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                gap: 12,
+            }}
+        >
+            {children}
+        </div>
+    );
+};
+
+const Divider = () => <hr style={{ border: 0, borderTop: '1px solid #e2e8f0', margin: '0.75rem 0' }} />;
+
+const FormControl = ({ children, isRequired, ...props }: AnyProps) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {children}
+    </div>
+);
+const FormLabel = ({ children, ...props }: AnyProps) => (
+    <label style={{ fontWeight: 700, fontSize: '0.9rem' }}>{children}</label>
+);
+
+const Input = React.forwardRef<HTMLInputElement, AnyProps>(({ style, ...props }, ref) => (
+    <input
+        ref={ref}
+        style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 8, padding: '0.55rem 0.7rem', ...(style ?? {}) }}
+        {...props}
+    />
+));
+Input.displayName = 'InputShim';
+
+const Select = React.forwardRef<HTMLSelectElement, AnyProps>(({ style, ...props }, ref) => (
+    <select
+        ref={ref}
+        style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 8, padding: '0.55rem 0.7rem', background: '#fff', ...(style ?? {}) }}
+        {...props}
+    />
+));
+Select.displayName = 'SelectShim';
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, AnyProps>(({ style, ...props }, ref) => (
+    <textarea
+        ref={ref}
+        style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 8, padding: '0.55rem 0.7rem', ...(style ?? {}) }}
+        {...props}
+    />
+));
+Textarea.displayName = 'TextareaShim';
+
+const Button = ({ children, style, isLoading, isDisabled, disabled, ...props }: AnyProps) => (
+    <button
+        type={props.type ?? 'button'}
+        disabled={disabled || isDisabled || isLoading}
+        onClick={props.onClick}
+        style={{
+            border: '1px solid transparent',
+            borderRadius: 8,
+            padding: '0.6rem 0.85rem',
+            background: props.bg ?? '#ef5a8b',
+            color: props.color ?? '#fff',
+            cursor: disabled || isDisabled || isLoading ? 'not-allowed' : 'pointer',
+            opacity: disabled || isDisabled || isLoading ? 0.7 : 1,
+            ...(style ?? {}),
+        }}
+        {...props}
+    >
+        {isLoading ? '...' : children}
+    </button>
+);
+
+const IconButton = ({ children, icon, ...props }: AnyProps) => (
+    <button
+        type="button"
+        aria-label={props['aria-label']}
+        onClick={props.onClick}
+        style={{
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: props.colorScheme === 'red' ? '#dc2626' : '#2f406a',
+            padding: 4,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+        }}
+    >
+        {icon ?? children}
+    </button>
+);
+
+const Checkbox = ({ isChecked, onChange, ...props }: AnyProps) => (
+    <input type="checkbox" checked={!!isChecked} onChange={onChange} style={{ cursor: 'pointer' }} />
+);
+
+const Table = ({ children, ...props }: AnyProps) => (
+    <table style={{ width: '100%', borderCollapse: 'collapse' }} {...props}>
+        {children}
+    </table>
+);
+const Thead = ({ children, ...props }: AnyProps) => <thead>{children}</thead>;
+const Tbody = ({ children, ...props }: AnyProps) => <tbody>{children}</tbody>;
+const Tr = ({ children, ...props }: AnyProps) => <tr>{children}</tr>;
+const Th = ({ children, ...props }: AnyProps) => (
+    <th style={{ textAlign: 'left', padding: '0.5rem 0.35rem', borderBottom: '1px solid #e2e8f0' }}>{children}</th>
+);
+const Td = ({ children, ...props }: AnyProps) => (
+    <td style={{ textAlign: 'left', padding: '0.5rem 0.35rem', borderBottom: '1px solid #f1f5f9' }}>{children}</td>
+);
 
 interface ModalProps {
     isOpen: boolean;

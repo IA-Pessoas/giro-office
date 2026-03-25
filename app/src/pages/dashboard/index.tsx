@@ -1,34 +1,30 @@
-import React, { useState, ChangeEvent, useRef, FormEvent, useEffect } from 'react'
+import React from 'react'
 import Head from 'next/head'
-import {
-    useMediaQuery,
-    useDisclosure,
-} from '@chakra-ui/react'
 import 'react-toastify/dist/ReactToastify.css';
 
-import Navbar from "@shared/components/sidebar"
 import { canSSRAuth } from '@modules/auth'
+import { DashboardGrid, useDashboard } from '@modules/dashboard';
 import { setupAPIClient } from '@shared/services/api'
 
 export interface MeItem { id: string; name: string; permission: number; department_id: string; status: string; photo: string | null; }
 interface Props { me: MeItem; }
 
 export default function Dashboard({ me }: Props) {
-    const apiClient = setupAPIClient();
-    const [isLoading, setIsLoading] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [isMobile] = useMediaQuery("(max-width: 500px)")
-    const [isPortrait] = useMediaQuery("(orientation: portrait)")
-    const { isOpen, onOpen, onClose } = useDisclosure()
-    const initialRef = useRef<HTMLInputElement>(null)
-    const finalRef = useRef(null)
+    const { stats, isLoading, error } = useDashboard();
 
     return (
         <>
             <Head>
                 <title>Dashboard</title>
             </Head>
-
+            <main className="dashboard-shell u-stack u-gap-4 px-4 py-4 md:px-6">
+                <section className="dashboard-card">
+                    <h1 className="dashboard-card-title">Dashboard</h1>
+                    <p className="dashboard-card-subtitle">Bem-vindo, {me.name}.</p>
+                    {error ? <p className="mt-2 text-sm text-red-600">Falha ao carregar dados do dashboard.</p> : null}
+                </section>
+                <DashboardGrid stats={stats} isLoading={isLoading} />
+            </main>
         </>
     )
 }

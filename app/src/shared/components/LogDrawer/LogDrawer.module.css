@@ -1,0 +1,80 @@
+.trigger {
+  width: auto;
+  margin-top: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #fff;
+  cursor: pointer;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 1000;
+}
+
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(420px, 92vw);
+  height: 100%;
+  background: #fff;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+.closeBtn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  border: none;
+  background: transparent;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.header {
+  padding: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  font-weight: 700;
+}
+
+.body {
+  padding: 1rem;
+  overflow: auto;
+}
+
+.spinner {
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.logCard {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 0.5rem;
+}
+
+.logTitle {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+}
+
+.changes {
+  margin-top: 0.5rem;
+}
+
+.text {
+  margin: 0.2rem 0;
+  font-size: 0.9rem;
+  color: #334155;
+}

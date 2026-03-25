@@ -1,6 +1,7 @@
 packages:
   - "app"
   - "infra"
+  - "services/src"
   - "services/gateway"
   - "services/organization-service"
   - "services/audit-service"

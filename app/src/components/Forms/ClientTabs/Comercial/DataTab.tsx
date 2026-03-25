@@ -16,7 +16,7 @@ import {
     PopoverCloseButton,
     PopoverAnchor,  
     Select,
-} from '@chakra-ui/react';
+} from '@shared/ui/chakraShims';
 import { IoCreate } from 'react-icons/io5';
 import { toast } from 'react-toastify';
 import { setupAPIClient } from '@shared/services/api';

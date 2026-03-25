@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Box, Flex, FormControl, FormLabel, Input, Switch, SimpleGrid, Button, Heading,
     useDisclosure, Divider, Text, IconButton, Card, CardBody, Badge, Select
-} from '@chakra-ui/react';
+} from '@shared/ui/chakraShims';
 import { IoCreate, IoAddCircleOutline, IoPencil, IoFolderOpen } from "react-icons/io5";
 
 import LogDrawer from '@shared/components/LogDrawer';
