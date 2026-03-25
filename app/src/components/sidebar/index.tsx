@@ -240,17 +240,17 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
             w="full"
             h="60px"
             px={3}
-            my={1}
+            my={0}
             borderRadius="md"
             transition="all 0.3s ease"
           >
             <Flex align="center" justify="flex-start" w="full" minW="55px">
-              <Box flexShrink={0} display="flex" justifyContent="center" alignItems="center" w="60px">
+              <Box flexShrink={0} display="flex" justifyContent="center" alignItems="center" w="64px">
                 <Image
                   src={`/logos/lions/Castelo.webp`}
                   alt="Logo da Castelo"
-                  width={140}
-                  height={28}
+                  width={150}
+                  height={30}
                   style={{ objectFit: 'contain' }}
                 />
               </Box>
@@ -259,6 +259,7 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
                 fontSize="md"
                 fontWeight="bold"
                 whiteSpace="nowrap"
+                lineHeight="1"
                 opacity={0}
                 w={0}
                 pointerEvents="none"
@@ -274,7 +275,7 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
               </Text>
             </Flex>
           </Flex>
-          <Divider borderColor="borderColor" opacity={0.5} my={4} />
+          <Divider borderColor="borderColor" opacity={0.5} my={2} />
         </Box>
 
         <VStack

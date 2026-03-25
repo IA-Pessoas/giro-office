@@ -449,13 +449,102 @@ html[data-theme="dark"] .text-gray-400,
     color: var(--colors-text-secondary-dark) !important;
 }
 
-html[data-theme="dark"] .dashboard-shell,
+/* Dashboard (dark mode): cards stay white (like light), so use dark typography for contrast */
+html[data-theme="dark"] .dashboard-card,
+.chakra-ui-dark .dashboard-card {
+    background: var(--colors-white) !important;
+    border-color: color-mix(in srgb, var(--colors-black) 10%, transparent) !important;
+}
+
 html[data-theme="dark"] .dashboard-card-title,
+.chakra-ui-dark .dashboard-card-title {
+    color: #0f172a !important;
+}
+
 html[data-theme="dark"] .dashboard-card-subtitle,
-.chakra-ui-dark .dashboard-shell,
-.chakra-ui-dark .dashboard-card-title,
 .chakra-ui-dark .dashboard-card-subtitle {
-    color: var(--colors-gold-500) !important;
+    color: #334155 !important;
+}
+
+html[data-theme="dark"] .dashboard-shell .text-slate-800,
+.chakra-ui-dark .dashboard-shell .text-slate-800 {
+    color: #0f172a !important;
+}
+
+html[data-theme="dark"] .dashboard-shell .text-slate-500,
+.chakra-ui-dark .dashboard-shell .text-slate-500 {
+    color: #475569 !important;
+}
+
+/* Clients (dark mode): match dashboard (white surfaces + brand blue typography) */
+html[data-theme="dark"] .clients-shell,
+.chakra-ui-dark .clients-shell {
+    /* In dark mode, --colors-blue-500 is repurposed to gold for the sidebar.
+       Inside the Clients page we want the classic brand blue tone. */
+    --colors-blue-500: var(--colors-brand-blue);
+}
+
+html[data-theme="dark"] .clients-shell .clients-sidebar,
+html[data-theme="dark"] .clients-shell .clients-table-header,
+html[data-theme="dark"] .clients-shell .clients-table-row,
+.chakra-ui-dark .clients-shell .clients-sidebar,
+.chakra-ui-dark .clients-shell .clients-table-header,
+.chakra-ui-dark .clients-shell .clients-table-row {
+    background: var(--colors-white) !important;
+    border-color: color-mix(in srgb, var(--colors-black) 10%, transparent) !important;
+}
+
+html[data-theme="dark"] .clients-shell .ui-input,
+.chakra-ui-dark .clients-shell .ui-input {
+    background: var(--colors-white) !important;
+    color: #0f172a !important;
+    border-color: color-mix(in srgb, var(--colors-black) 16%, transparent) !important;
+}
+
+html[data-theme="dark"] .clients-shell .ui-input::placeholder,
+.chakra-ui-dark .clients-shell .ui-input::placeholder {
+    color: #64748b !important;
+}
+
+html[data-theme="dark"] .clients-shell .clients-table-header {
+    border-bottom-color: var(--colors-brand-blue) !important;
+}
+
+html[data-theme="dark"] .clients-shell .clients-table-row:hover,
+.chakra-ui-dark .clients-shell .clients-table-row:hover {
+    background: #f8fafc !important;
+}
+
+/* Organizations (dark mode): match dashboard/clients (white surfaces + brand blue typography) */
+html[data-theme="dark"] .organizations-shell,
+.chakra-ui-dark .organizations-shell {
+    --colors-blue-500: var(--colors-brand-blue);
+}
+
+html[data-theme="dark"] .organizations-shell .organizations-sidebar,
+html[data-theme="dark"] .organizations-shell .users-detail-panel,
+.chakra-ui-dark .organizations-shell .organizations-sidebar,
+.chakra-ui-dark .organizations-shell .users-detail-panel {
+    background: var(--colors-white) !important;
+    border-color: color-mix(in srgb, var(--colors-black) 10%, transparent) !important;
+}
+
+html[data-theme="dark"] .organizations-shell .ui-input,
+.chakra-ui-dark .organizations-shell .ui-input {
+    background: var(--colors-white) !important;
+    color: #0f172a !important;
+    border-color: color-mix(in srgb, var(--colors-black) 16%, transparent) !important;
+}
+
+html[data-theme="dark"] .organizations-shell .ui-input::placeholder,
+.chakra-ui-dark .organizations-shell .ui-input::placeholder {
+    color: #64748b !important;
+}
+
+html[data-theme="dark"] .organizations-shell .ui-button-primary,
+.chakra-ui-dark .organizations-shell .ui-button-primary {
+    background: var(--colors-brand-blue) !important;
+    color: var(--colors-white) !important;
 }
 
 html[data-theme="dark"] .ui-input::placeholder,
@@ -472,33 +561,22 @@ html[data-theme="dark"] body,
 }
 
 html[data-theme="dark"] .users-sidebar,
-html[data-theme="dark"] .clients-sidebar,
 html[data-theme="dark"] .organizations-sidebar,
 html[data-theme="dark"] .users-detail-panel,
-html[data-theme="dark"] .dashboard-card,
 html[data-theme="dark"] .ui-surface,
 html[data-theme="dark"] .ui-panel,
-html[data-theme="dark"] .clients-table-header,
-html[data-theme="dark"] .clients-table-row,
 html[data-theme="dark"] .ui-input,
 .chakra-ui-dark .users-sidebar,
-.chakra-ui-dark .clients-sidebar,
 .chakra-ui-dark .organizations-sidebar,
 .chakra-ui-dark .users-detail-panel,
-.chakra-ui-dark .dashboard-card,
 .chakra-ui-dark .ui-surface,
 .chakra-ui-dark .ui-panel,
-.chakra-ui-dark .clients-table-header,
-.chakra-ui-dark .clients-table-row,
 .chakra-ui-dark .ui-input {
     background: var(--colors-surface-dark-soft) !important;
     border-color: color-mix(in srgb, var(--colors-gold-500) 30%, transparent) !important;
 }
 
-html[data-theme="dark"] .clients-table-row:hover,
-.chakra-ui-dark .clients-table-row:hover {
-    background: color-mix(in srgb, var(--colors-brand-blue) 78%, #ffffff 22%) !important;
-}
+/* Clients hover handled inside .clients-shell override above */
 
 @media (max-width: 800px) {
     .main {
