@@ -6,6 +6,7 @@ import express, { type Request, type Response } from "express";
 import "express-async-errors";
 
 import { requestContext } from "./middlewares/requestContext.js";
+import holidayRoutes from "./routes/holiday.routes.js";
 import pointRoutes from "./routes/point.routes.js";
 import pointConfigRoutes from "./routes/point-config.routes.js";
 import timeClockRequestRoutes from "./routes/timeClockRequest.routes.js";
@@ -25,6 +26,7 @@ export function createApp(logger: Logger): express.Express {
   app.use("/rh", pointConfigRoutes);
   app.use("/rh", pointRoutes);
   app.use("/rh", timeClockRequestRoutes);
+  app.use("/rh", holidayRoutes);
 
   app.use(
     createExpressErrorHandler({

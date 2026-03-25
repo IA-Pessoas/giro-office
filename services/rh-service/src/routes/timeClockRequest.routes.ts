@@ -8,10 +8,10 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { parseWithZod } from "../schemas/rhGeneral.schemas.js";
 import {
   approveAdjustmentBodySchema,
   createAdjustmentRequestBodySchema,
-  parseWithZod,
 } from "../schemas/timeClockRequest.schemas.js";
 import { TimeClockRequestService } from "../services/timeClockRequestService.js";
 
@@ -33,8 +33,7 @@ router.post(
       }
 
       const parsed = parseWithZod(createAdjustmentRequestBodySchema, req.body);
-      const lunchInRaw = parsed.lunch_in ?? parsed.launch_in;
-      const lunch_in = parseIsoDate(lunchInRaw, "lunch_in");
+      const lunch_in = parseIsoDate(parsed.lunch_in, "lunch_in");
 
       const result = await timeClockRequestService.create({
         user_id: userId,
