@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'; // Importar hooks
 import Image from "next/image";
 import { useRouter } from "next/router";
-import { Link as ChakraLink, Box, IconButton, useColorMode, Text, Tooltip, VStack, HStack, Flex, Icon, Divider } from "@chakra-ui/react";
+import { Link as ChakraLink, Box, IconButton, Text, Tooltip, VStack, HStack, Flex, Icon, Divider } from "@shared/ui/chakraShims";
 import { IconType } from "react-icons";
 import { FiHome, FiUser, FiUsers, FiLogOut, FiSettings, FiBriefcase, FiChevronRight } from "react-icons/fi";
 import { FiMessageSquare } from "react-icons/fi";
 import { useChat } from "@modules/chat";
 import { useAuth } from "../../../context/AuthContext";
-import { MoonIcon, SunIcon } from "@chakra-ui/icons";
+import { FiMoon, FiSun } from "react-icons/fi";
 import { setupAPIClient } from '@shared/services/api';
 
 // Dados estáticos fora do componente
@@ -57,7 +57,7 @@ const navItensPorModulo: Record<string, NavItemProps[]> = {
   ],
 };
 
-function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive: boolean; currentPath: string }) {
+function NavItem({ item, isActive, currentPath, isExpanded }: { item: NavItemProps; isActive: boolean; currentPath: string; isExpanded: boolean }) {
   const isParentActive = isActive || item.subItems?.some((sub) => currentPath.startsWith(sub.link));
   const [isSubMenuOpen, setIsSubMenuOpen] = useState(Boolean(isParentActive));
 
@@ -105,16 +105,11 @@ function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive
           <Text
             fontSize="md"
             fontWeight="medium"
-            opacity={0}
-            w={0}
-            pointerEvents="none"
+          opacity={isExpanded ? 1 : 0}
+          w={isExpanded ? 'auto' : 0}
+          pointerEvents={isExpanded ? 'auto' : 'none'}
             transition="opacity 0.2s ease-in-out"
-            _groupHover={{
-              opacity: 1,
-              w: 'auto',
-              pointerEvents: 'auto',
-              ml: 2,
-            }}
+          ml={isExpanded ? 2 : 0}
           >
             {item.label}
           </Text>
@@ -140,11 +135,10 @@ function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive
               borderRadius="lg"
               px={2.5}
               py={1.5}
-              borderWidth="1px"
-              borderColor={currentPath === sub.link ? "borderColor" : "transparent"}
-              bg={currentPath === sub.link ? "borderColor" : "whiteAlpha.100"}
-              color={currentPath === sub.link ? "white" : "componentColor"}
-              boxShadow="sm"
+              borderWidth="0px"
+              bg={currentPath === sub.link ? "borderColor" : "transparent"}
+              color={currentPath === sub.link ? "componentColorReverse" : "componentColor"}
+              boxShadow="none"
               transition="all 0.2s ease"
               _hover={{
                 bg: "borderColorReverse",
@@ -169,7 +163,7 @@ function NavItem({ item, isActive, currentPath }: { item: NavItemProps; isActive
     </Box>
   );
 }
-function NavItemAction({ label, icon, onClick, children = null }) {
+function NavItemAction({ label, icon, onClick, children = null, isExpanded = false }) {
   return (
     <HStack
       w="full"
@@ -202,16 +196,11 @@ function NavItemAction({ label, icon, onClick, children = null }) {
       <Text
         fontSize="md"
         fontWeight="medium"
-        opacity={0}
-        w={0}
-        pointerEvents="none"
+        opacity={isExpanded ? 1 : 0}
+        w={isExpanded ? 'auto' : 0}
+        pointerEvents={isExpanded ? 'auto' : 'none'}
         transition="opacity 0.2s ease-in-out" // Ajustado para ficar igual ao NavItem padrão
-        _groupHover={{
-          opacity: 1,
-          w: 'auto',
-          pointerEvents: 'auto',
-          ml: 2,
-        }}
+        ml={isExpanded ? 2 : 0}
       >
         {label}
       </Text>
@@ -224,6 +213,8 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
   const router = useRouter();
   const { logoutUser } = useAuth();
   const [perms, setPerms] = useState<any>(null);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     async function fetchPerms() {
@@ -238,6 +229,18 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
     }
     fetchPerms();
   }, []);
+
+  useEffect(() => {
+    const current = document.documentElement.getAttribute("data-theme");
+    setTheme(current === "dark" ? "dark" : "light");
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("chakra-ui-color-mode", next);
+  };
 
   const navItems = navItensPorModulo[modulo] || [];
   const filteredNavItems = navItems.filter(item => {
@@ -258,14 +261,13 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
   
   const { totalUnreadCount } = useChat();
 
-  const { colorMode, toggleColorMode } = useColorMode();
-
   const navLinks = filteredNavItems.map((item) => (
     <NavItem
       key={item.link}
       item={item}
       isActive={router.pathname === item.link || item.subItems?.some((sub) => sub.link === router.pathname) === true}
       currentPath={router.asPath}
+      isExpanded={isExpanded}
     />
   ));
 
@@ -287,10 +289,14 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
       right={{ base: 0, md: "auto" }}
       h={{ base: "60px", md: "100vh" }}
       w={{ base: "100%", md: "80px" }}
-      _hover={{
-        w: { md: "240px" },
+      onMouseEnter={() => setIsExpanded(true)}
+      onMouseLeave={() => setIsExpanded(false)}
+      style={{
+        width: typeof window !== 'undefined' && window.innerWidth >= 768 ? (isExpanded ? "240px" : "80px") : undefined,
+        transition: "width 0.28s ease-in-out, box-shadow 0.2s ease-in-out",
+        willChange: "width",
       }}
-      transition="width 0.3s ease-in-out"
+      transition="all 0.2s ease-in-out"
       _groupHover={{ opacity: 1, pointerEvents: 'auto' }}
       whiteSpace="nowrap"
       overflow="hidden"
@@ -301,23 +307,27 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
         w="full"
         h="full"
         display={{ base: "none", md: "flex" }}
-        justifyContent="space-between"
+        justifyContent="flex-start"
       >
         <Box w="full" pt={0}>
-          <Flex>
+          <Flex justifyContent="center">
             <Flex
+              direction="column"
               align="center"
-              w="full"
-              h="60px"
-              px={3}
-              mx={2}
+              justifyContent="center"
+              w="auto"
+              h="96px"
+              px={0}
+              py={1}
+              mx="auto"
+              mr={isExpanded ? 6 : "auto"}
               my={1}
               borderRadius="md"
               _hover={{ textDecoration: 'none' }}
             >
               <Flex
-                w="55px"
-                h="full"
+                w="64px"
+                h="64px"
                 align="center"
                 justify="center"
                 flexShrink={0}
@@ -325,8 +335,8 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
                 <Image
                   src={`/logos/lions/Castelo.webp`}
                   alt="Logo da Castelo"
-                  width={125}
-                  height={25}
+                  width={64}
+                  height={64}
                   style={{ objectFit: 'contain' }}
                 />
               </Flex>
@@ -334,16 +344,16 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
               <Text
                 fontSize="md"
                 fontWeight="medium"
-                opacity={0}
-                w={0}
-                pointerEvents="none"
-                transition="opacity 0.2s 0.1s ease, width 0.2s 0.1s ease" // Adiciona um pequeno delay
-                _groupHover={{
-                  opacity: 1,
-                  w: 'auto',
-                  pointerEvents: 'auto',
-                  ml: 2,
-                }}
+                opacity={1}
+                w="auto"
+                alignSelf="center"
+                mx="auto"
+                pointerEvents="auto"
+                mt={2}
+                ml={0}
+                textAlign="center"
+                whiteSpace="nowrap"
+                color={theme === "dark" ? "borderColorReverse" : "primaryText"}
               >
                 Castelo Workspace
               </Text>
@@ -356,19 +366,20 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
           spacing={2}
           align="stretch"
           w="full"
-          flexGrow={1} 
-          overflowY="auto"
+          mt={3}
+          overflowY="visible"
           overflowX="hidden"
         >
           {navLinks}
         </VStack>
 
-        <Box w="full" pb={4}>
-          <Divider borderColor="borderColor" opacity={.5} my={4} />
+        <Box w="full" pb={2}>
+          <Divider borderColor="borderColor" opacity={.5} my={6} />
           <NavItemAction
             label="Chat"
             icon={FiMessageSquare}
             onClick={onChatOpen}
+            isExpanded={isExpanded}
           >
             {totalUnreadCount > 0 && (
               <Flex
@@ -392,15 +403,17 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
             )}
           </NavItemAction>
           <NavItemAction
-            label={colorMode === 'light' ? 'Modo Escuro' : 'Modo Claro'}
-            icon={colorMode === 'light' ? MoonIcon : SunIcon}
-            onClick={toggleColorMode}
+            label={theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}
+            icon={theme === 'light' ? FiMoon : FiSun}
+            onClick={toggleTheme}
+            isExpanded={isExpanded}
           />
           <Divider borderColor="borderColor" opacity={.5} my={4} />
           <NavItemAction
             label="Sair"
             icon={FiLogOut}
             onClick={logoutUser}
+            isExpanded={isExpanded}
           />
         </Box>
       </VStack>

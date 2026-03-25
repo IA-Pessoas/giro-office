@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react'
 import Head from 'next/head'
-import { useDisclosure } from '@chakra-ui/react';
 import { FaUsers } from 'react-icons/fa';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
@@ -22,7 +21,9 @@ export default function clients({ clients, permList }: Props) {
     const [filterLabel, setFilterLabel] = useState('Ativo');    
     const [isListLoading, setIsListLoading] = useState(false);
 
-    const { isOpen: isModalOpen, onOpen: onModalOpen, onClose: onModalClose } = useDisclosure();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const onModalOpen = () => setIsModalOpen(true);
+    const onModalClose = () => setIsModalOpen(false);
 
 
     const isDesktopListCollapsed = !!selected;

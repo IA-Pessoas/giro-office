@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Flex, FormControl, FormLabel, Input, Switch, SimpleGrid, Select, Button } from '@chakra-ui/react';
+import { Box, Flex, FormControl, FormLabel, Input, Switch, SimpleGrid, Select, Button } from '@shared/ui/chakraShims';
 import { IoCreate } from "react-icons/io5";
 
 import LogDrawer from '@shared/components/LogDrawer';

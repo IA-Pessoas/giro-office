@@ -1,32 +1,9 @@
 import React, { useState, useMemo, useRef } from 'react';
 import Head from 'next/head';
-import { 
-    Box, 
-    Button, 
-    Flex, 
-    Heading, 
-    Table, 
-    Thead, 
-    Tbody, 
-    Tr, 
-    Th, 
-    Td, 
-    IconButton, 
-    Text, 
-    Spinner,
-    Input,
-    InputGroup,
-    InputLeftElement,
-    AlertDialog,
-    AlertDialogBody,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogContent,
-    AlertDialogOverlay,
-} from '@chakra-ui/react';
 import { IoAdd, IoPencil, IoTrash, IoSearch } from 'react-icons/io5';
 import { canSSRAuth } from '@modules/auth';
 import { useTaskModels, TaskModelModal, type TaskModel } from '@modules/integracao';
+import styles from './TaskModelsPage.module.css';
 
 export default function TaskModelsConfig() {
     const { models, isLoading, createModel, updateModel, deleteModel } = useTaskModels();
@@ -41,7 +18,7 @@ export default function TaskModelsConfig() {
     // Estados do Modal de Exclusão
     const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
     const [modelToDelete, setModelToDelete] = useState<string | null>(null);
-    const cancelRef = useRef<HTMLButtonElement>(null); // Ref para foco no botão Cancelar
+    const cancelRef = useRef<HTMLButtonElement>(null); // Ref mantida para compatibilidade
 
     // --- Lógica de Criação/Edição ---
     const handleOpenCreate = () => {
@@ -101,94 +78,83 @@ export default function TaskModelsConfig() {
     return (
         <>
             <Head><title>Modelos de Tarefa - Integração</title></Head>
-            <Box p={6}>
-                <Flex direction={{ base: 'column', md: 'row' }} justify="space-between" align={{ base: 'start', md: 'center' }} mb={6} gap={4}>
-                    <Heading size="lg" color="primaryText">Modelos de Tarefas</Heading>
+            <div className={styles.page}>
+                <div className={styles.header}>
+                    <h1 className={styles.title}>Modelos de Tarefas</h1>
                     
-                    <Flex gap={4} w={{ base: '100%', md: 'auto' }}>
-                        {/* Barra de Busca */}
-                        <InputGroup maxW="300px">
-                            <InputLeftElement pointerEvents="none">
-                                <IoSearch color="gray.300" />
-                            </InputLeftElement>
-                            <Input 
+                    <div className={styles.headerActions}>
+                        <div className={styles.searchWrap}>
+                            <IoSearch className={styles.searchIcon} />
+                            <input
                                 type="text" 
                                 placeholder="Buscar por nome ou tipo..." 
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                bg="componentColorDarkOnly"
-                                border="none"
-                                _focus={{ border: '1px solid', borderColor: 'integracao.main' }}
+                                className={styles.searchInput}
                             />
-                        </InputGroup>
+                        </div>
 
-                        <Button leftIcon={<IoAdd />} bg="integracao.main" color="white" _hover={{ bg: 'integracao.sub' }} onClick={handleOpenCreate}>
+                        <button className={styles.primaryBtn} onClick={handleOpenCreate}>
+                            <IoAdd />
                             Nova Tarefa
-                        </Button>
-                    </Flex>
-                </Flex>
+                        </button>
+                    </div>
+                </div>
 
-                <Box overflowX="auto" bg="componentColorDarkOnly" borderRadius="md" p={4} boxShadow="md">
+                <div className={styles.card}>
                     {isLoading ? (
-                        <Flex justify="center" p={10}><Spinner color="integracao.main" /></Flex>
+                        <div className={styles.loading}>Carregando...</div>
                     ) : filteredModels.length === 0 ? (
-                        <Text textAlign="center" color="gray.500">
+                        <p className={styles.emptyText}>
                             {searchTerm ? 'Nenhum resultado encontrado para a busca.' : 'Nenhum modelo cadastrado.'}
-                        </Text>
+                        </p>
                     ) : (
-                        <Table variant="simple">
-                            <Thead>
-                                <Tr>
-                                    <Th color="primaryText">Nome</Th>
-                                    <Th color="primaryText">Departamento</Th>
-                                    <Th color="primaryText">Tipo</Th>
-                                    <Th color="primaryText" width="100px">Ações</Th>
-                                </Tr>
-                            </Thead>
-                            <Tbody>
+                        <div className={styles.tableWrap}>
+                            <table className={styles.table}>
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Departamento</th>
+                                        <th>Tipo</th>
+                                        <th style={{ width: 100 }}>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
                                 {filteredModels.map((model) => (
-                                    <Tr key={model.id} _hover={{ bg: 'mainOpacity' }}>
-                                        <Td>{model.name}</Td>
-                                        <Td>{model.department?.name || '-'}</Td>
-                                        <Td>
-                                            <Text 
-                                                as="span" 
-                                                px={2} py={1} 
-                                                borderRadius="md" 
-                                                fontSize="sm"
-                                                bg={model.billing === 'Realizar' ? 'blue.100' : 'gray.100'}
-                                                color={model.billing === 'Realizar' ? 'blue.800' : 'gray.800'}
-                                            >
+                                    <tr key={model.id}>
+                                        <td>{model.name}</td>
+                                        <td>{model.department?.name || '-'}</td>
+                                        <td>
+                                            <span className={model.billing === 'Realizar' ? styles.badgeBlue : styles.badgeGray}>
                                                 {model.billing === 'Realizar' ? 'Produto' : 'Tarefa'}
-                                            </Text>
-                                        </Td>
-                                        <Td>
-                                            <Flex gap={2}>
-                                                <IconButton 
-                                                    aria-label="Editar" 
-                                                    icon={<IoPencil />} 
-                                                    size="sm" 
-                                                    colorScheme="blue" 
-                                                    variant="ghost"
-                                                    onClick={() => handleOpenEdit(model)} 
-                                                />
-                                                <IconButton 
-                                                    aria-label="Excluir" 
-                                                    icon={<IoTrash />} 
-                                                    size="sm" 
-                                                    colorScheme="red" 
-                                                    variant="ghost"
-                                                    onClick={() => handleOpenDelete(model.id)} 
-                                                />
-                                            </Flex>
-                                        </Td>
-                                    </Tr>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div className={styles.rowActions}>
+                                                <button 
+                                                    aria-label="Editar"
+                                                    className={styles.iconBtn}
+                                                    onClick={() => handleOpenEdit(model)}
+                                                >
+                                                    <IoPencil />
+                                                </button>
+                                                <button
+                                                    aria-label="Excluir"
+                                                    className={styles.iconBtnDanger}
+                                                    onClick={() => handleOpenDelete(model.id)}
+                                                >
+                                                    <IoTrash />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 ))}
-                            </Tbody>
-                        </Table>
+                                </tbody>
+                            </table>
+                        </div>
                     )}
-                </Box>
-            </Box>
+                </div>
+            </div>
 
             {/* Modal de Criação/Edição */}
             <TaskModelModal 
@@ -199,32 +165,24 @@ export default function TaskModelsConfig() {
             />
 
             {/* Modal de Confirmação de Exclusão (AlertDialog) */}
-            <AlertDialog
-                isOpen={isDeleteAlertOpen}
-                leastDestructiveRef={cancelRef}
-                onClose={onCloseDelete}
-            >
-                <AlertDialogOverlay>
-                    <AlertDialogContent bg="bodyBg" color="bodyText">
-                        <AlertDialogHeader fontSize="lg" fontWeight="bold">
-                            Excluir Modelo
-                        </AlertDialogHeader>
-
-                        <AlertDialogBody>
+            {isDeleteAlertOpen && (
+                <div className={styles.modalOverlay} onClick={onCloseDelete}>
+                    <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+                        <h3 className={styles.modalTitle}>Excluir Modelo</h3>
+                        <p className={styles.modalBody}>
                             Tem certeza que deseja excluir este modelo de tarefa? Essa ação não pode ser desfeita.
-                        </AlertDialogBody>
-
-                        <AlertDialogFooter>
-                            <Button ref={cancelRef} onClick={onCloseDelete} variant="ghost">
+                        </p>
+                        <div className={styles.modalFooter}>
+                            <button ref={cancelRef} onClick={onCloseDelete} className={styles.ghostBtn}>
                                 Cancelar
-                            </Button>
-                            <Button colorScheme="red" onClick={confirmDelete} ml={3}>
+                            </button>
+                            <button onClick={confirmDelete} className={styles.dangerBtn}>
                                 Excluir
-                            </Button>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialogOverlay>
-            </AlertDialog>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

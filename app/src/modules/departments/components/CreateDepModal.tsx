@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Button } from '@chakra-ui/react';
 import { toast } from 'react-toastify';
 
 import { setupAPIClient } from '@shared/services/api';
@@ -51,22 +50,12 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
       title="Cadastrar Novo Departamento"
       footer={(
         <>
-          <Button colorScheme="gray" mr={3} onClick={onClose}>
+          <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100" onClick={onClose}>
             Cancelar
-          </Button>
-          <Button
-            bg="componentColor"
-            color="secondaryText"
-            border="1px solid transparent"
-            _hover={{
-              bg: 'white',
-              color: 'main.main',
-            }}
-            isLoading={isLoading}
-            onClick={handleCadastrar}
-          >
-            Salvar
-          </Button>
+          </button>
+          <button type="button" className="ui-button-primary" disabled={isLoading} onClick={handleCadastrar}>
+            {isLoading ? 'Salvando...' : 'Salvar'}
+          </button>
         </>
       )}
     >

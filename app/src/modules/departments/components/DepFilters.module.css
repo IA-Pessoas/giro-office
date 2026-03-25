@@ -1,0 +1,46 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 0.75rem;
+  padding: 0.5rem;
+}
+
+.searchWrap {
+  position: relative;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #2f406a;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.55rem 0.7rem 0.55rem 2rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+.row {
+  width: 100%;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.select,
+.createButton {
+  width: 50%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  background: #fff;
+}
+
+.createButton {
+  cursor: pointer;
+}

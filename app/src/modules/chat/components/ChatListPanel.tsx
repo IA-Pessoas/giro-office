@@ -1,10 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Box, 
-    Button, 
-    Input, 
-    Checkbox,
-    Text 
-} from '@chakra-ui/react';
 import { IoMdArrowRoundBack } from "react-icons/io";
 import { MdGroupAdd } from "react-icons/md";
 import { CiCirclePlus } from "react-icons/ci";
@@ -12,6 +6,7 @@ import { CiCirclePlus } from "react-icons/ci";
 import { useChat } from '../../../context/ChatContext';
 import { useAuth } from '../../../context/AuthContext';
 import * as styles from '../../../styles/chat'
+import css from './ChatListPanel.module.css';
 
 const NewChatView = ({ onBack, onSelectUser, onNewGroupClick }) => {
     const { fetchAllUsers } = useChat();
@@ -29,152 +24,58 @@ const NewChatView = ({ onBack, onSelectUser, onNewGroupClick }) => {
     );
 
     return (
-        <Box 
-            display={'flex'}
-            flexDirection={'column'}
-            w={'30%'}
-            maxW={'400px'}
-            minW={'280px'}
-            bg={'bodyBg'}
-            borderRight={'1px solid'}
-            borderColor={'mainOpacity'}
-        >
-            <Box 
-                p={'4px 16px'}
-                bg={'bodyBg'}
-                borderBottom={'1px solid'}
-                borderColor={'mainOpacity'}
-            >
-                <Box 
-                    display={'flex'}
-                    alignItems={'center'}
-                    gap={'20px'}
-                >
-                    <Button 
-                        onClick={onBack} 
-                        bg={'none'}
-                        border={'none'}
-                        fontSize={'24px'}
-                        cursor={'pointer'}
-                    >
+        <div className={css.panel}>
+            <div className={css.header}>
+                <div className={css.headerRow}>
+                    <button onClick={onBack} className={css.iconBtn}>
                        <IoMdArrowRoundBack />
-                    </Button>
-                    <Text fontWeight={'bold'}>Nova Conversa</Text>
-                </Box>
-            </Box>
-            <Box 
-                position={'relative'}
-                p={'8px 12px'}
-                bg={'bodyBg'}
-            >
-                <Input 
+                    </button>
+                    <p className={css.title}>Nova Conversa</p>
+                </div>
+            </div>
+            <div className={css.searchWrap}>
+                <input
+                    className={css.input}
                     placeholder="Pesquisar contatos..."
                     value={searchTerm} 
                     onChange={e => setSearchTerm(e.target.value)} 
-                    w={'100%'}
-                    p={'8px 12px'}
-                    borderRadius={'8px'}
-                    border={'1px solid'}
-                    borderColor={'mainOpacity'}
                 />
-            </Box>
-            <Box 
-                flexGrow={1}
-                overflowY={'auto'}
-                borderTop={'1px solid'}
-                borderColor={'mainOpacity'}
-                sx={{
-                    '&::-webkit-scrollbar': { width: '4px' },
-                    '&::-webkit-scrollbar-track': { background: 'transparent' },
-                    '&::-webkit-scrollbar-thumb': { background: 'borderColorReverse', borderRadius: '24px' },
-                }}
-            >
-                <Box 
-                    display={'flex'}
-                    alignItems={'center'}
-                    p={'12px 15px'}
-                    cursor={'pointer'}
-                    borderBottom={'1px solid'}
-                    borderColor={'mainOpacity'}
+            </div>
+            <div className={css.list}>
+                <div
+                    className={css.item}
                     onClick={onNewGroupClick}
-                    _hover={{ opacity: .7 }}
                 >
-                    <Box 
-                        w={'50px'}
-                        h={'50px'}
-                        borderRadius={'50%'}
-                        display={'flex'}
-                        justifyContent={'center'}
-                        alignItems={'center'}
-                        fontSize={'20px'}
-                        fontWeight={'bold'}
-                        bg={'transparent'}
-                        mr={'15px'}
-                        position={'relative'}
-                        flexShrink={0}
-                        overflow={'hidden'}
-                    >
+                    <div className={css.avatar}>
                         <MdGroupAdd />
-                    </Box>
-                    <Box flexGrow={1} overflow={'hidden'}>
-                        <Text 
-                            fontWeight={600}
-                            m={0}
-                            color={'primaryText'}
-                            overflowWrap={'break-word'}
-                            wordBreak={'break-word'}
-                        >
+                    </div>
+                    <div className={css.grow}>
+                        <p className={css.itemTitle}>
                             Novo Grupo
-                        </Text>
-                    </Box>
-                </Box>
+                        </p>
+                    </div>
+                </div>
                 {isLoading && 
-                    <Text style={{textAlign: 'center', padding: '20px'}}>Carregando...</Text>
+                    <p className={css.centerText}>Carregando...</p>
                 }
                 {!isLoading && filteredUsers.map(user => (
-                    <Box 
+                    <div
                         onClick={() => onSelectUser(user.id)}
                         key={user.id} 
-                        display={'flex'}
-                        alignItems={'center'}
-                        p={'12px 15px'}
-                        cursor={'pointer'}
-                        borderBottom={'1px solid'}
-                        borderColor={'mainOpacity'}
-                        transition={'all .2s ease-in-out'}
-                        _hover={{ bg: 'componentColor', color: 'white' }}
+                        className={css.item}
                     >
-                        <Box 
-                            w={'50px'}
-                            h={'50px'}
-                            borderRadius={'50%'}
-                            display={'flex'}
-                            alignItems={'center'}
-                            justifyContent={'center'}
-                            fontSize={'20px'}
-                            fontWeight={'bold'}
-                            bg={'componentColorReverse'}
-                            mr={'15px'}
-                            pos={'relative'}
-                            flexShrink={0}
-                            overflow={'hidden'}
-                        >
+                        <div className={css.avatar}>
                             {user.name.charAt(0).toUpperCase()}
-                        </Box>
-                        <Box flexGrow={1} overflow={'hidden'}>
-                            <Text 
-                                fontWeight={600}
-                                m={0}
-                                overflowWrap={'break-word'}
-                                wordBreak={'break-word'}
-                            >
+                        </div>
+                        <div className={css.grow}>
+                            <p className={css.itemTitle}>
                                 {user.name}
-                            </Text>
-                        </Box>
-                    </Box>
+                            </p>
+                        </div>
+                    </div>
                 ))}
-            </Box>
-        </Box>
+            </div>
+        </div>
     );
 };
 const NewGroupView = ({ onBack, onGroupCreated }) => {
@@ -215,113 +116,47 @@ const NewGroupView = ({ onBack, onGroupCreated }) => {
     };
 
     return (
-        <Box 
-            display={'flex'}
-            flexDirection={'column'}
-            w={'30%'}
-            maxW={'400px'}
-            minW={'280px'}
-            bg={'bodyBg'}
-            borderRight={'1px solid'}
-            borderColor={'mainOpacity'}
-        >
-            <Box
-                p={'4px 16px'}
-                bg={'bodyBg'}
-                borderBottom={'1px solid'}
-                borderColor={'mainOpacity'}
-            >
-                <Box display={'flex'} justifyContent={'space-between'} alignItems={'center'}>
-                    <Button 
-                        onClick={onBack} 
-                        bg={'none'}
-                        border={'none'}
-                        fontSize={'24px'}
-                        cursor={'pointer'}
-                    >
+        <div className={css.panel}>
+            <div className={css.header}>
+                <div className={css.headerBetween}>
+                    <button onClick={onBack} className={css.iconBtn}>
                         <IoMdArrowRoundBack />
-                    </Button>
-                    <Text fontWeight={'bold'}>Novo Grupo</Text>
-                </Box>
-            </Box>
-            <Box 
-                position={'relative'}
-                p={'8px 12px'}
-                bg={'bodyBg'}
-                display={'flex'}
-                gap={1}
-            >
-                <Input 
+                    </button>
+                    <p className={css.title}>Novo Grupo</p>
+                </div>
+            </div>
+            <div className={css.searchWrapRow}>
+                <input
+                    className={css.input}
                     placeholder="Nome do Grupo" 
                     value={groupName} 
                     onChange={e => setGroupName(e.target.value)} 
-                    w={'100%'}
-                    p={'8px 12px'}
-                    borderRadius={'8px'}
-                    border={'1px solid'}
-                    borderColor={'mainOpacity'}
                 />
-                <Button onClick={handleCreateGroup}><MdGroupAdd /></Button>
-            </Box>
-            <Box 
-                flexGrow={1} 
-                overflowY={'auto'} 
-                borderTop={'1px solid'} 
-                borderColor={'mainOpacity'} 
-                sx={{
-                    '&::-webkit-scrollbar': { width: '4px' },
-                    '&::-webkit-scrollbar-track': { background: 'transparent' },
-                    '&::-webkit-scrollbar-thumb': { background: 'borderColorReverse', borderRadius: '24px' },
-                }}
-            >
+                <button onClick={handleCreateGroup} className={css.iconBtn}><MdGroupAdd /></button>
+            </div>
+            <div className={css.list}>
                 {isLoading && 
-                    <Text style={{textAlign: 'center', padding: '20px'}}>Carregando...</Text>
+                    <p className={css.centerText}>Carregando...</p>
                 }
                 {!isLoading && users.map(user => (
-                    <Box
+                    <div
                         key={user.id} style={selectedUserIds.has(user.id) ? styles.chatListItemSelectedStyle : styles.chatListItemStyle} 
                         onClick={() => handleUserSelect(user.id)}
-                        display={'flex'}
-                        alignItems={'center'}
-                        p={'12px 15px'}
-                        cursor={'pointer'}
-                        borderBottom={'1px solid'}
-                        borderColor={'mainOpacity'}
-                        transition={'all .2s ease-in-out'}
-                        _hover={{ bg: 'componentColor', color: 'white' }}
+                        className={css.item}
                     >
-                        <Checkbox display={'none'} type="checkbox" checked={selectedUserIds.has(user.id)} readOnly mr={'10px'} />
-                        <Box
-                            w={'50px'}
-                            h={'50px'}
-                            borderRadius={'50%'}
-                            display={'flex'}
-                            alignItems={'center'}
-                            justifyContent={'center'}
-                            fontSize={'20px'}
-                            fontWeight={'bold'}
-                            bg={'componentColorReverse'}
-                            mr={'15px'}
-                            pos={'relative'}
-                            flexShrink={0}
-                            overflow={'hidden'}
-                        >
+                        <input type="checkbox" checked={selectedUserIds.has(user.id)} readOnly className={css.hiddenCheckbox} />
+                        <div className={css.avatar}>
                             {user.name.charAt(0).toUpperCase()}
-                        </Box>
-                        <Box flexGrow={1} overflow={'hidden'}>
-                            <Text
-                                fontWeight={600}
-                                m={0}
-                                overflowWrap={'break-word'}
-                                wordBreak={'break-word'}
-                            >
+                        </div>
+                        <div className={css.grow}>
+                            <p className={css.itemTitle}>
                                 {user.name}
-                            </Text>
-                        </Box>
-                    </Box>
+                            </p>
+                        </div>
+                    </div>
                 ))}
-            </Box>
-        </Box>
+            </div>
+        </div>
     );
 };
 
@@ -340,33 +175,24 @@ const SearchBar = () => {
         clearSearch();
     };
     return (
-        <Box pos={'relative'} p={'8px 12px'} bg={'bodyBg'}>
+        <div className={css.searchWrap}>
             <form style={{ display: 'flex' }} onSubmit={handleSearch}>
-                <Input 
+                <input
                     placeholder='Pesquisar mensagens...' 
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    w={'100%'}
-                    p={'8px 12px'}
-                    borderRadius={'8px'}
-                    border={'1px solid'}
-                    borderColor={'mainOpacity'}
+                    className={css.input}
                 />
                 {isSearching && (
-                    <Button 
+                    <button
                         onClick={handleClear}
-                        bg={'none'}
-                        border={'none'}
-                        fontSize={'24px'}
-                        cursor={'pointer'}
-                        color={'primaryText'}
-                        _hover={{bg: 'transparent'}}
+                        className={css.iconBtn}
                     >
                         &times;
-                    </Button>)
+                    </button>)
                 }
             </form>
-        </Box>
+        </div>
     );
 };
 
@@ -379,38 +205,19 @@ const SearchResultItem = ({ message }) => {
         }
     };
     return (
-        <Box 
+        <div
             onClick={handleResultClick}
-            display={'flex'}
-            alignItems={'center'}
-            p={'12px 15px'}
-            cursor={'pointer'}
-            borderBottom={'1px solid'}
-            borderColor={'mainOpacity'}
-            transition={'all .2s ease-in-out'}
-            _hover={{ bg: 'componentColor', color: 'white' }}
+            className={css.item}
         >
-            <Box flexGrow={1} overflow={'hidden'}>
-                <Text 
-                    fontWeight={600}
-                    m={0}
-                    overflowWrap={'break-word'}
-                    wordBreak={'break-word'}
-                    color={'secondaryText'}
-                >
+            <div className={css.grow}>
+                <p className={css.itemTitle}>
                     {message.sender.name} em <strong>{message.chat.name || 'Conversa Direta'}</strong>
-                </Text>
-                <Text
-                    m={0}
-                    fontSize={'0.9em'}
-                    whiteSpace={'nowrap'}
-                    textOverflow={'ellipsis'}
-                    overflowWrap={'break-word'}
-                >
+                </p>
+                <p className={css.itemSubtitle}>
                     {message.content}
-                </Text>
-            </Box>
-        </Box>
+                </p>
+            </div>
+        </div>
     );
 };
 
@@ -453,30 +260,11 @@ const ChatListItem = ({ chat, isSelected, onSelect }) => {
     
     
     return (
-        <Box 
+        <div
             onClick={onSelect}
-            display={'flex'}
-            alignItems={'center'}
-            p={'12px 15px'}
-            cursor={'pointer'}
-            borderBottom={'1px solid'}
-            borderColor={'mainOpacity'}
+            className={css.item}
         >
-            <Box 
-                w={'50px'}
-                h={'50px'}
-                borderRadius={'50%'}
-                display={'flex'}
-                justifyContent={'center'}
-                alignItems={'center'}
-                fontSize={'20px'}
-                fontWeight={'bold'}
-                bg={'transparent'}
-                mr={'15px'}
-                position={'relative'}
-                flexShrink={0}
-                overflow={'hidden'}
-            >
+            <div className={css.avatar}>
                 {details.photo ? (
                     <img 
                         src={details.photo} 
@@ -491,28 +279,16 @@ const ChatListItem = ({ chat, isSelected, onSelect }) => {
                 ) : (
                     details.name?.charAt(0).toUpperCase()
                 )}
-                {details.isOnline && <Box pos={'absolute'} bottom={'2px'} right={'1px'} w={'12px'} h={'12px'} borderRadius={'50%'} bg={'componentColorReberse'}></Box>}
-            </Box>
-            <Box flexGrow={1} overflow={'hidden'}>
-                <Text 
-                    fontWeight={600}
-                    m={0}
-                    overflowWrap={'break-word'}
-                    wordBreak={'break-word'}
-                >
+                {details.isOnline && <span className={css.onlineDot}></span>}
+            </div>
+            <div className={css.grow}>
+                <p className={css.itemTitle}>
                     {details.name}
-                </Text>
-                <Box display={'flex'} justifyContent={'space-between'}>
-                    <Text 
-                        m={0}
-                        fontSize={'0.9em'}
-                        whiteSpace={'nowrap'}
-                        overflow={'hidden'}
-                        textOverflow={'ellipsis'}
-                        overflowWrap={'break-word'}
-                    >
+                </p>
+                <div className={css.rowBetween}>
+                    <p className={css.itemSubtitle}>
                         {lastMessage?.content}
-                    </Text>
+                    </p>
                     {unreadCount > 0 && (
                         <span 
                             style={{
@@ -527,9 +303,9 @@ const ChatListItem = ({ chat, isSelected, onSelect }) => {
                             }}
                         >{unreadCount}</span>
                     )}
-                </Box>
-            </Box>
-        </Box>
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -537,55 +313,29 @@ const ChatListView = ({ onNewChatClick }) => {
     const { chats, selectedChat, selectChat, isSearching, searchResults } = useChat();
     
     return (
-        <Box 
-            display={'flex'}
-            flexDirection={'column'}
-            w={'30%'}
-            maxW={'400px'}
-            bg={'bodyBg'}
-            borderRight={'1px solid'}
-            borderColor={'mainOpacity'}
-        >
-            <Box 
-                p={'4px 16px'}
-                bg={'bodyBg'}
-                borderBottom={'1px solid'}
-                borderColor={'mainOpacity'}
-            >
-                <Box display={'flex'} justifyContent={'space-between'} alignItems={'center'}>
-                    <Text>Conversas</Text>
-                    <Button 
+        <div className={css.panel}>
+            <div className={css.header}>
+                <div className={css.headerBetween}>
+                    <p className={css.title}>Conversas</p>
+                    <button
                         onClick={onNewChatClick} 
                         title="Nova Conversa" 
-                        bg={'none'}
-                        border={'none'}
-                        fontSize={'35px'}
-                        cursor={'pointer'}
+                        className={css.iconBtnLarge}
                     >
                         <CiCirclePlus />
-                    </Button>
-                </Box>
+                    </button>
+                </div>
                 <SearchBar />
-            </Box>
-            <Box 
-                flexGrow={1} 
-                overflowY={'auto'} 
-                borderTop={'1px solid'} 
-                borderColor={'mainOpacity'} 
-                sx={{
-                    '&::-webkit-scrollbar': { width: '4px' },
-                    '&::-webkit-scrollbar-track': { background: 'transparent' },
-                    '&::-webkit-scrollbar-thumb': { background: 'borderColorReverse', borderRadius: '24px' },
-                }}
-            >
+            </div>
+            <div className={css.list}>
                 {isSearching ? (
-                    <Box>
+                    <div>
                         {searchResults.length > 0 ? (
                             searchResults.map(msg => <SearchResultItem key={msg.id} message={msg} />)
                         ) : (
-                            <Text textAlign={'center'} p={'20px'} color={'primaryText'}>Nenhum resultado encontrado.</Text>
+                            <p className={css.centerText}>Nenhum resultado encontrado.</p>
                         )}
-                    </Box>
+                    </div>
                 ) : (
                     chats.map(chat => (
                         <ChatListItem
@@ -596,8 +346,8 @@ const ChatListView = ({ onNewChatClick }) => {
                         />
                     ))
                 )}
-            </Box>
-        </Box>
+            </div>
+        </div>
     );
 };
 

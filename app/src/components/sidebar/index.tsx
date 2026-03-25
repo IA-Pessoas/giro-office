@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'; // Importar hooks
 import Image from "next/image";
 import { useRouter } from "next/router";
-import { Link as ChakraLink, Box, IconButton, useColorMode, Text, Tooltip, VStack, HStack, Flex, Icon, Divider } from "@chakra-ui/react";
+import { Link as ChakraLink, Box, IconButton, Text, Tooltip, VStack, HStack, Flex, Icon, Divider } from "@shared/ui/chakraShims";
 import { IconType } from "react-icons";
 import { FiHome, FiUser, FiUsers, FiLogOut, FiSettings } from "react-icons/fi";
 import { FiMessageSquare } from "react-icons/fi";
 import { useChat } from "../../context/ChatContext";
 import { useAuth } from "../../context/AuthContext";
-import { MoonIcon, SunIcon } from "@chakra-ui/icons";
+import { FiMoon, FiSun } from "react-icons/fi";
 import { setupAPIClient } from '@shared/services/api';
 
 // Dados estáticos fora do componente
@@ -144,6 +144,7 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
   const router = useRouter();
   const { logoutUser } = useAuth();
   const [perms, setPerms] = useState<any>(null);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     async function fetchPerms() {
@@ -178,7 +179,17 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
   
   const { totalUnreadCount } = useChat();
 
-  const { colorMode, toggleColorMode } = useColorMode();
+  useEffect(() => {
+    const current = document.documentElement.getAttribute("data-theme");
+    setTheme(current === "dark" ? "dark" : "light");
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("chakra-ui-color-mode", next);
+  };
 
   const navLinks = filteredNavItems.map((item) => (
     <NavItem
@@ -223,24 +234,18 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
         justifyContent="space-between"
       >
         <Box w="full" pt={0}>
-          <Flex>
-            <Flex
-              align="center"
-              w="full"
-              h="60px"
-              px={3}
-              mx={2}
-              my={1}
-              borderRadius="md"
-              _hover={{ textDecoration: 'none' }}
-            >
-              <Flex
-                w="55px"
-                h="full"
-                align="center"
-                justify="center"
-                flexShrink={0}
-              >
+          <Flex
+            align="center"
+            justify="center"
+            w="full"
+            h="60px"
+            px={3}
+            my={1}
+            borderRadius="md"
+            transition="all 0.3s ease"
+          >
+            <Flex align="center" justify="center" w="full" minW="55px">
+              <Box flexShrink={0} display="flex" justifyContent="center" alignItems="center" w="55px">
                 <Image
                   src={`/logos/lions/Castelo.webp`}
                   alt="Logo da Castelo"
@@ -248,27 +253,28 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
                   height={25}
                   style={{ objectFit: 'contain' }}
                 />
-              </Flex>
+              </Box>
 
               <Text
                 fontSize="md"
-                fontWeight="medium"
+                fontWeight="bold"
+                whiteSpace="nowrap"
                 opacity={0}
                 w={0}
                 pointerEvents="none"
-                transition="opacity 0.2s 0.1s ease, width 0.2s 0.1s ease" // Adiciona um pequeno delay
+                transition="opacity 0.2s ease, width 0.2s ease, margin 0.2s ease"
                 _groupHover={{
                   opacity: 1,
                   w: 'auto',
+                  ml: 3,
                   pointerEvents: 'auto',
-                  ml: 2,
                 }}
               >
                 Castelo Workspace
               </Text>
             </Flex>
           </Flex>
-          <Divider borderColor="borderColor" opacity={.5} my={4} />
+          <Divider borderColor="borderColor" opacity={0.5} my={4} />
         </Box>
 
         <VStack
@@ -311,9 +317,9 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
             )}
           </NavItemAction>
           <NavItemAction
-            label={colorMode === 'light' ? 'Modo Escuro' : 'Modo Claro'}
-            icon={colorMode === 'light' ? MoonIcon : SunIcon}
-            onClick={toggleColorMode}
+            label={theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}
+            icon={theme === 'light' ? FiMoon : FiSun}
+            onClick={toggleTheme}
           />
           <Divider borderColor="borderColor" opacity={.5} my={4} />
           <NavItemAction
