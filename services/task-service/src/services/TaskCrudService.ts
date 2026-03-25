@@ -434,8 +434,8 @@ export class TaskCrudService {
         select: TASK_UPDATE_SELECT,
       });
 
-      // TODO(project-service): EmailService quando status Paralisado + billing Realizar
-      // TODO(project-service): recalcular percentual do projeto se status mudou
+      // TODO: (project-service): EmailService quando status Paralisado + billing Realizar
+      // TODO: (project-service): recalcular percentual do projeto se status mudou
 
       await audit.logUpdateIfChanged({
         userId: data.user_id,
