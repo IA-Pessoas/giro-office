@@ -23,8 +23,8 @@ export interface CategoryCreateInput {
 export interface CategoryUpdateInput {
   id: string;
   organization_id: string;
-  name: string;
-  active: boolean;
+  name?: string;
+  active?: boolean;
 }
 
 export interface CategoryDeleteInput {
@@ -85,7 +85,10 @@ class CategoryService {
     try {
       const id = assertNonEmptyString(input.id, "id");
       const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
-      const name = assertNonEmptyString(input.name, "name");
+
+      if (input.name === undefined && input.active === undefined) {
+        throw new ServiceError(400, "Informe name ou active para atualizar.");
+      }
 
       const existing = await prismaClient.rhCategory.findFirst({
         where: { id, organization_id: organizationId },
@@ -96,14 +99,23 @@ class CategoryService {
         throw new ServiceError(404, "Categoria não encontrada.");
       }
 
-      const duplicate = await this.findDuplicateNameInOrg(organizationId, name, id);
-      if (duplicate) {
-        throw new ServiceError(409, `Já existe uma categoria com este nome: ${duplicate.name}`);
+      const data: { name?: string; active?: boolean } = {};
+
+      if (input.name !== undefined) {
+        const duplicate = await this.findDuplicateNameInOrg(organizationId, input.name, id);
+        if (duplicate) {
+          throw new ServiceError(409, `Já existe uma categoria com este nome: ${duplicate.name}`);
+        }
+        data.name = input.name;
+      }
+
+      if (input.active !== undefined) {
+        data.active = input.active;
       }
 
       const updated = await prismaClient.rhCategory.update({
         where: { id },
-        data: { name, active: input.active },
+        data,
         select: CATEGORY_SELECT,
       });
 

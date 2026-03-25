@@ -59,8 +59,8 @@ router.put("/", isAuthenticated, async (req: Request, res: Response, next: NextF
     const result = await categoryService.update({
       id: body.id,
       organization_id: organizationId,
-      name: body.name,
-      active: body.active,
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.active !== undefined ? { active: body.active } : {}),
     });
 
     res.status(200).json(createSuccessResponse(result));

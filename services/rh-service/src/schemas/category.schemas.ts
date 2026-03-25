@@ -11,10 +11,13 @@ export const createCategoryBodySchema = z
 export const updateCategoryBodySchema = z
   .object({
     id: zNonEmptyText("id"),
-    name: zNonEmptyText("name"),
-    active: z.boolean(),
+    name: zNonEmptyText("name").optional(),
+    active: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine((body) => body.name !== undefined || body.active !== undefined, {
+    message: "Informe name ou active para atualizar.",
+  });
 
 export const deleteCategoryBodySchema = z
   .object({
