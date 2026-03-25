@@ -2,13 +2,12 @@ import {
   createSuccessResponse,
   error as logError,
   parseIsoDate,
+  parseWithZod,
   ServiceError,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { parseWithZod } from "@workspace/shared";
 import {
   approveAdjustmentBodySchema,
   createAdjustmentRequestBodySchema,
@@ -19,7 +18,7 @@ const router: ReturnType<typeof Router> = Router();
 const timeClockRequestService = new TimeClockRequestService();
 
 router.post(
-  "/point/adjustment/request",
+  "/adjustment/request",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -56,7 +55,7 @@ router.post(
 );
 
 router.put(
-  "/point/adjustment/approve",
+  "/adjustment/approve",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

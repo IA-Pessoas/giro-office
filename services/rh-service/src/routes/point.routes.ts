@@ -9,7 +9,7 @@ const router: ReturnType<typeof Router> = Router();
 const pointService = new PointService();
 
 router.post(
-  "/point/register",
+  "/register",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -36,7 +36,7 @@ router.post(
 );
 
 router.post(
-  "/point/:pointId/calculate",
+  "/:pointId/calculate",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

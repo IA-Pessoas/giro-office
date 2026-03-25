@@ -23,10 +23,10 @@ export function createApp(logger: Logger): express.Express {
     response.status(200).json(createSuccessResponse({ status: "ok", service: "rh-service" }));
   });
 
-  app.use("/rh", pointConfigRoutes);
-  app.use("/rh", pointRoutes);
-  app.use("/rh", timeClockRequestRoutes);
-  app.use("/rh", holidayRoutes);
+  app.use("/rh/point-config", pointConfigRoutes);
+  app.use("/rh/point", pointRoutes);
+  app.use("/rh/point", timeClockRequestRoutes);
+  app.use("/rh/holidays", holidayRoutes);
 
   app.use(
     createExpressErrorHandler({
