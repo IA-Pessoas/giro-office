@@ -8,9 +8,9 @@ import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
-} from "@workspace/shared/http";
-import type { CreateAuditRequestPayload } from "@workspace/shared/audit";
-import { createLogger } from "@workspace/shared/logger";
+  createLogger,
+} from "@workspace/shared";
+import type { CreateAuditRequestPayload } from "@workspace/shared";
 import jwt from "jsonwebtoken";
 import { createApp } from "./app.js";
 import type { GatewayEnv } from "./config/env.js";
@@ -126,6 +126,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     auditServiceUrl: "http://127.0.0.1:3335",
     port: 0,
     legacyApiUrl: "http://127.0.0.1:3333",
+    userServiceUrl: "http://127.0.0.1:3335",
     jwtSecret: "test-secret",
     logLevel: "silent",
     logPretty: false,
@@ -192,7 +193,7 @@ test("returns shared forbidden response when permission is insufficient", async 
 test("returns shared upstream error when the upstream service is unreachable", async () => {
   const app = createApp(
     createEnv({
-      legacyApiUrl: "http://127.0.0.1:1",
+      userServiceUrl: "http://127.0.0.1:1",
     }),
     createTestLogger(),
   );
@@ -225,9 +226,9 @@ test("passes upstream error responses through unchanged", async () => {
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ error: "Teapot upstream" }));
   });
-  const legacyApiUrl = await startServer(upstream);
+  const userServiceUrl = await startServer(upstream);
 
-  const app = createApp(createEnv({ legacyApiUrl }), createTestLogger());
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
   const gateway = createServer(app);
   const gatewayUrl = await startServer(gateway);
 
@@ -350,13 +351,13 @@ test("records successful proxied requests when audit is enabled", async () => {
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ ok: true }));
   });
-  const legacyApiUrl = await startServer(upstream);
+  const userServiceUrl = await startServer(upstream);
 
   const app = createApp(
     createEnv({
       auditEnabled: true,
       auditServiceUrl: auditService.url,
-      legacyApiUrl,
+      userServiceUrl,
     }),
     createTestLogger(),
   );
@@ -423,7 +424,7 @@ test("records bad gateway failures when audit is enabled", async () => {
     createEnv({
       auditEnabled: true,
       auditServiceUrl: auditService.url,
-      legacyApiUrl: "http://127.0.0.1:1",
+      userServiceUrl: "http://127.0.0.1:1",
     }),
     createTestLogger(),
   );
@@ -469,13 +470,13 @@ test("records aborted requests when audit is enabled", async () => {
       }
     }, 100);
   });
-  const legacyApiUrl = await startServer(upstream);
+  const userServiceUrl = await startServer(upstream);
 
   const app = createApp(
     createEnv({
       auditEnabled: true,
       auditServiceUrl: auditService.url,
-      legacyApiUrl,
+      userServiceUrl,
     }),
     createTestLogger(),
   );

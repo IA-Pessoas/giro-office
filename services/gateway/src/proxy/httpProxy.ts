@@ -4,7 +4,7 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   REQUEST_ID_HEADER,
   ServiceError,
-} from "@workspace/shared/http";
+} from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 
 function hasRequestBody(method: string): boolean {
@@ -54,17 +54,19 @@ function buildForwardHeaders(request: Request): Headers {
   return headers;
 }
 
-export function buildHttpProxyMiddleware(targetUrl: string) {
+export type UpstreamResolver = (method: string, path: string) => string;
+
+function createHttpProxy(resolveTargetUrl: (request: Request) => string) {
   return async function httpProxy(
     request: Request,
     response: Response,
     next: NextFunction,
   ): Promise<void> {
-    const upstreamUrl = new URL(request.originalUrl, targetUrl);
+    const targetUrl = resolveTargetUrl(request);
+    const upstreamUrl = new URL(request.originalUrl, targetUrl).toString();
+    const body = getRequestBody(request);
 
     try {
-      const body = getRequestBody(request);
-
       const upstreamResponse = await fetch(upstreamUrl, {
         method: request.method,
         headers: buildForwardHeaders(request),
@@ -89,4 +91,11 @@ export function buildHttpProxyMiddleware(targetUrl: string) {
       next(new ServiceError(502, "Erro ao comunicar com o serviço upstream.", error));
     }
   };
+}
+
+export function buildHttpProxyMiddleware(targetUrlOrResolver: string | UpstreamResolver) {
+  if (typeof targetUrlOrResolver === "string") {
+    return createHttpProxy(() => targetUrlOrResolver);
+  }
+  return createHttpProxy((request) => targetUrlOrResolver(request.method, request.path));
 }

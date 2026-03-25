@@ -3,4 +3,8 @@ packages:
   - "infra"
   - "services/src"
   - "services/gateway"
+  - "services/organization-service"
+  - "services/audit-service"
   - "shared"
+  - "services/user-service"
+  - "services/rh-service"

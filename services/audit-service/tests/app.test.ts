@@ -16,7 +16,7 @@ import type {
   AuditSearchResult,
   CreateAuditRequestPayload,
 } from "@workspace/shared/audit";
-import { createLogger } from "@workspace/shared/logger";
+import { createLogger } from "@workspace/shared";
 import { createApp } from "../src/app.js";
 import type { AuditServiceEnv } from "../src/config/env.js";
 import type { AuditRequestRepository } from "../src/integrations/prisma/audit-request-repository.js";

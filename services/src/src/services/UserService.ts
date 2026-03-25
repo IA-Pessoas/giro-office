@@ -185,6 +185,12 @@ class UserService {
                 name: user.name,
                 login: user.login,
                 permission: user.permission,
+                organization_id: user.organization_id,
+            },
+            jwtSecret,
+            {
+                subject: user.id,
+                expiresIn: '365d',
                 department_id: user.department_id,
                 token: token,   
             }

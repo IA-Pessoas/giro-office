@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { LoggerLevel } from "@workspace/shared/logger";
+import { loggerLevelSchema } from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -15,16 +15,6 @@ function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
 }
 
-const loggerLevelSchema = z.enum([
-  "trace",
-  "debug",
-  "info",
-  "warn",
-  "error",
-  "fatal",
-  "silent",
-]) satisfies z.ZodType<LoggerLevel>;
-
 const auditServiceEnvSchema = z
   .object({
     nodeEnv: z.string().optional().default("development"),
@@ -36,10 +26,10 @@ const auditServiceEnvSchema = z
     auditServicePort: z
       .string()
       .optional()
-      .default("3335")
+      .default("3336")
       .transform((value) => {
         const parsed = Number.parseInt(value, 10);
-        return Number.isNaN(parsed) ? 3335 : parsed;
+        return Number.isNaN(parsed) ? 3336 : parsed;
       }),
     auditServiceToken: z.string().optional().default("audit-service-token"),
     databaseUrl: z.string().min(1, "DATABASE_URL não definido para o audit-service."),

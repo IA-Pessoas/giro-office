@@ -3,9 +3,11 @@ import type {
   AuditQuery,
   AuditRecorder,
   CreateAuditRequestPayload,
-} from "@workspace/shared/audit";
-import type { Logger } from "@workspace/shared/logger";
+  Logger,
+} from "@workspace/shared";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
+
+import { isUserServiceRoute } from "../utils/routeUtils.js";
 
 interface BuildAuditLifecycleMiddlewareOptions {
   enabled: boolean;
@@ -64,7 +66,9 @@ function getOutcome(statusCode: number): AuditOutcome {
 }
 
 function getRouteTarget(request: Request): string {
-  return request.originalUrl.startsWith("/audit") ? "audit-service" : "legacy-api";
+  if (request.originalUrl.startsWith("/audit")) return "audit-service";
+  if (isUserServiceRoute(request.path)) return "user-service";
+  return "legacy-api";
 }
 
 export function buildAuditLifecycleMiddleware({
