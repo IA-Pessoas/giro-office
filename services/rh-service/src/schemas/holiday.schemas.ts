@@ -1,17 +1,23 @@
 import { z } from "zod";
-import { zNonEmptyText, zIsoDate } from "@workspace/shared";
+import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 
-export const createHolidayBodySchema = z.object({
+export const createHolidayBodySchema = z
+  .object({
     name: zNonEmptyText("name"),
     date: zIsoDate("date"),
-  });
-  
-  export const updateHolidayBodySchema = z.object({
+  })
+  .strict();
+
+export const updateHolidayBodySchema = z
+  .object({
     id: zNonEmptyText("id"),
     name: zNonEmptyText("name"),
     date: zIsoDate("date"),
-  });
-  
-  export const deleteHolidayBodySchema = z.object({
+  })
+  .strict();
+
+export const deleteHolidayBodySchema = z
+  .object({
     id: zNonEmptyText("id"),
-  });
+  })
+  .strict();
