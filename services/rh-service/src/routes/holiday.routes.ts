@@ -8,7 +8,7 @@ import {
   deleteHolidayBodySchema,
   updateHolidayBodySchema,
 } from "../schemas/holiday.schemas.js";
-import { parseWithZod } from "../schemas/rhGeneral.schemas.js";
+import { parseWithZod } from "@workspace/shared";
 import { HolidayService } from "../services/holidayService.js";
 
 const router: ReturnType<typeof Router> = Router();

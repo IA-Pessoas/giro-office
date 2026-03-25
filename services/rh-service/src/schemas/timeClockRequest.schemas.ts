@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { zNonEmptyText, zIsoDate } from "./rhGeneral.schemas.js";
+import { zNonEmptyText, zIsoDate } from "@workspace/shared";
 
 export const createAdjustmentRequestBodySchema = z.object({
   point_id: zNonEmptyText("point_id"),

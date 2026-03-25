@@ -8,7 +8,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { parseWithZod } from "../schemas/rhGeneral.schemas.js";
+import { parseWithZod } from "@workspace/shared";
 import {
   approveAdjustmentBodySchema,
   createAdjustmentRequestBodySchema,

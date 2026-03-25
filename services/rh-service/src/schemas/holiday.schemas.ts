@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { zNonEmptyText, zIsoDate } from "./rhGeneral.schemas.js";
+import { zNonEmptyText, zIsoDate } from "@workspace/shared";
 
 export const createHolidayBodySchema = z.object({
     name: zNonEmptyText("name"),
