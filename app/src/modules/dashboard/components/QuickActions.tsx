@@ -21,7 +21,7 @@ const MotionDiv = motion.div;
 
 export function QuickActions() {
   const router = useRouter();
-  const primaryColor = 'var(--colors-blue-500)';
+  const primaryColor = 'var(--colors-brand-blue)';
 
   const actions: QuickAction[] = [
     {
@@ -70,8 +70,8 @@ export function QuickActions() {
           >
             <button
               type="button"
-              className="u-flex u-items-center u-gap-2 w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--colors-blue-500)]"
-              style={{ color: action.color || 'var(--colors-blue-500)' }}
+              className="u-flex u-items-center u-gap-2 w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--colors-brand-blue)]"
+              style={{ color: action.color || 'var(--colors-brand-blue)' }}
               onClick={() => router.push(action.href)}
             >
               <action.icon size={18} />

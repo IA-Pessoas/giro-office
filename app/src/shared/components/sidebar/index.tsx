@@ -310,56 +310,57 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
         justifyContent="flex-start"
       >
         <Box w="full" pt={0}>
-          <Flex justifyContent="center">
+          <Flex justifyContent="center" px={2}>
             <Flex
-              direction="column"
               align="center"
-              justifyContent="center"
-              w="auto"
+              direction="row"
+              w={isExpanded ? "full" : "auto"}
               h="96px"
-              px={0}
-              py={1}
-              mx="auto"
-              mr={isExpanded ? 6 : "auto"}
-              my={1}
+              px={2}
+              py={0}
+              my={0}
+              mt={0}
               borderRadius="md"
               _hover={{ textDecoration: 'none' }}
+              justifyContent="center"
             >
-              <Flex
-                w="64px"
-                h="64px"
-                align="center"
-                justify="center"
+              <Box
+                w="80px"
+                h="80px"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
                 flexShrink={0}
               >
                 <Image
                   src={`/logos/lions/Castelo.webp`}
                   alt="Logo da Castelo"
-                  width={64}
-                  height={64}
+                  width={65}
+                  height={65}
                   style={{ objectFit: 'contain' }}
                 />
-              </Flex>
+              </Box>
 
               <Text
                 fontSize="md"
                 fontWeight="medium"
-                opacity={1}
-                w="auto"
-                alignSelf="center"
-                mx="auto"
-                pointerEvents="auto"
-                mt={2}
-                ml={0}
-                textAlign="center"
                 whiteSpace="nowrap"
+                lineHeight="1"
+                opacity={isExpanded ? 1 : 0}
+                w={isExpanded ? "auto" : 0}
+                pointerEvents={isExpanded ? "auto" : "none"}
+                ml={isExpanded ? 3 : 0}
+                mt={0}
+                transition="opacity 0.18s ease-in-out, width 0.18s ease-in-out, margin 0.18s ease-in-out"
                 color={theme === "dark" ? "borderColorReverse" : "primaryText"}
+                textAlign="center"
+                style={{ whiteSpace: 'nowrap' }}
               >
                 Castelo Workspace
               </Text>
             </Flex>
           </Flex>
-          <Divider borderColor="borderColor" opacity={.5} my={4} />
+          <Divider borderColor="borderColor" opacity={.5} my={2} />
         </Box>
 
         <VStack

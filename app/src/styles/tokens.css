@@ -33,7 +33,8 @@
 .chakra-ui-dark {
   /* Keep typography in the same gold tone used by the dark sidebar */
   --colors-blue-500: var(--colors-gold-500);
-  --dashboard-text-color: var(--colors-gold-500);
+  /* Dashboard: in dark mode we keep cards white, so use dark text for readability */
+  --dashboard-text-color: #0f172a;
   /* Use the exact same dark blue tone used by the sidebar across all surfaces */
   --colors-surface-dark: #010e30ff;
   --colors-surface-dark-soft: #010e30ff;

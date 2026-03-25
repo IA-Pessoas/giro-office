@@ -16,7 +16,7 @@ interface DashboardGridProps {
 }
 
 export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
-  const cardColor = 'var(--colors-blue-500)';
+  const cardColor = 'var(--colors-brand-blue)';
 
   if (isLoading) {
     return (
