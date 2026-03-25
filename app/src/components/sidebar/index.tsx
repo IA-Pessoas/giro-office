@@ -244,13 +244,13 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
             borderRadius="md"
             transition="all 0.3s ease"
           >
-            <Flex align="center" justify="center" w="full" minW="55px">
-              <Box flexShrink={0} display="flex" justifyContent="center" alignItems="center" w="55px">
+            <Flex align="center" justify="flex-start" w="full" minW="55px">
+              <Box flexShrink={0} display="flex" justifyContent="center" alignItems="center" w="60px">
                 <Image
                   src={`/logos/lions/Castelo.webp`}
                   alt="Logo da Castelo"
-                  width={125}
-                  height={25}
+                  width={140}
+                  height={28}
                   style={{ objectFit: 'contain' }}
                 />
               </Box>

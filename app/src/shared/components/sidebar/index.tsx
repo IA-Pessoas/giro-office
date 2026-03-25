@@ -310,53 +310,59 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
         justifyContent="flex-start"
       >
         <Box w="full" pt={0}>
-          <Flex justifyContent="center">
+          <Flex justifyContent={isExpanded ? "flex-start" : "center"} px={isExpanded ? 2 : 0}>
             <Flex
-              direction="column"
               align="center"
-              justifyContent="center"
-              w="auto"
+              direction="row"
+              w={isExpanded ? "full" : "auto"}
               h="96px"
-              px={0}
+              px={isExpanded ? 2 : 0}
               py={1}
-              mx="auto"
-              mr={isExpanded ? 6 : "auto"}
+              mx={isExpanded ? 0 : "auto"}
               my={1}
               borderRadius="md"
               _hover={{ textDecoration: 'none' }}
             >
-              <Flex
-                w="64px"
-                h="64px"
-                align="center"
-                justify="center"
+              <Box
+                w={isExpanded ? "72px" : "72px"}
+                h={isExpanded ? "72px" : "72px"}
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
                 flexShrink={0}
               >
                 <Image
                   src={`/logos/lions/Castelo.webp`}
                   alt="Logo da Castelo"
-                  width={64}
-                  height={64}
+                  width={72}
+                  height={72}
                   style={{ objectFit: 'contain' }}
                 />
+              </Box>
+
+              {/* Centered title (overall center, not shifted by logo) */}
+              <Flex
+                flex="1"
+                align="center"
+                justify="center"
+                opacity={isExpanded ? 1 : 0}
+                w={isExpanded ? "auto" : 0}
+                pointerEvents={isExpanded ? "auto" : "none"}
+                transition="opacity 0.18s ease-in-out, width 0.18s ease-in-out"
+              >
+                <Text
+                  fontSize="md"
+                  fontWeight="medium"
+                  whiteSpace="nowrap"
+                  textAlign="center"
+                  color={theme === "dark" ? "borderColorReverse" : "primaryText"}
+                >
+                  Castelo Workspace
+                </Text>
               </Flex>
 
-              <Text
-                fontSize="md"
-                fontWeight="medium"
-                opacity={1}
-                w="auto"
-                alignSelf="center"
-                mx="auto"
-                pointerEvents="auto"
-                mt={2}
-                ml={0}
-                textAlign="center"
-                whiteSpace="nowrap"
-                color={theme === "dark" ? "borderColorReverse" : "primaryText"}
-              >
-                Castelo Workspace
-              </Text>
+              {/* Right spacer equals logo width to keep the title centered */}
+              {isExpanded ? <Box w="72px" flexShrink={0} /> : null}
             </Flex>
           </Flex>
           <Divider borderColor="borderColor" opacity={.5} my={4} />
