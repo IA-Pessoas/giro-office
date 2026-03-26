@@ -196,18 +196,24 @@ class RequestService {
     try {
       const orgId = assertNonEmptyString(organizationId, "organization_id");
 
+      const where: Prisma.RhRequestWhereInput = {
+        organization_id: orgId,
+      };
+      if (options.status !== undefined) {
+        where.status = options.status;
+      }
+      if (options.category_id !== undefined) {
+        where.category_id = options.category_id;
+      }
+      if (options.requester_user_id !== undefined) {
+        where.requester_user_id = options.requester_user_id;
+      }
+      if (options.assigned_to_user_id !== undefined) {
+        where.assigned_to_user_id = options.assigned_to_user_id;
+      }
+
       return await prismaClient.rhRequest.findMany({
-        where: {
-          organization_id: orgId,
-          ...(options.status !== undefined ? { status: options.status } : {}),
-          ...(options.category_id !== undefined ? { category_id: options.category_id } : {}),
-          ...(options.requester_user_id !== undefined
-            ? { requester_user_id: options.requester_user_id }
-            : {}),
-          ...(options.assigned_to_user_id !== undefined
-            ? { assigned_to_user_id: options.assigned_to_user_id }
-            : {}),
-        },
+        where,
         orderBy: { created_at: "desc" },
         select: REQUEST_SELECT,
       });

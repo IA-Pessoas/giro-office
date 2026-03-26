@@ -14,6 +14,7 @@ import {
   requestIdParamsSchema,
   updateRequestBodySchema,
 } from "../schemas/request.schemas.js";
+import type { RequestListOptions, RequestUpdateInput } from "../services/requestService.js";
 import { RequestService } from "../services/requestService.js";
 
 const router: ReturnType<typeof Router> = Router();
@@ -76,16 +77,21 @@ router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextF
     };
     const parsed = parseWithZod(listRequestQuerySchema, queryInput);
 
-    const result = await requestService.list(organizationId, {
-      ...(parsed.status !== undefined ? { status: parsed.status } : {}),
-      ...(parsed.category_id !== undefined ? { category_id: parsed.category_id } : {}),
-      ...(parsed.requester_user_id !== undefined
-        ? { requester_user_id: parsed.requester_user_id }
-        : {}),
-      ...(parsed.assigned_to_user_id !== undefined
-        ? { assigned_to_user_id: parsed.assigned_to_user_id }
-        : {}),
-    });
+    const listOptions: RequestListOptions = {};
+    if (parsed.status !== undefined) {
+      listOptions.status = parsed.status;
+    }
+    if (parsed.category_id !== undefined) {
+      listOptions.category_id = parsed.category_id;
+    }
+    if (parsed.requester_user_id !== undefined) {
+      listOptions.requester_user_id = parsed.requester_user_id;
+    }
+    if (parsed.assigned_to_user_id !== undefined) {
+      listOptions.assigned_to_user_id = parsed.assigned_to_user_id;
+    }
+
+    const result = await requestService.list(organizationId, listOptions);
 
     res.status(200).json(createSuccessResponse(result));
   } catch (err) {
@@ -128,18 +134,30 @@ router.put("/", isAuthenticated, async (req: Request, res: Response, next: NextF
 
     const body = parseWithZod(updateRequestBodySchema, req.body);
 
-    const result = await requestService.update({
+    const updateInput: RequestUpdateInput = {
       id: body.id,
       organization_id: organizationId,
-      ...(body.title !== undefined ? { title: body.title } : {}),
-      ...(body.description !== undefined ? { description: body.description } : {}),
-      ...(body.category_id !== undefined ? { category_id: body.category_id } : {}),
-      ...(body.assigned_to_user_id !== undefined
-        ? { assigned_to_user_id: body.assigned_to_user_id }
-        : {}),
-      ...(body.urgency !== undefined ? { urgency: body.urgency } : {}),
-      ...(body.status !== undefined ? { status: body.status } : {}),
-    });
+    };
+    if (body.title !== undefined) {
+      updateInput.title = body.title;
+    }
+    if (body.description !== undefined) {
+      updateInput.description = body.description;
+    }
+    if (body.category_id !== undefined) {
+      updateInput.category_id = body.category_id;
+    }
+    if (body.assigned_to_user_id !== undefined) {
+      updateInput.assigned_to_user_id = body.assigned_to_user_id;
+    }
+    if (body.urgency !== undefined) {
+      updateInput.urgency = body.urgency;
+    }
+    if (body.status !== undefined) {
+      updateInput.status = body.status;
+    }
+
+    const result = await requestService.update(updateInput);
 
     res.status(200).json(createSuccessResponse(result));
   } catch (err) {
