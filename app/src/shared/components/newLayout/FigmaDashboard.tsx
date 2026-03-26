@@ -9,6 +9,7 @@ import {
   CheckSquare,
   Clock,
   DollarSign,
+  FileText,
   Mail,
   Target,
   TrendingUp,
