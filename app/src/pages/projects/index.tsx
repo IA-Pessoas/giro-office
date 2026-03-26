@@ -1,6 +1,6 @@
 import type { GetServerSideProps } from "next";
 
-import { canSSRAuth } from "../../utils/canSSRAuth";
+import { canSSRAuth } from "@modules/auth";
 import { AppShell } from "../../shared/components/newLayout/AppShell";
 import { FigmaProjects } from "../../shared/components/newLayout/FigmaProjects";
 
