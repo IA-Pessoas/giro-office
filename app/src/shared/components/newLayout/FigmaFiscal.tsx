@@ -353,6 +353,13 @@ export function FigmaFiscal() {
     'Escrituração': { color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300', icon: FileCheck },
   };
 
+  const obligationTypeSurface = {
+    Declaração: "bg-blue-100 dark:bg-blue-900/30",
+    Apuração: "bg-purple-100 dark:bg-purple-900/30",
+    Pagamento: "bg-green-100 dark:bg-green-900/30",
+    Escrituração: "bg-orange-100 dark:bg-orange-900/30",
+  } as const;
+
   const obligationStatusConfig = {
     pending: { label: 'Pendente', color: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300', icon: Clock },
     'in-progress': { label: 'Em Andamento', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', icon: RefreshCw },
@@ -785,7 +792,7 @@ export function FigmaFiscal() {
           </div>
 
           {/* Companies Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {companies.map((company) => {
               const companyAssessments = assessments.filter(a => a.company === company.name);
               const totalTax = companyAssessments.reduce((sum, a) => sum + a.calculatedTax, 0);
@@ -793,11 +800,11 @@ export function FigmaFiscal() {
               return (
                 <div 
                   key={company.id}
-                  className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg hover:border-cyan-300 dark:hover:border-cyan-600 transition-all cursor-pointer"
+                  className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg hover:border-cyan-300 dark:hover:border-cyan-600 transition-all cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{company.name}</h3>
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">{company.name}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400">{company.cnpj}</p>
                     </div>
                     <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors">
@@ -805,26 +812,27 @@ export function FigmaFiscal() {
                     </button>
                   </div>
 
-                  <div className="space-y-3 mb-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Regime:</span>
+                  <div className="grid grid-cols-1 gap-2.5 mb-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Regime:</span>
                       <span className="px-2.5 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-xs font-medium">
                         {company.regime}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Segmento:</span>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">{company.segment}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Segmento:</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white text-right">{company.segment}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Impostos (Fev):</span>
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(totalTax)}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Impostos (Fev):</span>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white text-right">{formatCurrency(totalTax)}</span>
                     </div>
                   </div>
 
                   <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Responsável: <span className="font-medium text-gray-900 dark:text-white">{company.responsible}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Responsável:</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white text-right">{company.responsible}</span>
                     </div>
                   </div>
                 </div>
@@ -1070,19 +1078,21 @@ export function FigmaFiscal() {
               const StatusIcon = obligationStatusConfig[obligation.status].icon;
               
               return (
-                <div 
+                <div
                   key={obligation.id}
                   className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-all"
                 >
                   <div className="flex items-start gap-4">
-                    <div className={`w-12 h-12 rounded-lg ${obligationTypeConfig[obligation.type].color.replace('text', 'bg').replace('dark:text', 'dark:bg')} flex items-center justify-center flex-shrink-0`}>
-                      <TypeIcon className="w-6 h-6" />
+                    <div
+                      className={`w-12 h-12 rounded-lg ${obligationTypeSurface[obligation.type]} flex items-center justify-center flex-shrink-0`}
+                    >
+                      <TypeIcon className="w-6 h-6 text-gray-700 dark:text-gray-200" />
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4 mb-3">
                         <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">{obligation.name}</h3>
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">{obligation.name}</h3>
                           <p className="text-sm text-gray-600 dark:text-gray-400">{obligation.company} • Período: {obligation.period}</p>
                         </div>
                         <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors">
@@ -1090,7 +1100,7 @@ export function FigmaFiscal() {
                         </button>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${obligationTypeConfig[obligation.type].color} flex items-center gap-1`}>
                           <TypeIcon className="w-3 h-3" />
                           {obligation.type}
@@ -1104,13 +1114,15 @@ export function FigmaFiscal() {
                         <span className={`px-2.5 py-1 rounded text-xs font-medium ${priorityConfig[obligation.priority].color}`}>
                           {priorityConfig[obligation.priority].label}
                         </span>
+                      </div>
 
-                        <span className="px-2.5 py-1 text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-400">
+                        <span className="px-2.5 py-1 rounded-md bg-gray-50 dark:bg-gray-700/40 flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           Vencimento: {formatDate(obligation.dueDate)}
                         </span>
 
-                        <span className="px-2.5 py-1 text-xs text-gray-600 dark:text-gray-400">
+                        <span className="px-2.5 py-1 rounded-md bg-gray-50 dark:bg-gray-700/40">
                           Responsável: {obligation.assignee}
                         </span>
                       </div>
