@@ -1,6 +1,6 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import type { StatCardData } from '../types';
+import React from "react";
+import { motion } from "framer-motion";
+import type { StatCardData } from "../types";
 
 interface StatCardProps {
   data: StatCardData;
@@ -11,8 +11,8 @@ const MotionDiv = motion.div;
 
 export function StatCard({ data, delay = 0 }: StatCardProps) {
   const { title, value, icon: Icon, change, changeLabel, color } = data;
-  const changeColor = change && change >= 0 ? '#16a34a' : '#dc2626';
-  const cardColor = color || 'var(--colors-blue-500)';
+  const changeColor = change && change >= 0 ? "#16a34a" : "#dc2626";
+  const cardColor = color || "var(--colors-brand-blue)";
 
   return (
     <MotionDiv
@@ -20,33 +20,43 @@ export function StatCard({ data, delay = 0 }: StatCardProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay }}
       whileHover={{ scale: 1.02 }}
-      className="dashboard-card relative cursor-pointer overflow-hidden"
-      style={{ borderLeftColor: cardColor }}
+      className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer"
     >
-      <div className="u-flex u-justify-between mb-4 items-start">
-        <div>
-          <p className="dashboard-card-subtitle mb-1 font-medium">
-            {title}
-          </p>
-          <p className="text-3xl font-bold text-slate-800">
-            {typeof value === 'number' ? value.toLocaleString('pt-BR') : value}
-          </p>
-          {change !== undefined && (
-            <div className="u-flex u-items-center mt-2">
-              <span className="text-sm font-medium" style={{ color: changeColor }}>
-                {change >= 0 ? '+' : ''}{change}%
-              </span>
-              {changeLabel && (
-                <span className="ml-2 text-xs text-slate-500">
-                  {changeLabel}
-                </span>
-              )}
-            </div>
-          )}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md"
+            style={{
+              background: `linear-gradient(to bottom right, ${cardColor}, ${cardColor})`,
+            }}
+          >
+            <Icon size={24} color="white" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              {typeof value === "number" ? value.toLocaleString("pt-BR") : value}
+            </p>
+            <p className="text-xs text-gray-600 dark:text-gray-400">{title}</p>
+          </div>
         </div>
-        <div className="rounded-full p-3" style={{ background: `${cardColor}20`, color: cardColor }}>
-          <Icon size={24} />
-        </div>
+
+        {change !== undefined ? (
+          <div className="text-right">
+            <span
+              className="text-xs font-medium px-2 py-1 rounded-full"
+              style={{
+                color: changeColor,
+                background: change && change >= 0 ? "rgba(22,163,74,0.08)" : "rgba(220,38,38,0.08)",
+              }}
+            >
+              {change >= 0 ? "+" : ""}
+              {change}%
+            </span>
+            {changeLabel ? (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{changeLabel}</p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </MotionDiv>
   );
