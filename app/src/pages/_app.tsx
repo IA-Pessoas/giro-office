@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import type { AppProps } from "next/app";
 import { useRouter } from 'next/router';
-import { Box, Flex } from '@shared/ui/chakraShims';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -11,7 +10,7 @@ import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ChatProvider } from "@modules/chat";
 import { ChatControllerUI } from '@shared/components/ChatControllerUI';
 import { SocketProvider } from '../context/SocketContext'
-import Navbar from "@shared/components/sidebar";
+import { AppShell } from "../shared/components/newLayout/AppShell";
 
 function AppLayout({ children }) {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -29,24 +28,13 @@ function AppLayout({ children }) {
   }
 
   return (
-    <Flex>
-      <Navbar modulo='castelo' cargo={user.permission} onChatOpen={() => setIsChatOpen(true)} />
-      
-      <Box 
-        className='main' 
-        flex="1"
-        // Deixa o espaço para a Navbar na esquerda em telas de desktop
-        pl={{ base: 0, md: '0px' }}
-      >
-        {children} {/* Aqui é onde o conteúdo da sua página será renderizado */}
-      </Box>
-
-      {/* 4. O Overlay do chat também é controlado pelo estado do Layout */}
+    <AppShell>
+      {children}
       <ChatControllerUI
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
       />
-    </Flex>
+    </AppShell>
   );
 }
 
