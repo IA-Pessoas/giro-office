@@ -877,7 +877,7 @@ export function FigmaCommercial() {
 
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
@@ -906,13 +906,13 @@ export function FigmaCommercial() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
+                <tbody>
                   {filteredLeads.map((lead) => {
                     const StatusIcon = leadStatusConfig[lead.status].icon;
                     return (
                       <tr
                         key={lead.id}
-                        className="hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors"
+                        className="[&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl [&>td]:bg-white dark:[&>td]:bg-slate-900 [&>td]:border-y [&>td]:border-gray-200 dark:[&>td]:border-slate-800 [&>td:first-child]:border-l [&>td:last-child]:border-r hover:[&>td]:bg-gray-50 dark:hover:[&>td]:bg-slate-800/60 transition-colors"
                       >
                         <td className="px-6 py-4">
                           <div>
@@ -1298,7 +1298,7 @@ export function FigmaCommercial() {
         <div className="space-y-5">
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
@@ -1324,13 +1324,13 @@ export function FigmaCommercial() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
+                <tbody>
                   {contracts.map((contract) => {
                     const StatusIcon = contractStatusConfig[contract.status].icon;
                     return (
                       <tr
                         key={contract.id}
-                        className="hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors"
+                        className="[&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl [&>td]:bg-white dark:[&>td]:bg-slate-900 [&>td]:border-y [&>td]:border-gray-200 dark:[&>td]:border-slate-800 [&>td:first-child]:border-l [&>td:last-child]:border-r hover:[&>td]:bg-gray-50 dark:hover:[&>td]:bg-slate-800/60 transition-colors"
                       >
                         <td className="px-6 py-4">
                           <div>
