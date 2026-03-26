@@ -138,7 +138,7 @@ export function FigmaProjects() {
   const statusConfig = {
     planning: {
       label: "Planejamento",
-      color: "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300",
+      color: "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200",
       icon: Clock,
     },
     "in-progress": {
@@ -159,7 +159,7 @@ export function FigmaProjects() {
   } as const;
 
   const priorityConfig = {
-    low: { label: "Baixa", color: "text-gray-600 dark:text-gray-400" },
+    low: { label: "Baixa", color: "text-gray-600 dark:text-slate-400" },
     medium: { label: "Média", color: "text-yellow-600 dark:text-yellow-400" },
     high: { label: "Alta", color: "text-red-600 dark:text-red-400" },
   } as const;
@@ -211,7 +211,7 @@ export function FigmaProjects() {
             </div>
             Projetos
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-gray-600 dark:text-slate-400">
             Gerencie e acompanhe todos os projetos da empresa
           </p>
         </div>
@@ -231,11 +231,11 @@ export function FigmaProjects() {
           return (
             <div
               key={stat.label}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6"
+              className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{stat.label}</p>
+                  <p className="text-sm text-gray-600 dark:text-slate-400 mb-1">{stat.label}</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
                 </div>
                 <div
@@ -249,7 +249,7 @@ export function FigmaProjects() {
         })}
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -258,7 +258,7 @@ export function FigmaProjects() {
               placeholder="Buscar projetos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -267,7 +267,7 @@ export function FigmaProjects() {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Todos os Status</option>
               <option value="planning">Planejamento</option>
@@ -277,13 +277,13 @@ export function FigmaProjects() {
             </select>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+          <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
             <button
               onClick={() => setViewMode("grid")}
               className={`p-2 rounded-md transition-colors ${
                 viewMode === "grid"
-                  ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm"
+                  : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white"
               }`}
               type="button"
             >
@@ -293,8 +293,8 @@ export function FigmaProjects() {
               onClick={() => setViewMode("list")}
               className={`p-2 rounded-md transition-colors ${
                 viewMode === "list"
-                  ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm"
+                  : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white"
               }`}
               type="button"
             >
@@ -311,7 +311,7 @@ export function FigmaProjects() {
             return (
               <div
                 key={project.id}
-                className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all cursor-pointer group"
+                className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
@@ -321,13 +321,13 @@ export function FigmaProjects() {
                       </h3>
                       <Star className="w-4 h-4 text-gray-300 dark:text-gray-600 hover:text-yellow-500 hover:fill-yellow-500 transition-colors cursor-pointer" />
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-3">
+                    <p className="text-sm text-gray-600 dark:text-slate-400 line-clamp-2 mb-3">
                       {project.description}
                     </p>
                   </div>
                   <div className="relative">
                     <button
-                      className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                      className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
                       type="button"
                     >
                       <MoreVertical className="w-5 h-5 text-gray-400" />
@@ -349,10 +349,10 @@ export function FigmaProjects() {
 
                 <div className="mb-4">
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-gray-600 dark:text-gray-400">Progresso</span>
+                    <span className="text-gray-600 dark:text-slate-400">Progresso</span>
                     <span className="font-semibold text-gray-900 dark:text-white">{project.progress}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div className="w-full bg-gray-200 dark:bg-slate-800 rounded-full h-2">
                     <div
                       className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all"
                       style={{ width: `${project.progress}%` }}
@@ -360,15 +360,15 @@ export function FigmaProjects() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-100 dark:border-slate-800">
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
                     <span className="text-gray-900 dark:text-white font-medium">
                       {project.tasks.completed}
                     </span>
                     <span className="text-gray-400">/</span>
-                    <span className="text-gray-600 dark:text-gray-400">{project.tasks.total}</span>
-                    <span className="text-gray-600 dark:text-gray-400">tarefas</span>
+                    <span className="text-gray-600 dark:text-slate-400">{project.tasks.total}</span>
+                    <span className="text-gray-600 dark:text-slate-400">tarefas</span>
                   </div>
                 </div>
 
@@ -386,7 +386,7 @@ export function FigmaProjects() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-slate-400">
                     <Calendar className="w-3.5 h-3.5" />
                     <span>{project.endDate}</span>
                   </div>
@@ -396,10 +396,10 @@ export function FigmaProjects() {
           })}
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
+              <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Projeto
@@ -424,18 +424,18 @@ export function FigmaProjects() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
                 {filteredProjects.map((project) => {
                   const StatusIcon = statusConfig[project.status].icon;
                   return (
                     <tr
                       key={project.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                      className="hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors"
                     >
                       <td className="px-6 py-4">
                         <div>
                           <p className="font-semibold text-gray-900 dark:text-white">{project.name}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
+                          <p className="text-sm text-gray-600 dark:text-slate-400 line-clamp-1">
                             {project.description}
                           </p>
                         </div>
@@ -450,7 +450,7 @@ export function FigmaProjects() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 max-w-[100px]">
+                          <div className="flex-1 bg-gray-200 dark:bg-slate-800 rounded-full h-2 max-w-[100px]">
                             <div
                               className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full"
                               style={{ width: `${project.progress}%` }}
@@ -479,7 +479,7 @@ export function FigmaProjects() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-slate-400">
                           <Calendar className="w-4 h-4" />
                           <span>{project.endDate}</span>
                         </div>
@@ -487,16 +487,16 @@ export function FigmaProjects() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1">
                           <button
-                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-md transition-colors"
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
                             type="button"
                           >
-                            <Eye className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                            <Eye className="w-4 h-4 text-gray-600 dark:text-slate-300" />
                           </button>
                           <button
-                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-md transition-colors"
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
                             type="button"
                           >
-                            <Edit className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                            <Edit className="w-4 h-4 text-gray-600 dark:text-slate-300" />
                           </button>
                           <button
                             className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md transition-colors"
@@ -516,12 +516,12 @@ export function FigmaProjects() {
       )}
 
       {filteredProjects.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-12 text-center">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-12 text-center">
           <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Nenhum projeto encontrado
           </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="text-gray-600 dark:text-slate-400 mb-6">
             {searchTerm ? "Tente ajustar sua busca ou filtros" : "Comece criando seu primeiro projeto"}
           </p>
           {!searchTerm ? (
@@ -543,15 +543,15 @@ export function FigmaProjects() {
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowNewProjectModal(false)}
           />
-          <div className="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-xl">
+          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Novo Projeto</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-gray-600 dark:text-slate-400">
               Modal placeholder (Figma). Integração será feita depois.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
                 onClick={() => setShowNewProjectModal(false)}
               >
                 Fechar
