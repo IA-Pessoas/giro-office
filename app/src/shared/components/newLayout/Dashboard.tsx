@@ -142,7 +142,7 @@ export function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400">Visão geral do seu workspace</p>
+          <p className="text-gray-600 dark:text-gray-400">Visão geral do Office</p>
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-600 dark:text-gray-400">Última atualização</p>

@@ -22,8 +22,8 @@ export function Configuracoes() {
     setIsDark(next);
   };
 
-  const displayName = user?.name?.trim() || "Admin Workspace";
-  const displayEmail = user?.login?.trim() || "admin@workspace.com";
+  const displayName = user?.name?.trim() || "Admin Office";
+  const displayEmail = user?.login?.trim() || "admin@office.com";
   const initials = displayName
     .split(" ")
     .filter(Boolean)

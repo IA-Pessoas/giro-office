@@ -64,7 +64,7 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>Login - Castelo Workspace</title>
+        <title>Login - Office</title>
       </Head>
 
       <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 flex items-center justify-center p-4 relative overflow-hidden">
@@ -82,9 +82,9 @@ export default function Login() {
                 <div className="inline-flex items-center gap-4 bg-white rounded-2xl p-3 shadow-2xl">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                      <span className="text-xs font-bold text-white">CW</span>
+                      <span className="text-xs font-bold text-white">OF</span>
                     </div>
-                    <span className="text-xl font-bold tracking-tight text-gray-900">Workspace</span>
+                    <span className="text-xl font-bold tracking-tight text-gray-900">Office</span>
                   </div>
                 </div>
 
@@ -142,9 +142,9 @@ export default function Login() {
                 <div className="inline-flex items-center justify-center gap-3 bg-white rounded-2xl p-3 shadow-2xl">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                      <span className="text-xs font-bold text-white">CW</span>
+                      <span className="text-xs font-bold text-white">OF</span>
                     </div>
-                    <span className="text-xl font-bold tracking-tight text-gray-900">Workspace</span>
+                    <span className="text-xl font-bold tracking-tight text-gray-900">Office</span>
                   </div>
                 </div>
               </div>
@@ -273,20 +273,12 @@ export default function Login() {
                         </span>
                       ) : (
                         <span className="flex items-center justify-center gap-2">
-                          <span>Entrar no Workspace</span>
+                          <span>Entrar no Office</span>
                           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </span>
                       )}
                     </button>
                   </form>
-
-                  <div className="mt-4 p-2.5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                      <p className="text-xs font-bold text-blue-800 uppercase">Demo</p>
-                    </div>
-                    <p className="text-xs text-blue-700">Use qualquer login e senha válidos</p>
-                  </div>
 
                   <p className="text-center text-xs text-gray-600 mt-4">
                     Não tem conta?{" "}

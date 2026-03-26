@@ -68,7 +68,7 @@ export default function Me() {
     return (
         <>
             <Head>
-                <title>Meu Perfil - cw</title>
+                <title>Meu Perfil - Office</title>
             </Head>
             <div className={styles.page}>
                 <div className={styles.breadcrumb}>Meu Perfil</div>

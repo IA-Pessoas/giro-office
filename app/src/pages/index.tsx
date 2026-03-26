@@ -7,7 +7,7 @@ export default function Home() {
     return(
         <>
             <Head>
-                <title>cw</title>
+                <title>Office</title>
             </Head>
             <div className={styles.page}>
                 <p className={styles.title}>Home</p>
