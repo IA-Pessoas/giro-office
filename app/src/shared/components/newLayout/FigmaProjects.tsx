@@ -202,7 +202,7 @@ export function FigmaProjects() {
   ];
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6">
+    <div className="max-w-[1600px] mx-auto space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-3">
@@ -225,13 +225,13 @@ export function FigmaProjects() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
             <div
               key={stat.label}
-              className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6"
+              className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5"
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -249,8 +249,8 @@ export function FigmaProjects() {
         })}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-4">
-        <div className="flex flex-col md:flex-row gap-4">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-3">
+        <div className="flex flex-col md:flex-row gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -305,15 +305,15 @@ export function FigmaProjects() {
       </div>
 
       {viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredProjects.map((project) => {
             const StatusIcon = statusConfig[project.status].icon;
             return (
               <div
                 key={project.id}
-                className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group"
+                className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group"
               >
-                <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
@@ -321,7 +321,7 @@ export function FigmaProjects() {
                       </h3>
                       <Star className="w-4 h-4 text-gray-300 dark:text-gray-600 hover:text-yellow-500 hover:fill-yellow-500 transition-colors cursor-pointer" />
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-slate-400 line-clamp-2 mb-3">
+                    <p className="text-sm text-gray-600 dark:text-slate-400 line-clamp-2 mb-2.5">
                       {project.description}
                     </p>
                   </div>
@@ -335,7 +335,7 @@ export function FigmaProjects() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-3">
                   <span
                     className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[project.status].color} flex items-center gap-1`}
                   >
@@ -347,7 +347,7 @@ export function FigmaProjects() {
                   </span>
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-3">
                   <div className="flex items-center justify-between text-sm mb-2">
                     <span className="text-gray-600 dark:text-slate-400">Progresso</span>
                     <span className="font-semibold text-gray-900 dark:text-white">{project.progress}%</span>
@@ -360,7 +360,7 @@ export function FigmaProjects() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-100 dark:border-slate-800">
+                <div className="flex items-center gap-4 mb-3 pb-3 border-b border-gray-100 dark:border-slate-800">
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
                     <span className="text-gray-900 dark:text-white font-medium">
