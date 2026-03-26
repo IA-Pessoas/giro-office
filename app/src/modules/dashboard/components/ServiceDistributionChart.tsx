@@ -1,4 +1,5 @@
-import React from 'react';
+import React from "react";
+import { PieChart as PieChartIcon } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -18,10 +19,8 @@ interface ServiceDistributionChartProps {
 }
 
 export function ServiceDistributionChart({ data }: ServiceDistributionChartProps) {
-  const textColor = 'var(--dashboard-text-color, #334155)';
-  const gridColor = '#e2e8f0';
-  const barColor = '#2f406a';
-  const lineColor = '#d0ab70';
+  const barColor = "#3b82f6";
+  const lineColor = "#3b82f6";
 
   const chartData = [
     {
@@ -61,14 +60,10 @@ export function ServiceDistributionChart({ data }: ServiceDistributionChartProps
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="rounded-md border border-slate-200 bg-white p-3 shadow-lg">
-          <p className="mb-2 font-bold" style={{ color: textColor }}>
-            {payload[0].payload.name}
-          </p>
-          <p className="text-sm" style={{ color: textColor }}>
-            Clientes: {payload[0].value}
-          </p>
-          <p className="text-sm" style={{ color: textColor }}>
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 shadow-lg">
+          <p className="mb-1 font-semibold text-gray-900 dark:text-white">{payload[0].payload.name}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Clientes: {payload[0].value}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Percentual: {payload[0].payload.percentage}%
           </p>
         </div>
@@ -78,27 +73,27 @@ export function ServiceDistributionChart({ data }: ServiceDistributionChartProps
   };
 
   return (
-    <section className="dashboard-card">
-      <h3 className="dashboard-card-title mb-4" style={{ color: textColor }}>
+    <section className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-1">
+        <PieChartIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
         Distribuição por Serviços
       </h3>
-      <p className="dashboard-card-subtitle mb-4">
-        Total: {total} clientes
-      </p>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Total: {total} clientes</p>
       <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
           <XAxis 
             dataKey="name" 
-            tick={{ fill: textColor, fontSize: 12 }}
+            stroke="#9ca3af"
+            tick={{ fill: "#9ca3af", fontSize: 12 }}
             angle={-45}
             textAnchor="end"
             height={80}
           />
-          <YAxis tick={{ fill: textColor, fontSize: 12 }} />
+          <YAxis stroke="#9ca3af" tick={{ fill: "#9ca3af", fontSize: 12 }} />
           <Tooltip content={<CustomTooltip />} />
           <Legend 
-            wrapperStyle={{ color: textColor }}
+            wrapperStyle={{ color: "#9ca3af" }}
             iconType="circle"
           />
           <Bar 

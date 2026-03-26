@@ -1,8 +1,8 @@
 {
   "generatedAt": "2026-03-24",
   "summary": {
-    "totalFilesUsingChakra": 40,
-    "highRiskCount": 6,
+    "totalFilesUsingChakra": 38,
+    "highRiskCount": 4,
     "mediumRiskCount": 19,
     "lowRiskCount": 15
   },
@@ -10,8 +10,6 @@
     "app/src/pages/_app.tsx",
     "app/src/pages/_documents.tsx",
     "app/src/styles/theme.ts",
-    "app/src/shared/components/sidebar/index.tsx",
-    "app/src/components/sidebar/index.tsx",
     "app/src/modules/chat/components/ChatOverlay.tsx"
   ],
   "mediumRisk": [
@@ -54,7 +52,7 @@
   ],
   "notes": [
     "Nao remover @chakra-ui/react e @chakra-ui/icons do app/package.json antes de migrar os arquivos de risco alto e medio.",
-    "Priorizar _app.tsx, theme.ts e sidebars para desacoplamento final.",
+    "Priorizar _app.tsx e theme.ts para desacoplamento final.",
     "Ao migrar ChatOverlay e flow de chat, validar comportamento de drawer, focus e notificacoes."
   ]
 }

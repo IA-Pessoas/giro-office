@@ -1,8 +1,18 @@
-import { canSSRAuth } from '@modules/auth';
-import { DepartmentRoutePage } from '@modules/departments/components/DepartmentRoutePage';
+import React from "react";
+import Head from "next/head";
+
+import { canSSRAuth } from "@modules/auth";
+import { Contabil } from "../shared/components/newLayout/Contabil";
 
 export default function ContabilPage() {
-  return <DepartmentRoutePage title="Contabil" />;
+  return (
+    <>
+      <Head>
+        <title>Contábil</title>
+      </Head>
+      <Contabil />
+    </>
+  );
 }
 
 export const getServerSideProps = canSSRAuth(async () => {

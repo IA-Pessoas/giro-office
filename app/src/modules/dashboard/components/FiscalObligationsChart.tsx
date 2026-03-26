@@ -1,4 +1,5 @@
-import React from 'react';
+import React from "react";
+import { BarChart3 } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -7,7 +8,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts';
 import type { DashboardStats, FiscalObligationStatus } from '../types';
@@ -23,11 +23,9 @@ const STATUS_LABEL: Record<FiscalObligationStatus, string> = {
 };
 
 export function FiscalObligationsChart({ data }: FiscalObligationsChartProps) {
-  const textColor = 'var(--dashboard-text-color, #334155)';
-  const gridColor = '#e2e8f0';
-  const pendingColor = '#2f406a';
-  const issuedColor = '#48BB78';
-  const overdueColor = '#EF4444';
+  const pendingColor = "#2f406a";
+  const issuedColor = "#48BB78";
+  const overdueColor = "#EF4444";
 
   const chartData = data.map((item) => ({
     status: STATUS_LABEL[item.status],
@@ -45,27 +43,24 @@ export function FiscalObligationsChart({ data }: FiscalObligationsChartProps) {
     if (!active || !payload?.length) return null;
     const p = payload[0];
     return (
-      <div className="rounded-md border border-slate-200 bg-white p-3 shadow-lg">
-        <p className="font-bold" style={{ color: textColor }}>
-          {p.payload.status}
-        </p>
-        <p className="text-sm" style={{ color: textColor }}>
-          Quantidade: {p.value}
-        </p>
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 shadow-lg">
+        <p className="font-semibold text-gray-900 dark:text-white">{p.payload.status}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">Quantidade: {p.value}</p>
       </div>
     );
   };
 
   return (
-    <section className="dashboard-card">
-      <h3 className="dashboard-card-title mb-4" style={{ color: textColor }}>
+    <section className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-6">
+        <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
         Fiscal: Obrigações/Guias
       </h3>
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-          <XAxis dataKey="status" tick={{ fill: textColor, fontSize: 12 }} />
-          <YAxis tick={{ fill: textColor, fontSize: 12 }} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+          <XAxis dataKey="status" stroke="#9ca3af" tick={{ fill: "#9ca3af", fontSize: 12 }} />
+          <YAxis stroke="#9ca3af" tick={{ fill: "#9ca3af", fontSize: 12 }} />
           <Tooltip content={<CustomTooltip />} />
           <Bar dataKey="count" name="Quantidade" radius={[8, 8, 0, 0]}>
             {chartData.map((entry, index) => (
@@ -77,15 +72,15 @@ export function FiscalObligationsChart({ data }: FiscalObligationsChartProps) {
       <div className="mt-3 flex flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <span className="h-[10px] w-[10px] rounded-full" style={{ background: pendingColor }} />
-          <span className="text-xs text-slate-500">Pendentes</span>
+          <span className="text-xs text-gray-600 dark:text-gray-400">Pendentes</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="h-[10px] w-[10px] rounded-full" style={{ background: issuedColor }} />
-          <span className="text-xs text-slate-500">Emitidas</span>
+          <span className="text-xs text-gray-600 dark:text-gray-400">Emitidas</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="h-[10px] w-[10px] rounded-full" style={{ background: overdueColor }} />
-          <span className="text-xs text-slate-500">Atrasadas</span>
+          <span className="text-xs text-gray-600 dark:text-gray-400">Atrasadas</span>
         </div>
       </div>
     </section>

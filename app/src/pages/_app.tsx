@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import type { AppProps } from "next/app";
 import { useRouter } from 'next/router';
-import { Box, Flex } from '@shared/ui/chakraShims';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -11,7 +10,7 @@ import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ChatProvider } from "@modules/chat";
 import { ChatControllerUI } from '@shared/components/ChatControllerUI';
 import { SocketProvider } from '../context/SocketContext'
-import Navbar from "@shared/components/sidebar";
+import { AppShell } from "../shared/components/newLayout/AppShell";
 
 function AppLayout({ children }) {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -29,32 +28,43 @@ function AppLayout({ children }) {
   }
 
   return (
-    <Flex>
-      <Navbar modulo='castelo' cargo={user.permission} onChatOpen={() => setIsChatOpen(true)} />
-      
-      <Box 
-        className='main' 
-        flex="1"
-        // Deixa o espaço para a Navbar na esquerda em telas de desktop
-        pl={{ base: 0, md: '0px' }}
-      >
-        {children} {/* Aqui é onde o conteúdo da sua página será renderizado */}
-      </Box>
-
-      {/* 4. O Overlay do chat também é controlado pelo estado do Layout */}
+    <AppShell>
+      {children}
       <ChatControllerUI
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
       />
-    </Flex>
+    </AppShell>
   );
 }
 
-function ColorModeBridge() {
+function ThemeBridge() {
   useEffect(() => {
-    const storedMode = localStorage.getItem("chakra-ui-color-mode");
-    const initialTheme = storedMode === "dark" ? "dark" : "light";
-    document.documentElement.setAttribute("data-theme", initialTheme);
+    const storedWorkspaceTheme = localStorage.getItem("workspace-theme");
+    const storedLegacyTheme = localStorage.getItem("chakra-ui-color-mode");
+
+    const prefersDark =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    const initialTheme =
+      storedWorkspaceTheme === "dark" || storedWorkspaceTheme === "light"
+        ? storedWorkspaceTheme
+        : storedLegacyTheme === "dark" || storedLegacyTheme === "light"
+          ? storedLegacyTheme
+          : prefersDark
+            ? "dark"
+            : "light";
+
+    const root = document.documentElement;
+    root.classList.remove("light", "dark");
+    root.classList.add(initialTheme);
+
+    // Compatibility while we migrate old overrides: keep `data-theme` in sync too.
+    root.setAttribute("data-theme", initialTheme);
+
+    localStorage.setItem("workspace-theme", initialTheme);
   }, []);
 
   return null;
@@ -68,7 +78,7 @@ function MyApp({ Component, pageProps }: AppProps) {
 
   return (
     <>
-      <ColorModeBridge />
+      <ThemeBridge />
       <AuthProvider>
         <SocketProvider>
           <ChatProvider>

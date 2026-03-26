@@ -1,8 +1,18 @@
-import { canSSRAuth } from '@modules/auth';
-import { DepartmentRoutePage } from '@modules/departments/components/DepartmentRoutePage';
+import React from "react";
+import Head from "next/head";
+
+import { canSSRAuth } from "@modules/auth";
+import { Triagem } from "../shared/components/newLayout/Triagem";
 
 export default function TriagemPage() {
-  return <DepartmentRoutePage title="Triagem" />;
+  return (
+    <>
+      <Head>
+        <title>Triagem</title>
+      </Head>
+      <Triagem />
+    </>
+  );
 }
 
 export const getServerSideProps = canSSRAuth(async () => {

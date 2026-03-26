@@ -1,14 +1,15 @@
-import React from 'react';
-import { FiUsers, FiTrendingUp, FiActivity } from 'react-icons/fi';
-import { StatCard } from './StatCard';
-import { ServiceDistributionChart } from './ServiceDistributionChart';
-import { ClientTrendsChart } from './ClientTrendsChart';
-import { QuickActions } from './QuickActions';
-import { FiscalObligationsChart } from './FiscalObligationsChart';
-import { InsightsPanel } from './InsightsPanel';
-import { RecentClientsTable } from './RecentClientsTable';
-import { LoadingSpinner } from '@shared/components/LoadingSpinner';
-import type { DashboardStats } from '../types';
+import React from "react";
+import { FiActivity, FiTrendingUp, FiUsers } from "react-icons/fi";
+import { LoadingSpinner } from "@shared/components/LoadingSpinner";
+
+import type { DashboardStats } from "../types";
+import { ClientTrendsChart } from "./ClientTrendsChart";
+import { FiscalObligationsChart } from "./FiscalObligationsChart";
+import { InsightsPanel } from "./InsightsPanel";
+import { QuickActions } from "./QuickActions";
+import { RecentClientsTable } from "./RecentClientsTable";
+import { ServiceDistributionChart } from "./ServiceDistributionChart";
+import { StatCard } from "./StatCard";
 
 interface DashboardGridProps {
   stats: DashboardStats | null;
@@ -16,11 +17,14 @@ interface DashboardGridProps {
 }
 
 export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
-  const cardColor = 'var(--colors-brand-blue)';
+  const cardColor = "var(--colors-brand-blue)";
 
   if (isLoading) {
     return (
-      <div className="u-flex u-items-center u-justify-between" style={{ minHeight: 400, justifyContent: 'center' }}>
+      <div
+        className="flex items-center justify-center"
+        style={{ minHeight: 400 }}
+      >
         <LoadingSpinner />
       </div>
     );
@@ -29,7 +33,7 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
   if (!stats) {
     return (
       <div className="py-10 text-center">
-        <p className="text-sm text-slate-500">Nenhum dado disponível</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">Nenhum dado disponível</p>
       </div>
     );
   }
@@ -40,10 +44,10 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
     : 0;
 
   return (
-    <section className="dashboard-shell u-stack u-gap-4 p-4 md:p-6">
+    <section className="space-y-6">
       <QuickActions />
 
-      <div className="u-grid-kpi">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <StatCard
           data={{
             title: 'Total de Clientes',
@@ -74,7 +78,7 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
         />
       </div>
 
-      <div className="u-grid-two-up">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <FiscalObligationsChart data={stats.fiscal.obligations} />
         <InsightsPanel insights={stats.insights} />
       </div>
@@ -83,7 +87,7 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
         <RecentClientsTable data={stats.recentClients} />
       </div>
 
-      <div className="u-grid-two-up">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ServiceDistributionChart data={stats.clientsByService} />
         <ClientTrendsChart data={stats.monthlyTrends} />
       </div>
