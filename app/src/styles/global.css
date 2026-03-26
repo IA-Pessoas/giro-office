@@ -1,7 +1,7 @@
 @import "./tokens.css";
+@import "./new-layout/index.css";
 
-@import "tailwindcss" source(none);
-@source "../**/*.{js,ts,jsx,tsx}";
+/* Tailwind v4 is now provided by `./new-layout/tailwind.css` (kept here as a single entrypoint). */
 
 *,
 *::before,
