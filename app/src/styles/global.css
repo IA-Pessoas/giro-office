@@ -1,5 +1,5 @@
-@import "./tokens.css";
 @import "./new-layout/index.css";
+@import "./tokens.css";
 
 /* Tailwind v4 is now provided by `./new-layout/tailwind.css` (kept here as a single entrypoint). */
 
