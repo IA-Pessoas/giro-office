@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+test("package root and subpath exports resolve", async () => {
+  const root = await import("@workspace/shared");
+  const auth = await import("@workspace/shared/auth");
+  const audit = await import("@workspace/shared/audit");
+  const http = await import("@workspace/shared/http");
+  const logger = await import("@workspace/shared/logger");
+
+  assert.equal(root.ServiceError, http.ServiceError);
+  assert.equal(root.authenticateFromAuthHeader, auth.authenticateFromAuthHeader);
+  assert.equal(root.createAuditRecorder, audit.createAuditRecorder);
+  assert.equal(root.createLogger, logger.createLogger);
+});

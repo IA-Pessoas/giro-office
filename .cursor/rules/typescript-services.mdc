@@ -1,0 +1,29 @@
+---
+description: Padrões TypeScript e services
+globs: services/**/*.ts
+alwaysApply: false
+---
+
+# TypeScript e Services
+
+## Imports
+- Usar extensão .js em imports locais (ESM)
+- Importar de @workspace/shared quando disponível
+
+## Services
+- Uma responsabilidade por service
+- StorageService: apenas operações de storage
+- UserService: lógica de usuário e banco
+- OrganizationService: lógica de organização e banco
+- Rotas coordenam chamadas entre services
+
+## Erros em services
+- Logs de erro detalhados
+
+```typescript
+} catch (err: unknown) {
+  if (err instanceof ServiceError) throw err;
+  logError("Contexto do erro", { err });
+  throw new ServiceError(500, "Mensagem amigável.", err);
+}
+```

@@ -1,0 +1,39 @@
+---
+description: Regras padrão do projeto Workspace
+alwaysApply: true
+---
+# Regras do Projeto Workspace
+
+## Idioma
+- Sempre responder em português.
+
+## Stack
+- Microservices em `services/` (pnpm workspace)
+- TypeScript, ESM (imports com extensão .js)
+- Biome para lint/format
+- Express, Prisma, Supabase
+
+## Formatação (Biome)
+- Aspas duplas
+- 2 espaços de indentação
+- Trailing commas
+- Line width: 100
+- Semicolons sempre
+
+## Tratamento de erros
+- Usar `ServiceError` do @workspace/shared para erros de negócio
+- Usar `logError` (error do shared) para logging
+- Em rotas: try/catch, logError e next(err)
+- Em services: `if (err instanceof ServiceError) throw err` antes de re-throw genérico
+
+## Respostas da API
+- Usar `createSuccessResponse` do @workspace/shared para respostas JSON
+
+## Arquitetura e Estrutura
+
+- **Microservices**: O projeto está em refatoração para microservices. O padrão de estrutura está em `services/`.
+- **Serviços atuais**: user-service, audit-service, organization-service, gateway (cada um em `services/<nome>/src/`).
+- **Legado**: A estrutura monorepo antiga (ex: `services/src`, `app`, etc.) não deve mais ser usada como referência.
+- **Novos serviços**: Seguir o padrão dos microservices existentes em `services/`.
+- Código compartilhado em `shared`.
+- Rotas orquestram services; services não chamam rotas.

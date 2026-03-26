@@ -1,0 +1,72 @@
+{
+  "generatedAt": "2026-03-26",
+  "summary": {
+    "note": "@chakra-ui/react is not an app dependency. Legacy UI uses clientTabPrimitives (client tabs) or inline shims (integracao modals).",
+    "totalFilesUsingChakra": 0,
+    "highRiskCount": 3,
+    "mediumRiskCount": 19,
+    "lowRiskCount": 15
+  },
+  "highRisk": [
+    "app/src/pages/_app.tsx",
+    "app/src/pages/_documents.tsx",
+    "app/src/modules/chat/components/ChatOverlay.tsx"
+  ],
+  "legacyClientPrimitives": [
+    "app/src/shared/ui/clientTabPrimitives.tsx",
+    "app/src/components/Tabs/Client/Client.tsx",
+    "app/src/components/Tabs/Client/Comercial.tsx",
+    "app/src/components/Tabs/Client/Integracao.tsx",
+    "app/src/components/Tabs/Client/Regularize.tsx",
+    "app/src/components/Forms/ClientTabs/Comercial/DataTab.tsx",
+    "app/src/components/Forms/ClientTabs/Integracao/DataTab.tsx",
+    "app/src/components/Forms/ClientTabs/Regularize/DataTab.tsx"
+  ],
+  "inlineShimsIntegracao": [
+    "app/src/modules/integracao/components/ProjectCreateModal.tsx",
+    "app/src/modules/integracao/components/TaskModelModal.tsx"
+  ],
+  "mediumRisk": [
+    "app/src/pages/login/index.tsx",
+    "app/src/pages/home/index.tsx",
+    "app/src/pages/me/index.tsx",
+    "app/src/pages/configs/integracao/index.tsx",
+    "app/src/pages/configs/integracao/tasks/index.tsx",
+    "app/src/modules/chat/components/ChatLayout.tsx",
+    "app/src/modules/chat/components/ChatListPanel.tsx",
+    "app/src/modules/chat/components/ConversationWindow.tsx",
+    "app/src/modules/chat/components/GroupInfoSidebar.tsx",
+    "app/src/modules/departments/components/DepartmentProfile.tsx",
+    "app/src/components/Tabs/ClientTabs.tsx",
+    "app/src/components/Tabs/Client/Client.tsx",
+    "app/src/components/Tabs/Client/Comercial.tsx",
+    "app/src/components/Tabs/Client/Integracao.tsx",
+    "app/src/components/Tabs/Client/Regularize.tsx",
+    "app/src/components/Forms/ClientTabs/Comercial/DataTab.tsx",
+    "app/src/components/Forms/ClientTabs/Integracao/DataTab.tsx",
+    "app/src/components/Forms/ClientTabs/Regularize/DataTab.tsx",
+    "app/src/modules/departments/components/CreateDepModal.tsx"
+  ],
+  "lowRisk": [
+    "app/src/pages/index.tsx",
+    "app/src/pages/users/index.tsx",
+    "app/src/pages/clients/index.tsx",
+    "app/src/pages/departments/[id].tsx",
+    "app/src/modules/departments/components/DepList.tsx",
+    "app/src/modules/departments/components/DepFilters.tsx",
+    "app/src/modules/departments/components/DepDetailsView.tsx",
+    "app/src/modules/integracao/components/ProjectCreateModal.tsx",
+    "app/src/modules/integracao/components/TaskModelModal.tsx",
+    "app/src/components/Iframe/Details.tsx",
+    "app/src/components/DateList/InfoItem/index.tsx",
+    "app/src/components/Forms/StateCity/index.tsx",
+    "app/src/components/Infos/ActionButton.tsx",
+    "app/src/components/Infos/DataRow.tsx",
+    "app/src/utils/redirect.tsx"
+  ],
+  "notes": [
+    "Theme: primary storage key is workspace-theme (localStorage + cookie); chakra-ui-color-mode is still written for backward compatibility.",
+    "Run pnpm --filter @workspace/app migration:audit:chakra for @chakra-ui import scan + clientTabPrimitives report.",
+    "Next cleanup: replace clientTabPrimitives with Tailwind on client tabs; replace integracao modal inline shims with shared Dialog."
+  ]
+}
