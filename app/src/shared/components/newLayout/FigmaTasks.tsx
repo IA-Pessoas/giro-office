@@ -367,8 +367,8 @@ export function FigmaTasks() {
       </div>
 
       {viewMode === "list" ? (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-          <div className="divide-y divide-gray-200 dark:divide-slate-800">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-3">
+          <div className="space-y-3">
             {filteredTasks.map((task) => {
               const StatusIcon = statusConfig[task.status].icon;
               const overdueTask = isOverdue(task.dueDate) && !task.completed;
@@ -376,7 +376,7 @@ export function FigmaTasks() {
               return (
                 <div
                   key={task.id}
-                  className={`p-4 hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors ${
+                  className={`p-4 rounded-xl border border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors ${
                     task.completed ? "opacity-60" : ""
                   }`}
                 >
