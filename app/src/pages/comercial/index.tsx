@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaCommercial } from "../../shared/components/newLayout/FigmaCommercial";
+import { Commercial } from "../../shared/components/newLayout/Commercial";
 
 export default function CommercialPage() {
   return (
@@ -10,7 +10,7 @@ export default function CommercialPage() {
       <Head>
         <title>Comercial</title>
       </Head>
-      <FigmaCommercial />
+      <Commercial />
     </>
   );
 }

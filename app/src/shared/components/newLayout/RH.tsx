@@ -67,7 +67,7 @@ interface Request {
   description: string;
 }
 
-export function FigmaRH() {
+export function RH() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'requests' | 'evaluations' | 'timetracking'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
@@ -400,48 +400,48 @@ export function FigmaRH() {
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total de Colaboradores</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{totalEmployees}</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Users className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Colaboradores Ativos</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{activeEmployees}</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <UserCheck className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Em Férias</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{onVacation}</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Calendar className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Solicitações Pendentes</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{pendingRequests}</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Clock className="w-6 h-6 text-white" />
                 </div>
               </div>
@@ -722,7 +722,7 @@ export function FigmaRH() {
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Colaborador</th>
@@ -733,13 +733,16 @@ export function FigmaRH() {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody>
                   {requests.map((req) => {
                     const TypeIcon = requestTypeConfig[req.type].icon;
                     const StatusIcon = requestStatusConfig[req.status].icon;
                     
                     return (
-                      <tr key={req.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <tr
+                        key={req.id}
+                        className="[&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl [&>td]:bg-white dark:[&>td]:bg-gray-800 [&>td]:border-y [&>td]:border-gray-200 dark:[&>td]:border-gray-700 [&>td:first-child]:border-l [&>td:last-child]:border-r hover:[&>td]:bg-gray-50 dark:hover:[&>td]:bg-gray-700/50 transition-colors"
+                      >
                         <td className="px-6 py-4">
                           <p className="font-semibold text-gray-900 dark:text-white">{req.employee}</p>
                         </td>
@@ -886,52 +889,52 @@ export function FigmaRH() {
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Presentes Hoje</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">124</p>
                   <p className="text-xs text-green-600 dark:text-green-400 mt-1">+8 vs ontem</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <UserCheck className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Horas Extras Mês</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">342h</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">15 colaboradores</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Clock className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Ajustes Pendentes</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">8</p>
                   <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">Aguardando aprovação</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <AlertCircle className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Faltas do Mês</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">12</p>
                   <p className="text-xs text-red-600 dark:text-red-400 mt-1">-3 vs mês anterior</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <UserX className="w-6 h-6 text-white" />
                 </div>
               </div>

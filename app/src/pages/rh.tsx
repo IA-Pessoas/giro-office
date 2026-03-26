@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaRH } from "../shared/components/newLayout/FigmaRH";
+import { RH } from "../shared/components/newLayout/RH";
 
 export default function RHPage() {
   return (
@@ -10,7 +10,7 @@ export default function RHPage() {
       <Head>
         <title>RH</title>
       </Head>
-      <FigmaRH />
+      <RH />
     </>
   );
 }

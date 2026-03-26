@@ -3,7 +3,7 @@ import Head from "next/head";
 import "react-toastify/dist/ReactToastify.css";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaDashboard } from "../../shared/components/newLayout/FigmaDashboard";
+import { Dashboard as DashboardContent } from "../../shared/components/newLayout/Dashboard";
 
 export default function Dashboard() {
     return (
@@ -11,7 +11,7 @@ export default function Dashboard() {
             <Head>
                 <title>Dashboard</title>
             </Head>
-            <FigmaDashboard />
+            <DashboardContent />
         </>
     )
 }

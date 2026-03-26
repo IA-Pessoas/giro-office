@@ -144,7 +144,7 @@ interface Reminder {
   createdAt: string;
 }
 
-export function FigmaRegularize() {
+export function Regularize() {
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "processes" | "permits" | "clients" | "passwords" | "partners" | "reminders"
   >("dashboard");

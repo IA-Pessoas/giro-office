@@ -106,7 +106,7 @@ interface Reminder {
   createdAt: string;
 }
 
-export function FigmaParcelamento() {
+export function Parcelamento() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'certificates' | 'debts' | 'installments' | 'reminders'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -493,7 +493,7 @@ export function FigmaParcelamento() {
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Certidões Válidas</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{validCertificates}</p>
@@ -504,14 +504,14 @@ export function FigmaParcelamento() {
                     </p>
                   )}
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <ShieldCheck className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Débitos Ativos</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{activeDebts}</p>
@@ -519,14 +519,14 @@ export function FigmaParcelamento() {
                     {formatCurrency(totalDebtAmount)}
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Receipt className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Parcelamentos Ativos</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{activeInstallments}</p>
@@ -537,14 +537,14 @@ export function FigmaParcelamento() {
                     </p>
                   )}
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Wallet className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Lembretes Pendentes</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{pendingReminders}</p>
@@ -552,7 +552,7 @@ export function FigmaParcelamento() {
                     próximos vencimentos
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Bell className="w-6 h-6 text-white" />
                 </div>
               </div>
@@ -826,7 +826,7 @@ export function FigmaParcelamento() {
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Cliente</th>
@@ -838,11 +838,14 @@ export function FigmaParcelamento() {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody>
                   {debts.map((debt) => {
                     const StatusIcon = statusConfig[debt.status].icon;
                     return (
-                      <tr key={debt.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <tr
+                        key={debt.id}
+                        className="[&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl [&>td]:bg-white dark:[&>td]:bg-gray-800 [&>td]:border-y [&>td]:border-gray-200 dark:[&>td]:border-gray-700 [&>td:first-child]:border-l [&>td:last-child]:border-r hover:[&>td]:bg-gray-50 dark:hover:[&>td]:bg-gray-700/50 transition-colors"
+                      >
                         <td className="px-6 py-4">
                           <div>
                             <p className="font-medium text-gray-900 dark:text-white">{debt.clientName}</p>

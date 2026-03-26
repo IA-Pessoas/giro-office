@@ -31,7 +31,7 @@ import {
   YAxis,
 } from "recharts";
 
-export function FigmaDashboard() {
+export function Dashboard() {
   const activities = [
     {
       user: "João Silva",
@@ -154,17 +154,17 @@ export function FigmaDashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
-                <CheckSquare className="w-6 h-6 text-white" />
+          <div className="mb-4 flex items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div className="h-[3.25rem] w-[3.25rem] shrink-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                <CheckSquare className="h-7 w-7 text-white" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">24</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">24</p>
                 <p className="text-xs text-gray-600 dark:text-gray-400">Tarefas Hoje</p>
               </div>
             </div>
-            <div className="text-right">
+            <div className="shrink-0 text-right">
               <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded-full flex items-center gap-1">
                 <ArrowUp className="w-3 h-3" />
                 12%
@@ -186,21 +186,15 @@ export function FigmaDashboard() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">R$ 125k</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Receita Março</p>
-              </div>
+          <div className="mb-4 flex items-start gap-3">
+            <div className="h-[3.25rem] w-[3.25rem] shrink-0 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md">
+              <DollarSign className="h-7 w-7 text-white" />
             </div>
-            <div className="text-right">
-              <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded-full flex items-center gap-1">
-                <ArrowUp className="w-3 h-3" />
-                8.5%
-              </span>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold leading-tight whitespace-nowrap text-gray-900 dark:text-white">
+                R$ 125k
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Receita Março</p>
             </div>
           </div>
           <div className="space-y-1">
@@ -215,20 +209,20 @@ export function FigmaDashboard() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md relative">
-                <Bell className="w-6 h-6 text-white" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
+          <div className="mb-4 flex items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div className="relative h-[3.25rem] w-[3.25rem] shrink-0 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+                <Bell className="h-7 w-7 text-white" />
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
                   3
                 </span>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">8</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">8</p>
                 <p className="text-xs text-gray-600 dark:text-gray-400">Notificações</p>
               </div>
             </div>
-            <AlertCircle className="w-5 h-5 text-purple-500 dark:text-purple-400" />
+            <AlertCircle className="h-6 w-6 shrink-0 text-purple-500 dark:text-purple-400" />
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs">
@@ -243,17 +237,17 @@ export function FigmaDashboard() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-md">
-                <Target className="w-6 h-6 text-white" />
+          <div className="mb-4 flex items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div className="h-[3.25rem] w-[3.25rem] shrink-0 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-md">
+                <Target className="h-7 w-7 text-white" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">42</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">42</p>
                 <p className="text-xs text-gray-600 dark:text-gray-400">Projetos Ativos</p>
               </div>
             </div>
-            <Calendar className="w-5 h-5 text-cyan-500 dark:text-cyan-400" />
+            <Calendar className="h-6 w-6 shrink-0 text-cyan-500 dark:text-cyan-400" />
           </div>
           <div className="space-y-1">
             <p className="text-xs text-gray-600 dark:text-gray-400">Taxa de conclusão:</p>
@@ -468,32 +462,32 @@ export function FigmaDashboard() {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Ações Rápidas</h3>
           <div className="grid grid-cols-2 gap-3">
             <button className="flex flex-col items-center justify-center p-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-all hover:scale-105 group border border-transparent hover:border-blue-200 dark:hover:border-blue-700">
-              <CheckSquare className="w-6 h-6 text-blue-600 dark:text-blue-400 mb-2 group-hover:scale-110 transition-transform" />
+              <CheckSquare className="h-7 w-7 text-blue-600 dark:text-blue-400 mb-2 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium text-gray-900 dark:text-white">Nova Tarefa</span>
             </button>
 
             <button className="flex flex-col items-center justify-center p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-all hover:scale-105 group border border-transparent hover:border-green-200 dark:hover:border-green-700">
-              <Users className="w-6 h-6 text-green-600 dark:text-green-400 mb-2 group-hover:scale-110 transition-transform" />
+              <Users className="h-7 w-7 text-green-600 dark:text-green-400 mb-2 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium text-gray-900 dark:text-white">Novo Cliente</span>
             </button>
 
             <button className="flex flex-col items-center justify-center p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-all hover:scale-105 group border border-transparent hover:border-purple-200 dark:hover:border-purple-700">
-              <Briefcase className="w-6 h-6 text-purple-600 dark:text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
+              <Briefcase className="h-7 w-7 text-purple-600 dark:text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium text-gray-900 dark:text-white">Novo Projeto</span>
             </button>
 
             <button className="flex flex-col items-center justify-center p-4 bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/30 rounded-lg transition-all hover:scale-105 group border border-transparent hover:border-cyan-200 dark:hover:border-cyan-700">
-              <Mail className="w-6 h-6 text-cyan-600 dark:text-cyan-400 mb-2 group-hover:scale-110 transition-transform" />
+              <Mail className="h-7 w-7 text-cyan-600 dark:text-cyan-400 mb-2 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium text-gray-900 dark:text-white">Enviar Email</span>
             </button>
 
             <button className="flex flex-col items-center justify-center p-4 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-lg transition-all hover:scale-105 group border border-transparent hover:border-orange-200 dark:hover:border-orange-700">
-              <FileText className="w-6 h-6 text-orange-600 dark:text-orange-400 mb-2 group-hover:scale-110 transition-transform" />
+              <FileText className="h-7 w-7 text-orange-600 dark:text-orange-400 mb-2 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium text-gray-900 dark:text-white">Novo Documento</span>
             </button>
 
             <button className="flex flex-col items-center justify-center p-4 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg transition-all hover:scale-105 group border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700">
-              <Calendar className="w-6 h-6 text-indigo-600 dark:text-indigo-400 mb-2 group-hover:scale-110 transition-transform" />
+              <Calendar className="h-7 w-7 text-indigo-600 dark:text-indigo-400 mb-2 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium text-gray-900 dark:text-white">Agendar Reunião</span>
             </button>
           </div>

@@ -60,7 +60,7 @@ function Logo({ showText }: { showText: boolean }) {
 
       {showText ? (
         <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Castelo Workspace
+          Workspace
         </span>
       ) : null}
     </div>
@@ -95,13 +95,20 @@ const moduleCategories = [
   },
   {
     name: "Sistema",
-    modules: [{ path: "/configs/integracao", name: "Configurações", icon: Settings }],
+    modules: [{ path: "/configuracoes", name: "Configurações", icon: Settings }],
   },
   {
     name: "Admin",
     modules: [{ path: "/administracao", name: "Administração", icon: Shield }],
   },
 ];
+
+type ChatMessage = {
+  id: string;
+  sender: "user" | "ai";
+  text: string;
+  time: string;
+};
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -110,16 +117,84 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showAiChat, setShowAiChat] = useState(false);
   const [aiQuery, setAiQuery] = useState("");
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const notifications = [
+    {
+      id: "1",
+      title: "Novo chamado crítico aberto",
+      description: "TI • Computador não liga (Financeiro)",
+      time: "há 5 min",
+      unread: true,
+    },
+    {
+      id: "2",
+      title: "Prazo de tarefa próximo do vencimento",
+      description: "Marketing • Aprovar orçamento de campanha",
+      time: "há 20 min",
+      unread: true,
+    },
+    {
+      id: "3",
+      title: "Backup diário finalizado",
+      description: "Tecnologia • Execução concluída com sucesso",
+      time: "há 1 h",
+      unread: false,
+    },
+  ];
+
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const pathname = router.asPath.split("?")[0] ?? "";
 
   const handleLogout = () => {
     logoutUser();
     router.push("/login");
+  };
+
+  const getTimeLabel = () =>
+    new Date().toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+  const sendChatMessage = (rawText: string) => {
+    const text = rawText.trim();
+    if (!text) {
+      return;
+    }
+
+    const userMsg: ChatMessage = {
+      id: `${Date.now()}-u`,
+      sender: "user",
+      text,
+      time: getTimeLabel(),
+    };
+    const aiMsg: ChatMessage = {
+      id: `${Date.now()}-a`,
+      sender: "ai",
+      text: "Recebi sua mensagem. Em breve vou responder por aqui.",
+      time: getTimeLabel(),
+    };
+
+    setChatMessages((prev) => [...prev, userMsg, aiMsg]);
+    setShowAiChat(true);
+  };
+
+  const handleHeaderAiSubmit = () => {
+    sendChatMessage(aiQuery);
+    setAiQuery("");
+  };
+
+  const handleChatInputSubmit = () => {
+    sendChatMessage(chatInput);
+    setChatInput("");
   };
 
   const toggleSidebar = () => setIsSidebarOpen((v) => !v);
@@ -139,6 +214,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (isMobileMenuOpen) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isMobileMenuOpen]);
+
+  useEffect(() => {
+    if (!showAiChat) {
+      return;
+    }
+    chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [chatMessages, showAiChat]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
@@ -226,10 +308,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <input
                   value={aiQuery}
                   onChange={(e) => setAiQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleHeaderAiSubmit();
+                    }
+                  }}
                   placeholder="Pergunte qualquer coisa ao Assistente IA..."
                   className="w-full pl-9 pr-10 py-2 rounded-xl border border-gray-200 dark:border-slate-800 bg-white/70 dark:bg-slate-800/60 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 />
                 <button
+                  onClick={() => {
+                    if (aiQuery.trim()) {
+                      handleHeaderAiSubmit();
+                    } else {
+                      setShowAiChat(true);
+                    }
+                  }}
                   type="button"
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
                   title="Abrir Assistente IA"
@@ -241,6 +336,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             <div className="flex items-center gap-3">
               <button
+                onClick={() => setShowNotifications((v) => !v)}
                 className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 type="button"
               >
@@ -248,12 +344,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
               </button>
 
-              <Link
-                href="/configs/integracao"
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <Settings className="w-5 h-5 text-gray-600 dark:text-slate-300" />
-              </Link>
+              {showNotifications ? (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+                  <div className="absolute right-6 top-16 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notificações</h3>
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        Marcar todas como lidas
+                      </button>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {notifications.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
+                        >
+                          <div className="flex items-start gap-3">
+                            <span
+                              className={`mt-1 h-2 w-2 rounded-full ${item.unread ? "bg-red-500" : "bg-gray-300 dark:bg-gray-600"}`}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">{item.title}</p>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{item.description}</p>
+                            </div>
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                              {item.time}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : null}
 
               <div className="relative">
                 <button
@@ -283,7 +411,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email ?? ""}</p>
                       </div>
                       <Link
-                        href="/configs/integracao"
+                        href="/configuracoes"
                         className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
                         onClick={() => setShowUserMenu(false)}
                       >
@@ -309,6 +437,85 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
       </div>
+
+      {showAiChat ? (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => setShowAiChat(false)} />
+          <div className="fixed z-[70] right-4 bottom-4 w-[420px] max-w-[calc(100vw-2rem)] h-[70vh] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bot className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Assistente IA</h3>
+              </div>
+              <button
+                onClick={() => setShowAiChat(false)}
+                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                type="button"
+              >
+                <X className="w-4 h-4 text-gray-500 dark:text-slate-400" />
+              </button>
+            </div>
+
+            <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-slate-950/40">
+              {chatMessages.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-center">
+                  <p className="text-sm text-gray-600 dark:text-slate-400">
+                    Envie uma mensagem para iniciar a conversa com a IA.
+                  </p>
+                </div>
+              ) : (
+                chatMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-3 py-2 ${
+                        message.sender === "user"
+                          ? "bg-blue-600 text-white rounded-br-md"
+                          : "bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 border border-gray-200 dark:border-slate-700 rounded-bl-md"
+                      }`}
+                    >
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+                      <p
+                        className={`text-[11px] mt-1 ${
+                          message.sender === "user" ? "text-blue-100" : "text-gray-500 dark:text-slate-400"
+                        }`}
+                      >
+                        {message.time}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-3 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+              <div className="flex items-center gap-2">
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleChatInputSubmit();
+                    }
+                  }}
+                  placeholder="Digite uma mensagem..."
+                  className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+                <button
+                  onClick={handleChatInputSubmit}
+                  className="px-3 py-2 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors"
+                  type="button"
+                >
+                  Enviar
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

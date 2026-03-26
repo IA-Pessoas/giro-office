@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaContabil } from "../shared/components/newLayout/FigmaContabil";
+import { Contabil } from "../shared/components/newLayout/Contabil";
 
 export default function ContabilPage() {
   return (
@@ -10,7 +10,7 @@ export default function ContabilPage() {
       <Head>
         <title>Contábil</title>
       </Head>
-      <FigmaContabil />
+      <Contabil />
     </>
   );
 }

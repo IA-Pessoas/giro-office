@@ -46,7 +46,7 @@ const statusColors: Record<string, string> = {
   Suspensa: "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400",
 };
 
-export function FigmaOrganizations() {
+export function Organizations() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
 

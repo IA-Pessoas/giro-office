@@ -32,7 +32,7 @@ interface Project {
   budget?: string;
 }
 
-export function FigmaProjects() {
+export function Projects() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");

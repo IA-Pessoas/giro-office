@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaTasks } from "../../shared/components/newLayout/FigmaTasks";
+import { Tasks } from "../../shared/components/newLayout/Tasks";
 
 export default function TasksPage() {
   return (
@@ -10,7 +10,7 @@ export default function TasksPage() {
       <Head>
         <title>Tarefas</title>
       </Head>
-      <FigmaTasks />
+      <Tasks />
     </>
   );
 }

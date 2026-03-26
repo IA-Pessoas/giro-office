@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaTriagem } from "../shared/components/newLayout/FigmaTriagem";
+import { Triagem } from "../shared/components/newLayout/Triagem";
 
 export default function TriagemPage() {
   return (
@@ -10,7 +10,7 @@ export default function TriagemPage() {
       <Head>
         <title>Triagem</title>
       </Head>
-      <FigmaTriagem />
+      <Triagem />
     </>
   );
 }

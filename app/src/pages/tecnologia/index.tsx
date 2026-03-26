@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaTecnologia } from "../../shared/components/newLayout/FigmaTecnologia";
+import { Tecnologia } from "../../shared/components/newLayout/Tecnologia";
 
 export default function TecnologiaPage() {
   return (
@@ -10,7 +10,7 @@ export default function TecnologiaPage() {
       <Head>
         <title>Tecnologia</title>
       </Head>
-      <FigmaTecnologia />
+      <Tecnologia />
     </>
   );
 }

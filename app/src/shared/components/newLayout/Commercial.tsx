@@ -96,7 +96,7 @@ interface Contract {
   paymentDay: number;
 }
 
-export function FigmaCommercial() {
+export function Commercial() {
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "leads" | "pipeline" | "proposals" | "contracts"
   >("dashboard");
@@ -640,18 +640,24 @@ export function FigmaCommercial() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5">
-              <div className="flex items-center justify-between">
-                <div>
+            <div
+              className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5 group relative"
+              title={formatCurrency(totalValue)}
+            >
+              <div className="flex items-start justify-between">
+                <div className="min-w-0 flex-1 pr-3">
                   <p className="text-sm text-gray-600 dark:text-slate-400 mb-1">Receita Conquistada</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white leading-tight truncate">
                     {formatCurrency(totalValue)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">mensal</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <DollarSign className="w-6 h-6 text-white" />
                 </div>
+              </div>
+              <div className="pointer-events-none absolute left-4 -bottom-9 rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                {formatCurrency(totalValue)}
               </div>
             </div>
           </div>

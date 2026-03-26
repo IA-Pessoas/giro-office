@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaOrganizations } from "../../shared/components/newLayout/FigmaOrganizations";
+import { Organizations } from "../../shared/components/newLayout/Organizations";
 
 export default function OrganizationsPage() {
   return (
@@ -10,7 +10,7 @@ export default function OrganizationsPage() {
       <Head>
         <title>Organizações</title>
       </Head>
-      <FigmaOrganizations />
+      <Organizations />
     </>
   );
 }

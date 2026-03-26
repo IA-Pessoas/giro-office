@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaClients } from "../../shared/components/newLayout/FigmaClients";
+import { Clients } from "../../shared/components/newLayout/Clients";
 
 export default function ClientsPage() {
   return (
@@ -10,7 +10,7 @@ export default function ClientsPage() {
       <Head>
         <title>Clientes</title>
       </Head>
-      <FigmaClients />
+      <Clients />
     </>
   );
 }

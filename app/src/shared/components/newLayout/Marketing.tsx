@@ -112,7 +112,7 @@ interface Request {
   deliverables?: string[];
 }
 
-export function FigmaMarketing() {
+export function Marketing() {
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "budgets" | "suppliers" | "campaigns" | "requests"
   >("dashboard");
@@ -619,23 +619,29 @@ export function FigmaMarketing() {
       {activeTab === "dashboard" ? (
         <div className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5">
-              <div className="flex items-center justify-between">
-                <div>
+            <div
+              className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5 group relative"
+              title={formatCurrency(totalBudgetValue)}
+            >
+              <div className="flex items-start justify-between">
+                <div className="min-w-0 flex-1 pr-3">
                   <p className="text-sm text-gray-600 dark:text-slate-400 mb-1">Total em Orçamentos</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white leading-tight truncate">
                     {formatCurrency(totalBudgetValue)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">{totalBudgets} orçamentos</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <DollarSign className="w-6 h-6 text-white" />
                 </div>
+              </div>
+              <div className="pointer-events-none absolute left-4 -bottom-9 rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                {formatCurrency(totalBudgetValue)}
               </div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-slate-400 mb-1">Campanhas Ativas</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{activeCampaigns}</p>
@@ -643,27 +649,27 @@ export function FigmaMarketing() {
                     de {campaigns.length} totais
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Target className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-slate-400 mb-1">Pendente Aprovação</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{pendingBudgets}</p>
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">orçamentos</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Clock className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-slate-400 mb-1">Solicitações Ativas</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{pendingRequests}</p>
@@ -671,7 +677,7 @@ export function FigmaMarketing() {
                     de {requests.length} totais
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-pink-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-pink-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Inbox className="w-6 h-6 text-white" />
                 </div>
               </div>

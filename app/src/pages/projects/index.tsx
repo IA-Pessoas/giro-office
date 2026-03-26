@@ -1,10 +1,10 @@
 import type { GetServerSideProps } from "next";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaProjects } from "../../shared/components/newLayout/FigmaProjects";
+import { Projects } from "../../shared/components/newLayout/Projects";
 
 export default function ProjectsPage() {
-  return <FigmaProjects />;
+  return <Projects />;
 }
 
 export const getServerSideProps: GetServerSideProps = canSSRAuth(async () => {

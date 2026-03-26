@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Bell, Globe, Moon, Palette, Shield, Sun, User } from "lucide-react";
+import { Bell, Moon, Palette, Shield, Sun, User } from "lucide-react";
+import { useAuth } from "../../../context/AuthContext";
 
-export function FigmaConfiguracoes() {
+export function Configuracoes() {
+  const { user } = useAuth();
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -20,11 +22,14 @@ export function FigmaConfiguracoes() {
     setIsDark(next);
   };
 
-  const user = {
-    name: "Admin Workspace",
-    email: "admin@workspace.com",
-    initials: "AW",
-  };
+  const displayName = user?.name?.trim() || "Admin Workspace";
+  const displayEmail = user?.login?.trim() || "admin@workspace.com";
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "AW";
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -43,11 +48,11 @@ export function FigmaConfiguracoes() {
 
         <div className="flex items-center gap-4 mb-4">
           <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-            <span className="text-xl font-semibold text-white">{user.initials}</span>
+            <span className="text-xl font-semibold text-white">{initials}</span>
           </div>
           <div>
-            <p className="text-lg font-medium text-gray-900 dark:text-white">{user.name}</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">{user.email}</p>
+            <p className="text-lg font-medium text-gray-900 dark:text-white">{displayName}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{displayEmail}</p>
           </div>
         </div>
 
@@ -116,33 +121,6 @@ export function FigmaConfiguracoes() {
             <span className="text-sm text-gray-700 dark:text-gray-300">Alertas de prazos</span>
             <input type="checkbox" defaultChecked className="w-4 h-4 text-blue-600 rounded" />
           </label>
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Globe className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Preferências</h2>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Idioma</label>
-            <select className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option>Português (BR)</option>
-              <option>English (US)</option>
-              <option>Español</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Fuso Horário
-            </label>
-            <select className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option>América/São Paulo (GMT-3)</option>
-              <option>América/Rio de Janeiro (GMT-3)</option>
-            </select>
-          </div>
         </div>
       </div>
 

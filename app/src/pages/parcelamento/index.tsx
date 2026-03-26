@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaParcelamento } from "../../shared/components/newLayout/FigmaParcelamento";
+import { Parcelamento } from "../../shared/components/newLayout/Parcelamento";
 
 export default function ParcelamentoPage() {
   return (
@@ -10,7 +10,7 @@ export default function ParcelamentoPage() {
       <Head>
         <title>Parcelamento</title>
       </Head>
-      <FigmaParcelamento />
+      <Parcelamento />
     </>
   );
 }

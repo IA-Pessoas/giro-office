@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaAdministracao } from "../../shared/components/newLayout/FigmaAdministracao";
+import { Administracao } from "../../shared/components/newLayout/Administracao";
 
 export default function AdministracaoPage() {
   return (
@@ -10,7 +10,7 @@ export default function AdministracaoPage() {
       <Head>
         <title>Administração</title>
       </Head>
-      <FigmaAdministracao />
+      <Administracao />
     </>
   );
 }

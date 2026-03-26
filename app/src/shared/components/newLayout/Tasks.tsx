@@ -27,7 +27,7 @@ interface Task {
   completed: boolean;
 }
 
-export function FigmaTasks() {
+export function Tasks() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");

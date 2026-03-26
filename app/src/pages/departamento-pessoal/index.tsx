@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { FigmaDepartamentoPessoal } from "../../shared/components/newLayout/FigmaDepartamentoPessoal";
+import { DepartamentoPessoal } from "../../shared/components/newLayout/DepartamentoPessoal";
 
 export default function DepartamentoPessoalPage() {
   return (
@@ -10,7 +10,7 @@ export default function DepartamentoPessoalPage() {
       <Head>
         <title>Departamento Pessoal</title>
       </Head>
-      <FigmaDepartamentoPessoal />
+      <DepartamentoPessoal />
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { Filter, Wrench, Calendar, TrendingUp } from 'lucide-react';
 
-export function FigmaTriagem() {
+export function Triagem() {
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
       {/* Header */}

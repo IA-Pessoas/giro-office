@@ -88,7 +88,7 @@ interface Task {
   assignee: string;
 }
 
-export function FigmaDepartamentoPessoal() {
+export function DepartamentoPessoal() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'companies' | 'certificates' | 'debts' | 'tasks'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRegime, setFilterRegime] = useState<string>('all');
@@ -527,48 +527,56 @@ export function FigmaDepartamentoPessoal() {
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Empresas Ativas</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{totalCompanies}</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Building2 className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total de Colaboradores</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{totalEmployees}</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Users className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
-                <div>
+            <div
+              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 group relative"
+              title={formatCurrency(totalPayroll)}
+            >
+              <div className="flex items-start justify-between">
+                <div className="min-w-0 flex-1 pr-3">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Folha Total</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(totalPayroll)}</p>
+                  <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white leading-tight truncate">
+                    {formatCurrency(totalPayroll)}
+                  </p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <DollarSign className="w-6 h-6 text-white" />
                 </div>
+              </div>
+              <div className="pointer-events-none absolute left-4 -bottom-9 rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                {formatCurrency(totalPayroll)}
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Pendências</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">{pendingTasks}</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <Clock className="w-6 h-6 text-white" />
                 </div>
               </div>
@@ -856,7 +864,7 @@ export function FigmaDepartamentoPessoal() {
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Tipo</th>
@@ -868,13 +876,16 @@ export function FigmaDepartamentoPessoal() {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody>
                   {certificates.map((cert) => {
                     const StatusIcon = certificateStatusConfig[cert.status].icon;
                     const daysLeft = getDaysUntilExpiry(cert.expiryDate);
                     
                     return (
-                      <tr key={cert.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <tr
+                        key={cert.id}
+                        className="[&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl [&>td]:bg-white dark:[&>td]:bg-gray-800 [&>td]:border-y [&>td]:border-gray-200 dark:[&>td]:border-gray-700 [&>td:first-child]:border-l [&>td:last-child]:border-r hover:[&>td]:bg-gray-50 dark:hover:[&>td]:bg-gray-700/50 transition-colors"
+                      >
                         <td className="px-6 py-4">
                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                             cert.type === 'PJ' 
@@ -962,7 +973,7 @@ export function FigmaDepartamentoPessoal() {
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Empresa</th>
@@ -974,11 +985,14 @@ export function FigmaDepartamentoPessoal() {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody>
                   {debts.map((debt) => {
                     const StatusIcon = debtStatusConfig[debt.status].icon;
                     return (
-                      <tr key={debt.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <tr
+                        key={debt.id}
+                        className="[&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl [&>td]:bg-white dark:[&>td]:bg-gray-800 [&>td]:border-y [&>td]:border-gray-200 dark:[&>td]:border-gray-700 [&>td:first-child]:border-l [&>td:last-child]:border-r hover:[&>td]:bg-gray-50 dark:hover:[&>td]:bg-gray-700/50 transition-colors"
+                      >
                         <td className="px-6 py-4">
                           <p className="font-medium text-gray-900 dark:text-white">{debt.company}</p>
                         </td>
