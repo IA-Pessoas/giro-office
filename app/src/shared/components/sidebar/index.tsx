@@ -231,14 +231,20 @@ export default function Navbar({ modulo, cargo, onChatOpen }: NavbarProps) {
   }, []);
 
   useEffect(() => {
-    const current = document.documentElement.getAttribute("data-theme");
-    setTheme(current === "dark" ? "dark" : "light");
+    const root = document.documentElement;
+    const current =
+      root.classList.contains("dark") || root.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    setTheme(current);
   }, []);
 
   const toggleTheme = () => {
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
-    document.documentElement.setAttribute("data-theme", next);
+    const root = document.documentElement;
+    root.classList.remove("light", "dark");
+    root.classList.add(next);
+    root.setAttribute("data-theme", next);
+    localStorage.setItem("workspace-theme", next);
     localStorage.setItem("chakra-ui-color-mode", next);
   };
 

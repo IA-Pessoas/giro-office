@@ -50,11 +50,33 @@ function AppLayout({ children }) {
   );
 }
 
-function ColorModeBridge() {
+function ThemeBridge() {
   useEffect(() => {
-    const storedMode = localStorage.getItem("chakra-ui-color-mode");
-    const initialTheme = storedMode === "dark" ? "dark" : "light";
-    document.documentElement.setAttribute("data-theme", initialTheme);
+    const storedWorkspaceTheme = localStorage.getItem("workspace-theme");
+    const storedLegacyTheme = localStorage.getItem("chakra-ui-color-mode");
+
+    const prefersDark =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    const initialTheme =
+      storedWorkspaceTheme === "dark" || storedWorkspaceTheme === "light"
+        ? storedWorkspaceTheme
+        : storedLegacyTheme === "dark" || storedLegacyTheme === "light"
+          ? storedLegacyTheme
+          : prefersDark
+            ? "dark"
+            : "light";
+
+    const root = document.documentElement;
+    root.classList.remove("light", "dark");
+    root.classList.add(initialTheme);
+
+    // Compatibility while we migrate old overrides: keep `data-theme` in sync too.
+    root.setAttribute("data-theme", initialTheme);
+
+    localStorage.setItem("workspace-theme", initialTheme);
   }, []);
 
   return null;
@@ -68,7 +90,7 @@ function MyApp({ Component, pageProps }: AppProps) {
 
   return (
     <>
-      <ColorModeBridge />
+      <ThemeBridge />
       <AuthProvider>
         <SocketProvider>
           <ChatProvider>
