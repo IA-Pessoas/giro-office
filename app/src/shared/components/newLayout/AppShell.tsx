@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import {
+  Bot,
   Bell,
   Briefcase,
   ChevronDown,
@@ -13,8 +14,11 @@ import {
   Filter,
   LayoutDashboard,
   Menu,
+  Search,
   Settings,
   Shield,
+  SquareCheck,
+  FolderKanban,
   TrendingUp,
   Users,
   X,
@@ -69,7 +73,8 @@ const moduleCategories = [
     modules: [
       { path: "/dashboard", name: "Dashboard", icon: LayoutDashboard },
       { path: "/clients", name: "Clientes", icon: Users },
-      { path: "/organizations", name: "Organizações", icon: Briefcase },
+      { path: "/projects", name: "Projetos", icon: FolderKanban },
+      { path: "/tasks", name: "Tarefas", icon: SquareCheck },
     ],
   },
   {
@@ -81,6 +86,7 @@ const moduleCategories = [
       { path: "/fiscal", name: "Fiscal", icon: FileText },
       { path: "/contabil", name: "Contábil", icon: FileText },
       { path: "/rh", name: "RH", icon: Users },
+      { path: "/departamento-pessoal", name: "Dep. Pessoal", icon: Users },
       { path: "/tecnologia", name: "Tecnologia", icon: Code },
       { path: "/triagem", name: "Triagem", icon: Filter },
       { path: "/parcelamento", name: "Parcelamento", icon: CreditCard },
@@ -103,6 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [aiQuery, setAiQuery] = useState("");
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
@@ -133,11 +140,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [isMobileMenuOpen]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
       <button
         ref={mobileMenuButtonRef}
         onClick={() => setIsMobileMenuOpen((v) => !v)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white dark:bg-slate-900 rounded-lg shadow-lg"
         type="button"
       >
         {isMobileMenuOpen ? (
@@ -149,17 +156,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <aside
         ref={sidebarRef}
-        className={`fixed top-0 left-0 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 z-40 ${
+        className={`fixed top-0 left-0 h-full bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 transition-all duration-300 z-40 ${
           isSidebarOpen ? "w-64" : "w-20"
         } ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
       >
-        <div className="h-16 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4">
+        <div className="h-16 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-4">
           <Logo showText={isSidebarOpen} />
         </div>
 
         <button
           onClick={toggleSidebar}
-          className="hidden lg:flex absolute -right-3 top-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full p-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors z-50"
+          className="hidden lg:flex absolute -right-3 top-20 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-full p-1 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors z-50"
           type="button"
         >
           {isSidebarOpen ? (
@@ -191,8 +198,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       href={module.path}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                         isActive
-                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
+                          : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
                       } ${!isSidebarOpen ? "justify-center" : ""}`}
                       title={!isSidebarOpen ? module.name : undefined}
                     >
@@ -210,16 +217,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className={`flex flex-col min-h-screen transition-all duration-300 ${isSidebarOpen ? "lg:ml-64" : "lg:ml-20"}`}>
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 sticky top-0 z-40">
+        <header className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 py-3 sticky top-0 z-40">
           <div className="flex items-center justify-between gap-4">
-            <div />
+            <div className="flex-1 max-w-2xl">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-slate-400" />
+                <input
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  placeholder="Pergunte qualquer coisa ao Assistente IA..."
+                  className="w-full pl-9 pr-10 py-2 rounded-xl border border-gray-200 dark:border-slate-800 bg-white/70 dark:bg-slate-800/60 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                  title="Abrir Assistente IA"
+                >
+                  <Bot className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                </button>
+              </div>
+            </div>
 
             <div className="flex items-center gap-3">
               <button
                 className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 type="button"
               >
-                <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <Bell className="w-5 h-5 text-gray-600 dark:text-slate-300" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
               </button>
 
@@ -227,7 +251,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href="/configs/integracao"
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
-                <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <Settings className="w-5 h-5 text-gray-600 dark:text-slate-300" />
               </Link>
 
               <div className="relative">
@@ -244,7 +268,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300 hidden md:block">
                     {user?.name ?? "Admin"}
                   </span>
-                  <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <ChevronDown className="w-4 h-4 text-gray-500 dark:text-slate-400" />
                 </button>
 
                 {showUserMenu ? (
