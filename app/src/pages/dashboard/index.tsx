@@ -1,10 +1,10 @@
-import React from 'react'
-import Head from 'next/head'
-import 'react-toastify/dist/ReactToastify.css';
+import React from "react";
+import Head from "next/head";
+import "react-toastify/dist/ReactToastify.css";
 
-import { canSSRAuth } from '@modules/auth'
-import { DashboardGrid, useDashboard } from '@modules/dashboard';
-import { setupAPIClient } from '@shared/services/api'
+import { canSSRAuth } from "@modules/auth";
+import { DashboardGrid, useDashboard } from "@modules/dashboard";
+import { setupAPIClient } from "@shared/services/api";
 
 export interface MeItem { id: string; name: string; permission: number; department_id: string; status: string; photo: string | null; }
 interface Props { me: MeItem; }
@@ -17,12 +17,29 @@ export default function Dashboard({ me }: Props) {
             <Head>
                 <title>Dashboard</title>
             </Head>
-            <main className="dashboard-shell u-stack u-gap-4 px-4 py-4 md:px-6">
-                <section className="dashboard-card">
-                    <h1 className="dashboard-card-title">Dashboard</h1>
-                    <p className="dashboard-card-subtitle">Bem-vindo, {me.name}.</p>
-                    {error ? <p className="mt-2 text-sm text-red-600">Falha ao carregar dados do dashboard.</p> : null}
+            <main className="max-w-[1600px] mx-auto space-y-6 p-4 lg:p-8">
+                <section className="flex items-center justify-between gap-6">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+                            Dashboard
+                        </h1>
+                        <p className="text-gray-600 dark:text-gray-400">
+                            Bem-vindo, {me.name}.
+                        </p>
+                        {error ? (
+                            <p className="mt-2 text-sm text-red-600">
+                                Falha ao carregar dados do dashboard.
+                            </p>
+                        ) : null}
+                    </div>
+                    <div className="text-right hidden md:block">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Última atualização</p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {new Date().toLocaleString("pt-BR")}
+                        </p>
+                    </div>
                 </section>
+
                 <DashboardGrid stats={stats} isLoading={isLoading} />
             </main>
         </>
