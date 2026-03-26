@@ -1,8 +1,18 @@
-import { canSSRAuth } from '@modules/auth';
-import { DepartmentRoutePage } from '@modules/departments/components/DepartmentRoutePage';
+import React from "react";
+import Head from "next/head";
+
+import { canSSRAuth } from "@modules/auth";
+import { FigmaRH } from "../shared/components/newLayout/FigmaRH";
 
 export default function RHPage() {
-  return <DepartmentRoutePage title="RH" />;
+  return (
+    <>
+      <Head>
+        <title>RH</title>
+      </Head>
+      <FigmaRH />
+    </>
+  );
 }
 
 export const getServerSideProps = canSSRAuth(async () => {
