@@ -11,9 +11,7 @@ export default function Dashboard() {
             <Head>
                 <title>Dashboard</title>
             </Head>
-            <main className="p-4 lg:p-8">
-                <FigmaDashboard />
-            </main>
+            <FigmaDashboard />
         </>
     )
 }
