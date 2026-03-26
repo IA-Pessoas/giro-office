@@ -202,7 +202,7 @@ export function FigmaProjects() {
   ];
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-5">
+    <div className="w-full space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-3">
