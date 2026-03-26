@@ -1,15 +1,10 @@
 import type { GetServerSideProps } from "next";
 
 import { canSSRAuth } from "@modules/auth";
-import { AppShell } from "../../shared/components/newLayout/AppShell";
 import { FigmaProjects } from "../../shared/components/newLayout/FigmaProjects";
 
 export default function ProjectsPage() {
-  return (
-    <AppShell>
-      <FigmaProjects />
-    </AppShell>
-  );
+  return <FigmaProjects />;
 }
 
 export const getServerSideProps: GetServerSideProps = canSSRAuth(async () => {
