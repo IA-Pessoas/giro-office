@@ -60,7 +60,7 @@ function Logo({ showText }: { showText: boolean }) {
 
       {showText ? (
         <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Workspace
+          Office
         </span>
       ) : null}
     </div>

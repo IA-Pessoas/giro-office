@@ -138,7 +138,7 @@ export function Tecnologia() {
     {
       id: '1',
       name: 'Ana Costa',
-      email: 'ana.costa@workspace.com',
+      email: 'ana.costa@office.com',
       department: 'RH',
       position: 'Gerente de RH',
       status: 'active',
@@ -149,7 +149,7 @@ export function Tecnologia() {
     {
       id: '2',
       name: 'Carlos Oliveira',
-      email: 'carlos.oliveira@workspace.com',
+      email: 'carlos.oliveira@office.com',
       department: 'Comercial',
       position: 'Diretor Comercial',
       status: 'active',
@@ -160,7 +160,7 @@ export function Tecnologia() {
     {
       id: '3',
       name: 'Roberto Alves',
-      email: 'roberto.alves@workspace.com',
+      email: 'roberto.alves@office.com',
       department: 'Marketing',
       position: 'Coordenador de Marketing',
       status: 'active',
@@ -171,7 +171,7 @@ export function Tecnologia() {
     {
       id: '4',
       name: 'Maria Santos',
-      email: 'maria.santos@workspace.com',
+      email: 'maria.santos@office.com',
       department: 'Financeiro',
       position: 'Analista Financeiro',
       status: 'suspended',
@@ -461,7 +461,7 @@ export function Tecnologia() {
     {
       id: '3',
       name: 'Sincronização AD com Sistema',
-      description: 'Sincroniza usuários do Active Directory com o Workspace',
+      description: 'Sincroniza usuários do Active Directory com o Office',
       type: 'Integração',
       schedule: 'A cada 6 horas',
       status: 'active',
