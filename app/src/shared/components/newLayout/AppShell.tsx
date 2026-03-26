@@ -75,6 +75,7 @@ const moduleCategories = [
       { path: "/clients", name: "Clientes", icon: Users },
       { path: "/projects", name: "Projetos", icon: FolderKanban },
       { path: "/tasks", name: "Tarefas", icon: SquareCheck },
+      { path: "/organizations", name: "Organização", icon: Briefcase },
     ],
   },
   {
