@@ -960,22 +960,461 @@ export function FigmaRegularize() {
         </div>
       ) : null}
 
-      {activeTab !== "dashboard" && activeTab !== "processes" ? (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6">
-          <p className="text-sm text-gray-600 dark:text-slate-400">
-            Esta aba foi portada parcialmente. Continuamos refinando as próximas abas em etapas.
-          </p>
+      {activeTab === "permits" ? (
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {permits.map((permit) => {
+              const StatusIcon = statusConfig[permit.status].icon;
+
+              return (
+                <div
+                  key={permit.id}
+                  className={`bg-white dark:bg-slate-900 rounded-xl border p-5 hover:shadow-lg transition-all cursor-pointer ${
+                    permit.status === "expired"
+                      ? "border-red-300 dark:border-red-700"
+                      : "border-gray-200 dark:border-slate-800"
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{permit.clientName}</h3>
+                      <p className="text-sm text-gray-600 dark:text-slate-400">{permit.cnpj}</p>
+                    </div>
+                    <button
+                      className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                      type="button"
+                    >
+                      <MoreVertical className="w-5 h-5 text-gray-400" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600 dark:text-slate-400">Tipo:</span>
+                      <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-full text-xs font-medium">
+                        {permit.type}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600 dark:text-slate-400">Status:</span>
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[permit.status].color} flex items-center gap-1`}
+                      >
+                        <StatusIcon className="w-3 h-3" />
+                        {statusConfig[permit.status].label}
+                      </span>
+                    </div>
+                    {permit.blockedBy ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-slate-400">Travamento:</span>
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium ${blockedByConfig[permit.blockedBy].color}`}
+                        >
+                          {blockedByConfig[permit.blockedBy].label}
+                        </span>
+                      </div>
+                    ) : null}
+                    {permit.issueDate ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-slate-400">Emissão:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          {formatDate(permit.issueDate)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {permit.expiryDate ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-slate-400">Validade:</span>
+                        <span
+                          className={`text-sm font-medium ${
+                            permit.status === "expired"
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-gray-900 dark:text-white"
+                          }`}
+                        >
+                          {formatDate(permit.expiryDate)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {permit.contact ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-slate-400">Contato:</span>
+                        <span className="text-sm text-gray-900 dark:text-white flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          {permit.contact}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {permit.observations ? (
+                    <div className="pt-4 border-t border-gray-100 dark:border-slate-800">
+                      <p className="text-xs text-gray-600 dark:text-slate-400 italic">{permit.observations}</p>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 
-      <div className="hidden">
-        <RefreshCw />
-        <MapPin />
-        <Mail />
-        <Phone />
-        <Bell />
-        <MoreVertical />
-      </div>
+      {activeTab === "clients" ? (
+        <div className="space-y-5">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-separate border-spacing-y-2 px-2">
+                <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Empresa
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      CNPJ
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Regime
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Setor
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Cidade
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Entrada
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clients.map((client) => {
+                    const StatusIcon = statusConfig[client.status].icon;
+                    return (
+                      <tr
+                        key={client.id}
+                        className="[&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl [&>td]:bg-white dark:[&>td]:bg-slate-900 [&>td]:border-y [&>td]:border-gray-200 dark:[&>td]:border-slate-800 [&>td:first-child]:border-l [&>td:last-child]:border-r hover:[&>td]:bg-gray-50 dark:hover:[&>td]:bg-slate-800/60 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">{client.companyName}</p>
+                            {client.tradeName ? (
+                              <p className="text-sm text-gray-600 dark:text-slate-400">{client.tradeName}</p>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-gray-900 dark:text-white font-mono">{client.cnpj}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-2.5 py-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-full text-xs font-medium">
+                            {client.regime}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-2.5 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
+                            {client.sector}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {client.city ? (
+                            <p className="text-sm text-gray-900 dark:text-white flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {client.city}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-gray-500">-</p>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[client.status].color} flex items-center gap-1 w-fit`}
+                          >
+                            <StatusIcon className="w-3 h-3" />
+                            {statusConfig[client.status].label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-gray-900 dark:text-white">{formatDate(client.entryDate)}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-1">
+                            <button
+                              className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                              type="button"
+                            >
+                              <Eye className="w-4 h-4 text-gray-600 dark:text-slate-300" />
+                            </button>
+                            <button
+                              className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded-md transition-colors"
+                              type="button"
+                            >
+                              <Edit className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "passwords" ? (
+        <div className="space-y-5">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-separate border-spacing-y-2 px-2">
+                <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Cliente
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Sistema
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Usuário
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Justificativa
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Atualização
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {passwords.map((pwd) => {
+                    const StatusIcon = statusConfig[pwd.status].icon;
+                    return (
+                      <tr
+                        key={pwd.id}
+                        className="[&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl [&>td]:bg-white dark:[&>td]:bg-slate-900 [&>td]:border-y [&>td]:border-gray-200 dark:[&>td]:border-slate-800 [&>td:first-child]:border-l [&>td:last-child]:border-r hover:[&>td]:bg-gray-50 dark:hover:[&>td]:bg-slate-800/60 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">{pwd.clientName}</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-400">{pwd.cnpj}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-2.5 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-xs font-medium">
+                            {pwd.system}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {pwd.username ? (
+                            <p className="text-sm text-gray-900 dark:text-white font-mono">{pwd.username}</p>
+                          ) : (
+                            <p className="text-sm text-gray-500">-</p>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[pwd.status].color} flex items-center gap-1 w-fit`}
+                          >
+                            <StatusIcon className="w-3 h-3" />
+                            {statusConfig[pwd.status].label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {pwd.justification ? (
+                            <div className="max-w-xs">
+                              <p className="text-sm text-gray-900 dark:text-white">{pwd.justification}</p>
+                              {pwd.visibleToOthers ? (
+                                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                                  <Eye className="w-3 h-3" />
+                                  Visível para outros setores
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500">-</p>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-gray-900 dark:text-white">{formatDate(pwd.lastUpdate)}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-1">
+                            <button
+                              className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                              type="button"
+                            >
+                              <Eye className="w-4 h-4 text-gray-600 dark:text-slate-300" />
+                            </button>
+                            <button
+                              className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded-md transition-colors"
+                              type="button"
+                            >
+                              <Edit className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "partners" ? (
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {partners.map((partner) => {
+              const StatusIcon = statusConfig[partner.status].icon;
+
+              return (
+                <div
+                  key={partner.id}
+                  className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5 hover:shadow-lg transition-all cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{partner.name}</h3>
+                      <p className="text-sm text-gray-600 dark:text-slate-400">CPF: {partner.cpf}</p>
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[partner.status].color} flex items-center gap-1`}
+                    >
+                      <StatusIcon className="w-3 h-3" />
+                      {statusConfig[partner.status].label}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 mb-4">
+                    {partner.rg ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-slate-400">RG:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{partner.rg}</span>
+                      </div>
+                    ) : null}
+                    {partner.birthDate ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-slate-400">Nascimento:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          {formatDate(partner.birthDate)}
+                        </span>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600 dark:text-slate-400">Entrada:</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        {formatDate(partner.entryDate)}
+                      </span>
+                    </div>
+                    {partner.contact ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-slate-400">Contato:</span>
+                        <span className="text-sm text-gray-900 dark:text-white flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          {partner.contact}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-100 dark:border-slate-800">
+                    <p className="text-xs text-gray-600 dark:text-slate-400 mb-2 font-semibold">Empresas:</p>
+                    <div className="space-y-2">
+                      {partner.companies.map((company) => (
+                        <div key={`${partner.id}-${company.cnpj}`} className="flex items-center justify-between text-sm">
+                          <span className="text-gray-900 dark:text-white">{company.companyName}</span>
+                          <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-full text-xs font-medium">
+                            {company.share}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "reminders" ? (
+        <div className="space-y-5">
+          <div className="space-y-4">
+            {reminders.map((reminder) => (
+              <div
+                key={reminder.id}
+                className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5 hover:shadow-md transition-all"
+              >
+                <div className="flex items-start gap-4">
+                  <div
+                    className={`w-12 h-12 rounded-lg ${
+                      reminder.priority === "high"
+                        ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                        : reminder.priority === "medium"
+                          ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300"
+                          : "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300"
+                    } flex items-center justify-center flex-shrink-0`}
+                  >
+                    <Bell className="w-6 h-6" />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">{reminder.title}</h3>
+                        <p className="text-sm text-gray-600 dark:text-slate-400">{reminder.description}</p>
+                      </div>
+                      <button
+                        className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                        type="button"
+                      >
+                        <MoreVertical className="w-5 h-5 text-gray-400" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className={`font-medium ${priorityConfig[reminder.priority].color}`}>
+                        {priorityConfig[reminder.priority].label}
+                      </span>
+                      <span className="text-gray-600 dark:text-slate-400 flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        {formatDate(reminder.dueDate)}
+                      </span>
+                      {reminder.recurring ? (
+                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3" />
+                          {reminder.frequency}
+                        </span>
+                      ) : null}
+                      {reminder.assignedTo ? (
+                        <span className="text-gray-600 dark:text-slate-400 flex items-center gap-1">
+                          <User className="w-4 h-4" />
+                          {reminder.assignedTo}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
