@@ -4,6 +4,7 @@ import type { ProspectingStatus } from "../constants/prospecting-status.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
+import { TaskWorkflowService } from "./TaskWorkflowService.js";
 
 const TASK_DETAIL_SELECT = {
   id: true,
@@ -130,6 +131,8 @@ export interface ListTaskCrudParams {
 }
 
 export class TaskCrudService {
+  readonly #workflow = new TaskWorkflowService();
+
   /**
    * Cria uma linha em `integracao.tasks` para um modelo dependente (fluxo do legado `createDependent`).
    * Não confundir com `TaskDependentService` (tabela `tasksDependent` entre modelos).
@@ -298,7 +301,7 @@ export class TaskCrudService {
         }),
       );
 
-      // TODO(project-service): ProjectService.calculateAndUpdateProjectPercentage(data.project_id)
+      await this.#workflow.afterTaskCreated(data.project_id);
 
       return { create };
     } catch (err: unknown) {
@@ -434,9 +437,6 @@ export class TaskCrudService {
         select: TASK_UPDATE_SELECT,
       });
 
-      // TODO: (project-service): EmailService quando status Paralisado + billing Realizar
-      // TODO: (project-service): recalcular percentual do projeto se status mudou
-
       await audit.logUpdateIfChanged({
         userId: data.user_id,
         organizationId: data.organization_id,
@@ -445,6 +445,14 @@ export class TaskCrudService {
         referringId: data.task_id,
         oldData: exists as Record<string, unknown>,
         updatedData: updated as Record<string, unknown>,
+      });
+
+      await this.#workflow.afterTaskUpdated({
+        taskId: data.task_id,
+        projectId: exists.project_id,
+        previousStatus: exists.status ?? "",
+        newStatus: status,
+        previousBilling: exists.billing ?? "",
       });
 
       return updated;
