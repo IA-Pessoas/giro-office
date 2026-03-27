@@ -1,9 +1,22 @@
 import { useMemo, useState } from "react";
 import { Edit, Eye, Filter, MoreVertical, Plus, Search, Trash2 } from "lucide-react";
 
-const clients = [
+import { ClientCreateModal } from "@modules/clients";
+import type { ClientItem } from "@modules/clients";
+
+type ClientRow = {
+  id: string;
+  name: string;
+  cnpj: string;
+  status: string;
+  department: string;
+  revenue: string;
+  contact: string;
+};
+
+const seedRows: ClientRow[] = [
   {
-    id: 1,
+    id: "1",
     name: "Tech Solutions Ltda",
     cnpj: "12.345.678/0001-90",
     status: "Ativo",
@@ -12,7 +25,7 @@ const clients = [
     contact: "João Silva",
   },
   {
-    id: 2,
+    id: "2",
     name: "Comércio ABC",
     cnpj: "98.765.432/0001-11",
     status: "Ativo",
@@ -21,7 +34,7 @@ const clients = [
     contact: "Maria Santos",
   },
   {
-    id: 3,
+    id: "3",
     name: "Indústria Delta S/A",
     cnpj: "45.678.912/0001-33",
     status: "Prospect",
@@ -30,7 +43,7 @@ const clients = [
     contact: "Carlos Oliveira",
   },
   {
-    id: 4,
+    id: "4",
     name: "Serviços Omega",
     cnpj: "78.912.345/0001-55",
     status: "Ativo",
@@ -39,7 +52,7 @@ const clients = [
     contact: "Ana Costa",
   },
   {
-    id: 5,
+    id: "5",
     name: "Consultoria Gamma",
     cnpj: "32.165.498/0001-77",
     status: "Inativo",
@@ -49,6 +62,29 @@ const clients = [
   },
 ];
 
+function formatCpfCnpjDisplay(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 14) {
+    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+  }
+  if (digits.length === 11) {
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  }
+  return raw;
+}
+
+function clientItemToRow(item: ClientItem): ClientRow {
+  return {
+    id: String(item.id ?? crypto.randomUUID()),
+    name: item.name,
+    cnpj: formatCpfCnpjDisplay(item.cpf_cnpj ?? ""),
+    status: item.status ?? "Ativo",
+    department: "—",
+    revenue: "—",
+    contact: item.name,
+  };
+}
+
 const statusColors: Record<string, string> = {
   Ativo: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
   Prospect: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400",
@@ -56,6 +92,8 @@ const statusColors: Record<string, string> = {
 };
 
 export function Clients() {
+  const [clients, setClients] = useState<ClientRow[]>(seedRows);
+  const [createOpen, setCreateOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
 
@@ -67,10 +105,20 @@ export function Clients() {
       const matchesStatus = statusFilter === "todos" || client.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [searchTerm, statusFilter]);
+  }, [clients, searchTerm, statusFilter]);
+
+  const handleCreated = (item: ClientItem) => {
+    setClients((prev) => [clientItemToRow(item), ...prev]);
+  };
 
   return (
     <div className="space-y-6">
+      <ClientCreateModal
+        isOpen={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={handleCreated}
+      />
+
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Clientes</h1>
@@ -78,7 +126,11 @@ export function Clients() {
             Gerencie todos os clientes e prospects
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+        <button
+          type="button"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+          onClick={() => setCreateOpen(true)}
+        >
           <Plus className="w-4 h-4" />
           Novo Cliente
         </button>
@@ -130,7 +182,10 @@ export function Clients() {
               <option value="Prospect">Prospect</option>
               <option value="Inativo">Inativo</option>
             </select>
-            <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+            <button
+              type="button"
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            >
               <Filter className="w-4 h-4" />
               Mais Filtros
             </button>
@@ -243,22 +298,37 @@ export function Clients() {
         <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-sm text-gray-600 dark:text-gray-400">
             Mostrando <span className="font-medium">{filteredClients.length}</span> de{" "}
-            <span className="font-medium">248</span> clientes
+            <span className="font-medium">{clients.length}</span> clientes
           </div>
           <div className="flex gap-2">
-            <button className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm">
+            <button
+              type="button"
+              className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm"
+            >
               Anterior
             </button>
-            <button className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+            <button
+              type="button"
+              className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+            >
               1
             </button>
-            <button className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm">
+            <button
+              type="button"
+              className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm"
+            >
               2
             </button>
-            <button className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm">
+            <button
+              type="button"
+              className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm"
+            >
               3
             </button>
-            <button className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm">
+            <button
+              type="button"
+              className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm"
+            >
               Próximo
             </button>
           </div>
@@ -267,4 +337,3 @@ export function Clients() {
     </div>
   );
 }
-
