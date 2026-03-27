@@ -19,6 +19,8 @@ const TASK_SERVICE_EXACT_PATHS = new Set([
   "/integracao-tasks-conclusion",
   "/integracao-tasks-completeRequest",
   "/integracao-task",
+  "/comercial-tasks",
+  "/financeiro-tasks",
 ]);
 
 export function isTaskServiceRoute(path: string): boolean {
