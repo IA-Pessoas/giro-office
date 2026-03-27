@@ -109,10 +109,34 @@ export function AuthProvider({ children }: AuthProviderProps){
                 Router.push('/dashboard');
             }
 
-        } catch (error) {
-            toast.error("Usuário e/ou senha incorretos!")
+        } catch (error: any) {
+            if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || !error.response) {
+                const url = process.env.NEXT_PUBLIC_API_URL || 'não definida';
+                toast.error(`Erro de conexão! URL: ${url}. Verifique se o servidor está rodando.`)
+                console.error('Erro de conexão:', {
+                    code: error.code,
+                    message: error.message,
+                    url: url,
+                    fullError: error
+                })
+                return
+            }
 
-            console.log('Erro ao entrar', error)
+            if (error.response?.status >= 500) {
+                toast.error(`Erro no servidor (${error.response.status})! Tente novamente.`)
+                console.error('Erro do servidor:', error.response?.data || error.message)
+                return
+            }
+
+            if (error.response?.status === 401 || error.response?.status === 400) {
+                const errorMessage = error.response?.data?.error || error.response?.data?.message || "Usuário e/ou senha incorretos!"
+                toast.error(errorMessage)
+                console.error('Erro de autenticação:', error.response?.data)
+                return
+            }
+
+            toast.error(error.response?.data?.error || error.message || "Erro ao fazer login!")
+            console.error('Erro ao entrar:', error)
         }
     }
 

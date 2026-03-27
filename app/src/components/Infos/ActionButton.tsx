@@ -1,10 +1,11 @@
 import React from 'react';
-import { Button, Icon, Link } from '@chakra-ui/react';
+import Link from 'next/link';
 import { FaSpinner } from 'react-icons/fa';
 import { MdOutlineMotionPhotosPause } from "react-icons/md";
 import { IoMdCheckmarkCircleOutline } from "react-icons/io";
-
 import { IconType } from 'react-icons';
+import styles from './ActionButton.module.css';
+
 
 interface ActionButtonProps {
   icon: IconType
@@ -33,22 +34,20 @@ export const ActionButton = ({ icon, href, onClick, children, status }: ActionBu
   DefaultColor = statusColorMap[status] || DefaultColor;
   
   const button = (
-    <Button
-      leftIcon={<Icon as={DefaultIcon} boxSize={5} />}
-      variant="outline"
-      color={DefaultColor}
-      border={'1px solid'}
-      borderColor={DefaultColor}
-      justifyContent="flex-start"
+    <button
+      type="button"
+      className={styles.button}
+      data-color={DefaultColor}
       onClick={onClick}
     >
-      {children}
-    </Button>
+      <DefaultIcon className={styles.icon} />
+      <span>{children}</span>
+    </button>
   );
 
   if (href) {
     return (
-      <Link href={href} _hover={{ textDecoration: 'none' }}>
+      <Link href={href} className={styles.link}>
         {button}
       </Link>
     );
