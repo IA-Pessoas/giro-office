@@ -23,9 +23,5 @@ Thumbs.db
 !.vscode/extensions.json
 !.vscode/settings.json
 
-
-# docs
-docs/
-
 # Figma reference project (local only)
 novo layout/
