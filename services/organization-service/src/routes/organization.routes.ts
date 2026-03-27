@@ -14,7 +14,7 @@ import {
 import {
   type ListOrganizationsParams,
   OrganizationService,
-} from "../services/organization.service.js";
+} from "../services/organizationService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const organizationService = new OrganizationService();
