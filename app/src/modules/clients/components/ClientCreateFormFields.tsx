@@ -225,7 +225,7 @@ export function ClientCreateFormFields({
           type="checkbox"
           checked={formData.service_unique}
           onChange={onChange}
-          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:focus:ring-blue-600"
         />
         <span className={`${labelClass} mb-0`}>Serviço Único?</span>
       </label>

@@ -160,7 +160,7 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
       }}
       title="Cadastrar Novo Cliente"
       description="Formulário para cadastro de cliente"
-      contentClassName="w-[min(96vw,1280px)] max-h-[92vh] dark:border-gray-700"
+      contentClassName="w-[min(96vw,1280px)] max-h-[92vh]"
       bodyClassName="pb-0"
       footer={
         <>
@@ -173,7 +173,7 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
           </button>
           <button
             type="button"
-            className="rounded-xl px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+            className="rounded-xl px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
             disabled={isLoading}
             onClick={handleCadastrar}
           >

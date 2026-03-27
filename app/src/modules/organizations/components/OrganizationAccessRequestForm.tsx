@@ -171,7 +171,7 @@ export function OrganizationAccessRequestForm() {
               onChange={(e) => setCnpj(e.target.value)}
               onFocus={() => setFocusedField("cnpj")}
               onBlur={() => setFocusedField(null)}
-              placeholder="Somente números ou com máscara"
+              placeholder="Informe seu CNPJ"
               className="w-full pl-11 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-transparent transition-all duration-300 text-gray-900 placeholder:text-gray-400 text-sm"
               disabled={loading}
               autoComplete="off"
