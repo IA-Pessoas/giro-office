@@ -16,6 +16,8 @@ const TASK_SERVICE_EXACT_PATHS = new Set([
   "/integracao-taskModel-dependent",
   "/integracao-tasksIntegration",
   "/integracao-tasks",
+  "/integracao-tasks-conclusion",
+  "/integracao-tasks-completeRequest",
   "/integracao-task",
 ]);
 

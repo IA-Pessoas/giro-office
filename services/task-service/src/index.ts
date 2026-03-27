@@ -10,6 +10,7 @@ import { getTaskServiceEnv } from "./config/env.js";
 import { taskCrudRoutes } from "./routes/task-crud.routes.js";
 import { taskDependentRoutes } from "./routes/task-dependent.routes.js";
 import { taskIntegrationRegularizeRoutes } from "./routes/task-integration-regularize.routes.js";
+import { taskLifecycleRoutes } from "./routes/task-lifecycle.routes.js";
 import { taskModelRoutes } from "./routes/task-model.routes.js";
 
 const env = getTaskServiceEnv();
@@ -32,6 +33,7 @@ app.get("/health", (_req, res) => {
 app.use(taskModelRoutes);
 app.use(taskDependentRoutes);
 app.use(taskIntegrationRegularizeRoutes);
+app.use(taskLifecycleRoutes);
 app.use(taskCrudRoutes);
 
 app.use(
