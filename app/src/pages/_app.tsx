@@ -18,7 +18,11 @@ function AppLayout({ children }) {
   const router = useRouter();
 
   // Se está na página de login ou index, não mostra layout
-  if (router.pathname === '/login' || router.pathname === '/') {
+  if (
+    router.pathname === "/login" ||
+    router.pathname === "/" ||
+    router.pathname === "/solicitar-acesso"
+  ) {
     return <>{children}</>;
   }
 

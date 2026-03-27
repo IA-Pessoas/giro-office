@@ -1,6 +1,7 @@
 import { useContext, useState } from "react";
 import type { FormEvent } from "react";
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import {
   AlertCircle,
@@ -282,12 +283,12 @@ export default function Login() {
 
                   <p className="text-center text-xs text-gray-600 mt-4">
                     Não tem conta?{" "}
-                    <a
-                      href="#"
+                    <Link
+                      href="/solicitar-acesso"
                       className="text-blue-600 hover:text-blue-700 font-semibold hover:underline"
                     >
                       Solicitar acesso
-                    </a>
+                    </Link>
                   </p>
                 </div>
               </div>
