@@ -44,10 +44,7 @@ export default function SolicitarAcessoPage() {
                     Solicitar acesso
                   </h1>
                 </div>
-                <p className="text-gray-600 text-sm">
-                  Registe uma nova organização. O envio utiliza a mesma API do sistema e requer sessão
-                  iniciada.
-                </p>
+                <p className="text-gray-600 text-sm">Registre sua organização.</p>
               </div>
 
               <OrganizationAccessRequestForm />
