@@ -1,11 +1,14 @@
 import { z } from "zod";
 
-/** Aceita string ISO (data ou data-hora) ou valor coercível e produz `Date` válido. */
-export function zIsoDate(field: string) {
-  return z.coerce
-    .date({
-      required_error: `${field} é obrigatório.`,
-      invalid_type_error: `${field} inválido.`,
+/** Data a partir de string ISO (body JSON); falha no refine se inválida. */
+export function zIsoDate(fieldName: string) {
+  return z
+    .string({
+      required_error: `${fieldName} é obrigatório.`,
+      invalid_type_error: `${fieldName} deve ser uma string.`,
     })
-    .refine((d) => !Number.isNaN(d.getTime()), { message: `${field} inválido.` });
+    .trim()
+    .min(1, `${fieldName} é obrigatório.`)
+    .transform((s: string) => new Date(s))
+    .refine((d: Date) => !Number.isNaN(d.getTime()), `${fieldName} inválido.`);
 }

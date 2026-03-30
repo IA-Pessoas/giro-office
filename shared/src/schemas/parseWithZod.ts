@@ -1,8 +1,8 @@
-import { ZodError, type ZodType } from "zod";
+import { ZodError, type ZodTypeAny, z } from "zod";
 
 import { ServiceError } from "../http/errors.js";
 
-export function parseWithZod<T>(schema: ZodType<T>, data: unknown): T {
+export function parseWithZod<T extends ZodTypeAny>(schema: T, data: unknown): z.infer<T> {
   try {
     return schema.parse(data);
   } catch (err: unknown) {
