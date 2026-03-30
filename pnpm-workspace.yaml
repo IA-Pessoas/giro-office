@@ -7,3 +7,4 @@ packages:
   - "shared"
   - "services/user-service"
   - "services/rh-service"
+  - "services/task-service"

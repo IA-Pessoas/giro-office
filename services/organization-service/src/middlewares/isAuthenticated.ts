@@ -1,5 +1,5 @@
 import { extractBearerToken, verifyJwtToken } from "@workspace/shared";
-import type { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
 
 type JwtClaims = {
   user_id: string;
@@ -17,10 +17,7 @@ function isValidClaims(claims: unknown): claims is JwtClaims {
     return false;
   }
 
-  if (
-    value.organization_id !== undefined &&
-    typeof value.organization_id !== "string"
-  ) {
+  if (value.organization_id !== undefined && typeof value.organization_id !== "string") {
     return false;
   }
 
@@ -71,7 +68,7 @@ export async function isAuthenticated(
     }
 
     request.user_id = claims.user_id;
-    request.organization_id = claims.organization_id;
+    request.organization_id = claims.organization_id ?? "";
 
     // CNPJ verification (disabled - not currently used on routes)
     // const { cnpj } = request.params;

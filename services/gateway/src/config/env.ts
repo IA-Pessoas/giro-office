@@ -34,6 +34,7 @@ const gatewayEnvSchema = z
       }),
     legacyApiUrl: z.string().url().default("http://localhost:3333"),
     userServiceUrl: z.string().url().default("http://localhost:3335"),
+    taskServiceUrl: z.string().url().default("http://localhost:3337"),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o gateway."),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
@@ -65,6 +66,7 @@ export interface GatewayEnv {
   port: number;
   legacyApiUrl: string;
   userServiceUrl: string;
+  taskServiceUrl: string;
   jwtSecret: string;
   logLevel: LoggerLevel;
   logPretty: boolean;
@@ -80,6 +82,7 @@ export function getGatewayEnv(): GatewayEnv {
     port: process.env.GATEWAY_PORT,
     legacyApiUrl: process.env.LEGACY_API_URL,
     userServiceUrl: process.env.USER_SERVICE_URL,
+    taskServiceUrl: process.env.TASK_SERVICE_URL,
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
