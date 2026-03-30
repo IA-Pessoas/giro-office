@@ -43,7 +43,10 @@ router.post(
         lunch_in,
         clock_out: parsed.clock_out,
         justification: parsed.justification,
-        attachment: parsed.attachment,
+        attachment:
+          parsed.attachment === undefined || parsed.attachment === null
+            ? undefined
+            : String(parsed.attachment),
       });
 
       res.status(200).json(createSuccessResponse(result));
@@ -74,7 +77,12 @@ router.put(
         request_id: body.request_id,
         approver_user_id: userId,
         organization_id: organizationId,
-        obs_approver: body.obs_approver,
+        obs_approver:
+          body.obs_approver === undefined
+            ? undefined
+            : body.obs_approver === null
+              ? null
+              : String(body.obs_approver),
       });
 
       res.status(200).json(createSuccessResponse(result));
