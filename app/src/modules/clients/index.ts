@@ -5,9 +5,9 @@ export { ClientFilters } from './components/ClientFilters';
 export { ClientCreateModal } from './components/ClientCreateModal';
 
 export { useClientList } from './hooks/useClientList';
-export { useFormComercial } from './hooks/useFormComercial';
-export { useFormIntegracao } from './hooks/useFormIntegracao';
-export { useFormRegularize } from './hooks/useFormRegularize';
+export { useClientFormComercial } from './hooks/useFormComercial';
+export { useClientFormIntegracao } from './hooks/useFormIntegracao';
+export { useClientFormRegularize } from './hooks/useFormRegularize';
 
 export { clientService } from './services/clientService';
 

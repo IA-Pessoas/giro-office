@@ -1,27 +1,43 @@
 // components/ToggleThemeButton.tsx
-import { IconButton, useColorMode } from "@chakra-ui/react";
-import { MoonIcon, SunIcon } from "@chakra-ui/icons";
+import { useEffect, useState } from "react";
+import { FiMoon, FiSun } from "react-icons/fi";
 import Cookie from "js-cookie";
 
 export function ToggleThemeButton() {
-  const { colorMode, toggleColorMode } = useColorMode();
-  
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const htmlTheme = document.documentElement.getAttribute("data-theme");
+    if (htmlTheme === "dark" || htmlTheme === "light") {
+      setTheme(htmlTheme);
+      return;
+    }
+
+    const cookieTheme = Cookie.get("chakra-ui-color-mode");
+    if (cookieTheme === "dark" || cookieTheme === "light") {
+      setTheme(cookieTheme);
+      document.documentElement.setAttribute("data-theme", cookieTheme);
+    }
+  }, []);
+
   const handleToggleTheme = () => {
-    toggleColorMode();
-    Cookie.set("chakra-ui-color-mode", colorMode === "light" ? "dark" : "light", {
+    const nextTheme = theme === "light" ? "dark" : "light";
+    setTheme(nextTheme);
+    document.documentElement.setAttribute("data-theme", nextTheme);
+    Cookie.set("chakra-ui-color-mode", nextTheme, {
       expires: 365,
       path: "/"
     });
-    toggleColorMode()
   };
 
   return (
-    <IconButton
+    <button
+      type="button"
       aria-label="Alternar tema"
-      icon={colorMode === "light" ? <MoonIcon /> : <SunIcon />}
       onClick={handleToggleTheme}
-      variant="ghost"
-      size="md"
-    />
+      className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition-colors hover:bg-slate-100"
+    >
+      {theme === "light" ? <FiMoon /> : <FiSun />}
+    </button>
   );
 }

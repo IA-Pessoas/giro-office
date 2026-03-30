@@ -1,0 +1,81 @@
+import { zNonEmptyText } from "@workspace/shared";
+import { z } from "zod";
+
+import { status as statusEnum } from "../generated/prisma/client.js";
+
+function firstQueryPart(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
+}
+
+export const createOrganizationBodySchema = z
+  .object({
+    name: zNonEmptyText("name"),
+    email_created_by: zNonEmptyText("email_created_by"),
+    cnpj: zNonEmptyText("cnpj"),
+  })
+  .strict();
+
+export const organizationIdParamsSchema = z
+  .object({
+    id: z.string().uuid({ message: "id inválido." }),
+  })
+  .strict();
+
+export const updateOrganizationStatusBodySchema = z
+  .object({
+    status: z.nativeEnum(statusEnum, {
+      message: "status é obrigatório e deve ser trial, past_due, active, suspended ou cancelled.",
+    }),
+  })
+  .strict();
+
+export const updateOrganizationSubscriptionPlanBodySchema = z
+  .object({
+    subscription_plan: zNonEmptyText("subscription_plan"),
+  })
+  .strict();
+
+export const updateOrganizationLogoUrlBodySchema = z
+  .object({
+    logo_url: z.union([z.string(), z.null()]),
+  })
+  .strict();
+
+export const listOrganizationsQuerySchema = z
+  .object({
+    page: z.preprocess(
+      (v) => {
+        const x = firstQueryPart(v);
+        if (x === undefined || x === null || x === "") {
+          return 1;
+        }
+        return Number(x);
+      },
+      z.number().int().min(1, "page deve ser um inteiro maior ou igual a 1."),
+    ),
+    pageSize: z.preprocess(
+      (v) => {
+        const x = firstQueryPart(v);
+        if (x === undefined || x === null || x === "") {
+          return 20;
+        }
+        return Number(x);
+      },
+      z
+        .number()
+        .int()
+        .min(1, "pageSize deve ser um inteiro entre 1 e 100.")
+        .max(100, "pageSize deve ser um inteiro entre 1 e 100."),
+    ),
+    status: z.preprocess((v) => {
+      const x = firstQueryPart(v);
+      if (x === undefined || x === null || x === "") {
+        return undefined;
+      }
+      return x;
+    }, z.nativeEnum(statusEnum).optional()),
+  })
+  .strict();

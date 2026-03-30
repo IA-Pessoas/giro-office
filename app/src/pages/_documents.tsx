@@ -1,6 +1,4 @@
 import Document, { Html, Head, Main, NextScript } from "next/document";
-import { ColorModeScript } from '@chakra-ui/react'
-import theme from '../styles/theme'
 
 export default class Mydocument extends Document {
     render(): JSX.Element {
@@ -8,7 +6,11 @@ export default class Mydocument extends Document {
             <Html lang="pt-BR">
                 <Head />
                 <body>
-                    <ColorModeScript initialColorMode={theme.config.initialColorMode} />
+                    <script
+                      dangerouslySetInnerHTML={{
+                        __html: "(function(){try{var m=localStorage.getItem('chakra-ui-color-mode');document.documentElement.setAttribute('data-theme',m==='dark'?'dark':'light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();",
+                      }}
+                    />
                     <Main/>
                     <NextScript/>
                 </body>

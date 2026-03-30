@@ -1,5 +1,4 @@
 import React from 'react';
-import { Flex, Input, InputGroup, InputLeftElement, Menu, MenuButton, MenuItem, MenuList, Button, Box, MenuOptionGroup, MenuDivider } from '@chakra-ui/react';
 import { IoMdSearch, IoIosArrowForward } from 'react-icons/io';
 import { CiCirclePlus } from "react-icons/ci";
 
@@ -14,79 +13,76 @@ interface FiltersProps {
 }
 
 export function ClientFilters({ initialLabel, perm, onFilterChange, onSearchChange, onOpenCreateModal }: FiltersProps) {
+  const isIntegracaoAdmin = perm.integracao === 2;
+  const hasDeptFilters = perm.contabil !== null || perm.fiscal !== null || perm.pessoal !== null;
+
   return (
-    <Flex direction={'column'} w="100%" gap={3} p={2}>
-      <InputGroup>
-        <InputLeftElement pointerEvents='none'>
-          <Box color='primaryText'>
-            <IoMdSearch />
-          </Box>
-        </InputLeftElement>
-        <Input
+    <div className="u-stack u-gap-3 w-full p-2">
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--colors-blue-500)]">
+          <IoMdSearch />
+        </span>
+        <input
           type="text"
-          bg='componentBg'
+          className="ui-input pl-9"
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder='Buscar por nome...'
-          _placeholder={{ color: 'primaryText' }}
+          placeholder="Buscar por nome..."
         />
-      </InputGroup>
-      
-      <Flex w="100%" flexDirection={'row'} gap={3} overflow={'none'}>
-        <Menu>
-          <MenuButton as={Button} w="90%" rightIcon={<IoIosArrowForward />} isTruncated>
-            <Box as="span" isTruncated>
-              Filtro: {initialLabel}
-            </Box>
-          </MenuButton>
-          <MenuList zIndex={10} bg='bodyBg' border={'1px solid'} borderColor={'borderColor'} overflowY={'scroll'} boxShadow={'0 0 10px var(--chakra-colors-shadow)'} maxH={'50vh'}>
-            <MenuOptionGroup title='Status' sx={{ '& > p': { fontWeight: 'bold', paddingX: '0.75rem', fontSize: 'sm', color: 'primaryText' } }}>
-              <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Ativo', label: 'Ativo' })}>Ativos</MenuItem>
-              <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Inativo', label: 'Inativo' })}>Inativos</MenuItem>
-            </MenuOptionGroup>
-            {perm.integracao === 2 && (
+      </div>
+
+      <div className="u-flex w-full gap-3">
+        <details className="w-[90%] rounded-md border border-slate-200 bg-white" aria-label="Menu de filtros de clientes">
+          <summary className="u-flex cursor-pointer list-none items-center justify-between px-4 py-2 font-medium text-slate-700">
+            <span className="truncate">Filtro: {initialLabel}</span>
+            <IoIosArrowForward />
+          </summary>
+          <div className="max-h-[50vh] overflow-y-auto border-t border-slate-100 p-2">
+            <p className="users-section-title px-2 py-1">Status</p>
+            <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Ativo', label: 'Ativo' })}>Ativos</button>
+            <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Inativo', label: 'Inativo' })}>Inativos</button>
+
+            {isIntegracaoAdmin && (
               <>
-                <MenuDivider />
-                <MenuOptionGroup title='Integração' sx={{ '& > p': { fontWeight: 'bold', paddingX: '0.75rem', fontSize: 'sm', color: 'primaryText' } }}>
-                  <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Ativo e Prospecção', label: 'Ativos e em Prospecção' })}>Ativos e em Prospecçãos</MenuItem>
-                  <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Ativo PJ', label: 'Ativo PJ' })}>Ativos PJ</MenuItem>
-                  <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Ativo PF', label: 'Ativo PF' })}>Ativos PF</MenuItem>
-                  <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Prospecção PJ', label: 'Prospecção PJ' })}>Prospecção PJ</MenuItem>
-                  <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Prospecção PF', label: 'Prospecção PF' })}>Prospecção PF</MenuItem>
-                  <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Não Contradado e Paralisado', label: 'Não Contratados e Paralisados' })}>Não Contratados e Paralisados</MenuItem>
-                  <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Inativo PJ', label: 'Inativo PJ' })}>Inativo PJ</MenuItem>
-                  <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Inativo PF', label: 'Inativo PF' })}>Inativo PF</MenuItem>
-                </MenuOptionGroup>
+                <hr className="my-2" />
+                <p className="users-section-title px-2 py-1">Integração</p>
+                <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Ativo e Prospecção', label: 'Ativos e em Prospecção' })}>Ativos e em Prospecçãos</button>
+                <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Ativo PJ', label: 'Ativo PJ' })}>Ativos PJ</button>
+                <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Ativo PF', label: 'Ativo PF' })}>Ativos PF</button>
+                <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Prospecção PJ', label: 'Prospecção PJ' })}>Prospecção PJ</button>
+                <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Prospecção PF', label: 'Prospecção PF' })}>Prospecção PF</button>
+                <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Não Contradado e Paralisado', label: 'Não Contratados e Paralisados' })}>Não Contratados e Paralisados</button>
+                <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Inativo PJ', label: 'Inativo PJ' })}>Inativo PJ</button>
+                <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Inativo PF', label: 'Inativo PF' })}>Inativo PF</button>
               </>
             )}
-            {(perm.contabil !== null || perm.fiscal !== null || perm.pessoal !== null) && (
+
+            {hasDeptFilters && (
               <>
-                <MenuDivider />
-                <MenuOptionGroup title='Clientes por Departamento' sx={{ '& > p': { fontWeight: 'bold', paddingX: '0.75rem', fontSize: 'sm', color: 'primaryText' } }}>
-                  {perm.contabil !== null && (
-                    <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Ativo', label: 'Dep Contábil' })}>Dep Contábil</MenuItem>
-                  )}
-                  {perm.fiscal !== null && (
-                    <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Ativo', label: 'Dep Fiscal' })}>Dep Fiscal</MenuItem>
-                  )}
-                  {perm.pessoal !== null && (
-                    <MenuItem bg={'transparent'} _hover={{ bg: 'componentColor', color: 'secondaryText' }} onClick={() => onFilterChange({ status: 'Ativo', label: 'Dep Pessoal' })}>Dep Pessoal</MenuItem>
-                  )}
-                </MenuOptionGroup>
+                <hr className="my-2" />
+                <p className="users-section-title px-2 py-1">Clientes por Departamento</p>
+                {perm.contabil !== null && (
+                  <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Ativo', label: 'Dep Contábil' })}>Dep Contábil</button>
+                )}
+                {perm.fiscal !== null && (
+                  <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Ativo', label: 'Dep Fiscal' })}>Dep Fiscal</button>
+                )}
+                {perm.pessoal !== null && (
+                  <button type="button" className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]" onClick={() => onFilterChange({ status: 'Ativo', label: 'Dep Pessoal' })}>Dep Pessoal</button>
+                )}
               </>
             )}
-          </MenuList>
-        </Menu>
-        <Menu>
-          <MenuButton as={Button} w="5%" _hover={{ bg: 'componentColor', color: 'secondaryText' }}>
-            <CiCirclePlus size={30} />
-          </MenuButton>
-          <MenuList zIndex={10}>
-            {perm.integracao === 2 && (
-              <MenuItem onClick={() => onOpenCreateModal()}>Novo Cliente (Integração)</MenuItem>
-            )}
-          </MenuList>
-        </Menu>
-      </Flex>
-    </Flex>
+          </div>
+        </details>
+        <button
+          type="button"
+          className="u-flex w-[5%] items-center justify-center rounded-md border border-slate-200 hover:bg-[var(--colors-blue-500)] hover:text-[var(--colors-main-mainDourado)]"
+          onClick={onOpenCreateModal}
+          aria-label="Novo Cliente"
+          title="Cadastrar cliente"
+        >
+          <CiCirclePlus size={30} />
+        </button>
+      </div>
+    </div>
   );
 }

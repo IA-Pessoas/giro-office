@@ -1,18 +1,17 @@
 import Head from "next/head"
-import { Flex, Text } from "@chakra-ui/react"
+import styles from "./LandingPage.module.css"
 
-import { setupAPIClient } from "@shared/services/api"
 import { canSSRGuest } from "@modules/auth"
 
 export default function Home() {
     return(
         <>
             <Head>
-                <title>cw</title>
+                <title>Office</title>
             </Head>
-            <Flex background={"main.900"} height="100vh" alignItems="center" justifyContent="center" >
-                <Text fontSize={30}>Home</Text>
-            </Flex>
+            <div className={styles.page}>
+                <p className={styles.title}>Home</p>
+            </div>
         </>
     )
 }

@@ -1,7 +1,4 @@
-import {
-  Box,
-  Text,
-} from "@chakra-ui/react";
+import styles from "./InfoItem.module.css";
 
 type Props = {
   label: string
@@ -10,9 +7,9 @@ type Props = {
 
 export default function InfoItem({ label, value }: Props) {
   return (
-    <Box>
-      <Text fontWeight="bold">{label}</Text>
-      <Text>{value}</Text>
-    </Box>
+    <div className={styles.item}>
+      <div className={styles.label}>{label}</div>
+      <div className={styles.value}>{value}</div>
+    </div>
   )
 }
