@@ -5,16 +5,16 @@ import "react-toastify/dist/ReactToastify.css";
 import styles from "./MePage.module.css";
 
 import { useAuth } from "../../context/AuthContext";
-import { useUserProfile } from "@shared/hooks";
+import { useMePassword, useUserProfile } from "@shared/hooks";
 import { setupAPIClient } from "@shared/services/api";
 
 export default function Me() {
   const { user, logoutUser } = useAuth();
   const profileQuery = useUserProfile(user?.id);
+  const { password, setPassword } = useMePassword(user?.id);
 
   const [name, setName] = useState("");
   const [login, setLogin] = useState("");
-  const [password, setPassword] = useState("");
 
   useEffect(() => {
     if (profileQuery.data) {
@@ -22,25 +22,6 @@ export default function Me() {
       setLogin(profileQuery.data.login);
     }
   }, [profileQuery.data]);
-
-  useEffect(() => {
-    if (!user?.id) {
-      return;
-    }
-    const client = setupAPIClient();
-    let cancelled = false;
-    client
-      .get("/me")
-      .then((res) => {
-        if (!cancelled && res.data?.user?.password != null) {
-          setPassword(String(res.data.user.password));
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
 
   async function handleLogout() {
     await logoutUser();
