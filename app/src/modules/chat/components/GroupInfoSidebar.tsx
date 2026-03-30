@@ -1,16 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-    Box, 
-    Button, 
-    Input, 
-    Textarea,
-    Text, 
-    Checkbox
-} from '@chakra-ui/react';
 
-import { useAuth } from '../../context/AuthContext';
-import { useChat } from '../context/ChatContext';
-import * as styles from '../../styles/chat'
+import { useAuth } from '../../../context/AuthContext';
+import { useChat } from '../../../context/ChatContext';
+import * as styles from '../../../styles/chat'
+import css from './GroupInfoSidebar.module.css'
 
 import { BsFillPersonPlusFill } from "react-icons/bs";
 import { MdGroups } from "react-icons/md";
@@ -45,68 +38,28 @@ const AddMembersModal = ({ chat, onClose, onAddMembers }) => {
     };
 
     return (
-        <Box
-            position={'fixed'}
-            top={0}
-            left={0}
-            width={'100%'}
-            height={'100%'}
-            backgroundColor={'rgba(0, 0, 0, 0.5)'}
-            display={'flex'}
-            justifyContent={'center'}
-            alignItems={'center'}
-            zIndex={1000}
-        >
-            <Box 
-                backgroundColor={'bodyBg'}
-                borderRadius={'8px'}
-                p={'20px'}
-                minW={'40%'}
-                maxW={'90%'}
-                maxH={'90%'}
-                overflow={'auto'}
-                textAlign={'center'}
-                display={'flex'}
-                flexDirection={'column'}
-            >
-                <Text fontSize={'25px'} fontWeight={'bold'} mb={'10px'}>Adicionar Participantes</Text>
-                <Box
-                    flexGrow={1}
-                    overflowY={'auto'}
-                    borderTop={'1px solid'}
-                    borderColor={'borderColor'}
-                >
+        <div className={css.modalOverlay}>
+            <div className={css.modalCard}>
+                <p className={css.modalTitle}>Adicionar Participantes</p>
+                <div className={css.modalList}>
                     {allUsers.map(user => (
-                        <Box 
+                        <div
                             key={user.id} 
                             style={selectedUserIds.has(user.id) ? styles.chatListItemSelectedStyle : styles.chatListItemStyle} 
                             onClick={() => handleUserSelect(user.id)}
-                            p={'10px 0'}
-                            display={'flex'}
-                            alignItems={'center'}
-                            justifyContent={'start'}
-                            cursor={'pointer'} 
-                            w={'100%'}
-                            borderBottom={'1px solid'}
-                            borderColor={'borderColor'}
-                            _hover={{ bg: 'componentColor', color: 'white' }}
+                            className={css.userRow}
                         >
-                            <Checkbox display={'none'} checked={selectedUserIds.has(user.id)} readOnly mr={'10px'} />
-                            <Text>{user.name}</Text>
-                        </Box>
+                            <input type="checkbox" checked={selectedUserIds.has(user.id)} readOnly className={css.hiddenCheckbox} />
+                            <p>{user.name}</p>
+                        </div>
                     ))}
-                </Box>
-                <Box
-                    mt={'20px'}
-                    display={'flex'}
-                    justifyContent={'space-between'}
-                    gap={'10px'}
-                >
-                    <Button onClick={onClose} bg={'transparent'}>Cancelar</Button>
-                    <Button onClick={handleConfirmAdd} _hover={{ bg: 'componentColor', }}>Adicionar</Button>
-                </Box>
-            </Box>
-        </Box>
+                </div>
+                <div className={css.modalActions}>
+                    <button onClick={onClose} className={css.ghostBtn}>Cancelar</button>
+                    <button onClick={handleConfirmAdd} className={css.primaryBtn}>Adicionar</button>
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -192,60 +145,21 @@ export const GroupInfoSidebar = ({ chat, onClose }) => {
                     onAddMembers={handleAddMembers} 
                 />
             )}
-            <Box 
-                position={'absolute'}
-                top={0}
-                right={'100%'}
-                width={'43%'}
-                minW={'280px'}
-                maxW={'400px'}
-                h={'100%'}
-                bg={'bodyBg'}
-                boxShadow={'-5px 0px 15px rgba(0,0,0,0.9)'}
-                zIndex={20}
-                display={'flex'}
-                flexDirection={'column'}
-            >
-                <Box
-                    p={'10px'}
-                    bg={'bodyBg'}
-                >
-                    <Box 
-                        display={'flex'}
-                        alignItems={'center'}
-                        justifyContent={'space-between'}
-                        gap={'20px'}
-                    >
-                        <Text>Informações do Grupo</Text>
-                        <Button 
-                            onClick={onClose} 
-                            background={'none'}
-                            border={'none'} 
-                            fontSize={'24px'} 
-                            cursor={'pointer'}
-                        >
+            <div className={css.sidebar}>
+                <div className={css.sidebarHeader}>
+                    <div className={css.headerRow}>
+                        <p>Informações do Grupo</p>
+                        <button onClick={onClose} className={css.closeBtn}>
                             &times;
-                        </Button>
-                    </Box>
-                </Box>
+                        </button>
+                    </div>
+                </div>
 
-                <Box 
+                <div
                     onClick={handleAvatarClick}
                     title={isAdmin ? "Clique para alterar a foto" : ""}
-                    w={'150px'}
-                    h={'150px'}
-                    borderRadius={'50%'}
-                    display={'flex'}
-                    alignItems={'center'}
-                    justifyContent={'center'}
-                    fontWeight={'bold'}
-                    fontSize={'20px'}
-                    bg={'bodyBg'}
-                    m={'0 auto 20px auto'}
-                    position={'relative'}
-                    flexShrink={0}
-                    overflow={'hidden'}
-                    cursor={isAdmin ? 'pointer' : 'default'}
+                    className={css.avatar}
+                    style={{ cursor: isAdmin ? 'pointer' : 'default' }}
                 >
                     {photoPreviewUrl ? (
                         <img
@@ -258,7 +172,7 @@ export const GroupInfoSidebar = ({ chat, onClose }) => {
                     )}
 
                     {isAdmin && (
-                        <Input 
+                        <input
                             type="file" 
                             ref={fileInputRef} 
                             style={{ display: 'none' }}
@@ -266,75 +180,42 @@ export const GroupInfoSidebar = ({ chat, onClose }) => {
                             accept="image/*"
                         />
                     )}
-                </Box>
+                </div>
 
-                <Box 
-                    flexGrow={1} 
-                    overflowY={'auto'} 
-                    p={'20px'} 
-                    sx={{
-                        '&::-webkit-scrollbar': { width: '4px' },
-                        '&::-webkit-scrollbar-track': { background: 'transparent' },
-                        '&::-webkit-scrollbar-thumb': { background: 'borderColorReverse', borderRadius: '24px' },
-                    }}
-                >
+                <div className={css.sidebarBody}>
                     {isAdmin && (
-                        <Box 
-                            display={'flex'}
-                            alignItems={'flex-end'}
-                            justifyContent={'space-between'}
-                            mb={'25px'}
-                            gap={'10px'}
-                        >
-                            <Box display={'flex'} flexDirection={'column'} alignItems={'start'} gap={'10px'}>
-                                <Text>Nome do Grupo</Text>
-                                <Input 
+                        <div className={css.editRow}>
+                            <div className={css.editField}>
+                                <p>Nome do Grupo</p>
+                                <input
                                     value={groupName}
                                     onChange={(e) => setGroupName(e.target.value)}
-                                    w={'100%'}
-                                    p={'8px'}
-                                    border={'1px solid'}
-                                    borderColor={'borderColor'}
-                                    borderRadius={'4px'}
                                 />
-                            </Box>
-                            <Button onClick={handleSaveChanges}>
+                            </div>
+                            <button onClick={handleSaveChanges} className={css.iconBtn}>
                                 <MdEdit />
-                            </Button>
-                        </Box>
+                            </button>
+                        </div>
                     )}
 
-                    <Box mb={'25px'}>
-                        <Box display={'flex'} justifyContent={'start'} alignItems={'center'}>
-                            <Text>{chat.participants.length} Participantes</Text>
+                    <div className={css.membersBlock}>
+                        <div className={css.membersHeader}>
+                            <p>{chat.participants.length} Participantes</p>
                             {isAdmin && (
-                                <Button 
+                                <button
                                     onClick={() => setIsAddModalOpen(true)}
-                                    bg={'none'}
-                                    border={'none'}
-                                    fontSize={'24px'}
-                                    fontWeight={'bold'}
-                                    cursor={'pointer'}
-                                    _hover={{ color: 'primaryText' }}
+                                    className={css.iconBtn}
                                 >
                                     <BsFillPersonPlusFill />
-                                </Button>
+                                </button>
                             )}
-                        </Box>
+                        </div>
                         {chat.participants.map(({ user, role }) => (
-                            <Box 
+                            <div
                                 key={user.id} 
-                                p={'10px 0'}
-                                borderBottom={'1px solid'}
-                                borderColor={'borderColor'}
-                                display={'flex'}
-                                alignItems={'center'}
-                                justifyContent={'start'}
-                                cursor={'pointer'} 
-                                w={'100%'}
-                                color={'bodyText'}
+                                className={css.memberRow}
                             >
-                                <Text style={{width: '100%'}}>
+                                <p style={{width: '100%'}}>
                                     {user.name} 
                                     {role === 'ADMIN' && 
                                         <span style={{
@@ -348,24 +229,24 @@ export const GroupInfoSidebar = ({ chat, onClose }) => {
                                             marginLeft: '8px'
                                         }}>Admin</span>
                                     }
-                                </Text>
+                                </p>
                                 {isAdmin && user.id !== currentUser.id && (
-                                    <Box display={'flex'} flexDirection={'row'} justifyContent={'start'} width={'100%'} gap={'10px'} marginLeft={'30px'}>
+                                    <div className={css.memberActions}>
                                         {role === 'MEMBER' ? (
-                                            <Button onClick={() => handlePromoteToAdmin(user.id)} title="Promover a Admin" bg={'none'}><GrUserAdmin /></Button>
+                                            <button onClick={() => handlePromoteToAdmin(user.id)} title="Promover a Admin" className={css.iconBtn}><GrUserAdmin /></button>
                                         ) : (
-                                            <Button onClick={() => handleDemoteToMember(user.id)} title="Rebaixar para Membro" bg={'none'}><RiAdminLine /></Button>
+                                            <button onClick={() => handleDemoteToMember(user.id)} title="Rebaixar para Membro" className={css.iconBtn}><RiAdminLine /></button>
                                         )}
-                                        <Button onClick={() => handleRemoveMember(user.id, user.name)} title="Remover Membro" bg={'none'} color={'red'} fontSize={'22px'}>
+                                        <button onClick={() => handleRemoveMember(user.id, user.name)} title="Remover Membro" className={css.removeBtn}>
                                             <MdOutlinePersonRemove />
-                                        </Button>
-                                    </Box>
+                                        </button>
+                                    </div>
                                 )}
-                            </Box>
+                            </div>
                         ))}
-                    </Box>
-                </Box>
-            </Box>
+                    </div>
+                </div>
+            </div>
         </>
     );
 };

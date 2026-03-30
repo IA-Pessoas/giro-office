@@ -8,7 +8,7 @@ export function setupAPIClient(ctx = undefined, onUnauthorized?: () => void) {
     const token = cookies['@cw.token'];
 
     const api = axios.create({
-        baseURL: process.env.NEXT_PUBLIC_API_URL,
+        baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3334',
         headers:{
             Authorization: token ? `Bearer ${token}` : undefined
         }

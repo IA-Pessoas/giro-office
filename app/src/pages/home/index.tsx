@@ -1,11 +1,9 @@
 import { useRouter } from 'next/router';
 import { FormEvent, useState, useEffect } from "react";
 import Head from "next/head";
-import {
-    Box,
-} from "@chakra-ui/react";
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
+import styles from "./HomePage.module.css";
 
 import { ModuleCard } from '@shared/components/ModulosCards'
 
@@ -75,7 +73,7 @@ export default function Dashboard({ perm }: Props) {
       
     return (
         <>
-            <Box display="flex" justifyContent="center" alignItems="center" height="100vh" padding="4">
+            <div className={styles.page}>
                 {modules.map((module) => (
                     <ModuleCard
                         key={module.name}
@@ -85,10 +83,10 @@ export default function Dashboard({ perm }: Props) {
                         color={module.color}
                     />
                 ))}
-            </Box>
-            <Box position="absolute" top={2} right={2}>
+            </div>
+            <div className={styles.themeToggle}>
                 <ToggleThemeButton />
-            </Box>
+            </div>
         </>
     );
 }

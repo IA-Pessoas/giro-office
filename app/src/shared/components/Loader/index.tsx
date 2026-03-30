@@ -1,39 +1,21 @@
 // Loader.tsx
-import { Box, useBreakpointValue } from '@chakra-ui/react';
 import { CSSProperties } from 'react';
 
 const Loader = () => {
-    const isSmallScreen = useBreakpointValue({ base: true, md: false }); // Responsividade
-
     const imageStyle: CSSProperties = {
         animation: 'blink 1.5s ease-in-out infinite',
     };
 
     return (
-        <Box
-            position="absolute" // antes era fixed
-            top={0}
-            left={0}
-            right={0}
-            bottom={0}
-            zIndex={10}
-            display="flex"
-            justifyContent="center"
-            alignItems="center"
-        >
-            <Box
-                borderRadius="full"
-                overflow="hidden"
-                width={isSmallScreen ? "60px" : "100px"}
-                height={isSmallScreen ? "60px" : "100px"}
-            >
+        <div className="absolute inset-0 z-10 flex items-center justify-center">
+            <div className="h-[60px] w-[60px] overflow-hidden rounded-full md:h-[100px] md:w-[100px]">
                 <img
                     src={`/logos/lions/Castelo.webp`}
                     alt="Loading"
                     style={imageStyle}
                 />
-            </Box>
-        </Box>
+            </div>
+        </div>
 
     );
 };

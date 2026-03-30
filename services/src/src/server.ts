@@ -21,7 +21,6 @@ import { error as logError, info as logInfo } from "@workspace/shared";
 
 interface SocketWithAuth extends Socket {
     user_id?: string;
-    organization_id?: string;
 }
 
 const app = express();
@@ -77,9 +76,8 @@ io.use((socket: SocketWithAuth, next) => {
     }
 
     try {
-        const payload = jwt.verify(token, secret) as { sub: string; organization_id?: string };
+        const payload = jwt.verify(token, secret) as { sub: string };
         socket.user_id = payload.sub;
-        socket.organization_id = payload.organization_id;
         next();
     } catch (err) {
         if (err instanceof Error) {

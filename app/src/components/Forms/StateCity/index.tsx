@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Select, FormLabel, Flex } from '@chakra-ui/react';
+import styles from './StateCity.module.css';
 
 type StateCityProps = {
     initialState: string;
@@ -8,9 +8,20 @@ type StateCityProps = {
     onChangeCity: (cidade: string) => void;
 };
 
+type UF = {
+  id: number;
+  sigla: string;
+  nome: string;
+};
+
+type City = {
+  id: number;
+  nome: string;
+};
+
 export default function StateCity({ initialState, initialCity, onChangeState, onChangeCity }: StateCityProps) {
-  const [estados, setEstados] = useState([]);
-  const [cidades, setCidades] = useState([]);
+  const [estados, setEstados] = useState<UF[]>([]);
+  const [cidades, setCidades] = useState<City[]>([]);
   const [estadoSelecionado, setEstadoSelecionado] = useState(initialState || '');
   const [cidadeSelecionada, setCidadeSelecionada] = useState(initialCity || '');
 
@@ -40,41 +51,41 @@ export default function StateCity({ initialState, initialCity, onChangeState, on
   }, [cidadeSelecionada]);
 
   return (
-    <Flex w="100%" direction="row" gap={2}>
-        <Flex w="50%" direction="column" justifyContent={'flex-end'}>
-            <FormLabel htmlFor="estado">Estado</FormLabel>
-            <Select
-                id="estado"
-                placeholder="Selecione o estado"
-                value={estadoSelecionado}
-                onChange={(e) => setEstadoSelecionado(e.target.value)}
-                borderColor='main.divisor'
-            >
-                {estados.map((estado) => (
-                    <option key={estado.id} value={estado.sigla}>
-                    {estado.nome}
-                    </option>
-                ))}
-            </Select>
-        </Flex>
+    <div className={styles.row}>
+      <div className={styles.field}>
+        <label htmlFor="estado" className={styles.label}>Estado</label>
+        <select
+          id="estado"
+          value={estadoSelecionado}
+          onChange={(e) => setEstadoSelecionado(e.target.value)}
+          className={styles.select}
+        >
+          <option value="">Selecione o estado</option>
+          {estados.map((estado) => (
+            <option key={estado.id} value={estado.sigla}>
+              {estado.nome}
+            </option>
+          ))}
+        </select>
+      </div>
 
-        <Flex w="50%" direction="column" justifyContent={'flex-end'}>
-            <FormLabel htmlFor="cidade">Cidade</FormLabel>
-            <Select
-                id="cidade"
-                placeholder="Selecione a cidade"
-                value={cidadeSelecionada}
-                onChange={(e) => setCidadeSelecionada(e.target.value)}
-                isDisabled={!estadoSelecionado}
-                borderColor='main.divisor'
-            >
-                {cidades.map((cidade) => (
-                    <option key={cidade.id} value={cidade.nome}>
-                        {cidade.nome}
-                    </option>
-                ))}
-            </Select>
-        </Flex>
-    </Flex>
+      <div className={styles.field}>
+        <label htmlFor="cidade" className={styles.label}>Cidade</label>
+        <select
+          id="cidade"
+          value={cidadeSelecionada}
+          onChange={(e) => setCidadeSelecionada(e.target.value)}
+          disabled={!estadoSelecionado}
+          className={styles.select}
+        >
+          <option value="">Selecione a cidade</option>
+          {cidades.map((cidade) => (
+            <option key={cidade.id} value={cidade.nome}>
+              {cidade.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
   );
 }

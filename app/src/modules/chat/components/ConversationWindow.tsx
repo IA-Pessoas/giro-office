@@ -1,10 +1,4 @@
 import React, { useRef, useEffect, useLayoutEffect, useState } from 'react';
-import { Box, 
-    Button, 
-    Input, 
-    Textarea,
-    Text 
-} from '@chakra-ui/react';
 
 import { GrSend } from "react-icons/gr";
 import { IoMdMic } from "react-icons/io";
@@ -16,12 +10,119 @@ import { GiConfirmed } from "react-icons/gi";
 import { CiCircleInfo } from "react-icons/ci";
 import { FaPencilRuler } from "react-icons/fa";
 
-import { useChat } from '../context/ChatContext';
-import { useAuth } from '../../context/AuthContext';
-import * as styles from '../../styles/chat'
+import { useChat } from '../../../context/ChatContext';
+import { useAuth } from '../../../context/AuthContext';
+import * as styles from '../../../styles/chat'
 import { useClickOutside } from '@shared/hooks/useClickOutside';
 
 import { GroupInfoSidebar } from './GroupInfoSidebar';
+
+const parseSpace = (value: any) => {
+    if (value === undefined || value === null) return undefined;
+    if (typeof value === 'number') return `${value}px`;
+    return value;
+};
+
+const getStyleFromProps = (props: any): React.CSSProperties => ({
+    display: props.display,
+    alignItems: props.alignItems,
+    justifyContent: props.justifyContent,
+    flexDirection: props.flexDirection,
+    flexGrow: props.flexGrow,
+    position: props.position ?? props.pos,
+    top: parseSpace(props.top),
+    right: parseSpace(props.right),
+    bottom: parseSpace(props.bottom),
+    left: parseSpace(props.left),
+    width: parseSpace(props.width ?? props.w),
+    height: parseSpace(props.height ?? props.h),
+    maxHeight: parseSpace(props.maxH),
+    background: props.bg ?? props.background ?? props.backgroundColor,
+    border: props.border,
+    borderColor: props.borderColor,
+    borderRadius: parseSpace(props.borderRadius),
+    overflow: props.overflow,
+    overflowX: props.overflowX,
+    overflowY: props.overflowY,
+    boxShadow: props.boxShadow,
+    color: props.color,
+    fontSize: parseSpace(props.fontSize),
+    fontWeight: props.fontWeight,
+    lineHeight: props.lineHeight,
+    textAlign: props.textAlign,
+    resize: props.resize,
+    zIndex: props.zIndex,
+    padding: parseSpace(props.p),
+    margin: parseSpace(props.m ?? props.margin),
+    marginTop: parseSpace(props.mt),
+    marginBottom: parseSpace(props.mb),
+    marginLeft: parseSpace(props.ml),
+    marginRight: parseSpace(props.mr),
+});
+
+const Box = React.forwardRef<HTMLDivElement, any>(({ children, style, ...props }, ref) => (
+    <div
+        ref={ref}
+        id={props.id}
+        onClick={props.onClick}
+        onScroll={props.onScroll}
+        style={{ ...getStyleFromProps(props), ...style }}
+    >
+        {children}
+    </div>
+));
+Box.displayName = 'BoxShim';
+
+const Text = ({ children, style, ...props }: any) => (
+    <p style={{ margin: 0, ...getStyleFromProps(props), ...style }}>{children}</p>
+);
+
+const Button = ({ children, style, ...props }: any) => (
+    <button
+        type={props.type ?? 'button'}
+        onClick={props.onClick}
+        disabled={props.disabled}
+        title={props.title}
+        style={{
+            border: 'none',
+            background: 'transparent',
+            cursor: props.disabled ? 'not-allowed' : 'pointer',
+            ...getStyleFromProps(props),
+            ...style,
+        }}
+    >
+        {children}
+    </button>
+);
+
+const Input = React.forwardRef<HTMLInputElement, any>(({ style, ...props }, ref) => (
+    <input
+        ref={ref}
+        type={props.type}
+        value={props.value}
+        onChange={props.onChange}
+        onClick={props.onClick}
+        placeholder={props.placeholder}
+        disabled={props.disabled}
+        accept={props.accept}
+        style={{ ...getStyleFromProps(props), ...style }}
+    />
+));
+Input.displayName = 'InputShim';
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, any>(({ style, ...props }, ref) => (
+    <textarea
+        ref={ref}
+        value={props.value}
+        onChange={props.onChange}
+        onKeyDown={props.onKeyDown}
+        rows={props.rows}
+        placeholder={props.placeholder}
+        disabled={props.disabled}
+        style={{ ...getStyleFromProps(props), ...style }}
+    />
+));
+Textarea.displayName = 'TextareaShim';
 
 interface MessageInputProps {
     onSendMessage: (payload: { content: string; fileUrl?: string; type?: 'TEXT' | 'IMAGE' | 'AUDIO' }) => void;

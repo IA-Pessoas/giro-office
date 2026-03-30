@@ -19,16 +19,7 @@ router.METODO("/path", async (request, response, next) => {
 });
 ```
 
-## Validação e erros 4xx nas rotas
-- Validar body/query/params e pré-requisitos (ex.: `req.organization_id`) **antes** de chamar services.
-- **Não** responder validação com `response.status(400).json({ success: false, error: "...", code: "BAD_REQUEST" })`. Usar **`throw new ServiceError(400, "mensagem clara")`**; o handler global monta `success`, `error` e `code` de forma consistente.
-- Exemplo:
-```typescript
-const organizationId = request.organization_id;
-if (!organizationId) {
-  throw new ServiceError(400, "organization_id é obrigatório.");
-}
-```
-
-## Middlewares (mesmo arquivo ou importados)
-- Se o middleware tiver `try`/`catch`, aplicar a regra do workspace: **`logError` primeiro no `catch`**, depois tratar `ServiceError` vs erro genérico.
+## Validação
+- Validar body, query e params **antes** de chamar services.
+- Preferir **Zod** + `parseWithZod` de `@workspace/shared` e schemas em `services/<serviço>/src/schemas/` (ver `.cursor/rules/schemas-zod.mdc`).
+- Para checagens pontuais de contexto HTTP (ex.: `organization_id` / `user_id` ausente após middleware), `throw new ServiceError(400, "mensagem")` continua válido.

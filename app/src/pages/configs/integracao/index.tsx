@@ -1,36 +1,28 @@
 import React from 'react';
 import Head from 'next/head';
-import { Box, Button, SimpleGrid, Heading, Text, Icon } from '@chakra-ui/react';
 import { FaTasks } from 'react-icons/fa';
 import Link from 'next/link';
 import { canSSRAuth } from '@modules/auth';
+import styles from './IntegracaoConfigPage.module.css';
 
 export default function IntegracaoConfig() {
     return (
         <>
             <Head><title>Configurações - Integração</title></Head>
-            <Box p={8}>
-                <Heading mb={6} color="primaryText">Configurações da Integração</Heading>
+            <div className={styles.page}>
+                <h1 className={styles.title}>Configurações da Integração</h1>
                 
-                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
+                <div className={styles.grid}>
                     <Link href="/configs/integracao/tasks">
-                        <Box 
-                            p={6} 
-                            bg="componentColorDarkOnly" 
-                            borderRadius="lg" 
-                            boxShadow="md" 
-                            cursor="pointer"
-                            transition="0.2s"
-                            _hover={{ transform: 'translateY(-2px)', boxShadow: 'lg', border: '1px solid', borderColor: 'integracao.main' }}
-                        >
-                            <Icon as={FaTasks} w={10} h={10} color="integracao.main" mb={4} />
-                            <Heading size="md" mb={2}>Modelos de Tarefas</Heading>
-                            <Text color="gray.500">Gerencie os modelos padrão de tarefas recorrentes.</Text>
-                        </Box>
+                        <div className={styles.card}>
+                            <FaTasks className={styles.icon} />
+                            <h2 className={styles.cardTitle}>Modelos de Tarefas</h2>
+                            <p className={styles.cardText}>Gerencie os modelos padrão de tarefas recorrentes.</p>
+                        </div>
                     </Link>
                     {/* Adicione mais cards de configuração aqui no futuro */}
-                </SimpleGrid>
-            </Box>
+                </div>
+            </div>
         </>
     );
 }

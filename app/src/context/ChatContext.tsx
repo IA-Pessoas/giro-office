@@ -44,7 +44,7 @@ export interface ChatContextType {
 
 export const ChatContext = createContext<ChatContextType | null>(null);
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
+const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3334';
 const MESSAGES_PER_PAGE = 30;
 
 export function ChatProvider({ children }: { children: ReactNode }) {

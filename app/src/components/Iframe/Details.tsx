@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text, } from '@chakra-ui/react';
-import { LoadingSpinner } from '@shared/components/LoadingSpinner';
+import Loader from '../Loader';
+import styles from './Details.module.css';
 
 interface DetailsViewProps {
   id: string | null;
@@ -22,26 +22,17 @@ export function DetailsView({ id, link }: DetailsViewProps) {
 
   if (!id) {
     return (
-      <Box w="100%" h="90vh" display="flex" alignItems="center" justifyContent="center">
-        <Text color="main.main">Selecione para ver os detalhes...</Text>
-      </Box>
+      <div className={styles.emptyState}>
+        <p className={styles.emptyText}>Selecione para ver os detalhes...</p>
+      </div>
     );
   }
 
   const iframeSrc = `/${link}/${id}?view=iframe`;
 
   return (
-    <Box 
-      w="100%" 
-      h="90vh" 
-      ml={2}
-      position="relative"
-      borderRadius={'8px'}
-      border={'1px solid'}
-      borderColor={'borderColorDarkOnly'}
-      shadow={'md'}
-    >
-      {isLoading && <LoadingSpinner />}
+    <div className={styles.wrapper}>
+      {isLoading && <Loader />}
 
       <iframe
         key={id}
@@ -55,6 +46,6 @@ export function DetailsView({ id, link }: DetailsViewProps) {
         }}
         onLoad={handleIframeLoad}
       />
-    </Box>
+    </div>
   );
 }
