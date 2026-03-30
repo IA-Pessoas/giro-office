@@ -1,4 +1,9 @@
-import { assertNonEmptyString, error as logError, ServiceError } from "@workspace/shared";
+import {
+  assertNonEmptyString,
+  error as logError,
+  ServiceError,
+  TimeUtils,
+} from "@workspace/shared";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
@@ -30,6 +35,13 @@ export interface TimeBankReleaseCreateInput {
 export interface TimeBankReleaseApproveInput {
   id: string;
   organization_id: string;
+}
+
+export interface TimeBankReleaseListFilters {
+  user_id?: string;
+  is_approved?: boolean;
+  date_from?: Date;
+  date_to?: Date;
 }
 
 class TimeBankReleaseService {
@@ -130,6 +142,44 @@ class TimeBankReleaseService {
       logError("Erro ao aprovar lançamento de banco de horas", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro interno ao aprovar lançamento de banco de horas.", err);
+    }
+  }
+
+  async list(
+    organizationId: string,
+    filters: TimeBankReleaseListFilters,
+  ): Promise<TimeBankReleaseSnapshot[]> {
+    try {
+      const orgId = assertNonEmptyString(organizationId, "organization_id");
+
+      const dateFilter: { gte?: Date; lte?: Date } = {};
+      if (filters.date_from !== undefined) {
+        if (Number.isNaN(filters.date_from.getTime())) {
+          throw new ServiceError(400, "date_from inválido.");
+        }
+        dateFilter.gte = TimeUtils.getUtcDayBounds(filters.date_from).dayStart;
+      }
+      if (filters.date_to !== undefined) {
+        if (Number.isNaN(filters.date_to.getTime())) {
+          throw new ServiceError(400, "date_to inválido.");
+        }
+        dateFilter.lte = TimeUtils.getUtcDayBounds(filters.date_to).dayEnd;
+      }
+
+      return await prismaClient.timeBankReleases.findMany({
+        where: {
+          organization_id: orgId,
+          ...(filters.user_id !== undefined ? { user_id: filters.user_id } : {}),
+          ...(filters.is_approved !== undefined ? { is_approved: filters.is_approved } : {}),
+          ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
+        },
+        select: TIME_BANK_RELEASE_SELECT,
+        orderBy: [{ date: "desc" }, { id: "desc" }],
+      });
+    } catch (err: unknown) {
+      logError("Erro ao listar lançamentos de banco de horas", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao listar lançamentos de banco de horas.", err);
     }
   }
 }

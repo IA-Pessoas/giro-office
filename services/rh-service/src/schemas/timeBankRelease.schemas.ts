@@ -15,3 +15,26 @@ export const approveTimeBankReleaseBodySchema = z
     id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
+
+function optionalIsoDateQuery(field: string) {
+  return z.union([
+    z.undefined(),
+    z
+      .string()
+      .trim()
+      .min(1, `${field} inválido.`)
+      .refine((s) => !Number.isNaN(Date.parse(s)), `${field} inválido.`)
+      .transform((s: string) => new Date(s)),
+  ]);
+}
+
+export const listTimeBankReleasesQuerySchema = z
+  .object({
+    user_id: z.string().uuid({ message: "user_id inválido." }).optional(),
+    is_approved: z
+      .enum(["true", "false"], { message: "is_approved deve ser true ou false." })
+      .optional(),
+    date_from: optionalIsoDateQuery("date_from"),
+    date_to: optionalIsoDateQuery("date_to"),
+  })
+  .strict();
