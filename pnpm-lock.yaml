@@ -66,7 +66,7 @@ importers:
         version: 5.1.36
       '@workspace/api':
         specifier: workspace:*
-        version: link:../services/src
+        version: link:../packages/api
       axios:
         specifier: ^1.6.7
         version: 1.13.5
