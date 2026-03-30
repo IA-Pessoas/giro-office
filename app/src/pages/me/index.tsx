@@ -1,17 +1,16 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styles from "./MePage.module.css";
 
 import { useAuth } from "../../context/AuthContext";
-import { useMePassword, useUserProfile } from "@shared/hooks";
-import { setupAPIClient } from "@shared/services/api";
+import { useMePassword, useUpdateCurrentUser, useUserProfile } from "@shared/hooks";
 
 export default function Me() {
   const { user, logoutUser } = useAuth();
   const profileQuery = useUserProfile(user?.id);
   const { password, setPassword } = useMePassword(user?.id);
+  const updateUserMutation = useUpdateCurrentUser();
 
   const [name, setName] = useState("");
   const [login, setLogin] = useState("");
@@ -27,25 +26,19 @@ export default function Me() {
     await logoutUser();
   }
 
-  async function handleUpdate() {
+  function handleUpdate() {
     if (name === "") {
       return;
     }
 
-    try {
-      const apiClient = setupAPIClient();
-      await apiClient.put("/users", {
-        name: name,
-        password: password,
-        permission: 2,
-        status: "Ativo",
-      });
+    const permission = user?.permission ?? profileQuery.data?.permission ?? 2;
 
-      toast.success("Atualizado com sucesso!");
-    } catch (error) {
-      toast.error("Erro ao atualizar!");
-      console.log(error);
-    }
+    updateUserMutation.mutate({
+      name,
+      password,
+      permission,
+      status: "Ativo",
+    });
   }
 
   return (
@@ -61,6 +54,9 @@ export default function Me() {
               <p className={styles.label}>Carregando perfil…</p>
             ) : profileQuery.isError ? (
               <p className={styles.label}>Não foi possível carregar o perfil.</p>
+            ) : null}
+            {updateUserMutation.isError ? (
+              <p className={styles.label}>Não foi possível salvar. Tente novamente.</p>
             ) : null}
             <label className={styles.label}>Login</label>
             <input className={styles.input} placeholder="Seu Login" type="text" disabled value={login} />
@@ -80,8 +76,13 @@ export default function Me() {
               onChange={(e) => setPassword(e.target.value)}
             />
 
-            <button type="button" className={styles.saveBtn} onClick={handleUpdate}>
-              Salvar
+            <button
+              type="button"
+              className={styles.saveBtn}
+              onClick={handleUpdate}
+              disabled={updateUserMutation.isPending}
+            >
+              {updateUserMutation.isPending ? "Salvando…" : "Salvar"}
             </button>
 
             <button type="button" className={styles.logoutBtn} onClick={handleLogout}>

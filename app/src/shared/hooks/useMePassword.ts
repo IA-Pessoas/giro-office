@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { getMe } from "@workspace/api";
 
-import { setupAPIClient } from "@shared/services/api";
+import { api } from "@shared/services/apiClient";
 
 /**
  * Carrega o valor inicial do campo de senha a partir de GET /me (quando a API expõe `user.password`).
@@ -14,14 +15,12 @@ export function useMePassword(userId: string | undefined) {
       return;
     }
 
-    const client = setupAPIClient();
     let cancelled = false;
 
-    client
-      .get("/me")
-      .then((res) => {
-        if (!cancelled && res.data?.user?.password != null) {
-          setPassword(String(res.data.user.password));
+    getMe(api)
+      .then((sessionUser) => {
+        if (!cancelled && sessionUser.password != null) {
+          setPassword(String(sessionUser.password));
         }
       })
       .catch(() => {});
