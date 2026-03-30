@@ -166,13 +166,21 @@ class TimeBankReleaseService {
         dateFilter.lte = TimeUtils.getUtcDayBounds(filters.date_to).dayEnd;
       }
 
+      const where: Prisma.TimeBankReleasesWhereInput = {
+        organization_id: orgId,
+      };
+      if (filters.user_id !== undefined) {
+        where.user_id = filters.user_id;
+      }
+      if (filters.is_approved !== undefined) {
+        where.is_approved = filters.is_approved;
+      }
+      if (Object.keys(dateFilter).length > 0) {
+        where.date = dateFilter;
+      }
+
       return await prismaClient.timeBankReleases.findMany({
-        where: {
-          organization_id: orgId,
-          ...(filters.user_id !== undefined ? { user_id: filters.user_id } : {}),
-          ...(filters.is_approved !== undefined ? { is_approved: filters.is_approved } : {}),
-          ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
-        },
+        where,
         select: TIME_BANK_RELEASE_SELECT,
         orderBy: [{ date: "desc" }, { id: "desc" }],
       });
