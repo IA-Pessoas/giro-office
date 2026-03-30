@@ -8,6 +8,8 @@ declare global {
       requestId?: string;
       auditErrorCode?: string;
       auditErrorMessage?: string;
+      user_id: string;
+      organization_id: string;
     }
   }
 }
