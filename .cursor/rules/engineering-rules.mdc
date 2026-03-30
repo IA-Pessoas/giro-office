@@ -1,25 +1,6 @@
-# .cursorrules
-
-## Objetivo
-
-Executar com qualidade, clareza e disciplina. Resolver o problema certo com a menor complexidade necessária. Não declarar sucesso sem prova.
-
 ---
-
-## Sempre
-
-* Entenda o problema antes de editar código.
-* Defina objetivo, escopo, restrições e critério de sucesso.
-* Não trate hipótese como fato.
-* Explicite premissas e valide cedo as de maior risco.
-* Prefira a solução mais simples que resolva o problema por completo.
-* Não faça overengineering.
-* Não aumente escopo sem explicitar isso.
-* Não esconda incerteza, risco ou limitação.
-* Seja conciso, direto e tecnicamente preciso.
-
+alwaysApply: true
 ---
-
 ## Para tarefas não triviais
 
 Considere não trivial qualquer tarefa com 3 ou mais etapas relevantes, decisões de arquitetura, integração, ambiguidade, dependências externas ou alto risco de retrabalho.
