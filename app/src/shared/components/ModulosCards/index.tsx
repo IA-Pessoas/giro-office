@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Text, Image, Link } from '@chakra-ui/react';
+import Link from 'next/link';
 
 interface ModuleCardProps {
   name: string;
@@ -9,32 +9,29 @@ interface ModuleCardProps {
 }
 
 export function ModuleCard({ name, imageUrl, link, color }) {
-    const [isHovered, setIsHovered] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <Link href={link} _hover={{ textDecoration: 'none' }}>
-      <Box
-        p={4}
-        boxShadow="md"
-        borderRadius="md"
-        cursor="pointer"
-        _hover={{
-          transition: '0.5s',
-          textColor: 'white',
-          bg: color,
-          boxShadow: "lg",
-          '& img': {
-            filter: 'brightness(0.5)',
-          },
+    <Link href={link} className="no-underline">
+      <article
+        className="cursor-pointer rounded-md p-4 shadow-md transition duration-500 hover:shadow-lg"
+        style={{
+          color: isHovered ? 'white' : undefined,
+          background: isHovered ? color : undefined,
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <Image src={imageUrl} alt={name} maxW="150px" mx="auto" style={isHovered ? { filter: 'brightness(0.5)' } : {}} />
-        <Text mt={4} textAlign="center" fontWeight="bold">
+        <img
+          src={imageUrl}
+          alt={name}
+          className="mx-auto max-w-[150px]"
+          style={isHovered ? { filter: 'brightness(0.5)' } : {}}
+        />
+        <p className="mt-4 text-center font-bold">
           {name}
-        </Text>
-      </Box>
+        </p>
+      </article>
     </Link>
   );
 };

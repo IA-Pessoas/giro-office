@@ -4,7 +4,7 @@ export { ChatOverlay } from './components/ChatOverlay';
 export { ConversationWindow } from './components/ConversationWindow';
 export { GroupInfoSidebar } from './components/GroupInfoSidebar';
 
-export { ChatProvider, useChat } from './context/ChatContext';
+export { ChatProvider, useChat } from '../../context/ChatContext';
 
 export { chatService } from './services/chatService';
 
