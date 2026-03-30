@@ -8,6 +8,7 @@ import "express-async-errors";
 import { requestContext } from "./middlewares/requestContext.js";
 import categoryRoutes from "./routes/category.routes.js";
 import holidayRoutes from "./routes/holiday.routes.js";
+import messageRoutes from "./routes/message.routes.js";
 import pointRoutes from "./routes/point.routes.js";
 import pointConfigRoutes from "./routes/point-config.routes.js";
 import requestRoutes from "./routes/request.routes.js";
@@ -31,6 +32,7 @@ export function createApp(logger: Logger): express.Express {
   app.use("/rh/categories", categoryRoutes);
   app.use("/rh/requests", requestRoutes);
   app.use("/rh/holidays", holidayRoutes);
+  app.use("/rh/messages", messageRoutes);
 
   app.use(
     createExpressErrorHandler({
