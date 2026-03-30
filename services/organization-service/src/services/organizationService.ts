@@ -1,5 +1,5 @@
 import { error as logError, ServiceError } from "@workspace/shared";
-import { type Prisma, type status, status as statusEnum } from "../generated/prisma/client.js";
+import type { Prisma, status } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 
 function generateSlug(name: string): string {
@@ -16,6 +16,12 @@ interface CreateOrganizationInput {
   name: string;
   email_created_by: string;
   cnpj: string;
+}
+
+export interface ListOrganizationsParams {
+  page: number;
+  pageSize: number;
+  status?: status;
 }
 
 const ORGANIZATION_SELECT = {
@@ -82,20 +88,34 @@ export type OrganizationLogoUpdatedRow = Prisma.OrganizationGetPayload<{
 }>;
 
 class OrganizationService {
-  async create(data: CreateOrganizationInput): Promise<OrganizationCreatedRow> {
+  async list(params: ListOrganizationsParams) {
+    try {
+      const { page, pageSize, status: statusFilter } = params;
+      const where = statusFilter !== undefined ? { status: statusFilter } : {};
+
+      const [organizations, total] = await Promise.all([
+        prismaClient.organization.findMany({
+          where,
+          select: ORGANIZATION_SELECT,
+          orderBy: { created_at: "desc" },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        }),
+        prismaClient.organization.count({ where }),
+      ]);
+
+      return { organizations, total, page, pageSize };
+    } catch (err: unknown) {
+      logError("Erro ao listar organizações", { err });
+      if (err instanceof ServiceError) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao listar organizações. ${msg}`, err);
+    }
+  }
+
+  async create(data: CreateOrganizationInput) {
     try {
       const { name, email_created_by, cnpj } = data;
-
-      if (!name?.trim()) {
-        throw new ServiceError(400, "name é obrigatório.");
-      }
-      if (!email_created_by?.trim()) {
-        throw new ServiceError(400, "email_created_by é obrigatório.");
-      }
-      if (!cnpj?.trim()) {
-        throw new ServiceError(400, "cnpj é obrigatório.");
-      }
-
       const slug = generateSlug(name);
 
       const slugExists = await prismaClient.organization.findUnique({
@@ -127,10 +147,6 @@ class OrganizationService {
 
   async findById(id: string): Promise<OrganizationRow> {
     try {
-      if (!id?.trim()) {
-        throw new ServiceError(400, "id é obrigatório.");
-      }
-
       const organization = await prismaClient.organization.findUnique({
         where: { id },
         select: ORGANIZATION_SELECT,
@@ -149,27 +165,18 @@ class OrganizationService {
     }
   }
 
-  async updateStatus(id: string, statusValue: string): Promise<OrganizationStatusUpdatedRow> {
+  async updateStatus(id: string, statusValue: status) {
     try {
-      if (!id?.trim()) {
-        throw new ServiceError(400, "id é obrigatório.");
-      }
-      const validStatuses = Object.values(statusEnum);
-      if (
-        statusValue === undefined ||
-        statusValue === null ||
-        !validStatuses.includes(statusValue as status)
-      ) {
-        throw new ServiceError(
-          400,
-          "status é obrigatório e deve ser trial, past_due, active, suspended ou cancelled.",
-        );
-      }
-
       const updated = await prismaClient.organization.update({
         where: { id },
-        data: { status: statusValue as status },
-        select: ORGANIZATION_STATUS_UPDATE_SELECT,
+        data: { status: statusValue },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          status: true,
+          updated_at: true,
+        },
       });
 
       return updated;
@@ -186,16 +193,6 @@ class OrganizationService {
     subscription_plan: string,
   ): Promise<OrganizationSubscriptionUpdatedRow> {
     try {
-      if (!id?.trim()) {
-        throw new ServiceError(400, "id é obrigatório.");
-      }
-      if (typeof subscription_plan !== "string" || !subscription_plan.trim()) {
-        throw new ServiceError(
-          400,
-          "subscription_plan é obrigatório e deve ser uma string não vazia.",
-        );
-      }
-
       const updated = await prismaClient.organization.update({
         where: { id },
         data: { subscription_plan },
@@ -211,15 +208,8 @@ class OrganizationService {
     }
   }
 
-  async updateLogoUrl(
-    id: string,
-    logo_url: string | null | undefined,
-  ): Promise<OrganizationLogoUpdatedRow> {
+  async updateLogoUrl(id: string, logo_url: string | null) {
     try {
-      if (!id?.trim()) {
-        throw new ServiceError(400, "id é obrigatório.");
-      }
-
       const updated = await prismaClient.organization.update({
         where: { id },
         data: { logo_url },
