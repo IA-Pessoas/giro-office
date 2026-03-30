@@ -13,6 +13,7 @@ import pointRoutes from "./routes/point.routes.js";
 import pointConfigRoutes from "./routes/point-config.routes.js";
 import requestRoutes from "./routes/request.routes.js";
 import timeClockRequestRoutes from "./routes/timeClockRequest.routes.js";
+import timeSheetRoutes from "./routes/timeSheet.routes.js";
 
 export function createApp(logger: Logger): express.Express {
   const app = express();
@@ -33,6 +34,7 @@ export function createApp(logger: Logger): express.Express {
   app.use("/rh/requests", requestRoutes);
   app.use("/rh/holidays", holidayRoutes);
   app.use("/rh/messages", messageRoutes);
+  app.use("/rh/timesheets", timeSheetRoutes);
 
   app.use(
     createExpressErrorHandler({
