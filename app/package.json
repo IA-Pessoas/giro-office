@@ -11,7 +11,8 @@
     "migration:baseline:visual": "node scripts/generate-visual-baseline.mjs",
     "lint": "echo \"Skipping app lint (Biome ignored for now)\"",
     "format": "echo \"Skipping app format (Biome ignored for now)\"",
-    "check": "echo \"Skipping app check (Biome ignored for now)\""
+    "check": "echo \"Skipping app check (Biome ignored for now)\"",
+    "typecheck:usefetch": "tsc -p tsconfig.usefetch-types.json --noEmit"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",
