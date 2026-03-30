@@ -34,6 +34,10 @@
       "types": "./dist/routes/services.d.ts",
       "default": "./dist/routes/services.js"
     },
+    "./schemas": {
+      "types": "./dist/schemas/index.d.ts",
+      "default": "./dist/schemas/index.js"
+    },
     "./storage": {
       "types": "./dist/storage/index.d.ts",
       "default": "./dist/storage/index.js"
