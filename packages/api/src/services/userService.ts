@@ -19,5 +19,13 @@ export async function updateCurrentUser(
   client: AxiosInstance,
   payload: UpdateCurrentUserPayload,
 ): Promise<void> {
-  await client.put("/users", payload);
+  const body: Record<string, string | number> = {
+    name: payload.name,
+    permission: payload.permission,
+    status: payload.status,
+  };
+  if (payload.password !== undefined && payload.password !== "") {
+    body.password = payload.password;
+  }
+  await client.put("/users", body);
 }

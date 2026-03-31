@@ -4,7 +4,6 @@ export interface MeSessionUser {
   name?: string;
   login?: string;
   permission?: number;
-  password?: string | null;
 }
 
 export interface MeApiResponse {
@@ -13,7 +12,8 @@ export interface MeApiResponse {
 
 export interface UpdateCurrentUserPayload {
   name: string;
-  password: string;
   permission: number;
   status: string;
+  /** Incluir apenas quando a UI permitir alteração de senha. */
+  password?: string;
 }
