@@ -11,21 +11,41 @@ export const clientIdParamsSchema = z
   })
   .strict();
 
-/** Valores do filtro de listagem alinhados à UI (dropdown de status). */
-export const clientListStatusSchema = z.enum(["Ativo", "Prospect", "Inativo"], {
-  message: "status de filtro inválido.",
-});
+/**
+ * Filtro de listagem: tokens da UI + literais usados na coluna `Client.status` no legado/BD.
+ * `Prospect` (UI) mapeia para `Prospecção` na BD — ver `mapListStatusFilterToDb`.
+ */
+export const clientListStatusSchema = z.enum(
+  ["Ativo", "Inativo", "Prospect", "Prospecção", "Fechado"],
+  {
+    message: "status de filtro inválido.",
+  },
+);
 
 export type ClientListStatus = z.infer<typeof clientListStatusSchema>;
 
+/** Valor a usar em `where.status` no Prisma após mapear o token da query. */
+export function mapListStatusFilterToDb(value: ClientListStatus): string {
+  if (value === "Prospect") {
+    return "Prospecção";
+  }
+  return value;
+}
+
 export type ListClientsFilters = {
-  status?: ClientListStatus;
+  statusDbValue?: string;
+  page: number;
+  pageSize: number;
+  search?: string;
 };
 
 export const listClientsQuerySchema = z
   .object({
     organization_id: z.string().uuid({ message: "organization_id inválido." }).optional(),
     status: clientListStatusSchema.optional(),
+    page: z.coerce.number().int().min(1).optional().default(1),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+    search: z.string().max(200).optional(),
   })
   .strict();
 

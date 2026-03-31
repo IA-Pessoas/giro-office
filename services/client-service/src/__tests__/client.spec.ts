@@ -7,6 +7,7 @@ import { createApp } from "../app.js";
 import { getClientServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import {
+  type ClientListPage,
   type ClientPublic,
   ClientService,
   type IClientService,
@@ -26,6 +27,40 @@ function testOrganization(overrides: Partial<OrganizationPublic> = {}): Organiza
     status: "active",
     subscription_plan: "trial",
     ...overrides,
+  };
+}
+
+function baseClient(overrides: Partial<ClientPublic> = {}): ClientPublic {
+  return {
+    id: TEST_CLIENT_ID,
+    name: "Cliente A",
+    organization_id: TEST_ORG_ID,
+    status: "Ativo",
+    cpf_cnpj: "123",
+    company_name: null,
+    fantasy_name: null,
+    service_unique: false,
+    deletion_date: null,
+    organization: testOrganization(),
+    ...overrides,
+  };
+}
+
+function emptyListPage(): ClientListPage {
+  return { items: [], total: 0, page: 1, pageSize: 20, hasMore: false };
+}
+
+function mockServiceBase(): Pick<
+  IClientService,
+  "listByOrganization" | "getById" | "create" | "update" | "deactivate" | "activate"
+> {
+  return {
+    listByOrganization: vi.fn(),
+    getById: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    deactivate: vi.fn(),
+    activate: vi.fn(),
   };
 }
 
@@ -50,12 +85,7 @@ function bearerToken(organizationId: string): string {
 
 describe("client-service", () => {
   it("GET /health returns success envelope", async () => {
-    const mock: IClientService = {
-      listByOrganization: vi.fn(),
-      getById: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    };
+    const mock: IClientService = { ...mockServiceBase() };
     const app = buildTestApp(mock);
     const res = await request(app).get("/health");
 
@@ -65,25 +95,18 @@ describe("client-service", () => {
     expect(res.body.data?.status).toBe("ok");
   });
 
-  it("GET /clients returns list from injected service", async () => {
-    const items: ClientPublic[] = [
-      {
-        id: TEST_CLIENT_ID,
-        name: "Cliente A",
-        organization_id: TEST_ORG_ID,
-        status: "Ativo",
-        cpf_cnpj: "123",
-        company_name: null,
-        fantasy_name: null,
-        service_unique: false,
-        organization: testOrganization(),
-      },
-    ];
+  it("GET /clients returns paginated list from injected service", async () => {
+    const items: ClientPublic[] = [baseClient()];
+    const page: ClientListPage = {
+      items,
+      total: 1,
+      page: 1,
+      pageSize: 20,
+      hasMore: false,
+    };
     const mock: IClientService = {
-      listByOrganization: vi.fn().mockResolvedValue(items),
-      getById: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
+      ...mockServiceBase(),
+      listByOrganization: vi.fn().mockResolvedValue(page),
     };
     const app = buildTestApp(mock);
     const token = bearerToken(TEST_ORG_ID);
@@ -92,17 +115,20 @@ describe("client-service", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data?.items).toEqual(items);
-    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, undefined);
+    expect(res.body.data).toEqual(page);
+    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, {
+      statusDbValue: undefined,
+      page: 1,
+      pageSize: 20,
+      search: undefined,
+    });
   });
 
-  it("GET /clients passes status filter to service when query has status", async () => {
-    const items: ClientPublic[] = [];
+  it("GET /clients passes status filter mapped to BD when query has status Ativo", async () => {
+    const page = emptyListPage();
     const mock: IClientService = {
-      listByOrganization: vi.fn().mockResolvedValue(items),
-      getById: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
+      ...mockServiceBase(),
+      listByOrganization: vi.fn().mockResolvedValue(page),
     };
     const app = buildTestApp(mock);
     const token = bearerToken(TEST_ORG_ID);
@@ -113,16 +139,62 @@ describe("client-service", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, { status: "Ativo" });
+    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, {
+      statusDbValue: "Ativo",
+      page: 1,
+      pageSize: 20,
+      search: undefined,
+    });
+  });
+
+  it("GET /clients maps Prospect to Prospecção for list filter", async () => {
+    const page = emptyListPage();
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      listByOrganization: vi.fn().mockResolvedValue(page),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .get("/clients")
+      .query({ status: "Prospect" })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, {
+      statusDbValue: "Prospecção",
+      page: 1,
+      pageSize: 20,
+      search: undefined,
+    });
+  });
+
+  it("GET /clients passes page, limit and search to service", async () => {
+    const page = emptyListPage();
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      listByOrganization: vi.fn().mockResolvedValue(page),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .get("/clients")
+      .query({ page: "2", limit: "10", search: "  acme  " })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, {
+      statusDbValue: undefined,
+      page: 2,
+      pageSize: 10,
+      search: "  acme  ",
+    });
   });
 
   it("GET /clients returns 400 for invalid status query", async () => {
-    const mock: IClientService = {
-      listByOrganization: vi.fn(),
-      getById: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    };
+    const mock: IClientService = { ...mockServiceBase() };
     const app = buildTestApp(mock);
     const token = bearerToken(TEST_ORG_ID);
 
@@ -136,22 +208,15 @@ describe("client-service", () => {
   });
 
   it("POST /clients creates via injected service and returns 201 envelope", async () => {
-    const created: ClientPublic = {
+    const created = baseClient({
       id: "770e8400-e29b-41d4-a716-446655440003",
       name: "Novo Cliente",
-      organization_id: TEST_ORG_ID,
-      status: "Ativo",
       cpf_cnpj: "",
-      company_name: null,
-      fantasy_name: null,
       service_unique: true,
-      organization: testOrganization(),
-    };
+    });
     const mock: IClientService = {
-      listByOrganization: vi.fn(),
-      getById: vi.fn(),
+      ...mockServiceBase(),
       create: vi.fn().mockResolvedValue(created),
-      update: vi.fn(),
     };
     const app = buildTestApp(mock);
     const token = bearerToken(TEST_ORG_ID);
@@ -177,21 +242,13 @@ describe("client-service", () => {
   });
 
   it("PATCH /clients/:id updates via injected service and returns 200 envelope", async () => {
-    const updated: ClientPublic = {
-      id: TEST_CLIENT_ID,
+    const updated = baseClient({
       name: "Nome atualizado",
-      organization_id: TEST_ORG_ID,
-      status: "Ativo",
       cpf_cnpj: "12345678000199",
       company_name: "ACME",
-      fantasy_name: null,
-      service_unique: false,
-      organization: testOrganization(),
-    };
+    });
     const mock: IClientService = {
-      listByOrganization: vi.fn(),
-      getById: vi.fn(),
-      create: vi.fn(),
+      ...mockServiceBase(),
       update: vi.fn().mockResolvedValue(updated),
     };
     const app = buildTestApp(mock);
@@ -216,12 +273,51 @@ describe("client-service", () => {
     );
   });
 
+  it("DELETE /clients/:id desativa via service e devolve envelope", async () => {
+    const deactivated = baseClient({
+      status: "Inativo",
+      deletion_date: "2026-01-01T00:00:00.000Z",
+    });
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      deactivate: vi.fn().mockResolvedValue(deactivated),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .delete(`/clients/${TEST_CLIENT_ID}`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toEqual(deactivated);
+    expect(mock.deactivate).toHaveBeenCalledWith(TEST_CLIENT_ID, TEST_ORG_ID);
+  });
+
+  it("POST /clients/:id/activate reativa via service e devolve envelope", async () => {
+    const activated = baseClient({ status: "Ativo", deletion_date: null });
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      activate: vi.fn().mockResolvedValue(activated),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .post(`/clients/${TEST_CLIENT_ID}/activate`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toEqual(activated);
+    expect(mock.activate).toHaveBeenCalledWith(TEST_CLIENT_ID, TEST_ORG_ID);
+  });
+
   it("POST /clients returns 400 when service rejects unknown organization", async () => {
     const mock: IClientService = {
-      listByOrganization: vi.fn(),
-      getById: vi.fn(),
+      ...mockServiceBase(),
       create: vi.fn().mockRejectedValue(new ServiceError(400, "Organização não encontrada.")),
-      update: vi.fn(),
     };
     const app = buildTestApp(mock);
     const token = bearerToken(TEST_ORG_ID);

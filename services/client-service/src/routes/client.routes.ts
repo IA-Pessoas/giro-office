@@ -12,6 +12,7 @@ import {
   clientIdParamsSchema,
   createClientBodySchema,
   listClientsQuerySchema,
+  mapListStatusFilterToDb,
   updateClientBodySchema,
 } from "../schemas/client.schema.js";
 import type { IClientService } from "../services/clientService.js";
@@ -39,11 +40,49 @@ export function createClientRouter(clientService: IClientService): Router {
       try {
         const query = parseWithZod(listClientsQuerySchema, request.query);
         const organizationId = resolveOrganizationId(request, query.organization_id);
-        const listFilters = query.status !== undefined ? { status: query.status } : undefined;
-        const items = await clientService.listByOrganization(organizationId, listFilters);
-        response.json(createSuccessResponse({ items }));
+        const listFilters = {
+          statusDbValue:
+            query.status !== undefined ? mapListStatusFilterToDb(query.status) : undefined,
+          page: query.page,
+          pageSize: query.limit,
+          search: query.search,
+        };
+        const page = await clientService.listByOrganization(organizationId, listFilters);
+        response.json(createSuccessResponse(page));
       } catch (err) {
         logError("Erro ao listar clientes", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/clients/:id/activate",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const params = parseWithZod(clientIdParamsSchema, request.params);
+        const organizationId = resolveOrganizationId(request, undefined);
+        const client = await clientService.activate(params.id, organizationId);
+        response.json(createSuccessResponse(client));
+      } catch (err) {
+        logError("Erro ao ativar cliente", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.delete(
+    "/clients/:id",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const params = parseWithZod(clientIdParamsSchema, request.params);
+        const organizationId = resolveOrganizationId(request, undefined);
+        const client = await clientService.deactivate(params.id, organizationId);
+        response.json(createSuccessResponse(client));
+      } catch (err) {
+        logError("Erro ao desativar cliente", { err });
         next(err);
       }
     },
