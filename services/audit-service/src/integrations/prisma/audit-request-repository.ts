@@ -189,8 +189,12 @@ export function createAuditRequestRepository(
     async create(payload) {
       const createData = {
         request_id: payload.requestId,
-        organization_id: payload.organizationId ?? null,
-        user_id: payload.userId ?? null,
+        ...(payload.organizationId && {
+          organization: { connect: { id: payload.organizationId } },
+        }),
+        ...(payload.userId && {
+          user: { connect: { id: payload.userId } },
+        }),
         permission: payload.permission ?? null,
         method: payload.method.toUpperCase(),
         path: payload.path,

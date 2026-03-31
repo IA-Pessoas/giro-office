@@ -8,3 +8,21 @@ export function isUserServiceRoute(path: string): boolean {
     path.startsWith("/permission/")
   );
 }
+
+const TASK_SERVICE_EXACT_PATHS = new Set([
+  "/integracao-tasksModel",
+  "/integracao-taskModel",
+  "/integracao-tasksModel-dependent",
+  "/integracao-taskModel-dependent",
+  "/integracao-tasksIntegration",
+  "/integracao-tasks",
+  "/integracao-tasks-conclusion",
+  "/integracao-tasks-completeRequest",
+  "/integracao-task",
+  "/comercial-tasks",
+  "/financeiro-tasks",
+]);
+
+export function isTaskServiceRoute(path: string): boolean {
+  return TASK_SERVICE_EXACT_PATHS.has(path);
+}

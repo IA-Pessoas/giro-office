@@ -1,0 +1,183 @@
+---
+description: Testes unitários em serviços Node.js/Express com node:test + tsx
+globs: "**/*.test.ts"
+alwaysApply: false
+---
+
+# Testes unitários
+
+## Decisão padrão do workspace
+
+* O padrão do monorepo para testes unitários em serviços **Node.js + Express + TypeScript** deve ser **`node:test`** como framework de testes.
+* Para executar arquivos `.ts` sem etapa prévia de build, usar **`tsx --test`**.
+* **Não introduzir Jest por padrão**. Jest só deve ser adotado se houver uma necessidade explícita que o stack atual não cubra bem (ex.: ecossistema legado já dependente de Jest, snapshots como prática central, ou forte dependência de APIs específicas do Jest).
+
+## Quando usar este padrão
+
+* Serviços backend em Node.js.
+* Regras de negócio, camadas de aplicação, utilitários e adaptadores.
+* Testes HTTP leves contra `createApp()` ou servidor efêmero, quando isso já fizer parte do padrão do pacote.
+
+## Runner e script (`package.json`)
+
+* Comando padrão nos microservices: **`tsx --test`**.
+* O script de teste deve refletir exatamente onde os arquivos do pacote vivem:
+
+  * testes em `src/`: **`"test": "tsx --test src/**/*.test.ts"`**
+  * testes em `tests/`: **`"test": "tsx --test tests/**/*.test.ts"`**
+* Não misturar `src/**/*.test.ts` e `tests/**/*.test.ts` no mesmo pacote sem motivo claro.
+* Cada pacote deve escolher **um padrão principal** e manter consistência.
+* Se houver watch local de desenvolvimento, preferir um script separado em vez de poluir `test`:
+
+  * **`"test:watch": "tsx --test --watch src/**/*.test.ts"`** ou equivalente para `tests/`
+* Como `tsx` **não faz type-check**, o pacote ou workspace deve ter checagem de tipos separada com `tsc --noEmit` ou script equivalente.
+
+## Imports e estilo
+
+* Usar:
+
+```ts
+import test from "node:test";
+import assert from "node:assert/strict";
+```
+
+* Quando necessário, usar APIs nativas do runner (`before`, `after`, `beforeEach`, `afterEach`, `mock`) a partir de `node:test`.
+* Imports locais devem seguir o padrão ESM do workspace, incluindo extensão **`.js`** quando exigido pela configuração do projeto.
+* Formatação e lint seguem o padrão do workspace (**Biome**).
+
+## Organização dos testes
+
+* Nome do arquivo: **`*.test.ts`**.
+* A descrição do `test(...)` deve ler como comportamento observável, não como detalhe interno de implementação.
+* Pode ser em português ou inglês, mas o arquivo deve manter consistência.
+* Preferir co-localização perto do código (`src/`) quando isso melhorar manutenção.
+* Preferir `tests/` quando o pacote quiser separar claramente código de produção e testes. O importante é consistência por pacote.
+
+## O que cobrir
+
+### Services e application layer
+
+* Regras de negócio.
+* Casos de sucesso.
+* Ramos de erro.
+* Validações.
+* Mapeamentos e normalizações.
+* Comportamento com dependências mockadas/stubadas.
+* Falhas que devem lançar `ServiceError`, validando o que realmente importa:
+
+  * tipo do erro;
+  * `statusCode`, quando relevante;
+  * mensagem, apenas quando a mensagem fizer parte do contrato.
+
+### Rotas / app HTTP
+
+* Cobrir contrato HTTP quando o pacote já adota esse estilo:
+
+  * status;
+  * body;
+  * headers relevantes;
+  * comportamento para entrada inválida.
+* Preferir testar a app criada por `createApp()` sem subir infraestrutura real desnecessária.
+* Subir servidor em porta efêmera só quando realmente necessário para validar o fluxo.
+
+## O que evitar em teste unitário
+
+* Banco real.
+* Rede real.
+* Fila real.
+* Serviços externos reais.
+* Arquivos globais compartilhados entre testes sem isolamento.
+* Dependência de hora do sistema sem controle explícito.
+* `console.log` como substituto de assert.
+* Assert em texto de log, salvo quando log for parte do comportamento contratado.
+* Teste acoplado a detalhes internos triviais de implementação.
+
+## Tratamento de erros nos testes
+
+* Para falhas assíncronas, usar **`assert.rejects`**.
+* Para falhas síncronas, usar **`assert.throws`**.
+* Quando o contrato exigir `ServiceError`, validar primeiro o tipo e o status; validar mensagem apenas se ela for relevante para o contrato.
+
+Exemplo:
+
+```ts
+await assert.rejects(async () => execute(input), (err) => {
+  assert.ok(err instanceof ServiceError);
+  assert.equal(err.statusCode, 400);
+  return true;
+});
+```
+
+## Isolamento e limpeza
+
+* Cada teste deve poder rodar isoladamente.
+* Liberar recursos ao final:
+
+  * servidores HTTP;
+  * timers;
+  * listeners;
+  * mocks temporários;
+  * estado global alterado durante o teste.
+* Evitar vazamento de estado entre casos.
+* Preferir dados de teste explícitos e locais ao caso de teste.
+
+## Mocks, stubs e dependências
+
+* Preferir injeção de dependência sempre que possível.
+* Mockar nas bordas: banco, HTTP, filas, storage, providers externos.
+* Não mockar agressivamente o que poderia ser exercitado como unidade real e barata.
+* O objetivo do teste unitário é validar comportamento da unidade, não reimplementar o sistema inteiro com mocks frágeis.
+
+## Qualidade da suíte
+
+* Testes devem ser:
+
+  * rápidos;
+  * determinísticos;
+  * legíveis;
+  * independentes.
+* Cada teste deve ter um motivo claro para existir.
+* Evitar casos redundantes que testam a mesma regra com nomes diferentes.
+* Cobertura é sinal auxiliar, não objetivo principal. Priorizar risco e comportamento crítico.
+
+## Quando considerar Jest
+
+* Só considerar Jest se houver ganho concreto e explícito, por exemplo:
+
+  * base já fortemente acoplada a Jest;
+  * necessidade real de snapshots como prática recorrente;
+  * dependência de matchers/plugins específicos do ecossistema Jest;
+  * time já operando em massa com tooling Jest e custo de mudança maior que o benefício.
+* Na ausência desses fatores, manter **`node:test` + `tsx`**.
+
+## Exemplo mínimo
+
+```ts
+import assert from "node:assert/strict";
+import test from "node:test";
+
+test("soma 1 + 1 corretamente", () => {
+  assert.equal(1 + 1, 2);
+});
+```
+
+## Execução no monorepo
+
+* Rodar testes de um pacote:
+
+```bash
+pnpm --filter @workspace/<nome-do-pacote> test
+```
+
+* Rodar checagem de tipos separadamente no pacote ou no workspace, já que `tsx` não faz type-check.
+
+## Diretriz prática para geração de código
+
+Ao criar ou alterar testes neste workspace:
+
+* use **`node:test`**;
+* use **`node:assert/strict`**;
+* respeite o padrão de localização de testes já adotado pelo pacote;
+* não introduza Jest/Vitest sem pedido explícito;
+* mantenha os testes pequenos, determinísticos e focados em comportamento observável;
+* para código HTTP, teste contrato; para services, teste regra de negócio e falhas.
