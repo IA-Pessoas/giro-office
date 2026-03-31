@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { Bell, Moon, Palette, Shield, Sun, User } from "lucide-react";
+import { grantMeProfileAccess } from "@shared/utils/meProfileAccessGate";
 import { useAuth } from "../../../context/AuthContext";
 
 export function Configuracoes() {
+  const router = useRouter();
   const { user } = useAuth();
   const [isDark, setIsDark] = useState(false);
+
+  function goToEditProfile() {
+    grantMeProfileAccess();
+    void router.push("/me");
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -59,6 +67,7 @@ export function Configuracoes() {
         <button
           className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           type="button"
+          onClick={goToEditProfile}
         >
           Editar Perfil
         </button>

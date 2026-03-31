@@ -9,7 +9,7 @@ export default function SolicitarAcessoPage() {
   return (
     <>
       <Head>
-        <title>Solicitar acesso - Office</title>
+        <title>Solicitar Acesso - Office</title>
       </Head>
 
       <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 flex items-center justify-center p-4 relative overflow-hidden">
