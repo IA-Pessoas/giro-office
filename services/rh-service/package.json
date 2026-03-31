@@ -10,9 +10,12 @@
     "test": "tsx --test tests/**/*.test.ts",
     "start": "node dist/server.js",
     "prisma:generate": "pnpm --filter @workspace/infra run prisma:generate",
-    "lint": "biome lint src",
-    "format": "biome format --write src",
-    "check": "biome check src"
+    "lint": "biome lint src tests",
+    "format": "biome format --write src tests",
+    "check": "biome check src tests",
+    "test": "tsx --test tests/**/*.test.ts",
+    "test:watch": "tsx --test --watch tests/**/*.test.ts",
+    "typecheck:tests": "tsc -p tsconfig.tests.json"
   },
   "dependencies": {
     "@workspace/shared": "workspace:*",
