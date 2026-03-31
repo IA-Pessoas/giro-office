@@ -2,6 +2,7 @@ import { assertNonEmptyString, error as logError, ServiceError } from "@workspac
 
 import {
   Prisma,
+  type PrismaClient,
   ScoreEvaluationStatus,
   ScoreEvaluatorRole,
   ScoreQuestionType,
@@ -57,6 +58,8 @@ export interface GetScoreDetailInput {
 }
 
 class ScoreQuarterService {
+  constructor(private readonly db: PrismaClient = prismaClient) {}
+
   private async findDepartmentLeader(
     tx: Prisma.TransactionClient,
     organizationId: string,
@@ -108,7 +111,7 @@ class ScoreQuarterService {
   }
 
   private async recalculateFinalScore(scoreId: string): Promise<void> {
-    const score = await prismaClient.scoreQuarter.findUnique({
+    const score = await this.db.scoreQuarter.findUnique({
       where: { id: scoreId },
       include: { evaluations: true, nitro: true },
     });
@@ -135,7 +138,7 @@ class ScoreQuarterService {
     const finalTech = counts.tech > 0 ? sums.tech / counts.tech : 0;
     const finalLeadership = counts.leadership > 0 ? sums.leadership / counts.leadership : 0;
 
-    await prismaClient.scoreQuarter.update({
+    await this.db.scoreQuarter.update({
       where: { id: scoreId },
       data: {
         behavioral: finalBehavioral,
@@ -177,7 +180,7 @@ class ScoreQuarterService {
     if (finalScore > 10) finalScore = 10;
     if (finalScore < 0) finalScore = 0;
 
-    await prismaClient.scoreQuarter.update({
+    await this.db.scoreQuarter.update({
       where: { id: scoreId },
       data: { final_score: finalScore },
     });
@@ -189,7 +192,7 @@ class ScoreQuarterService {
       const targetUserId = assertNonEmptyString(input.target_user_id, "target_user_id");
       const quarter = assertNonEmptyString(input.quarter, "quarter");
 
-      const exists = await prismaClient.scoreQuarter.findUnique({
+      const exists = await this.db.scoreQuarter.findUnique({
         where: {
           user_id_quarter: { user_id: targetUserId, quarter },
         },
@@ -198,7 +201,7 @@ class ScoreQuarterService {
         throw new ServiceError(409, "Score já gerado para este trimestre.");
       }
 
-      const targetUser = await prismaClient.user.findUnique({
+      const targetUser = await this.db.user.findUnique({
         where: { id: targetUserId },
         include: {
           permissions: true,
@@ -225,7 +228,7 @@ class ScoreQuarterService {
       const isLeader = userPermission.rh === PERMISSION_LEADER;
       const userDept = targetUser.department_id;
 
-      return await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
+      return await this.db.$transaction(async (tx: Prisma.TransactionClient) => {
         const score = await tx.scoreQuarter.create({
           data: {
             user_id: targetUserId,
@@ -345,7 +348,7 @@ class ScoreQuarterService {
       const evaluationId = assertNonEmptyString(input.evaluation_id, "evaluation_id");
       const answers = input.answers;
 
-      const evaluation = await prismaClient.scoreEvaluation.findUnique({
+      const evaluation = await this.db.scoreEvaluation.findUnique({
         where: { id: evaluationId },
         include: { scoreQuarter: true },
       });
@@ -369,7 +372,7 @@ class ScoreQuarterService {
       }
       const average = answers.length > 0 ? sum / answers.length : 0;
 
-      await prismaClient.scoreEvaluation.update({
+      await this.db.scoreEvaluation.update({
         where: { id: evaluationId },
         data: {
           answers: answers as unknown as Prisma.InputJsonValue,
@@ -396,7 +399,7 @@ class ScoreQuarterService {
       const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
       const scoreId = assertNonEmptyString(input.score_id, "score_id");
 
-      const nitro = await prismaClient.scoreNitro.findUnique({
+      const nitro = await this.db.scoreNitro.findUnique({
         where: { score_id: scoreId },
         include: { scoreQuarter: true },
       });
@@ -430,7 +433,7 @@ class ScoreQuarterService {
           throw new ServiceError(400, "Tipo de Nitro inválido.");
       }
 
-      const updatedNitro = await prismaClient.scoreNitro.update({
+      const updatedNitro = await this.db.scoreNitro.update({
         where: { score_id: scoreId },
         data: updateData,
       });
@@ -453,7 +456,7 @@ class ScoreQuarterService {
       const orgId = assertNonEmptyString(organizationId, "organization_id");
       const uid = assertNonEmptyString(userId, "user_id");
 
-      return await prismaClient.scoreQuarter.findMany({
+      return await this.db.scoreQuarter.findMany({
         where: { user_id: uid, organization_id: orgId },
         include: { nitro: true },
         orderBy: { quarter: "desc" },
@@ -473,7 +476,7 @@ class ScoreQuarterService {
       const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
       const scoreId = assertNonEmptyString(input.score_id, "score_id");
 
-      const score = await prismaClient.scoreQuarter.findUnique({
+      const score = await this.db.scoreQuarter.findUnique({
         where: { id: scoreId },
         include: {
           nitro: true,
@@ -506,7 +509,7 @@ class ScoreQuarterService {
       const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
       const userId = assertNonEmptyString(input.user_id, "user_id");
 
-      const me = await prismaClient.user.findUnique({
+      const me = await this.db.user.findUnique({
         where: { id: userId },
         include: { permissions: true, permissionRef: true },
       });
@@ -528,7 +531,7 @@ class ScoreQuarterService {
         myRoles.push(ScoreEvaluatorRole.DIRECTOR);
       }
 
-      return await prismaClient.scoreEvaluation.findMany({
+      return await this.db.scoreEvaluation.findMany({
         where: {
           status: ScoreEvaluationStatus.Pending,
           organization_id: organizationId,
