@@ -1,0 +1,158 @@
+import { createLogger } from "@workspace/shared/logger";
+import jwt from "jsonwebtoken";
+import request from "supertest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
+import { createApp } from "../app.js";
+import { getClientServiceEnv } from "../config/env.js";
+import type { ClientPublic, IClientService } from "../services/clientService.js";
+
+const TEST_JWT_SECRET = "test-jwt-secret-for-client-service";
+const TEST_ORG_ID = "550e8400-e29b-41d4-a716-446655440000";
+const TEST_CLIENT_ID = "660e8400-e29b-41d4-a716-446655440001";
+
+beforeAll(() => {
+  process.env.JWT_SECRET = TEST_JWT_SECRET;
+  process.env.DATABASE_URL = "postgresql://127.0.0.1:5432/test";
+});
+
+function buildTestApp(mock: IClientService) {
+  const env = getClientServiceEnv();
+  const logger = createLogger({
+    service: "client-service-test",
+    env: "test",
+    level: "silent",
+  });
+  return createApp({ clientService: mock, env, logger });
+}
+
+function bearerToken(organizationId: string): string {
+  return jwt.sign({ user_id: "user-test-1", organization_id: organizationId }, TEST_JWT_SECRET);
+}
+
+describe("client-service", () => {
+  it("GET /health returns success envelope", async () => {
+    const mock: IClientService = {
+      listByOrganization: vi.fn(),
+      getById: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    };
+    const app = buildTestApp(mock);
+    const res = await request(app).get("/health");
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data?.service).toBe("client-service");
+    expect(res.body.data?.status).toBe("ok");
+  });
+
+  it("GET /clients returns list from injected service", async () => {
+    const items: ClientPublic[] = [
+      {
+        id: TEST_CLIENT_ID,
+        name: "Cliente A",
+        organization_id: TEST_ORG_ID,
+        status: "Ativo",
+        cpf_cnpj: "123",
+        company_name: null,
+        fantasy_name: null,
+        service_unique: false,
+      },
+    ];
+    const mock: IClientService = {
+      listByOrganization: vi.fn().mockResolvedValue(items),
+      getById: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app).get("/clients").set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data?.items).toEqual(items);
+    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID);
+  });
+
+  it("POST /clients creates via injected service and returns 201 envelope", async () => {
+    const created: ClientPublic = {
+      id: "770e8400-e29b-41d4-a716-446655440003",
+      name: "Novo Cliente",
+      organization_id: TEST_ORG_ID,
+      status: "Ativo",
+      cpf_cnpj: "",
+      company_name: null,
+      fantasy_name: null,
+      service_unique: true,
+    };
+    const mock: IClientService = {
+      listByOrganization: vi.fn(),
+      getById: vi.fn(),
+      create: vi.fn().mockResolvedValue(created),
+      update: vi.fn(),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app).post("/clients").set("Authorization", `Bearer ${token}`).send({
+      organization_id: TEST_ORG_ID,
+      name: "Novo Cliente",
+      status: "Ativo",
+      service_unique: true,
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toEqual(created);
+    expect(mock.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: TEST_ORG_ID,
+        name: "Novo Cliente",
+        status: "Ativo",
+        service_unique: true,
+      }),
+    );
+  });
+
+  it("PATCH /clients/:id updates via injected service and returns 200 envelope", async () => {
+    const updated: ClientPublic = {
+      id: TEST_CLIENT_ID,
+      name: "Nome atualizado",
+      organization_id: TEST_ORG_ID,
+      status: "Ativo",
+      cpf_cnpj: "12345678000199",
+      company_name: "ACME",
+      fantasy_name: null,
+      service_unique: false,
+    };
+    const mock: IClientService = {
+      listByOrganization: vi.fn(),
+      getById: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn().mockResolvedValue(updated),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .patch(`/clients/${TEST_CLIENT_ID}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ name: "Nome atualizado", cpf_cnpj: "12345678000199", company_name: "ACME" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toEqual(updated);
+    expect(mock.update).toHaveBeenCalledWith(
+      TEST_CLIENT_ID,
+      TEST_ORG_ID,
+      expect.objectContaining({
+        name: "Nome atualizado",
+        cpf_cnpj: "12345678000199",
+        company_name: "ACME",
+      }),
+    );
+  });
+});
