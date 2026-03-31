@@ -1,12 +1,12 @@
-import "../test/env-bootstrap.js";
+import "./env-bootstrap.js";
 
 import assert from "node:assert/strict";
 import { mock, test } from "node:test";
 
 import { ServiceError } from "@workspace/shared";
 
-import type { ProjectCrudPrisma } from "./ProjectCrudService.js";
-import { ProjectCrudService } from "./ProjectCrudService.js";
+import type { ProjectCrudPrisma } from "../services/ProjectCrudService.js";
+import { ProjectCrudService } from "../services/ProjectCrudService.js";
 
 const ORG_ID = "a0000000-0000-4000-8000-000000000001";
 const CLIENT_ID = "b0000000-0000-4000-8000-000000000001";

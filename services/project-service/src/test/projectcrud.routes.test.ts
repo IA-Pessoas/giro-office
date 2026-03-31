@@ -1,4 +1,4 @@
-import "../test/env-bootstrap.js";
+import "./env-bootstrap.js";
 
 import assert from "node:assert/strict";
 import { once } from "node:events";
@@ -12,7 +12,7 @@ import {
 } from "@workspace/shared";
 
 import { createProjectApplication } from "../app.js";
-import type { ProjectCrudRouteDeps } from "./projectcrud.routes.js";
+import type { ProjectCrudRouteDeps } from "../routes/projectcrud.routes.js";
 
 const ORG_ID = "a0000000-0000-4000-8000-000000000001";
 const USER_ID = "c0000000-0000-4000-8000-000000000001";

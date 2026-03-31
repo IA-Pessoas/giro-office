@@ -7,10 +7,18 @@ import express, { type Express } from "express";
 import "express-async-errors";
 
 import { getProjectServiceEnv } from "./config/env.js";
+import {
+  createProjectProgressRoutes,
+  type ProjectProgressRouteDeps,
+} from "./routes/project-progress.routes.js";
 import { createProjectCrudRoutes, type ProjectCrudRouteDeps } from "./routes/projectcrud.routes.js";
 import { ProjectCrudService } from "./services/ProjectCrudService.js";
+import { ProjectProgressService } from "./services/ProjectProgressService.js";
 
-export function createProjectApplication(options?: { projectCrudService?: ProjectCrudRouteDeps }): {
+export function createProjectApplication(options?: {
+  projectCrudService?: ProjectCrudRouteDeps;
+  projectProgressService?: ProjectProgressRouteDeps;
+}): {
   app: Express;
   logger: ReturnType<typeof createLogger>;
   port: number;
@@ -24,6 +32,7 @@ export function createProjectApplication(options?: { projectCrudService?: Projec
   });
 
   const projectCrudService = options?.projectCrudService ?? new ProjectCrudService();
+  const projectProgressService = options?.projectProgressService ?? new ProjectProgressService();
 
   const app = express();
 
@@ -35,6 +44,7 @@ export function createProjectApplication(options?: { projectCrudService?: Projec
   });
 
   app.use(createProjectCrudRoutes(projectCrudService));
+  app.use(createProjectProgressRoutes(projectProgressService));
 
   app.use(
     createExpressErrorHandler({
