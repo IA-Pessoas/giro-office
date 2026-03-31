@@ -1,8 +1,9 @@
-import { ZodError, type ZodType } from "zod";
+import { ZodError, type ZodTypeAny, type z } from "zod";
 
 import { ServiceError } from "../http/errors.js";
 
-export function parseWithZod<T>(schema: ZodType<T>, data: unknown): T {
+/** Retorna o tipo de *saída* do schema (após defaults e transforms). */
+export function parseWithZod<S extends ZodTypeAny>(schema: S, data: unknown): z.infer<S> {
   try {
     return schema.parse(data);
   } catch (err: unknown) {
