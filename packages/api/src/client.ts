@@ -6,10 +6,13 @@ export interface CreateApiClientOptions {
   onUnauthorized?: () => void;
   /** When set, non-browser 401 responses reject with this error (e.g. SSR). */
   getUnauthorizedErrorForSsr?: () => Error;
+  /** Browser only: chamado em respostas HTTP 5xx (ex.: toast genérico). */
+  onServerError?: () => void;
 }
 
 export function createApiClient(options: CreateApiClientOptions): AxiosInstance {
-  const { baseURL, getAccessToken, onUnauthorized, getUnauthorizedErrorForSsr } = options;
+  const { baseURL, getAccessToken, onUnauthorized, getUnauthorizedErrorForSsr, onServerError } =
+    options;
   const api = axios.create({ baseURL });
 
   api.interceptors.request.use((config) => {
@@ -30,6 +33,12 @@ export function createApiClient(options: CreateApiClientOptions): AxiosInstance 
           return Promise.reject(getUnauthorizedErrorForSsr());
         }
       }
+
+      const status = error.response?.status;
+      if (typeof window !== "undefined" && status !== undefined && status >= 500) {
+        onServerError?.();
+      }
+
       return Promise.reject(error);
     },
   );

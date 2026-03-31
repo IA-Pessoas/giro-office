@@ -1,9 +1,13 @@
 import { createApiClient } from "@workspace/api";
 import { parseCookies } from "nookies";
+import { toast } from "react-toastify";
 
 import { AuthTokenError } from "./errors/AuthTokenError";
 
 const TOKEN_COOKIE = "@cw.token";
+
+const SERVER_ERROR_TOAST_MESSAGE =
+  "Não foi possível concluir a operação. Tente de novo daqui a pouco.";
 
 export function setupAPIClient(ctx = undefined, onUnauthorized?: () => void) {
   return createApiClient({
@@ -14,5 +18,8 @@ export function setupAPIClient(ctx = undefined, onUnauthorized?: () => void) {
     },
     onUnauthorized,
     getUnauthorizedErrorForSsr: () => new AuthTokenError(),
+    onServerError: () => {
+      toast.error(SERVER_ERROR_TOAST_MESSAGE);
+    },
   });
 }
