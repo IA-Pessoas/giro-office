@@ -7,7 +7,11 @@ import type {
 } from "@workspace/shared";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
-import { isTaskServiceRoute, isUserServiceRoute } from "../utils/routeUtils.js";
+import {
+  isProjectServiceRoute,
+  isTaskServiceRoute,
+  isUserServiceRoute,
+} from "../utils/routeUtils.js";
 
 interface BuildAuditLifecycleMiddlewareOptions {
   enabled: boolean;
@@ -69,6 +73,7 @@ function getRouteTarget(request: Request): string {
   if (request.originalUrl.startsWith("/audit")) return "audit-service";
   if (isUserServiceRoute(request.path)) return "user-service";
   if (isTaskServiceRoute(request.path)) return "task-service";
+  if (isProjectServiceRoute(request.path)) return "project-service";
   return "legacy-api";
 }
 
