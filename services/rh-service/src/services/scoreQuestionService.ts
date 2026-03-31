@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { assertNonEmptyString, error as logError, ServiceError } from "@workspace/shared";
 
-import type { Prisma } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 
 const SCORE_QUESTION_SELECT = {
@@ -44,6 +44,8 @@ export interface ScoreQuestionListOptions {
 }
 
 class ScoreQuestionService {
+  constructor(private readonly prisma: PrismaClient = prismaClient) {}
+
   async create(input: ScoreQuestionCreateInput): Promise<ScoreQuestionSnapshot> {
     try {
       const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
@@ -51,7 +53,7 @@ class ScoreQuestionService {
       const active = input.active ?? true;
       const id = randomUUID();
 
-      const created = await prismaClient.scoreQuestion.create({
+      const created = await this.prisma.scoreQuestion.create({
         data: {
           id,
           question_id: id,
@@ -81,7 +83,7 @@ class ScoreQuestionService {
         throw new ServiceError(400, "Informe question, type ou active para atualizar.");
       }
 
-      const existing = await prismaClient.scoreQuestion.findFirst({
+      const existing = await this.prisma.scoreQuestion.findFirst({
         where: { id, organization_id: organizationId },
         select: SCORE_QUESTION_SELECT,
       });
@@ -106,7 +108,7 @@ class ScoreQuestionService {
         data.active = input.active;
       }
 
-      const updated = await prismaClient.scoreQuestion.update({
+      const updated = await this.prisma.scoreQuestion.update({
         where: { id },
         data,
         select: SCORE_QUESTION_SELECT,
@@ -138,7 +140,7 @@ class ScoreQuestionService {
         where.active = true;
       }
 
-      return await prismaClient.scoreQuestion.findMany({
+      return await this.prisma.scoreQuestion.findMany({
         where,
         orderBy: { type: "asc" },
         select: SCORE_QUESTION_SELECT,
@@ -156,7 +158,7 @@ class ScoreQuestionService {
       const id = assertNonEmptyString(input.id, "id");
       const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
 
-      const existing = await prismaClient.scoreQuestion.findFirst({
+      const existing = await this.prisma.scoreQuestion.findFirst({
         where: { id, organization_id: organizationId },
         select: { id: true },
       });
@@ -165,7 +167,7 @@ class ScoreQuestionService {
         throw new ServiceError(404, "Pergunta não encontrada.");
       }
 
-      await prismaClient.scoreQuestion.update({
+      await this.prisma.scoreQuestion.update({
         where: { id },
         data: { active: false },
       });
