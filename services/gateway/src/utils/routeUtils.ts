@@ -26,3 +26,9 @@ const TASK_SERVICE_EXACT_PATHS = new Set([
 export function isTaskServiceRoute(path: string): boolean {
   return TASK_SERVICE_EXACT_PATHS.has(path);
 }
+
+const PROJECT_SERVICE_EXACT_PATHS = new Set(["/integracao-projects", "/integracao-project"]);
+
+export function isProjectServiceRoute(path: string): boolean {
+  return PROJECT_SERVICE_EXACT_PATHS.has(path);
+}
