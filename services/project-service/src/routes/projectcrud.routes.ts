@@ -58,7 +58,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
           client_id: body.client_id,
           start_date: body.start_date,
           objective: body.objective,
-          sponsor_id: body.sponsor_id,
+          sponsor_id: body.sponsor_id ?? undefined,
         });
 
         res.status(201).json(createSuccessResponse(result));
@@ -81,7 +81,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
         const query = parseWithZod(integracaoProjectListQuerySchema, raw);
         const auth = requireAuthContext(req);
 
-        const list = await service.list(query.ref, query.id, auth.organization_id);
+        const list = await service.list(query.ref, query.id as string, auth.organization_id);
 
         res.json(createSuccessResponse(list));
       } catch (err) {
@@ -108,7 +108,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
           start_date: body.start_date,
           end_date: body.end_date,
           objective: body.objective,
-          sponsor_id: body.sponsor_id,
+          sponsor_id: body.sponsor_id ?? undefined,
         });
 
         res.json(createSuccessResponse(result));
