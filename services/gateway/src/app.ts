@@ -88,16 +88,13 @@ function getUpstreamContext(url: string, request: Request) {
   }
 }
 
-function getProxyTargetUrl(env: GatewayEnv, request: Request): string {
-  if (env.auditEnabled && request.originalUrl.startsWith("/audit")) {
-    return env.auditServiceUrl;
-  }
-
+/** URL do upstream HTTP ou `null` se o path não estiver mapeado no gateway (sem fallback legado). */
+function getProxyTargetUrl(env: GatewayEnv, request: Request): string | null {
   if (isUserServiceRoute(request.path)) {
     return env.userServiceUrl;
   }
 
-  return env.legacyApiUrl;
+  return null;
 }
 
 function getResponseSizeBytes(response: Response): number | undefined {
@@ -223,7 +220,7 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     response.status(200).json(
       createSuccessResponse({
         status: "ready",
-        url: env.legacyApiUrl,
+        service: "gateway",
       }),
     );
   });
@@ -243,6 +240,10 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
 
   app.use((request, response, next) => {
     const targetUrl = getProxyTargetUrl(env, request);
+    if (targetUrl === null) {
+      next(new ServiceError(404, "Rota não mapeada no gateway."));
+      return;
+    }
     return buildHttpProxyMiddleware(targetUrl)(request, response, next);
   });
   app.use(buildAuditErrorCaptureMiddleware());
@@ -251,10 +252,13 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
       logger,
       event: "gateway.error",
       fallbackMessage: "Erro interno no gateway.",
-      getContext: (request) => ({
-        auth: getAuthLogContext(request),
-        upstream: getUpstreamContext(getProxyTargetUrl(env, request), request),
-      }),
+      getContext: (request) => {
+        const targetUrl = getProxyTargetUrl(env, request);
+        return {
+          auth: getAuthLogContext(request),
+          upstream: targetUrl ? getUpstreamContext(targetUrl, request) : undefined,
+        };
+      },
     }),
   );
   app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
