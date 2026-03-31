@@ -1,4 +1,4 @@
-export type OrganizationStatus = 'trial' | 'past_due' | 'active' | 'suspended' | 'cancelled';
+export type OrganizationStatus = "trial" | "past_due" | "active" | "suspended" | "cancelled";
 
 export interface Organization {
   id: string;
@@ -22,15 +22,14 @@ export interface OrganizationItem {
   subscription_plan: string;
 }
 
-export interface CreateOrganizationData {
+/** Payload for POST /organizations (matches organization-service create body). */
+export interface OrganizationCreatePayload {
   name: string;
-  slug: string;
-  cnpj: string;
   email_created_by: string;
-  logo_url?: string;
-  status?: OrganizationStatus;
-  subscription_plan?: string;
+  cnpj: string;
 }
+
+/** Reserved for future fields once API contract is extended. */
 
 export interface UpdateOrganizationData {
   name?: string;

@@ -1,4 +1,5 @@
 packages:
+  - "packages/*"
   - "app"
   - "infra"
   - "services/src" # TODO: remove this
