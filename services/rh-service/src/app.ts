@@ -10,7 +10,7 @@ import categoryRoutes from "./routes/category.routes.js";
 import holidayRoutes from "./routes/holiday.routes.js";
 import messageRoutes from "./routes/message.routes.js";
 import pointRoutes from "./routes/point.routes.js";
-import pointConfigRoutes from "./routes/point-config.routes.js";
+import pointConfigRoutes from "./routes/pointConfig.routes.js";
 import requestRoutes from "./routes/request.routes.js";
 import scoreQuestionRoutes from "./routes/scoreQuestion.routes.js";
 import timeBankReleaseRoutes from "./routes/timeBankRelease.routes.js";
