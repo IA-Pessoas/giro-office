@@ -11,9 +11,21 @@ export const clientIdParamsSchema = z
   })
   .strict();
 
+/** Valores do filtro de listagem alinhados à UI (dropdown de status). */
+export const clientListStatusSchema = z.enum(["Ativo", "Prospect", "Inativo"], {
+  message: "status de filtro inválido.",
+});
+
+export type ClientListStatus = z.infer<typeof clientListStatusSchema>;
+
+export type ListClientsFilters = {
+  status?: ClientListStatus;
+};
+
 export const listClientsQuerySchema = z
   .object({
     organization_id: z.string().uuid({ message: "organization_id inválido." }).optional(),
+    status: clientListStatusSchema.optional(),
   })
   .strict();
 

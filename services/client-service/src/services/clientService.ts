@@ -1,7 +1,20 @@
 import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 
-import type { CreateClientBody, UpdateClientBody } from "../schemas/client.schema.js";
+import type {
+  CreateClientBody,
+  ListClientsFilters,
+  UpdateClientBody,
+} from "../schemas/client.schema.js";
+
+export type OrganizationPublic = {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url: string | null;
+  status: string;
+  subscription_plan: string;
+};
 
 export type ClientPublic = {
   id: string;
@@ -12,16 +25,26 @@ export type ClientPublic = {
   company_name: string | null;
   fantasy_name: string | null;
   service_unique: boolean | null;
+  organization: OrganizationPublic;
 };
 
 export interface IClientService {
-  listByOrganization(organizationId: string): Promise<ClientPublic[]>;
+  listByOrganization(organizationId: string, filters?: ListClientsFilters): Promise<ClientPublic[]>;
   getById(id: string, organizationId: string): Promise<ClientPublic>;
   create(input: CreateClientBody): Promise<ClientPublic>;
   update(id: string, organizationId: string, input: UpdateClientBody): Promise<ClientPublic>;
 }
 
-const clientSelect = {
+const organizationSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  logo_url: true,
+  status: true,
+  subscription_plan: true,
+} as const;
+
+const clientWithOrganizationSelect = {
   id: true,
   name: true,
   organization_id: true,
@@ -30,9 +53,12 @@ const clientSelect = {
   company_name: true,
   fantasy_name: true,
   service_unique: true,
+  organization: {
+    select: organizationSelect,
+  },
 } as const;
 
-function toPublic(row: {
+type ClientRowWithOrganization = {
   id: string;
   name: string;
   organization_id: string;
@@ -41,7 +67,17 @@ function toPublic(row: {
   company_name: string | null;
   fantasy_name: string | null;
   service_unique: boolean | null;
-}): ClientPublic {
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+    logo_url: string | null;
+    status: string;
+    subscription_plan: string;
+  };
+};
+
+function toPublic(row: ClientRowWithOrganization): ClientPublic {
   return {
     id: row.id,
     name: row.name,
@@ -51,16 +87,30 @@ function toPublic(row: {
     company_name: row.company_name,
     fantasy_name: row.fantasy_name,
     service_unique: row.service_unique,
+    organization: {
+      id: row.organization.id,
+      name: row.organization.name,
+      slug: row.organization.slug,
+      logo_url: row.organization.logo_url,
+      status: String(row.organization.status),
+      subscription_plan: row.organization.subscription_plan,
+    },
   };
 }
 
 export class ClientService implements IClientService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async listByOrganization(organizationId: string): Promise<ClientPublic[]> {
+  async listByOrganization(
+    organizationId: string,
+    filters?: ListClientsFilters,
+  ): Promise<ClientPublic[]> {
     const rows = await this.prisma.client.findMany({
-      where: { organization_id: organizationId },
-      select: clientSelect,
+      where: {
+        organization_id: organizationId,
+        ...(filters?.status !== undefined ? { status: filters.status } : {}),
+      },
+      select: clientWithOrganizationSelect,
       orderBy: { name: "asc" },
     });
     return rows.map(toPublic);
@@ -69,7 +119,7 @@ export class ClientService implements IClientService {
   async getById(id: string, organizationId: string): Promise<ClientPublic> {
     const row = await this.prisma.client.findFirst({
       where: { id, organization_id: organizationId },
-      select: clientSelect,
+      select: clientWithOrganizationSelect,
     });
     if (!row) {
       throw new ServiceError(404, "Cliente não encontrado.");
@@ -78,6 +128,14 @@ export class ClientService implements IClientService {
   }
 
   async create(input: CreateClientBody): Promise<ClientPublic> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: input.organization_id },
+      select: { id: true },
+    });
+    if (!org) {
+      throw new ServiceError(400, "Organização não encontrada.");
+    }
+
     const row = await this.prisma.client.create({
       data: {
         name: input.name,
@@ -91,7 +149,7 @@ export class ClientService implements IClientService {
         type_registration: input.type_registration ?? "Novo",
         service_unique: input.service_unique,
       },
-      select: clientSelect,
+      select: clientWithOrganizationSelect,
     });
     return toPublic(row);
   }
@@ -118,7 +176,7 @@ export class ClientService implements IClientService {
           : {}),
         ...(input.service_unique !== undefined ? { service_unique: input.service_unique } : {}),
       },
-      select: clientSelect,
+      select: clientWithOrganizationSelect,
     });
     return toPublic(row);
   }

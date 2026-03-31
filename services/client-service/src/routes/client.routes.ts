@@ -39,7 +39,8 @@ export function createClientRouter(clientService: IClientService): Router {
       try {
         const query = parseWithZod(listClientsQuerySchema, request.query);
         const organizationId = resolveOrganizationId(request, query.organization_id);
-        const items = await clientService.listByOrganization(organizationId);
+        const listFilters = query.status !== undefined ? { status: query.status } : undefined;
+        const items = await clientService.listByOrganization(organizationId, listFilters);
         response.json(createSuccessResponse({ items }));
       } catch (err) {
         logError("Erro ao listar clientes", { err });

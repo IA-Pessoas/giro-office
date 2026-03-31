@@ -1,15 +1,33 @@
+import { ServiceError } from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-
 import { createApp } from "../app.js";
 import { getClientServiceEnv } from "../config/env.js";
-import type { ClientPublic, IClientService } from "../services/clientService.js";
+import type { PrismaClient } from "../generated/prisma/client.js";
+import {
+  type ClientPublic,
+  ClientService,
+  type IClientService,
+  type OrganizationPublic,
+} from "../services/clientService.js";
 
 const TEST_JWT_SECRET = "test-jwt-secret-for-client-service";
 const TEST_ORG_ID = "550e8400-e29b-41d4-a716-446655440000";
 const TEST_CLIENT_ID = "660e8400-e29b-41d4-a716-446655440001";
+
+function testOrganization(overrides: Partial<OrganizationPublic> = {}): OrganizationPublic {
+  return {
+    id: TEST_ORG_ID,
+    name: "Org Test",
+    slug: "org-test",
+    logo_url: null,
+    status: "active",
+    subscription_plan: "trial",
+    ...overrides,
+  };
+}
 
 beforeAll(() => {
   process.env.JWT_SECRET = TEST_JWT_SECRET;
@@ -58,6 +76,7 @@ describe("client-service", () => {
         company_name: null,
         fantasy_name: null,
         service_unique: false,
+        organization: testOrganization(),
       },
     ];
     const mock: IClientService = {
@@ -74,7 +93,46 @@ describe("client-service", () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data?.items).toEqual(items);
-    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID);
+    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, undefined);
+  });
+
+  it("GET /clients passes status filter to service when query has status", async () => {
+    const items: ClientPublic[] = [];
+    const mock: IClientService = {
+      listByOrganization: vi.fn().mockResolvedValue(items),
+      getById: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .get("/clients")
+      .query({ status: "Ativo" })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, { status: "Ativo" });
+  });
+
+  it("GET /clients returns 400 for invalid status query", async () => {
+    const mock: IClientService = {
+      listByOrganization: vi.fn(),
+      getById: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .get("/clients")
+      .query({ status: "invalid" })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(400);
+    expect(mock.listByOrganization).not.toHaveBeenCalled();
   });
 
   it("POST /clients creates via injected service and returns 201 envelope", async () => {
@@ -87,6 +145,7 @@ describe("client-service", () => {
       company_name: null,
       fantasy_name: null,
       service_unique: true,
+      organization: testOrganization(),
     };
     const mock: IClientService = {
       listByOrganization: vi.fn(),
@@ -127,6 +186,7 @@ describe("client-service", () => {
       company_name: "ACME",
       fantasy_name: null,
       service_unique: false,
+      organization: testOrganization(),
     };
     const mock: IClientService = {
       listByOrganization: vi.fn(),
@@ -154,5 +214,60 @@ describe("client-service", () => {
         company_name: "ACME",
       }),
     );
+  });
+
+  it("POST /clients returns 400 when service rejects unknown organization", async () => {
+    const mock: IClientService = {
+      listByOrganization: vi.fn(),
+      getById: vi.fn(),
+      create: vi.fn().mockRejectedValue(new ServiceError(400, "Organização não encontrada.")),
+      update: vi.fn(),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app).post("/clients").set("Authorization", `Bearer ${token}`).send({
+      organization_id: TEST_ORG_ID,
+      name: "Cliente",
+      status: "Ativo",
+    });
+
+    expect(res.status).toBe(400);
+    expect(mock.create).toHaveBeenCalled();
+  });
+});
+
+describe("ClientService", () => {
+  it("create does not call prisma.client.create when organization is missing", async () => {
+    const findUniqueOrg = vi.fn().mockResolvedValue(null);
+    const createClient = vi.fn();
+    const prisma = {
+      organization: { findUnique: findUniqueOrg },
+      client: { create: createClient },
+    } as unknown as PrismaClient;
+    const service = new ClientService(prisma);
+    const missingOrgId = "880e8400-e29b-41d4-a716-446655440099";
+
+    await expect(
+      service.create({
+        name: "X",
+        organization_id: missingOrgId,
+        status: "Ativo",
+        cpf_cnpj: "",
+        prospecting_status: "Lead",
+        type: "PJ",
+        type_registration: "Novo",
+        service_unique: false,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Organização não encontrada.",
+    });
+
+    expect(findUniqueOrg).toHaveBeenCalledWith({
+      where: { id: missingOrgId },
+      select: { id: true },
+    });
+    expect(createClient).not.toHaveBeenCalled();
   });
 });
