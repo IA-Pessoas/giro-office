@@ -52,3 +52,4 @@ Imports: `debug`, `info`, `warn`, `error` de `@workspace/shared` (logger baseado
 - Código compartilhado em `shared`.
 - Rotas orquestram services; services não chamam rotas.
 - **Services (TypeScript)**: métodos públicos de service com tipo de retorno explícito; detalhes em `typescript-services.mdc`.
+- Criar testes unitarios baseados nas rules `cursor/rules/testes-unitarios.mdc`
