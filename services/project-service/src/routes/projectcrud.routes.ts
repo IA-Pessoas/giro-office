@@ -149,6 +149,10 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
           project_id: firstQueryValue(
             req.body?.project_id !== undefined ? req.body.project_id : req.query.project_id,
           ),
+        const rawObj = {
+          project_id: firstQueryValue(
+            req.body?.project_id !== undefined ? req.body.project_id : req.query.project_id,
+          ),
         };
         const params = parseWithZod(integracaoProjectDeleteParamsSchema, raw);
         const auth = requireAuthContext(req);
