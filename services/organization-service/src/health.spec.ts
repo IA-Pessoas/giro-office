@@ -1,9 +1,28 @@
+import { createLogger } from "@workspace/shared/logger";
 import request from "supertest";
+import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
-import { app } from "./app.js";
+import { createOrganizationApp } from "./app.js";
+
+class MemoryLogStream extends Writable {
+  _write(
+    _chunk: string | Uint8Array,
+    _encoding: BufferEncoding,
+    callback: (error?: Error | null) => void,
+  ): void {
+    callback();
+  }
+}
 
 describe("organization-service", () => {
   it("GET /health returns success envelope", async () => {
+    const logger = createLogger({
+      service: "organization-service-test",
+      env: "test",
+      level: "silent",
+      destination: new MemoryLogStream(),
+    });
+    const app = createOrganizationApp(logger);
     const res = await request(app).get("/health");
 
     expect(res.status).toBe(200);

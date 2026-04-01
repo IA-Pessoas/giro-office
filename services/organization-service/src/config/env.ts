@@ -1,19 +1,36 @@
 import "dotenv/config";
 
+import { loggerLevelSchema } from "@workspace/shared/logger";
 import { z } from "zod";
 
-const organizationEnvSchema = z.object({
-  port: z
-    .string()
-    .optional()
-    .default("3400")
-    .transform((val: string) => {
-      const parsed = Number.parseInt(val, 10);
-      return Number.isNaN(parsed) ? 3400 : parsed;
-    }),
-  databaseUrl: z.string().min(1, "DATABASE_URL não definido para o organization-service."),
-  jwtSecret: z.string().min(1, "JWT_SECRET não definido para o organization-service."),
-});
+function parseBoolean(value: string | undefined): boolean {
+  return value === "true" || value === "1";
+}
+
+const organizationEnvSchema = z
+  .object({
+    port: z
+      .string()
+      .optional()
+      .default("3400")
+      .transform((val: string) => {
+        const parsed = Number.parseInt(val, 10);
+        return Number.isNaN(parsed) ? 3400 : parsed;
+      }),
+    databaseUrl: z.string().min(1, "DATABASE_URL não definido para o organization-service."),
+    jwtSecret: z.string().min(1, "JWT_SECRET não definido para o organization-service."),
+    nodeEnv: z.string().optional().default("development"),
+    logLevel: loggerLevelSchema.optional().default("info"),
+    logPretty: z
+      .string()
+      .optional()
+      .default("false")
+      .transform((value) => parseBoolean(value)),
+  })
+  .transform((env) => ({
+    ...env,
+    logPretty: env.nodeEnv !== "production" && env.logPretty,
+  }));
 
 export type OrganizationEnv = z.infer<typeof organizationEnvSchema>;
 
@@ -22,5 +39,8 @@ export function getOrganizationEnv(): OrganizationEnv {
     port: process.env.PORT,
     databaseUrl: process.env.DATABASE_URL,
     jwtSecret: process.env.JWT_SECRET,
+    nodeEnv: process.env.NODE_ENV,
+    logLevel: process.env.LOG_LEVEL,
+    logPretty: process.env.LOG_PRETTY,
   });
 }
