@@ -6,6 +6,7 @@
     "dev": "pnpm run dev:reset && turbo run dev --parallel",
     "dev:reset": "node scripts/dev-reset.mjs",
     "build": "turbo run build",
+    "test": "turbo run test",
     "lint": "biome lint .",
     "dev:app": "turbo run dev --filter=@workspace/app",
     "dev:api": "turbo run dev --filter=@workspace/legacy-api",
