@@ -1,14 +1,14 @@
 import "dotenv/config";
-import { createSuccessResponse, serializeError, serviceError } from "@workspace/shared";
+import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
 import type { Logger } from "@workspace/shared/logger";
 import cors from "cors";
-import express, { type Request, type Response, type NextFunction } from "express";
+import express, { type Request, type Response } from "express";
 import "express-async-errors";
 
 import { requestContext } from "./middlewares/requestContext.js";
 import organizationRoutes from "./routes/organization.routes.js";
 
-export function createOrganizationApp(_logger: Logger): express.Express {
+export function createOrganizationApp(logger: Logger): express.Express {
   const app = express();
 
   app.use(cors());
@@ -23,19 +23,13 @@ export function createOrganizationApp(_logger: Logger): express.Express {
 
   app.use(organizationRoutes);
 
-  app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
-    serviceError({
-      service: "organization-service",
-      requestId: request.requestId,
-      message: error.message,
-    });
-
-    const { statusCode, body } = serializeError(error, {
-      requestId: request.requestId,
+  app.use(
+    createExpressErrorHandler({
+      logger,
+      event: "organization-service.error",
       fallbackMessage: "Erro interno no organization-service.",
-    });
-    response.status(statusCode).json(body);
-  });
+    }),
+  );
 
   return app;
 }
