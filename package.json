@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm run dev:reset && turbo run dev --filter=@workspace/app --filter=@workspace/gateway --filter=@workspace/legacy-api",
+    "dev": "pnpm run dev:reset && turbo run dev --parallel",
     "dev:reset": "node scripts/dev-reset.mjs",
     "build": "turbo run build",
     "lint": "biome lint .",

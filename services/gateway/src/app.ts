@@ -22,7 +22,7 @@ import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
-import { isUserServiceRoute } from "./utils/routeUtils.js";
+import { isTaskServiceRoute, isUserServiceRoute } from "./utils/routeUtils.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
   return {
