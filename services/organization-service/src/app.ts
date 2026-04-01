@@ -29,9 +29,9 @@ export function createOrganizationApp(logger: Logger): express.Express {
   app.use(requestContext);
 
   app.get("/health", (_request: Request, response: Response) => {
-    response.status(200).json(
-      createSuccessResponse({ status: "ok", service: "organization-service" }),
-    );
+    response
+      .status(200)
+      .json(createSuccessResponse({ status: "ok", service: "organization-service" }));
   });
 
   app.use(organizationRoutes);
