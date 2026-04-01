@@ -13,7 +13,7 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-const app = createApp(logger);
+const app = createApp(logger, env);
 const server = http.createServer(app);
 
 server.listen(env.port, () => {

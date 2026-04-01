@@ -1,11 +1,16 @@
 import "dotenv/config";
 import { createSuccessResponse, serializeError, serviceError } from "@workspace/shared";
-import express, { type Request, type Response, type NextFunction } from "express";
+import { mountOpenApiDocs } from "@workspace/shared/http";
+import express, { type NextFunction, type Request, type Response } from "express";
 import "express-async-errors";
 import cors from "cors";
 
+import { getOrganizationEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
+import { buildOrganizationServiceOpenApiSpec } from "./openapi/spec.js";
 import organizationRoutes from "./routes/organization.routes.js";
+
+const organizationEnv = getOrganizationEnv();
 
 const app: express.Express = express();
 
@@ -14,10 +19,17 @@ app.use(express.json());
 app.use(requestContext);
 
 app.get("/health", (_request: Request, response: Response) => {
-  response.status(200).json(
-    createSuccessResponse({ status: "ok", service: "organization-service" }),
-  );
+  response
+    .status(200)
+    .json(createSuccessResponse({ status: "ok", service: "organization-service" }));
 });
+
+if (organizationEnv.enableApiDocs) {
+  mountOpenApiDocs(app, {
+    spec: buildOrganizationServiceOpenApiSpec(organizationEnv),
+    siteTitle: "organization-service — OpenAPI",
+  });
+}
 
 app.use(organizationRoutes);
 

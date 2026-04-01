@@ -1,7 +1,9 @@
 import { createExpressErrorHandler, type Logger } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import express from "express";
 
 import type { AuditServiceEnv } from "./config/env.js";
+import { buildAuditServiceOpenApiSpec } from "./openapi/spec.js";
 import type { AuditRequestRepository } from "./integrations/prisma/audit-request-repository.js";
 import { createAuditRouter } from "./routes/index.js";
 
@@ -16,6 +18,14 @@ export function createApp({ env, logger, repository }: CreateAppOptions): expres
 
   app.set("trust proxy", true);
   app.use(express.json());
+
+  if (env.enableApiDocs) {
+    mountOpenApiDocs(app, {
+      spec: buildAuditServiceOpenApiSpec(env),
+      siteTitle: "audit-service — OpenAPI",
+    });
+  }
+
   app.use(createAuditRouter({ env, logger, repository }));
   app.use(
     createExpressErrorHandler({

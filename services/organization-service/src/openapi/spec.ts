@@ -1,0 +1,216 @@
+import type { OpenApiDocument } from "@workspace/shared/http";
+
+import type { OrganizationEnv } from "../config/env.js";
+
+export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenApiDocument {
+  const baseUrl = `http://localhost:${env.port}`;
+
+  return {
+    openapi: "3.0.3",
+    info: {
+      title: "organization-service",
+      version: "1.0.0",
+      description: "Organizações. Endpoints autenticados usam JWT.",
+    },
+    servers: [{ url: baseUrl }],
+    tags: [
+      { name: "Health", description: "Saúde do serviço" },
+      { name: "Organizações", description: "Listagem e gestão" },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+      schemas: {
+        SuccessEnvelope: {
+          type: "object",
+          description: "Resposta de sucesso padrão do workspace",
+          additionalProperties: true,
+        },
+      },
+    },
+    paths: {
+      "/health": {
+        get: {
+          tags: ["Health"],
+          summary: "Health check",
+          responses: {
+            "200": {
+              description: "Serviço disponível",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/organizations": {
+        get: {
+          tags: ["Organizações"],
+          summary: "Listar organizações",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "page",
+              in: "query",
+              schema: { type: "integer", minimum: 1 },
+            },
+            {
+              name: "pageSize",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+            {
+              name: "status",
+              in: "query",
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Lista paginada",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        post: {
+          tags: ["Organizações"],
+          summary: "Criar organização",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { type: "object", additionalProperties: true },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Criada",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/organizations/{id}": {
+        get: {
+          tags: ["Organizações"],
+          summary: "Buscar organização por ID",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Organização",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/organizations/{id}/status": {
+        patch: {
+          tags: ["Organizações"],
+          summary: "Atualizar status",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { type: "object", additionalProperties: true },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/organizations/{id}/subscription-plan": {
+        patch: {
+          tags: ["Organizações"],
+          summary: "Atualizar plano de assinatura",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { type: "object", additionalProperties: true },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/organizations/{id}/logo-url": {
+        patch: {
+          tags: ["Organizações"],
+          summary: "Atualizar URL do logo",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { type: "object", additionalProperties: true },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}

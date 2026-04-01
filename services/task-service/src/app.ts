@@ -1,10 +1,12 @@
 import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import cors from "cors";
 import express, { type Express } from "express";
 import "express-async-errors";
 
 import type { TaskServiceEnv } from "./config/env.js";
+import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
 import { taskComercialRoutes } from "./routes/task-comercial.routes.js";
 import { taskCrudRoutes } from "./routes/task-crud.routes.js";
 import { taskDependentRoutes } from "./routes/task-dependent.routes.js";
@@ -13,7 +15,7 @@ import { taskIntegrationRegularizeRoutes } from "./routes/task-integration-regul
 import { taskLifecycleRoutes } from "./routes/task-lifecycle.routes.js";
 import { taskModelRoutes } from "./routes/task-model.routes.js";
 
-export function createTaskApp(_env: TaskServiceEnv, logger: Logger): Express {
+export function createTaskApp(env: TaskServiceEnv, logger: Logger): Express {
   const app = express();
 
   app.use(cors());
@@ -22,6 +24,13 @@ export function createTaskApp(_env: TaskServiceEnv, logger: Logger): Express {
   app.get("/health", (_req, res) => {
     res.status(200).json(createSuccessResponse({ status: "ok", service: "task-service" }));
   });
+
+  if (env.enableApiDocs) {
+    mountOpenApiDocs(app, {
+      spec: buildTaskServiceOpenApiSpec(env),
+      siteTitle: "task-service — OpenAPI",
+    });
+  }
 
   app.use(taskModelRoutes);
   app.use(taskDependentRoutes);

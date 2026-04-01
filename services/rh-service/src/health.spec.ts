@@ -1,8 +1,9 @@
+import { Writable } from "node:stream";
 import { createLogger } from "@workspace/shared/logger";
 import request from "supertest";
-import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
+import type { RhEnv } from "./config/env.js";
 
 class MemoryLogStream extends Writable {
   _write(
@@ -22,7 +23,16 @@ describe("rh-service", () => {
       level: "silent",
       destination: new MemoryLogStream(),
     });
-    const app = createApp(logger);
+    const env = {
+      port: 3339,
+      databaseUrl: "postgresql://localhost/rh_test",
+      jwtSecret: "test-jwt-secret",
+      nodeEnv: "test",
+      logLevel: "silent",
+      logPretty: false,
+      enableApiDocs: false,
+    } satisfies RhEnv;
+    const app = createApp(logger, env);
     const res = await request(app).get("/health");
 
     expect(res.status).toBe(200);
