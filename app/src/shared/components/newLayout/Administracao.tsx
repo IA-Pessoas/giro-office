@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { Shield, Users, KeyRound, FileSearch, Plus } from "lucide-react";
 
+import { departmentService } from "@modules/departments";
 import { CreateUserModal, type UserItem } from "@modules/users";
+import { useFetch } from "@shared/hooks";
 
 export function Administracao() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const { data: departments = [] } = useFetch(["departments"], () => departmentService.list());
 
   const handleOpenCreateModal = () => setIsCreateModalOpen(true);
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);
@@ -71,7 +75,7 @@ export function Administracao() {
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
         onUserCreated={handleUserCreated}
-        departments={[]}
+        departments={departments}
       />
     </div>
   );
