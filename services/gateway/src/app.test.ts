@@ -125,6 +125,8 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     auditServiceUrl: "http://127.0.0.1:3335",
     port: 0,
     userServiceUrl: "http://127.0.0.1:3335",
+    taskServiceUrl: "http://127.0.0.1:3337",
+    projectServiceUrl: "http://127.0.0.1:3338",
     jwtSecret: "test-secret",
     logLevel: "silent",
     logPretty: false,

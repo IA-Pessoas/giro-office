@@ -33,7 +33,6 @@ const gatewayEnvSchema = z
         return Number.isNaN(parsed) ? 3334 : parsed;
       }),
     userServiceUrl: z.string().url().default("http://localhost:3335"),
-    /** Opcional: destino HTTP do upgrade WebSocket `/socket.io` (ex.: user-service ou outro host). */
     websocketUpstreamUrl: z
       .string()
       .optional()

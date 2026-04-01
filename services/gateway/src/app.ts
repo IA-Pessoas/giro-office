@@ -22,7 +22,7 @@ import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
-import { isTaskServiceRoute, isUserServiceRoute } from "./utils/routeUtils.js";
+import { isUserServiceRoute } from "./utils/routeUtils.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
   return {
@@ -87,8 +87,6 @@ function getUpstreamContext(url: string, request: Request) {
     return undefined;
   }
 }
-
-/** URL do upstream HTTP ou `null` se o path não estiver mapeado no gateway (sem fallback legado). */
 function getProxyTargetUrl(env: GatewayEnv, request: Request): string | null {
   if (isUserServiceRoute(request.path)) {
     return env.userServiceUrl;
