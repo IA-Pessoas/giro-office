@@ -2,18 +2,19 @@ import { useState } from "react";
 import { Shield, Users, KeyRound, FileSearch, Plus } from "lucide-react";
 
 import { departmentService } from "@modules/departments";
-import { CreateUserModal, type UserItem } from "@modules/users";
+import { CreateUserModal, userService, type UserItem } from "@modules/users";
 import { useFetch } from "@shared/hooks";
 
 export function Administracao() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const { data: departments = [] } = useFetch(["departments"], () => departmentService.list());
+  const { data: users = [], refetch: refetchUsers } = useFetch(["users"], () => userService.list());
 
   const handleOpenCreateModal = () => setIsCreateModalOpen(true);
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);
   const handleUserCreated = (_user: UserItem) => {
-    // Refetch users list in a follow-up commit
+    void refetchUsers();
   };
 
   return (
@@ -43,7 +44,7 @@ export function Administracao() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Usuários Ativos</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">48</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{users.length}</p>
             </div>
             <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
           </div>
