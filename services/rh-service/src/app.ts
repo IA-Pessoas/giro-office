@@ -12,12 +12,13 @@ import messageRoutes from "./routes/message.routes.js";
 import pointRoutes from "./routes/point.routes.js";
 import pointConfigRoutes from "./routes/pointConfig.routes.js";
 import requestRoutes from "./routes/request.routes.js";
-import scoreQuarterRoutes from "./routes/scoreQuarter.routes.js";
-import scoreQuestionRoutes from "./routes/scoreQuestion.routes.js";
-import scoreEvaluationRoutes from "./routes/scoreEvaluation.routes.js";
+import scoreNitroRoutes from "./routes/scoreNitro.routes.js";
 import timeBankReleaseRoutes from "./routes/timeBankRelease.routes.js";
 import timeClockRequestRoutes from "./routes/timeClockRequest.routes.js";
 import timeSheetRoutes from "./routes/timeSheet.routes.js";
+import scoreQuestionRoutes from "./routes/scoreQuestion.routes.js";
+import scoreQuarterRoutes from "./routes/scoreQuarter.routes.js";
+import scoreEvaluationRoutes from "./routes/scoreEvaluation.routes.js";
 
 export function createApp(logger: Logger): express.Express {
   const app = express();
@@ -38,11 +39,12 @@ export function createApp(logger: Logger): express.Express {
   app.use("/rh/requests", requestRoutes);
   app.use("/rh/score/questions", scoreQuestionRoutes);
   app.use("/rh/score/quarters", scoreQuarterRoutes);
+  app.use("/rh/score/evaluations", scoreEvaluationRoutes);
   app.use("/rh/holidays", holidayRoutes);
   app.use("/rh/time-bank-releases", timeBankReleaseRoutes);
   app.use("/rh/messages", messageRoutes);
   app.use("/rh/timesheets", timeSheetRoutes);
-  app.use("/rh/score/evaluations", scoreEvaluationRoutes);
+  app.use("/rh/score/nitro", scoreNitroRoutes);
 
   app.use(
     createExpressErrorHandler({
