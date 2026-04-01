@@ -22,11 +22,7 @@ import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
-import {
-  isProjectServiceRoute,
-  isTaskServiceRoute,
-  isUserServiceRoute,
-} from "./utils/routeUtils.js";
+import { isUserServiceRoute } from "./utils/routeUtils.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
   return {
@@ -91,26 +87,12 @@ function getUpstreamContext(url: string, request: Request) {
     return undefined;
   }
 }
-
-/** URL do upstream HTTP ou `null` se o path não estiver mapeado no gateway (sem fallback legado). */
 function getProxyTargetUrl(env: GatewayEnv, request: Request): string | null {
   if (isUserServiceRoute(request.path)) {
     return env.userServiceUrl;
   }
 
-<<<<<<< feature/project
-  if (isTaskServiceRoute(request.path)) {
-    return env.taskServiceUrl;
-  }
-
-  if (isProjectServiceRoute(request.path)) {
-    return env.projectServiceUrl;
-  }
-
-  return env.legacyApiUrl;
-=======
   return null;
->>>>>>> develop
 }
 
 function getResponseSizeBytes(response: Response): number | undefined {
@@ -256,18 +238,9 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
 
   app.use((request, response, next) => {
     const targetUrl = getProxyTargetUrl(env, request);
-<<<<<<< feature/project
-    const isInternalService =
-      targetUrl === env.taskServiceUrl ||
-      targetUrl === env.userServiceUrl ||
-      targetUrl === env.projectServiceUrl;
-    if (isInternalService) {
-      request.headers[INTERNAL_SERVICE_TOKEN_HEADER] = env.auditServiceToken;
-=======
     if (targetUrl === null) {
       next(new ServiceError(404, "Rota não mapeada no gateway."));
       return;
->>>>>>> develop
     }
     return buildHttpProxyMiddleware(targetUrl)(request, response, next);
   });
