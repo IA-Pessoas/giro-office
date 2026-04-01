@@ -1,7 +1,5 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-
 import { parseWithZod, ServiceError } from "@workspace/shared";
+import { expect, it } from "vitest";
 
 import {
   generateQuarterBodySchema,
@@ -9,51 +7,53 @@ import {
   updateNitroBodySchema,
 } from "../src/schemas/scoreQuarter.schemas.js";
 
-test("generateQuarterBodySchema aceita payload válido", () => {
+it("generateQuarterBodySchema aceita payload válido", () => {
   const parsed = parseWithZod(generateQuarterBodySchema, {
     target_user_id: "user-1",
     quarter: "2026-Q1",
   });
-  assert.equal(parsed.target_user_id, "user-1");
-  assert.equal(parsed.quarter, "2026-Q1");
+  expect(parsed.target_user_id).toBe("user-1");
+  expect(parsed.quarter).toBe("2026-Q1");
 });
 
-test("generateQuarterBodySchema rejeita chaves extras (strict)", () => {
-  assert.throws(
-    () =>
-      parseWithZod(generateQuarterBodySchema, {
-        target_user_id: "user-1",
-        quarter: "2026-Q1",
-        extra: true,
-      }),
-    (err: unknown) => err instanceof ServiceError && err.statusCode === 400,
-  );
+it("generateQuarterBodySchema rejeita chaves extras (strict)", () => {
+  let caught: unknown;
+  try {
+    parseWithZod(generateQuarterBodySchema, {
+      target_user_id: "user-1",
+      quarter: "2026-Q1",
+      extra: true,
+    });
+  } catch (e) {
+    caught = e;
+  }
+  expect(caught).toBeDefined();
+  expect(caught).toBeInstanceOf(ServiceError);
+  expect((caught as ServiceError).statusCode).toBe(400);
 });
 
-test("updateNitroBodySchema aceita os quatro tipos de métrica", () => {
+it("updateNitroBodySchema aceita os quatro tipos de métrica", () => {
   for (const type of ["projects", "hours", "errors", "folders"] as const) {
     const parsed = parseWithZod(updateNitroBodySchema, {
       score_id: "score-1",
       type,
       value: 1.5,
     });
-    assert.equal(parsed.type, type);
+    expect(parsed.type).toBe(type);
   }
 });
 
-test("updateNitroBodySchema rejeita tipo inválido", () => {
-  assert.throws(
-    () =>
-      parseWithZod(updateNitroBodySchema, {
-        score_id: "score-1",
-        type: "invalid",
-        value: 1,
-      }),
-    (err: unknown) => err instanceof ServiceError && err.statusCode === 400,
-  );
+it("updateNitroBodySchema rejeita tipo inválido", () => {
+  expect(() =>
+    parseWithZod(updateNitroBodySchema, {
+      score_id: "score-1",
+      type: "invalid",
+      value: 1,
+    }),
+  ).toThrow(ServiceError);
 });
 
-test("scoreQuarterIdParamSchema valida id", () => {
+it("scoreQuarterIdParamSchema valida id", () => {
   const parsed = parseWithZod(scoreQuarterIdParamSchema, { id: "score-uuid-1" });
-  assert.equal(parsed.id, "score-uuid-1");
+  expect(parsed.id).toBe("score-uuid-1");
 });
