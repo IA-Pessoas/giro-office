@@ -8,6 +8,19 @@ import "express-async-errors";
 import { requestContext } from "./middlewares/requestContext.js";
 import organizationRoutes from "./routes/organization.routes.js";
 
+function organizationErrorLogContext(request: Request): Record<string, unknown> | undefined {
+  const userId = request.user_id;
+  const organizationId = request.organization_id;
+  const out: Record<string, unknown> = {};
+  if (userId) {
+    out.userId = userId;
+  }
+  if (organizationId) {
+    out.organizationId = organizationId;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export function createOrganizationApp(logger: Logger): express.Express {
   const app = express();
 
@@ -28,6 +41,7 @@ export function createOrganizationApp(logger: Logger): express.Express {
       logger,
       event: "organization-service.error",
       fallbackMessage: "Erro interno no organization-service.",
+      getContext: organizationErrorLogContext,
     }),
   );
 
