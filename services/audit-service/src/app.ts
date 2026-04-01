@@ -1,8 +1,10 @@
 import { createExpressErrorHandler, type Logger } from "@workspace/shared";
 import express from "express";
+import "express-async-errors";
 
 import type { AuditServiceEnv } from "./config/env.js";
 import type { AuditRequestRepository } from "./integrations/prisma/audit-request-repository.js";
+import { requestContext } from "./middlewares/requestContext.js";
 import { createAuditRouter } from "./routes/index.js";
 
 interface CreateAppOptions {
@@ -16,6 +18,7 @@ export function createApp({ env, logger, repository }: CreateAppOptions): expres
 
   app.set("trust proxy", true);
   app.use(express.json());
+  app.use(requestContext);
   app.use(createAuditRouter({ env, logger, repository }));
   app.use(
     createExpressErrorHandler({
