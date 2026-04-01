@@ -8,6 +8,19 @@ import "express-async-errors";
 import { requestContext } from "./middlewares/requestContext.js";
 import pointConfigRoutes from "./routes/point-config.routes.js";
 
+function rhErrorLogContext(request: Request): Record<string, unknown> | undefined {
+  const userId = request.user_id;
+  const organizationId = request.organization_id;
+  const out: Record<string, unknown> = {};
+  if (userId) {
+    out.userId = userId;
+  }
+  if (organizationId) {
+    out.organizationId = organizationId;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export function createApp(logger: Logger): express.Express {
   const app = express();
 
@@ -27,6 +40,7 @@ export function createApp(logger: Logger): express.Express {
       logger,
       event: "rh-service.error",
       fallbackMessage: "Erro interno no rh-service.",
+      getContext: rhErrorLogContext,
     }),
   );
 

@@ -1,38 +1,49 @@
 import "dotenv/config";
-import { createSuccessResponse, serializeError, serviceError } from "@workspace/shared";
-import express, { type Request, type Response, type NextFunction } from "express";
-import "express-async-errors";
+import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
+import type { Logger } from "@workspace/shared/logger";
 import cors from "cors";
+import express, { type Request, type Response } from "express";
+import "express-async-errors";
 
 import { requestContext } from "./middlewares/requestContext.js";
 import organizationRoutes from "./routes/organization.routes.js";
 
-const app: express.Express = express();
+function organizationErrorLogContext(request: Request): Record<string, unknown> | undefined {
+  const userId = request.user_id;
+  const organizationId = request.organization_id;
+  const out: Record<string, unknown> = {};
+  if (userId) {
+    out.userId = userId;
+  }
+  if (organizationId) {
+    out.organizationId = organizationId;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
-app.use(cors());
-app.use(express.json());
-app.use(requestContext);
+export function createOrganizationApp(logger: Logger): express.Express {
+  const app = express();
 
-app.get("/health", (_request: Request, response: Response) => {
-  response.status(200).json(
-    createSuccessResponse({ status: "ok", service: "organization-service" }),
+  app.use(cors());
+  app.use(express.json());
+  app.use(requestContext);
+
+  app.get("/health", (_request: Request, response: Response) => {
+    response
+      .status(200)
+      .json(createSuccessResponse({ status: "ok", service: "organization-service" }));
+  });
+
+  app.use(organizationRoutes);
+
+  app.use(
+    createExpressErrorHandler({
+      logger,
+      event: "organization-service.error",
+      fallbackMessage: "Erro interno no organization-service.",
+      getContext: organizationErrorLogContext,
+    }),
   );
-});
 
-app.use(organizationRoutes);
-
-app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
-  serviceError({
-    service: "organization-service",
-    requestId: request.requestId,
-    message: error.message,
-  });
-
-  const { statusCode, body } = serializeError(error, {
-    requestId: request.requestId,
-    fallbackMessage: "Erro interno no organization-service.",
-  });
-  response.status(statusCode).json(body);
-});
-
-export { app };
+  return app;
+}
