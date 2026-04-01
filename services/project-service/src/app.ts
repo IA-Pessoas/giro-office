@@ -3,7 +3,7 @@ import "dotenv/config";
 import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import cors from "cors";
-import express, { type Express } from "express";
+import express, { type Express, type Request } from "express";
 import "express-async-errors";
 
 import { getProjectServiceEnv } from "./config/env.js";
@@ -15,6 +15,23 @@ import {
 import { createProjectCrudRoutes, type ProjectCrudRouteDeps } from "./routes/projectcrud.routes.js";
 import { ProjectCrudService } from "./services/ProjectCrudService.js";
 import { ProjectProgressService } from "./services/ProjectProgressService.js";
+
+function projectServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
+  const userId = request.user_id;
+  const organizationId = request.organization_id;
+  const permission = request.permission;
+  const out: Record<string, unknown> = {};
+  if (userId) {
+    out.userId = userId;
+  }
+  if (organizationId) {
+    out.organizationId = organizationId;
+  }
+  if (typeof permission === "number") {
+    out.permission = permission;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
 export function createProjectApplication(options?: {
   projectCrudService?: ProjectCrudRouteDeps;
@@ -53,6 +70,7 @@ export function createProjectApplication(options?: {
       logger,
       event: "project-service.error",
       fallbackMessage: "Erro interno no project-service.",
+      getContext: projectServiceErrorLogContext,
     }),
   );
 
