@@ -232,7 +232,12 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   });
 
   app.use("/organizations", buildHttpProxyMiddleware(env.organizationServiceUrl));
-  app.use("/clients", buildHttpProxyMiddleware(env.clientServiceUrl));
+  app.use(
+    "/clients",
+    buildHttpProxyMiddleware(
+      env.useClientServiceForClients ? env.clientServiceUrl : env.legacyApiUrl,
+    ),
+  );
   app.use("/rh", buildHttpProxyMiddleware(env.rhServiceUrl));
   if (env.auditEnabled) {
     app.use(
