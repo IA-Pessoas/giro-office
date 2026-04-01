@@ -1,18 +1,18 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { ServiceError } from "@workspace/shared";
+import { expect, it } from "vitest";
 
-import type { PrismaClient } from "../src/generated/prisma/client.js";
+import {
+  Prisma,
+  type PrismaClient,
+  ScoreEvaluationStatus,
+} from "../src/generated/prisma/client.js";
 
-process.env.DATABASE_URL ??= "postgresql://user:pass@127.0.0.1:5432/rh_service_test";
-process.env.JWT_SECRET ??= "test-jwt-secret-at-least-32-characters-long";
-process.env.LOG_LEVEL ??= "silent";
-process.env.NODE_ENV ??= "test";
-
-const { Prisma, ScoreEvaluationStatus } = await import("../src/generated/prisma/client.js");
-const { ServiceError } = await import("@workspace/shared");
-const { ScoreQuarterService } = await import("../src/services/scoreQuarterService.js");
+import { ScoreEvaluationService } from "../src/services/scoreEvaluationService.js";
+import { ScoreQuarterService } from "../src/services/scoreQuarterService.js";
 
 const orgId = "org-1";
+/** UUID fixo para testes de submit (schema HTTP exige UUID). */
+const evalIdSubmit = "550e8400-e29b-41d4-a716-446655440001";
 const targetUserId = "user-target";
 const quarter = "2026-Q1";
 
@@ -46,7 +46,7 @@ function createEmptyQuestionsTxMock() {
     },
     scoreEvaluation: {
       create: async () => {
-        assert.fail("scoreEvaluation.create não deve ser chamado sem perguntas ativas");
+        throw new Error("scoreEvaluation.create não deve ser chamado sem perguntas ativas");
       },
     },
     user: {
@@ -60,47 +60,51 @@ function asDb(mock: object): PrismaClient {
   return mock as unknown as PrismaClient;
 }
 
-test("generateQuarterlyScore lança 409 quando o trimestre já existe", async () => {
+it("generateQuarterlyScore lança 409 quando o trimestre já existe", async () => {
   const db = {
     scoreQuarter: {
       findUnique: async () => ({ id: "existing" }),
     },
     user: { findUnique: async () => null },
-    $transaction: async () => assert.fail("transaction não deve rodar"),
+    $transaction: async () => {
+      throw new Error("transaction não deve rodar");
+    },
     scoreEvaluation: {},
     scoreNitro: {},
   };
   const svc = new ScoreQuarterService(asDb(db));
 
-  await assert.rejects(
-    () =>
-      svc.generateQuarterlyScore({
-        organization_id: orgId,
-        target_user_id: targetUserId,
-        quarter,
-      }),
+  await expect(
+    svc.generateQuarterlyScore({
+      organization_id: orgId,
+      target_user_id: targetUserId,
+      quarter,
+    }),
+  ).rejects.toSatisfy(
     (err: unknown) =>
       err instanceof ServiceError && err.statusCode === 409 && err.message.includes("já gerado"),
   );
 });
 
-test("generateQuarterlyScore lança 404 quando o usuário alvo não existe", async () => {
+it("generateQuarterlyScore lança 404 quando o usuário alvo não existe", async () => {
   const db = {
     scoreQuarter: { findUnique: async () => null },
     user: { findUnique: async () => null },
-    $transaction: async () => assert.fail("transaction não deve rodar"),
+    $transaction: async () => {
+      throw new Error("transaction não deve rodar");
+    },
     scoreEvaluation: {},
     scoreNitro: {},
   };
   const svc = new ScoreQuarterService(asDb(db));
 
-  await assert.rejects(
-    () =>
-      svc.generateQuarterlyScore({
-        organization_id: orgId,
-        target_user_id: targetUserId,
-        quarter,
-      }),
+  await expect(
+    svc.generateQuarterlyScore({
+      organization_id: orgId,
+      target_user_id: targetUserId,
+      quarter,
+    }),
+  ).rejects.toSatisfy(
     (err: unknown) =>
       err instanceof ServiceError &&
       err.statusCode === 404 &&
@@ -108,7 +112,7 @@ test("generateQuarterlyScore lança 404 quando o usuário alvo não existe", asy
   );
 });
 
-test("generateQuarterlyScore lança 400 quando o alvo não pertence à organização", async () => {
+it("generateQuarterlyScore lança 400 quando o alvo não pertence à organização", async () => {
   const db = {
     scoreQuarter: { findUnique: async () => null },
     user: {
@@ -117,25 +121,27 @@ test("generateQuarterlyScore lança 400 quando o alvo não pertence à organiza�
         organization_id: "outra-org",
       }),
     },
-    $transaction: async () => assert.fail("transaction não deve rodar"),
+    $transaction: async () => {
+      throw new Error("transaction não deve rodar");
+    },
     scoreEvaluation: {},
     scoreNitro: {},
   };
   const svc = new ScoreQuarterService(asDb(db));
 
-  await assert.rejects(
-    () =>
-      svc.generateQuarterlyScore({
-        organization_id: orgId,
-        target_user_id: targetUserId,
-        quarter,
-      }),
+  await expect(
+    svc.generateQuarterlyScore({
+      organization_id: orgId,
+      target_user_id: targetUserId,
+      quarter,
+    }),
+  ).rejects.toSatisfy(
     (err: unknown) =>
       err instanceof ServiceError && err.statusCode === 400 && err.message.includes("organização"),
   );
 });
 
-test("generateQuarterlyScore lança 400 sem permissão RH na organização", async () => {
+it("generateQuarterlyScore lança 400 sem permissão RH na organização", async () => {
   const db = {
     scoreQuarter: { findUnique: async () => null },
     user: {
@@ -148,19 +154,21 @@ test("generateQuarterlyScore lança 400 sem permissão RH na organização", asy
         permissions: [{ organization_id: "outra-org", rh: 1 }],
       }),
     },
-    $transaction: async () => assert.fail("transaction não deve rodar"),
+    $transaction: async () => {
+      throw new Error("transaction não deve rodar");
+    },
     scoreEvaluation: {},
     scoreNitro: {},
   };
   const svc = new ScoreQuarterService(asDb(db));
 
-  await assert.rejects(
-    () =>
-      svc.generateQuarterlyScore({
-        organization_id: orgId,
-        target_user_id: targetUserId,
-        quarter,
-      }),
+  await expect(
+    svc.generateQuarterlyScore({
+      organization_id: orgId,
+      target_user_id: targetUserId,
+      quarter,
+    }),
+  ).rejects.toSatisfy(
     (err: unknown) =>
       err instanceof ServiceError &&
       err.statusCode === 400 &&
@@ -168,7 +176,7 @@ test("generateQuarterlyScore lança 400 sem permissão RH na organização", asy
   );
 });
 
-test("generateQuarterlyScore conclui transação quando não há perguntas cadastradas", async () => {
+it("generateQuarterlyScore conclui transação quando não há perguntas cadastradas", async () => {
   const tx = createEmptyQuestionsTxMock();
   const db = {
     scoreQuarter: { findUnique: async () => null },
@@ -185,11 +193,11 @@ test("generateQuarterlyScore conclui transação quando não há perguntas cadas
     quarter,
   });
 
-  assert.ok(result && typeof result === "object");
-  assert.equal((result as { id: string }).id, "score-new");
+  expect(result && typeof result === "object").toBe(true);
+  expect((result as { id: string }).id).toBe("score-new");
 });
 
-test("generateQuarterlyScore mapeia P2002 para 409", async () => {
+it("generateQuarterlyScore mapeia P2002 para 409", async () => {
   const db = {
     scoreQuarter: { findUnique: async () => null },
     user: { findUnique: async () => collaboratorTargetUser() },
@@ -204,50 +212,53 @@ test("generateQuarterlyScore mapeia P2002 para 409", async () => {
   };
   const svc = new ScoreQuarterService(asDb(db));
 
-  await assert.rejects(
-    () =>
-      svc.generateQuarterlyScore({
-        organization_id: orgId,
-        target_user_id: targetUserId,
-        quarter,
-      }),
+  await expect(
+    svc.generateQuarterlyScore({
+      organization_id: orgId,
+      target_user_id: targetUserId,
+      quarter,
+    }),
+  ).rejects.toSatisfy(
     (err: unknown) =>
       err instanceof ServiceError && err.statusCode === 409 && err.message.includes("já gerado"),
   );
 });
 
-test("submitEvaluation lança 404 quando a avaliação não existe", async () => {
+it("ScoreEvaluationService.submitEvaluation lança 404 quando a avaliação não existe", async () => {
   const db = {
     scoreEvaluation: {
-      findUnique: async () => null,
+      findFirst: async () => null,
     },
     scoreQuarter: {},
     user: {},
     $transaction: async () => undefined,
     scoreNitro: {},
   };
-  const svc = new ScoreQuarterService(asDb(db));
+  const svc = new ScoreEvaluationService(asDb(db));
 
-  await assert.rejects(
-    () =>
-      svc.submitEvaluation({
-        organization_id: orgId,
-        evaluation_id: "missing",
-        answers: [{ question_id: "q1", answer: 5 }],
-      }),
+  await expect(
+    svc.submitEvaluation({
+      organization_id: orgId,
+      user_id: "user-1",
+      evaluation_id: evalIdSubmit,
+      answers: [{ question_id: "q1", answer: 5 }],
+    }),
+  ).rejects.toSatisfy(
     (err: unknown) =>
       err instanceof ServiceError && err.statusCode === 404 && err.message.includes("Avaliação"),
   );
 });
 
-test("submitEvaluation lança 400 quando já está concluída", async () => {
+it("ScoreEvaluationService.submitEvaluation lança 409 quando já está concluída", async () => {
   const db = {
     scoreEvaluation: {
-      findUnique: async () => ({
-        id: "ev-1",
+      findFirst: async () => ({
+        id: evalIdSubmit,
         score_id: "s-1",
         organization_id: orgId,
         status: ScoreEvaluationStatus.Completed,
+        evaluator_id: "user-1",
+        evaluator_role: "SELF",
         scoreQuarter: { organization_id: orgId },
       }),
     },
@@ -256,40 +267,46 @@ test("submitEvaluation lança 400 quando já está concluída", async () => {
     $transaction: async () => undefined,
     scoreNitro: {},
   };
-  const svc = new ScoreQuarterService(asDb(db));
+  const svc = new ScoreEvaluationService(asDb(db));
 
-  await assert.rejects(
-    () =>
-      svc.submitEvaluation({
-        organization_id: orgId,
-        evaluation_id: "ev-1",
-        answers: [{ question_id: "q1", answer: 5 }],
-      }),
+  await expect(
+    svc.submitEvaluation({
+      organization_id: orgId,
+      user_id: "user-1",
+      evaluation_id: evalIdSubmit,
+      answers: [{ question_id: "q1", answer: 5 }],
+    }),
+  ).rejects.toSatisfy(
     (err: unknown) =>
-      err instanceof ServiceError && err.statusCode === 400 && err.message.includes("concluída"),
+      err instanceof ServiceError && err.statusCode === 409 && err.message.includes("concluída"),
   );
 });
 
-test("submitEvaluation atualiza e dispara recálculo", async () => {
+it("ScoreEvaluationService.submitEvaluation atualiza e dispara recálculo", async () => {
   const scoreId = "s-recalc";
-  let updateCalls = 0;
+  const submitUserId = "user-evaluator";
+  let evaluationUpdateCalls = 0;
+  let quarterUpdateCalls = 0;
   const db = {
     scoreEvaluation: {
-      findUnique: async () => ({
-        id: "ev-1",
+      findFirst: async () => ({
+        id: evalIdSubmit,
         score_id: scoreId,
         organization_id: orgId,
         status: ScoreEvaluationStatus.Pending,
+        evaluator_id: submitUserId,
+        evaluator_role: "SELF",
         scoreQuarter: { organization_id: orgId },
       }),
       update: async () => {
-        updateCalls += 1;
-        return { id: "ev-1" };
+        evaluationUpdateCalls += 1;
+        return { id: evalIdSubmit };
       },
     },
     scoreQuarter: {
-      findUnique: async () => ({
+      findFirst: async () => ({
         id: scoreId,
+        organization_id: orgId,
         evaluations: [],
         nitro: {
           projects_score: 0,
@@ -298,28 +315,33 @@ test("submitEvaluation atualiza e dispara recálculo", async () => {
           folders_score: 0,
         },
       }),
-      update: async () => ({ id: scoreId }),
+      update: async () => {
+        quarterUpdateCalls += 1;
+        return { id: scoreId };
+      },
     },
     user: {},
     $transaction: async () => undefined,
     scoreNitro: {},
   };
-  const svc = new ScoreQuarterService(asDb(db));
+  const svc = new ScoreEvaluationService(asDb(db));
 
   const result = await svc.submitEvaluation({
     organization_id: orgId,
-    evaluation_id: "ev-1",
+    user_id: submitUserId,
+    evaluation_id: evalIdSubmit,
     answers: [
       { question_id: "q1", answer: 8 },
       { question_id: "q2", answer: 6 },
     ],
   });
 
-  assert.equal(updateCalls, 1);
-  assert.equal(result.message, "Avaliação enviada com sucesso");
+  expect(evaluationUpdateCalls).toBe(1);
+  expect(quarterUpdateCalls).toBe(1);
+  expect(result.message).toBe("Avaliação enviada com sucesso");
 });
 
-test("getDetail lança 404 quando o score não existe", async () => {
+it("getDetail lança 404 quando o score não existe", async () => {
   const db = {
     scoreQuarter: { findUnique: async () => null },
     scoreEvaluation: {},
@@ -329,8 +351,7 @@ test("getDetail lança 404 quando o score não existe", async () => {
   };
   const svc = new ScoreQuarterService(asDb(db));
 
-  await assert.rejects(
-    () => svc.getDetail({ organization_id: orgId, score_id: "x" }),
+  await expect(svc.getDetail({ organization_id: orgId, score_id: "x" })).rejects.toSatisfy(
     (err: unknown) =>
       err instanceof ServiceError &&
       err.statusCode === 404 &&
@@ -338,7 +359,7 @@ test("getDetail lança 404 quando o score não existe", async () => {
   );
 });
 
-test("getDetail lança 403 quando a organização não confere", async () => {
+it("getDetail lança 403 quando a organização não confere", async () => {
   const db = {
     scoreQuarter: {
       findUnique: async () => ({
@@ -355,14 +376,13 @@ test("getDetail lança 403 quando a organização não confere", async () => {
   };
   const svc = new ScoreQuarterService(asDb(db));
 
-  await assert.rejects(
-    () => svc.getDetail({ organization_id: orgId, score_id: "s1" }),
+  await expect(svc.getDetail({ organization_id: orgId, score_id: "s1" })).rejects.toSatisfy(
     (err: unknown) =>
       err instanceof ServiceError && err.statusCode === 403 && err.message.includes("organização"),
   );
 });
 
-test("listForUser retorna lista do prisma", async () => {
+it("listForUser retorna lista do prisma", async () => {
   const expected = [{ id: "s1", quarter }];
   const db = {
     scoreQuarter: {
@@ -376,10 +396,10 @@ test("listForUser retorna lista do prisma", async () => {
   const svc = new ScoreQuarterService(asDb(db));
 
   const rows = await svc.listForUser(orgId, "user-1");
-  assert.deepEqual(rows, expected);
+  expect(rows).toEqual(expected);
 });
 
-test("listPendingEvaluations lança 404 se o usuário não existe", async () => {
+it("ScoreEvaluationService.listPendingEvaluations lança 404 se o utilizador não existe", async () => {
   const db = {
     user: { findUnique: async () => null },
     scoreQuarter: {},
@@ -387,18 +407,17 @@ test("listPendingEvaluations lança 404 se o usuário não existe", async () => 
     $transaction: async () => undefined,
     scoreNitro: {},
   };
-  const svc = new ScoreQuarterService(asDb(db));
+  const svc = new ScoreEvaluationService(asDb(db));
 
-  await assert.rejects(
-    () => svc.listPendingEvaluations({ organization_id: orgId, user_id: "ghost" }),
+  await expect(svc.listPendingEvaluations(orgId, "ghost")).rejects.toSatisfy(
     (err: unknown) =>
       err instanceof ServiceError &&
       err.statusCode === 404 &&
-      err.message.includes("Usuário não encontrado"),
+      err.message.includes("Utilizador não encontrado"),
   );
 });
 
-test("updateNitro lança 404 quando nitro não existe", async () => {
+it("updateNitro lança 404 quando nitro não existe", async () => {
   const db = {
     scoreNitro: { findUnique: async () => null },
     scoreQuarter: {},
@@ -408,14 +427,14 @@ test("updateNitro lança 404 quando nitro não existe", async () => {
   };
   const svc = new ScoreQuarterService(asDb(db));
 
-  await assert.rejects(
-    () =>
-      svc.updateNitro({
-        organization_id: orgId,
-        score_id: "s1",
-        type: "projects",
-        value: 1,
-      }),
+  await expect(
+    svc.updateNitro({
+      organization_id: orgId,
+      score_id: "s1",
+      type: "projects",
+      value: 1,
+    }),
+  ).rejects.toSatisfy(
     (err: unknown) =>
       err instanceof ServiceError && err.statusCode === 404 && err.message.includes("Nitro"),
   );

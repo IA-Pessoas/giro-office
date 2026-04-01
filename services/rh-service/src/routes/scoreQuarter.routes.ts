@@ -11,7 +11,6 @@ import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   generateQuarterBodySchema,
   scoreQuarterIdParamSchema,
-  submitEvaluationBodySchema,
   updateNitroBodySchema,
 } from "../schemas/scoreQuarter.schemas.js";
 import { ScoreQuarterService } from "../services/scoreQuarterService.js";
@@ -44,63 +43,6 @@ router.post(
       res.status(200).json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro ao gerar score trimestral", { err });
-      next(err);
-    }
-  },
-);
-
-router.post(
-  "/evaluations/submit",
-  isAuthenticated,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const organizationId = req.organization_id;
-      const userId = req.user_id;
-      if (!organizationId) {
-        throw new ServiceError(400, "organization_id é obrigatório.");
-      }
-      if (!userId) {
-        throw new ServiceError(400, "user_id é obrigatório.");
-      }
-
-      const body = parseWithZod(submitEvaluationBodySchema, req.body);
-
-      const result = await scoreQuarterService.submitEvaluation({
-        organization_id: organizationId,
-        evaluation_id: body.evaluation_id,
-        answers: body.answers,
-      });
-
-      res.status(200).json(createSuccessResponse(result));
-    } catch (err) {
-      logError("Erro ao submeter avaliação de score", { err });
-      next(err);
-    }
-  },
-);
-
-router.get(
-  "/evaluations/pending",
-  isAuthenticated,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const organizationId = req.organization_id;
-      const userId = req.user_id;
-      if (!organizationId) {
-        throw new ServiceError(400, "organization_id é obrigatório.");
-      }
-      if (!userId) {
-        throw new ServiceError(400, "user_id é obrigatório.");
-      }
-
-      const result = await scoreQuarterService.listPendingEvaluations({
-        organization_id: organizationId,
-        user_id: userId,
-      });
-
-      res.status(200).json(createSuccessResponse(result));
-    } catch (err) {
-      logError("Erro ao listar avaliações pendentes de score", { err });
       next(err);
     }
   },

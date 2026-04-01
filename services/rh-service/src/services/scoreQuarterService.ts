@@ -8,6 +8,7 @@ import {
   ScoreQuestionType,
 } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
+import { ScoreEvaluationService } from "./scoreEvaluationService.js";
 
 const PERMISSION_LEADER = 1;
 const PERMISSION_COLLABORATOR = 0;
@@ -34,22 +35,11 @@ export interface GenerateQuarterlyScoreInput {
   quarter: string;
 }
 
-export interface SubmitEvaluationInput {
-  organization_id: string;
-  evaluation_id: string;
-  answers: { question_id: string; answer: number; obs?: string }[];
-}
-
 export interface UpdateNitroInput {
   organization_id: string;
   score_id: string;
   type: "projects" | "hours" | "errors" | "folders";
   value: number;
-}
-
-export interface ListPendingEvaluationsInput {
-  organization_id: string;
-  user_id: string;
 }
 
 export interface GetScoreDetailInput {
@@ -58,7 +48,11 @@ export interface GetScoreDetailInput {
 }
 
 class ScoreQuarterService {
-  constructor(private readonly db: PrismaClient = prismaClient) {}
+  private readonly scoreEvaluation: ScoreEvaluationService;
+
+  constructor(private readonly db: PrismaClient = prismaClient) {
+    this.scoreEvaluation = new ScoreEvaluationService(db);
+  }
 
   private async findDepartmentLeader(
     tx: Prisma.TransactionClient,
@@ -107,82 +101,6 @@ class ScoreQuarterService {
           },
         },
       },
-    });
-  }
-
-  private async recalculateFinalScore(scoreId: string): Promise<void> {
-    const score = await this.db.scoreQuarter.findUnique({
-      where: { id: scoreId },
-      include: { evaluations: true, nitro: true },
-    });
-
-    if (!score?.nitro) {
-      return;
-    }
-
-    const sums = { behavioral: 0, technical: 0, leadership: 0, tech: 0 };
-    const counts = { behavioral: 0, technical: 0, leadership: 0, tech: 0 };
-
-    for (const ev of score.evaluations) {
-      if (ev.status === ScoreEvaluationStatus.Completed) {
-        const type = ev.type as keyof typeof sums;
-        if (type in sums) {
-          sums[type] += ev.average_score;
-          counts[type] += 1;
-        }
-      }
-    }
-
-    const finalBehavioral = counts.behavioral > 0 ? sums.behavioral / counts.behavioral : 0;
-    const finalTechnical = counts.technical > 0 ? sums.technical / counts.technical : 0;
-    const finalTech = counts.tech > 0 ? sums.tech / counts.tech : 0;
-    const finalLeadership = counts.leadership > 0 ? sums.leadership / counts.leadership : 0;
-
-    await this.db.scoreQuarter.update({
-      where: { id: scoreId },
-      data: {
-        behavioral: finalBehavioral,
-        technical: finalTechnical,
-        technology: finalTech,
-        leadership: finalLeadership,
-      },
-    });
-
-    let sumBase = 0;
-    let validBase = 0;
-
-    if (counts.behavioral > 0) {
-      sumBase += finalBehavioral;
-      validBase += 1;
-    }
-    if (counts.technical > 0) {
-      sumBase += finalTechnical;
-      validBase += 1;
-    }
-    if (counts.tech > 0) {
-      sumBase += finalTech;
-      validBase += 1;
-    }
-    if (counts.leadership > 0) {
-      sumBase += finalLeadership;
-      validBase += 1;
-    }
-
-    const baseScore = validBase > 0 ? sumBase / validBase : 0;
-
-    let finalScore =
-      baseScore +
-      score.nitro.projects_score +
-      score.nitro.hours_score -
-      score.nitro.errors_score +
-      score.nitro.folders_score;
-
-    if (finalScore > 10) finalScore = 10;
-    if (finalScore < 0) finalScore = 0;
-
-    await this.db.scoreQuarter.update({
-      where: { id: scoreId },
-      data: { final_score: finalScore },
     });
   }
 
@@ -342,58 +260,6 @@ class ScoreQuarterService {
     }
   }
 
-  async submitEvaluation(input: SubmitEvaluationInput): Promise<{ message: string }> {
-    try {
-      const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
-      const evaluationId = assertNonEmptyString(input.evaluation_id, "evaluation_id");
-      const answers = input.answers;
-
-      const evaluation = await this.db.scoreEvaluation.findUnique({
-        where: { id: evaluationId },
-        include: { scoreQuarter: true },
-      });
-
-      if (!evaluation) {
-        throw new ServiceError(404, "Avaliação não encontrada.");
-      }
-      if (evaluation.organization_id !== organizationId) {
-        throw new ServiceError(403, "Avaliação não pertence à organização.");
-      }
-      if (evaluation.scoreQuarter.organization_id !== organizationId) {
-        throw new ServiceError(403, "Score não pertence à organização.");
-      }
-      if (evaluation.status === ScoreEvaluationStatus.Completed) {
-        throw new ServiceError(400, "Avaliação já concluída.");
-      }
-
-      let sum = 0;
-      for (const a of answers) {
-        sum += a.answer;
-      }
-      const average = answers.length > 0 ? sum / answers.length : 0;
-
-      await this.db.scoreEvaluation.update({
-        where: { id: evaluationId },
-        data: {
-          answers: answers as unknown as Prisma.InputJsonValue,
-          average_score: average,
-          status: ScoreEvaluationStatus.Completed,
-        },
-      });
-
-      await this.recalculateFinalScore(evaluation.score_id);
-
-      return { message: "Avaliação enviada com sucesso" };
-    } catch (err: unknown) {
-      logError("Erro ao submeter avaliação de score", { err });
-      if (err instanceof ServiceError) {
-        throw err;
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao submeter avaliação. ${msg}`, err);
-    }
-  }
-
   async updateNitro(input: UpdateNitroInput): Promise<unknown> {
     try {
       const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
@@ -438,7 +304,7 @@ class ScoreQuarterService {
         data: updateData,
       });
 
-      await this.recalculateFinalScore(scoreId);
+      await this.scoreEvaluation.recalculateScoreQuarterAggregates(scoreId, organizationId);
 
       return updatedNitro;
     } catch (err: unknown) {
@@ -501,64 +367,6 @@ class ScoreQuarterService {
       }
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao obter detalhe do score. ${msg}`, err);
-    }
-  }
-
-  async listPendingEvaluations(input: ListPendingEvaluationsInput): Promise<unknown> {
-    try {
-      const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
-      const userId = assertNonEmptyString(input.user_id, "user_id");
-
-      const me = await this.db.user.findUnique({
-        where: { id: userId },
-        include: { permissions: true, permissionRef: true },
-      });
-
-      if (!me) {
-        throw new ServiceError(404, "Usuário não encontrado.");
-      }
-
-      const myRoles: ScoreEvaluatorRole[] = [ScoreEvaluatorRole.SELF];
-
-      const orgPerm = pickOrgPermission(me, organizationId);
-      if (orgPerm?.rh === 2) {
-        myRoles.push(ScoreEvaluatorRole.RH);
-      }
-      if (me.permission === 1) {
-        myRoles.push(ScoreEvaluatorRole.TI);
-      }
-      if (me.permission === 2) {
-        myRoles.push(ScoreEvaluatorRole.DIRECTOR);
-      }
-
-      return await this.db.scoreEvaluation.findMany({
-        where: {
-          status: ScoreEvaluationStatus.Pending,
-          organization_id: organizationId,
-          scoreQuarter: { organization_id: organizationId },
-          OR: [
-            { evaluator_id: userId },
-            {
-              evaluator_id: null,
-              evaluator_role: { in: myRoles },
-            },
-          ],
-        },
-        include: {
-          scoreQuarter: {
-            include: {
-              user: { select: { name: true } },
-            },
-          },
-        },
-      });
-    } catch (err: unknown) {
-      logError("Erro ao listar avaliações pendentes de score", { err });
-      if (err instanceof ServiceError) {
-        throw err;
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao listar avaliações pendentes. ${msg}`, err);
     }
   }
 }
