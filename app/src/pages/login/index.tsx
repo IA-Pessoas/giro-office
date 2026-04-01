@@ -1,6 +1,7 @@
 import { useContext, useState } from "react";
 import type { FormEvent } from "react";
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import {
   AlertCircle,
@@ -282,95 +283,18 @@ export default function Login() {
 
                   <p className="text-center text-xs text-gray-600 mt-4">
                     Não tem conta?{" "}
-                    <a
-                      href="#"
+                    <Link
+                      href="/solicitar-acesso"
                       className="text-blue-600 hover:text-blue-700 font-semibold hover:underline"
                     >
                       Solicitar acesso
-                    </a>
+                    </Link>
                   </p>
                 </div>
               </div>
             </div>
           </div>
         </div>
-
-        <style jsx global>{`
-          @keyframes blob {
-            0%,
-            100% {
-              transform: translate(0, 0) scale(1);
-            }
-            25% {
-              transform: translate(20px, -50px) scale(1.1);
-            }
-            50% {
-              transform: translate(-20px, 20px) scale(0.9);
-            }
-            75% {
-              transform: translate(50px, 50px) scale(1.05);
-            }
-          }
-
-          @keyframes fade-in-left {
-            from {
-              opacity: 0;
-              transform: translateX(-30px);
-            }
-            to {
-              opacity: 1;
-              transform: translateX(0);
-            }
-          }
-
-          @keyframes fade-in-right {
-            from {
-              opacity: 0;
-              transform: translateX(30px);
-            }
-            to {
-              opacity: 1;
-              transform: translateX(0);
-            }
-          }
-
-          @keyframes shake {
-            0%,
-            100% {
-              transform: translateX(0);
-            }
-            25% {
-              transform: translateX(-5px);
-            }
-            75% {
-              transform: translateX(5px);
-            }
-          }
-
-          .animate-blob {
-            animation: blob 7s infinite;
-          }
-
-          .animation-delay-2000 {
-            animation-delay: 2s;
-          }
-
-          .animation-delay-4000 {
-            animation-delay: 4s;
-          }
-
-          .animate-fade-in-left {
-            animation: fade-in-left 0.6s ease-out forwards;
-          }
-
-          .animate-fade-in-right {
-            animation: fade-in-right 0.6s ease-out forwards;
-          }
-
-          .animate-shake {
-            animation: shake 0.5s ease-in-out;
-          }
-        `}</style>
       </div>
     </>
   );

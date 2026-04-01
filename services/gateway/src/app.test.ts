@@ -125,7 +125,6 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     auditServiceToken: "audit-service-token",
     auditServiceUrl: "http://127.0.0.1:3335",
     port: 0,
-    legacyApiUrl: "http://127.0.0.1:3333",
     userServiceUrl: "http://127.0.0.1:3335",
     taskServiceUrl: "http://127.0.0.1:3337",
     projectServiceUrl: "http://127.0.0.1:3338",
@@ -269,6 +268,32 @@ test("returns the shared success envelope for gateway health", async () => {
         service: "gateway",
       },
     });
+  } finally {
+    await stopServer(server);
+  }
+});
+
+test("returns 404 for routes not mapped to any upstream", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/rota-so-legado`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    assert.equal(response.status, 404);
+    assert.equal(body.success, false);
+    assert.equal(body.error, "Rota não mapeada no gateway.");
   } finally {
     await stopServer(server);
   }

@@ -32,10 +32,23 @@ const gatewayEnvSchema = z
         const parsed = Number.parseInt(val, 10);
         return Number.isNaN(parsed) ? 3334 : parsed;
       }),
-    legacyApiUrl: z.string().url().default("http://localhost:3333"),
     userServiceUrl: z.string().url().default("http://localhost:3335"),
+<<<<<<< feature/project
     taskServiceUrl: z.string().url().default("http://localhost:3337"),
     projectServiceUrl: z.string().url().default("http://localhost:3338"),
+=======
+    /** Opcional: destino HTTP do upgrade WebSocket `/socket.io` (ex.: user-service ou outro host). */
+    websocketUpstreamUrl: z
+      .string()
+      .optional()
+      .transform((value) => {
+        if (value === undefined || value.trim() === "") {
+          return undefined;
+        }
+        return value.trim();
+      })
+      .pipe(z.union([z.string().url(), z.undefined()])),
+>>>>>>> develop
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o gateway."),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
@@ -65,10 +78,13 @@ export interface GatewayEnv {
   auditServiceToken: string;
   auditServiceUrl: string;
   port: number;
-  legacyApiUrl: string;
   userServiceUrl: string;
+<<<<<<< feature/project
   taskServiceUrl: string;
   projectServiceUrl: string;
+=======
+  websocketUpstreamUrl?: string;
+>>>>>>> develop
   jwtSecret: string;
   logLevel: LoggerLevel;
   logPretty: boolean;
@@ -82,10 +98,13 @@ export function getGatewayEnv(): GatewayEnv {
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     port: process.env.GATEWAY_PORT,
-    legacyApiUrl: process.env.LEGACY_API_URL,
     userServiceUrl: process.env.USER_SERVICE_URL,
+<<<<<<< feature/project
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
+=======
+    websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
+>>>>>>> develop
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,

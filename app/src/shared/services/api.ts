@@ -1,33 +1,25 @@
-import axios, { AxiosError } from "axios";
+import { createApiClient } from "@workspace/api";
 import { parseCookies } from "nookies";
+import { toast } from "react-toastify";
 
 import { AuthTokenError } from "./errors/AuthTokenError";
 
+const TOKEN_COOKIE = "@cw.token";
+
+const SERVER_ERROR_TOAST_MESSAGE =
+  "Não foi possível concluir a operação. Tente de novo daqui a pouco.";
+
 export function setupAPIClient(ctx = undefined, onUnauthorized?: () => void) {
-    let cookies = parseCookies(ctx);
-    const token = cookies['@cw.token'];
-
-    const api = axios.create({
-        baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3334',
-        headers:{
-            Authorization: token ? `Bearer ${token}` : undefined
-        }
-    })
-
-    api.interceptors.response.use(response => {
-        return response;
-    }, (error: AxiosError) => {
-        if (error.response?.status === 401) {
-            if (typeof window !== 'undefined') {
-                if (onUnauthorized) {
-                    onUnauthorized();
-                }
-            } else {
-                return Promise.reject(new AuthTokenError());
-            }
-        }
-        return Promise.reject(error);
-    });
-    
-    return api;
+  return createApiClient({
+    baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3334",
+    getAccessToken: () => {
+      const cookies = parseCookies(ctx);
+      return cookies[TOKEN_COOKIE];
+    },
+    onUnauthorized,
+    getUnauthorizedErrorForSsr: () => new AuthTokenError(),
+    onServerError: () => {
+      toast.error(SERVER_ERROR_TOAST_MESSAGE);
+    },
+  });
 }

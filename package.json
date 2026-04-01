@@ -8,7 +8,7 @@
     "build": "turbo run build",
     "lint": "biome lint .",
     "dev:app": "turbo run dev --filter=@workspace/app",
-    "dev:api": "turbo run dev --filter=@workspace/api",
+    "dev:api": "turbo run dev --filter=@workspace/legacy-api",
     "dev:gateway": "turbo run dev --filter=@workspace/gateway",
     "build:gateway": "turbo run build --filter=@workspace/gateway",
     "prisma:generate": "pnpm --filter @workspace/infra run prisma:generate",
