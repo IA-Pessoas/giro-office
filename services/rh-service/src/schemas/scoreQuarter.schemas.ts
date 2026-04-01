@@ -8,23 +8,6 @@ export const generateQuarterBodySchema = z
   })
   .strict();
 
-export const submitEvaluationBodySchema = z
-  .object({
-    evaluation_id: zNonEmptyText("evaluation_id"),
-    answers: z
-      .array(
-        z
-          .object({
-            question_id: zNonEmptyText("question_id"),
-            answer: z.number(),
-            obs: z.string().optional(),
-          })
-          .strict(),
-      )
-      .min(1, "answers deve conter ao menos um item."),
-  })
-  .strict();
-
 export const updateNitroBodySchema = z
   .object({
     score_id: zNonEmptyText("score_id"),

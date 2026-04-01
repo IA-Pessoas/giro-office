@@ -6,7 +6,6 @@ import { parseWithZod, ServiceError } from "@workspace/shared";
 import {
   generateQuarterBodySchema,
   scoreQuarterIdParamSchema,
-  submitEvaluationBodySchema,
   updateNitroBodySchema,
 } from "../src/schemas/scoreQuarter.schemas.js";
 
@@ -29,26 +28,6 @@ test("generateQuarterBodySchema rejeita chaves extras (strict)", () => {
       }),
     (err: unknown) => err instanceof ServiceError && err.statusCode === 400,
   );
-});
-
-test("submitEvaluationBodySchema exige answers não vazio", () => {
-  assert.throws(
-    () =>
-      parseWithZod(submitEvaluationBodySchema, {
-        evaluation_id: "ev-1",
-        answers: [],
-      }),
-    (err: unknown) => err instanceof ServiceError && err.statusCode === 400,
-  );
-});
-
-test("submitEvaluationBodySchema aceita respostas válidas", () => {
-  const parsed = parseWithZod(submitEvaluationBodySchema, {
-    evaluation_id: "ev-1",
-    answers: [{ question_id: "q1", answer: 8, obs: "ok" }],
-  });
-  assert.equal(parsed.answers.length, 1);
-  assert.equal(parsed.answers[0]?.answer, 8);
 });
 
 test("updateNitroBodySchema aceita os quatro tipos de métrica", () => {

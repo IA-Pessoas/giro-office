@@ -11,8 +11,11 @@ process.env.NODE_ENV ??= "test";
 const { Prisma, ScoreEvaluationStatus } = await import("../src/generated/prisma/client.js");
 const { ServiceError } = await import("@workspace/shared");
 const { ScoreQuarterService } = await import("../src/services/scoreQuarterService.js");
+const { ScoreEvaluationService } = await import("../src/services/scoreEvaluationService.js");
 
 const orgId = "org-1";
+/** UUID fixo para testes de submit (schema HTTP exige UUID). */
+const evalIdSubmit = "550e8400-e29b-41d4-a716-446655440001";
 const targetUserId = "user-target";
 const quarter = "2026-Q1";
 
@@ -216,23 +219,24 @@ test("generateQuarterlyScore mapeia P2002 para 409", async () => {
   );
 });
 
-test("submitEvaluation lança 404 quando a avaliação não existe", async () => {
+test("ScoreEvaluationService.submitEvaluation lança 404 quando a avaliação não existe", async () => {
   const db = {
     scoreEvaluation: {
-      findUnique: async () => null,
+      findFirst: async () => null,
     },
     scoreQuarter: {},
     user: {},
     $transaction: async () => undefined,
     scoreNitro: {},
   };
-  const svc = new ScoreQuarterService(asDb(db));
+  const svc = new ScoreEvaluationService(asDb(db));
 
   await assert.rejects(
     () =>
       svc.submitEvaluation({
         organization_id: orgId,
-        evaluation_id: "missing",
+        user_id: "user-1",
+        evaluation_id: evalIdSubmit,
         answers: [{ question_id: "q1", answer: 5 }],
       }),
     (err: unknown) =>
@@ -240,14 +244,16 @@ test("submitEvaluation lança 404 quando a avaliação não existe", async () =>
   );
 });
 
-test("submitEvaluation lança 400 quando já está concluída", async () => {
+test("ScoreEvaluationService.submitEvaluation lança 409 quando já está concluída", async () => {
   const db = {
     scoreEvaluation: {
-      findUnique: async () => ({
-        id: "ev-1",
+      findFirst: async () => ({
+        id: evalIdSubmit,
         score_id: "s-1",
         organization_id: orgId,
         status: ScoreEvaluationStatus.Completed,
+        evaluator_id: "user-1",
+        evaluator_role: "SELF",
         scoreQuarter: { organization_id: orgId },
       }),
     },
@@ -256,40 +262,46 @@ test("submitEvaluation lança 400 quando já está concluída", async () => {
     $transaction: async () => undefined,
     scoreNitro: {},
   };
-  const svc = new ScoreQuarterService(asDb(db));
+  const svc = new ScoreEvaluationService(asDb(db));
 
   await assert.rejects(
     () =>
       svc.submitEvaluation({
         organization_id: orgId,
-        evaluation_id: "ev-1",
+        user_id: "user-1",
+        evaluation_id: evalIdSubmit,
         answers: [{ question_id: "q1", answer: 5 }],
       }),
     (err: unknown) =>
-      err instanceof ServiceError && err.statusCode === 400 && err.message.includes("concluída"),
+      err instanceof ServiceError && err.statusCode === 409 && err.message.includes("concluída"),
   );
 });
 
-test("submitEvaluation atualiza e dispara recálculo", async () => {
+test("ScoreEvaluationService.submitEvaluation atualiza e dispara recálculo", async () => {
   const scoreId = "s-recalc";
-  let updateCalls = 0;
+  const submitUserId = "user-evaluator";
+  let evaluationUpdateCalls = 0;
+  let quarterUpdateCalls = 0;
   const db = {
     scoreEvaluation: {
-      findUnique: async () => ({
-        id: "ev-1",
+      findFirst: async () => ({
+        id: evalIdSubmit,
         score_id: scoreId,
         organization_id: orgId,
         status: ScoreEvaluationStatus.Pending,
+        evaluator_id: submitUserId,
+        evaluator_role: "SELF",
         scoreQuarter: { organization_id: orgId },
       }),
       update: async () => {
-        updateCalls += 1;
-        return { id: "ev-1" };
+        evaluationUpdateCalls += 1;
+        return { id: evalIdSubmit };
       },
     },
     scoreQuarter: {
-      findUnique: async () => ({
+      findFirst: async () => ({
         id: scoreId,
+        organization_id: orgId,
         evaluations: [],
         nitro: {
           projects_score: 0,
@@ -298,24 +310,29 @@ test("submitEvaluation atualiza e dispara recálculo", async () => {
           folders_score: 0,
         },
       }),
-      update: async () => ({ id: scoreId }),
+      update: async () => {
+        quarterUpdateCalls += 1;
+        return { id: scoreId };
+      },
     },
     user: {},
     $transaction: async () => undefined,
     scoreNitro: {},
   };
-  const svc = new ScoreQuarterService(asDb(db));
+  const svc = new ScoreEvaluationService(asDb(db));
 
   const result = await svc.submitEvaluation({
     organization_id: orgId,
-    evaluation_id: "ev-1",
+    user_id: submitUserId,
+    evaluation_id: evalIdSubmit,
     answers: [
       { question_id: "q1", answer: 8 },
       { question_id: "q2", answer: 6 },
     ],
   });
 
-  assert.equal(updateCalls, 1);
+  assert.equal(evaluationUpdateCalls, 1);
+  assert.equal(quarterUpdateCalls, 1);
   assert.equal(result.message, "Avaliação enviada com sucesso");
 });
 
@@ -379,7 +396,7 @@ test("listForUser retorna lista do prisma", async () => {
   assert.deepEqual(rows, expected);
 });
 
-test("listPendingEvaluations lança 404 se o usuário não existe", async () => {
+test("ScoreEvaluationService.listPendingEvaluations lança 404 se o utilizador não existe", async () => {
   const db = {
     user: { findUnique: async () => null },
     scoreQuarter: {},
@@ -387,14 +404,14 @@ test("listPendingEvaluations lança 404 se o usuário não existe", async () => 
     $transaction: async () => undefined,
     scoreNitro: {},
   };
-  const svc = new ScoreQuarterService(asDb(db));
+  const svc = new ScoreEvaluationService(asDb(db));
 
   await assert.rejects(
-    () => svc.listPendingEvaluations({ organization_id: orgId, user_id: "ghost" }),
+    () => svc.listPendingEvaluations(orgId, "ghost"),
     (err: unknown) =>
       err instanceof ServiceError &&
       err.statusCode === 404 &&
-      err.message.includes("Usuário não encontrado"),
+      err.message.includes("Utilizador não encontrado"),
   );
 });
 
