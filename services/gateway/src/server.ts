@@ -34,16 +34,27 @@ server.on("upgrade", (request, socket, head) => {
     return;
   }
 
-  proxyWebSocketUpgrade(request, socket, head, env.legacyApiUrl);
+  if (!env.websocketUpstreamUrl) {
+    logger.warn({
+      event: "ws.upgrade.skipped",
+      message: "WEBSOCKET_UPSTREAM_URL não definido; encerrando socket.",
+    });
+    socket.destroy();
+    return;
+  }
+
+  proxyWebSocketUpgrade(request, socket, head, env.websocketUpstreamUrl);
 });
 
 server.listen(env.port, () => {
   logger.info({
     event: "server.start",
     message: "Gateway server started",
-    upstream: getUpstreamContext(env.legacyApiUrl),
     data: {
       port: env.port,
+      websocketUpstream: env.websocketUpstreamUrl
+        ? getUpstreamContext(env.websocketUpstreamUrl)
+        : undefined,
     },
   });
 });
@@ -52,7 +63,6 @@ server.on("error", (err) => {
   logger.error({
     event: "server.error",
     message: "Gateway server error",
-    upstream: getUpstreamContext(env.legacyApiUrl),
     err,
   });
 });
