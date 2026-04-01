@@ -8,7 +8,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "node -e \"import('node:fs').then((fs) => { fs.rmSync('dist', { recursive: true, force: true }); fs.rmSync('tsconfig.tsbuildinfo', { force: true }); })\" && tsc",
     "start": "node dist/src/server.js",
-    "test": "tsx --test tests/**/*.test.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check ."
@@ -25,7 +26,10 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^25.3.0",
+    "@types/supertest": "^6.0.2",
+    "supertest": "^7.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.0"
   }
 }
