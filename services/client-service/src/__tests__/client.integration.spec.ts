@@ -12,6 +12,7 @@ import { createApp } from "../app.js";
 import { getClientServiceEnv } from "../config/env.js";
 import { PrismaClient } from "../generated/prisma/client.js";
 import { ClientService } from "../services/clientService.js";
+import { LocalHistoryFileStorage } from "../services/historyStorage.js";
 
 const runIntegration = process.env.CLIENT_SERVICE_INTEGRATION === "1";
 
@@ -78,10 +79,11 @@ describe.skipIf(!runIntegration)("client-service Postgres integration", () => {
       level: "silent",
     });
     const clientService = new ClientService(prisma);
-    const app = createApp({ clientService, env, logger });
+    const historyStorage = new LocalHistoryFileStorage(".data/test-history-uploads");
+    const app = createApp({ clientService, env, logger, prisma, historyStorage });
 
     const token = jwt.sign(
-      { user_id: "integration-user", organization_id: organizationId },
+      { user_id: "integration-user", organization_id: organizationId, permission: 2 },
       INTEGRATION_JWT_SECRET,
     );
 
@@ -141,10 +143,11 @@ describe.skipIf(!runIntegration)("client-service Postgres integration", () => {
       level: "silent",
     });
     const clientService = new ClientService(prisma);
-    const app = createApp({ clientService, env, logger });
+    const historyStorage = new LocalHistoryFileStorage(".data/test-history-uploads");
+    const app = createApp({ clientService, env, logger, prisma, historyStorage });
 
     const token = jwt.sign(
-      { user_id: "integration-user", organization_id: organizationId },
+      { user_id: "integration-user", organization_id: organizationId, permission: 2 },
       INTEGRATION_JWT_SECRET,
     );
 

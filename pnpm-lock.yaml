@@ -257,6 +257,12 @@ importers:
       express-async-errors:
         specifier: ^3.1.1
         version: 3.1.1(express@4.22.1)
+      multer:
+        specifier: ^2.1.1
+        version: 2.1.1
+      node-cron:
+        specifier: ^3.0.2
+        version: 3.0.3
       pg:
         specifier: ^8.13.0
         version: 8.19.0
@@ -279,9 +285,15 @@ importers:
       '@types/jsonwebtoken':
         specifier: ^9.0.5
         version: 9.0.10
+      '@types/multer':
+        specifier: ^2.1.0
+        version: 2.1.0
       '@types/node':
         specifier: ^25.3.0
         version: 25.3.3
+      '@types/node-cron':
+        specifier: ^3.0.11
+        version: 3.0.11
       '@types/supertest':
         specifier: ^6.0.2
         version: 6.0.3

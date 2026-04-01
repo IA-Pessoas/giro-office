@@ -6,6 +6,7 @@ import { getClientServiceEnv } from "../config/env.js";
 type JwtClaims = {
   user_id: string;
   organization_id?: string;
+  permission?: number;
 };
 
 function isValidClaims(claims: unknown): claims is JwtClaims {
@@ -67,6 +68,7 @@ export async function isAuthenticated(
 
     request.user_id = claims.user_id;
     request.organization_id = claims.organization_id ?? "";
+    request.permission = typeof claims.permission === "number" ? claims.permission : undefined;
 
     next();
   } catch {
