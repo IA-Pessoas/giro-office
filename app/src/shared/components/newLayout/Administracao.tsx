@@ -1,6 +1,17 @@
+import { useState } from "react";
 import { Shield, Users, KeyRound, FileSearch, Plus } from "lucide-react";
 
+import { CreateUserModal, type UserItem } from "@modules/users";
+
 export function Administracao() {
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const handleOpenCreateModal = () => setIsCreateModalOpen(true);
+  const handleCloseCreateModal = () => setIsCreateModalOpen(false);
+  const handleUserCreated = (_user: UserItem) => {
+    // Refetch users list in a follow-up commit
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -16,6 +27,7 @@ export function Administracao() {
         <button
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
           type="button"
+          onClick={handleOpenCreateModal}
         >
           <Plus className="w-4 h-4" />
           Novo Usuário
@@ -54,7 +66,13 @@ export function Administracao() {
           </div>
         </div>
       </div>
+
+      <CreateUserModal
+        isOpen={isCreateModalOpen}
+        onClose={handleCloseCreateModal}
+        onUserCreated={handleUserCreated}
+        departments={[]}
+      />
     </div>
   );
 }
-
