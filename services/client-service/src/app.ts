@@ -5,6 +5,7 @@ import express from "express";
 import "express-async-errors";
 
 import type { ClientServiceEnv } from "./config/env.js";
+import { requestContext } from "./middlewares/requestContext.js";
 import { createClientRouter } from "./routes/client.routes.js";
 import type { IClientService } from "./services/clientService.js";
 
@@ -19,6 +20,7 @@ export function createApp({ clientService, env, logger }: CreateAppOptions): exp
 
   app.use(cors());
   app.use(express.json());
+  app.use(requestContext);
 
   app.get("/health", (_request, response) => {
     response.status(200).json(

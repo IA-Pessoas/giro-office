@@ -204,6 +204,8 @@ describe("client-service", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(400);
+    expect(res.headers["x-request-id"]).toBeDefined();
+    expect(res.body.requestId).toBe(res.headers["x-request-id"]);
     expect(mock.listByOrganization).not.toHaveBeenCalled();
   });
 
