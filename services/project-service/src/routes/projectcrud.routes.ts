@@ -74,11 +74,11 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const raw = {
-          ref: firstQueryValue(req.body?.ref ?? req.query.ref),
-          id: firstQueryValue(req.body?.id ?? req.query.id),
+        const rawObj = {
+          ref: firstQueryValue(req.query.ref),
+          id: firstQueryValue(req.query.id),
         };
-        const query = parseWithZod(integracaoProjectListQuerySchema, raw);
+        const query = parseWithZod(integracaoProjectListQuerySchema, rawObj);
         const auth = requireAuthContext(req);
 
         const list = await service.list(query.ref, query.id as string, auth.organization_id);
@@ -124,10 +124,10 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const raw = {
+        const rawObj = {
           project_id: firstQueryValue(req.query.project_id),
         };
-        const query = parseWithZod(integracaoProjectDetailQuerySchema, raw);
+        const query = parseWithZod(integracaoProjectDetailQuerySchema, rawObj);
         const auth = requireAuthContext(req);
 
         const result = await service.detail(query.project_id, auth.organization_id);
@@ -145,16 +145,12 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const raw = {
-          project_id: firstQueryValue(
-            req.body?.project_id !== undefined ? req.body.project_id : req.query.project_id,
-          ),
         const rawObj = {
           project_id: firstQueryValue(
             req.body?.project_id !== undefined ? req.body.project_id : req.query.project_id,
           ),
         };
-        const params = parseWithZod(integracaoProjectDeleteParamsSchema, raw);
+        const params = parseWithZod(integracaoProjectDeleteParamsSchema, rawObj);
         const auth = requireAuthContext(req);
 
         const result = await service.delete({
