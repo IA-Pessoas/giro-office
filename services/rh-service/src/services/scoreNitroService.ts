@@ -1,5 +1,5 @@
 import { assertNonEmptyString, error as logError, ServiceError } from "@workspace/shared";
-import type { Prisma } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import { ScoreEvaluationStatus } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 import type { UpdateScoreNitroBody } from "../schemas/scoreNitro.schemas.js";
@@ -23,8 +23,10 @@ export type ScoreNitroSnapshot = Prisma.ScoreNitroGetPayload<{
 type NitroMetricType = UpdateScoreNitroBody["type"];
 
 export class ScoreNitroService {
+  constructor(private readonly db: PrismaClient = prismaClient) {}
+
   private async recalculateFinalScore(scoreId: string, organizationId: string): Promise<void> {
-    const score = await prismaClient.scoreQuarter.findUnique({
+    const score = await this.db.scoreQuarter.findUnique({
       where: { id: scoreId },
       include: { evaluations: true, nitro: true },
     });
@@ -56,7 +58,7 @@ export class ScoreNitroService {
     const finalTech = counts.tech > 0 ? sums.tech / counts.tech : 0;
     const finalLeadership = counts.leadership > 0 ? sums.leadership / counts.leadership : 0;
 
-    await prismaClient.scoreQuarter.update({
+    await this.db.scoreQuarter.update({
       where: { id: scoreId },
       data: {
         behavioral: finalBehavioral,
@@ -102,7 +104,7 @@ export class ScoreNitroService {
       finalScore = 0;
     }
 
-    await prismaClient.scoreQuarter.update({
+    await this.db.scoreQuarter.update({
       where: { id: scoreId },
       data: { final_score: finalScore },
     });
@@ -136,7 +138,7 @@ export class ScoreNitroService {
       const orgId = assertNonEmptyString(organizationId, "organization_id");
       const scoreId = assertNonEmptyString(input.score_id, "score_id");
 
-      const nitro = await prismaClient.scoreNitro.findUnique({
+      const nitro = await this.db.scoreNitro.findUnique({
         where: { score_id: scoreId },
         select: { ...SCORE_NITRO_SELECT },
       });
@@ -151,7 +153,7 @@ export class ScoreNitroService {
 
       const data = this.buildNitroUpdateData(input.type, input.value);
 
-      const updated = await prismaClient.scoreNitro.update({
+      const updated = await this.db.scoreNitro.update({
         where: { score_id: scoreId },
         data,
         select: SCORE_NITRO_SELECT,
