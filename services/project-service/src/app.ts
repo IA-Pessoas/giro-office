@@ -7,6 +7,7 @@ import express, { type Express } from "express";
 import "express-async-errors";
 
 import { getProjectServiceEnv } from "./config/env.js";
+import { requestContext } from "./middlewares/requestContext.js";
 import {
   createProjectProgressRoutes,
   type ProjectProgressRouteDeps,
@@ -38,6 +39,7 @@ export function createProjectApplication(options?: {
 
   app.use(cors());
   app.use(express.json());
+  app.use(requestContext);
 
   app.get("/health", (_req, res) => {
     res.status(200).json(createSuccessResponse({ status: "ok", service: "project-service" }));

@@ -4,6 +4,7 @@ declare global {
       user_id: string;
       organization_id: string;
       permission?: number;
+      requestId?: string;
     }
   }
 }
