@@ -19,43 +19,16 @@ export async function terminateClient(
     throw new ServiceError(404, "Cliente não encontrado.");
   }
 
-  const list = await prisma.task.findMany({
+  await prisma.task.updateMany({
     where: {
       status: { in: [...OPEN_TASK_STATUSES] },
       client_id: clientId,
       organization_id: organizationId,
     },
-    select: {
-      id: true,
-      name: true,
-      status: true,
-      department_id: true,
-      observations: true,
-      billing: true,
-      urgency: true,
-      responsible_id: true,
-      responsible2_id: true,
-      responsible3_id: true,
-      prevision_date: true,
+    data: {
+      status: "Paralisado",
     },
   });
-
-  for (const task of list) {
-    await prisma.task.update({
-      where: { id: task.id },
-      data: {
-        status: "Paralisado",
-        department_id: task.department_id,
-        observations: task.observations ?? "",
-        billing: task.billing,
-        urgency: task.urgency,
-        responsible_id: task.responsible_id,
-        responsible2_id: task.responsible2_id,
-        responsible3_id: task.responsible3_id,
-        prevision_date: task.prevision_date,
-      },
-    });
-  }
 
   const competenceStr = `${input.competence_output}-01T00:00:00Z`;
   const competenceDate = new Date(competenceStr);
