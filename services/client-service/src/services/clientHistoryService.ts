@@ -232,7 +232,11 @@ export async function deleteHistoryPending(
 export async function uploadHistoryFileAndPath(
   storage: HistoryFileStorage,
   clientId: string,
-  file: { buffer: Buffer; originalname: string },
+  file: { buffer: Buffer; mimetype: string; originalname: string },
 ): Promise<string> {
-  return storage.saveObjectPath(clientId, file.originalname, file.buffer);
+  return storage.saveObjectPath(clientId, {
+    buffer: file.buffer,
+    mimetype: file.mimetype,
+    originalName: file.originalname,
+  });
 }

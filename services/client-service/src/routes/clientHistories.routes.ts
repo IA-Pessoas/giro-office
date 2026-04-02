@@ -53,6 +53,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
         if (file) {
           filePath = await uploadHistoryFileAndPath(historyStorage, params.id, {
             buffer: file.buffer,
+            mimetype: file.mimetype,
             originalname: file.originalname,
           });
         }

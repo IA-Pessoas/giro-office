@@ -5,9 +5,10 @@ import { createLogger } from "@workspace/shared/logger";
 import { createApp } from "./app.js";
 import { getClientServiceEnv } from "./config/env.js";
 import { prismaClient } from "./integrations/prisma.js";
+import { supabase } from "./integrations/supabase.js";
 import { ClientService } from "./services/clientService.js";
 import { startCompetenceOutputCron } from "./services/competenceOutputCronService.js";
-import { LocalHistoryFileStorage } from "./services/historyStorage.js";
+import { SupabaseHistoryFileStorage } from "./services/historyStorage.js";
 
 const env = getClientServiceEnv();
 const logger = createLogger({
@@ -18,7 +19,7 @@ const logger = createLogger({
 });
 
 const clientService = new ClientService(prismaClient);
-const historyStorage = new LocalHistoryFileStorage(env.historyStorageDir);
+const historyStorage = new SupabaseHistoryFileStorage(supabase, env.historyStorageBucket);
 
 const app = createApp({
   clientService,
@@ -35,5 +36,5 @@ startCompetenceOutputCron({
 });
 
 app.listen(env.port, () => {
-  logger.info({ event: "server.start", data: { port: env.port } }, "client-service em execuÃ§Ã£o");
+  logger.info({ event: "server.start", data: { port: env.port } }, "client-service em execuÃƒÂ§ÃƒÂ£o");
 });

@@ -15,19 +15,22 @@ const clientServiceEnvSchema = z.object({
       return Number.isNaN(parsed) ? 3410 : parsed;
     }),
   nodeEnv: z.string().optional().default("development"),
-  databaseUrl: z.string().min(1, "DATABASE_URL não definido para o client-service."),
-  jwtSecret: z.string().min(1, "JWT_SECRET não definido para o client-service."),
+  databaseUrl: z.string().min(1, "DATABASE_URL nÃ£o definido para o client-service."),
+  jwtSecret: z.string().min(1, "JWT_SECRET nÃ£o definido para o client-service."),
   logLevel: loggerLevelSchema.optional().default("info"),
   logPretty: z
     .string()
     .optional()
     .default("false")
     .transform((value) => parseBoolean(value)),
-  /** Diretório base para uploads de histórico (alternativa ao Firebase). */
+  supabaseUrl: z.string().url("SUPABASE_URL nÃ£o definida."),
+  supabaseServiceRoleKey: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY nÃ£o definida."),
+  historyStorageBucket: z.string().optional().default("ClientHistory"),
+  /** DiretÃ³rio base para uploads de histÃ³rico (alternativa ao Firebase). */
   historyStorageDir: z.string().optional().default(".data/client-history-uploads"),
   /** Token para `POST /internal/competence-output-update` (header `x-internal-service-token`). */
   internalServiceToken: z.string().optional(),
-  /** Agenda a rotina diária de competência (07:00 America/Sao_Paulo) no processo. */
+  /** Agenda a rotina diÃ¡ria de competÃªncia (07:00 America/Sao_Paulo) no processo. */
   enableCompetenceOutputCron: z
     .string()
     .optional()
@@ -48,6 +51,9 @@ export function getClientServiceEnv(): ClientServiceEnv {
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    historyStorageBucket: process.env.CLIENT_HISTORY_STORAGE_BUCKET,
     historyStorageDir: process.env.CLIENT_HISTORY_STORAGE_DIR,
     internalServiceToken: process.env.CLIENT_SERVICE_INTERNAL_TOKEN,
     enableCompetenceOutputCron: process.env.CLIENT_ENABLE_COMPETENCE_OUTPUT_CRON,
