@@ -5,8 +5,8 @@ import type { UpdateCommercialBody } from "../schemas/clientVerticals.schema.js"
 const OPEN_TASK_STATUSES = ["A Realizar", "Em andamento", "Em Espera", "Pendente"] as const;
 
 /**
- * Fluxo comercial alinhado ao legado `updateComercial` (atualizaÃ§Ã£o de cliente + tarefas).
- * Envio de e-mail ao fechar prospecÃ§Ã£o nÃ£o estÃ¡ replicado aqui (dependia de `EmailService` no monÃ³lito).
+ * Fluxo comercial alinhado ao legado `updateComercial` (atualizaÃƒÂ§ÃƒÂ£o de cliente + tarefas).
+ * Envio de e-mail ao fechar prospecÃƒÂ§ÃƒÂ£o nÃƒÂ£o estÃƒÂ¡ replicado aqui (dependia de `EmailService` no monÃƒÂ³lito).
  */
 export async function updateCommercialClient(
   prisma: PrismaClient,
@@ -46,7 +46,7 @@ export async function updateCommercialClient(
   });
 
   if (!exists) {
-    throw new ServiceError(404, "Cliente nÃ£o encontrado.");
+    throw new ServiceError(404, "Cliente nÃƒÂ£o encontrado.");
   }
 
   const { prospecting_status } = input;
@@ -67,7 +67,7 @@ export async function updateCommercialClient(
     prospecting_status !== "Paralisado" &&
     prospecting_status !== "Fechado"
   ) {
-    status = "ProspecÃ§Ã£o";
+    status = "ProspecÃƒÂ§ÃƒÂ£o";
   }
 
   const updated = await prisma.client.update({
@@ -97,86 +97,43 @@ export async function updateCommercialClient(
   });
 
   if (prospecting_status === "Recusado pelo Cliente" || prospecting_status === "Paralisado") {
-    const list = await prisma.task.findMany({
+    await prisma.task.updateMany({
       where: {
         status: { in: [...OPEN_TASK_STATUSES] },
         client_id: clientId,
         organization_id: organizationId,
       },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        department_id: true,
-        observations: true,
-        billing: true,
-        urgency: true,
-        responsible_id: true,
-        responsible2_id: true,
-        responsible3_id: true,
-        prevision_date: true,
+      data: {
+        status: prospecting_status === "Recusado pelo Cliente" ? "NÃƒÂ£o Contratado" : "Paralisado",
       },
     });
-
-    await Promise.all(
-      list.map((task) =>
-        prisma.task.update({
-          where: { id: task.id },
-          data: {
-            status: prospecting_status === "Recusado pelo Cliente" ? "NÃ£o Contratado" : "Paralisado",
-            department_id: task.department_id,
-            observations: task.observations ?? "",
-            billing: task.billing,
-            urgency: task.urgency,
-            responsible_id: task.responsible_id,
-            responsible2_id: task.responsible2_id,
-            responsible3_id: task.responsible3_id,
-            prevision_date: task.prevision_date,
-          },
-        }),
-      ),
-    );
   } else if (prospecting_status === "Fechado") {
-    const list = await prisma.task.findMany({
+    const baseWhere = {
+      status: { in: ["A Realizar", "Em andamento"] as const },
+      charge_comercial: false,
+      client_id: clientId,
+      organization_id: organizationId,
+    };
+
+    await prisma.task.updateMany({
       where: {
-        status: { in: ["A Realizar", "Em andamento"] },
-        charge_comercial: false,
-        client_id: clientId,
-        organization_id: organizationId,
+        ...baseWhere,
+        billing: "Realizar",
       },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        department_id: true,
-        observations: true,
-        billing: true,
-        urgency: true,
-        responsible_id: true,
-        responsible2_id: true,
-        responsible3_id: true,
-        prevision_date: true,
+      data: {
+        status: "A Realizar",
       },
     });
 
-    await Promise.all(
-      list.map((task) =>
-        prisma.task.update({
-          where: { id: task.id },
-          data: {
-            status: task.billing === "Realizar" ? "A Realizar" : "Em andamento",
-            department_id: task.department_id,
-            observations: task.observations ?? "",
-            billing: task.billing,
-            urgency: task.urgency,
-            responsible_id: task.responsible_id,
-            responsible2_id: task.responsible2_id,
-            responsible3_id: task.responsible3_id,
-            prevision_date: task.prevision_date,
-          },
-        }),
-      ),
-    );
+    await prisma.task.updateMany({
+      where: {
+        ...baseWhere,
+        billing: { not: "Realizar" },
+      },
+      data: {
+        status: "Em andamento",
+      },
+    });
   }
 
   return updated as Record<string, unknown>;
