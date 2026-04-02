@@ -12,7 +12,7 @@ export async function updateCommercialClient(
   prisma: PrismaClient,
   clientId: string,
   organizationId: string,
-  _userId: string,
+  _userId: string | null,
   input: UpdateCommercialBody,
 ): Promise<Record<string, unknown>> {
   const exists = await prisma.client.findFirst({
