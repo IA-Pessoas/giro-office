@@ -6,7 +6,7 @@ export async function updateFinanceClient(
   prisma: PrismaClient,
   clientId: string,
   organizationId: string,
-  _userId: string,
+  _userId: string | null,
   input: UpdateFinanceBody,
 ): Promise<Record<string, unknown>> {
   const exists = await prisma.client.findFirst({
