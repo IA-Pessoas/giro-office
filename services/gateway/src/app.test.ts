@@ -272,6 +272,154 @@ it("returns the shared success envelope for gateway health", async () => {
   }
 });
 
+it("serves the aggregated OpenAPI JSON from the gateway", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/openapi.json`);
+    const body = (await response.json()) as {
+      openapi: string;
+      servers?: Array<{ url: string }>;
+      paths: Record<string, unknown>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.openapi).toBe("3.0.3");
+    expect(body.servers?.[0]?.url).toBe(baseUrl);
+    expect(body.paths["/users"]).toBeTruthy();
+    expect(body.paths["/integracao-tasks"]).toBeTruthy();
+    expect(body.paths["/integracao-projects"]).toBeTruthy();
+    expect(body.paths["/organizations"]).toBeTruthy();
+    expect(body.paths["/rh/point-config"]).toBeTruthy();
+    expect(body.paths["/audit/requests"]).toBeTruthy();
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("does not duplicate gateway path prefixes in the aggregated OpenAPI JSON", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/openapi.json`);
+    const body = (await response.json()) as {
+      paths: Record<string, unknown>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.paths["/organizations/organizations"]).toBe(undefined);
+    expect(body.paths["/rh/rh/point-config"]).toBe(undefined);
+    expect(body.paths["/audit/audit/requests"]).toBe(undefined);
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("serves Swagger UI from the gateway docs endpoint", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/docs`);
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(html).toContain("gateway");
+    expect(html).toContain('id="swagger-ui"');
+    expect(html).toContain("swagger-ui-init.js");
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("proxies task-service routes mapped in the gateway", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const taskService = createServer((request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: { service: "task-service", path: request.url },
+      }),
+    );
+  });
+  const taskServiceUrl = await startServer(taskService);
+
+  const app = createApp(createEnv({ taskServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/integracao-tasks`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      success: true,
+      data: { service: "task-service", path: "/integracao-tasks" },
+    });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(taskService);
+  }
+});
+
+it("proxies project-service routes mapped in the gateway", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const projectService = createServer((request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: { service: "project-service", path: request.url },
+      }),
+    );
+  });
+  const projectServiceUrl = await startServer(projectService);
+
+  const app = createApp(createEnv({ projectServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/integracao-projects`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      success: true,
+      data: { service: "project-service", path: "/integracao-projects" },
+    });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(projectService);
+  }
+});
+
 it("returns 404 for routes not mapped to any upstream", async () => {
   const token = createToken({
     user_id: "user-1",

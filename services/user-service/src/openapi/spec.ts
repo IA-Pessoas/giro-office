@@ -74,6 +74,10 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                     login: { type: "string" },
                     password: { type: "string" },
                   },
+                  example: {
+                    login: "admin@castelo.com",
+                    password: "strong-password",
+                  },
                 },
               },
             },
@@ -120,7 +124,16 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           requestBody: {
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true },
+                schema: {
+                  type: "object",
+                  additionalProperties: true,
+                  example: {
+                    name: "Joao Silva",
+                    login: "joao.silva@castelo.com",
+                    password: "temporary-password",
+                    permission: 2,
+                  },
+                },
               },
             },
           },
@@ -145,7 +158,15 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           requestBody: {
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true },
+                schema: {
+                  type: "object",
+                  additionalProperties: true,
+                  example: {
+                    name: "Joao Silva Atualizado",
+                    permission: 3,
+                    active: true,
+                  },
+                },
               },
             },
           },
@@ -216,6 +237,11 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                 schema: {
                   type: "object",
                   additionalProperties: { type: "integer", nullable: true },
+                  example: {
+                    administracao: 2,
+                    integracao: 3,
+                    rh: 1,
+                  },
                 },
               },
             },

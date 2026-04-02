@@ -76,7 +76,24 @@ export function buildAuditServiceOpenApiSpec(env: AuditServiceEnv): OpenApiDocum
           requestBody: {
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true },
+                schema: {
+                  type: "object",
+                  additionalProperties: true,
+                  example: {
+                    requestId: "request-uuid",
+                    organizationId: "organization-uuid",
+                    userId: "user-uuid",
+                    method: "GET",
+                    path: "/users",
+                    query: { page: "1" },
+                    statusCode: 200,
+                    outcome: "success",
+                    durationMs: 42,
+                    serviceSource: "gateway",
+                    createdAt: "2026-04-02T10:00:00.000Z",
+                    finishedAt: "2026-04-02T10:00:00.042Z",
+                  },
+                },
               },
             },
           },

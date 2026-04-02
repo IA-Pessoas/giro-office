@@ -4,6 +4,24 @@ import type { ProjectServiceEnv } from "../config/env.js";
 
 export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
+  const createProjectExample = {
+    name: "Implantacao ERP Cliente XPTO",
+    client_id: "client-uuid",
+    start_date: "2026-04-02T00:00:00.000Z",
+    objective: "Automatizar fluxo financeiro e fiscal.",
+    sponsor_id: "user-uuid",
+  };
+  const updateProjectExample = {
+    project_id: "project-uuid",
+    name: "Implantacao ERP Cliente XPTO - fase 2",
+    start_date: "2026-04-02T00:00:00.000Z",
+    end_date: "2026-05-10T00:00:00.000Z",
+    objective: "Concluir rollout e treinamento da equipe.",
+    sponsor_id: "user-uuid",
+  };
+  const progressExample = {
+    project_id: "project-uuid",
+  };
 
   return {
     openapi: "3.0.3",
@@ -60,7 +78,7 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
             required: true,
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true },
+                schema: { type: "object", additionalProperties: true, example: createProjectExample },
               },
             },
           },
@@ -102,7 +120,7 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
             required: true,
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true },
+                schema: { type: "object", additionalProperties: true, example: updateProjectExample },
               },
             },
           },
@@ -159,6 +177,7 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
                 schema: {
                   type: "object",
                   properties: { project_id: { type: "string", format: "uuid" } },
+                  example: { project_id: "project-uuid" },
                 },
               },
             },
@@ -184,7 +203,7 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
             required: true,
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true },
+                schema: { type: "object", additionalProperties: true, example: progressExample },
               },
             },
           },

@@ -12,11 +12,106 @@ const successJson = {
 
 const bearer: Array<Record<string, string[]>> = [{ bearerAuth: [] }];
 
-const requestBodyJson = {
+function createJsonRequestBody(example: Record<string, unknown>) {
+  return {
+    requestBody: {
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            additionalProperties: true,
+            example,
+          },
+        },
+      },
+    },
+  } as const;
+}
+
+const createTaskRequestBody = createJsonRequestBody({
+  model_id: "task-model-uuid",
+  project_id: "project-uuid",
+  client_id: "client-uuid",
+  prospecting_status: "EM_ANDAMENTO",
+  observations: "Priorizar validacao documental.",
+  urgency: "ALTA",
+});
+
+const updateTaskRequestBody = createJsonRequestBody({
+  task_id: "task-uuid",
+  observations: "Cliente enviou novos documentos.",
+  urgency: "MEDIA",
+  prospecting_status: "CONCLUIDO",
+});
+
+const createTaskModelRequestBody = createJsonRequestBody({
+  name: "Abertura de processo",
+  department_id: "department-uuid",
+  responsible_id: "user-uuid",
+  responsible2_id: "backup-user-uuid",
+  responsible3_id: null,
+  observations: "Fluxo padrao do time de integracao.",
+  billing: "mensal",
+  prevision: 3,
+  type: "regularize",
+});
+
+const updateTaskModelRequestBody = createJsonRequestBody({
+  task_id: "task-model-uuid",
+  name: "Abertura de processo - revisado",
+  department_id: "department-uuid",
+  responsible_id: "user-uuid",
+  responsible2_id: "backup-user-uuid",
+  responsible3_id: null,
+  observations: "Novo SLA combinado com o cliente.",
+  billing: "mensal",
+  prevision: 5,
+  type: "regularize",
+});
+
+const createTaskDependentRequestBody = createJsonRequestBody({
+  task_model_id: "task-model-uuid",
+  dependent_task_model_id: "dependent-task-model-uuid",
+});
+
+const createTaskIntegrationRequestBody = createJsonRequestBody({
+  task_model_id: "task-model-uuid",
+  integration_step_id: "integration-step-uuid",
+});
+
+const updateFinanceiroRequestBody = createJsonRequestBody({
+  task_id: "task-uuid",
+  billing_status: "FATURADO",
+  amount: 1499.9,
+  observations: "Cobranca aprovada pelo financeiro.",
+});
+
+const updateComercialRequestBody = createJsonRequestBody({
+  task_id: "task-uuid",
+  comercial_status: "NEGOCIADO",
+  observations: "Cliente aprovou proposta comercial.",
+});
+
+const concludeTaskRequestBody = createJsonRequestBody({
+  task_id: "task-uuid",
+  conclusion_notes: "Documentacao revisada e concluida.",
+});
+
+const approveConclusionRequestBody = createJsonRequestBody({
+  task_id: "task-uuid",
+  approved: true,
+  approver_notes: "Conclusao validada pelo responsavel.",
+});
+
+const taskIdRequestBody = {
   requestBody: {
     content: {
       "application/json": {
-        schema: { type: "object", additionalProperties: true },
+        schema: {
+          type: "object",
+          properties: { task_id: { type: "string" } },
+          example: { task_id: "task-uuid" },
+        },
       },
     },
   },
@@ -75,7 +170,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["IntegracaoTasks"],
           summary: "Criar tarefa",
           security: bearer,
-          ...requestBodyJson,
+          ...createTaskRequestBody,
           responses: { "201": { description: "Criada", ...successJson } },
         },
         get: {
@@ -96,7 +191,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["IntegracaoTasks"],
           summary: "Atualizar tarefa",
           security: bearer,
-          ...requestBodyJson,
+          ...updateTaskRequestBody,
           responses: { "200": { description: "Atualizada", ...successJson } },
         },
       },
@@ -106,16 +201,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           summary: "Detalhe da tarefa",
           security: bearer,
           parameters: [{ name: "task_id", in: "query", schema: { type: "string" } }],
-          requestBody: {
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: { task_id: { type: "string" } },
-                },
-              },
-            },
-          },
+          ...taskIdRequestBody,
           responses: { "200": { description: "Detalhe", ...successJson } },
         },
         delete: {
@@ -123,16 +209,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           summary: "Excluir tarefa",
           security: bearer,
           parameters: [{ name: "task_id", in: "query", schema: { type: "string" } }],
-          requestBody: {
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: { task_id: { type: "string" } },
-                },
-              },
-            },
-          },
+          ...taskIdRequestBody,
           responses: { "200": { description: "Excluída", ...successJson } },
         },
       },
@@ -141,7 +218,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["TaskModel"],
           summary: "Criar modelo de tarefa",
           security: bearer,
-          ...requestBodyJson,
+          ...createTaskModelRequestBody,
           responses: { "201": { description: "Criado", ...successJson } },
         },
         get: {
@@ -158,7 +235,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["TaskModel"],
           summary: "Atualizar modelo",
           security: bearer,
-          ...requestBodyJson,
+          ...updateTaskModelRequestBody,
           responses: { "200": { description: "Atualizado", ...successJson } },
         },
       },
@@ -183,7 +260,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["TaskDependent"],
           summary: "Adicionar dependente ao modelo",
           security: bearer,
-          ...requestBodyJson,
+          ...createTaskDependentRequestBody,
           responses: { "201": { description: "Criado", ...successJson } },
         },
         get: {
@@ -208,14 +285,14 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["TaskIntegration"],
           summary: "Criar vínculo Regularize",
           security: bearer,
-          ...requestBodyJson,
+          ...createTaskIntegrationRequestBody,
           responses: { "201": { description: "Criado", ...successJson } },
         },
         delete: {
           tags: ["TaskIntegration"],
           summary: "Remover vínculo",
           security: bearer,
-          ...requestBodyJson,
+          ...createTaskIntegrationRequestBody,
           responses: { "200": { description: "Removido", ...successJson } },
         },
         get: {
@@ -231,7 +308,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["Financeiro"],
           summary: "Atualizar cobrança financeira",
           security: bearer,
-          ...requestBodyJson,
+          ...updateFinanceiroRequestBody,
           responses: { "200": { description: "Atualizado", ...successJson } },
         },
       },
@@ -240,7 +317,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["Comercial"],
           summary: "Atualizar cobrança comercial",
           security: bearer,
-          ...requestBodyJson,
+          ...updateComercialRequestBody,
           responses: { "200": { description: "Atualizado", ...successJson } },
         },
       },
@@ -249,7 +326,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["Lifecycle"],
           summary: "Concluir tarefa (fluxo de status)",
           security: bearer,
-          ...requestBodyJson,
+          ...concludeTaskRequestBody,
           responses: { "200": { description: "Concluído", ...successJson } },
         },
       },
@@ -258,7 +335,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["Lifecycle"],
           summary: "Aprovar pedido de conclusão",
           security: bearer,
-          ...requestBodyJson,
+          ...approveConclusionRequestBody,
           responses: { "200": { description: "Aprovado", ...successJson } },
         },
       },

@@ -4,6 +4,14 @@ import type { OrganizationEnv } from "../config/env.js";
 
 export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
+  const createOrganizationExample = {
+    name: "Castelo Tecnologia",
+    cnpj: "12345678000190",
+    email: "contato@castelo.com",
+    phone: "11999999999",
+    status: "active",
+    subscription_plan: "pro",
+  };
 
   return {
     openapi: "3.0.3",
@@ -91,7 +99,11 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
             required: true,
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true },
+                schema: {
+                  type: "object",
+                  additionalProperties: true,
+                  example: createOrganizationExample,
+                },
               },
             },
           },
@@ -139,7 +151,11 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
             required: true,
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true },
+                schema: {
+                  type: "object",
+                  additionalProperties: true,
+                  example: { status: "inactive" },
+                },
               },
             },
           },
@@ -167,7 +183,11 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
             required: true,
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true },
+                schema: {
+                  type: "object",
+                  additionalProperties: true,
+                  example: { subscription_plan: "enterprise" },
+                },
               },
             },
           },
@@ -195,7 +215,11 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
             required: true,
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true },
+                schema: {
+                  type: "object",
+                  additionalProperties: true,
+                  example: { logo_url: "https://cdn.castelo.com/logos/organization.png" },
+                },
               },
             },
           },
