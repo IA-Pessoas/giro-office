@@ -7,8 +7,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import multer from "multer";
-import { z } from "zod";
-import type { PrismaClient } from "../generated/prisma/client.js";
+
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   ADMIN_PERMISSION,
@@ -48,42 +47,16 @@ import {
   updateIntegrationClient,
 } from "../services/clientIntegrationService.js";
 import { updateRegularizeClient } from "../services/clientRegularizeService.js";
-import type { IClientService } from "../services/clientService.js";
 import { terminateClient } from "../services/clientTerminationService.js";
-import type { HistoryFileStorage } from "../services/historyStorage.js";
+
+import {
+  type ClientRouterDeps,
+  pendingDeleteParamsSchema,
+  pendingListQuerySchema,
+  resolveOrganizationId,
+} from "./clientRouteHelpers.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
-
-const pendingListQuerySchema = z
-  .object({
-    user_id: z.string().uuid().optional(),
-  })
-  .strict();
-
-const pendingDeleteParamsSchema = z
-  .object({
-    pendingId: z.string().uuid(),
-  })
-  .strict();
-
-export type ClientRouterDeps = {
-  clientService: IClientService;
-  prisma: PrismaClient;
-  historyStorage: HistoryFileStorage;
-};
-
-function resolveOrganizationId(request: Request, queryOrganizationId: string | undefined): string {
-  const fromQuery = queryOrganizationId;
-  const fromToken = request.organization_id?.trim() ? request.organization_id : undefined;
-  const resolved = fromQuery ?? fromToken;
-  if (!resolved) {
-    throw new ServiceError(400, "organization_id é obrigatório (query ou token).");
-  }
-  if (fromToken && fromQuery && fromToken !== fromQuery) {
-    throw new ServiceError(403, "organization_id da query não corresponde ao token.");
-  }
-  return resolved;
-}
 
 export function createClientRouter(deps: ClientRouterDeps): Router {
   const { clientService, prisma, historyStorage } = deps;
