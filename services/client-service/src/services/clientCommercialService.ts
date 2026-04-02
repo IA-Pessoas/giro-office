@@ -5,8 +5,8 @@ import type { UpdateCommercialBody } from "../schemas/clientVerticals.schema.js"
 const OPEN_TASK_STATUSES = ["A Realizar", "Em andamento", "Em Espera", "Pendente"] as const;
 
 /**
- * Fluxo comercial alinhado ao legado `updateComercial` (atualização de cliente + tarefas).
- * Envio de e-mail ao fechar prospecção não está replicado aqui (dependia de `EmailService` no monólito).
+ * Fluxo comercial alinhado ao legado `updateComercial` (atualizaÃ§Ã£o de cliente + tarefas).
+ * Envio de e-mail ao fechar prospecÃ§Ã£o nÃ£o estÃ¡ replicado aqui (dependia de `EmailService` no monÃ³lito).
  */
 export async function updateCommercialClient(
   prisma: PrismaClient,
@@ -46,7 +46,7 @@ export async function updateCommercialClient(
   });
 
   if (!exists) {
-    throw new ServiceError(404, "Cliente não encontrado.");
+    throw new ServiceError(404, "Cliente nÃ£o encontrado.");
   }
 
   const { prospecting_status } = input;
@@ -67,7 +67,7 @@ export async function updateCommercialClient(
     prospecting_status !== "Paralisado" &&
     prospecting_status !== "Fechado"
   ) {
-    status = "Prospecção";
+    status = "ProspecÃ§Ã£o";
   }
 
   const updated = await prisma.client.update({
@@ -118,22 +118,24 @@ export async function updateCommercialClient(
       },
     });
 
-    for (const task of list) {
-      await prisma.task.update({
-        where: { id: task.id },
-        data: {
-          status: prospecting_status === "Recusado pelo Cliente" ? "Não Contratado" : "Paralisado",
-          department_id: task.department_id,
-          observations: task.observations ?? "",
-          billing: task.billing,
-          urgency: task.urgency,
-          responsible_id: task.responsible_id,
-          responsible2_id: task.responsible2_id,
-          responsible3_id: task.responsible3_id,
-          prevision_date: task.prevision_date,
-        },
-      });
-    }
+    await Promise.all(
+      list.map((task) =>
+        prisma.task.update({
+          where: { id: task.id },
+          data: {
+            status: prospecting_status === "Recusado pelo Cliente" ? "NÃ£o Contratado" : "Paralisado",
+            department_id: task.department_id,
+            observations: task.observations ?? "",
+            billing: task.billing,
+            urgency: task.urgency,
+            responsible_id: task.responsible_id,
+            responsible2_id: task.responsible2_id,
+            responsible3_id: task.responsible3_id,
+            prevision_date: task.prevision_date,
+          },
+        }),
+      ),
+    );
   } else if (prospecting_status === "Fechado") {
     const list = await prisma.task.findMany({
       where: {
@@ -157,22 +159,24 @@ export async function updateCommercialClient(
       },
     });
 
-    for (const task of list) {
-      await prisma.task.update({
-        where: { id: task.id },
-        data: {
-          status: task.billing === "Realizar" ? "A Realizar" : "Em andamento",
-          department_id: task.department_id,
-          observations: task.observations ?? "",
-          billing: task.billing,
-          urgency: task.urgency,
-          responsible_id: task.responsible_id,
-          responsible2_id: task.responsible2_id,
-          responsible3_id: task.responsible3_id,
-          prevision_date: task.prevision_date,
-        },
-      });
-    }
+    await Promise.all(
+      list.map((task) =>
+        prisma.task.update({
+          where: { id: task.id },
+          data: {
+            status: task.billing === "Realizar" ? "A Realizar" : "Em andamento",
+            department_id: task.department_id,
+            observations: task.observations ?? "",
+            billing: task.billing,
+            urgency: task.urgency,
+            responsible_id: task.responsible_id,
+            responsible2_id: task.responsible2_id,
+            responsible3_id: task.responsible3_id,
+            prevision_date: task.prevision_date,
+          },
+        }),
+      ),
+    );
   }
 
   return updated as Record<string, unknown>;
