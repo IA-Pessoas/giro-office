@@ -10,9 +10,9 @@ import {
   type Logger,
   type LogLevel,
 } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
-import swaggerUi from "../../../shared/node_modules/swagger-ui-express/index.js";
 
 import type { GatewayEnv } from "./config/env.js";
 import {
@@ -217,14 +217,13 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
       servers: [{ url: `${request.protocol}://${request.get("host")}` }],
     });
   });
-  app.use(
-    "/docs",
-    swaggerUi.serve,
-    swaggerUi.setup(undefined, {
-      customSiteTitle: "gateway — OpenAPI",
-      swaggerOptions: { url: "/openapi.json" },
-    }),
-  );
+  mountOpenApiDocs(app, {
+    spec: gatewayOpenApiSpec,
+    docsPath: "/docs",
+    jsonPath: "/__gateway-openapi-static.json",
+    specUrl: "/openapi.json",
+    siteTitle: "gateway - OpenAPI",
+  });
 
   if (!env.auditEnabled) {
     app.use("/audit", (_request, _response, next) => {

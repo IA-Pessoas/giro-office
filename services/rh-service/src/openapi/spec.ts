@@ -60,6 +60,14 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
               "application/json": {
                 schema: {
                   type: "object",
+                  properties: {
+                    target_user_id: { type: "string" },
+                    start_time: { type: "string" },
+                    lunch_break: { type: "string" },
+                    lunch_return: { type: "string" },
+                    end_time: { type: "string" },
+                    work_days: { type: "string" },
+                  },
                   additionalProperties: true,
                   example: {
                     target_user_id: "user-uuid",

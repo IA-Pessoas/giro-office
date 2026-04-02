@@ -6,11 +6,8 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
   const baseUrl = `http://localhost:${env.port}`;
   const createOrganizationExample = {
     name: "Castelo Tecnologia",
+    email_created_by: "admin@castelo.com",
     cnpj: "12345678000190",
-    email: "contato@castelo.com",
-    phone: "11999999999",
-    status: "active",
-    subscription_plan: "pro",
   };
 
   return {
@@ -101,6 +98,12 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
               "application/json": {
                 schema: {
                   type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    email_created_by: { type: "string" },
+                    cnpj: { type: "string" },
+                  },
+                  required: ["name", "email_created_by", "cnpj"],
                   additionalProperties: true,
                   example: createOrganizationExample,
                 },
@@ -153,6 +156,10 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
               "application/json": {
                 schema: {
                   type: "object",
+                  properties: {
+                    status: { type: "string" },
+                  },
+                  required: ["status"],
                   additionalProperties: true,
                   example: { status: "inactive" },
                 },
@@ -185,6 +192,10 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
               "application/json": {
                 schema: {
                   type: "object",
+                  properties: {
+                    subscription_plan: { type: "string" },
+                  },
+                  required: ["subscription_plan"],
                   additionalProperties: true,
                   example: { subscription_plan: "enterprise" },
                 },
@@ -217,6 +228,10 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
               "application/json": {
                 schema: {
                   type: "object",
+                  properties: {
+                    logo_url: { type: ["string", "null"] },
+                  },
+                  required: ["logo_url"],
                   additionalProperties: true,
                   example: { logo_url: "https://cdn.castelo.com/logos/organization.png" },
                 },

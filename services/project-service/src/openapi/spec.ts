@@ -78,7 +78,19 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
             required: true,
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true, example: createProjectExample },
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    client_id: { type: "string", format: "uuid" },
+                    start_date: { type: "string", format: "date-time" },
+                    objective: { type: "string" },
+                    sponsor_id: { type: "string", format: "uuid" },
+                  },
+                  required: ["name", "client_id", "start_date", "objective"],
+                  additionalProperties: true,
+                  example: createProjectExample,
+                },
               },
             },
           },
@@ -120,7 +132,20 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
             required: true,
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true, example: updateProjectExample },
+                schema: {
+                  type: "object",
+                  properties: {
+                    project_id: { type: "string", format: "uuid" },
+                    name: { type: "string" },
+                    start_date: { type: "string", format: "date-time" },
+                    end_date: { type: "string", format: "date-time" },
+                    objective: { type: "string" },
+                    sponsor_id: { type: "string", format: "uuid" },
+                  },
+                  required: ["project_id", "name", "start_date", "end_date", "objective"],
+                  additionalProperties: true,
+                  example: updateProjectExample,
+                },
               },
             },
           },
@@ -177,6 +202,7 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
                 schema: {
                   type: "object",
                   properties: { project_id: { type: "string", format: "uuid" } },
+                  required: ["project_id"],
                   example: { project_id: "project-uuid" },
                 },
               },
@@ -203,7 +229,15 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
             required: true,
             content: {
               "application/json": {
-                schema: { type: "object", additionalProperties: true, example: progressExample },
+                schema: {
+                  type: "object",
+                  properties: {
+                    project_id: { type: "string", format: "uuid" },
+                  },
+                  required: ["project_id"],
+                  additionalProperties: true,
+                  example: progressExample,
+                },
               },
             },
           },

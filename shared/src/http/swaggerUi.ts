@@ -12,6 +12,7 @@ export interface MountOpenApiDocsOptions {
   spec: OpenApiDocument;
   docsPath?: string;
   jsonPath?: string;
+  specUrl?: string;
   siteTitle?: string;
 }
 
@@ -19,11 +20,24 @@ export interface MountOpenApiDocsOptions {
  * Registra `GET <jsonPath>` com o JSON do spec e `GET <docsPath>` com Swagger UI.
  */
 export function mountOpenApiDocs(app: Express, options: MountOpenApiDocsOptions): void {
-  const { spec, docsPath = "/docs", jsonPath = "/openapi.json", siteTitle = "API Docs" } = options;
+  const {
+    spec,
+    docsPath = "/docs",
+    jsonPath = "/openapi.json",
+    specUrl = jsonPath,
+    siteTitle = "API Docs",
+  } = options;
 
   app.get(jsonPath, (_req: Request, res: Response) => {
     res.json(spec);
   });
 
-  app.use(docsPath, swaggerUi.serve, swaggerUi.setup(spec, { customSiteTitle: siteTitle }));
+  app.use(
+    docsPath,
+    swaggerUi.serve,
+    swaggerUi.setup(undefined, {
+      customSiteTitle: siteTitle,
+      swaggerOptions: { url: specUrl },
+    }),
+  );
 }

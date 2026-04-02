@@ -319,6 +319,32 @@ it("does not duplicate gateway path prefixes in the aggregated OpenAPI JSON", as
   }
 });
 
+it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/openapi.json`);
+    const body = (await response.json()) as {
+      components?: {
+        securitySchemes?: Record<string, unknown>;
+      };
+      paths: Record<string, { get?: { security?: Array<Record<string, string[]>> } }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.components?.securitySchemes?.bearerAuth).toBeTruthy();
+    expect(body.components?.securitySchemes?.forwardedAuthUserId).toBe(undefined);
+    expect(body.components?.securitySchemes?.internalServiceToken).toBe(undefined);
+    expect(body.paths["/me"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(body.paths["/users/{id}"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(body.paths["/audit/requests"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+  } finally {
+    await stopServer(server);
+  }
+});
+
 it("serves Swagger UI from the gateway docs endpoint", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
@@ -327,12 +353,16 @@ it("serves Swagger UI from the gateway docs endpoint", async () => {
   try {
     const response = await fetch(`${baseUrl}/docs`);
     const html = await response.text();
+    const initScriptResponse = await fetch(`${baseUrl}/docs/swagger-ui-init.js`);
+    const initScript = await initScriptResponse.text();
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(html).toContain("gateway");
     expect(html).toContain('id="swagger-ui"');
     expect(html).toContain("swagger-ui-init.js");
+    expect(initScriptResponse.status).toBe(200);
+    expect(initScript).toContain("/openapi.json");
   } finally {
     await stopServer(server);
   }

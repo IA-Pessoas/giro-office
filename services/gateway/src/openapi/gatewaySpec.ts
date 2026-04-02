@@ -153,6 +153,38 @@ function transformSecurity(
   });
 }
 
+function isGatewayVisibleSecurityScheme(name: string): boolean {
+  return name !== "forwardedAuthUserId" && name !== "internalServiceToken";
+}
+
+function getGatewayOperationSecurity(
+  path: string,
+  definition: ServiceSpecDefinition,
+  security: Array<Record<string, string[]>> | undefined,
+): Array<Record<string, string[]>> | undefined {
+  if (path === "/me") {
+    return [{ bearerAuth: [] }];
+  }
+
+  if (definition.key === "audit-service" && !definition.isInternalPath?.(path)) {
+    return [{ bearerAuth: [] }];
+  }
+
+  if (!security) {
+    return undefined;
+  }
+
+  const filtered = security
+    .map((entry) =>
+      Object.fromEntries(
+        Object.entries(entry).filter(([key]) => isGatewayVisibleSecurityScheme(key)),
+      ),
+    )
+    .filter((entry) => Object.keys(entry).length > 0);
+
+  return filtered.length > 0 ? filtered : undefined;
+}
+
 function mergeSecuritySchemes(
   aggregateSpec: AggregatedOpenApiDocument,
   spec: AggregatedOpenApiDocument,
@@ -167,6 +199,10 @@ function mergeSecuritySchemes(
   const targetSchemes = aggregateComponents.securitySchemes as Record<string, unknown>;
 
   for (const [name, definition] of Object.entries(sourceSchemes)) {
+    if (!isGatewayVisibleSecurityScheme(name)) {
+      continue;
+    }
+
     const existing = targetSchemes[name];
 
     if (!existing) {
@@ -347,8 +383,11 @@ function mergeServicePaths(
           operationRecord.security,
           securitySchemeNameMap,
         );
-        if (transformedSecurity) {
-          operationRecord.security = transformedSecurity;
+        const gatewaySecurity = getGatewayOperationSecurity(path, definition, transformedSecurity);
+        if (gatewaySecurity) {
+          operationRecord.security = gatewaySecurity;
+        } else {
+          delete operationRecord.security;
         }
 
         operationRecord["x-origin-service"] = definition.key;
@@ -372,7 +411,7 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
   const aggregateSpec: AggregatedOpenApiDocument = {
     openapi: "3.0.3",
     info: {
-      title: "workspace-gateway",
+      title: "office-gateway",
       version: "1.0.0",
       description:
         "Gateway OpenAPI document aggregating user-service, task-service, project-service, organization-service, rh-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",

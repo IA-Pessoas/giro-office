@@ -9,6 +9,7 @@ const successJson = {
     },
   },
 } as const;
+const bearer = [{ bearerAuth: [] }] as const;
 
 export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
@@ -110,6 +111,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         get: {
           tags: ["Users"],
           summary: "Listar usuários",
+          security: bearer,
           parameters: [
             { name: "skip", in: "query", schema: { type: "integer" } },
             { name: "take", in: "query", schema: { type: "integer" } },
@@ -121,17 +123,48 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         post: {
           tags: ["Users"],
           summary: "Criar usuário",
+          security: bearer,
           requestBody: {
             content: {
               "application/json": {
                 schema: {
                   type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    login: { type: "string" },
+                    password: { type: "string" },
+                    department_id: { type: "string" },
+                    permission: { type: "integer" },
+                    status: { type: "string" },
+                    photo_url: { type: "string" },
+                    invited_by: { type: "string" },
+                    organization_id: { type: "string" },
+                    type: { type: "string" },
+                    first_owner_flag: { type: "boolean" },
+                    modules: {
+                      type: "object",
+                      additionalProperties: { type: ["integer", "null"] },
+                    },
+                  },
+                  required: ["name", "login", "password", "department_id", "permission"],
                   additionalProperties: true,
                   example: {
                     name: "Joao Silva",
                     login: "joao.silva@castelo.com",
                     password: "temporary-password",
+                    department_id: "department-uuid",
                     permission: 2,
+                    status: "active",
+                    photo_url: "https://cdn.castelo.com/users/joao.png",
+                    invited_by: "admin-user-uuid",
+                    organization_id: "organization-uuid",
+                    type: "owner",
+                    first_owner_flag: true,
+                    modules: {
+                      administracao: 2,
+                      integracao: 3,
+                      rh: 1,
+                    },
                   },
                 },
               },
@@ -146,6 +179,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         get: {
           tags: ["Users"],
           summary: "Buscar usuário por ID",
+          security: bearer,
           parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
           responses: {
             "200": { description: "Usuário", ...successJson },
@@ -154,17 +188,46 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         patch: {
           tags: ["Users"],
           summary: "Atualizar usuário",
+          security: bearer,
           parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
           requestBody: {
             content: {
               "application/json": {
                 schema: {
                   type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    login: { type: "string" },
+                    password: { type: "string" },
+                    department_id: { type: "string" },
+                    permission: { type: "integer" },
+                    status: { type: "string" },
+                    photo_url: { type: "string" },
+                    organization_id: { type: "string" },
+                    type: { type: "string" },
+                    first_owner_flag: { type: "boolean" },
+                    modules: {
+                      type: "object",
+                      additionalProperties: { type: ["integer", "null"] },
+                    },
+                  },
                   additionalProperties: true,
                   example: {
                     name: "Joao Silva Atualizado",
+                    login: "joao.silva@castelo.com",
+                    password: "new-password",
+                    department_id: "department-uuid",
                     permission: 3,
-                    active: true,
+                    status: "inactive",
+                    photo_url: "https://cdn.castelo.com/users/joao-atualizado.png",
+                    organization_id: "organization-uuid",
+                    type: "user",
+                    first_owner_flag: false,
+                    modules: {
+                      administracao: 1,
+                      integracao: 2,
+                      rh: null,
+                    },
                   },
                 },
               },
@@ -177,6 +240,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         delete: {
           tags: ["Users"],
           summary: "Desativar usuário",
+          security: bearer,
           parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
           responses: {
             "200": { description: "Desativado", ...successJson },
@@ -187,6 +251,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         post: {
           tags: ["Users"],
           summary: "Upload de foto do usuário",
+          security: bearer,
           parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
           requestBody: {
             content: {
@@ -208,6 +273,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         delete: {
           tags: ["Users"],
           summary: "Remover foto do usuário",
+          security: bearer,
           parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
           responses: {
             "200": { description: "Foto removida", ...successJson },
@@ -218,6 +284,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         get: {
           tags: ["Permission"],
           summary: "Buscar permissões do usuário",
+          security: bearer,
           parameters: [
             { name: "userId", in: "path", required: true, schema: { type: "string" } },
             { name: "modulo", in: "query", schema: { type: "string" } },
@@ -229,6 +296,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         put: {
           tags: ["Permission"],
           summary: "Atualizar módulos de permissão",
+          security: bearer,
           parameters: [{ name: "userId", in: "path", required: true, schema: { type: "string" } }],
           requestBody: {
             required: true,
@@ -236,6 +304,11 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
               "application/json": {
                 schema: {
                   type: "object",
+                  properties: {
+                    administracao: { type: ["integer", "null"] },
+                    integracao: { type: ["integer", "null"] },
+                    rh: { type: ["integer", "null"] },
+                  },
                   additionalProperties: { type: "integer", nullable: true },
                   example: {
                     administracao: 2,
