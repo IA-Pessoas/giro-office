@@ -8,8 +8,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "node -e \"import('node:fs').then((fs) => { fs.rmSync('dist', { recursive: true, force: true }); fs.rmSync('tsconfig.tsbuildinfo', { force: true }); })\" && tsc",
     "start": "node dist/src/server.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "pnpm exec vitest run",
+    "test:watch": "pnpm exec vitest",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check ."
