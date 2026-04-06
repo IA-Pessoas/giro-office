@@ -28,6 +28,7 @@ export async function terminateClient(
     where: { id: clientId, organization_id: organizationId },
     select: { id: true, status: true },
   });
+
   if (!exists) {
     throw new ServiceError(404, "Cliente nao encontrado.");
   }
