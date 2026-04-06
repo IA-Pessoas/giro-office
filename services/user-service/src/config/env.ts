@@ -29,11 +29,20 @@ const envSchema = z
       .optional()
       .default("false")
       .transform((value) => parseBoolean(value)),
+    enableApiDocsEnv: z.string().optional(),
   })
-  .transform((env) => ({
-    ...env,
-    logPretty: env.nodeEnv !== "production" && env.logPretty,
-  }));
+  .transform((env) => {
+    const { enableApiDocsEnv, ...rest } = env;
+    const enableApiDocs =
+      enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
+        ? parseBoolean(enableApiDocsEnv)
+        : rest.nodeEnv !== "production";
+    return {
+      ...rest,
+      logPretty: rest.nodeEnv !== "production" && rest.logPretty,
+      enableApiDocs,
+    };
+  });
 
 export type UserServiceEnv = z.infer<typeof envSchema>;
 
@@ -48,5 +57,6 @@ export function getUserServiceEnv(): UserServiceEnv {
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
+    enableApiDocsEnv: process.env.ENABLE_API_DOCS,
   });
 }

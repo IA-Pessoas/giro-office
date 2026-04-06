@@ -1,8 +1,9 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import type { AppProps } from "next/app";
-import { useRouter } from 'next/router';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { useRouter } from "next/router";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import '../styles/global.css'
 
@@ -18,7 +19,11 @@ function AppLayout({ children }) {
   const router = useRouter();
 
   // Se está na página de login ou index, não mostra layout
-  if (router.pathname === '/login' || router.pathname === '/') {
+  if (
+    router.pathname === "/login" ||
+    router.pathname === "/" ||
+    router.pathname === "/solicitar-acesso"
+  ) {
     return <>{children}</>;
   }
 
@@ -71,30 +76,40 @@ function ThemeBridge() {
 }
 
 function MyApp({ Component, pageProps }: AppProps) {
-  const router = useRouter(); // 2. Use o hook do router
+  const router = useRouter();
 
-  // 3. Verifique se o parâmetro `view=iframe` está na URL
-  const isIframeView = router.query.view === 'iframe';
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 60 * 1000,
+          },
+        },
+      }),
+  );
+
+  const isIframeView = router.query.view === "iframe";
 
   return (
     <>
       <ThemeBridge />
-      <AuthProvider>
-        <SocketProvider>
-          <ChatProvider>
-            {/* 4. Lógica condicional: Se for a visão de iframe, renderiza só o componente.
-                Senão, renderiza o Layout completo com o componente dentro. */}
-            {isIframeView ? (
-              <Component {...pageProps} />
-            ) : (
-              <AppLayout>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <SocketProvider>
+            <ChatProvider>
+              {isIframeView ? (
                 <Component {...pageProps} />
-              </AppLayout>
-            )}
-            <ToastContainer position="bottom-right" autoClose={2000} />
-          </ChatProvider>
-        </SocketProvider>
-      </AuthProvider>
+              ) : (
+                <AppLayout>
+                  <Component {...pageProps} />
+                </AppLayout>
+              )}
+              <ToastContainer position="bottom-right" autoClose={2000} />
+            </ChatProvider>
+          </SocketProvider>
+        </AuthProvider>
+      </QueryClientProvider>
     </>
   );
 }

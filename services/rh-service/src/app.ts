@@ -1,10 +1,13 @@
 import "dotenv/config";
 import type { Logger } from "@workspace/shared";
 import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import cors from "cors";
 import express, { type Request, type Response } from "express";
 import "express-async-errors";
 
+import type { RhEnv } from "./config/env.js";
+import { buildRhServiceOpenApiSpec } from "./openapi/spec.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import categoryRoutes from "./routes/category.routes.js";
 import holidayRoutes from "./routes/holiday.routes.js";
@@ -20,7 +23,20 @@ import scoreQuestionRoutes from "./routes/scoreQuestion.routes.js";
 import scoreQuarterRoutes from "./routes/scoreQuarter.routes.js";
 import scoreEvaluationRoutes from "./routes/scoreEvaluation.routes.js";
 
-export function createApp(logger: Logger): express.Express {
+function rhErrorLogContext(request: Request): Record<string, unknown> | undefined {
+  const userId = request.user_id;
+  const organizationId = request.organization_id;
+  const out: Record<string, unknown> = {};
+  if (userId) {
+    out.userId = userId;
+  }
+  if (organizationId) {
+    out.organizationId = organizationId;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+export function createApp(logger: Logger, env: RhEnv): express.Express {
   const app = express();
 
   app.set("trust proxy", true);
@@ -45,12 +61,19 @@ export function createApp(logger: Logger): express.Express {
   app.use("/rh/messages", messageRoutes);
   app.use("/rh/timesheets", timeSheetRoutes);
   app.use("/rh/score/nitro", scoreNitroRoutes);
+  if (env.enableApiDocs) {
+    mountOpenApiDocs(app, {
+      spec: buildRhServiceOpenApiSpec(env),
+      siteTitle: "rh-service — OpenAPI",
+    });
+  }
 
   app.use(
     createExpressErrorHandler({
       logger,
       event: "rh-service.error",
       fallbackMessage: "Erro interno no rh-service.",
+      getContext: rhErrorLogContext,
     }),
   );
 

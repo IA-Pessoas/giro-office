@@ -1,8 +1,7 @@
-import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer, type IncomingMessage, request as nodeRequest, type Server } from "node:http";
 import { Writable } from "node:stream";
-import test from "node:test";
+import { expect, it } from "vitest";
 
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -125,8 +124,9 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     auditServiceToken: "audit-service-token",
     auditServiceUrl: "http://127.0.0.1:3335",
     port: 0,
-    legacyApiUrl: "http://127.0.0.1:3333",
     userServiceUrl: "http://127.0.0.1:3335",
+    taskServiceUrl: "http://127.0.0.1:3337",
+    projectServiceUrl: "http://127.0.0.1:3338",
     jwtSecret: "test-secret",
     logLevel: "silent",
     logPretty: false,
@@ -142,7 +142,7 @@ function createToken(
   return jwt.sign(claims, secret);
 }
 
-test("returns shared unauthorized response when token is missing", async () => {
+it("returns shared unauthorized response when token is missing", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
   const baseUrl = await startServer(server);
@@ -151,17 +151,17 @@ test("returns shared unauthorized response when token is missing", async () => {
     const response = await fetch(`${baseUrl}/users`);
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 401);
-    assert.equal(body.success, false);
-    assert.equal(body.error, "Cabeçalho Authorization não informado.");
-    assert.equal(body.code, "UNAUTHORIZED");
-    assert.ok(body.requestId);
+    expect(response.status).toBe(401);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Cabeçalho Authorization não informado.");
+    expect(body.code).toBe("UNAUTHORIZED");
+    expect(body.requestId).toBeTruthy();
   } finally {
     await stopServer(server);
   }
 });
 
-test("returns shared forbidden response when permission is insufficient", async () => {
+it("returns shared forbidden response when permission is insufficient", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
   const baseUrl = await startServer(server);
@@ -180,17 +180,17 @@ test("returns shared forbidden response when permission is insufficient", async 
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 403);
-    assert.equal(body.success, false);
-    assert.equal(body.error, "Acesso negado para esta rota.");
-    assert.equal(body.code, "FORBIDDEN");
-    assert.ok(body.requestId);
+    expect(response.status).toBe(403);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Acesso negado para esta rota.");
+    expect(body.code).toBe("FORBIDDEN");
+    expect(body.requestId).toBeTruthy();
   } finally {
     await stopServer(server);
   }
 });
 
-test("returns shared upstream error when the upstream service is unreachable", async () => {
+it("returns shared upstream error when the upstream service is unreachable", async () => {
   const app = createApp(
     createEnv({
       userServiceUrl: "http://127.0.0.1:1",
@@ -210,17 +210,17 @@ test("returns shared upstream error when the upstream service is unreachable", a
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 502);
-    assert.equal(body.success, false);
-    assert.equal(body.error, "Erro ao comunicar com o serviço upstream.");
-    assert.equal(body.code, "BAD_GATEWAY");
-    assert.ok(body.requestId);
+    expect(response.status).toBe(502);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Erro ao comunicar com o serviço upstream.");
+    expect(body.code).toBe("BAD_GATEWAY");
+    expect(body.requestId).toBeTruthy();
   } finally {
     await stopServer(server);
   }
 });
 
-test("passes upstream error responses through unchanged", async () => {
+it("passes upstream error responses through unchanged", async () => {
   const upstream = createServer((_request, response) => {
     response.statusCode = 418;
     response.setHeader("content-type", "application/json");
@@ -242,15 +242,15 @@ test("passes upstream error responses through unchanged", async () => {
     });
     const body = (await response.json()) as Record<string, string>;
 
-    assert.equal(response.status, 418);
-    assert.deepEqual(body, { error: "Teapot upstream" });
+    expect(response.status).toBe(418);
+    expect(body).toEqual({ error: "Teapot upstream" });
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
   }
 });
 
-test("returns the shared success envelope for gateway health", async () => {
+it("returns the shared success envelope for gateway health", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
   const baseUrl = await startServer(server);
@@ -259,8 +259,8 @@ test("returns the shared success envelope for gateway health", async () => {
     const response = await fetch(`${baseUrl}/health`);
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 200);
-    assert.deepEqual(body, {
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
       success: true,
       data: {
         status: "ok",
@@ -272,7 +272,211 @@ test("returns the shared success envelope for gateway health", async () => {
   }
 });
 
-test("returns 404 for audit routes when the feature flag is disabled", async () => {
+it("serves the aggregated OpenAPI JSON from the gateway", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/openapi.json`);
+    const body = (await response.json()) as {
+      openapi: string;
+      servers?: Array<{ url: string }>;
+      paths: Record<string, unknown>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.openapi).toBe("3.0.3");
+    expect(body.servers?.[0]?.url).toBe(baseUrl);
+    expect(body.paths["/users"]).toBeTruthy();
+    expect(body.paths["/integracao-tasks"]).toBeTruthy();
+    expect(body.paths["/integracao-projects"]).toBeTruthy();
+    expect(body.paths["/organizations"]).toBeTruthy();
+    expect(body.paths["/rh/point-config"]).toBeTruthy();
+    expect(body.paths["/audit/requests"]).toBeTruthy();
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("does not duplicate gateway path prefixes in the aggregated OpenAPI JSON", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/openapi.json`);
+    const body = (await response.json()) as {
+      paths: Record<string, unknown>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.paths["/organizations/organizations"]).toBe(undefined);
+    expect(body.paths["/rh/rh/point-config"]).toBe(undefined);
+    expect(body.paths["/audit/audit/requests"]).toBe(undefined);
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/openapi.json`);
+    const body = (await response.json()) as {
+      components?: {
+        securitySchemes?: Record<string, unknown>;
+      };
+      paths: Record<string, { get?: { security?: Array<Record<string, string[]>> } }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.components?.securitySchemes?.bearerAuth).toBeTruthy();
+    expect(body.components?.securitySchemes?.forwardedAuthUserId).toBe(undefined);
+    expect(body.components?.securitySchemes?.internalServiceToken).toBe(undefined);
+    expect(body.paths["/me"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(body.paths["/users/{id}"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(body.paths["/audit/requests"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("serves Swagger UI from the gateway docs endpoint", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/docs`);
+    const html = await response.text();
+    const initScriptResponse = await fetch(`${baseUrl}/docs/swagger-ui-init.js`);
+    const initScript = await initScriptResponse.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(html).toContain("gateway");
+    expect(html).toContain('id="swagger-ui"');
+    expect(html).toContain("swagger-ui-init.js");
+    expect(initScriptResponse.status).toBe(200);
+    expect(initScript).toContain("/openapi.json");
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("proxies task-service routes mapped in the gateway", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const taskService = createServer((request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: { service: "task-service", path: request.url },
+      }),
+    );
+  });
+  const taskServiceUrl = await startServer(taskService);
+
+  const app = createApp(createEnv({ taskServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/integracao-tasks`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      success: true,
+      data: { service: "task-service", path: "/integracao-tasks" },
+    });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(taskService);
+  }
+});
+
+it("proxies project-service routes mapped in the gateway", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const projectService = createServer((request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: { service: "project-service", path: request.url },
+      }),
+    );
+  });
+  const projectServiceUrl = await startServer(projectService);
+
+  const app = createApp(createEnv({ projectServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/integracao-projects`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      success: true,
+      data: { service: "project-service", path: "/integracao-projects" },
+    });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(projectService);
+  }
+});
+
+it("returns 404 for routes not mapped to any upstream", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/rota-so-legado`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(404);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Rota não mapeada no gateway.");
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("returns 404 for audit routes when the feature flag is disabled", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
   const baseUrl = await startServer(server);
@@ -281,14 +485,14 @@ test("returns 404 for audit routes when the feature flag is disabled", async () 
     const response = await fetch(`${baseUrl}/audit/requests`);
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 404);
-    assert.equal(body.error, "Recurso não encontrado.");
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Recurso não encontrado.");
   } finally {
     await stopServer(server);
   }
 });
 
-test("proxies audit routes to the audit service when the feature flag is enabled", async () => {
+it("proxies audit routes to the audit service when the feature flag is enabled", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -328,18 +532,18 @@ test("proxies audit routes to the audit service when the feature flag is enabled
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 200);
-    assert.equal(body.success, true);
-    assert.equal(seenHeaders.internalToken, "audit-service-token");
-    assert.equal(seenHeaders.userId, "user-1");
-    assert.equal(seenHeaders.organizationId, "org-1");
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenHeaders.internalToken).toBe("audit-service-token");
+    expect(seenHeaders.userId).toBe("user-1");
+    expect(seenHeaders.organizationId).toBe("org-1");
   } finally {
     await stopServer(gateway);
     await stopServer(auditService);
   }
 });
 
-test("records successful proxied requests when audit is enabled", async () => {
+it("records successful proxied requests when audit is enabled", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -371,16 +575,16 @@ test("records successful proxied requests when audit is enabled", async () => {
       },
     });
 
-    assert.equal(response.status, 200);
+    expect(response.status).toBe(200);
 
     await waitForRecords(auditService.records, 1);
 
-    assert.equal(auditService.records.length, 1);
-    assert.equal(auditService.records[0]?.requestId.length > 0, true);
-    assert.equal(auditService.records[0]?.organizationId, "org-1");
-    assert.equal(auditService.records[0]?.userId, "user-1");
-    assert.equal(auditService.records[0]?.statusCode, 200);
-    assert.equal(auditService.records[0]?.outcome, "success");
+    expect(auditService.records.length).toBe(1);
+    expect(auditService.records[0]?.requestId.length > 0).toBe(true);
+    expect(auditService.records[0]?.organizationId).toBe("org-1");
+    expect(auditService.records[0]?.userId).toBe("user-1");
+    expect(auditService.records[0]?.statusCode).toBe(200);
+    expect(auditService.records[0]?.outcome).toBe("success");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -388,7 +592,7 @@ test("records successful proxied requests when audit is enabled", async () => {
   }
 });
 
-test("records unauthorized requests when audit is enabled", async () => {
+it("records unauthorized requests when audit is enabled", async () => {
   const auditService = await startAuditIngestServer();
   const app = createApp(
     createEnv({
@@ -403,22 +607,22 @@ test("records unauthorized requests when audit is enabled", async () => {
   try {
     const response = await fetch(`${gatewayUrl}/users`);
 
-    assert.equal(response.status, 401);
+    expect(response.status).toBe(401);
 
     await waitForRecords(auditService.records, 1);
 
-    assert.equal(auditService.records.length, 1);
-    assert.equal(auditService.records[0]?.statusCode, 401);
-    assert.equal(auditService.records[0]?.outcome, "error");
-    assert.equal(auditService.records[0]?.errorCode, "UNAUTHORIZED");
-    assert.equal(auditService.records[0]?.userId, undefined);
+    expect(auditService.records.length).toBe(1);
+    expect(auditService.records[0]?.statusCode).toBe(401);
+    expect(auditService.records[0]?.outcome).toBe("error");
+    expect(auditService.records[0]?.errorCode).toBe("UNAUTHORIZED");
+    expect(auditService.records[0]?.userId).toBe(undefined);
   } finally {
     await stopServer(gateway);
     await stopServer(auditService.server);
   }
 });
 
-test("records bad gateway failures when audit is enabled", async () => {
+it("records bad gateway failures when audit is enabled", async () => {
   const auditService = await startAuditIngestServer();
   const app = createApp(
     createEnv({
@@ -440,21 +644,21 @@ test("records bad gateway failures when audit is enabled", async () => {
       body: JSON.stringify({ login: "user" }),
     });
 
-    assert.equal(response.status, 502);
+    expect(response.status).toBe(502);
 
     await waitForRecords(auditService.records, 1);
 
-    assert.equal(auditService.records.length, 1);
-    assert.equal(auditService.records[0]?.statusCode, 502);
-    assert.equal(auditService.records[0]?.outcome, "error");
-    assert.equal(auditService.records[0]?.errorCode, "BAD_GATEWAY");
+    expect(auditService.records.length).toBe(1);
+    expect(auditService.records[0]?.statusCode).toBe(502);
+    expect(auditService.records[0]?.outcome).toBe("error");
+    expect(auditService.records[0]?.errorCode).toBe("BAD_GATEWAY");
   } finally {
     await stopServer(gateway);
     await stopServer(auditService.server);
   }
 });
 
-test("records aborted requests when audit is enabled", async () => {
+it("records aborted requests when audit is enabled", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -517,9 +721,9 @@ test("records aborted requests when audit is enabled", async () => {
 
     await waitForRecords(auditService.records, 1);
 
-    assert.equal(auditService.records.length, 1);
-    assert.equal(auditService.records[0]?.statusCode, 499);
-    assert.equal(auditService.records[0]?.outcome, "aborted");
+    expect(auditService.records.length).toBe(1);
+    expect(auditService.records[0]?.statusCode).toBe(499);
+    expect(auditService.records[0]?.outcome).toBe("aborted");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -527,7 +731,7 @@ test("records aborted requests when audit is enabled", async () => {
   }
 });
 
-test("does not change responses when audit ingestion fails", async () => {
+it("does not change responses when audit ingestion fails", async () => {
   const app = createApp(
     createEnv({
       auditEnabled: true,
@@ -542,8 +746,8 @@ test("does not change responses when audit ingestion fails", async () => {
     const response = await fetch(`${gatewayUrl}/health`);
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 200);
-    assert.equal(body.success, true);
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
   } finally {
     await stopServer(gateway);
   }
