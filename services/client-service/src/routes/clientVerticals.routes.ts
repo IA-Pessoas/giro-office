@@ -78,7 +78,6 @@ export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
           prisma,
           params.id,
           organizationId,
-          request.user_id,
           body,
         );
         response.json(createSuccessResponse(updated));
