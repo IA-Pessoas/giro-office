@@ -17,9 +17,9 @@ const DEPARTMENT_FIELD_NAMES = new Set([
 export function buildLegacyListStatusWhere(
   ref: ListRefFilter,
   status: string | undefined,
-): Prisma.ClientWhereInput {
+): Prisma.ClientWhereInput | undefined {
   if (!status || status === "Todos") {
-    return {};
+    return undefined;
   }
 
   if (ref === "integracao") {
@@ -66,10 +66,10 @@ export function buildLegacyListStatusWhere(
         } as Prisma.ClientWhereInput;
       }
     }
-    return {};
+    return undefined;
   }
 
-  return {};
+  return undefined;
 }
 
 export function mergeClientListSearchWhere(

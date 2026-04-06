@@ -141,10 +141,10 @@ function toPublic(row: ClientRowWithOrganization): ClientPublic {
   };
 }
 
-function buildListStatusWhere(filters: ListClientsFilters): Prisma.ClientWhereInput {
+function buildListStatusWhere(filters: ListClientsFilters): Prisma.ClientWhereInput | undefined {
   const st = filters.status;
   if (!st || st === "Todos") {
-    return {};
+    return undefined;
   }
   if (!filters.ref) {
     return { status: mapSimpleListStatusToDb(st as ClientListStatus) };
@@ -170,7 +170,7 @@ export class ClientService implements IClientService {
   ): Promise<ClientListPage> {
     const statusWhere = buildListStatusWhere(filters);
     const where = mergeClientListSearchWhere(
-      { organization_id: organizationId, ...statusWhere },
+      { organization_id: organizationId, ...(statusWhere ?? {}) },
       filters.search,
     );
     const skip = (filters.page - 1) * filters.pageSize;

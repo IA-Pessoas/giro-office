@@ -5,6 +5,11 @@ import {
 } from "../services/clientListQuery.js";
 
 describe("buildLegacyListStatusWhere", () => {
+  it("retorna undefined quando nao ha filtro aplicavel", () => {
+    expect(buildLegacyListStatusWhere(undefined, undefined)).toBeUndefined();
+    expect(buildLegacyListStatusWhere("deps", "Todos")).toBeUndefined();
+  });
+
   it("integracao + Ativo exige dominio_code", () => {
     expect(buildLegacyListStatusWhere("integracao", "Ativo")).toEqual({
       status: "Ativo",
