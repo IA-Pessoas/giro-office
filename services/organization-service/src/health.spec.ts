@@ -3,6 +3,7 @@ import request from "supertest";
 import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { createOrganizationApp } from "./app.js";
+import type { OrganizationEnv } from "./config/env.js";
 
 class MemoryLogStream extends Writable {
   _write(
@@ -16,13 +17,22 @@ class MemoryLogStream extends Writable {
 
 describe("organization-service", () => {
   it("GET /health returns success envelope", async () => {
+    const env = {
+      port: 3400,
+      databaseUrl: "https://example.com/db",
+      jwtSecret: "test-secret",
+      nodeEnv: "test",
+      logLevel: "silent",
+      logPretty: false,
+      enableApiDocs: false,
+    } satisfies OrganizationEnv;
     const logger = createLogger({
       service: "organization-service-test",
       env: "test",
       level: "silent",
       destination: new MemoryLogStream(),
     });
-    const app = createOrganizationApp(logger);
+    const app = createOrganizationApp(env, logger);
     const res = await request(app).get("/health");
 
     expect(res.status).toBe(200);

@@ -4,10 +4,12 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   type Logger,
 } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { AuditServiceEnv } from "./config/env.js";
+import { buildAuditServiceOpenApiSpec } from "./openapi/spec.js";
 import type { AuditRequestRepository } from "./integrations/prisma/audit-request-repository.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { createAuditRouter } from "./routes/index.js";
@@ -37,6 +39,14 @@ export function createApp({ env, logger, repository }: CreateAppOptions): expres
   app.set("trust proxy", true);
   app.use(express.json());
   app.use(requestContext);
+
+  if (env.enableApiDocs) {
+    mountOpenApiDocs(app, {
+      spec: buildAuditServiceOpenApiSpec(env),
+      siteTitle: "audit-service - OpenAPI",
+    });
+  }
+
   app.use(createAuditRouter({ env, logger, repository }));
   app.use(
     createExpressErrorHandler({

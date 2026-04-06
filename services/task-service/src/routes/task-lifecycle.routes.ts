@@ -34,7 +34,11 @@ router.put(
       const result = await taskLifecycleService.concludeTask({
         user_id,
         organization_id,
-        body,
+        body: {
+          ...body,
+          observations: body.observations ?? "",
+          justification: body.justification ?? "",
+        },
       });
 
       res.json(createSuccessResponse(result));

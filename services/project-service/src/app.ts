@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import { createLogger } from "@workspace/shared/logger";
 import cors from "cors";
 import express, { type Express, type Request } from "express";
@@ -12,6 +13,7 @@ import {
   createProjectProgressRoutes,
   type ProjectProgressRouteDeps,
 } from "./routes/project-progress.routes.js";
+import { buildProjectServiceOpenApiSpec } from "./openapi/spec.js";
 import { createProjectCrudRoutes, type ProjectCrudRouteDeps } from "./routes/projectcrud.routes.js";
 import { ProjectCrudService } from "./services/ProjectCrudService.js";
 import { ProjectProgressService } from "./services/ProjectProgressService.js";
@@ -61,6 +63,13 @@ export function createProjectApplication(options?: {
   app.get("/health", (_req, res) => {
     res.status(200).json(createSuccessResponse({ status: "ok", service: "project-service" }));
   });
+
+  if (env.enableApiDocs) {
+    mountOpenApiDocs(app, {
+      spec: buildProjectServiceOpenApiSpec(env),
+      siteTitle: "project-service — OpenAPI",
+    });
+  }
 
   app.use(createProjectCrudRoutes(projectCrudService));
   app.use(createProjectProgressRoutes(projectProgressService));

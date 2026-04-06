@@ -1,11 +1,14 @@
 import "dotenv/config";
 import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import cors from "cors";
 import express, { type Request, type Response } from "express";
 import "express-async-errors";
 
+import type { OrganizationEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
+import { buildOrganizationServiceOpenApiSpec } from "./openapi/spec.js";
 import organizationRoutes from "./routes/organization.routes.js";
 
 function organizationErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -21,7 +24,7 @@ function organizationErrorLogContext(request: Request): Record<string, unknown> 
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export function createOrganizationApp(logger: Logger): express.Express {
+export function createOrganizationApp(env: OrganizationEnv, logger: Logger): express.Express {
   const app = express();
 
   app.use(cors());
@@ -33,6 +36,13 @@ export function createOrganizationApp(logger: Logger): express.Express {
       .status(200)
       .json(createSuccessResponse({ status: "ok", service: "organization-service" }));
   });
+
+  if (env.enableApiDocs) {
+    mountOpenApiDocs(app, {
+      spec: buildOrganizationServiceOpenApiSpec(env),
+      siteTitle: "organization-service - OpenAPI",
+    });
+  }
 
   app.use(organizationRoutes);
 

@@ -33,11 +33,20 @@ const envSchema = z
       .transform((value) => parseBoolean(value)),
     auditServiceUrl: z.string().url().default("http://localhost:3336"),
     auditServiceToken: z.string().default("audit-service-token"),
+    enableApiDocsEnv: z.string().optional(),
   })
-  .transform((env) => ({
-    ...env,
-    logPretty: env.nodeEnv !== "production" && env.logPretty,
-  }));
+  .transform((env) => {
+    const { enableApiDocsEnv, ...rest } = env;
+    const enableApiDocs =
+      enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
+        ? parseBoolean(enableApiDocsEnv)
+        : rest.nodeEnv !== "production";
+    return {
+      ...rest,
+      logPretty: rest.nodeEnv !== "production" && rest.logPretty,
+      enableApiDocs,
+    };
+  });
 
 export type TaskServiceEnv = z.infer<typeof envSchema>;
 
@@ -52,5 +61,6 @@ export function getTaskServiceEnv(): TaskServiceEnv {
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
+    enableApiDocsEnv: process.env.ENABLE_API_DOCS,
   });
 }

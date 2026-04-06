@@ -1,10 +1,13 @@
 import "dotenv/config";
 import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
 import type { Logger } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import cors from "cors";
 import express, { type Request, type Response } from "express";
 import "express-async-errors";
 
+import type { RhEnv } from "./config/env.js";
+import { buildRhServiceOpenApiSpec } from "./openapi/spec.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import pointConfigRoutes from "./routes/point-config.routes.js";
 
@@ -21,7 +24,7 @@ function rhErrorLogContext(request: Request): Record<string, unknown> | undefine
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export function createApp(logger: Logger): express.Express {
+export function createApp(logger: Logger, env: RhEnv): express.Express {
   const app = express();
 
   app.set("trust proxy", true);
@@ -32,6 +35,13 @@ export function createApp(logger: Logger): express.Express {
   app.get("/health", (_request: Request, response: Response) => {
     response.status(200).json(createSuccessResponse({ status: "ok", service: "rh-service" }));
   });
+
+  if (env.enableApiDocs) {
+    mountOpenApiDocs(app, {
+      spec: buildRhServiceOpenApiSpec(env),
+      siteTitle: "rh-service — OpenAPI",
+    });
+  }
 
   app.use("/rh", pointConfigRoutes);
 

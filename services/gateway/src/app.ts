@@ -10,6 +10,7 @@ import {
   type Logger,
   type LogLevel,
 } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
@@ -20,9 +21,14 @@ import {
 } from "./middlewares/audit.js";
 import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
+import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
-import { isUserServiceRoute } from "./utils/routeUtils.js";
+import {
+  isProjectServiceRoute,
+  isTaskServiceRoute,
+  isUserServiceRoute,
+} from "./utils/routeUtils.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
   return {
@@ -90,6 +96,14 @@ function getUpstreamContext(url: string, request: Request) {
 function getProxyTargetUrl(env: GatewayEnv, request: Request): string | null {
   if (isUserServiceRoute(request.path)) {
     return env.userServiceUrl;
+  }
+
+  if (isTaskServiceRoute(request.path)) {
+    return env.taskServiceUrl;
+  }
+
+  if (isProjectServiceRoute(request.path)) {
+    return env.projectServiceUrl;
   }
 
   return null;
@@ -175,6 +189,7 @@ function buildRequestLifecycleMiddleware(logger: Logger) {
 
 export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   const app = express();
+  const gatewayOpenApiSpec = buildGatewayOpenApiSpec(env);
   const recordAuditRequest = createAuditRecorder({
     enabled: env.auditEnabled,
     serviceUrl: env.auditServiceUrl,
@@ -195,6 +210,20 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   app.use(cors(createCorsOptions(env)));
   app.options("*", cors(createCorsOptions(env)));
   app.use(express.json());
+
+  app.get("/openapi.json", (request: Request, response: Response) => {
+    response.json({
+      ...gatewayOpenApiSpec,
+      servers: [{ url: `${request.protocol}://${request.get("host")}` }],
+    });
+  });
+  mountOpenApiDocs(app, {
+    spec: gatewayOpenApiSpec,
+    docsPath: "/docs",
+    jsonPath: "/__gateway-openapi-static.json",
+    specUrl: "/openapi.json",
+    siteTitle: "gateway - OpenAPI",
+  });
 
   if (!env.auditEnabled) {
     app.use("/audit", (_request, _response, next) => {
