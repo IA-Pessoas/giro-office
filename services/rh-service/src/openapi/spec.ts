@@ -2,6 +2,392 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { RhEnv } from "../config/env.js";
 
+const successJson = {
+  content: {
+    "application/json": {
+      schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+    },
+  },
+} as const;
+
+const bearer: Array<Record<string, string[]>> = [{ bearerAuth: [] }];
+
+function createObjectRequestBody(options: {
+  example: Record<string, unknown>;
+  properties: Record<string, unknown>;
+  required?: string[];
+}) {
+  const { example, properties, required } = options;
+
+  return {
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties,
+            ...(required ? { required } : {}),
+            additionalProperties: false,
+            example,
+          },
+        },
+      },
+    },
+  } as const;
+}
+
+const pointConfigRequestBody = createObjectRequestBody({
+  example: {
+    target_user_id: "user-uuid",
+    start_time: "08:00",
+    lunch_break: "12:00",
+    lunch_return: "13:00",
+    end_time: "17:30",
+    work_days: "1,2,3,4,5",
+  },
+  properties: {
+    target_user_id: { type: "string" },
+    start_time: { type: "string" },
+    lunch_break: { type: "string" },
+    lunch_return: { type: "string" },
+    end_time: { type: "string" },
+    work_days: { type: "string" },
+  },
+});
+
+const timeClockAdjustmentRequestBody = createObjectRequestBody({
+  example: {
+    point_id: "point-uuid",
+    clock_in: "2026-04-02T08:00:00.000Z",
+    lunch_out: "2026-04-02T12:00:00.000Z",
+    lunch_in: "2026-04-02T13:00:00.000Z",
+    clock_out: "2026-04-02T17:30:00.000Z",
+    justification: "Esqueci de bater o retorno do almoço.",
+    attachment: "https://cdn.castelo.com/rh/adjustment-proof.pdf",
+  },
+  required: ["point_id", "clock_in", "lunch_out", "lunch_in", "clock_out", "justification"],
+  properties: {
+    point_id: { type: "string" },
+    clock_in: { type: "string", format: "date-time" },
+    lunch_out: { type: "string", format: "date-time" },
+    lunch_in: { type: "string", format: "date-time" },
+    clock_out: { type: "string", format: "date-time" },
+    justification: { type: "string" },
+    attachment: { type: ["string", "null"] },
+  },
+});
+
+const approveTimeClockAdjustmentRequestBody = createObjectRequestBody({
+  example: {
+    request_id: "request-uuid",
+    obs_approver: "Ajuste validado pelo RH.",
+  },
+  required: ["request_id"],
+  properties: {
+    request_id: { type: "string" },
+    obs_approver: { type: ["string", "null"] },
+  },
+});
+
+const categoryCreateRequestBody = createObjectRequestBody({
+  example: {
+    name: "Benefícios",
+    active: true,
+  },
+  required: ["name"],
+  properties: {
+    name: { type: "string" },
+    active: { type: "boolean" },
+  },
+});
+
+const categoryUpdateRequestBody = createObjectRequestBody({
+  example: {
+    id: "category-uuid",
+    name: "Folha de Pagamento",
+    active: true,
+  },
+  required: ["id"],
+  properties: {
+    id: { type: "string" },
+    name: { type: "string" },
+    active: { type: "boolean" },
+  },
+});
+
+const categoryDeleteRequestBody = createObjectRequestBody({
+  example: {
+    id: "category-uuid",
+  },
+  required: ["id"],
+  properties: {
+    id: { type: "string" },
+  },
+});
+
+const rhRequestCreateRequestBody = createObjectRequestBody({
+  example: {
+    title: "Solicitação de férias",
+    description: "Quero solicitar férias para maio.",
+    category_id: "category-uuid",
+    assigned_to_user_id: "user-uuid",
+    urgency: "Medium",
+  },
+  required: ["title", "description", "category_id", "assigned_to_user_id", "urgency"],
+  properties: {
+    title: { type: "string" },
+    description: { type: "string" },
+    category_id: { type: "string", format: "uuid" },
+    assigned_to_user_id: { type: "string", format: "uuid" },
+    urgency: { type: "string", enum: ["Low", "Medium", "High"] },
+  },
+});
+
+const rhRequestUpdateRequestBody = createObjectRequestBody({
+  example: {
+    id: "request-uuid",
+    title: "Solicitação de férias atualizada",
+    description: "Alteração do período solicitado.",
+    category_id: "category-uuid",
+    assigned_to_user_id: "user-uuid",
+    urgency: "High",
+    status: "In_Progress",
+  },
+  required: ["id"],
+  properties: {
+    id: { type: "string" },
+    title: { type: "string" },
+    description: { type: "string" },
+    category_id: { type: "string" },
+    assigned_to_user_id: { type: "string" },
+    urgency: { type: "string", enum: ["Low", "Medium", "High"] },
+    status: { type: "string", enum: ["New", "In_Progress", "Resolved", "Closed"] },
+  },
+});
+
+const rhRequestDeleteRequestBody = createObjectRequestBody({
+  example: {
+    id: "request-uuid",
+  },
+  required: ["id"],
+  properties: {
+    id: { type: "string" },
+  },
+});
+
+const scoreQuestionCreateRequestBody = createObjectRequestBody({
+  example: {
+    question: "Demonstra colaboração com o time?",
+    type: "behavioral",
+  },
+  required: ["question", "type"],
+  properties: {
+    question: { type: "string" },
+    type: { type: "string", enum: ["behavioral", "technical", "tech", "leadership"] },
+  },
+});
+
+const scoreQuestionUpdateRequestBody = createObjectRequestBody({
+  example: {
+    id: "question-uuid",
+    question: "Comunica riscos com antecedência?",
+    type: "leadership",
+    active: true,
+  },
+  required: ["id"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    question: { type: "string" },
+    type: { type: "string", enum: ["behavioral", "technical", "tech", "leadership"] },
+    active: { type: "boolean" },
+  },
+});
+
+const scoreQuestionDeleteRequestBody = createObjectRequestBody({
+  example: {
+    id: "question-uuid",
+  },
+  required: ["id"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+  },
+});
+
+const scoreQuarterGenerateRequestBody = createObjectRequestBody({
+  example: {
+    target_user_id: "user-uuid",
+    quarter: "2026-Q2",
+  },
+  required: ["target_user_id", "quarter"],
+  properties: {
+    target_user_id: { type: "string" },
+    quarter: { type: "string" },
+  },
+});
+
+const scoreQuarterNitroRequestBody = createObjectRequestBody({
+  example: {
+    score_id: "score-uuid",
+    type: "projects",
+    value: 9,
+  },
+  required: ["score_id", "type", "value"],
+  properties: {
+    score_id: { type: "string" },
+    type: { type: "string", enum: ["projects", "hours", "errors", "folders"] },
+    value: { type: "number" },
+  },
+});
+
+const scoreEvaluationSubmitRequestBody = createObjectRequestBody({
+  example: {
+    evaluation_id: "evaluation-uuid",
+    answers: [
+      {
+        question_id: "question-uuid",
+        answer: 4,
+        obs: "Boa comunicação durante o trimestre.",
+      },
+    ],
+  },
+  required: ["evaluation_id", "answers"],
+  properties: {
+    evaluation_id: { type: "string", format: "uuid" },
+    answers: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          question_id: { type: "string" },
+          answer: { type: "number" },
+          obs: { type: "string" },
+        },
+        required: ["question_id", "answer"],
+        additionalProperties: false,
+      },
+    },
+  },
+});
+
+const holidayCreateRequestBody = createObjectRequestBody({
+  example: {
+    name: "Corpus Christi",
+    date: "2026-06-04T00:00:00.000Z",
+  },
+  required: ["name", "date"],
+  properties: {
+    name: { type: "string" },
+    date: { type: "string", format: "date-time" },
+  },
+});
+
+const holidayUpdateRequestBody = createObjectRequestBody({
+  example: {
+    id: "holiday-uuid",
+    name: "Corpus Christi",
+    date: "2026-06-04T00:00:00.000Z",
+  },
+  required: ["id", "name", "date"],
+  properties: {
+    id: { type: "string" },
+    name: { type: "string" },
+    date: { type: "string", format: "date-time" },
+  },
+});
+
+const holidayDeleteRequestBody = createObjectRequestBody({
+  example: {
+    id: "holiday-uuid",
+  },
+  required: ["id"],
+  properties: {
+    id: { type: "string" },
+  },
+});
+
+const timeBankReleaseCreateRequestBody = createObjectRequestBody({
+  example: {
+    user_id: "user-uuid",
+    date: "2026-04-03T00:00:00.000Z",
+    minutes: 120,
+    reason: "Compensação de horas extras em sábado.",
+  },
+  required: ["user_id", "date", "minutes", "reason"],
+  properties: {
+    user_id: { type: "string", format: "uuid" },
+    date: { type: "string", format: "date-time" },
+    minutes: { type: "integer" },
+    reason: { type: "string" },
+  },
+});
+
+const timeBankReleaseApproveRequestBody = createObjectRequestBody({
+  example: {
+    id: "release-uuid",
+  },
+  required: ["id"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+  },
+});
+
+const messageCreateRequestBody = createObjectRequestBody({
+  example: {
+    request_id: "request-uuid",
+    message: "Seu pedido foi encaminhado para aprovação.",
+    type: "Message",
+    attachment: "https://cdn.castelo.com/rh/attachment.pdf",
+  },
+  required: ["request_id", "message", "type"],
+  properties: {
+    request_id: { type: "string" },
+    message: { type: "string" },
+    type: { type: "string", enum: ["Message", "Solution", "Rejection", "Acceptance"] },
+    attachment: { type: "string" },
+  },
+});
+
+const timeSheetCreateRequestBody = createObjectRequestBody({
+  example: {
+    user_id: "user-uuid",
+    start_time: "2026-04-01T00:00:00.000Z",
+    end_time: "2026-04-30T23:59:59.999Z",
+  },
+  required: ["user_id", "start_time", "end_time"],
+  properties: {
+    user_id: { type: "string", format: "uuid" },
+    start_time: { type: "string", format: "date-time" },
+    end_time: { type: "string", format: "date-time" },
+  },
+});
+
+const timeSheetSignRequestBody = createObjectRequestBody({
+  example: {
+    id: "timesheet-uuid",
+    signature: "Joao Silva",
+  },
+  required: ["id", "signature"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    signature: { type: "string" },
+  },
+});
+
+const scoreNitroUpdateRequestBody = createObjectRequestBody({
+  example: {
+    score_id: "score-uuid",
+    type: "hours",
+    value: 7,
+  },
+  required: ["score_id", "type", "value"],
+  properties: {
+    score_id: { type: "string", format: "uuid" },
+    type: { type: "string", enum: ["projects", "hours", "errors", "folders"] },
+    value: { type: "number" },
+  },
+});
+
 export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
 
@@ -10,12 +396,22 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
     info: {
       title: "rh-service",
       version: "1.0.0",
-      description: "RH — configuração de ponto e rotas sob o prefixo /rh.",
+      description: "RH. Endpoints autenticados usam JWT e ficam sob o prefixo /rh.",
     },
     servers: [{ url: baseUrl }],
     tags: [
-      { name: "Health", description: "Saúde do serviço" },
-      { name: "Ponto", description: "Configuração de jornada" },
+      { name: "Health", description: "Saude do servico" },
+      { name: "Ponto", description: "Configuracao, registro e ajuste de ponto" },
+      { name: "Categorias", description: "Categorias de chamados RH" },
+      { name: "Solicitacoes", description: "Chamados e solicitacoes RH" },
+      { name: "Mensagens", description: "Mensagens vinculadas aos chamados RH" },
+      { name: "ScoreQuestions", description: "Perguntas de score" },
+      { name: "ScoreQuarters", description: "Scores trimestrais e nitro" },
+      { name: "ScoreEvaluations", description: "Avaliacoes de score" },
+      { name: "Feriados", description: "Calendario de feriados" },
+      { name: "BancoDeHoras", description: "Lancamentos de banco de horas" },
+      { name: "TimeSheets", description: "Folhas de ponto" },
+      { name: "ScoreNitro", description: "Atualizacao de metricas Nitro" },
     ],
     components: {
       securitySchemes: {
@@ -28,7 +424,7 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
       schemas: {
         SuccessEnvelope: {
           type: "object",
-          description: "Resposta de sucesso padrão do workspace",
+          description: "Resposta de sucesso padrao do workspace",
           additionalProperties: true,
         },
       },
@@ -39,90 +435,434 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           tags: ["Health"],
           summary: "Health check",
           responses: {
-            "200": {
-              description: "Serviço disponível",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
+            "200": { description: "Servico disponivel", ...successJson },
           },
         },
       },
       "/rh/point-config": {
         put: {
           tags: ["Ponto"],
-          summary: "Criar ou atualizar configuração de ponto",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    target_user_id: { type: "string" },
-                    start_time: { type: "string" },
-                    lunch_break: { type: "string" },
-                    lunch_return: { type: "string" },
-                    end_time: { type: "string" },
-                    work_days: { type: "string" },
-                  },
-                  additionalProperties: true,
-                  example: {
-                    target_user_id: "user-uuid",
-                    start_time: "08:00",
-                    lunch_break: "12:00",
-                    lunch_return: "13:00",
-                    end_time: "17:30",
-                    work_days: "1,2,3,4,5",
-                  },
-                },
-              },
-            },
-          },
+          summary: "Criar ou atualizar configuracao de ponto",
+          security: bearer,
+          ...pointConfigRequestBody,
           responses: {
-            "200": {
-              description: "Configuração salva",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
+            "200": { description: "Configuracao salva", ...successJson },
           },
         },
         get: {
           tags: ["Ponto"],
-          summary: "Obter configuração de ponto do usuário autenticado",
-          security: [{ bearerAuth: [] }],
+          summary: "Obter configuracao de ponto do usuario autenticado",
+          security: bearer,
           responses: {
-            "200": {
-              description: "Configuração",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
+            "200": { description: "Configuracao", ...successJson },
           },
         },
       },
       "/rh/point-config/{userId}": {
         get: {
           tags: ["Ponto"],
-          summary: "Obter configuração de ponto por usuário",
-          security: [{ bearerAuth: [] }],
+          summary: "Obter configuracao de ponto por usuario",
+          security: bearer,
           parameters: [{ name: "userId", in: "path", required: true, schema: { type: "string" } }],
           responses: {
-            "200": {
-              description: "Configuração",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
+            "200": { description: "Configuracao", ...successJson },
+          },
+        },
+      },
+      "/rh/point/register": {
+        post: {
+          tags: ["Ponto"],
+          summary: "Registrar batida de ponto",
+          security: bearer,
+          responses: {
+            "200": { description: "Ponto registrado", ...successJson },
+          },
+        },
+      },
+      "/rh/point/{pointId}/calculate": {
+        post: {
+          tags: ["Ponto"],
+          summary: "Calcular horas diarias de um ponto",
+          security: bearer,
+          parameters: [
+            { name: "pointId", in: "path", required: true, schema: { type: "string" } },
+          ],
+          responses: {
+            "200": { description: "Horas calculadas", ...successJson },
+          },
+        },
+      },
+      "/rh/point/adjustment/request": {
+        post: {
+          tags: ["Ponto"],
+          summary: "Solicitar ajuste de ponto",
+          security: bearer,
+          ...timeClockAdjustmentRequestBody,
+          responses: {
+            "200": { description: "Solicitacao criada", ...successJson },
+          },
+        },
+      },
+      "/rh/point/adjustment/approve": {
+        put: {
+          tags: ["Ponto"],
+          summary: "Aprovar ajuste de ponto",
+          security: bearer,
+          ...approveTimeClockAdjustmentRequestBody,
+          responses: {
+            "200": { description: "Ajuste aprovado", ...successJson },
+          },
+        },
+      },
+      "/rh/categories": {
+        post: {
+          tags: ["Categorias"],
+          summary: "Criar categoria RH",
+          security: bearer,
+          ...categoryCreateRequestBody,
+          responses: {
+            "200": { description: "Categoria criada", ...successJson },
+          },
+        },
+        put: {
+          tags: ["Categorias"],
+          summary: "Atualizar categoria RH",
+          security: bearer,
+          ...categoryUpdateRequestBody,
+          responses: {
+            "200": { description: "Categoria atualizada", ...successJson },
+          },
+        },
+        get: {
+          tags: ["Categorias"],
+          summary: "Listar categorias RH",
+          security: bearer,
+          parameters: [{ name: "activeOnly", in: "query", schema: { type: "boolean" } }],
+          responses: {
+            "200": { description: "Lista", ...successJson },
+          },
+        },
+        delete: {
+          tags: ["Categorias"],
+          summary: "Excluir categoria RH",
+          security: bearer,
+          ...categoryDeleteRequestBody,
+          responses: {
+            "200": { description: "Categoria excluida", ...successJson },
+          },
+        },
+      },
+      "/rh/requests": {
+        post: {
+          tags: ["Solicitacoes"],
+          summary: "Criar solicitacao RH",
+          security: bearer,
+          ...rhRequestCreateRequestBody,
+          responses: {
+            "200": { description: "Solicitacao criada", ...successJson },
+          },
+        },
+        get: {
+          tags: ["Solicitacoes"],
+          summary: "Listar solicitacoes RH",
+          security: bearer,
+          parameters: [
+            {
+              name: "status",
+              in: "query",
+              schema: { type: "string", enum: ["New", "In_Progress", "Resolved", "Closed"] },
             },
+            { name: "category_id", in: "query", schema: { type: "string", format: "uuid" } },
+            {
+              name: "requester_user_id",
+              in: "query",
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "assigned_to_user_id",
+              in: "query",
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": { description: "Lista", ...successJson },
+          },
+        },
+        put: {
+          tags: ["Solicitacoes"],
+          summary: "Atualizar solicitacao RH",
+          security: bearer,
+          ...rhRequestUpdateRequestBody,
+          responses: {
+            "200": { description: "Solicitacao atualizada", ...successJson },
+          },
+        },
+        delete: {
+          tags: ["Solicitacoes"],
+          summary: "Excluir solicitacao RH",
+          security: bearer,
+          ...rhRequestDeleteRequestBody,
+          responses: {
+            "200": { description: "Solicitacao excluida", ...successJson },
+          },
+        },
+      },
+      "/rh/requests/{id}": {
+        get: {
+          tags: ["Solicitacoes"],
+          summary: "Buscar solicitacao RH por ID",
+          security: bearer,
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": { description: "Solicitacao", ...successJson },
+          },
+        },
+      },
+      "/rh/score/questions": {
+        post: {
+          tags: ["ScoreQuestions"],
+          summary: "Criar pergunta de score",
+          security: bearer,
+          ...scoreQuestionCreateRequestBody,
+          responses: {
+            "200": { description: "Pergunta criada", ...successJson },
+          },
+        },
+        put: {
+          tags: ["ScoreQuestions"],
+          summary: "Atualizar pergunta de score",
+          security: bearer,
+          ...scoreQuestionUpdateRequestBody,
+          responses: {
+            "200": { description: "Pergunta atualizada", ...successJson },
+          },
+        },
+        get: {
+          tags: ["ScoreQuestions"],
+          summary: "Listar perguntas de score",
+          security: bearer,
+          parameters: [
+            {
+              name: "type",
+              in: "query",
+              schema: { type: "string", enum: ["behavioral", "technical", "tech", "leadership"] },
+            },
+            { name: "all", in: "query", schema: { type: "boolean" } },
+          ],
+          responses: {
+            "200": { description: "Lista", ...successJson },
+          },
+        },
+        delete: {
+          tags: ["ScoreQuestions"],
+          summary: "Inativar pergunta de score",
+          security: bearer,
+          ...scoreQuestionDeleteRequestBody,
+          responses: {
+            "200": { description: "Pergunta inativada", ...successJson },
+          },
+        },
+      },
+      "/rh/score/quarters/generate": {
+        post: {
+          tags: ["ScoreQuarters"],
+          summary: "Gerar score trimestral",
+          security: bearer,
+          ...scoreQuarterGenerateRequestBody,
+          responses: {
+            "200": { description: "Score gerado", ...successJson },
+          },
+        },
+      },
+      "/rh/score/quarters/nitro": {
+        patch: {
+          tags: ["ScoreQuarters"],
+          summary: "Atualizar Nitro de um score trimestral",
+          security: bearer,
+          ...scoreQuarterNitroRequestBody,
+          responses: {
+            "200": { description: "Nitro atualizado", ...successJson },
+          },
+        },
+      },
+      "/rh/score/quarters/me": {
+        get: {
+          tags: ["ScoreQuarters"],
+          summary: "Listar scores trimestrais do usuario autenticado",
+          security: bearer,
+          responses: {
+            "200": { description: "Lista", ...successJson },
+          },
+        },
+      },
+      "/rh/score/quarters/{id}": {
+        get: {
+          tags: ["ScoreQuarters"],
+          summary: "Obter detalhe de score trimestral",
+          security: bearer,
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": { description: "Detalhe", ...successJson },
+          },
+        },
+      },
+      "/rh/score/evaluations/pending": {
+        get: {
+          tags: ["ScoreEvaluations"],
+          summary: "Listar avaliacoes pendentes de score",
+          security: bearer,
+          responses: {
+            "200": { description: "Lista", ...successJson },
+          },
+        },
+      },
+      "/rh/score/evaluations/submit": {
+        post: {
+          tags: ["ScoreEvaluations"],
+          summary: "Submeter avaliacao de score",
+          security: bearer,
+          ...scoreEvaluationSubmitRequestBody,
+          responses: {
+            "200": { description: "Avaliacao enviada", ...successJson },
+          },
+        },
+      },
+      "/rh/holidays": {
+        post: {
+          tags: ["Feriados"],
+          summary: "Criar feriado",
+          security: bearer,
+          ...holidayCreateRequestBody,
+          responses: {
+            "200": { description: "Feriado criado", ...successJson },
+          },
+        },
+        put: {
+          tags: ["Feriados"],
+          summary: "Atualizar feriado",
+          security: bearer,
+          ...holidayUpdateRequestBody,
+          responses: {
+            "200": { description: "Feriado atualizado", ...successJson },
+          },
+        },
+        get: {
+          tags: ["Feriados"],
+          summary: "Listar feriados",
+          security: bearer,
+          responses: {
+            "200": { description: "Lista", ...successJson },
+          },
+        },
+        delete: {
+          tags: ["Feriados"],
+          summary: "Excluir feriado",
+          security: bearer,
+          ...holidayDeleteRequestBody,
+          responses: {
+            "200": { description: "Feriado excluido", ...successJson },
+          },
+        },
+      },
+      "/rh/time-bank-releases/list": {
+        get: {
+          tags: ["BancoDeHoras"],
+          summary: "Listar lancamentos de banco de horas",
+          security: bearer,
+          parameters: [
+            { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
+            { name: "is_approved", in: "query", schema: { type: "boolean" } },
+            { name: "date_from", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "date_to", in: "query", schema: { type: "string", format: "date-time" } },
+          ],
+          responses: {
+            "200": { description: "Lista", ...successJson },
+          },
+        },
+      },
+      "/rh/time-bank-releases": {
+        post: {
+          tags: ["BancoDeHoras"],
+          summary: "Criar lancamento de banco de horas",
+          security: bearer,
+          ...timeBankReleaseCreateRequestBody,
+          responses: {
+            "200": { description: "Lancamento criado", ...successJson },
+          },
+        },
+      },
+      "/rh/time-bank-releases/approve": {
+        put: {
+          tags: ["BancoDeHoras"],
+          summary: "Aprovar lancamento de banco de horas",
+          security: bearer,
+          ...timeBankReleaseApproveRequestBody,
+          responses: {
+            "200": { description: "Lancamento aprovado", ...successJson },
+          },
+        },
+      },
+      "/rh/messages": {
+        post: {
+          tags: ["Mensagens"],
+          summary: "Criar mensagem de um chamado RH",
+          security: bearer,
+          ...messageCreateRequestBody,
+          responses: {
+            "200": { description: "Mensagem criada", ...successJson },
+          },
+        },
+        get: {
+          tags: ["Mensagens"],
+          summary: "Listar mensagens de um chamado RH",
+          security: bearer,
+          parameters: [{ name: "requestId", in: "query", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": { description: "Lista", ...successJson },
+          },
+        },
+      },
+      "/rh/timesheets": {
+        post: {
+          tags: ["TimeSheets"],
+          summary: "Criar folha de ponto",
+          security: bearer,
+          ...timeSheetCreateRequestBody,
+          responses: {
+            "200": { description: "Folha criada", ...successJson },
+          },
+        },
+        get: {
+          tags: ["TimeSheets"],
+          summary: "Listar folhas de ponto",
+          security: bearer,
+          parameters: [
+            { name: "target_user_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Lista", ...successJson },
+          },
+        },
+      },
+      "/rh/timesheets/sign": {
+        put: {
+          tags: ["TimeSheets"],
+          summary: "Assinar folha de ponto",
+          security: bearer,
+          ...timeSheetSignRequestBody,
+          responses: {
+            "200": { description: "Folha assinada", ...successJson },
+          },
+        },
+      },
+      "/rh/score/nitro/update": {
+        put: {
+          tags: ["ScoreNitro"],
+          summary: "Atualizar metrica Nitro",
+          security: bearer,
+          ...scoreNitroUpdateRequestBody,
+          responses: {
+            "200": { description: "Metrica atualizada", ...successJson },
           },
         },
       },
