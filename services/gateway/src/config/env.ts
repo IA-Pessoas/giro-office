@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { loggerLevelSchema, type LoggerLevel } from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -37,14 +38,8 @@ const gatewayEnvSchema = z
     taskServiceUrl: z.string().url().default("http://localhost:3337"),
     organizationServiceUrl: z.string().url().default("http://localhost:3400"),
     clientServiceUrl: z.string().url().default("http://localhost:3410"),
-    /** Quando `false`, `/clients` é encaminhado para a API legado (rollback de rollout). */
-    useClientServiceForClients: z
-      .string()
-      .optional()
-      .default("true")
-      .transform((value) => parseBoolean(value)),
     rhServiceUrl: z.string().url().default("http://localhost:3339"),
-    jwtSecret: z.string().min(1, "JWT_SECRET não definido para o gateway."),
+    jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o gateway."),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
       .string()
@@ -78,7 +73,6 @@ export interface GatewayEnv {
   taskServiceUrl: string;
   organizationServiceUrl: string;
   clientServiceUrl: string;
-  useClientServiceForClients: boolean;
   rhServiceUrl: string;
   jwtSecret: string;
   logLevel: LoggerLevel;
@@ -98,7 +92,6 @@ export function getGatewayEnv(): GatewayEnv {
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     organizationServiceUrl: process.env.ORGANIZATION_SERVICE_URL,
     clientServiceUrl: process.env.CLIENT_SERVICE_URL,
-    useClientServiceForClients: process.env.GATEWAY_USE_CLIENT_SERVICE_FOR_CLIENTS,
     rhServiceUrl: process.env.RH_SERVICE_URL,
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,

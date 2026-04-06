@@ -15,27 +15,21 @@ const clientServiceEnvSchema = z.object({
       return Number.isNaN(parsed) ? 3410 : parsed;
     }),
   nodeEnv: z.string().optional().default("development"),
-  databaseUrl: z.string().min(1, "DATABASE_URL nÃ£o definido para o client-service."),
-  jwtSecret: z.string().min(1, "JWT_SECRET nÃ£o definido para o client-service."),
+  databaseUrl: z.string().min(1, "DATABASE_URL nao definido para o client-service."),
+  jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o client-service."),
   logLevel: loggerLevelSchema.optional().default("info"),
   logPretty: z
     .string()
     .optional()
     .default("false")
     .transform((value) => parseBoolean(value)),
-  supabaseUrl: z.string().url("SUPABASE_URL nÃ£o definida."),
-  supabaseServiceRoleKey: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY nÃ£o definida."),
+  supabaseUrl: z.string().url("SUPABASE_URL nao definida."),
+  supabaseServiceRoleKey: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY nao definida."),
   historyStorageBucket: z.string().optional().default("ClientHistory"),
-  /** DiretÃ³rio base para uploads de histÃ³rico (alternativa ao Firebase). */
+  /** Diretorio base para uploads de historico (alternativa ao Firebase). */
   historyStorageDir: z.string().optional().default(".data/client-history-uploads"),
   /** Token para `POST /internal/competence-output-update` (header `x-internal-service-token`). */
   internalServiceToken: z.string().optional(),
-  /** Agenda a rotina diÃ¡ria de competÃªncia (07:00 America/Sao_Paulo) no processo. */
-  enableCompetenceOutputCron: z
-    .string()
-    .optional()
-    .default("false")
-    .transform((value) => parseBoolean(value)),
 });
 
 export type ClientServiceEnv = z.infer<typeof clientServiceEnvSchema> & {
@@ -56,7 +50,6 @@ export function getClientServiceEnv(): ClientServiceEnv {
     historyStorageBucket: process.env.CLIENT_HISTORY_STORAGE_BUCKET,
     historyStorageDir: process.env.CLIENT_HISTORY_STORAGE_DIR,
     internalServiceToken: process.env.CLIENT_SERVICE_INTERNAL_TOKEN,
-    enableCompetenceOutputCron: process.env.CLIENT_ENABLE_COMPETENCE_OUTPUT_CRON,
   });
 
   return {

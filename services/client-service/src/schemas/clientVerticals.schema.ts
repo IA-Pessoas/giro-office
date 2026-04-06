@@ -64,7 +64,9 @@ export const terminationBodySchema = z
     reason: z.string().min(1),
     description: z.string().min(1),
     /** Competência no formato YYYY-MM (ex.: 2026-03). */
-    competence_output: z.string().min(1),
+    competence_output: z
+      .string()
+      .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "competence_output deve estar no formato YYYY-MM."),
   })
   .strict();
 

@@ -7,7 +7,6 @@ import { getClientServiceEnv } from "./config/env.js";
 import { prismaClient } from "./integrations/prisma.js";
 import { supabase } from "./integrations/supabase.js";
 import { ClientService } from "./services/clientService.js";
-import { startCompetenceOutputCron } from "./services/competenceOutputCronService.js";
 import { SupabaseHistoryFileStorage } from "./services/historyStorage.js";
 
 const env = getClientServiceEnv();
@@ -27,12 +26,6 @@ const app = createApp({
   env,
   logger,
   historyStorage,
-});
-
-startCompetenceOutputCron({
-  enabled: env.enableCompetenceOutputCron,
-  logger,
-  prisma: prismaClient,
 });
 
 app.listen(env.port, () => {
