@@ -234,11 +234,9 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   });
 
   for (const service of getGatewayServiceDefinitions(env)) {
-    if (!service.mountPrefix) {
-      continue;
+    for (const routePrefix of service.routePrefixes) {
+      app.use(routePrefix, buildHttpProxyMiddleware(service.targetUrl));
     }
-
-    app.use(service.mountPrefix, buildHttpProxyMiddleware(service.targetUrl));
   }
   if (env.auditEnabled) {
     app.use(
