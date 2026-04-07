@@ -1,55 +1,66 @@
 ---
-description: Regras padrão do projeto Workspace
+description: Regras padrao do projeto Workspace
 alwaysApply: true
 ---
+
 # Regras do Projeto Workspace
 
 ## Idioma
-- Sempre responder em português.
+- Sempre responder em portugues.
 
 ## Stack
 - Microservices em `services/` (pnpm workspace)
-- TypeScript, ESM (imports com extensão .js)
+- TypeScript, ESM (imports com extensao `.js`)
 - Biome para lint/format
 - Express, Prisma, Supabase
 
-## Formatação (Biome)
+## Formatacao (Biome)
 - Aspas duplas
-- 2 espaços de indentação
+- 2 espacos de indentacao
 - Trailing commas
 - Line width: 100
 - Semicolons sempre
 
 ## Logging (`@workspace/shared`)
-
-Imports: `debug`, `info`, `warn`, `error` de `@workspace/shared` (logger baseado em Pino). Assinatura: `(message: string, context?: Record<string, unknown>)`. Opcional: `import { error as logError }` quando `error` conflitar com nome de variável (ex.: `catch (err)`).
-
-| Nível | Uso |
-|-------|-----|
-| **`debug`** | Detalhe de diagnóstico em desenvolvimento (fluxos internos, payloads não sensíveis, ramos raros). Em produção só aparece se `LOG_LEVEL` permitir. |
-| **`info`** | Eventos esperados e rastreáveis: início/fim de operação relevante, decisões de negócio auditáveis em alto nível; requisições HTTP completas quando usar helpers como `httpRequest`. |
-| **`warn`** | Situação anormal mas recuperável: retry, fallback, validação que não quebra o fluxo, recurso próximo do limite. |
-| **`error`** | Falha que exige atenção: exceções em `catch`, falha de I/O, erro de integração, estado inconsistente. Em rotas/middlewares/services, no `catch` usar **`error` / `logError` como primeira linha útil** antes de ramificar (`ServiceError` re-lançado também pode ser logado para diagnóstico). |
-
-**Serviços com `createLogger`**: preferir o logger da instância (`logger.info`, `logger.error`, …) para incluir `service`/`env` no `base`; as funções globais acima usam o logger padrão (`LOG_SERVICE`, `LOG_LEVEL`).
+- Imports: `debug`, `info`, `warn`, `error` de `@workspace/shared`.
+- Assinatura: `(message: string, context?: Record<string, unknown>)`.
+- Quando `error` conflitar com nome de variavel, usar `import { error as logError }`.
+- Servicos com `createLogger` devem preferir o logger da instancia (`logger.info`, `logger.error`, etc.).
 
 ## Tratamento de erros
-- Usar `ServiceError` do @workspace/shared para erros HTTP 4xx/5xx (validação, negócio, não encontrado, etc.). O construtor é `new ServiceError(statusCode, message?, cause?)`; o campo `code` (ex.: `BAD_REQUEST` para 400) é derivado do status — **não** duplicar `code`/`success`/`error` manualmente em JSON.
-- **Rotas**: `try`/`catch` com `error`/`logError` e `next(err)` para erros não tratados; para condições esperadas (parâmetro obrigatório ausente, regra de negócio), **preferir `throw new ServiceError(400, "mensagem")`** em vez de `res.status(400).json({ success: false, error: "...", code: "..." })`, para uma única forma de resposta de erro via handler global.
-- **Middlewares**: no `catch`, chamar `error`/`logError` **no início do bloco**, **antes** de `if (err instanceof ServiceError)` ou outros ramos — todo erro passa pelo log de diagnóstico; em seguida encaminhar com `next(err)` ou encapsular.
-- **Services**: no `catch`, mesma ordem — `error`/`logError` primeiro, depois `if (err instanceof ServiceError) throw err`, depois `throw new ServiceError(500, …)` se aplicável.
+- Usar `ServiceError` de `@workspace/shared` para erros HTTP 4xx/5xx.
+- Rotas devem preferir `throw new ServiceError(...)` para erros esperados, deixando o handler global serializar a resposta.
+- Em `catch`, registrar erro como primeira linha util com `error` ou `logError`, antes de ramificacoes.
 
 ## Respostas da API
-- Sucesso: `createSuccessResponse` do @workspace/shared para JSON de sucesso.
-- Erro: deixar o handler de erro serializar (via `ServiceError` / `serializeError`); não montar corpo de erro à mão nas rotas salvo exceção documentada no projeto.
+- Sucesso: `createSuccessResponse` de `@workspace/shared`.
+- Erro: deixar o handler de erro serializar; nao montar corpo de erro manualmente sem necessidade documentada.
 
-## Arquitetura e Estrutura
+## Arquitetura e estrutura
+- O padrao oficial do projeto esta em `services/`.
+- A estrutura legado fora desse padrao nao deve ser usada como referencia para novos contratos ou novas implementacoes.
+- Servicos atuais: `user-service`, `audit-service`, `organization-service`, `rh-service`, `task-service`, `project-service` e `gateway`.
+- Codigo compartilhado fica em `shared`.
+- Rotas orquestram services; services nao chamam rotas.
+- Metodos publicos de service devem ter tipo de retorno explicito; ver `typescript-services.mdc`.
 
-- **Microservices**: O projeto está em refatoração para microservices. O padrão de estrutura está em `services/`.
-- **Serviços atuais**: user-service, audit-service, organization-service, rh-service,task-service, gateway (cada um em `services/<nome>/src/`).
-- **Legado**: A estrutura monorepo antiga (ex: `services/src`, `app`, etc.) não deve mais ser usada como referência.
-- **Novos serviços**: Seguir o padrão dos microservices existentes em `services/`.
-- Código compartilhado em `shared`.
-- Rotas orquestram services; services não chamam rotas.
-- **Services (TypeScript)**: métodos públicos de service com tipo de retorno explícito; detalhes em `typescript-services.mdc`.
-- Criar testes unitarios baseados nas rules `cursor/rules/testes-unitarios.mdc`
+## Gateway
+- A configuracao de upstreams pertence ao proprio gateway.
+- URLs de upstream devem ser centralizadas em `services/gateway/src/config/env.ts`.
+- O gateway deve usar uma registry unica de servicos para runtime, audit e OpenAPI agregada.
+- Nao espalhar configuracao de upstream entre `app.ts`, OpenAPI, middlewares e arquivos compartilhados.
+
+## Padrao de rotas HTTP
+- O padrao oficial e prefix-based routing.
+- Evitar paths redundantes como `/user/users`, `/task/tasks` e `/project/projects`.
+- Preferir paths publicos como `/user`, `/task`, `/project`, `/organizations` e `/rh`.
+- Quando houver conflito entre `GET` de detalhe e `GET` de colecao no mesmo prefixo, usar:
+  - `GET /prefixo` para detalhe
+  - `GET /prefixo/list` para colecao
+
+## Testes
+- Toda alteracao de contrato HTTP deve alinhar:
+  - rota do servico
+  - OpenAPI do servico
+  - gateway, se aplicavel
+  - testes do servico e do gateway
