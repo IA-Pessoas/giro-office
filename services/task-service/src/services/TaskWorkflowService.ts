@@ -1,32 +1,51 @@
 import { debug, error as logError } from "@workspace/shared";
 
+import {
+  createHttpProjectProgressIntegration,
+  type ProjectProgressIntegration,
+} from "../integrations/project-progress.js";
+
 /**
- * Efeitos colaterais de fluxo após CRUD de tarefas de integração (legado `TaskService` +
- * `ProjectService` / `EmailService`). Integrações HTTP ficam para quando existir `project-service`
- * e canal de e-mail exposto ao task-service.
+ * Efeitos colaterais de fluxo apos CRUD de tarefas de integracao (legado `TaskService` +
+ * `ProjectService` / `EmailService`). Integracoes HTTP ficam aqui para manter o service de CRUD
+ * focado em regra de negocio e persistencia.
  */
 export class TaskWorkflowService {
+  readonly #projectProgressIntegration: ProjectProgressIntegration;
+
+  constructor(
+    projectProgressIntegration: ProjectProgressIntegration = createHttpProjectProgressIntegration(),
+  ) {
+    this.#projectProgressIntegration = projectProgressIntegration;
+  }
+
   /**
-   * `ProjectService.calculateAndUpdateProjectPercentage` após criar tarefa (legado ~481).
+   * `ProjectService.calculateAndUpdateProjectPercentage` apos criar tarefa (legado ~481).
    */
-  async afterTaskCreated(projectId: string): Promise<void> {
+  async afterTaskCreated(params: {
+    projectId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<void> {
     try {
-      await this.#recalculateProjectPercentage(projectId);
+      await this.#recalculateProjectPercentage(params);
     } catch (err: unknown) {
-      logError("Workflow após criar tarefa falhou", { err, projectId });
+      logError("Workflow apos criar tarefa falhou", { err, projectId: params.projectId });
     }
   }
 
   /**
-   * E-mail quando a tarefa passa a `Paralisado` com billing `Realizar` (legado ~564–567);
-   * recálculo do projeto se `status` mudou (legado ~579–581).
+   * E-mail quando a tarefa passa a `Paralisado` com billing `Realizar` (legado ~564-567);
+   * recalculo do projeto se `status` mudou (legado ~579-581).
    */
   async afterTaskUpdated(params: {
     taskId: string;
     projectId: string;
+    userId: string;
+    organizationId: string;
     previousStatus: string;
     newStatus: string;
-    /** Billing antes do update (o legado usa `exists.billing` na condição do e-mail). */
+    /** Billing antes do update (o legado usa `exists.billing` na condicao do e-mail). */
     previousBilling: string;
   }): Promise<void> {
     try {
@@ -38,10 +57,14 @@ export class TaskWorkflowService {
       });
 
       if (params.previousStatus !== params.newStatus) {
-        await this.#recalculateProjectPercentage(params.projectId);
+        await this.#recalculateProjectPercentage({
+          projectId: params.projectId,
+          userId: params.userId,
+          organizationId: params.organizationId,
+        });
       }
     } catch (err: unknown) {
-      logError("Workflow após atualizar tarefa falhou", { err, taskId: params.taskId });
+      logError("Workflow apos atualizar tarefa falhou", { err, taskId: params.taskId });
     }
   }
 
@@ -60,16 +83,25 @@ export class TaskWorkflowService {
       return;
     }
 
-    debug("Workflow: tarefa paralisada com billing Realizar — e-mail pendente de integração", {
+    debug("Workflow: tarefa paralisada com billing Realizar - e-mail pendente de integracao", {
       taskId: ctx.taskId,
     });
     // TODO(project-service / notification): EmailService.sendTaskStalled (legado).
   }
 
-  async #recalculateProjectPercentage(projectId: string): Promise<void> {
-    debug("Workflow: recalcular percentual do projeto — project-service ainda não integrado", {
-      projectId,
+  async #recalculateProjectPercentage(params: {
+    projectId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<void> {
+    debug("Workflow: recalculando percentual do projeto via project-service", {
+      projectId: params.projectId,
     });
-    // TODO(project-service): ProjectService.calculateAndUpdateProjectPercentage.
+
+    await this.#projectProgressIntegration.recalculateProjectProgress({
+      projectId: params.projectId,
+      userId: params.userId,
+      organizationId: params.organizationId,
+    });
   }
 }

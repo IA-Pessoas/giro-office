@@ -301,7 +301,11 @@ export class TaskCrudService {
         }),
       );
 
-      await this.#workflow.afterTaskCreated(data.project_id);
+      await this.#workflow.afterTaskCreated({
+        projectId: data.project_id,
+        userId: data.user_id,
+        organizationId: data.organization_id,
+      });
 
       return { create };
     } catch (err: unknown) {
@@ -450,6 +454,8 @@ export class TaskCrudService {
       await this.#workflow.afterTaskUpdated({
         taskId: data.task_id,
         projectId: exists.project_id,
+        userId: data.user_id,
+        organizationId: data.organization_id,
         previousStatus: exists.status ?? "",
         newStatus: status,
         previousBilling: exists.billing ?? "",
