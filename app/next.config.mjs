@@ -10,6 +10,6 @@ const nextConfig = {
         source: '/api/:path*',
         destination: 'http://192.168.1.40:3333/:path*',
       },
-    ]
+    ];
   },
 };                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      

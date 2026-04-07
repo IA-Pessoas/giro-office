@@ -1,3 +1,4 @@
+/** Paths forwarded to **user-service** (`USER_SERVICE_URL`) before the legacy fallback. */
 export function isUserServiceRoute(path: string): boolean {
   return (
     path === "/session" ||
@@ -9,6 +10,10 @@ export function isUserServiceRoute(path: string): boolean {
   );
 }
 
+/**
+ * Gateway sends matching paths to **task-service** (`TASK_SERVICE_URL`). Unlisted paths hit the
+ * legacy upstream. Add new exact paths here when exposing more task APIs through the gateway.
+ */
 const TASK_SERVICE_EXACT_PATHS = new Set([
   "/integracao-tasksModel",
   "/integracao-taskModel",

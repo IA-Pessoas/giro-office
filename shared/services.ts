@@ -12,6 +12,21 @@ export const SERVICES = {
     envVar: "GATEWAY_URL",
     defaultUrl: "http://localhost:3334",
   },
+<<<<<<< HEAD
+  legacyApi: {
+    name: "legacy-api",
+    defaultPort: 3333,
+    envVar: "LEGACY_API_URL",
+    defaultUrl: "http://localhost:3333",
+  },
+  clientService: {
+    name: "client-service",
+    defaultPort: 3410,
+    envVar: "CLIENT_SERVICE_URL",
+    defaultUrl: "http://localhost:3410",
+  },
+=======
+>>>>>>> develop
   userService: {
     name: "user-service",
     defaultPort: 3335,

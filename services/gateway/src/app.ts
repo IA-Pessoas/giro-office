@@ -2,7 +2,6 @@ import {
   createAuditRecorder,
   createExpressErrorHandler,
   createSuccessResponse,
-  getServiceUrls,
   gatewayError,
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
@@ -252,8 +251,9 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     );
   });
 
-  app.use("/organizations", buildHttpProxyMiddleware(getServiceUrls().organizationServiceUrl));
-  app.use("/rh", buildHttpProxyMiddleware(getServiceUrls().rhServiceUrl));
+  app.use("/organizations", buildHttpProxyMiddleware(env.organizationServiceUrl));
+  app.use("/clients", buildHttpProxyMiddleware(env.clientServiceUrl));
+  app.use("/rh", buildHttpProxyMiddleware(env.rhServiceUrl));
   if (env.auditEnabled) {
     app.use(
       "/audit",
