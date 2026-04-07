@@ -1,14 +1,7 @@
-import { zNonEmptyText } from "@workspace/shared";
+import { getSingleQueryValue, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
 import { status as statusEnum } from "../generated/prisma/client.js";
-
-function firstQueryPart(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value[0];
-  }
-  return value;
-}
 
 export const createOrganizationBodySchema = z
   .object({
@@ -48,21 +41,21 @@ export const listOrganizationsQuerySchema = z
   .object({
     page: z.preprocess(
       (v) => {
-        const x = firstQueryPart(v);
-        if (x === undefined || x === null || x === "") {
+        const raw = getSingleQueryValue(v);
+        if (raw === undefined || raw === "") {
           return 1;
         }
-        return Number(x);
+        return Number(raw);
       },
       z.number().int().min(1, "page deve ser um inteiro maior ou igual a 1."),
     ),
     pageSize: z.preprocess(
       (v) => {
-        const x = firstQueryPart(v);
-        if (x === undefined || x === null || x === "") {
+        const raw = getSingleQueryValue(v);
+        if (raw === undefined || raw === "") {
           return 20;
         }
-        return Number(x);
+        return Number(raw);
       },
       z
         .number()
@@ -71,11 +64,11 @@ export const listOrganizationsQuerySchema = z
         .max(100, "pageSize deve ser um inteiro entre 1 e 100."),
     ),
     status: z.preprocess((v) => {
-      const x = firstQueryPart(v);
-      if (x === undefined || x === null || x === "") {
+      const raw = getSingleQueryValue(v);
+      if (raw === undefined || raw === "") {
         return undefined;
       }
-      return x;
+      return raw;
     }, z.nativeEnum(statusEnum).optional()),
   })
   .strict();

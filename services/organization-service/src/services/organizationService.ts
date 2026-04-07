@@ -1,5 +1,5 @@
 import { error as logError, ServiceError } from "@workspace/shared";
-import type { status } from "../generated/prisma/client.js";
+import type { Prisma, status } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 
 function generateSlug(name: string): string {
@@ -36,6 +36,56 @@ const ORGANIZATION_SELECT = {
   created_at: true,
   updated_at: true,
 } as const;
+
+const ORGANIZATION_CREATE_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  status: true,
+  subscription_plan: true,
+  logo_url: true,
+  cnpj: true,
+  email_created_by: true,
+  created_at: true,
+} as const;
+
+const ORGANIZATION_STATUS_UPDATE_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  status: true,
+  updated_at: true,
+} as const;
+
+const ORGANIZATION_SUBSCRIPTION_UPDATE_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  subscription_plan: true,
+  updated_at: true,
+} as const;
+
+const ORGANIZATION_LOGO_UPDATE_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  logo_url: true,
+  updated_at: true,
+} as const;
+
+export type OrganizationRow = Prisma.OrganizationGetPayload<{ select: typeof ORGANIZATION_SELECT }>;
+export type OrganizationCreatedRow = Prisma.OrganizationGetPayload<{
+  select: typeof ORGANIZATION_CREATE_SELECT;
+}>;
+export type OrganizationStatusUpdatedRow = Prisma.OrganizationGetPayload<{
+  select: typeof ORGANIZATION_STATUS_UPDATE_SELECT;
+}>;
+export type OrganizationSubscriptionUpdatedRow = Prisma.OrganizationGetPayload<{
+  select: typeof ORGANIZATION_SUBSCRIPTION_UPDATE_SELECT;
+}>;
+export type OrganizationLogoUpdatedRow = Prisma.OrganizationGetPayload<{
+  select: typeof ORGANIZATION_LOGO_UPDATE_SELECT;
+}>;
 
 class OrganizationService {
   async list(params: ListOrganizationsParams) {
@@ -83,17 +133,7 @@ class OrganizationService {
           email_created_by,
           cnpj,
         },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          status: true,
-          subscription_plan: true,
-          logo_url: true,
-          cnpj: true,
-          email_created_by: true,
-          created_at: true,
-        },
+        select: ORGANIZATION_CREATE_SELECT,
       });
 
       return organization;
@@ -105,7 +145,7 @@ class OrganizationService {
     }
   }
 
-  async findById(id: string) {
+  async findById(id: string): Promise<OrganizationRow> {
     try {
       const organization = await prismaClient.organization.findUnique({
         where: { id },
@@ -148,18 +188,15 @@ class OrganizationService {
     }
   }
 
-  async updateSubscriptionPlan(id: string, subscription_plan: string) {
+  async updateSubscriptionPlan(
+    id: string,
+    subscription_plan: string,
+  ): Promise<OrganizationSubscriptionUpdatedRow> {
     try {
       const updated = await prismaClient.organization.update({
         where: { id },
         data: { subscription_plan },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          subscription_plan: true,
-          updated_at: true,
-        },
+        select: ORGANIZATION_SUBSCRIPTION_UPDATE_SELECT,
       });
 
       return updated;
@@ -176,13 +213,7 @@ class OrganizationService {
       const updated = await prismaClient.organization.update({
         where: { id },
         data: { logo_url },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          logo_url: true,
-          updated_at: true,
-        },
+        select: ORGANIZATION_LOGO_UPDATE_SELECT,
       });
 
       return updated;

@@ -56,6 +56,15 @@ function buildForwardHeaders(request: Request): Headers {
 
 export type UpstreamResolver = (method: string, path: string) => string;
 
+/** Colapsa barras consecutivas no path (ex.: /rh//holidays/ → /rh/holidays/), preservando query string. */
+function normalizePathForUpstream(originalUrl: string): string {
+  const queryIndex = originalUrl.indexOf("?");
+  const pathPart = queryIndex === -1 ? originalUrl : originalUrl.slice(0, queryIndex);
+  const queryPart = queryIndex === -1 ? "" : originalUrl.slice(queryIndex);
+  const normalizedPath = pathPart.replace(/\/{2,}/g, "/");
+  return normalizedPath + queryPart;
+}
+
 function createHttpProxy(resolveTargetUrl: (request: Request) => string) {
   return async function httpProxy(
     request: Request,
@@ -63,7 +72,10 @@ function createHttpProxy(resolveTargetUrl: (request: Request) => string) {
     next: NextFunction,
   ): Promise<void> {
     const targetUrl = resolveTargetUrl(request);
-    const upstreamUrl = new URL(request.originalUrl, targetUrl).toString();
+    const upstreamUrl = new URL(
+      normalizePathForUpstream(request.originalUrl),
+      targetUrl,
+    ).toString();
     const body = getRequestBody(request);
 
     try {
