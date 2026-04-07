@@ -51,7 +51,7 @@ describe("project-progress routes", () => {
     });
 
     const res = await request(app)
-      .post("/integracao-project-progress")
+      .post("/project/progress")
       .set("Content-Type", "application/json")
       .send({ project_id: PROJECT_ID });
 
@@ -76,7 +76,7 @@ describe("project-progress routes", () => {
     });
 
     const res = await request(app)
-      .post("/integracao-project-progress")
+      .post("/project/progress")
       .set("Content-Type", "application/json")
       .set(gatewayHeaders())
       .send({ project_id: "não-uuid" });
@@ -103,7 +103,7 @@ describe("project-progress routes", () => {
     });
 
     const res = await request(app)
-      .post("/integracao-project-progress")
+      .post("/project/progress")
       .set("Content-Type", "application/json")
       .set(gatewayHeaders())
       .send({ project_id: PROJECT_ID });

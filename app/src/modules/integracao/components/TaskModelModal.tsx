@@ -250,11 +250,11 @@ export function TaskModelModal({ isOpen, onClose, initialData, onSave }: ModalPr
 
                 // Busca usuários e departamentos
                 const [usersRes, depsRes, tasksRes] = await Promise.all([
-                    apiClient.get('/users', { params: { status: 'Ativo' } }),
+                    apiClient.get('/user/users', { params: { status: 'Ativo' } }),
                     apiClient.get('/departments', { params: { status: 'Ativo' } }),
                     // Busca tarefas para popular o select de dependentes
                     // Ajuste a rota se necessário, estou usando a listagem padrão
-                    apiClient.get('/integracao-tasksModel') 
+                    apiClient.get('/task/models') 
                 ]);
 
                 setUsers(usersRes.data);

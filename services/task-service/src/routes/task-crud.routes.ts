@@ -24,7 +24,7 @@ function requireAuthContext(req: Request): { user_id: string; organization_id: s
 }
 
 router.post(
-  "/integracao-tasks",
+  "/",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -51,7 +51,7 @@ router.post(
 );
 
 router.get(
-  "/integracao-tasks",
+  "/list",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -85,7 +85,7 @@ router.get(
 );
 
 router.put(
-  "/integracao-tasks",
+  "/",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -109,7 +109,7 @@ router.put(
 );
 
 router.get(
-  "/integracao-task",
+  "/",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -130,7 +130,7 @@ router.get(
 );
 
 router.delete(
-  "/integracao-task",
+  "/",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

@@ -23,7 +23,7 @@ function requireAuthContext(req: Request): { user_id: string; organization_id: s
 }
 
 router.put(
-  "/comercial-tasks",
+  "/comercial",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

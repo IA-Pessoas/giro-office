@@ -24,7 +24,7 @@ function requireAuthContext(req: Request): { user_id: string; organization_id: s
 }
 
 router.put(
-  "/integracao-tasks-conclusion",
+  "/conclusion",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -50,7 +50,7 @@ router.put(
 );
 
 router.put(
-  "/integracao-tasks-completeRequest",
+  "/complete-request",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

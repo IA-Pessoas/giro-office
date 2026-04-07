@@ -23,7 +23,7 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
     const apiClient = setupAPIClient(ctx);
     // Otimização: Buscando dados em paralelo
     const [meResponse, userResponse, depsResponse] = await Promise.all([
-      apiClient.get('/me'),
+      apiClient.get('/user/me'),
       apiClient.get('/users-detail', { params: { user_id: id } }),
       apiClient.get('/departments')
     ]);

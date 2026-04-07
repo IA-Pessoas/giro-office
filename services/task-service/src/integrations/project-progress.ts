@@ -30,7 +30,7 @@ class HttpProjectProgressIntegration implements ProjectProgressIntegration {
   readonly #fetchImpl: typeof fetch;
 
   constructor(options: CreateHttpProjectProgressIntegrationOptions) {
-    this.#url = new URL("/integracao-project-progress", options.serviceUrl);
+    this.#url = new URL("/project/progress", options.serviceUrl);
     this.#serviceToken = options.serviceToken;
     this.#fetchImpl = options.fetchImpl ?? fetch;
   }

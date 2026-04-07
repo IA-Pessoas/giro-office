@@ -47,13 +47,13 @@ export function createTaskApp(env: TaskServiceEnv, logger: Logger): Express {
     });
   }
 
-  app.use(taskModelRoutes);
-  app.use(taskDependentRoutes);
-  app.use(taskIntegrationRegularizeRoutes);
-  app.use(taskLifecycleRoutes);
-  app.use(taskComercialRoutes);
-  app.use(taskFinanceiroRoutes);
-  app.use(taskCrudRoutes);
+  app.use("/task", taskModelRoutes);
+  app.use("/task", taskDependentRoutes);
+  app.use("/task", taskIntegrationRegularizeRoutes);
+  app.use("/task", taskLifecycleRoutes);
+  app.use("/task", taskComercialRoutes);
+  app.use("/task", taskFinanceiroRoutes);
+  app.use("/task", taskCrudRoutes);
 
   app.use(
     createExpressErrorHandler({

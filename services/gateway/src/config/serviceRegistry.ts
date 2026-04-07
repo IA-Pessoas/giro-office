@@ -1,34 +1,14 @@
 import type { GatewayEnv } from "./env.js";
 
-const USER_SERVICE_PREFIXES = [
-  "/session",
-  "/start-config",
-  "/me",
-  "/users",
-  "/permission",
-  "/permission-specific",
-  "/permission-integracao",
-] as const;
+const ORGANIZATION_SERVICE_PREFIXES = ["/organizations"] as const;
 
-const TASK_SERVICE_PREFIXES = [
-  "/integracao-tasksModel",
-  "/integracao-taskModel",
-  "/integracao-tasksModel-dependent",
-  "/integracao-taskModel-dependent",
-  "/integracao-tasksIntegration",
-  "/integracao-tasks",
-  "/integracao-tasks-conclusion",
-  "/integracao-tasks-completeRequest",
-  "/integracao-task",
-  "/comercial-tasks",
-  "/financeiro-tasks",
-] as const;
+const RH_SERVICE_PREFIXES = ["/rh"] as const;
 
-const PROJECT_SERVICE_PREFIXES = [
-  "/integracao-projects",
-  "/integracao-project",
-  "/integracao-project-progress",
-] as const;
+const USER_SERVICE_PREFIXES = ["/user"] as const;
+
+const TASK_SERVICE_PREFIXES = ["/task"] as const;
+
+const PROJECT_SERVICE_PREFIXES = ["/project"] as const;
 
 function getNormalizedPath(path: string): string {
   try {
@@ -55,13 +35,13 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       key: "organization-service",
       targetUrl: env.organizationServiceUrl,
       auditTarget: "organization-service",
-      routePrefixes: ["/organizations"],
+      routePrefixes: [...ORGANIZATION_SERVICE_PREFIXES],
     },
     {
       key: "rh-service",
       targetUrl: env.rhServiceUrl,
       auditTarget: "rh-service",
-      routePrefixes: ["/rh"],
+      routePrefixes: [...RH_SERVICE_PREFIXES],
     },
     {
       key: "user-service",

@@ -17,7 +17,7 @@ function requireAuthContext(req: Request): { user_id: string; organization_id: s
 }
 
 router.post(
-  "/integracao-tasksModel-dependent",
+  "/model/dependent",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -49,7 +49,7 @@ router.post(
 );
 
 router.get(
-  "/integracao-tasksModel-dependent",
+  "/model/dependent",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -70,7 +70,7 @@ router.get(
 );
 
 router.delete(
-  "/integracao-taskModel-dependent",
+  "/model/dependent",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

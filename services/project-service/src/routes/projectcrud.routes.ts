@@ -43,7 +43,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
   const router: ReturnType<typeof Router> = Router();
 
   router.post(
-    "/integracao-projects",
+    "/",
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -70,7 +70,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
   );
 
   router.get(
-    "/integracao-projects",
+    "/list",
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -92,7 +92,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
   );
 
   router.put(
-    "/integracao-projects",
+    "/",
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -120,7 +120,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
   );
 
   router.get(
-    "/integracao-project",
+    "/",
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -141,7 +141,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
   );
 
   router.delete(
-    "/integracao-project",
+    "/",
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {

@@ -71,8 +71,8 @@ export function createProjectApplication(options?: {
     });
   }
 
-  app.use(createProjectCrudRoutes(projectCrudService));
-  app.use(createProjectProgressRoutes(projectProgressService));
+  app.use("/project", createProjectCrudRoutes(projectCrudService));
+  app.use("/project", createProjectProgressRoutes(projectProgressService));
 
   app.use(
     createExpressErrorHandler({

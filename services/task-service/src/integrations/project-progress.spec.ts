@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createHttpProjectProgressIntegration } from "./project-progress.js";
 
 describe("project-progress integration", () => {
-  it("chama POST /integracao-project-progress com headers e body esperados", async () => {
+  it("chama POST /project/progress com headers e body esperados", async () => {
     const fetchImpl = vi.fn(async () => new Response(null, { status: 200 }));
     const integration = createHttpProjectProgressIntegration({
       serviceUrl: "http://project-service.local",
@@ -26,7 +26,7 @@ describe("project-progress integration", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, init] = fetchImpl.mock.calls[0] as [URL, RequestInit | undefined];
 
-    expect(url.toString()).toBe("http://project-service.local/integracao-project-progress");
+    expect(url.toString()).toBe("http://project-service.local/project/progress");
     expect(init?.method).toBe("POST");
     expect(init?.headers).toEqual({
       "content-type": "application/json",

@@ -60,7 +60,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/session": {
+      "/user/session": {
         post: {
           tags: ["Auth"],
           summary: "Login (criar sessão)",
@@ -88,7 +88,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/start-config": {
+      "/user/start-config": {
         post: {
           tags: ["Auth"],
           summary: "Primeira configuração (bootstrap)",
@@ -97,7 +97,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/me": {
+      "/user/me": {
         get: {
           tags: ["Auth"],
           summary: "Usuário autenticado (via header encaminhado)",
@@ -107,7 +107,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/users": {
+      "/user": {
         get: {
           tags: ["Users"],
           summary: "Listar usuários",
@@ -175,7 +175,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/users/{id}": {
+      "/user/{id}": {
         get: {
           tags: ["Users"],
           summary: "Buscar usuário por ID",
@@ -247,7 +247,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/users/{id}/photo": {
+      "/user/{id}/photo": {
         post: {
           tags: ["Users"],
           summary: "Upload de foto do usuário",
@@ -280,7 +280,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/permission/{userId}": {
+      "/user/permission/{userId}": {
         get: {
           tags: ["Permission"],
           summary: "Buscar permissões do usuário",

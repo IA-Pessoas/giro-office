@@ -4,7 +4,7 @@ import type { UserItem, CreateUserData, UpdateUserData } from '../types';
 export const userService = {
   list: async (filters?: { status?: string }): Promise<UserItem[]> => {
     const api = setupAPIClient();
-    const response = await api.get('/users', { params: filters });
+    const response = await api.get('/user/users', { params: filters });
     return response.data;
   },
 
@@ -16,7 +16,7 @@ export const userService = {
 
   create: async (data: CreateUserData): Promise<UserItem> => {
     const api = setupAPIClient();
-    const response = await api.post('/users', data);
+    const response = await api.post('/user/users', data);
     return response.data.user;
   },
 

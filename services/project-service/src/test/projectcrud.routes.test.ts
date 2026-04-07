@@ -24,7 +24,7 @@ function gatewayHeaders(): Record<string, string> {
 }
 
 describe("projectcrud routes", () => {
-  it("POST /integracao-projects sem token interno retorna 401", async () => {
+  it("POST /project sem token interno retorna 401", async () => {
     const deps: ProjectCrudRouteDeps = {
       create: vi.fn(async () => ({ create: {} })),
       list: vi.fn(async () => []),
@@ -35,7 +35,7 @@ describe("projectcrud routes", () => {
     const { app } = createProjectApplication({ projectCrudService: deps });
 
     const res = await request(app)
-      .post("/integracao-projects")
+      .post("/project")
       .set("Content-Type", "application/json")
       .send({});
 
@@ -43,7 +43,7 @@ describe("projectcrud routes", () => {
     expect(deps.create).not.toHaveBeenCalled();
   });
 
-  it("POST /integracao-projects com auth gateway chama create e retorna 201", async () => {
+  it("POST /project com auth gateway chama create e retorna 201", async () => {
     const payload = {
       create: {
         id: "d0000000-0000-4000-8000-000000000001",
@@ -67,7 +67,7 @@ describe("projectcrud routes", () => {
     };
 
     const res = await request(app)
-      .post("/integracao-projects")
+      .post("/project")
       .set("Content-Type", "application/json")
       .set(gatewayHeaders())
       .send(body);
@@ -88,7 +88,7 @@ describe("projectcrud routes", () => {
     const { app } = createProjectApplication({ projectCrudService: deps });
 
     const res = await request(app)
-      .get("/integracao-projects")
+      .get("/project/list")
       .query({ ref: "invalido", id: "b0000000-0000-4000-8000-000000000001" })
       .set(gatewayHeaders());
 

@@ -160,7 +160,7 @@ function getGatewayOperationSecurity(
   definition: ServiceSpecDefinition,
   security: Array<Record<string, string[]>> | undefined,
 ): Array<Record<string, string[]>> | undefined {
-  if (path === "/me") {
+  if (path === "/user/me") {
     return [{ bearerAuth: [] }];
   }
 

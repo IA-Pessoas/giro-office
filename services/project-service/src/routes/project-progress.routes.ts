@@ -32,7 +32,7 @@ export function createProjectProgressRoutes(
   const router: ReturnType<typeof Router> = Router();
 
   router.post(
-    "/integracao-project-progress",
+    "/progress",
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {

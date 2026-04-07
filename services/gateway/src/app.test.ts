@@ -150,7 +150,7 @@ it("returns shared unauthorized response when token is missing", async () => {
   const baseUrl = await startServer(server);
 
   try {
-    const response = await fetch(`${baseUrl}/users`);
+    const response = await fetch(`${baseUrl}/user`);
     const body = (await response.json()) as Record<string, unknown>;
 
     expect(response.status).toBe(401);
@@ -174,7 +174,7 @@ it("returns shared forbidden response when permission is insufficient", async ()
   });
 
   try {
-    const response = await fetch(`${baseUrl}/users`, {
+    const response = await fetch(`${baseUrl}/user`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -203,7 +203,7 @@ it("returns shared upstream error when the upstream service is unreachable", asy
   const baseUrl = await startServer(server);
 
   try {
-    const response = await fetch(`${baseUrl}/session`, {
+    const response = await fetch(`${baseUrl}/user/session`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -235,7 +235,7 @@ it("passes upstream error responses through unchanged", async () => {
   const gatewayUrl = await startServer(gateway);
 
   try {
-    const response = await fetch(`${gatewayUrl}/session`, {
+    const response = await fetch(`${gatewayUrl}/user/session`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -290,9 +290,9 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(response.status).toBe(200);
     expect(body.openapi).toBe("3.0.3");
     expect(body.servers?.[0]?.url).toBe(baseUrl);
-    expect(body.paths["/users"]).toBeTruthy();
-    expect(body.paths["/integracao-tasks"]).toBeTruthy();
-    expect(body.paths["/integracao-projects"]).toBeTruthy();
+    expect(body.paths["/user"]).toBeTruthy();
+    expect(body.paths["/task/list"]).toBeTruthy();
+    expect(body.paths["/project/list"]).toBeTruthy();
     expect(body.paths["/organizations"]).toBeTruthy();
     expect(body.paths["/rh/point-config"]).toBeTruthy();
     expect(body.paths["/audit/requests"]).toBeTruthy();
@@ -339,8 +339,8 @@ it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", 
     expect(body.components?.securitySchemes?.bearerAuth).toBeTruthy();
     expect(body.components?.securitySchemes?.forwardedAuthUserId).toBe(undefined);
     expect(body.components?.securitySchemes?.internalServiceToken).toBe(undefined);
-    expect(body.paths["/me"]?.get?.security).toEqual([{ bearerAuth: [] }]);
-    expect(body.paths["/users/{id}"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(body.paths["/user/me"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(body.paths["/user/{id}"]?.get?.security).toEqual([{ bearerAuth: [] }]);
     expect(body.paths["/audit/requests"]?.get?.security).toEqual([{ bearerAuth: [] }]);
   } finally {
     await stopServer(server);
@@ -393,7 +393,7 @@ it("proxies task-service routes mapped in the gateway", async () => {
   const gatewayUrl = await startServer(gateway);
 
   try {
-    const response = await fetch(`${gatewayUrl}/integracao-tasks`, {
+    const response = await fetch(`${gatewayUrl}/task/list`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -403,7 +403,7 @@ it("proxies task-service routes mapped in the gateway", async () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({
       success: true,
-      data: { service: "task-service", path: "/integracao-tasks" },
+      data: { service: "task-service", path: "/task/list" },
     });
   } finally {
     await stopServer(gateway);
@@ -434,7 +434,7 @@ it("proxies project-service routes mapped in the gateway", async () => {
   const gatewayUrl = await startServer(gateway);
 
   try {
-    const response = await fetch(`${gatewayUrl}/integracao-projects`, {
+    const response = await fetch(`${gatewayUrl}/project/list`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -444,7 +444,7 @@ it("proxies project-service routes mapped in the gateway", async () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({
       success: true,
-      data: { service: "project-service", path: "/integracao-projects" },
+      data: { service: "project-service", path: "/project/list" },
     });
   } finally {
     await stopServer(gateway);
@@ -653,7 +653,7 @@ it("records successful proxied requests when audit is enabled", async () => {
   const gatewayUrl = await startServer(gateway);
 
   try {
-    const response = await fetch(`${gatewayUrl}/users`, {
+    const response = await fetch(`${gatewayUrl}/user`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -733,7 +733,7 @@ it("records unauthorized requests when audit is enabled", async () => {
   const gatewayUrl = await startServer(gateway);
 
   try {
-    const response = await fetch(`${gatewayUrl}/users`);
+    const response = await fetch(`${gatewayUrl}/user`);
 
     expect(response.status).toBe(401);
 
@@ -764,7 +764,7 @@ it("records bad gateway failures when audit is enabled", async () => {
   const gatewayUrl = await startServer(gateway);
 
   try {
-    const response = await fetch(`${gatewayUrl}/session`, {
+    const response = await fetch(`${gatewayUrl}/user/session`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -822,7 +822,7 @@ it("records aborted requests when audit is enabled", async () => {
         {
           hostname,
           port,
-          path: "/users",
+          path: "/user",
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,

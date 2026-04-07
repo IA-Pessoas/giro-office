@@ -275,7 +275,7 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
             const fetchUsers = async () => {
                 try {
                     const apiClient = setupAPIClient();
-                    const response = await apiClient.get('/users', { params: { status: 'Ativo' } });
+                    const response = await apiClient.get('/user/users', { params: { status: 'Ativo' } });
                     setUsers(response.data);
                 } catch (error) {
                     console.error("Erro ao buscar usuários");
@@ -309,7 +309,7 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
         setIsLoadingDetails(true);
         try {
             const apiClient = setupAPIClient();
-            const response = await apiClient.get('/integracao-project', {
+            const response = await apiClient.get('/project/project', {
                 params: { project_id: projectId }
             });
 
@@ -380,7 +380,7 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
             
             try {
                 const apiClient = setupAPIClient();
-                await apiClient.delete('/integracao-task', { data: { task_id: item.originalId } });
+                await apiClient.delete('/task/task', { data: { task_id: item.originalId } });
                 toast({ title: 'Tarefa removida do sistema.', status: 'success' });
             } catch (error) {
                 toast({ title: 'Erro ao remover tarefa.', status: 'error' });
@@ -438,7 +438,7 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
 
             if (newTasks.length > 0) {
                 await Promise.all(newTasks.map(task => {
-                    return apiClient.post('/integracao-tasks', {
+                    return apiClient.post('/task/tasks', {
                         model_id: task.modelId,
                         project_id: projectId,
                         client_id: clientId,

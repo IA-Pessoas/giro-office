@@ -17,7 +17,7 @@ function requireAuthContext(req: Request): { user_id: string; organization_id: s
 }
 
 router.post(
-  "/integracao-tasksModel",
+  "/model",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -64,7 +64,7 @@ router.post(
 );
 
 router.get(
-  "/integracao-taskModel",
+  "/model",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -85,7 +85,7 @@ router.get(
 );
 
 router.put(
-  "/integracao-tasksModel",
+  "/model",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -141,7 +141,7 @@ router.put(
 );
 
 router.get(
-  "/integracao-tasksModel",
+  "/model/list",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -172,7 +172,7 @@ router.get(
 );
 
 router.delete(
-  "/integracao-taskModel",
+  "/model",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
