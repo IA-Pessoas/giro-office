@@ -1,15 +1,69 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Shield, Users, KeyRound, FileSearch, Plus } from "lucide-react";
 
 import { departmentService } from "@modules/departments";
 import { CreateUserModal, userService, type UserItem } from "@modules/users";
+import { useAuth } from "@/context/AuthContext";
+import { setupAPIClient } from "@shared/services/api";
 import { useFetch } from "@shared/hooks";
 
 export function Administracao() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
+  const [isLoadingOrganizationId, setIsLoadingOrganizationId] = useState(false);
+  const { user } = useAuth();
+
+  const authOrganizationId =
+    user && "organization_id" in user
+      ? (user as { organization_id?: string }).organization_id
+      : undefined;
 
   const { data: departments = [] } = useFetch(["departments"], () => departmentService.list());
   const { data: users = [], refetch: refetchUsers } = useFetch(["users"], () => userService.list());
+
+  useEffect(() => {
+    if (authOrganizationId) {
+      setOrganizationId(authOrganizationId);
+      return;
+    }
+
+    if (!user?.id) {
+      setOrganizationId(undefined);
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadOrganizationId() {
+      setIsLoadingOrganizationId(true);
+      try {
+        const api = setupAPIClient();
+        const response = await api.get("/me");
+        const nextOrganizationId =
+          response.data?.data?.organization_id ??
+          response.data?.user?.organization_id;
+
+        if (isMounted) {
+          setOrganizationId(nextOrganizationId);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setOrganizationId(undefined);
+        }
+        console.error("Erro ao carregar organization_id do usuario logado", error);
+      } finally {
+        if (isMounted) {
+          setIsLoadingOrganizationId(false);
+        }
+      }
+    }
+
+    void loadOrganizationId();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authOrganizationId, user?.id]);
 
   const handleOpenCreateModal = () => setIsCreateModalOpen(true);
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);
@@ -77,6 +131,9 @@ export function Administracao() {
         onClose={handleCloseCreateModal}
         onUserCreated={handleUserCreated}
         departments={departments}
+        organizationId={organizationId}
+        organizationIdLoading={isLoadingOrganizationId}
+        invitedBy={user?.id}
       />
     </div>
   );
