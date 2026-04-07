@@ -1,5 +1,5 @@
 import { setupAPIClient } from '@shared/services/api';
-import type { UserItem, CreateUserData, UpdateUserData } from '../types';
+import type { UserItem, CreateUserData, AdminCreateUserData, UpdateUserData } from '../types';
 
 export const userService = {
   list: async (filters?: { status?: string }): Promise<UserItem[]> => {
@@ -14,10 +14,10 @@ export const userService = {
     return response.data.user;
   },
 
-  create: async (data: CreateUserData): Promise<UserItem> => {
+  create: async (data: CreateUserData | AdminCreateUserData): Promise<UserItem> => {
     const api = setupAPIClient();
     const response = await api.post('/users', data);
-    return response.data.user;
+    return response.data.data;
   },
 
   update: async (id: string, data: UpdateUserData): Promise<UserItem> => {
