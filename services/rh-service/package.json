@@ -7,18 +7,19 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
+    "test": "vitest run",
     "start": "node dist/server.js",
     "prisma:generate": "pnpm --filter @workspace/infra run prisma:generate",
-    "lint": "biome lint src",
-    "format": "biome format --write src",
-    "check": "biome check src",
-    "test": "pnpm exec vitest run",
-    "test:watch": "pnpm exec vitest"
+    "lint": "biome lint src tests",
+    "format": "biome format --write src tests",
+    "check": "biome check src tests",
+    "test:watch": "vitest",
+    "typecheck:tests": "tsc -p tsconfig.tests.json"
   },
   "dependencies": {
-    "@workspace/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "7.4.1",
+    "@workspace/shared": "workspace:*",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.18.2",
@@ -36,6 +37,6 @@
     "supertest": "^7.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.3.3",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.2"
   }
 }

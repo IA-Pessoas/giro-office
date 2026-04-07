@@ -18,6 +18,10 @@
       "types": "./dist/audit/index.d.ts",
       "default": "./dist/audit/index.js"
     },
+    "./datetime": {
+      "types": "./dist/datetime/index.d.ts",
+      "default": "./dist/datetime/index.js"
+    },
     "./http": {
       "types": "./dist/http/index.d.ts",
       "default": "./dist/http/index.js"
@@ -41,6 +45,10 @@
     "./upload": {
       "types": "./dist/upload/index.d.ts",
       "default": "./dist/upload/index.js"
+    },
+    "./validation": {
+      "types": "./dist/validation/index.d.ts",
+      "default": "./dist/validation/index.js"
     }
   },
   "scripts": {
