@@ -1,4 +1,5 @@
 import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import cors from "cors";
 import express, { type Request } from "express";
@@ -8,6 +9,7 @@ import type { ClientServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { requireInternalToken } from "./middlewares/requireInternalToken.js";
+import { buildClientServiceOpenApiSpec } from "./openapi/spec.js";
 import { createClientRouter } from "./routes/client.routes.js";
 import type { IClientService } from "./services/clientService.js";
 import { runCompetenceOutputUpdate } from "./services/competenceOutputRoutine.js";
@@ -56,6 +58,13 @@ export function createApp({
       }),
     );
   });
+
+  if (env.enableApiDocs) {
+    mountOpenApiDocs(app, {
+      spec: buildClientServiceOpenApiSpec(env),
+      siteTitle: "client-service - OpenAPI",
+    });
+  }
 
   app.post(
     "/internal/competence-output-update",

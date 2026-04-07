@@ -68,6 +68,9 @@ function mockServiceBase(): Pick<
 beforeAll(() => {
   process.env.JWT_SECRET = TEST_JWT_SECRET;
   process.env.DATABASE_URL = "postgresql://127.0.0.1:5432/test";
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-supabase-service-role-key";
+  process.env.ENABLE_API_DOCS = "true";
 });
 
 function buildTestApp(mock: IClientService) {
@@ -105,6 +108,31 @@ describe("client-service", () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data?.service).toBe("client-service");
     expect(res.body.data?.status).toBe("ok");
+  });
+
+  it("GET /openapi.json returns service specification", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+    const res = await request(app).get("/openapi.json");
+
+    expect(res.status).toBe(200);
+    expect(res.body.openapi).toBe("3.0.3");
+    expect(res.body.info?.title).toBe("client-service");
+    expect(res.body.paths?.["/clients"]).toBeDefined();
+    expect(res.body.paths?.["/internal/competence-output-update"]).toBeDefined();
+  });
+
+  it("GET /docs serves Swagger UI assets", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+
+    const docsResponse = await request(app).get("/docs");
+    const initScriptResponse = await request(app).get("/docs/swagger-ui-init.js");
+
+    expect(docsResponse.status).toBe(301);
+    expect(docsResponse.headers.location).toBe("/docs/");
+    expect(initScriptResponse.status).toBe(200);
+    expect(initScriptResponse.text).toContain("/openapi.json");
   });
 
   it("GET /clients returns paginated list from injected service", async () => {
