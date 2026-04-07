@@ -73,18 +73,54 @@ beforeAll(() => {
   process.env.ENABLE_API_DOCS = "true";
 });
 
-function buildTestApp(mock: IClientService) {
+function buildTestApp(
+  mock: IClientService,
+  overrides?: { prisma?: PrismaClient; historyStorage?: HistoryFileStorage },
+) {
   const env = getClientServiceEnv();
   const logger = createLogger({
     service: "client-service-test",
     env: "test",
     level: "silent",
   });
-  const prisma = {} as unknown as PrismaClient;
-  const historyStorage = {
-    saveObjectPath: vi.fn(),
-  } as unknown as HistoryFileStorage;
+  const prisma = overrides?.prisma ?? ({} as unknown as PrismaClient);
+  const historyStorage =
+    overrides?.historyStorage ??
+    ({
+      saveObjectPath: vi.fn(),
+    } as unknown as HistoryFileStorage);
   return createApp({ clientService: mock, env, logger, prisma, historyStorage });
+}
+
+function buildPAPrismaMock() {
+  const paFindFirst = vi
+    .fn()
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce({
+      client_id: TEST_CLIENT_ID,
+      activities: "Comercio",
+    })
+    .mockResolvedValueOnce({
+      client_id: TEST_CLIENT_ID,
+      activities: "Comercio",
+    });
+
+  return {
+    client: {
+      findFirst: vi.fn().mockResolvedValue({ id: TEST_CLIENT_ID }),
+    },
+    pA: {
+      findFirst: paFindFirst,
+      create: vi.fn().mockResolvedValue({
+        client_id: TEST_CLIENT_ID,
+        activities: null,
+      }),
+      update: vi.fn().mockResolvedValue({
+        client_id: TEST_CLIENT_ID,
+        activities: "Atualizado",
+      }),
+    },
+  } as unknown as PrismaClient;
 }
 
 function bearerToken(organizationId: string, permission?: number): string {
@@ -119,6 +155,7 @@ describe("client-service", () => {
     expect(res.body.openapi).toBe("3.0.3");
     expect(res.body.info?.title).toBe("client-service");
     expect(res.body.paths?.["/clients"]).toBeDefined();
+    expect(res.body.paths?.["/clients/{id}/pa"]).toBeDefined();
     expect(res.body.paths?.["/internal/competence-output-update"]).toBeDefined();
   });
 
@@ -388,6 +425,38 @@ describe("client-service", () => {
 
     expect(res.status).toBe(400);
     expect(mock.create).toHaveBeenCalled();
+  });
+
+  it("supports create, detail and update for client PA", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const prisma = buildPAPrismaMock();
+    const app = buildTestApp(mock, { prisma });
+    const token = bearerToken(TEST_ORG_ID);
+
+    const createResponse = await request(app)
+      .post(`/clients/${TEST_CLIENT_ID}/pa`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({});
+
+    expect(createResponse.status).toBe(201);
+    expect(createResponse.body.success).toBe(true);
+
+    const detailResponse = await request(app)
+      .get(`/clients/${TEST_CLIENT_ID}/pa`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.body.success).toBe(true);
+    expect(detailResponse.body.data.detail.client_id).toBe(TEST_CLIENT_ID);
+
+    const updateResponse = await request(app)
+      .patch(`/clients/${TEST_CLIENT_ID}/pa`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ activities: "Atualizado" });
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.success).toBe(true);
+    expect(updateResponse.body.data.activities).toBe("Atualizado");
   });
 });
 

@@ -114,6 +114,37 @@ export const updateRegularizeBodySchema = z
   .strict()
   .refine((d) => Object.keys(d).length > 0, "Informe ao menos um campo para atualizar.");
 
+export const createClientPABodySchema = z.object({}).strict();
+
+export const updateClientPABodySchema = z
+  .object({
+    activities: z.string().nullable().optional(),
+    tax_billing: z.string().nullable().optional(),
+    management_billing: z.string().nullable().optional(),
+    works_bidding: z.boolean().nullable().optional(),
+    dissatisfaction: z.string().nullable().optional(),
+    registered_collabortors: z.number().int().nullable().optional(),
+    unregistered_collabortors: z.number().int().nullable().optional(),
+    esocial: z.boolean().nullable().optional(),
+    how_many_banks: z.boolean().nullable().optional(),
+    whitch_banks: z.string().nullable().optional(),
+    responsible_departments: z.string().nullable().optional(),
+    works_system: z.boolean().nullable().optional(),
+    system_name: z.string().nullable().optional(),
+    system_usage_time: z.string().nullable().optional(),
+    system_value: z.string().nullable().optional(),
+    system_contact: z.string().nullable().optional(),
+    system_operations: z.string().nullable().optional(),
+    cloud_storage: z.boolean().nullable().optional(),
+    which_cloud_storage: z.string().nullable().optional(),
+    rental_agreement: z.boolean().nullable().optional(),
+    assessment_regime: z.string().nullable().optional(),
+    permit: z.string().nullable().optional(),
+    services: z.string().nullable().optional(),
+  })
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, "Informe ao menos um campo para atualizar.");
+
 export const createHistoryBodySchema = z
   .object({
     date: z.coerce.date(),
@@ -148,3 +179,5 @@ export type UpdateCommercialBody = z.infer<typeof updateCommercialBodySchema>;
 export type TerminationBody = z.infer<typeof terminationBodySchema>;
 export type UpdateFinanceBody = z.infer<typeof updateFinanceBodySchema>;
 export type UpdateRegularizeBody = z.infer<typeof updateRegularizeBodySchema>;
+export type CreateClientPABody = z.infer<typeof createClientPABodySchema>;
+export type UpdateClientPABody = z.infer<typeof updateClientPABodySchema>;

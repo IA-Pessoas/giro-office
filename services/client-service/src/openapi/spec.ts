@@ -273,6 +273,77 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+      "/clients/{id}/pa": {
+        get: {
+          tags: ["Clients"],
+          summary: "Obter PA do cliente",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Detalhe do PA",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
+        post: {
+          tags: ["Clients"],
+          summary: "Criar PA do cliente",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "PA criado",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
+        patch: {
+          tags: ["Clients"],
+          summary: "Atualizar PA do cliente",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  example: {
+                    activities: "Comercio varejista",
+                    works_bidding: false,
+                    esocial: true,
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "PA atualizado",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
+      },
       "/clients/{id}/commercial": {
         patch: {
           tags: ["Verticals"],
