@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { loggerLevelSchema, type LoggerLevel } from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -38,7 +39,7 @@ const gatewayEnvSchema = z
     organizationServiceUrl: z.string().url().default("http://localhost:3400"),
     clientServiceUrl: z.string().url().default("http://localhost:3410"),
     rhServiceUrl: z.string().url().default("http://localhost:3339"),
-    jwtSecret: z.string().min(1, "JWT_SECRET não definido para o gateway."),
+    jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o gateway."),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
       .string()

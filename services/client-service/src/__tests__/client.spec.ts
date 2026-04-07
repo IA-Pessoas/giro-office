@@ -13,6 +13,7 @@ import {
   type IClientService,
   type OrganizationPublic,
 } from "../services/clientService.js";
+import type { HistoryFileStorage } from "../services/historyStorage.js";
 
 const TEST_JWT_SECRET = "test-jwt-secret-for-client-service";
 const TEST_ORG_ID = "550e8400-e29b-41d4-a716-446655440000";
@@ -67,6 +68,9 @@ function mockServiceBase(): Pick<
 beforeAll(() => {
   process.env.JWT_SECRET = TEST_JWT_SECRET;
   process.env.DATABASE_URL = "postgresql://127.0.0.1:5432/test";
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-supabase-service-role-key";
+  process.env.ENABLE_API_DOCS = "true";
 });
 
 function buildTestApp(mock: IClientService) {
@@ -76,11 +80,22 @@ function buildTestApp(mock: IClientService) {
     env: "test",
     level: "silent",
   });
-  return createApp({ clientService: mock, env, logger });
+  const prisma = {} as unknown as PrismaClient;
+  const historyStorage = {
+    saveObjectPath: vi.fn(),
+  } as unknown as HistoryFileStorage;
+  return createApp({ clientService: mock, env, logger, prisma, historyStorage });
 }
 
-function bearerToken(organizationId: string): string {
-  return jwt.sign({ user_id: "user-test-1", organization_id: organizationId }, TEST_JWT_SECRET);
+function bearerToken(organizationId: string, permission?: number): string {
+  return jwt.sign(
+    {
+      user_id: "user-test-1",
+      organization_id: organizationId,
+      ...(permission !== undefined ? { permission } : {}),
+    },
+    TEST_JWT_SECRET,
+  );
 }
 
 describe("client-service", () => {
@@ -93,6 +108,31 @@ describe("client-service", () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data?.service).toBe("client-service");
     expect(res.body.data?.status).toBe("ok");
+  });
+
+  it("GET /openapi.json returns service specification", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+    const res = await request(app).get("/openapi.json");
+
+    expect(res.status).toBe(200);
+    expect(res.body.openapi).toBe("3.0.3");
+    expect(res.body.info?.title).toBe("client-service");
+    expect(res.body.paths?.["/clients"]).toBeDefined();
+    expect(res.body.paths?.["/internal/competence-output-update"]).toBeDefined();
+  });
+
+  it("GET /docs serves Swagger UI assets", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+
+    const docsResponse = await request(app).get("/docs");
+    const initScriptResponse = await request(app).get("/docs/swagger-ui-init.js");
+
+    expect(docsResponse.status).toBe(301);
+    expect(docsResponse.headers.location).toBe("/docs/");
+    expect(initScriptResponse.status).toBe(200);
+    expect(initScriptResponse.text).toContain("/openapi.json");
   });
 
   it("GET /clients returns paginated list from injected service", async () => {
@@ -117,7 +157,8 @@ describe("client-service", () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data).toEqual(page);
     expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, {
-      statusDbValue: undefined,
+      ref: undefined,
+      status: undefined,
       page: 1,
       pageSize: 20,
       search: undefined,
@@ -140,7 +181,8 @@ describe("client-service", () => {
 
     expect(res.status).toBe(200);
     expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, {
-      statusDbValue: "Ativo",
+      ref: undefined,
+      status: "Ativo",
       page: 1,
       pageSize: 20,
       search: undefined,
@@ -163,7 +205,8 @@ describe("client-service", () => {
 
     expect(res.status).toBe(200);
     expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, {
-      statusDbValue: "Prospecção",
+      ref: undefined,
+      status: "Prospect",
       page: 1,
       pageSize: 20,
       search: undefined,
@@ -275,6 +318,19 @@ describe("client-service", () => {
     );
   });
 
+  it("DELETE /clients/:id devolve 403 sem permission=2 no token", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .delete(`/clients/${TEST_CLIENT_ID}`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(403);
+    expect(mock.deactivate).not.toHaveBeenCalled();
+  });
+
   it("DELETE /clients/:id desativa via service e devolve envelope", async () => {
     const deactivated = baseClient({
       status: "Inativo",
@@ -285,7 +341,7 @@ describe("client-service", () => {
       deactivate: vi.fn().mockResolvedValue(deactivated),
     };
     const app = buildTestApp(mock);
-    const token = bearerToken(TEST_ORG_ID);
+    const token = bearerToken(TEST_ORG_ID, 2);
 
     const res = await request(app)
       .delete(`/clients/${TEST_CLIENT_ID}`)

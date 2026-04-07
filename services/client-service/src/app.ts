@@ -1,13 +1,19 @@
 import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import cors from "cors";
 import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { ClientServiceEnv } from "./config/env.js";
+import type { PrismaClient } from "./generated/prisma/client.js";
 import { requestContext } from "./middlewares/requestContext.js";
+import { requireInternalToken } from "./middlewares/requireInternalToken.js";
+import { buildClientServiceOpenApiSpec } from "./openapi/spec.js";
 import { createClientRouter } from "./routes/client.routes.js";
 import type { IClientService } from "./services/clientService.js";
+import { runCompetenceOutputUpdate } from "./services/competenceOutputRoutine.js";
+import type { HistoryFileStorage } from "./services/historyStorage.js";
 
 function clientServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -24,11 +30,19 @@ function clientServiceErrorLogContext(request: Request): Record<string, unknown>
 
 export interface CreateAppOptions {
   clientService: IClientService;
+  prisma: PrismaClient;
   env: ClientServiceEnv;
   logger: Logger;
+  historyStorage: HistoryFileStorage;
 }
 
-export function createApp({ clientService, env, logger }: CreateAppOptions): express.Express {
+export function createApp({
+  clientService,
+  prisma,
+  env,
+  logger,
+  historyStorage,
+}: CreateAppOptions): express.Express {
   const app = express();
 
   app.use(cors());
@@ -45,7 +59,27 @@ export function createApp({ clientService, env, logger }: CreateAppOptions): exp
     );
   });
 
-  app.use(createClientRouter(clientService));
+  if (env.enableApiDocs) {
+    mountOpenApiDocs(app, {
+      spec: buildClientServiceOpenApiSpec(env),
+      siteTitle: "client-service - OpenAPI",
+    });
+  }
+
+  app.post(
+    "/internal/competence-output-update",
+    requireInternalToken(env),
+    async (_request, response, next) => {
+      try {
+        const result = await runCompetenceOutputUpdate(prisma);
+        response.json(createSuccessResponse(result));
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  app.use(createClientRouter({ clientService, prisma, historyStorage }));
 
   app.use(
     createExpressErrorHandler({

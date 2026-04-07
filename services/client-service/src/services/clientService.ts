@@ -1,10 +1,13 @@
 import { ServiceError } from "@workspace/shared";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
-import type {
-  CreateClientBody,
-  ListClientsFilters,
-  UpdateClientBody,
+import {
+  type ClientListStatus,
+  type CreateClientBody,
+  type ListClientsFilters,
+  mapSimpleListStatusToDb,
+  type UpdateClientBody,
 } from "../schemas/client.schema.js";
+import { buildLegacyListStatusWhere, mergeClientListSearchWhere } from "./clientListQuery.js";
 
 export type OrganizationPublic = {
   id: string;
@@ -62,6 +65,60 @@ type ClientRowWithOrganization = Prisma.ClientGetPayload<{
   select: typeof clientWithOrganizationSelect;
 }>;
 
+const EXTENDED_CLIENT_KEYS = [
+  "dominio_code",
+  "address",
+  "cep",
+  "neighborhood",
+  "state",
+  "city",
+  "customer_since",
+  "municipal_registration",
+  "state_registration",
+  "commercial_board_registration",
+  "competence_entry",
+  "competence_output",
+  "opening_date",
+  "instagram",
+  "indication",
+  "regime",
+  "size",
+  "segment",
+  "start_strike",
+  "end_strike",
+  "cnae",
+  "cnae_secondary",
+  "responsible",
+  "cpf_responsible",
+  "agent",
+  "cpf_agent",
+  "number",
+  "email",
+  "contabil",
+  "fiscal",
+  "pessoal",
+  "infoproduto",
+  "consultoria",
+  "castelo_med",
+  "contract",
+  "date_status",
+  "description_prospecting",
+  "participants_meet",
+  "meet_type",
+  "register_date_prospecting",
+] as const;
+
+function takeExtendedFields(input: CreateClientBody | UpdateClientBody): Record<string, unknown> {
+  const src = input as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const k of EXTENDED_CLIENT_KEYS) {
+    if (src[k] !== undefined) {
+      out[k] = src[k];
+    }
+  }
+  return out;
+}
+
 function toPublic(row: ClientRowWithOrganization): ClientPublic {
   return {
     id: row.id,
@@ -84,19 +141,15 @@ function toPublic(row: ClientRowWithOrganization): ClientPublic {
   };
 }
 
-function buildListSearchWhere(search: string | undefined): Prisma.ClientWhereInput {
-  const term = search?.trim();
-  if (!term) {
-    return {};
+function buildListStatusWhere(filters: ListClientsFilters): Prisma.ClientWhereInput | undefined {
+  const st = filters.status;
+  if (!st || st === "Todos") {
+    return undefined;
   }
-  return {
-    OR: [
-      { name: { contains: term, mode: "insensitive" } },
-      { company_name: { contains: term, mode: "insensitive" } },
-      { fantasy_name: { contains: term, mode: "insensitive" } },
-      { cpf_cnpj: { contains: term, mode: "insensitive" } },
-    ],
-  };
+  if (!filters.ref) {
+    return { status: mapSimpleListStatusToDb(st as ClientListStatus) };
+  }
+  return buildLegacyListStatusWhere(filters.ref, st);
 }
 
 export interface IClientService {
@@ -115,11 +168,11 @@ export class ClientService implements IClientService {
     organizationId: string,
     filters: ListClientsFilters,
   ): Promise<ClientListPage> {
-    const where: Prisma.ClientWhereInput = {
-      organization_id: organizationId,
-      ...(filters.statusDbValue !== undefined ? { status: filters.statusDbValue } : {}),
-      ...buildListSearchWhere(filters.search),
-    };
+    const statusWhere = buildListStatusWhere(filters);
+    const where = mergeClientListSearchWhere(
+      { organization_id: organizationId, ...(statusWhere ?? {}) },
+      filters.search,
+    );
     const skip = (filters.page - 1) * filters.pageSize;
     const take = filters.pageSize;
 
@@ -162,6 +215,8 @@ export class ClientService implements IClientService {
       throw new ServiceError(400, "Organização não encontrada.");
     }
 
+    const extended = takeExtendedFields(input);
+
     const row = await this.prisma.client.create({
       data: {
         name: input.name,
@@ -174,7 +229,8 @@ export class ClientService implements IClientService {
         type: input.type,
         type_registration: input.type_registration,
         service_unique: input.service_unique,
-      },
+        ...extended,
+      } as Prisma.ClientUncheckedCreateInput,
       select: clientWithOrganizationSelect,
     });
 
@@ -190,19 +246,51 @@ export class ClientService implements IClientService {
       throw new ServiceError(404, "Cliente não encontrado.");
     }
 
+    const extended = takeExtendedFields(input);
+
+    const data: Record<string, unknown> = {};
+
+    if (input.name !== undefined) {
+      data.name = input.name;
+    }
+
+    if (input.status !== undefined) {
+      data.status = input.status;
+    }
+
+    if (input.cpf_cnpj !== undefined) {
+      data.cpf_cnpj = input.cpf_cnpj;
+    }
+
+    if (input.company_name !== undefined) {
+      data.company_name = input.company_name;
+    }
+
+    if (input.fantasy_name !== undefined) {
+      data.fantasy_name = input.fantasy_name;
+    }
+
+    if (input.prospecting_status !== undefined) {
+      data.prospecting_status = input.prospecting_status;
+    }
+
+    if (input.service_unique !== undefined) {
+      data.service_unique = input.service_unique;
+    }
+
+    if (input.type !== undefined) {
+      data.type = input.type;
+    }
+
+    if (input.type_registration !== undefined) {
+      data.type_registration = input.type_registration;
+    }
+
+    Object.assign(data, extended);
+
     const row = await this.prisma.client.update({
       where: { id },
-      data: {
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
-        ...(input.cpf_cnpj !== undefined ? { cpf_cnpj: input.cpf_cnpj } : {}),
-        ...(input.company_name !== undefined ? { company_name: input.company_name } : {}),
-        ...(input.fantasy_name !== undefined ? { fantasy_name: input.fantasy_name } : {}),
-        ...(input.prospecting_status !== undefined
-          ? { prospecting_status: input.prospecting_status }
-          : {}),
-        ...(input.service_unique !== undefined ? { service_unique: input.service_unique } : {}),
-      },
+      data: data as Prisma.ClientUncheckedUpdateInput,
       select: clientWithOrganizationSelect,
     });
 
