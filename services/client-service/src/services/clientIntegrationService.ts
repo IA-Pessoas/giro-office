@@ -101,6 +101,10 @@ export async function updateIntegrationClient(
     ...(input.service_unique !== undefined ? { service_unique: input.service_unique } : {}),
   };
 
+  if (Object.keys(data).length === 0) {
+    throw new ServiceError(400, "Informe ao menos um campo para atualizar.");
+  }
+
   const select = {
     id: true,
     type: true,
