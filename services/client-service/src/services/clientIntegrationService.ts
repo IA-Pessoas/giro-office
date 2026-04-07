@@ -76,30 +76,87 @@ export async function updateIntegrationClient(
   const cleanedCpfAgent =
     input.cpf_agent !== undefined ? cleanDocument(input.cpf_agent) : undefined;
 
-  const data = {
-    ...(input.type !== undefined ? { type: input.type } : {}),
-    ...(input.name !== undefined ? { name: input.name } : {}),
-    ...(input.company_name !== undefined ? { company_name: input.company_name } : {}),
-    ...(input.fantasy_name !== undefined ? { fantasy_name: input.fantasy_name } : {}),
-    ...(cleanedCpfCnpj !== undefined ? { cpf_cnpj: cleanedCpfCnpj } : {}),
-    ...(input.responsible !== undefined ? { responsible: input.responsible } : {}),
-    ...(cleanedCpfResponsible !== undefined ? { cpf_responsible: cleanedCpfResponsible } : {}),
-    ...(input.agent !== undefined ? { agent: input.agent } : {}),
-    ...(cleanedCpfAgent !== undefined ? { cpf_agent: cleanedCpfAgent } : {}),
-    ...(input.number !== undefined ? { number: input.number } : {}),
-    ...(input.email !== undefined ? { email: input.email } : {}),
-    ...(input.address !== undefined ? { address: input.address } : {}),
-    ...(input.cep !== undefined ? { cep: input.cep } : {}),
-    ...(input.neighborhood !== undefined ? { neighborhood: input.neighborhood } : {}),
-    ...(input.state !== undefined ? { state: input.state } : {}),
-    ...(input.city !== undefined ? { city: input.city } : {}),
-    ...(input.instagram !== undefined ? { instagram: input.instagram } : {}),
-    ...(input.indication !== undefined ? { indication: input.indication } : {}),
-    ...(input.type_registration !== undefined
-      ? { type_registration: input.type_registration }
-      : {}),
-    ...(input.service_unique !== undefined ? { service_unique: input.service_unique } : {}),
-  };
+  const data: Record<string, unknown> = {};
+
+  if (input.type !== undefined) {
+    data.type = input.type;
+  }
+
+  if (input.name !== undefined) {
+    data.name = input.name;
+  }
+
+  if (input.company_name !== undefined) {
+    data.company_name = input.company_name;
+  }
+
+  if (input.fantasy_name !== undefined) {
+    data.fantasy_name = input.fantasy_name;
+  }
+
+  if (cleanedCpfCnpj !== undefined) {
+    data.cpf_cnpj = cleanedCpfCnpj;
+  }
+
+  if (input.responsible !== undefined) {
+    data.responsible = input.responsible;
+  }
+
+  if (cleanedCpfResponsible !== undefined) {
+    data.cpf_responsible = cleanedCpfResponsible;
+  }
+
+  if (input.agent !== undefined) {
+    data.agent = input.agent;
+  }
+
+  if (cleanedCpfAgent !== undefined) {
+    data.cpf_agent = cleanedCpfAgent;
+  }
+
+  if (input.number !== undefined) {
+    data.number = input.number;
+  }
+
+  if (input.email !== undefined) {
+    data.email = input.email;
+  }
+
+  if (input.address !== undefined) {
+    data.address = input.address;
+  }
+
+  if (input.cep !== undefined) {
+    data.cep = input.cep;
+  }
+
+  if (input.neighborhood !== undefined) {
+    data.neighborhood = input.neighborhood;
+  }
+
+  if (input.state !== undefined) {
+    data.state = input.state;
+  }
+
+  if (input.city !== undefined) {
+    data.city = input.city;
+  }
+
+  if (input.instagram !== undefined) {
+    data.instagram = input.instagram;
+  }
+
+  if (input.indication !== undefined) {
+    data.indication = input.indication;
+  }
+
+  if (input.type_registration !== undefined) {
+    data.type_registration = input.type_registration;
+  }
+
+  if (input.service_unique !== undefined) {
+    data.service_unique = input.service_unique;
+  }
 
   if (Object.keys(data).length === 0) {
     throw new ServiceError(400, "Informe ao menos um campo para atualizar.");
