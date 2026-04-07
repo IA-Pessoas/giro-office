@@ -78,7 +78,7 @@ describe("terminateClient", () => {
     expect(update).toHaveBeenCalledWith({
       where: { id: "client-1" },
       data: {
-        status: "Processo de InativaÃ§Ã£o",
+        status: "Processo de Inativação",
         competence_output: new Date("2026-03-31T23:59:59.999Z"),
       },
       select: { id: true },

@@ -108,8 +108,9 @@ export async function updateCommercialClient(
       },
     });
   } else if (prospecting_status === "Fechado") {
+    const reopenTaskStatuses = ["A Realizar", "Em andamento"];
     const baseWhere = {
-      status: { in: ["A Realizar", "Em andamento"] as const },
+      status: { in: reopenTaskStatuses },
       charge_comercial: false,
       client_id: clientId,
       organization_id: organizationId,
