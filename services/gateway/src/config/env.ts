@@ -32,6 +32,8 @@ const gatewayEnvSchema = z
         const parsed = Number.parseInt(val, 10);
         return Number.isNaN(parsed) ? 3334 : parsed;
       }),
+    organizationServiceUrl: z.string().url().default("http://localhost:3400"),
+    rhServiceUrl: z.string().url().default("http://localhost:3339"),
     userServiceUrl: z.string().url().default("http://localhost:3335"),
     taskServiceUrl: z.string().url().default("http://localhost:3337"),
     projectServiceUrl: z.string().url().default("http://localhost:3338"),
@@ -74,6 +76,8 @@ export interface GatewayEnv {
   auditServiceToken: string;
   auditServiceUrl: string;
   port: number;
+  organizationServiceUrl: string;
+  rhServiceUrl: string;
   userServiceUrl: string;
   taskServiceUrl: string;
   projectServiceUrl: string;
@@ -91,6 +95,8 @@ export function getGatewayEnv(): GatewayEnv {
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     port: process.env.GATEWAY_PORT,
+    organizationServiceUrl: process.env.ORGANIZATION_SERVICE_URL,
+    rhServiceUrl: process.env.RH_SERVICE_URL,
     userServiceUrl: process.env.USER_SERVICE_URL,
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,

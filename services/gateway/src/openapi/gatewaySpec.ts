@@ -1,5 +1,4 @@
 import type { OpenApiDocument } from "@workspace/shared/http";
-import { getServiceUrls } from "@workspace/shared/routes/services";
 
 import { buildAuditServiceOpenApiSpec } from "../../../audit-service/src/openapi/spec.js";
 import { buildOrganizationServiceOpenApiSpec } from "../../../organization-service/src/openapi/spec.js";
@@ -48,8 +47,6 @@ function getMutableComponents(spec: AggregatedOpenApiDocument): OpenApiComponent
 }
 
 function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
-  const { organizationServiceUrl, rhServiceUrl } = getServiceUrls();
-
   return [
     {
       key: "user-service",
@@ -77,14 +74,15 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "Organization Service",
       buildSpec: () =>
         buildOrganizationServiceOpenApiSpec({
-          port: getPortFromUrl(organizationServiceUrl),
+          port: getPortFromUrl(env.organizationServiceUrl),
         } as never),
       includePath: (path) => path !== "/health",
     },
     {
       key: "rh-service",
       label: "RH Service",
-      buildSpec: () => buildRhServiceOpenApiSpec({ port: getPortFromUrl(rhServiceUrl) } as never),
+      buildSpec: () =>
+        buildRhServiceOpenApiSpec({ port: getPortFromUrl(env.rhServiceUrl) } as never),
       includePath: (path) => path !== "/health",
     },
     {

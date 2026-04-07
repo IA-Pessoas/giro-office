@@ -1,4 +1,4 @@
-import { once } from "node:events";
+﻿import { once } from "node:events";
 import { createServer, type IncomingMessage, request as nodeRequest, type Server } from "node:http";
 import { Writable } from "node:stream";
 import { expect, it } from "vitest";
@@ -124,6 +124,8 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     auditServiceToken: "audit-service-token",
     auditServiceUrl: "http://127.0.0.1:3335",
     port: 0,
+    organizationServiceUrl: "http://127.0.0.1:3400",
+    rhServiceUrl: "http://127.0.0.1:3339",
     userServiceUrl: "http://127.0.0.1:3335",
     taskServiceUrl: "http://127.0.0.1:3337",
     projectServiceUrl: "http://127.0.0.1:3338",
@@ -450,6 +452,88 @@ it("proxies project-service routes mapped in the gateway", async () => {
   }
 });
 
+it("proxies organization-service routes mapped in the gateway", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const organizationService = createServer((request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: { service: "organization-service", path: request.url },
+      }),
+    );
+  });
+  const organizationServiceUrl = await startServer(organizationService);
+
+  const app = createApp(createEnv({ organizationServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/organizations`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      success: true,
+      data: { service: "organization-service", path: "/organizations" },
+    });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(organizationService);
+  }
+});
+
+it("proxies rh-service routes mapped in the gateway", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const rhService = createServer((request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: { service: "rh-service", path: request.url },
+      }),
+    );
+  });
+  const rhServiceUrl = await startServer(rhService);
+
+  const app = createApp(createEnv({ rhServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/rh/point-config`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      success: true,
+      data: { service: "rh-service", path: "/rh/point-config" },
+    });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(rhService);
+  }
+});
+
 it("returns 404 for routes not mapped to any upstream", async () => {
   const token = createToken({
     user_id: "user-1",
@@ -585,6 +669,50 @@ it("records successful proxied requests when audit is enabled", async () => {
     expect(auditService.records[0]?.userId).toBe("user-1");
     expect(auditService.records[0]?.statusCode).toBe(200);
     expect(auditService.records[0]?.outcome).toBe("success");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+    await stopServer(auditService.server);
+  }
+});
+
+it("records organization-service route targets when audit is enabled", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const auditService = await startAuditIngestServer();
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ ok: true }));
+  });
+  const organizationServiceUrl = await startServer(upstream);
+
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      organizationServiceUrl,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/organizations`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+
+    await waitForRecords(auditService.records, 1);
+
+    expect(auditService.records[0]?.metadata?.routeTarget).toBe("organization-service");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
