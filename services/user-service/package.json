@@ -10,7 +10,9 @@
     "predev": "pnpm sync:prisma",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "pnpm exec vitest run",
+    "test:watch": "pnpm exec vitest"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",
@@ -35,7 +37,10 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.3.0",
+    "@types/supertest": "^6.0.2",
+    "supertest": "^7.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.0"
   }
 }

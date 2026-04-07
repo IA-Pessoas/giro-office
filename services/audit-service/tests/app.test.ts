@@ -1,8 +1,7 @@
-import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 import { Writable } from "node:stream";
-import test from "node:test";
+import { expect, it } from "vitest";
 
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -157,7 +156,7 @@ function withReadHeaders(permission = "2", organizationId = "org-1"): HeadersIni
   });
 }
 
-test("returns 404 for audit routes when the feature flag is disabled", async () => {
+it("returns 404 for audit routes when the feature flag is disabled", async () => {
   const app = createApp({
     env: createEnv({ auditEnabled: false }),
     logger: createTestLogger(),
@@ -172,14 +171,14 @@ test("returns 404 for audit routes when the feature flag is disabled", async () 
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 404);
-    assert.equal(body.error, "Recurso não encontrado.");
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Recurso não encontrado.");
   } finally {
     await stopServer(server);
   }
 });
 
-test("stores audit records through the internal ingest endpoint", async () => {
+it("stores audit records through the internal ingest endpoint", async () => {
   const repository = createTestRepository();
   const app = createApp({
     env: createEnv(),
@@ -213,7 +212,7 @@ test("stores audit records through the internal ingest endpoint", async () => {
       body: JSON.stringify(payload),
     });
 
-    assert.equal(createResponse.status, 201);
+    expect(createResponse.status).toBe(201);
 
     const readResponse = await fetch(`${baseUrl}/audit/requests/req-1`, {
       headers: withReadHeaders(),
@@ -223,15 +222,15 @@ test("stores audit records through the internal ingest endpoint", async () => {
       data: { item: AuditRequestRecord };
     };
 
-    assert.equal(readResponse.status, 200);
-    assert.equal(readBody.data.item.requestId, "req-1");
-    assert.equal(readBody.data.item.organizationId, "org-1");
+    expect(readResponse.status).toBe(200);
+    expect(readBody.data.item.requestId).toBe("req-1");
+    expect(readBody.data.item.organizationId).toBe("org-1");
   } finally {
     await stopServer(server);
   }
 });
 
-test("denies audit reads for non-admin permissions", async () => {
+it("denies audit reads for non-admin permissions", async () => {
   const app = createApp({
     env: createEnv(),
     logger: createTestLogger(),
@@ -246,14 +245,14 @@ test("denies audit reads for non-admin permissions", async () => {
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 403);
-    assert.equal(body.error, "Acesso negado para esta rota.");
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Acesso negado para esta rota.");
   } finally {
     await stopServer(server);
   }
 });
 
-test("scopes audit search results to the forwarded organization", async () => {
+it("scopes audit search results to the forwarded organization", async () => {
   const repository = createTestRepository();
   await repository.create({
     requestId: "req-1",
@@ -301,9 +300,9 @@ test("scopes audit search results to the forwarded organization", async () => {
       data: AuditSearchResult;
     };
 
-    assert.equal(response.status, 200);
-    assert.equal(body.data.total, 1);
-    assert.equal(body.data.items[0]?.requestId, "req-1");
+    expect(response.status).toBe(200);
+    expect(body.data.total).toBe(1);
+    expect(body.data.items[0]?.requestId).toBe("req-1");
   } finally {
     await stopServer(server);
   }

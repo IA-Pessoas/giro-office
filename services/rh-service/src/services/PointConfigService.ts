@@ -1,7 +1,7 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import { error as logError, parseTimeToDate, ServiceError } from "@workspace/shared";
 
+import type { Prisma } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
-import { parseTimeToDate } from "../utils/parseTimeToDate.js";
 
 export interface PointConfigUpsertInput {
   user_id: string;
@@ -26,8 +26,12 @@ const POINT_CONFIG_SELECT = {
   signature: true,
 } as const;
 
+export type PointConfigSnapshot = Prisma.PointsConfigGetPayload<{
+  select: typeof POINT_CONFIG_SELECT;
+}>;
+
 class PointConfigService {
-  async upsert(data: PointConfigUpsertInput) {
+  async upsert(data: PointConfigUpsertInput): Promise<PointConfigSnapshot> {
     try {
       if (!data.user_id?.trim()) {
         throw new ServiceError(400, "user_id é obrigatório.");
@@ -91,7 +95,7 @@ class PointConfigService {
     }
   }
 
-  async getByUserId(userId: string, organizationId: string) {
+  async getByUserId(userId: string, organizationId: string): Promise<PointConfigSnapshot | null> {
     try {
       if (!userId?.trim()) {
         throw new ServiceError(400, "user_id é obrigatório.");

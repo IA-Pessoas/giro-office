@@ -26,11 +26,31 @@ const rhEnvSchema = z
       .optional()
       .default("false")
       .transform((value) => parseBoolean(value)),
+    pointMinIntervalMinutes: z
+      .string()
+      .optional()
+      .default("30")
+      .transform((val) => {
+        const parsed = Number.parseInt(val, 10);
+        if (Number.isNaN(parsed) || parsed < 1) {
+          return 1;
+        }
+        return parsed;
+      }),
+    enableApiDocsEnv: z.string().optional(),
   })
-  .transform((env) => ({
-    ...env,
-    logPretty: env.nodeEnv !== "production" && env.logPretty,
-  }));
+  .transform((env) => {
+    const { enableApiDocsEnv, ...rest } = env;
+    const enableApiDocs =
+      enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
+        ? parseBoolean(enableApiDocsEnv)
+        : rest.nodeEnv !== "production";
+    return {
+      ...rest,
+      logPretty: rest.nodeEnv !== "production" && rest.logPretty,
+      enableApiDocs,
+    };
+  });
 
 export type RhEnv = z.infer<typeof rhEnvSchema>;
 
@@ -42,5 +62,7 @@ export function getRhEnv(): RhEnv {
     nodeEnv: process.env.NODE_ENV,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
+    pointMinIntervalMinutes: process.env.POINT_MIN_INTERVAL_MINUTES,
+    enableApiDocsEnv: process.env.ENABLE_API_DOCS,
   });
 }

@@ -21,12 +21,6 @@ generator rh_service_client {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
-generator client_service_client {
-  provider        = "prisma-client"
-  output          = "../../services/client-service/src/generated/prisma"
-  previewFeatures = ["fullTextSearchPostgres"]
-}
-
 datasource db {
   provider = "postgresql"
 }

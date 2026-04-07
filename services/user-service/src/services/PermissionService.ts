@@ -1,5 +1,6 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
+import type { Prisma } from "../generated/prisma/client.js";
 import prismaClient from "../prisma/index.js";
 
 const PERMISSION_PUBLIC_SELECT = {
@@ -49,6 +50,11 @@ const MODULE_FIELDS = [
 
 type ModuleField = (typeof MODULE_FIELDS)[number];
 
+type PermissionPublicRow = Prisma.PermissionGetPayload<{ select: typeof PERMISSION_PUBLIC_SELECT }>;
+type PermissionSpecificRow = Prisma.PermissionSpecificGetPayload<{
+  select: typeof PERMISSION_SPECIFIC_SELECT;
+}>;
+
 interface UpdatePermissionInput {
   atendimento?: number | null;
   certificado?: number | null;
@@ -68,7 +74,7 @@ interface UpdatePermissionInput {
 }
 
 class PermissionService {
-  async create(userId: string, organizationId: string) {
+  async create(userId: string, organizationId: string): Promise<PermissionPublicRow> {
     const exists = await prismaClient.permission.findFirst({
       where: { user_id: userId },
     });
@@ -93,7 +99,7 @@ class PermissionService {
     }
   }
 
-  async getByUserId(userId: string, modulo?: string) {
+  async getByUserId(userId: string, modulo?: string): Promise<PermissionPublicRow> {
     const permission = await prismaClient.permission.findFirst({
       where: { user_id: userId },
       select: PERMISSION_PUBLIC_SELECT,
@@ -116,7 +122,7 @@ class PermissionService {
     return permission;
   }
 
-  async update(userId: string, data: UpdatePermissionInput) {
+  async update(userId: string, data: UpdatePermissionInput): Promise<PermissionPublicRow> {
     await this.getByUserId(userId);
 
     const updateData: Record<string, unknown> = {};
@@ -145,7 +151,11 @@ class PermissionService {
     }
   }
 
-  async createSpecific(userId: string, organizationId: string, taskCompletion?: boolean | null) {
+  async createSpecific(
+    userId: string,
+    organizationId: string,
+    taskCompletion?: boolean | null,
+  ): Promise<PermissionSpecificRow> {
     const exists = await prismaClient.permissionSpecific.findUnique({
       where: { user_id: userId },
     });
@@ -171,7 +181,7 @@ class PermissionService {
     }
   }
 
-  async updateSpecific(userId: string, taskCompletion: boolean) {
+  async updateSpecific(userId: string, taskCompletion: boolean): Promise<PermissionSpecificRow> {
     const exists = await prismaClient.permissionSpecific.findUnique({
       where: { user_id: userId },
     });
@@ -194,7 +204,7 @@ class PermissionService {
     }
   }
 
-  async getSpecific(userId: string) {
+  async getSpecific(userId: string): Promise<PermissionSpecificRow> {
     const permission = await prismaClient.permissionSpecific.findUnique({
       where: { user_id: userId },
       select: PERMISSION_SPECIFIC_SELECT,

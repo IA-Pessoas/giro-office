@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { createLogger } from "@workspace/shared/logger";
 import http from "node:http";
+import { createLogger } from "@workspace/shared/logger";
 
 import { createApp } from "./app.js";
 import { getRhEnv } from "./config/env.js";
@@ -13,7 +13,7 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-const app = createApp(logger);
+const app = createApp(logger, env);
 const server = http.createServer(app);
 
 server.listen(env.port, () => {

@@ -9,6 +9,7 @@ import {
   type Logger,
   type LogLevel,
 } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
@@ -19,9 +20,14 @@ import {
 } from "./middlewares/audit.js";
 import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
+import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
-import { isTaskServiceRoute, isUserServiceRoute } from "./utils/routeUtils.js";
+import {
+  isProjectServiceRoute,
+  isTaskServiceRoute,
+  isUserServiceRoute,
+} from "./utils/routeUtils.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
   return {
@@ -86,12 +92,7 @@ function getUpstreamContext(url: string, request: Request) {
     return undefined;
   }
 }
-
-function getProxyTargetUrl(env: GatewayEnv, request: Request): string {
-  if (env.auditEnabled && request.originalUrl.startsWith("/audit")) {
-    return env.auditServiceUrl;
-  }
-
+function getProxyTargetUrl(env: GatewayEnv, request: Request): string | null {
   if (isUserServiceRoute(request.path)) {
     return env.userServiceUrl;
   }
@@ -100,7 +101,11 @@ function getProxyTargetUrl(env: GatewayEnv, request: Request): string {
     return env.taskServiceUrl;
   }
 
-  return env.legacyApiUrl;
+  if (isProjectServiceRoute(request.path)) {
+    return env.projectServiceUrl;
+  }
+
+  return null;
 }
 
 function getResponseSizeBytes(response: Response): number | undefined {
@@ -183,6 +188,7 @@ function buildRequestLifecycleMiddleware(logger: Logger) {
 
 export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   const app = express();
+  const gatewayOpenApiSpec = buildGatewayOpenApiSpec(env);
   const recordAuditRequest = createAuditRecorder({
     enabled: env.auditEnabled,
     serviceUrl: env.auditServiceUrl,
@@ -203,6 +209,20 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   app.use(cors(createCorsOptions(env)));
   app.options("*", cors(createCorsOptions(env)));
   app.use(express.json());
+
+  app.get("/openapi.json", (request: Request, response: Response) => {
+    response.json({
+      ...gatewayOpenApiSpec,
+      servers: [{ url: `${request.protocol}://${request.get("host")}` }],
+    });
+  });
+  mountOpenApiDocs(app, {
+    spec: gatewayOpenApiSpec,
+    docsPath: "/docs",
+    jsonPath: "/__gateway-openapi-static.json",
+    specUrl: "/openapi.json",
+    siteTitle: "gateway - OpenAPI",
+  });
 
   if (!env.auditEnabled) {
     app.use("/audit", (_request, _response, next) => {
@@ -226,7 +246,7 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     response.status(200).json(
       createSuccessResponse({
         status: "ready",
-        url: env.legacyApiUrl,
+        service: "gateway",
       }),
     );
   });
@@ -247,9 +267,9 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
 
   app.use((request, response, next) => {
     const targetUrl = getProxyTargetUrl(env, request);
-    const isInternalService = targetUrl === env.taskServiceUrl || targetUrl === env.userServiceUrl;
-    if (isInternalService) {
-      request.headers[INTERNAL_SERVICE_TOKEN_HEADER] = env.auditServiceToken;
+    if (targetUrl === null) {
+      next(new ServiceError(404, "Rota não mapeada no gateway."));
+      return;
     }
     return buildHttpProxyMiddleware(targetUrl)(request, response, next);
   });
@@ -259,10 +279,13 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
       logger,
       event: "gateway.error",
       fallbackMessage: "Erro interno no gateway.",
-      getContext: (request) => ({
-        auth: getAuthLogContext(request),
-        upstream: getUpstreamContext(getProxyTargetUrl(env, request), request),
-      }),
+      getContext: (request) => {
+        const targetUrl = getProxyTargetUrl(env, request);
+        return {
+          auth: getAuthLogContext(request),
+          upstream: targetUrl ? getUpstreamContext(targetUrl, request) : undefined,
+        };
+      },
     }),
   );
   app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {

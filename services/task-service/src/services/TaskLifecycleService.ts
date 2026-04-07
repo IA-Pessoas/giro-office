@@ -116,6 +116,8 @@ export class TaskLifecycleService {
         await this.#workflow.afterTaskUpdated({
           taskId: body.task_id,
           projectId: exists.project_id,
+          userId: user_id,
+          organizationId: organization_id,
           previousStatus: exists.status ?? "",
           newStatus: updated.status ?? "",
           previousBilling: exists.billing ?? "",
@@ -185,6 +187,8 @@ export class TaskLifecycleService {
         await this.#workflow.afterTaskUpdated({
           taskId: task_id,
           projectId: exists.project_id,
+          userId: user_id,
+          organizationId: organization_id,
           previousStatus: exists.status ?? "",
           newStatus: updated.status ?? "",
           previousBilling: exists.billing ?? "",
