@@ -3,6 +3,7 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
+  debug,
 } from "@workspace/shared";
 
 import { getTaskServiceEnv } from "../config/env.js";
@@ -55,6 +56,10 @@ class HttpProjectProgressIntegration implements ProjectProgressIntegration {
     }
 
     if (response.ok) {
+      debug("Integracao com project-service concluida com sucesso", {
+        projectId: params.projectId,
+        statusCode: response.status,
+      });
       return;
     }
 
