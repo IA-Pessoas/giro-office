@@ -6,40 +6,64 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import { api } from '@shared/services/apiClient'
 
-interface AuthContextData {
-    user: UserProps;
-    isAuthenticated: boolean;
-    signIn: (credentials: SignInProps) => Promise<void>
-    logoutUser: () => Promise<void>;
-    loading: boolean;
-}
 interface UserProps {
     id: string;
     name: string;
     login: string;
     permission: number;
 }
+
 interface SignInProps {
     login: string;
     password: string;
 }
 
-type AuthProviderProps = {
-    children: ReactNode;
+interface AuthSessionData extends UserProps {
+    token: string;
 }
+
 interface AuthContextData {
-    user: UserProps | null; // Agora pode ser nulo
+    user: UserProps | null;
     isAuthenticated: boolean;
     signIn: (credentials: SignInProps) => Promise<void>;
     logoutUser: () => Promise<void>;
-    loading: boolean; // Novo estado para a tela de carregamento
+    loading: boolean;
+}
+
+type AuthProviderProps = {
+    children: ReactNode;
 }
 
 export const AuthContext = createContext({} as AuthContextData)
 
+function clearAuthCookie() {
+    destroyCookie(null, '@cw.token', { path: '/' })
+    delete api.defaults.headers.common['Authorization']
+}
+
+function isValidAuthSessionData(data: unknown): data is AuthSessionData {
+    return !!data &&
+        typeof data === "object" &&
+        typeof (data as AuthSessionData).id === "string" &&
+        typeof (data as AuthSessionData).name === "string" &&
+        typeof (data as AuthSessionData).login === "string" &&
+        typeof (data as AuthSessionData).permission === "number" &&
+        typeof (data as AuthSessionData).token === "string" &&
+        (data as AuthSessionData).token.length > 0;
+}
+
+function isValidAuthUser(data: unknown): data is UserProps {
+    return !!data &&
+        typeof data === "object" &&
+        typeof (data as UserProps).id === "string" &&
+        typeof (data as UserProps).name === "string" &&
+        typeof (data as UserProps).login === "string" &&
+        typeof (data as UserProps).permission === "number";
+}
+
 export function signOut() {
     try {
-        destroyCookie(null, '@cw.token', { path: '/' })
+        clearAuthCookie()
         Router.push('/login');
     } catch (error) {
         console.log('Erro ao deslogar');
@@ -47,7 +71,7 @@ export function signOut() {
 }
 
 export function AuthProvider({ children }: AuthProviderProps){
-    const [user, setUser] = useState<UserProps>()
+    const [user, setUser] = useState<UserProps | null>(null)
     const isAuthenticated = !!user;
     const [loading, setLoading] = useState(true);
     
@@ -56,18 +80,18 @@ export function AuthProvider({ children }: AuthProviderProps){
 
         if (token) {
             api.get('/me').then(response => {
-                const userData = response.data.user;
-                if (userData && userData.id) {
+                const userData = response.data?.data;
+
+                if (isValidAuthUser(userData)) {
                     setUser(userData);
+                    api.defaults.headers.common['Authorization'] = `Bearer ${token}`
                 } else {
-                    // Não chama signOut aqui para evitar redirecionamento durante SSR
-                    destroyCookie(null, '@cw.token', { path: '/' });
+                    clearAuthCookie();
                     setUser(null);
                 }
             }).catch((error) => {
-                // Não chama signOut aqui para evitar redirecionamento durante SSR
                 console.error('Erro ao verificar token:', error);
-                destroyCookie(null, '@cw.token', { path: '/' });
+                clearAuthCookie();
                 setUser(null);
             }).finally(() => {
                 setLoading(false);
@@ -84,25 +108,31 @@ export function AuthProvider({ children }: AuthProviderProps){
                 password
             })
 
-            const { id, name, permission, token } = response.data;
+            const sessionData = response.data?.data;
+
+            if (!isValidAuthSessionData(sessionData)) {
+                clearAuthCookie();
+                setUser(null);
+                toast.error("Resposta de autenticaÃ§Ã£o invÃ¡lida!")
+                return
+            }
         
-            setCookie(undefined, '@cw.token', token, {
-                maxAge: 60 * 60 * 24 * 30, // Expirar em um mes
-                path: '/' // Todos caminhos terao acesso ao cookie 
+            setCookie(undefined, '@cw.token', sessionData.token, {
+                maxAge: 60 * 60 * 24 * 30,
+                path: '/'
             })
 
             setUser({
-                id,
-                name,
-                login,
-                permission
+                id: sessionData.id,
+                name: sessionData.name,
+                login: sessionData.login,
+                permission: sessionData.permission
             })
             
-            api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+            api.defaults.headers.common['Authorization'] = `Bearer ${sessionData.token}`
 
             toast.success("Login Feito!")
 
-            // Usar window.location para forçar recarregamento completo e evitar problemas de navegação
             if (typeof window !== 'undefined') {
                 window.location.href = '/dashboard';
             } else {
@@ -111,9 +141,9 @@ export function AuthProvider({ children }: AuthProviderProps){
 
         } catch (error: any) {
             if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || !error.response) {
-                const url = process.env.NEXT_PUBLIC_API_URL || 'não definida';
-                toast.error(`Erro de conexão! URL: ${url}. Verifique se o servidor está rodando.`)
-                console.error('Erro de conexão:', {
+                const url = process.env.NEXT_PUBLIC_API_URL || 'nÃ£o definida';
+                toast.error(`Erro de conexÃ£o! URL: ${url}. Verifique se o servidor estÃ¡ rodando.`)
+                console.error('Erro de conexÃ£o:', {
                     code: error.code,
                     message: error.message,
                     url: url,
@@ -129,9 +159,9 @@ export function AuthProvider({ children }: AuthProviderProps){
             }
 
             if (error.response?.status === 401 || error.response?.status === 400) {
-                const errorMessage = error.response?.data?.error || error.response?.data?.message || "Usuário e/ou senha incorretos!"
+                const errorMessage = error.response?.data?.error || error.response?.data?.message || "UsuÃ¡rio e/ou senha incorretos!"
                 toast.error(errorMessage)
-                console.error('Erro de autenticação:', error.response?.data)
+                console.error('Erro de autenticaÃ§Ã£o:', error.response?.data)
                 return
             }
 
@@ -142,8 +172,8 @@ export function AuthProvider({ children }: AuthProviderProps){
 
     async function logoutUser(){
         try{
-            destroyCookie(null, '@cw.token', { path: '/' })
-            toast.success("Sessão encerrada!")
+            clearAuthCookie()
+            toast.success("SessÃ£o encerrada!")
             Router.push('/login')
             setUser(null);
         }catch(err){
@@ -154,7 +184,6 @@ export function AuthProvider({ children }: AuthProviderProps){
 
     if (loading) {
         return (
-            // Opcional: Crie um componente de Spinner para uma melhor UX
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
                 <h1>Carregando...</h1>
             </div>
@@ -172,8 +201,6 @@ export function useAuth() {
     const context = useContext(AuthContext);
 
     if (!context) {
-        // Este erro é útil para o futuro: se você tentar usar o useAuth
-        // fora de um componente que está dentro do AuthProvider, ele dará um aviso claro.
         throw new Error('useAuth deve ser usado dentro de um AuthProvider');
     }
 
