@@ -29,5 +29,5 @@ const app = createApp({
 });
 
 app.listen(env.port, () => {
-  logger.info({ event: "server.start", data: { port: env.port } }, "client-service em execuÃƒÂ§ÃƒÂ£o");
+  logger.info({ event: "server.start", data: { port: env.port } }, "client-service em execução");
 });
