@@ -248,24 +248,49 @@ export class ClientService implements IClientService {
 
     const extended = takeExtendedFields(input);
 
+    const data: Record<string, unknown> = {};
+
+    if (input.name !== undefined) {
+      data.name = input.name;
+    }
+
+    if (input.status !== undefined) {
+      data.status = input.status;
+    }
+
+    if (input.cpf_cnpj !== undefined) {
+      data.cpf_cnpj = input.cpf_cnpj;
+    }
+
+    if (input.company_name !== undefined) {
+      data.company_name = input.company_name;
+    }
+
+    if (input.fantasy_name !== undefined) {
+      data.fantasy_name = input.fantasy_name;
+    }
+
+    if (input.prospecting_status !== undefined) {
+      data.prospecting_status = input.prospecting_status;
+    }
+
+    if (input.service_unique !== undefined) {
+      data.service_unique = input.service_unique;
+    }
+
+    if (input.type !== undefined) {
+      data.type = input.type;
+    }
+
+    if (input.type_registration !== undefined) {
+      data.type_registration = input.type_registration;
+    }
+
+    Object.assign(data, extended);
+
     const row = await this.prisma.client.update({
       where: { id },
-      data: {
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
-        ...(input.cpf_cnpj !== undefined ? { cpf_cnpj: input.cpf_cnpj } : {}),
-        ...(input.company_name !== undefined ? { company_name: input.company_name } : {}),
-        ...(input.fantasy_name !== undefined ? { fantasy_name: input.fantasy_name } : {}),
-        ...(input.prospecting_status !== undefined
-          ? { prospecting_status: input.prospecting_status }
-          : {}),
-        ...(input.service_unique !== undefined ? { service_unique: input.service_unique } : {}),
-        ...(input.type !== undefined ? { type: input.type } : {}),
-        ...(input.type_registration !== undefined
-          ? { type_registration: input.type_registration }
-          : {}),
-        ...extended,
-      } as Prisma.ClientUncheckedUpdateInput,
+      data: data as Prisma.ClientUncheckedUpdateInput,
       select: clientWithOrganizationSelect,
     });
 

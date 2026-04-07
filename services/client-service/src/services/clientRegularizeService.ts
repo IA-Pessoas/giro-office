@@ -22,46 +22,135 @@ export async function updateRegularizeClient(
   const cleanedCpfResponsible =
     input.cpf_responsible !== undefined ? cleanDocument(input.cpf_responsible) : undefined;
 
-  const data = {
-    ...(input.dominio_code !== undefined ? { dominio_code: input.dominio_code } : {}),
-    ...(input.name !== undefined ? { name: input.name } : {}),
-    ...(input.company_name !== undefined ? { company_name: input.company_name } : {}),
-    ...(input.fantasy_name !== undefined ? { fantasy_name: input.fantasy_name } : {}),
-    ...(cleanedCpfCnpj !== undefined ? { cpf_cnpj: cleanedCpfCnpj } : {}),
-    ...(input.cnae !== undefined ? { cnae: input.cnae } : {}),
-    ...(input.cnae_secondary !== undefined ? { cnae_secondary: input.cnae_secondary } : {}),
-    ...(input.responsible !== undefined ? { responsible: input.responsible } : {}),
-    ...(cleanedCpfResponsible !== undefined ? { cpf_responsible: cleanedCpfResponsible } : {}),
-    ...(input.number !== undefined ? { number: input.number } : {}),
-    ...(input.email !== undefined ? { email: input.email } : {}),
-    ...(input.address !== undefined ? { address: input.address } : {}),
-    ...(input.cep !== undefined ? { cep: input.cep } : {}),
-    ...(input.neighborhood !== undefined ? { neighborhood: input.neighborhood } : {}),
-    ...(input.state !== undefined ? { state: input.state } : {}),
-    ...(input.city !== undefined ? { city: input.city } : {}),
-    ...(input.customer_since !== undefined ? { customer_since: input.customer_since } : {}),
-    ...(input.municipal_registration !== undefined
-      ? { municipal_registration: input.municipal_registration }
-      : {}),
-    ...(input.state_registration !== undefined
-      ? { state_registration: input.state_registration }
-      : {}),
-    ...(input.commercial_board_registration !== undefined
-      ? { commercial_board_registration: input.commercial_board_registration }
-      : {}),
-    ...(input.opening_date !== undefined ? { opening_date: input.opening_date } : {}),
-    ...(input.regime !== undefined ? { regime: input.regime } : {}),
-    ...(input.size !== undefined ? { size: input.size } : {}),
-    ...(input.segment !== undefined ? { segment: input.segment } : {}),
-    ...(input.contabil !== undefined ? { contabil: input.contabil } : {}),
-    ...(input.fiscal !== undefined ? { fiscal: input.fiscal } : {}),
-    ...(input.pessoal !== undefined ? { pessoal: input.pessoal } : {}),
-    ...(input.infoproduto !== undefined ? { infoproduto: input.infoproduto } : {}),
-    ...(input.consultoria !== undefined ? { consultoria: input.consultoria } : {}),
-    ...(input.start_strike !== undefined ? { start_strike: input.start_strike } : {}),
-    ...(input.end_strike !== undefined ? { end_strike: input.end_strike } : {}),
-    ...(input.deletion_date !== undefined ? { deletion_date: input.deletion_date } : {}),
-  };
+  const data: Record<string, unknown> = {};
+
+  if (input.dominio_code !== undefined) {
+    data.dominio_code = input.dominio_code;
+  }
+
+  if (input.name !== undefined) {
+    data.name = input.name;
+  }
+
+  if (input.company_name !== undefined) {
+    data.company_name = input.company_name;
+  }
+
+  if (input.fantasy_name !== undefined) {
+    data.fantasy_name = input.fantasy_name;
+  }
+
+  if (cleanedCpfCnpj !== undefined) {
+    data.cpf_cnpj = cleanedCpfCnpj;
+  }
+
+  if (input.cnae !== undefined) {
+    data.cnae = input.cnae;
+  }
+
+  if (input.cnae_secondary !== undefined) {
+    data.cnae_secondary = input.cnae_secondary;
+  }
+
+  if (input.responsible !== undefined) {
+    data.responsible = input.responsible;
+  }
+
+  if (cleanedCpfResponsible !== undefined) {
+    data.cpf_responsible = cleanedCpfResponsible;
+  }
+
+  if (input.number !== undefined) {
+    data.number = input.number;
+  }
+
+  if (input.email !== undefined) {
+    data.email = input.email;
+  }
+
+  if (input.address !== undefined) {
+    data.address = input.address;
+  }
+
+  if (input.cep !== undefined) {
+    data.cep = input.cep;
+  }
+
+  if (input.neighborhood !== undefined) {
+    data.neighborhood = input.neighborhood;
+  }
+
+  if (input.state !== undefined) {
+    data.state = input.state;
+  }
+
+  if (input.city !== undefined) {
+    data.city = input.city;
+  }
+
+  if (input.customer_since !== undefined) {
+    data.customer_since = input.customer_since;
+  }
+
+  if (input.municipal_registration !== undefined) {
+    data.municipal_registration = input.municipal_registration;
+  }
+
+  if (input.state_registration !== undefined) {
+    data.state_registration = input.state_registration;
+  }
+
+  if (input.commercial_board_registration !== undefined) {
+    data.commercial_board_registration = input.commercial_board_registration;
+  }
+
+  if (input.opening_date !== undefined) {
+    data.opening_date = input.opening_date;
+  }
+
+  if (input.regime !== undefined) {
+    data.regime = input.regime;
+  }
+
+  if (input.size !== undefined) {
+    data.size = input.size;
+  }
+
+  if (input.segment !== undefined) {
+    data.segment = input.segment;
+  }
+
+  if (input.contabil !== undefined) {
+    data.contabil = input.contabil;
+  }
+
+  if (input.fiscal !== undefined) {
+    data.fiscal = input.fiscal;
+  }
+
+  if (input.pessoal !== undefined) {
+    data.pessoal = input.pessoal;
+  }
+
+  if (input.infoproduto !== undefined) {
+    data.infoproduto = input.infoproduto;
+  }
+
+  if (input.consultoria !== undefined) {
+    data.consultoria = input.consultoria;
+  }
+
+  if (input.start_strike !== undefined) {
+    data.start_strike = input.start_strike;
+  }
+
+  if (input.end_strike !== undefined) {
+    data.end_strike = input.end_strike;
+  }
+
+  if (input.deletion_date !== undefined) {
+    data.deletion_date = input.deletion_date;
+  }
 
   const select = {
     id: true,
