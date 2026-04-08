@@ -8,8 +8,8 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { comercialTaskUpdateBodySchema } from "../schemas/comercial-task-update-body.schema.js";
-import { TaskComercialService } from "../services/TaskComercialService.js";
+import { comercialTaskUpdateBodySchema } from "../schemas/comercialTaskUpdateBody.schema.js";
+import { TaskComercialService } from "../services/taskComercialService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const taskComercialService = new TaskComercialService();

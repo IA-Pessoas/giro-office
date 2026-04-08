@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   INTEGRACAO_TASK_STATUS_VALUES,
   type IntegracaoTaskStatus,
-} from "../constants/integracao-task.js";
+} from "../constants/integracaoTask.js";
 
 const integracaoTaskStatusZod = z.enum(
   INTEGRACAO_TASK_STATUS_VALUES as unknown as [IntegracaoTaskStatus, ...IntegracaoTaskStatus[]],

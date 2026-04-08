@@ -2,7 +2,7 @@ import { FORWARDED_AUTH_USER_ID_HEADER } from "@workspace/shared";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { authServiceMock, createTestApp, resetUserRouteMocks, userServiceMock } from "./user-test-utils.js";
+import { authServiceMock, createTestApp, resetUserRouteMocks, userServiceMock } from "./userTestUtils.js";
 
 describe("auth routes", () => {
   beforeEach(() => {

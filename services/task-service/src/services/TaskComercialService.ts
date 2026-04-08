@@ -2,7 +2,7 @@ import { error as logError, ServiceError } from "@workspace/shared";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import type { ComercialTaskUpdateBody } from "../schemas/comercial-task-update-body.schema.js";
+import type { ComercialTaskUpdateBody } from "../schemas/comercialTaskUpdateBody.schema.js";
 
 const CHARGE_COMERCIAL_SELECT = {
   id: true,

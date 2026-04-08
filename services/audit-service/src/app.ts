@@ -11,9 +11,9 @@ import "express-async-errors";
 
 import type { AuditServiceEnv } from "./config/env.js";
 import { buildAuditServiceOpenApiSpec } from "./openapi/spec.js";
-import type { AuditRequestRepository } from "./integrations/prisma/audit-request-repository.js";
+import type { AuditRequestRepository } from "./integrations/prisma/auditRequestRepository.js";
 import { requestContext } from "./middlewares/requestContext.js";
-import { createAuditInternalRouter, createAuditPublicRouter } from "./routes/index.js";
+import { createAuditInternalRouter, createAuditPublicRouter } from "./routes/audit.routes.js";
 
 function auditErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.headers[FORWARDED_AUTH_USER_ID_HEADER];

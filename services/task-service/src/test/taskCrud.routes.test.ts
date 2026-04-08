@@ -1,7 +1,7 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createTestApp, resetTaskRouteMocks, taskCrudServiceMock } from "./task-test-utils.js";
+import { createTestApp, resetTaskRouteMocks, taskCrudServiceMock } from "./taskTestUtils.js";
 
 describe("task crud routes", () => {
   beforeEach(() => {

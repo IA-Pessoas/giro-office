@@ -12,11 +12,11 @@ import type { AuditServiceEnv } from "../config/env.js";
 import {
   type AuditRequestRepository,
   createAuditRequestRepository,
-} from "../integrations/prisma/audit-request-repository.js";
-import { createAuditEnabledMiddleware } from "../middleware/audit-enabled.js";
-import { assertAuditAdmin, getAuthFromHeaders } from "../middleware/get-auth-from-headers.js";
-import { createInternalServiceTokenMiddleware } from "../middleware/internal-service-token.js";
-import { createAuditRequestService } from "../services/audit-request-service.js";
+} from "../integrations/prisma/auditRequestRepository.js";
+import { createAuditEnabledMiddleware } from "../middleware/auditEnabled.js";
+import { assertAuditAdmin, getAuthFromHeaders } from "../middleware/getAuthFromHeaders.js";
+import { createInternalServiceTokenMiddleware } from "../middleware/internalServiceToken.js";
+import { createAuditRequestService } from "../services/auditRequestService.js";
 
 interface CreateAuditRouterOptions {
   env: AuditServiceEnv;

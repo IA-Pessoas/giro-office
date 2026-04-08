@@ -6,7 +6,7 @@ import {
   resetUserRouteMocks,
   storageServiceMock,
   userServiceMock,
-} from "./user-test-utils.js";
+} from "./userTestUtils.js";
 
 describe("user routes", () => {
   beforeEach(() => {

@@ -14,8 +14,8 @@ import {
   integracaoProjectDetailQuerySchema,
   integracaoProjectListQuerySchema,
   integracaoProjectUpdateBodySchema,
-} from "../schemas/project-crud.schemas.js";
-import type { ProjectCrudService } from "../services/ProjectCrudService.js";
+} from "../schemas/projectCrud.schemas.js";
+import type { ProjectCrudService } from "../services/projectCrudService.js";
 
 export type ProjectCrudRouteDeps = Pick<
   ProjectCrudService,

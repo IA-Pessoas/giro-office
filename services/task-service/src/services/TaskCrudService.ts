@@ -1,10 +1,10 @@
 import { error as logError, ServiceError } from "@workspace/shared";
-import type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracao-task.js";
-import type { ProspectingStatus } from "../constants/prospecting-status.js";
+import type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracaoTask.js";
+import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import { TaskWorkflowService } from "./TaskWorkflowService.js";
+import { TaskWorkflowService } from "./taskWorkflowService.js";
 
 const TASK_DETAIL_SELECT = {
   id: true,
@@ -81,10 +81,10 @@ export type TaskDetailRow = TaskGetPayload<{ select: typeof TASK_DETAIL_SELECT }
 export type TaskCreateRow = TaskGetPayload<{ select: typeof TASK_CREATE_SELECT }>;
 export type TaskListRow = TaskGetPayload<{ select: typeof TASK_LIST_SELECT }>;
 
-export type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracao-task.js";
-export { INTEGRACAO_TASK_STATUS_VALUES } from "../constants/integracao-task.js";
-export type { ProspectingStatus } from "../constants/prospecting-status.js";
-export { PROSPECTING_STATUS_VALUES } from "../constants/prospecting-status.js";
+export type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracaoTask.js";
+export { INTEGRACAO_TASK_STATUS_VALUES } from "../constants/integracaoTask.js";
+export type { ProspectingStatus } from "../constants/prospectingStatus.js";
+export { PROSPECTING_STATUS_VALUES } from "../constants/prospectingStatus.js";
 
 export interface CreateTaskCrudRequest {
   user_id: string;

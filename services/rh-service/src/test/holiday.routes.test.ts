@@ -1,7 +1,7 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createTestApp, holidayServiceMock, resetRhRouteMocks } from "./rh-test-utils.js";
+import { createTestApp, holidayServiceMock, resetRhRouteMocks } from "./rhTestUtils.js";
 
 describe("holiday routes", () => {
   const itemId = "00000000-0000-4000-8000-000000000010";

@@ -8,8 +8,8 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { integracaoProjectProgressBodySchema } from "../schemas/project-progress.schemas.js";
-import type { ProjectProgressService } from "../services/ProjectProgressService.js";
+import { integracaoProjectProgressBodySchema } from "../schemas/projectProgress.schemas.js";
+import type { ProjectProgressService } from "../services/projectProgressService.js";
 
 export type ProjectProgressRouteDeps = Pick<ProjectProgressService, "recalculateFromTasks">;
 

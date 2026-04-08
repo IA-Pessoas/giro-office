@@ -23,13 +23,13 @@ const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
 
 vi.mock("../prisma/index.js", () => ({ default: prismaMock }));
 vi.mock("../integrations/audit.js", () => auditMock);
-vi.mock("../services/TaskWorkflowService.js", () => ({
+vi.mock("../services/taskWorkflowService.js", () => ({
   TaskWorkflowService: vi.fn(function TaskWorkflowService() {
     return workflowMock;
   }),
 }));
 
-import { TaskLifecycleService } from "../services/TaskLifecycleService.js";
+import { TaskLifecycleService } from "../services/taskLifecycleService.js";
 
 describe("TaskLifecycleService", () => {
   beforeEach(() => {
@@ -47,6 +47,8 @@ describe("TaskLifecycleService", () => {
         body: {
           task_id: "task-1",
           status: "Concluída",
+          observations: "observacao",
+          justification: "justificativa",
           responsible_id: "user-1",
         },
       }),

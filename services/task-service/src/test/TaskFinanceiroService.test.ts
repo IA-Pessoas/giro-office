@@ -15,7 +15,7 @@ const { prismaMock, auditMock } = vi.hoisted(() => ({
 vi.mock("../prisma/index.js", () => ({ default: prismaMock }));
 vi.mock("../integrations/audit.js", () => auditMock);
 
-import { TaskFinanceiroService } from "../services/TaskFinanceiroService.js";
+import { TaskFinanceiroService } from "../services/taskFinanceiroService.js";
 
 describe("TaskFinanceiroService", () => {
   beforeEach(() => {

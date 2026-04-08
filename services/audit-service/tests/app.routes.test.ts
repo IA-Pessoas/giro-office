@@ -18,7 +18,7 @@ import type {
 import { createLogger } from "@workspace/shared";
 import { createApp } from "../src/app.js";
 import type { AuditServiceEnv } from "../src/config/env.js";
-import type { AuditRequestRepository } from "../src/integrations/prisma/audit-request-repository.js";
+import type { AuditRequestRepository } from "../src/integrations/prisma/auditRequestRepository.js";
 
 class MemoryLogStream extends Writable {
   _write(

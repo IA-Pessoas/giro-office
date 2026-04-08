@@ -5,7 +5,7 @@ import {
   createTestApp,
   resetTaskRouteMocks,
   taskIntegrationRegularizeServiceMock,
-} from "./task-test-utils.js";
+} from "./taskTestUtils.js";
 
 describe("task integration regularize routes", () => {
   beforeEach(() => {

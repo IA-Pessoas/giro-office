@@ -5,7 +5,7 @@ import {
   createTestApp,
   resetRhRouteMocks,
   timeBankReleaseServiceMock,
-} from "./rh-test-utils.js";
+} from "./rhTestUtils.js";
 
 describe("timeBankRelease routes", () => {
   const itemId = "00000000-0000-4000-8000-000000000010";

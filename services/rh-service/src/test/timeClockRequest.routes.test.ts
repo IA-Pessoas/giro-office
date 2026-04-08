@@ -5,7 +5,7 @@ import {
   createTestApp,
   resetRhRouteMocks,
   timeClockRequestServiceMock,
-} from "./rh-test-utils.js";
+} from "./rhTestUtils.js";
 
 describe("timeClockRequest routes", () => {
   const requestId = "00000000-0000-4000-8000-000000000010";

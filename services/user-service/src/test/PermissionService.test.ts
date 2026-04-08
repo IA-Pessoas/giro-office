@@ -19,7 +19,7 @@ vi.mock("../prisma/index.js", () => ({
   default: prismaMock,
 }));
 
-import { PermissionService } from "../services/PermissionService.js";
+import { PermissionService } from "../services/permissionService.js";
 
 describe("PermissionService", () => {
   beforeEach(() => {

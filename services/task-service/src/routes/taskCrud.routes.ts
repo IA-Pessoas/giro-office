@@ -9,9 +9,9 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { integracaoTaskCreateBodySchema } from "../schemas/integracao-task-create.schema.js";
-import { integracaoTaskUpdateBodySchema } from "../schemas/integracao-task-update.schema.js";
-import { TaskCrudService } from "../services/TaskCrudService.js";
+import { integracaoTaskCreateBodySchema } from "../schemas/integracaoTaskCreate.schema.js";
+import { integracaoTaskUpdateBodySchema } from "../schemas/integracaoTaskUpdate.schema.js";
+import { TaskCrudService } from "../services/taskCrudService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const taskCrudService = new TaskCrudService();

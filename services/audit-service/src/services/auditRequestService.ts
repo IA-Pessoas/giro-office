@@ -15,7 +15,7 @@ import {
 } from "@workspace/shared/http";
 import { z } from "zod";
 
-import type { AuditRequestRepository } from "../integrations/prisma/audit-request-repository.js";
+import type { AuditRequestRepository } from "../integrations/prisma/auditRequestRepository.js";
 
 export interface AuditRequestService {
   create(body: unknown): Promise<string>;

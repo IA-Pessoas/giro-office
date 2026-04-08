@@ -3,7 +3,7 @@ import { debug, error as logError } from "@workspace/shared";
 import {
   createHttpProjectProgressIntegration,
   type ProjectProgressIntegration,
-} from "../integrations/project-progress.js";
+} from "../integrations/projectProgress.js";
 
 /**
  * Efeitos colaterais de fluxo apos CRUD de tarefas de integracao (legado `TaskService` +

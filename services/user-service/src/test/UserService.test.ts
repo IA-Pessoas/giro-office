@@ -27,13 +27,13 @@ vi.mock("bcryptjs", () => ({
   default: bcryptMock,
 }));
 
-vi.mock("../services/PermissionService.js", () => ({
+vi.mock("../services/permissionService.js", () => ({
   PermissionService: vi.fn(function PermissionService() {
     return permissionServiceMock;
   }),
 }));
 
-import { UserService } from "../services/UserService.js";
+import { UserService } from "../services/userService.js";
 
 describe("UserService", () => {
   beforeEach(() => {

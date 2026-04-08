@@ -28,25 +28,25 @@ const { authServiceMock, userServiceMock, permissionServiceMock, storageServiceM
   }),
 );
 
-vi.mock("../services/AuthService.js", () => ({
+vi.mock("../services/authService.js", () => ({
   AuthService: vi.fn(function AuthService() {
     return authServiceMock;
   }),
 }));
 
-vi.mock("../services/UserService.js", () => ({
+vi.mock("../services/userService.js", () => ({
   UserService: vi.fn(function UserService() {
     return userServiceMock;
   }),
 }));
 
-vi.mock("../services/PermissionService.js", () => ({
+vi.mock("../services/permissionService.js", () => ({
   PermissionService: vi.fn(function PermissionService() {
     return permissionServiceMock;
   }),
 }));
 
-vi.mock("../services/StorageService.js", () => ({
+vi.mock("../services/storageService.js", () => ({
   StorageService: vi.fn(function StorageService() {
     return storageServiceMock;
   }),

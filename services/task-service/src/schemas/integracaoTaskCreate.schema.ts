@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   PROSPECTING_STATUS_VALUES,
   type ProspectingStatus,
-} from "../constants/prospecting-status.js";
+} from "../constants/prospectingStatus.js";
 
 const prospectingStatusZod = z.enum(
   PROSPECTING_STATUS_VALUES as unknown as [ProspectingStatus, ...ProspectingStatus[]],

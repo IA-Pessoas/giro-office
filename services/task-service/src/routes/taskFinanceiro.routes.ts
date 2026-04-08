@@ -8,8 +8,8 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { financeiroTaskUpdateBodySchema } from "../schemas/financeiro-task-update-body.schema.js";
-import { TaskFinanceiroService } from "../services/TaskFinanceiroService.js";
+import { financeiroTaskUpdateBodySchema } from "../schemas/financeiroTaskUpdateBody.schema.js";
+import { TaskFinanceiroService } from "../services/taskFinanceiroService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const taskFinanceiroService = new TaskFinanceiroService();

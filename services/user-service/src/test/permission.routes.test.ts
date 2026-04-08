@@ -1,7 +1,7 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createTestApp, permissionServiceMock, resetUserRouteMocks } from "./user-test-utils.js";
+import { createTestApp, permissionServiceMock, resetUserRouteMocks } from "./userTestUtils.js";
 
 describe("permission routes", () => {
   beforeEach(() => {

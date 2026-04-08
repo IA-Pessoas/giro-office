@@ -2,8 +2,8 @@ import { error as logError, ServiceError } from "@workspace/shared";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import type { IntegracaoTaskConclusionBody } from "../schemas/integracao-task-conclusion-body.schema.js";
-import { TaskWorkflowService } from "./TaskWorkflowService.js";
+import type { IntegracaoTaskConclusionBody } from "../schemas/integracaoTaskConclusionBody.schema.js";
+import { TaskWorkflowService } from "./taskWorkflowService.js";
 
 const CONCLUSION_UPDATE_SELECT = {
   id: true,

@@ -8,7 +8,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { TaskIntegrationRegularizeService } from "../services/TaskIntegrationRegularizeService.js";
+import { TaskIntegrationRegularizeService } from "../services/taskIntegrationRegularizeService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const taskIntegrationRegularizeService = new TaskIntegrationRegularizeService();

@@ -8,9 +8,9 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { integracaoTaskCompleteRequestBodySchema } from "../schemas/integracao-task-complete-request-body.schema.js";
-import { integracaoTaskConclusionBodySchema } from "../schemas/integracao-task-conclusion-body.schema.js";
-import { TaskLifecycleService } from "../services/TaskLifecycleService.js";
+import { integracaoTaskCompleteRequestBodySchema } from "../schemas/integracaoTaskCompleteRequestBody.schema.js";
+import { integracaoTaskConclusionBodySchema } from "../schemas/integracaoTaskConclusionBody.schema.js";
+import { TaskLifecycleService } from "../services/taskLifecycleService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const taskLifecycleService = new TaskLifecycleService();

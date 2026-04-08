@@ -1,7 +1,7 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createTestApp, pointServiceMock, resetRhRouteMocks } from "./rh-test-utils.js";
+import { createTestApp, pointServiceMock, resetRhRouteMocks } from "./rhTestUtils.js";
 
 describe("point routes", () => {
   const pointId = "00000000-0000-4000-8000-000000000010";

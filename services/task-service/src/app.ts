@@ -7,13 +7,13 @@ import "express-async-errors";
 
 import type { TaskServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
-import { taskComercialRoutes } from "./routes/task-comercial.routes.js";
-import { taskCrudRoutes } from "./routes/task-crud.routes.js";
-import { taskDependentRoutes } from "./routes/task-dependent.routes.js";
-import { taskFinanceiroRoutes } from "./routes/task-financeiro.routes.js";
-import { taskIntegrationRegularizeRoutes } from "./routes/task-integration-regularize.routes.js";
-import { taskLifecycleRoutes } from "./routes/task-lifecycle.routes.js";
-import { taskModelRoutes } from "./routes/task-model.routes.js";
+import { taskComercialRoutes } from "./routes/taskComercial.routes.js";
+import { taskCrudRoutes } from "./routes/taskCrud.routes.js";
+import { taskDependentRoutes } from "./routes/taskDependent.routes.js";
+import { taskFinanceiroRoutes } from "./routes/taskFinanceiro.routes.js";
+import { taskIntegrationRegularizeRoutes } from "./routes/taskIntegrationRegularize.routes.js";
+import { taskLifecycleRoutes } from "./routes/taskLifecycle.routes.js";
+import { taskModelRoutes } from "./routes/taskModel.routes.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
 
 function taskServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {

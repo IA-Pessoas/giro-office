@@ -103,7 +103,7 @@ const {
   scoreNitroServiceMock,
 } = rhMocks;
 
-vi.mock("../services/PointConfigService.js", () => ({
+vi.mock("../services/pointConfigService.js", () => ({
   PointConfigService: vi.fn(function PointConfigService() {
     return rhMocks.pointConfigServiceMock;
   }),

@@ -6,7 +6,7 @@ import {
 } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
-import { createHttpProjectProgressIntegration } from "./project-progress.js";
+import { createHttpProjectProgressIntegration } from "./projectProgress.js";
 
 describe("project-progress integration", () => {
   it("chama POST /project/progress com headers e body esperados", async () => {
