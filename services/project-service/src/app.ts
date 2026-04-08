@@ -1,13 +1,11 @@
-import "dotenv/config";
-
 import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
 import { mountOpenApiDocs } from "@workspace/shared/http";
-import { createLogger } from "@workspace/shared/logger";
+import type { Logger } from "@workspace/shared/logger";
 import cors from "cors";
-import express, { type Express, type Request } from "express";
+import express, { type Request } from "express";
 import "express-async-errors";
 
-import { getProjectServiceEnv } from "./config/env.js";
+import type { ProjectServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import {
   createProjectProgressRoutes,
@@ -35,22 +33,13 @@ function projectServiceErrorLogContext(request: Request): Record<string, unknown
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export function createProjectApplication(options?: {
+export function createProjectApplication(options: {
+  env: ProjectServiceEnv;
+  logger: Logger;
   projectCrudService?: ProjectCrudRouteDeps;
   projectProgressService?: ProjectProgressRouteDeps;
-}): {
-  app: Express;
-  logger: ReturnType<typeof createLogger>;
-  port: number;
-} {
-  const env = getProjectServiceEnv();
-  const logger = createLogger({
-    service: "project-service",
-    env: env.nodeEnv,
-    level: env.logLevel,
-    pretty: env.logPretty,
-  });
-
+}): express.Express {
+  const { env, logger } = options;
   const projectCrudService = options?.projectCrudService ?? new ProjectCrudService();
   const projectProgressService = options?.projectProgressService ?? new ProjectProgressService();
 
@@ -83,5 +72,5 @@ export function createProjectApplication(options?: {
     }),
   );
 
-  return { app, logger, port: env.port };
+  return app;
 }
