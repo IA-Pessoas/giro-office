@@ -2,7 +2,6 @@
 description: Padrao de testes em servicos Node.js/Express com Vitest
 globs:
   - "**/*.test.ts"
-  - "**/*.spec.ts"
 alwaysApply: false
 ---
 
@@ -56,11 +55,51 @@ import { describe, expect, it, vi } from "vitest";
 
 ## Organizacao dos testes
 
-- Arquivos podem usar `*.test.ts` ou `*.spec.ts`, respeitando o padrao ja adotado no pacote.
+- O padrao oficial do workspace para servicos e `*.test.ts`.
+- Nao criar novos arquivos `*.spec.ts`.
 - A descricao dos casos deve refletir comportamento observavel.
 - Pode ser em portugues ou ingles, mas manter consistencia no arquivo e no pacote.
-- Testes podem ficar em `src/`, `src/test/`, `tests/` ou pastas equivalentes ja adotadas pelo pacote.
-- Evitar misturar multiplos padroes de localizacao no mesmo pacote sem motivo claro.
+- Em servicos, os testes devem ficar em `src/test/`.
+- O formato de referencia e o `project-service`.
+- Evitar misturar `src/test/`, `tests/` e outras pastas no mesmo pacote.
+
+## Estrutura por modulo
+
+- Para cada modulo principal com rota HTTP, criar dois arquivos separados:
+  - um teste de service
+  - um teste de route
+- O par padrao deve seguir o formato:
+  - `XxxService.test.ts`
+  - `xxx.routes.test.ts`
+- Exemplo de referencia real:
+  - `ProjectCrudService.test.ts`
+  - `projectcrud.routes.test.ts`
+- Nao concentrar todos os testes de um servico em um unico arquivo monolitico.
+- Nao misturar testes de service e testes de rota no mesmo arquivo.
+- Helpers compartilhados de teste podem ficar em `src/test/`, por exemplo:
+  - `env-bootstrap.ts`
+  - `<service>-test-utils.ts`
+
+## Escopo dos testes por tipo
+
+### `XxxService.test.ts`
+
+- Deve testar regra de negocio da classe ou modulo de service.
+- Deve mockar dependencias de borda, como Prisma, HTTP, storage, fila ou providers externos.
+- Nao deve subir app HTTP nem depender de `supertest` salvo necessidade muito especifica.
+
+### `xxx.routes.test.ts`
+
+- Deve testar o contrato HTTP da rota.
+- Deve exercitar o `app.ts` ou o router montado no `app.ts`, preferindo `supertest`.
+- Deve validar status, body, headers relevantes, autenticacao, validacao e serializacao de erro.
+- Deve mockar services e middlewares externos quando isso isolar melhor o contrato da rota.
+
+## Bootstrap para testes
+
+- Quando o pacote precisar de variaveis minimas antes de importar modulos de producao, criar `src/test/env-bootstrap.ts`.
+- Importar esse bootstrap no topo dos testes que dependem desse ambiente, como no `project-service`.
+- O objetivo e impedir acoplamento acidental a `.env` real ou infraestrutura externa.
 
 ## O que cobrir
 
@@ -128,7 +167,12 @@ pnpm --filter @workspace/<nome-do-pacote> test
 Ao criar ou alterar testes neste workspace:
 
 - use Vitest;
-- respeite o padrao de localizacao ja adotado pelo pacote;
+- use `*.test.ts`;
+- coloque os testes em `src/test/`;
+- siga o modelo do `project-service`;
+- para cada modulo principal de rota, crie um par:
+  - `XxxService.test.ts`
+  - `xxx.routes.test.ts`
 - prefira `describe`, `it`, `expect` e `vi` quando fizer sentido;
 - mantenha os testes focados em comportamento observavel;
 - para codigo HTTP, teste contrato;

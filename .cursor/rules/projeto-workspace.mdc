@@ -88,3 +88,8 @@ alwaysApply: true
   - OpenAPI do servico
   - gateway, se aplicavel
   - testes do servico e do gateway
+- O padrao oficial de organizacao de testes em servicos e:
+  - `src/test/`
+  - um arquivo `XxxService.test.ts` para o service
+  - um arquivo `xxx.routes.test.ts` para a rota
+- A referencia de estrutura e o `project-service`.
