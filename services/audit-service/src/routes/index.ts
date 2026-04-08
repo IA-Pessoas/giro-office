@@ -1,11 +1,11 @@
+import type { ForwardedAuditAuthContext } from "@workspace/shared/audit";
+import type { Logger } from "@workspace/shared";
 import {
   createSuccessResponse,
   isServiceError,
   REQUEST_ID_HEADER,
   ServiceError,
 } from "@workspace/shared/http";
-import type { ForwardedAuditAuthContext } from "@workspace/shared/audit";
-import type { Logger } from "@workspace/shared";
 import { type RequestHandler, Router } from "express";
 
 import type { AuditServiceEnv } from "../config/env.js";
@@ -60,35 +60,24 @@ function asyncRoute(
   };
 }
 
-export function createAuditRouter({ env, logger, repository }: CreateAuditRouterOptions): Router {
-  const router = Router();
-
-  const auditRepository = repository ?? createAuditRequestRepository();
+function createAuditRequestContext(options: CreateAuditRouterOptions) {
+  const auditRepository = options.repository ?? createAuditRequestRepository();
   const auditRequestService = createAuditRequestService(auditRepository);
 
-  const requireAuditEnabled = createAuditEnabledMiddleware(env.auditEnabled);
-  const requireInternalToken = createInternalServiceTokenMiddleware(env.auditServiceToken);
+  return {
+    auditRequestService,
+    requireAuditEnabled: createAuditEnabledMiddleware(options.env.auditEnabled),
+    requireInternalToken: createInternalServiceTokenMiddleware(options.env.auditServiceToken),
+  };
+}
 
-  router.get("/health", (_request, response) => {
-    response.status(200).json(
-      createSuccessResponse({
-        status: "ok",
-        service: "audit-service",
-      }),
-    );
-  });
-
-  router.get("/ready", (_request, response) => {
-    response.status(200).json(
-      createSuccessResponse({
-        status: "ready",
-        service: "audit-service",
-      }),
-    );
-  });
+export function createAuditInternalRouter(options: CreateAuditRouterOptions): Router {
+  const router = Router();
+  const { auditRequestService, requireAuditEnabled, requireInternalToken } =
+    createAuditRequestContext(options);
 
   router.post(
-    "/internal/audit/requests",
+    "/audit/requests",
     requireAuditEnabled,
     requireInternalToken,
     asyncRoute(async (request, response) => {
@@ -102,19 +91,27 @@ export function createAuditRouter({ env, logger, repository }: CreateAuditRouter
     }),
   );
 
+  return router;
+}
+
+export function createAuditPublicRouter(options: CreateAuditRouterOptions): Router {
+  const router = Router();
+  const { auditRequestService, requireAuditEnabled, requireInternalToken } =
+    createAuditRequestContext(options);
+
   router.get(
-    "/audit/requests",
+    "/requests",
     requireAuditEnabled,
     requireInternalToken,
     asyncRoute(async (request, response) => {
       const auth = getAuthFromHeaders(request);
-      assertAuditAdminOrLog(logger, request, auth);
+      assertAuditAdminOrLog(options.logger, request, auth);
       const result = await auditRequestService.search(
         request.query as Record<string, unknown>,
         auth.organizationId,
       );
 
-      logger.info({
+      options.logger.info({
         event: "audit.requests.search",
         message: "Audit requests fetched",
         request: {
@@ -135,19 +132,19 @@ export function createAuditRouter({ env, logger, repository }: CreateAuditRouter
   );
 
   router.get(
-    "/audit/requests/:requestId",
+    "/requests/:requestId",
     requireAuditEnabled,
     requireInternalToken,
     asyncRoute(async (request, response) => {
       const auth = getAuthFromHeaders(request);
-      assertAuditAdminOrLog(logger, request, auth);
+      assertAuditAdminOrLog(options.logger, request, auth);
       const item = await auditRequestService.findByRequestId(
         request.params.requestId,
         auth.organizationId,
       );
 
       if (!item) {
-        logger.warn({
+        options.logger.warn({
           event: "audit.requests.lookup.not_found",
           message: "Audit request not found",
           request: {
@@ -160,10 +157,10 @@ export function createAuditRouter({ env, logger, repository }: CreateAuditRouter
             requestId: request.params.requestId,
           },
         });
-        throw new ServiceError(404, "Registro de auditoria não encontrado.");
+        throw new ServiceError(404, "Registro de auditoria nao encontrado.");
       }
 
-      logger.info({
+      options.logger.info({
         event: "audit.requests.lookup",
         message: "Audit request fetched",
         request: {
