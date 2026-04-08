@@ -36,6 +36,9 @@ const PERMISSION_OPTIONS: Array<{ value: UserPermission; label: string }> = [
   { value: 2, label: 'Owner' },
 ];
 
+const FIELD_CLASSNAME =
+  'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-80';
+
 function getUserTypeFromPermission(permission: UserPermission): UserType {
   switch (permission) {
     case 1:
@@ -146,15 +149,15 @@ export function CreateUserModal({
       <div className="u-stack u-gap-4">
         <div className="u-stack u-gap-2">
           <label htmlFor="user-name" className="users-section-title">Nome</label>
-          <input id="user-name" name="name" value={formData.name} onChange={handleInputChange} className="ui-input" required />
+          <input id="user-name" name="name" value={formData.name} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
         </div>
         <div className="u-stack u-gap-2">
           <label htmlFor="user-login" className="users-section-title">Login</label>
-          <input id="user-login" name="login" value={formData.login} onChange={handleInputChange} className="ui-input" required />
+          <input id="user-login" name="login" value={formData.login} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
         </div>
         <div className="u-stack u-gap-2">
           <label htmlFor="user-password" className="users-section-title">Senha</label>
-          <input id="user-password" type="password" name="password" value={formData.password} onChange={handleInputChange} className="ui-input" required />
+          <input id="user-password" type="password" name="password" value={formData.password} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
         </div>
         <div className="u-stack u-gap-2">
           <label htmlFor="user-department" className="users-section-title">Departamento</label>
@@ -163,7 +166,7 @@ export function CreateUserModal({
             name="department_id"
             value={formData.department_id}
             onChange={handleInputChange}
-            className="ui-input"
+            className={FIELD_CLASSNAME}
             required
           >
             <option value="">Selecione um departamento</option>
@@ -177,7 +180,7 @@ export function CreateUserModal({
             name="permission"
             value={formData.permission}
             onChange={handleInputChange}
-            className="ui-input"
+            className={FIELD_CLASSNAME}
           >
             {PERMISSION_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>

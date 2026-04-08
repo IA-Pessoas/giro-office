@@ -24,7 +24,6 @@ export function Administracao() {
   useEffect(() => {
     if (authOrganizationId) {
       setOrganizationId(authOrganizationId);
-      return;
     }
 
     if (!user?.id) {
@@ -39,9 +38,8 @@ export function Administracao() {
       try {
         const api = setupAPIClient();
         const response = await api.get("/me");
-        const nextOrganizationId =
-          response.data?.data?.organization_id ??
-          response.data?.user?.organization_id;
+        const meData = response.data?.data ?? response.data?.user;
+        const nextOrganizationId = meData?.organization_id;
 
         if (isMounted) {
           setOrganizationId(nextOrganizationId);
