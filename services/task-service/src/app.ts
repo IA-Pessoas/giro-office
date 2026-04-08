@@ -7,6 +7,10 @@ import "express-async-errors";
 
 import type { TaskServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
+import {
+  createProjectPlanRoutes,
+  type ProjectPlanRouteDeps,
+} from "./routes/project-plan.routes.js";
 import { taskComercialRoutes } from "./routes/task-comercial.routes.js";
 import { taskCrudRoutes } from "./routes/task-crud.routes.js";
 import { taskDependentRoutes } from "./routes/task-dependent.routes.js";
@@ -15,6 +19,7 @@ import { taskIntegrationRegularizeRoutes } from "./routes/task-integration-regul
 import { taskLifecycleRoutes } from "./routes/task-lifecycle.routes.js";
 import { taskModelRoutes } from "./routes/task-model.routes.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
+import { ProjectPlanService } from "./services/ProjectPlanService.js";
 
 function taskServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -29,8 +34,15 @@ function taskServiceErrorLogContext(request: Request): Record<string, unknown> |
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export function createTaskApp(env: TaskServiceEnv, logger: Logger): Express {
+export function createTaskApp(
+  env: TaskServiceEnv,
+  logger: Logger,
+  options?: {
+    projectPlanService?: ProjectPlanRouteDeps;
+  },
+): Express {
   const app = express();
+  const projectPlanService = options?.projectPlanService ?? new ProjectPlanService();
 
   app.use(cors());
   app.use(express.json());
@@ -48,6 +60,7 @@ export function createTaskApp(env: TaskServiceEnv, logger: Logger): Express {
   }
 
   app.use(taskModelRoutes);
+  app.use(createProjectPlanRoutes(projectPlanService));
   app.use(taskDependentRoutes);
   app.use(taskIntegrationRegularizeRoutes);
   app.use(taskLifecycleRoutes);
