@@ -522,6 +522,9 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.3
+      node-cron:
+        specifier: ^3.0.2
+        version: 3.0.3
       pg:
         specifier: ^8.13.0
         version: 8.20.0
@@ -544,6 +547,9 @@ importers:
       '@types/node':
         specifier: ^25.3.0
         version: 25.5.2
+      '@types/node-cron':
+        specifier: ^3.0.11
+        version: 3.0.11
       '@types/supertest':
         specifier: ^7.0.0
         version: 7.2.0

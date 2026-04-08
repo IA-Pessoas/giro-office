@@ -3,6 +3,18 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 export class RegularizeReconciliationService {
   constructor(private readonly prisma: PrismaClient) {}
 
+  async runClientPfDocumentNotificationReconciliation(): Promise<{ created: number }> {
+    return this.reconcileClientPfDocumentNotifications();
+  }
+
+  async runInactiveClientPfStatusReconciliation(): Promise<{ updated: number }> {
+    return this.reconcileInactiveClientPfStatuses();
+  }
+
+  async runLicenseNotificationReconciliation(): Promise<{ created: number }> {
+    return this.reconcileLicenseNotifications();
+  }
+
   async runFullReconciliation(): Promise<Record<string, unknown>> {
     const managerCache = new Map<string, string[]>();
     const expiredDocumentNotifications = await this.reconcileClientPfDocumentNotifications(
