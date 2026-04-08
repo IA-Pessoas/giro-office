@@ -16,6 +16,24 @@ alwaysApply: false
   - handler global de erros
 - Evitar colocar regras de negocio ou detalhes de resource routing diretamente no `app.ts`.
 
+## Separacao entre `app.ts` e `server.ts`
+- O padrao oficial para servicos Express do workspace e:
+  - `app.ts` para composicao da aplicacao
+  - `server.ts` para bootstrap e inicializacao do processo
+- `server.ts` deve concentrar:
+  - carregamento de env (`dotenv/config`, quando aplicavel)
+  - leitura de `env`
+  - criacao do logger
+  - criacao do servidor HTTP e `listen`
+  - logs de start e erro do servidor
+- `app.ts` nao deve:
+  - chamar `listen`
+  - criar logger de bootstrap
+  - decidir porta
+  - servir como entrypoint executavel do processo
+- Evitar `index.ts` como entrypoint quando ele mistura bootstrap e composicao da aplicacao.
+- Se existir `index.ts` em um servico Express, ele deve ser tratado como excecao temporaria ou legado a ser migrado para `server.ts`.
+
 ## Montagem de routers
 - Montar routers com prefixos explicitos no `app.ts`.
 - O router de dominio deve expor apenas paths relativos ao seu mount.
@@ -50,3 +68,4 @@ alwaysApply: false
 ## Bootstrap
 - O bootstrap/server deve criar logger de instancia e passar dependencias para `createApp` ou equivalente.
 - Evitar helpers globais de log quando o servico ja usa `createLogger`.
+- O entrypoint do pacote (`main`, `dev`, `start`) deve apontar para `server.ts` / `dist/server.js`, nao para `index.ts`, quando o servico segue esse padrao.

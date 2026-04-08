@@ -43,6 +43,10 @@ alwaysApply: true
 - Codigo compartilhado fica em `shared`.
 - Rotas orquestram services; services nao chamam rotas.
 - Metodos publicos de service devem ter tipo de retorno explicito; ver `typescript-services.mdc`.
+- Em servicos Express, o padrao oficial de entrypoint e:
+  - `src/app.ts` para compor a aplicacao
+  - `src/server.ts` para bootstrap e inicializacao
+- `index.ts` nao deve ser usado como entrypoint principal quando misturar composicao da app com `listen`, logger e leitura de env.
 
 ## Gateway
 - A configuracao de upstreams pertence ao proprio gateway.
@@ -64,6 +68,19 @@ alwaysApply: true
 - Exemplo de referencia atual:
   - `organization-service`: `app.use("/organizations", organizationRoutes)`
   - `audit-service`: `app.use("/audit", createAuditPublicRouter(...))` e `app.use("/internal", createAuditInternalRouter(...))`
+
+## Bootstrap de servicos
+- O bootstrap de servicos deve ser separado da composicao da aplicacao.
+- `server.ts` deve ser responsavel por:
+  - carregar env
+  - criar logger
+  - instanciar a app
+  - subir o servidor
+- `app.ts` deve permanecer reutilizavel em testes sem subir socket real.
+- Scripts de pacote devem preferir:
+  - `dev`: `tsx watch src/server.ts`
+  - `start`: `node dist/server.js`
+  - `main`: `dist/server.js`
 
 ## Testes
 - Toda alteracao de contrato HTTP deve alinhar:
