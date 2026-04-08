@@ -18,11 +18,6 @@ const env: RegularizeServiceEnv = {
   auditServiceToken: "audit-service-token",
   internalServiceToken: "internal-token",
   encryptionKey: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
-  enableReconciliationSchedule: false,
-  licenseNotificationCron: "30 4 * * *",
-  clientPfStatusCron: "* 5 * * *",
-  clientPfDocumentsCron: "30 5 * * *",
-  reconciliationTimezone: "America/Sao_Paulo",
   logLevel: "info",
   logPretty: false,
   enableApiDocs: false,
@@ -121,6 +116,9 @@ describe("regularize remaining routes", () => {
       prisma,
       reconciliationService: createReconciliationServiceMock() as never,
       runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
     const response = await request(app)
@@ -187,6 +185,9 @@ describe("regularize remaining routes", () => {
       prisma,
       reconciliationService: createReconciliationServiceMock() as never,
       runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
     const response = await request(app)
@@ -227,6 +228,9 @@ describe("regularize remaining routes", () => {
       prisma,
       reconciliationService: createReconciliationServiceMock() as never,
       runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
     const response = await request(app)
@@ -279,6 +283,9 @@ describe("regularize remaining routes", () => {
       prisma,
       reconciliationService: reconciliationService as never,
       runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
     const response = await request(app)

@@ -38,6 +38,9 @@ export interface CreateAppOptions {
   prisma: PrismaClient;
   reconciliationService: RegularizeReconciliationService;
   runReconciliation: () => Promise<Record<string, unknown>>;
+  runLicenseNotificationReconciliation: () => Promise<Record<string, unknown>>;
+  runClientPfStatusReconciliation: () => Promise<Record<string, unknown>>;
+  runClientPfDocumentsReconciliation: () => Promise<Record<string, unknown>>;
 }
 
 export function createApp({
@@ -46,6 +49,9 @@ export function createApp({
   prisma,
   reconciliationService,
   runReconciliation,
+  runLicenseNotificationReconciliation,
+  runClientPfStatusReconciliation,
+  runClientPfDocumentsReconciliation,
 }: CreateAppOptions): express.Express {
   const app = express();
 
@@ -76,6 +82,45 @@ export function createApp({
     async (_request, response, next) => {
       try {
         const result = await runReconciliation();
+        response.json(createSuccessResponse(result));
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    "/internal/reconciliation/license-notifications/run",
+    requireInternalToken(env),
+    async (_request, response, next) => {
+      try {
+        const result = await runLicenseNotificationReconciliation();
+        response.json(createSuccessResponse(result));
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    "/internal/reconciliation/client-pf-status/run",
+    requireInternalToken(env),
+    async (_request, response, next) => {
+      try {
+        const result = await runClientPfStatusReconciliation();
+        response.json(createSuccessResponse(result));
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    "/internal/reconciliation/client-pf-documents/run",
+    requireInternalToken(env),
+    async (_request, response, next) => {
+      try {
+        const result = await runClientPfDocumentsReconciliation();
         response.json(createSuccessResponse(result));
       } catch (error) {
         next(error);

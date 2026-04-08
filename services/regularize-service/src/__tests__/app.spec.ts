@@ -47,6 +47,9 @@ describe("regularize-service app", () => {
       prisma: {} as never,
       reconciliationService: new RegularizeReconciliationService({} as never),
       runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
     const response = await request(app).get("/health");

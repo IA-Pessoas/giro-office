@@ -369,6 +369,45 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           },
         },
       },
+      "/internal/reconciliation/license-notifications/run": {
+        post: {
+          tags: ["Internal"],
+          summary: "Executar reconciliacao de notificacoes de licencas",
+          security: [{ internalToken: [] }],
+          responses: {
+            "200": {
+              description: "Reconciliacao de licencas executada",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
+      },
+      "/internal/reconciliation/client-pf-status/run": {
+        post: {
+          tags: ["Internal"],
+          summary: "Executar reconciliacao de status de cliente PF",
+          security: [{ internalToken: [] }],
+          responses: {
+            "200": {
+              description: "Reconciliacao de status executada",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
+      },
+      "/internal/reconciliation/client-pf-documents/run": {
+        post: {
+          tags: ["Internal"],
+          summary: "Executar reconciliacao de documentos vencidos de cliente PF",
+          security: [{ internalToken: [] }],
+          responses: {
+            "200": {
+              description: "Reconciliacao de documentos executada",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
+      },
     },
   };
 }

@@ -13,11 +13,6 @@ const env: RegularizeServiceEnv = {
   auditServiceToken: "audit-service-token",
   internalServiceToken: "internal-token",
   encryptionKey: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
-  enableReconciliationSchedule: false,
-  licenseNotificationCron: "30 4 * * *",
-  clientPfStatusCron: "* 5 * * *",
-  clientPfDocumentsCron: "30 5 * * *",
-  reconciliationTimezone: "America/Sao_Paulo",
   logLevel: "info",
   logPretty: false,
   enableApiDocs: false,
@@ -57,6 +52,9 @@ describe("regularize internal routes", () => {
       prisma: {} as never,
       reconciliationService: {} as never,
       runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
     const response = await request(app).post("/internal/reconciliation/run");
@@ -72,6 +70,9 @@ describe("regularize internal routes", () => {
       prisma: {} as never,
       reconciliationService: {} as never,
       runReconciliation,
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
     const response = await request(app)
@@ -81,5 +82,71 @@ describe("regularize internal routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(runReconciliation).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /internal/reconciliation/license-notifications/run executes the specific reconciliation", async () => {
+    const runLicenseNotificationReconciliation = vi.fn(async () => ({ created: 2 }));
+    const app = createApp({
+      env,
+      logger: createLoggerMock(),
+      prisma: {} as never,
+      reconciliationService: {} as never,
+      runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation,
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
+    });
+
+    const response = await request(app)
+      .post("/internal/reconciliation/license-notifications/run")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.internalServiceToken!);
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(runLicenseNotificationReconciliation).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /internal/reconciliation/client-pf-status/run executes the specific reconciliation", async () => {
+    const runClientPfStatusReconciliation = vi.fn(async () => ({ updated: 1 }));
+    const app = createApp({
+      env,
+      logger: createLoggerMock(),
+      prisma: {} as never,
+      reconciliationService: {} as never,
+      runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation,
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
+    });
+
+    const response = await request(app)
+      .post("/internal/reconciliation/client-pf-status/run")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.internalServiceToken!);
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(runClientPfStatusReconciliation).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /internal/reconciliation/client-pf-documents/run executes the specific reconciliation", async () => {
+    const runClientPfDocumentsReconciliation = vi.fn(async () => ({ created: 4 }));
+    const app = createApp({
+      env,
+      logger: createLoggerMock(),
+      prisma: {} as never,
+      reconciliationService: {} as never,
+      runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation,
+    });
+
+    const response = await request(app)
+      .post("/internal/reconciliation/client-pf-documents/run")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.internalServiceToken!);
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(runClientPfDocumentsReconciliation).toHaveBeenCalledTimes(1);
   });
 });

@@ -107,6 +107,9 @@ describe("regularize client PF and partners routes", () => {
       prisma,
       reconciliationService: reconciliationService as never,
       runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
     const response = await request(app).post("/regularize/pf").set(gatewayHeaders()).send({
@@ -170,6 +173,9 @@ describe("regularize client PF and partners routes", () => {
       prisma,
       reconciliationService: reconciliationService as never,
       runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
     const response = await request(app)
