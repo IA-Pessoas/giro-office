@@ -6,15 +6,16 @@ export class RegularizeReconciliationService {
   async runFullReconciliation(): Promise<Record<string, unknown>> {
     const expiredDocumentNotifications = await this.reconcileClientPfDocumentNotifications();
     const inactivatedClientPf = await this.reconcileInactiveClientPfStatuses();
+    const licenseNotifications = await this.reconcileLicenseNotifications();
 
     return {
-      processed: expiredDocumentNotifications.created + inactivatedClientPf.updated,
+      processed:
+        expiredDocumentNotifications.created +
+        inactivatedClientPf.updated +
+        licenseNotifications.created,
       expiredDocumentNotifications,
       inactivatedClientPf,
-      licenseNotifications: {
-        created: 0,
-        pendingImplementation: true,
-      },
+      licenseNotifications,
     };
   }
 
@@ -36,7 +37,12 @@ export class RegularizeReconciliationService {
     });
   }
 
-  async handleLicenseChanged(_organizationId: string, _licenseId: string): Promise<void> {}
+  async handleLicenseChanged(organizationId: string, licenseId: string): Promise<void> {
+    await this.reconcileLicenseNotifications({
+      organizationId,
+      licenseId,
+    });
+  }
 
   private async reconcileClientPfDocumentNotifications(params?: {
     organizationId?: string;
@@ -188,5 +194,67 @@ export class RegularizeReconciliationService {
     });
 
     return true;
+  }
+
+  private async reconcileLicenseNotifications(params?: {
+    organizationId?: string;
+    licenseId?: string;
+  }): Promise<{ created: number }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const thirtyDaysFromNow = new Date(today);
+    thirtyDaysFromNow.setDate(today.getDate() + 30);
+
+    const licenses = await this.prisma.license.findMany({
+      where: {
+        ...(params?.organizationId ? { organization_id: params.organizationId } : {}),
+        ...(params?.licenseId ? { id: params.licenseId } : {}),
+        due_date: {
+          not: null,
+          lte: thirtyDaysFromNow,
+        },
+        client: {
+          status: "Ativo",
+        },
+      },
+      include: {
+        client: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    let created = 0;
+
+    for (const license of licenses) {
+      const managers = await this.getRegularizeManagerUserIds(license.organization_id);
+      if (!license.due_date || !license.client) {
+        continue;
+      }
+
+      const isExpired = license.due_date < today;
+      const title = `${isExpired ? "ALVARA VENCIDO" : "ALVARA A VENCER"}: ${license.type_license}`;
+      const dateStr = license.due_date.toLocaleDateString("pt-BR");
+      const message = isExpired
+        ? `O alvara do cliente ${license.client.name} venceu em ${dateStr}.`
+        : `O alvara do cliente ${license.client.name} vence em ${Math.ceil((license.due_date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))} dias (${dateStr}).`;
+
+      for (const userId of managers) {
+        const inserted = await this.createNotificationIfMissing({
+          organizationId: license.organization_id,
+          userId,
+          regarding: "regularize.license",
+          regardingId: license.id,
+          title,
+          message,
+        });
+        created += inserted ? 1 : 0;
+      }
+    }
+
+    return { created };
   }
 }
