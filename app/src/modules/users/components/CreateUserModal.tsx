@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 
 import { Dialog } from '@shared/components';
-import type { DepItem } from '@modules/departments';
 
 import type { AdminCreateUserData, UserItem, UserPermission, UserType } from '../types';
 
@@ -10,7 +9,7 @@ interface CreateUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUserCreated: (newUser: UserItem) => void;
-  departments: DepItem[];
+  departments?: Array<{ id: string; name: string }>;
   organizationId?: string;
   organizationIdLoading?: boolean;
   invitedBy?: string;
@@ -35,6 +34,18 @@ const PERMISSION_OPTIONS: Array<{ value: UserPermission; label: string }> = [
   { value: 1, label: 'Admin' },
   { value: 2, label: 'Owner' },
 ];
+
+// Temporary local department catalog until the backend exposes the proper flow.
+const DEPARTMENTS = [
+  { id: 'default-department', label: 'Administracao' },
+  { id: 'dept-comercial', label: 'Comercial' },
+  { id: 'dept-contabil', label: 'Contabil' },
+  { id: 'dept-financeiro', label: 'Financeiro' },
+  { id: 'dept-fiscal', label: 'Fiscal' },
+  { id: 'dept-pessoal', label: 'Pessoal' },
+  { id: 'dept-rh', label: 'Recursos Humanos' },
+  { id: 'dept-ti', label: 'Tecnologia' },
+] as const;
 
 const MODULE_PERMISSION_OPTIONS = [0, 1, 2] as const;
 
@@ -98,7 +109,6 @@ export function CreateUserModal({
   isOpen,
   onClose,
   onUserCreated,
-  departments,
   organizationId,
   organizationIdLoading = false,
   invitedBy,
@@ -239,7 +249,9 @@ export function CreateUserModal({
             required
           >
             <option value="">Selecione um departamento</option>
-            {departments.map((dep) => <option key={dep.id} value={dep.id}>{dep.name}</option>)}
+            {DEPARTMENTS.map((department) => (
+              <option key={department.id} value={department.id}>{department.label}</option>
+            ))}
           </select>
         </div>
         <div className="u-stack u-gap-2">
