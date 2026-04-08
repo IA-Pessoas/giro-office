@@ -14,11 +14,13 @@ import {
 import { taskComercialRoutes } from "./routes/task-comercial.routes.js";
 import { taskCrudRoutes } from "./routes/task-crud.routes.js";
 import { taskDependentRoutes } from "./routes/task-dependent.routes.js";
+import { createDepsTasksRoutes } from "./routes/deps-tasks.routes.js";
 import { taskFinanceiroRoutes } from "./routes/task-financeiro.routes.js";
 import { taskIntegrationRegularizeRoutes } from "./routes/task-integration-regularize.routes.js";
 import { taskLifecycleRoutes } from "./routes/task-lifecycle.routes.js";
 import { taskModelRoutes } from "./routes/task-model.routes.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
+import { DepsTasksService } from "./services/DepsTasksService.js";
 import { ProjectPlanService } from "./services/ProjectPlanService.js";
 
 function taskServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -61,6 +63,7 @@ export function createTaskApp(
 
   app.use(taskModelRoutes);
   app.use(createProjectPlanRoutes(projectPlanService));
+  app.use(createDepsTasksRoutes(new DepsTasksService()));
   app.use(taskDependentRoutes);
   app.use(taskIntegrationRegularizeRoutes);
   app.use(taskLifecycleRoutes);

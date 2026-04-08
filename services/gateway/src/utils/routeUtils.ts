@@ -15,12 +15,17 @@ const TASK_SERVICE_EXACT_PATHS = new Set([
   "/integracao-tasksModel-dependent",
   "/integracao-taskModel-dependent",
   "/integracao-tasksIntegration",
+  "/integracao-depsTasks",
   "/integracao-tasks",
   "/integracao-tasks-conclusion",
   "/integracao-tasks-completeRequest",
   "/integracao-task",
   "/comercial-tasks",
   "/financeiro-tasks",
+  "/integracao-plans",
+  "/integracao-plan",
+  "/integracao-plans-tasks",
+  "/integracao-plans-hire",
 ]);
 
 export function isTaskServiceRoute(path: string): boolean {

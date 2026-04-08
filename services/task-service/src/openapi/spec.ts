@@ -456,6 +456,14 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: { "200": { description: "Excluido", ...successJson } },
         },
       },
+      "/integracao-depsTasks": {
+        get: {
+          tags: ["TaskModel"],
+          summary: "Listar departamentos com modelos de tarefa",
+          security: bearer,
+          responses: { "200": { description: "Lista", ...successJson } },
+        },
+      },
       "/integracao-plans": {
         post: {
           tags: ["ProjectPlan"],
