@@ -57,6 +57,13 @@ alwaysApply: true
 - Quando houver conflito entre `GET` de detalhe e `GET` de colecao no mesmo prefixo, usar:
   - `GET /prefixo` para detalhe
   - `GET /prefixo/list` para colecao
+- O `app.ts` do servico deve ser o ponto de montagem dos routers por prefixo.
+- Arquivos em `routes/` devem trabalhar com paths relativos ao mount definido no `app.ts`.
+- Nao repetir prefixo de dominio dentro do proprio router quando ele ja e aplicado no `app.ts`.
+- Para servicos com contrato publico e interno, separar routers explicitamente no `app.ts` em vez de misturar os contextos no mesmo arquivo.
+- Exemplo de referencia atual:
+  - `organization-service`: `app.use("/organizations", organizationRoutes)`
+  - `audit-service`: `app.use("/audit", createAuditPublicRouter(...))` e `app.use("/internal", createAuditInternalRouter(...))`
 
 ## Testes
 - Toda alteracao de contrato HTTP deve alinhar:
