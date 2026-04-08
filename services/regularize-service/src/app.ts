@@ -11,6 +11,7 @@ import { requireInternalToken } from "./middlewares/requireInternalToken.js";
 import { buildRegularizeServiceOpenApiSpec } from "./openapi/spec.js";
 import { createRegularizeRoutes } from "./routes/index.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
+import type { RegularizeReconciliationService } from "./services/regularizeReconciliationService.js";
 
 function regularizeServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -35,6 +36,7 @@ export interface CreateAppOptions {
   env: RegularizeServiceEnv;
   logger: Logger;
   prisma: PrismaClient;
+  reconciliationService: RegularizeReconciliationService;
   runReconciliation: () => Promise<Record<string, unknown>>;
 }
 
@@ -42,6 +44,7 @@ export function createApp({
   env,
   logger,
   prisma,
+  reconciliationService,
   runReconciliation,
 }: CreateAppOptions): express.Express {
   const app = express();
@@ -80,7 +83,7 @@ export function createApp({
     },
   );
 
-  app.use(createRegularizeRoutes({ prisma }));
+  app.use(createRegularizeRoutes({ prisma, env, reconciliationService }));
 
   app.use(
     createExpressErrorHandler({

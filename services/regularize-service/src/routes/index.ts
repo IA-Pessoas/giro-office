@@ -8,13 +8,11 @@ import { createPartnersRoutes } from "./partners.routes.js";
 import { createPasswordRoutes } from "./password.routes.js";
 import { createProcessRoutes } from "./process.routes.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
-import { createSitePasswordRoutes } from "./sitePassword.routes.js";
 
 export function createRegularizeRoutes(deps: RegularizeRouteDeps): Router {
   const router = Router();
 
   router.use(createPasswordRoutes(deps));
-  router.use(createSitePasswordRoutes(deps));
   router.use(createClientPfRoutes(deps));
   router.use(createPartnersRoutes(deps));
   router.use(createMunicipalTaxesRoutes(deps));

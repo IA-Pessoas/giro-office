@@ -5,6 +5,7 @@ import { createLogger } from "@workspace/shared/logger";
 import { createApp } from "./app.js";
 import { getRegularizeServiceEnv } from "./config/env.js";
 import { prismaClient } from "./integrations/prisma.js";
+import { RegularizeReconciliationService } from "./services/regularizeReconciliationService.js";
 
 const env = getRegularizeServiceEnv();
 const logger = createLogger({
@@ -14,17 +15,17 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
+const reconciliationService = new RegularizeReconciliationService(prismaClient);
+
 async function runReconciliation(): Promise<Record<string, unknown>> {
-  return {
-    processed: 0,
-    message: "Reconciliation runner not wired yet.",
-  };
+  return reconciliationService.runFullReconciliation();
 }
 
 const app = createApp({
   env,
   logger,
   prisma: prismaClient,
+  reconciliationService,
   runReconciliation,
 });
 

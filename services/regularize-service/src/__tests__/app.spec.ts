@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../app.js";
 import type { RegularizeServiceEnv } from "../config/env.js";
+import { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
 
 const env: RegularizeServiceEnv = {
   port: 3411,
@@ -11,11 +12,16 @@ const env: RegularizeServiceEnv = {
   jwtSecret: "secret",
   auditServiceToken: "audit-service-token",
   internalServiceToken: "internal-token",
-  encryptionKey: "ZmFrZWtleWZmYWtla2V5ZmFrZWtleWZmYWtla2V5ZmFrZQ==",
+  encryptionKey: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
   logLevel: "info",
   logPretty: false,
   enableApiDocs: false,
 };
+
+process.env.DATABASE_URL = env.databaseUrl;
+process.env.JWT_SECRET = env.jwtSecret;
+process.env.AUDIT_SERVICE_TOKEN = env.auditServiceToken;
+process.env.MTK_ENCRYPTION_KEY = env.encryptionKey;
 
 describe("regularize-service app", () => {
   it("GET /health returns 200", async () => {
@@ -39,6 +45,7 @@ describe("regularize-service app", () => {
         })),
       } as never,
       prisma: {} as never,
+      reconciliationService: new RegularizeReconciliationService({} as never),
       runReconciliation: vi.fn(async () => ({ processed: 0 })),
     });
 
