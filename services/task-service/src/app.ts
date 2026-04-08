@@ -9,17 +9,18 @@ import type { TaskServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import {
   createProjectPlanRoutes,
+  projectPlanRoutes,
   type ProjectPlanRouteDeps,
 } from "./routes/project-plan.routes.js";
 import { taskComercialRoutes } from "./routes/task-comercial.routes.js";
 import { taskCrudRoutes } from "./routes/task-crud.routes.js";
 import { taskDependentRoutes } from "./routes/task-dependent.routes.js";
+import { depsTasksRoutes } from "./routes/deps-tasks.routes.js";
 import { taskFinanceiroRoutes } from "./routes/task-financeiro.routes.js";
 import { taskIntegrationRegularizeRoutes } from "./routes/task-integration-regularize.routes.js";
 import { taskLifecycleRoutes } from "./routes/task-lifecycle.routes.js";
 import { taskModelRoutes } from "./routes/task-model.routes.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
-import { ProjectPlanService } from "./services/ProjectPlanService.js";
 
 function taskServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -42,7 +43,9 @@ export function createTaskApp(
   },
 ): Express {
   const app = express();
-  const projectPlanService = options?.projectPlanService ?? new ProjectPlanService();
+  const resolvedProjectPlanRoutes = options?.projectPlanService
+    ? createProjectPlanRoutes(options.projectPlanService)
+    : projectPlanRoutes;
 
   app.use(cors());
   app.use(express.json());
@@ -60,7 +63,8 @@ export function createTaskApp(
   }
 
   app.use(taskModelRoutes);
-  app.use(createProjectPlanRoutes(projectPlanService));
+  app.use(resolvedProjectPlanRoutes);
+  app.use(depsTasksRoutes);
   app.use(taskDependentRoutes);
   app.use(taskIntegrationRegularizeRoutes);
   app.use(taskLifecycleRoutes);

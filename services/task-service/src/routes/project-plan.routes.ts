@@ -18,7 +18,7 @@ import {
   projectPlanReorderTaskBodySchema,
   projectPlanUpdateBodySchema,
 } from "../schemas/project-plan.schemas.js";
-import type { ProjectPlanService } from "../services/ProjectPlanService.js";
+import { ProjectPlanService, type ProjectPlanService as ProjectPlanServiceType } from "../services/ProjectPlanService.js";
 
 function requireAuthContext(req: Request): { user_id: string; organization_id: string } {
   const user_id = req.user_id;
@@ -30,7 +30,7 @@ function requireAuthContext(req: Request): { user_id: string; organization_id: s
 }
 
 export type ProjectPlanRouteDeps = Pick<
-  ProjectPlanService,
+  ProjectPlanServiceType,
   | "create"
   | "list"
   | "update"
@@ -271,3 +271,7 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
 
   return router;
 }
+
+export const projectPlanRoutes: ReturnType<typeof Router> = createProjectPlanRoutes(
+  new ProjectPlanService(),
+);
