@@ -36,6 +36,10 @@ const gatewayEnvSchema = z
     userServiceUrl: z.string().url().default("http://localhost:3335"),
     taskServiceUrl: z.string().url().default("http://localhost:3337"),
     projectServiceUrl: z.string().url().default("http://localhost:3338"),
+    organizationServiceUrl: z.string().url().default("http://localhost:3400"),
+    clientServiceUrl: z.string().url().default("http://localhost:3410"),
+    rhServiceUrl: z.string().url().default("http://localhost:3339"),
+    regularizeServiceUrl: z.string().url().default("http://localhost:3411"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -78,6 +82,10 @@ export interface GatewayEnv {
   userServiceUrl: string;
   taskServiceUrl: string;
   projectServiceUrl: string;
+  organizationServiceUrl: string;
+  clientServiceUrl: string;
+  rhServiceUrl: string;
+  regularizeServiceUrl: string;
   websocketUpstreamUrl?: string;
   jwtSecret: string;
   logLevel: LoggerLevel;
@@ -95,6 +103,10 @@ export function getGatewayEnv(): GatewayEnv {
     userServiceUrl: process.env.USER_SERVICE_URL,
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
+    organizationServiceUrl: process.env.ORGANIZATION_SERVICE_URL,
+    clientServiceUrl: process.env.CLIENT_SERVICE_URL,
+    rhServiceUrl: process.env.RH_SERVICE_URL,
+    regularizeServiceUrl: process.env.REGULARIZE_SERVICE_URL,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,

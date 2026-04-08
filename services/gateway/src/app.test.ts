@@ -1,7 +1,8 @@
+import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer, type IncomingMessage, request as nodeRequest, type Server } from "node:http";
 import { Writable } from "node:stream";
-import { expect, it } from "vitest";
+import { expect, it, test } from "vitest";
 
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -126,9 +127,11 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     port: 0,
     userServiceUrl: "http://127.0.0.1:3335",
     taskServiceUrl: "http://127.0.0.1:3337",
+    projectServiceUrl: "http://127.0.0.1:3338",
     organizationServiceUrl: "http://127.0.0.1:3400",
     clientServiceUrl: "http://127.0.0.1:3410",
     rhServiceUrl: "http://127.0.0.1:3339",
+    regularizeServiceUrl: "http://127.0.0.1:3411",
     jwtSecret: "test-secret",
     logLevel: "silent",
     logPretty: false,
@@ -295,6 +298,7 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/integracao-projects"]).toBeTruthy();
     expect(body.paths["/organizations"]).toBeTruthy();
     expect(body.paths["/rh/point-config"]).toBeTruthy();
+    expect(body.paths["/regularize/passwords"]).toBeTruthy();
     expect(body.paths["/audit/requests"]).toBeTruthy();
   } finally {
     await stopServer(server);
@@ -889,6 +893,41 @@ test("proxies /rh to the rh microservice", async () => {
     assert.equal(response.status, 200);
     assert.equal(body.success, true);
     assert.equal(seenUrl, "/rh/smoke");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+test("proxies /regularize to the regularize microservice", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const regularizeServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ regularizeServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/regularize/smoke`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    assert.equal(response.status, 200);
+    assert.equal(body.success, true);
+    assert.equal(seenUrl, "/regularize/smoke");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

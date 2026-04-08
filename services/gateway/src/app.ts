@@ -253,6 +253,10 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
 
   app.use("/organizations", buildHttpProxyMiddleware(env.organizationServiceUrl));
   app.use("/clients", buildHttpProxyMiddleware(env.clientServiceUrl));
+  app.use("/regularize/internal", (_request, _response, next) => {
+    next(new ServiceError(404, "Recurso não encontrado."));
+  });
+  app.use("/regularize", buildHttpProxyMiddleware(env.regularizeServiceUrl));
   app.use("/rh", buildHttpProxyMiddleware(env.rhServiceUrl));
   if (env.auditEnabled) {
     app.use(
