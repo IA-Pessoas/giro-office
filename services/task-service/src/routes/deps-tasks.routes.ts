@@ -2,7 +2,7 @@ import { createSuccessResponse, error as logError, ServiceError } from "@workspa
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import type { DepsTasksService } from "../services/DepsTasksService.js";
+import { DepsTasksService, type DepsTasksService as DepsTasksServiceType } from "../services/DepsTasksService.js";
 
 function requireAuthContext(req: Request): { organization_id: string } {
   const organization_id = req.organization_id;
@@ -12,7 +12,7 @@ function requireAuthContext(req: Request): { organization_id: string } {
   return { organization_id };
 }
 
-export type DepsTasksRouteDeps = Pick<DepsTasksService, "listDepartmentsWithTaskModels">;
+export type DepsTasksRouteDeps = Pick<DepsTasksServiceType, "listDepartmentsWithTaskModels">;
 
 export function createDepsTasksRoutes(service: DepsTasksRouteDeps): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
@@ -34,4 +34,6 @@ export function createDepsTasksRoutes(service: DepsTasksRouteDeps): ReturnType<t
 
   return router;
 }
+
+export const depsTasksRoutes: ReturnType<typeof Router> = createDepsTasksRoutes(new DepsTasksService());
 
