@@ -1,4 +1,4 @@
-import { createSuccessResponse, parseWithZod } from "@workspace/shared";
+import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
@@ -33,6 +33,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.status(201).json(createSuccessResponse(created));
       } catch (error) {
+        logError("Erro ao criar senha do regularize", { error });
         next(error);
       }
     },
@@ -51,6 +52,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.json(createSuccessResponse(updated));
       } catch (error) {
+        logError("Erro ao atualizar senha do regularize", { error });
         next(error);
       }
     },
@@ -65,6 +67,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
         const list = await passwordService.list(request.organization_id, query.client_id);
         response.json(createSuccessResponse(list));
       } catch (error) {
+        logError("Erro ao listar senhas do regularize", { error });
         next(error);
       }
     },
@@ -79,6 +82,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
         const detail = await passwordService.detail(request.organization_id, query.id);
         response.json(createSuccessResponse(detail));
       } catch (error) {
+        logError("Erro ao detalhar senha do regularize", { error });
         next(error);
       }
     },
@@ -97,6 +101,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.status(201).json(createSuccessResponse(created));
       } catch (error) {
+        logError("Erro ao criar senha de site do regularize", { error });
         next(error);
       }
     },
@@ -115,6 +120,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.json(createSuccessResponse(updated));
       } catch (error) {
+        logError("Erro ao atualizar senha de site do regularize", { error });
         next(error);
       }
     },
@@ -129,6 +135,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
         const list = await passwordService.listSites(request.organization_id, query.status);
         response.json(createSuccessResponse(list));
       } catch (error) {
+        logError("Erro ao listar senhas de site do regularize", { error });
         next(error);
       }
     },
@@ -143,6 +150,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
         const detail = await passwordService.detailSite(request.organization_id, query.id);
         response.json(createSuccessResponse(detail));
       } catch (error) {
+        logError("Erro ao detalhar senha de site do regularize", { error });
         next(error);
       }
     },

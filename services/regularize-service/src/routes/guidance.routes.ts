@@ -1,4 +1,4 @@
-import { createSuccessResponse, parseWithZod } from "@workspace/shared";
+import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
@@ -33,6 +33,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.status(201).json(createSuccessResponse(created));
       } catch (error) {
+        logError("Erro ao criar guidance do regularize", { error });
         next(error);
       }
     },
@@ -51,6 +52,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.json(createSuccessResponse(updated));
       } catch (error) {
+        logError("Erro ao atualizar guidance do regularize", { error });
         next(error);
       }
     },
@@ -65,6 +67,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
         const detail = await guidanceService.detail(request.organization_id, query.id);
         response.json(createSuccessResponse(detail));
       } catch (error) {
+        logError("Erro ao detalhar guidance do regularize", { error });
         next(error);
       }
     },
@@ -79,6 +82,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
         const list = await guidanceService.listByProcess(request.organization_id, query.process_id);
         response.json(createSuccessResponse(list));
       } catch (error) {
+        logError("Erro ao listar guidances do regularize", { error });
         next(error);
       }
     },
@@ -98,6 +102,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.json(createSuccessResponse(updated));
       } catch (error) {
+        logError("Erro ao adicionar atividade em guidance do regularize", { error });
         next(error);
       }
     },
@@ -117,6 +122,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.json(createSuccessResponse(updated));
       } catch (error) {
+        logError("Erro ao remover atividade de guidance do regularize", { error });
         next(error);
       }
     },
@@ -136,6 +142,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.json(createSuccessResponse(updated));
       } catch (error) {
+        logError("Erro ao adicionar parceiro em guidance do regularize", { error });
         next(error);
       }
     },
@@ -155,6 +162,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.json(createSuccessResponse(updated));
       } catch (error) {
+        logError("Erro ao remover parceiro de guidance do regularize", { error });
         next(error);
       }
     },

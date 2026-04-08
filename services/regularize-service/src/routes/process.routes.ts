@@ -1,4 +1,4 @@
-import { createSuccessResponse, parseWithZod } from "@workspace/shared";
+import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
@@ -29,6 +29,7 @@ export function createProcessRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.status(201).json(createSuccessResponse(created));
       } catch (error) {
+        logError("Erro ao criar processo do regularize", { error });
         next(error);
       }
     },
@@ -47,6 +48,7 @@ export function createProcessRoutes(deps: RegularizeRouteDeps): Router {
         });
         response.json(createSuccessResponse(updated));
       } catch (error) {
+        logError("Erro ao atualizar processo do regularize", { error });
         next(error);
       }
     },
@@ -61,6 +63,7 @@ export function createProcessRoutes(deps: RegularizeRouteDeps): Router {
         const detail = await processService.detail(request.organization_id, query.id);
         response.json(createSuccessResponse(detail));
       } catch (error) {
+        logError("Erro ao detalhar processo do regularize", { error });
         next(error);
       }
     },
@@ -75,6 +78,7 @@ export function createProcessRoutes(deps: RegularizeRouteDeps): Router {
         const list = await processService.list(request.organization_id, query.status);
         response.json(createSuccessResponse(list));
       } catch (error) {
+        logError("Erro ao listar processos do regularize", { error });
         next(error);
       }
     },
