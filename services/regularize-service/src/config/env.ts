@@ -16,11 +16,11 @@ const regularizeServiceEnvSchema = z
         return Number.isNaN(parsed) ? 3411 : parsed;
       }),
     nodeEnv: z.string().optional().default("development"),
-    databaseUrl: z.string().min(1, "DATABASE_URL nao definido para o regularize-service."),
-    jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o regularize-service."),
+    databaseUrl: z.string().min(1, "DATABASE_URL não definido para o regularize-service."),
+    jwtSecret: z.string().min(1, "JWT_SECRET não definido para o regularize-service."),
     auditServiceToken: z.string().optional().default("audit-service-token"),
     internalServiceToken: z.string().optional(),
-    encryptionKey: z.string().min(1, "MTK_ENCRYPTION_KEY nao definida."),
+    encryptionKey: z.string().min(1, "MTK_ENCRYPTION_KEY não definida."),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
       .string()
