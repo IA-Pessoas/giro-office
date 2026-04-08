@@ -76,35 +76,43 @@ export class RegularizeReconciliationService {
 
     for (const client of clients) {
       const managers = await this.getRegularizeManagerUserIds(client.organization_id, managerCache);
-      for (const userId of managers) {
+      const notificationPromises = managers.flatMap((userId) => {
+        const promises: Array<Promise<boolean>> = [];
+
         if (client.rg_validity) {
           const title = `RG Vencido: ${client.name}`;
           const message = `O RG do cliente ${client.name} venceu em ${client.rg_validity.toLocaleDateString("pt-BR")}.`;
-          const inserted = await this.createNotificationIfMissing({
-            organizationId: client.organization_id,
-            userId,
-            regarding: "clientPF",
-            regardingId: client.id,
-            title,
-            message,
-          });
-          created += inserted ? 1 : 0;
+          promises.push(
+            this.createNotificationIfMissing({
+              organizationId: client.organization_id,
+              userId,
+              regarding: "clientPF",
+              regardingId: client.id,
+              title,
+              message,
+            }),
+          );
         }
 
         if (client.cnh_validity) {
           const title = `CNH Vencida: ${client.name}`;
           const message = `A CNH do cliente ${client.name} venceu em ${client.cnh_validity.toLocaleDateString("pt-BR")}.`;
-          const inserted = await this.createNotificationIfMissing({
-            organizationId: client.organization_id,
-            userId,
-            regarding: "clientPF",
-            regardingId: client.id,
-            title,
-            message,
-          });
-          created += inserted ? 1 : 0;
+          promises.push(
+            this.createNotificationIfMissing({
+              organizationId: client.organization_id,
+              userId,
+              regarding: "clientPF",
+              regardingId: client.id,
+              title,
+              message,
+            }),
+          );
         }
-      }
+
+        return promises;
+      });
+      const insertedNotifications = await Promise.all(notificationPromises);
+      created += insertedNotifications.filter(Boolean).length;
     }
 
     return { created };
@@ -262,17 +270,19 @@ export class RegularizeReconciliationService {
         ? `O alvara do cliente ${license.client.name} venceu em ${dateStr}.`
         : `O alvara do cliente ${license.client.name} vence em ${Math.ceil((license.due_date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))} dias (${dateStr}).`;
 
-      for (const userId of managers) {
-        const inserted = await this.createNotificationIfMissing({
-          organizationId: license.organization_id,
-          userId,
-          regarding: "regularize.license",
-          regardingId: license.id,
-          title,
-          message,
-        });
-        created += inserted ? 1 : 0;
-      }
+      const insertedNotifications = await Promise.all(
+        managers.map((userId) =>
+          this.createNotificationIfMissing({
+            organizationId: license.organization_id,
+            userId,
+            regarding: "regularize.license",
+            regardingId: license.id,
+            title,
+            message,
+          }),
+        ),
+      );
+      created += insertedNotifications.filter(Boolean).length;
     }
 
     return { created };
