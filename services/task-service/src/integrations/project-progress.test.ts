@@ -24,7 +24,7 @@ describe("project-progress integration", () => {
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchImpl.mock.calls[0] as [URL, RequestInit | undefined];
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [URL, RequestInit | undefined];
 
     expect(url.toString()).toBe("http://project-service.local/project/progress");
     expect(init?.method).toBe("POST");

@@ -30,6 +30,7 @@ describe("rh-service", () => {
       nodeEnv: "test",
       logLevel: "silent",
       logPretty: false,
+      pointMinIntervalMinutes: 30,
       enableApiDocs: false,
     } satisfies RhEnv;
     const app = createApp(logger, env);

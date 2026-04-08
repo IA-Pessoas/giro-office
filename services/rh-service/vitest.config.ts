@@ -5,7 +5,7 @@ export default defineConfig({
     environment: "node",
     globals: false,
     pool: "forks",
-    include: ["src/**/*.spec.ts"],
+    include: ["src/**/*.test.ts"],
     setupFiles: ["./vitest.setup.ts"],
   },
 });
