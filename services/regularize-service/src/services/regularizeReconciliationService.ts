@@ -4,9 +4,13 @@ export class RegularizeReconciliationService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async runFullReconciliation(): Promise<Record<string, unknown>> {
-    const expiredDocumentNotifications = await this.reconcileClientPfDocumentNotifications();
+    const managerCache = new Map<string, string[]>();
+    const expiredDocumentNotifications = await this.reconcileClientPfDocumentNotifications(
+      undefined,
+      managerCache,
+    );
     const inactivatedClientPf = await this.reconcileInactiveClientPfStatuses();
-    const licenseNotifications = await this.reconcileLicenseNotifications();
+    const licenseNotifications = await this.reconcileLicenseNotifications(undefined, managerCache);
 
     return {
       processed:
@@ -20,10 +24,11 @@ export class RegularizeReconciliationService {
   }
 
   async handleClientPfChanged(organizationId: string, clientPfId: string): Promise<void> {
+    const managerCache = new Map<string, string[]>();
     await this.reconcileClientPfDocumentNotifications({
       organizationId,
       clientPfId,
-    });
+    }, managerCache);
     await this.reconcileInactiveClientPfStatuses({
       organizationId,
       clientPfId,
@@ -38,16 +43,17 @@ export class RegularizeReconciliationService {
   }
 
   async handleLicenseChanged(organizationId: string, licenseId: string): Promise<void> {
+    const managerCache = new Map<string, string[]>();
     await this.reconcileLicenseNotifications({
       organizationId,
       licenseId,
-    });
+    }, managerCache);
   }
 
   private async reconcileClientPfDocumentNotifications(params?: {
     organizationId?: string;
     clientPfId?: string;
-  }): Promise<{ created: number }> {
+  }, managerCache?: Map<string, string[]>): Promise<{ created: number }> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -69,7 +75,7 @@ export class RegularizeReconciliationService {
     let created = 0;
 
     for (const client of clients) {
-      const managers = await this.getRegularizeManagerUserIds(client.organization_id);
+      const managers = await this.getRegularizeManagerUserIds(client.organization_id, managerCache);
       for (const userId of managers) {
         if (client.rg_validity) {
           const title = `RG Vencido: ${client.name}`;
@@ -143,7 +149,15 @@ export class RegularizeReconciliationService {
     return { updated };
   }
 
-  private async getRegularizeManagerUserIds(organizationId: string): Promise<string[]> {
+  private async getRegularizeManagerUserIds(
+    organizationId: string,
+    managerCache?: Map<string, string[]>,
+  ): Promise<string[]> {
+    const cachedManagers = managerCache?.get(organizationId);
+    if (cachedManagers) {
+      return cachedManagers;
+    }
+
     const permissions = await this.prisma.permission.findMany({
       where: {
         organization_id: organizationId,
@@ -157,7 +171,10 @@ export class RegularizeReconciliationService {
       },
     });
 
-    return permissions.map((item) => item.user_id);
+    const managerIds = permissions.map((item) => item.user_id);
+    managerCache?.set(organizationId, managerIds);
+
+    return managerIds;
   }
 
   private async createNotificationIfMissing(input: {
@@ -199,7 +216,7 @@ export class RegularizeReconciliationService {
   private async reconcileLicenseNotifications(params?: {
     organizationId?: string;
     licenseId?: string;
-  }): Promise<{ created: number }> {
+  }, managerCache?: Map<string, string[]>): Promise<{ created: number }> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -230,7 +247,10 @@ export class RegularizeReconciliationService {
     let created = 0;
 
     for (const license of licenses) {
-      const managers = await this.getRegularizeManagerUserIds(license.organization_id);
+      const managers = await this.getRegularizeManagerUserIds(
+        license.organization_id,
+        managerCache,
+      );
       if (!license.due_date || !license.client) {
         continue;
       }
