@@ -24,7 +24,7 @@ describe("rh-service", () => {
       destination: new MemoryLogStream(),
     });
     const env = {
-      port: 3339,
+      port: 3034,
       databaseUrl: "postgresql://localhost/rh_test",
       jwtSecret: "test-jwt-secret",
       nodeEnv: "test",

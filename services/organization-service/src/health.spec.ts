@@ -18,7 +18,7 @@ class MemoryLogStream extends Writable {
 describe("organization-service", () => {
   it("GET /health returns success envelope", async () => {
     const env = {
-      port: 3400,
+      port: 3031,
       databaseUrl: "https://example.com/db",
       jwtSecret: "test-secret",
       nodeEnv: "test",

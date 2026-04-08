@@ -12,10 +12,10 @@ const envSchema = z
     port: z
       .string()
       .optional()
-      .default("3338")
+      .default("3033")
       .transform((val: string) => {
         const parsed = Number.parseInt(val, 10);
-        return Number.isNaN(parsed) ? 3338 : parsed;
+        return Number.isNaN(parsed) ? 3033 : parsed;
       }),
     databaseUrl: z.string().url("DATABASE_URL não definida."),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o project-service."),
@@ -31,7 +31,7 @@ const envSchema = z
       .optional()
       .default("true")
       .transform((value) => parseBoolean(value)),
-    auditServiceUrl: z.string().url().default("http://localhost:3336"),
+    auditServiceUrl: z.string().url().default("http://localhost:3020"),
     auditServiceToken: z.string().default("audit-service-token"),
     enableApiDocsEnv: z.string().optional(),
   })

@@ -131,7 +131,7 @@ function createEnv(overrides: Partial<AuditServiceEnv> = {}): AuditServiceEnv {
   return {
     nodeEnv: "test",
     auditEnabled: true,
-    auditServicePort: 3335,
+    auditServicePort: 3020,
     auditServiceToken: "audit-service-token",
     databaseUrl: "postgresql://localhost:5432/test",
     logLevel: "silent",

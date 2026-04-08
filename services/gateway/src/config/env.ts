@@ -23,20 +23,20 @@ const gatewayEnvSchema = z
       .default("false")
       .transform((value) => parseBoolean(value)),
     auditServiceToken: z.string().optional().default("audit-service-token"),
-    auditServiceUrl: z.string().url().default("http://localhost:3336"),
+    auditServiceUrl: z.string().url().default("http://localhost:3020"),
     port: z
       .string()
       .optional()
-      .default("3334")
+      .default("3010")
       .transform((val: string) => {
         const parsed = Number.parseInt(val, 10);
-        return Number.isNaN(parsed) ? 3334 : parsed;
+        return Number.isNaN(parsed) ? 3010 : parsed;
       }),
-    organizationServiceUrl: z.string().url().default("http://localhost:3400"),
-    rhServiceUrl: z.string().url().default("http://localhost:3339"),
-    userServiceUrl: z.string().url().default("http://localhost:3335"),
-    taskServiceUrl: z.string().url().default("http://localhost:3337"),
-    projectServiceUrl: z.string().url().default("http://localhost:3338"),
+    organizationServiceUrl: z.string().url().default("http://localhost:3031"),
+    rhServiceUrl: z.string().url().default("http://localhost:3034"),
+    userServiceUrl: z.string().url().default("http://localhost:3030"),
+    taskServiceUrl: z.string().url().default("http://localhost:3032"),
+    projectServiceUrl: z.string().url().default("http://localhost:3033"),
     websocketUpstreamUrl: z
       .string()
       .optional()

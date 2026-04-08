@@ -12,10 +12,10 @@ const rhEnvSchema = z
     port: z
       .string()
       .optional()
-      .default("3339")
+      .default("3034")
       .transform((val: string) => {
         const parsed = Number.parseInt(val, 10);
-        return Number.isNaN(parsed) ? 3339 : parsed;
+        return Number.isNaN(parsed) ? 3034 : parsed;
       }),
     databaseUrl: z.string().min(1, "DATABASE_URL não definido para o rh-service."),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o rh-service."),

@@ -26,10 +26,10 @@ const auditServiceEnvSchema = z
     auditServicePort: z
       .string()
       .optional()
-      .default("3336")
+      .default("3020")
       .transform((value) => {
         const parsed = Number.parseInt(value, 10);
-        return Number.isNaN(parsed) ? 3336 : parsed;
+        return Number.isNaN(parsed) ? 3020 : parsed;
       }),
     auditServiceToken: z.string().optional().default("audit-service-token"),
     databaseUrl: z.string().min(1, "DATABASE_URL não definido para o audit-service."),

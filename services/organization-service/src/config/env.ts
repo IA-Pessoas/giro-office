@@ -12,10 +12,10 @@ const organizationEnvSchema = z
     port: z
       .string()
       .optional()
-      .default("3400")
+      .default("3031")
       .transform((val: string) => {
         const parsed = Number.parseInt(val, 10);
-        return Number.isNaN(parsed) ? 3400 : parsed;
+        return Number.isNaN(parsed) ? 3031 : parsed;
       }),
     databaseUrl: z.string().min(1, "DATABASE_URL não definido para o organization-service."),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o organization-service."),
