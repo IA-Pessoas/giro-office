@@ -41,6 +41,11 @@ alwaysApply: true
 - A estrutura legado fora desse padrao nao deve ser usada como referencia para novos contratos ou novas implementacoes.
 - Servicos atuais: `user-service`, `audit-service`, `organization-service`, `rh-service`, `task-service`, `project-service` e `gateway`.
 - Codigo compartilhado fica em `shared`.
+- Convencao oficial de nomes de arquivos nos servicos atuais:
+  - services: `camelCaseService.ts`
+  - routes: `camelCase.routes.ts`
+  - teste de service: `camelCaseService.test.ts`
+  - teste de rota: `camelCase.routes.test.ts`
 - Rotas orquestram services; services nao chamam rotas.
 - Metodos publicos de service devem ter tipo de retorno explicito; ver `typescript-services.mdc`.
 - Em servicos Express, o padrao oficial de entrypoint e:
@@ -90,6 +95,6 @@ alwaysApply: true
   - testes do servico e do gateway
 - O padrao oficial de organizacao de testes em servicos e:
   - `src/test/`
-  - um arquivo `XxxService.test.ts` para o service
-  - um arquivo `xxx.routes.test.ts` para a rota
+  - um arquivo `camelCaseService.test.ts` para o service
+  - um arquivo `camelCase.routes.test.ts` para a rota
 - A referencia de estrutura e o `project-service`.
