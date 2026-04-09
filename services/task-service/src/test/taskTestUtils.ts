@@ -2,17 +2,46 @@ import { Writable } from "node:stream";
 
 import { createLogger } from "@workspace/shared/logger";
 import type { NextFunction } from "express";
-import { vi } from "vitest";
+import { vi, type Mock } from "vitest";
 
-const {
-  taskCrudServiceMock,
-  taskModelServiceMock,
-  taskDependentServiceMock,
-  taskIntegrationRegularizeServiceMock,
-  taskLifecycleServiceMock,
-  taskComercialServiceMock,
-  taskFinanceiroServiceMock,
-} = vi.hoisted(() => ({
+interface TaskRouteMocks {
+  taskCrudServiceMock: {
+    createTask: Mock;
+    listTasks: Mock;
+    updateTask: Mock;
+    detailTask: Mock;
+    deleteTask: Mock;
+  };
+  taskModelServiceMock: {
+    createModel: Mock;
+    detailModel: Mock;
+    updateModel: Mock;
+    listModel: Mock;
+    deleteModel: Mock;
+  };
+  taskDependentServiceMock: {
+    addDependent: Mock;
+    listDependents: Mock;
+    deleteDependent: Mock;
+  };
+  taskIntegrationRegularizeServiceMock: {
+    createLink: Mock;
+    removeLink: Mock;
+    list: Mock;
+  };
+  taskLifecycleServiceMock: {
+    concludeTask: Mock;
+    approveTaskCompletion: Mock;
+  };
+  taskComercialServiceMock: {
+    updateChargeComercial: Mock;
+  };
+  taskFinanceiroServiceMock: {
+    updateChargeFinanceiro: Mock;
+  };
+}
+
+const taskRouteMocks: TaskRouteMocks = vi.hoisted((): TaskRouteMocks => ({
   taskCrudServiceMock: {
     createTask: vi.fn(),
     listTasks: vi.fn(),
@@ -51,43 +80,43 @@ const {
 
 vi.mock("../services/taskCrudService.js", () => ({
   TaskCrudService: vi.fn(function TaskCrudService() {
-    return taskCrudServiceMock;
+    return taskRouteMocks.taskCrudServiceMock;
   }),
 }));
 
 vi.mock("../services/taskModelService.js", () => ({
   TaskModelService: vi.fn(function TaskModelService() {
-    return taskModelServiceMock;
+    return taskRouteMocks.taskModelServiceMock;
   }),
 }));
 
 vi.mock("../services/taskDependentService.js", () => ({
   TaskDependentService: vi.fn(function TaskDependentService() {
-    return taskDependentServiceMock;
+    return taskRouteMocks.taskDependentServiceMock;
   }),
 }));
 
 vi.mock("../services/taskIntegrationRegularizeService.js", () => ({
   TaskIntegrationRegularizeService: vi.fn(function TaskIntegrationRegularizeService() {
-    return taskIntegrationRegularizeServiceMock;
+    return taskRouteMocks.taskIntegrationRegularizeServiceMock;
   }),
 }));
 
 vi.mock("../services/taskLifecycleService.js", () => ({
   TaskLifecycleService: vi.fn(function TaskLifecycleService() {
-    return taskLifecycleServiceMock;
+    return taskRouteMocks.taskLifecycleServiceMock;
   }),
 }));
 
 vi.mock("../services/taskComercialService.js", () => ({
   TaskComercialService: vi.fn(function TaskComercialService() {
-    return taskComercialServiceMock;
+    return taskRouteMocks.taskComercialServiceMock;
   }),
 }));
 
 vi.mock("../services/taskFinanceiroService.js", () => ({
   TaskFinanceiroService: vi.fn(function TaskFinanceiroService() {
-    return taskFinanceiroServiceMock;
+    return taskRouteMocks.taskFinanceiroServiceMock;
   }),
 }));
 
@@ -143,6 +172,14 @@ export function createTestApp() {
 export function resetTaskRouteMocks() {
   vi.clearAllMocks();
 
+  const taskCrudServiceMock = taskRouteMocks.taskCrudServiceMock;
+  const taskModelServiceMock = taskRouteMocks.taskModelServiceMock;
+  const taskDependentServiceMock = taskRouteMocks.taskDependentServiceMock;
+  const taskIntegrationRegularizeServiceMock = taskRouteMocks.taskIntegrationRegularizeServiceMock;
+  const taskLifecycleServiceMock = taskRouteMocks.taskLifecycleServiceMock;
+  const taskComercialServiceMock = taskRouteMocks.taskComercialServiceMock;
+  const taskFinanceiroServiceMock = taskRouteMocks.taskFinanceiroServiceMock;
+
   taskCrudServiceMock.createTask.mockResolvedValue({ id: "task-1" });
   taskCrudServiceMock.listTasks.mockResolvedValue([{ id: "task-1" }]);
   taskCrudServiceMock.updateTask.mockResolvedValue({ id: "task-1" });
@@ -168,6 +205,20 @@ export function resetTaskRouteMocks() {
   taskComercialServiceMock.updateChargeComercial.mockResolvedValue({ id: "task-1" });
   taskFinanceiroServiceMock.updateChargeFinanceiro.mockResolvedValue({ id: "task-1" });
 }
+
+const taskCrudServiceMock: TaskRouteMocks["taskCrudServiceMock"] = taskRouteMocks.taskCrudServiceMock;
+const taskModelServiceMock: TaskRouteMocks["taskModelServiceMock"] =
+  taskRouteMocks.taskModelServiceMock;
+const taskDependentServiceMock: TaskRouteMocks["taskDependentServiceMock"] =
+  taskRouteMocks.taskDependentServiceMock;
+const taskIntegrationRegularizeServiceMock: TaskRouteMocks["taskIntegrationRegularizeServiceMock"] =
+  taskRouteMocks.taskIntegrationRegularizeServiceMock;
+const taskLifecycleServiceMock: TaskRouteMocks["taskLifecycleServiceMock"] =
+  taskRouteMocks.taskLifecycleServiceMock;
+const taskComercialServiceMock: TaskRouteMocks["taskComercialServiceMock"] =
+  taskRouteMocks.taskComercialServiceMock;
+const taskFinanceiroServiceMock: TaskRouteMocks["taskFinanceiroServiceMock"] =
+  taskRouteMocks.taskFinanceiroServiceMock;
 
 export {
   taskComercialServiceMock,

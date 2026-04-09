@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { loggerLevelSchema, type LoggerLevel } from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -37,6 +38,7 @@ const gatewayEnvSchema = z
     userServiceUrl: z.string().url().default("http://localhost:3030"),
     taskServiceUrl: z.string().url().default("http://localhost:3032"),
     projectServiceUrl: z.string().url().default("http://localhost:3033"),
+    clientServiceUrl: z.string().url().default("http://localhost:3035"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -81,6 +83,7 @@ export interface GatewayEnv {
   userServiceUrl: string;
   taskServiceUrl: string;
   projectServiceUrl: string;
+  clientServiceUrl: string;
   websocketUpstreamUrl?: string;
   jwtSecret: string;
   logLevel: LoggerLevel;
@@ -100,6 +103,7 @@ export function getGatewayEnv(): GatewayEnv {
     userServiceUrl: process.env.USER_SERVICE_URL,
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
+    clientServiceUrl: process.env.CLIENT_SERVICE_URL,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,

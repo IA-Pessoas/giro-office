@@ -2,53 +2,73 @@ import { Writable } from "node:stream";
 
 import { createLogger } from "@workspace/shared/logger";
 import type { NextFunction } from "express";
-import { vi } from "vitest";
+import { vi, type Mock } from "vitest";
 
-const { authServiceMock, userServiceMock, permissionServiceMock, storageServiceMock } = vi.hoisted(
-  () => ({
-    authServiceMock: {
-      login: vi.fn(),
-      firstCreate: vi.fn(),
-    },
-    userServiceMock: {
-      list: vi.fn(),
-      getById: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    permissionServiceMock: {
-      getByUserId: vi.fn(),
-      update: vi.fn(),
-    },
-    storageServiceMock: {
-      uploadUserPhoto: vi.fn(),
-      deleteUserPhoto: vi.fn(),
-    },
-  }),
-);
+interface UserRouteMocks {
+  authServiceMock: {
+    login: Mock;
+    firstCreate: Mock;
+  };
+  userServiceMock: {
+    list: Mock;
+    getById: Mock;
+    create: Mock;
+    update: Mock;
+    delete: Mock;
+  };
+  permissionServiceMock: {
+    getByUserId: Mock;
+    update: Mock;
+  };
+  storageServiceMock: {
+    uploadUserPhoto: Mock;
+    deleteUserPhoto: Mock;
+  };
+}
+
+const userRouteMocks: UserRouteMocks = vi.hoisted((): UserRouteMocks => ({
+  authServiceMock: {
+    login: vi.fn(),
+    firstCreate: vi.fn(),
+  },
+  userServiceMock: {
+    list: vi.fn(),
+    getById: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+  permissionServiceMock: {
+    getByUserId: vi.fn(),
+    update: vi.fn(),
+  },
+  storageServiceMock: {
+    uploadUserPhoto: vi.fn(),
+    deleteUserPhoto: vi.fn(),
+  },
+}));
 
 vi.mock("../services/authService.js", () => ({
   AuthService: vi.fn(function AuthService() {
-    return authServiceMock;
+    return userRouteMocks.authServiceMock;
   }),
 }));
 
 vi.mock("../services/userService.js", () => ({
   UserService: vi.fn(function UserService() {
-    return userServiceMock;
+    return userRouteMocks.userServiceMock;
   }),
 }));
 
 vi.mock("../services/permissionService.js", () => ({
   PermissionService: vi.fn(function PermissionService() {
-    return permissionServiceMock;
+    return userRouteMocks.permissionServiceMock;
   }),
 }));
 
 vi.mock("../services/storageService.js", () => ({
   StorageService: vi.fn(function StorageService() {
-    return storageServiceMock;
+    return userRouteMocks.storageServiceMock;
   }),
 }));
 
@@ -96,5 +116,11 @@ export function createTestApp() {
 export function resetUserRouteMocks() {
   vi.clearAllMocks();
 }
+
+const authServiceMock: UserRouteMocks["authServiceMock"] = userRouteMocks.authServiceMock;
+const userServiceMock: UserRouteMocks["userServiceMock"] = userRouteMocks.userServiceMock;
+const permissionServiceMock: UserRouteMocks["permissionServiceMock"] =
+  userRouteMocks.permissionServiceMock;
+const storageServiceMock: UserRouteMocks["storageServiceMock"] = userRouteMocks.storageServiceMock;
 
 export { authServiceMock, permissionServiceMock, storageServiceMock, userServiceMock };

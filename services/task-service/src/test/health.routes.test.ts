@@ -2,8 +2,8 @@ import { createLogger } from "@workspace/shared/logger";
 import request from "supertest";
 import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
-import { createTaskApp } from "./app.js";
-import { getTaskServiceEnv } from "./config/env.js";
+import { createTaskApp } from "../app.js";
+import { getTaskServiceEnv } from "../config/env.js";
 
 class MemoryLogStream extends Writable {
   _write(

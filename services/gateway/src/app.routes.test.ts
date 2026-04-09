@@ -129,6 +129,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     userServiceUrl: "http://127.0.0.1:3030",
     taskServiceUrl: "http://127.0.0.1:3032",
     projectServiceUrl: "http://127.0.0.1:3033",
+    clientServiceUrl: "http://127.0.0.1:3035",
     jwtSecret: "test-secret",
     logLevel: "silent",
     logPretty: false,
@@ -293,6 +294,7 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/user"]).toBeTruthy();
     expect(body.paths["/task/list"]).toBeTruthy();
     expect(body.paths["/project/list"]).toBeTruthy();
+    expect(body.paths["/client/list"]).toBeTruthy();
     expect(body.paths["/organizations"]).toBeTruthy();
     expect(body.paths["/rh/point-config"]).toBeTruthy();
     expect(body.paths["/audit/requests"]).toBeTruthy();
@@ -316,6 +318,7 @@ it("does not duplicate gateway path prefixes in the aggregated OpenAPI JSON", as
     expect(body.paths["/organizations/organizations"]).toBe(undefined);
     expect(body.paths["/rh/rh/point-config"]).toBe(undefined);
     expect(body.paths["/audit/audit/requests"]).toBe(undefined);
+    expect(body.paths["/client/client/list"]).toBe(undefined);
   } finally {
     await stopServer(server);
   }
@@ -878,5 +881,180 @@ it("does not change responses when audit ingestion fails", async () => {
     expect(body.success).toBe(true);
   } finally {
     await stopServer(gateway);
+  }
+});
+
+it("proxies /user/me to the user service with forwarded auth headers", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { userId: "user-1" } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl.startsWith("/user/me")).toBe(true);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("proxies /organizations to the organization microservice", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const organizationServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ organizationServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/organizations/smoke`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl).toBe("/organizations/smoke");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("proxies /client to the client microservice", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/smoke`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl).toBe("/client/smoke");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("proxies /rh to the rh microservice", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const rhServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ rhServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/rh/smoke`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl).toBe("/rh/smoke");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("proxies task-service paths from the gateway", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { task: true } }));
+  });
+  const taskServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ taskServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/task/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl).toBe("/task/list");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
   }
 });

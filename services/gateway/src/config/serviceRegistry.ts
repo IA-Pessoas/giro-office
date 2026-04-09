@@ -10,6 +10,8 @@ const TASK_SERVICE_PREFIXES = ["/task"] as const;
 
 const PROJECT_SERVICE_PREFIXES = ["/project"] as const;
 
+const CLIENT_SERVICE_PREFIXES = ["/client"] as const;
+
 function getNormalizedPath(path: string): string {
   try {
     return new URL(path, "http://localhost").pathname;
@@ -60,6 +62,12 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.projectServiceUrl,
       auditTarget: "project-service",
       routePrefixes: [...PROJECT_SERVICE_PREFIXES],
+    },
+    {
+      key: "client-service",
+      targetUrl: env.clientServiceUrl,
+      auditTarget: "client-service",
+      routePrefixes: [...CLIENT_SERVICE_PREFIXES],
     },
   ];
 }

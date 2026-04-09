@@ -2,9 +2,20 @@ import { Writable } from "node:stream";
 
 import { createLogger } from "@workspace/shared/logger";
 import type { NextFunction } from "express";
-import { vi } from "vitest";
+import { vi, type Mock } from "vitest";
 
-const { organizationServiceMock } = vi.hoisted(() => ({
+interface OrganizationRouteMocks {
+  organizationServiceMock: {
+    list: Mock;
+    create: Mock;
+    findById: Mock;
+    updateStatus: Mock;
+    updateSubscriptionPlan: Mock;
+    updateLogoUrl: Mock;
+  };
+}
+
+const organizationRouteMocks: OrganizationRouteMocks = vi.hoisted((): OrganizationRouteMocks => ({
   organizationServiceMock: {
     list: vi.fn(),
     create: vi.fn(),
@@ -17,7 +28,7 @@ const { organizationServiceMock } = vi.hoisted(() => ({
 
 vi.mock("../services/organizationService.js", () => ({
   OrganizationService: vi.fn(function OrganizationService() {
-    return organizationServiceMock;
+    return organizationRouteMocks.organizationServiceMock;
   }),
 }));
 
@@ -69,5 +80,8 @@ export function createTestApp() {
 export function resetOrganizationRouteMocks() {
   vi.clearAllMocks();
 }
+
+const organizationServiceMock: OrganizationRouteMocks["organizationServiceMock"] =
+  organizationRouteMocks.organizationServiceMock;
 
 export { organizationServiceMock };

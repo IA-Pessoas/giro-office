@@ -5,7 +5,7 @@ import {
   REQUEST_ID_HEADER,
   ServiceError,
 } from "@workspace/shared";
-import type { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 function hasRequestBody(method: string): boolean {
   const upperMethod = method.toUpperCase();
@@ -65,7 +65,7 @@ function normalizePathForUpstream(originalUrl: string): string {
   return normalizedPath + queryPart;
 }
 
-function createHttpProxy(resolveTargetUrl: (request: Request) => string) {
+function createHttpProxy(resolveTargetUrl: (request: Request) => string): RequestHandler {
   return async function httpProxy(
     request: Request,
     response: Response,
@@ -105,7 +105,9 @@ function createHttpProxy(resolveTargetUrl: (request: Request) => string) {
   };
 }
 
-export function buildHttpProxyMiddleware(targetUrlOrResolver: string | UpstreamResolver) {
+export function buildHttpProxyMiddleware(
+  targetUrlOrResolver: string | UpstreamResolver,
+): RequestHandler {
   if (typeof targetUrlOrResolver === "string") {
     return createHttpProxy(() => targetUrlOrResolver);
   }

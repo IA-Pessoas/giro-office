@@ -10,4 +10,5 @@ packages:
   - "services/user-service"
   - "services/rh-service"
   - "services/task-service"
+  - "services/client-service"
   - "services/project-service"

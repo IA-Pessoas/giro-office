@@ -1,6 +1,7 @@
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import { buildAuditServiceOpenApiSpec } from "../../../audit-service/src/openapi/spec.js";
+import { buildClientServiceOpenApiSpec } from "../../../client-service/src/openapi/spec.js";
 import { buildOrganizationServiceOpenApiSpec } from "../../../organization-service/src/openapi/spec.js";
 import { buildProjectServiceOpenApiSpec } from "../../../project-service/src/openapi/spec.js";
 import { buildRhServiceOpenApiSpec } from "../../../rh-service/src/openapi/spec.js";
@@ -68,6 +69,13 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       buildSpec: () =>
         buildProjectServiceOpenApiSpec({ port: getPortFromUrl(env.projectServiceUrl) } as never),
       includePath: (path) => path !== "/health",
+    },
+    {
+      key: "client-service",
+      label: "Client Service",
+      buildSpec: () =>
+        buildClientServiceOpenApiSpec({ port: getPortFromUrl(env.clientServiceUrl) } as never),
+      includePath: (path) => path !== "/health" && path !== "/ready",
     },
     {
       key: "organization-service",
@@ -412,7 +420,7 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
       title: "office-gateway",
       version: "1.0.0",
       description:
-        "Gateway OpenAPI document aggregating user-service, task-service, project-service, organization-service, rh-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
+        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, organization-service, rh-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
     },
     servers: [{ url: "http://localhost" }],
     tags: [
