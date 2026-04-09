@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { Shield, Users, KeyRound, FileSearch, Plus } from "lucide-react";
+import { Activity, BarChart3, KeyRound, Lock, Plus, Shield, Users } from "lucide-react";
 
-import { departmentService } from "@modules/departments";
 import { CreateUserModal, userService, type UserItem } from "@modules/users";
+import { TEMPORARY_DEPARTMENTS } from "@modules/users/constants/createUserConfig";
 import { useAuth } from "@/context/AuthContext";
 import { setupAPIClient } from "@shared/services/api";
 import { useFetch } from "@shared/hooks";
 
 export function Administracao() {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'permissions' | 'logs'>('dashboard');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
   const [isLoadingOrganizationId, setIsLoadingOrganizationId] = useState(false);
@@ -18,7 +19,6 @@ export function Administracao() {
       ? (user as { organization_id?: string }).organization_id
       : undefined;
 
-  const { data: departments = [] } = useFetch(["departments"], () => departmentService.list());
   const { data: users = [], refetch: refetchUsers } = useFetch(["users"], () => userService.list());
 
   useEffect(() => {
@@ -71,64 +71,113 @@ export function Administracao() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-            <Shield className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+          <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-950/20">
+              <Shield className="h-6 w-6 text-white" />
+            </div>
             Administração
           </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Configurações do sistema, usuários e permissões
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Gestão de usuários, permissões e configurações do sistema
           </p>
         </div>
         <button
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-700 px-4 py-2.5 text-white shadow-lg shadow-violet-950/20 transition-all hover:from-violet-700 hover:to-purple-800"
           type="button"
           onClick={handleOpenCreateModal}
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="h-4 w-4" />
           Novo Usuário
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Usuários Ativos</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{users.length}</p>
-            </div>
-            <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-          </div>
-        </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {[
+            { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+            { key: 'users', label: 'Usuários', icon: Users },
+            { key: 'permissions', label: 'Permissões', icon: Lock },
+            { key: 'logs', label: 'Logs', icon: Activity },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Perfis de Acesso</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">12</p>
-            </div>
-            <KeyRound className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Logs de Auditoria</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">1.543</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Últimos 30 dias</p>
-            </div>
-            <FileSearch className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-          </div>
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key as typeof activeTab)}
+                className={`min-w-fit flex-1 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Icon className="mr-2 inline-block h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {activeTab === 'dashboard' ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">Usuários Ativos</p>
+                <p className="text-2xl font-semibold text-slate-900 dark:text-white">{users.length}</p>
+              </div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                <Users className="h-5 w-5" />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">Perfis de Acesso</p>
+                <p className="text-2xl font-semibold text-slate-900 dark:text-white">12</p>
+              </div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                <KeyRound className="h-5 w-5" />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">Logs de Auditoria</p>
+                <p className="text-2xl font-semibold text-slate-900 dark:text-white">1.543</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Últimos 30 dias</p>
+              </div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                <Activity className="h-5 w-5" />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/80 p-8 text-center dark:border-slate-700 dark:bg-slate-900/70">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            Esta aba permanece somente visual neste refactor.
+          </p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            O fluxo real de criação continua disponível pelo botão &quot;Novo Usuário&quot;.
+          </p>
+        </div>
+      )}
 
       <CreateUserModal
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
         onUserCreated={handleUserCreated}
-        departments={departments}
+        departments={TEMPORARY_DEPARTMENTS}
         organizationId={organizationId}
         organizationIdLoading={isLoadingOrganizationId}
         invitedBy={user?.id}
