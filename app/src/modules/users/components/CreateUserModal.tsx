@@ -13,7 +13,7 @@ interface CreateUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUserCreated: (newUser: UserItem) => void;
-  departments?: Array<{ id: string; name: string }>;
+  departments?: ReadonlyArray<{ id: string; name: string }>;
   organizationId?: string;
   organizationIdLoading?: boolean;
   invitedBy?: string;
@@ -36,15 +36,16 @@ const INITIAL_FORM_DATA: {
 type ModuleKey = (typeof CREATE_USER_MODULE_OPTIONS)[number]['key'];
 
 type ModuleSelectionState = Record<ModuleKey, { enabled: boolean; level: 0 | 1 | 2 }>;
+type ModuleSelectValue = 'none' | '0' | '1' | '2';
 
 const FIELD_CLASSNAME =
-  'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-80';
+  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition-all outline-none placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-80';
 
 const MODULE_CARD_CLASSNAME =
-  'rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60';
+  'rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-700 dark:bg-slate-800/70';
 
 function createInitialModuleSelections(): ModuleSelectionState {
-  return MODULE_OPTIONS.reduce((acc, moduleOption) => {
+  return CREATE_USER_MODULE_OPTIONS.reduce((acc, moduleOption) => {
     acc[moduleOption.key] = { enabled: false, level: 0 };
     return acc;
   }, {} as ModuleSelectionState);
@@ -71,10 +72,19 @@ function getUserTypeFromPermission(permission: UserPermission): UserType {
   }
 }
 
+function getModuleSelectValue(selection: ModuleSelectionState[ModuleKey]): ModuleSelectValue {
+  if (!selection.enabled) {
+    return 'none';
+  }
+
+  return String(selection.level) as Exclude<ModuleSelectValue, 'none'>;
+}
+
 export function CreateUserModal({
   isOpen,
   onClose,
   onUserCreated,
+  departments = [],
   organizationId,
   organizationIdLoading = false,
   invitedBy,
@@ -91,22 +101,12 @@ export function CreateUserModal({
     }));
   };
 
-  const handleModuleToggle = (moduleKey: ModuleKey) => {
+  const handleModuleLevelChange = (moduleKey: ModuleKey, value: ModuleSelectValue) => {
     setModuleSelections((prev) => ({
       ...prev,
       [moduleKey]: {
-        ...prev[moduleKey],
-        enabled: !prev[moduleKey].enabled,
-      },
-    }));
-  };
-
-  const handleModuleLevelChange = (moduleKey: ModuleKey, value: string) => {
-    setModuleSelections((prev) => ({
-      ...prev,
-      [moduleKey]: {
-        ...prev[moduleKey],
-        level: Number(value) as 0 | 1 | 2,
+        enabled: value !== 'none',
+        level: value === 'none' ? 0 : Number(value) as 0 | 1 | 2,
       },
     }));
   };
@@ -169,104 +169,108 @@ export function CreateUserModal({
       }}
       title="Cadastrar Novo Usuario"
       description="Formulario para cadastro de novo usuario"
-      contentClassName="flex max-h-[90vh] flex-col overflow-hidden sm:max-h-[88vh]"
+      contentClassName="flex max-h-[90vh] flex-col overflow-hidden border border-slate-200 bg-white shadow-2xl sm:max-h-[88vh] dark:border-slate-700 dark:bg-slate-900"
       bodyClassName="overflow-y-auto"
       footer={(
         <>
           <button
             type="button"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
+            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             onClick={onClose}
           >
             Cancelar
           </button>
           <button
             type="button"
-            className="ui-button-primary"
+            className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-700 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-950/20 transition-all hover:from-violet-700 hover:to-purple-800 disabled:cursor-not-allowed disabled:opacity-70"
             disabled={isLoading}
             onClick={handleCadastrar}
           >
-            {isLoading ? 'Salvando...' : 'Salvar'}
+            {isLoading ? 'Salvando...' : 'Criar Usuario'}
           </button>
         </>
       )}
     >
-      <div className="u-stack u-gap-4">
-        <div className="u-stack u-gap-2">
-          <label htmlFor="user-name" className="users-section-title">Nome</label>
-          <input id="user-name" name="name" value={formData.name} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+      <div className="space-y-6">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Novo Usuario</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Preencha os dados principais e configure o acesso por modulo sem alterar as regras atuais do sistema.
+          </p>
         </div>
-        <div className="u-stack u-gap-2">
-          <label htmlFor="user-login" className="users-section-title">Login</label>
-          <input id="user-login" name="login" value={formData.login} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
-        </div>
-        <div className="u-stack u-gap-2">
-          <label htmlFor="user-password" className="users-section-title">Senha</label>
-          <input id="user-password" type="password" name="password" value={formData.password} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
-        </div>
-        <div className="u-stack u-gap-2">
-          <label htmlFor="user-department" className="users-section-title">Departamento</label>
-          <select
-            id="user-department"
-            name="department_id"
-            value={formData.department_id}
-            onChange={handleInputChange}
-            className={FIELD_CLASSNAME}
-            required
-          >
-            <option value="">Selecione um departamento</option>
-            {DEPARTMENTS.map((department) => (
-              <option key={department.id} value={department.id}>{department.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="u-stack u-gap-2">
-          <label htmlFor="user-permission" className="users-section-title">Permissao</label>
-          <select
-            id="user-permission"
-            name="permission"
-            value={formData.permission}
-            onChange={handleInputChange}
-            className={FIELD_CLASSNAME}
-          >
-            {PERMISSION_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="u-stack u-gap-2">
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="md:col-span-3">
+            <label htmlFor="user-name" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Nome</label>
+            <input id="user-name" name="name" value={formData.name} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+          </div>
           <div>
-            <label className="users-section-title">Modulos adicionais</label>
+            <label htmlFor="user-login" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Login</label>
+            <input id="user-login" name="login" value={formData.login} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+          </div>
+          <div className="md:col-span-2">
+            <label htmlFor="user-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Senha</label>
+            <input id="user-password" type="password" name="password" value={formData.password} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+          </div>
+          <div className="md:col-span-2">
+            <label htmlFor="user-department" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Departamento</label>
+            <select
+              id="user-department"
+              name="department_id"
+              value={formData.department_id}
+              onChange={handleInputChange}
+              className={FIELD_CLASSNAME}
+              required
+            >
+              <option value="">Selecione um departamento</option>
+              {departments.map((department) => (
+                <option key={department.id} value={department.id}>{department.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="user-permission" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Permissao</label>
+            <select
+              id="user-permission"
+              name="permission"
+              value={formData.permission}
+              onChange={handleInputChange}
+              className={FIELD_CLASSNAME}
+            >
+              {CREATE_USER_PERMISSION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <section className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+          <div className="mb-4 space-y-1">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Modulos adicionais</label>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Acesso complementar por modulo. O departamento principal continua sendo definido acima.
+              Defina o nivel de acesso por modulo. Selecoes em &quot;Sem acesso&quot; nao entram no payload.
             </p>
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:gap-3 lg:grid-cols-2">
-            {MODULE_OPTIONS.map((moduleOption) => {
+          <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1">
+            {CREATE_USER_MODULE_OPTIONS.map((moduleOption) => {
               const selection = moduleSelections[moduleOption.key];
 
               return (
                 <div key={moduleOption.key} className={MODULE_CARD_CLASSNAME}>
-                  <div className="grid grid-cols-[minmax(0,1fr)_88px] items-center gap-3">
-                    <label className="flex min-w-0 items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={selection.enabled}
-                        onChange={() => handleModuleToggle(moduleOption.key)}
-                        disabled={formData.permission === 2}
-                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-500 dark:bg-slate-900"
-                      />
-                      <span className="truncate">{moduleOption.label}</span>
-                    </label>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_180px] md:items-center">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{moduleOption.label}</p>
+                    </div>
                     <select
-                      value={selection.level}
-                      onChange={(e) => handleModuleLevelChange(moduleOption.key, e.target.value)}
-                      disabled={!selection.enabled || formData.permission === 2}
-                      className={`${FIELD_CLASSNAME} h-9 w-[88px] min-w-[88px] px-2 py-1 text-xs`}
+                      value={getModuleSelectValue(selection)}
+                      onChange={(e) => handleModuleLevelChange(moduleOption.key, e.target.value as ModuleSelectValue)}
+                      disabled={formData.permission === 2}
+                      className={`${FIELD_CLASSNAME} h-10 px-3 text-sm`}
                     >
-                      {MODULE_PERMISSION_OPTIONS.map((level) => (
-                        <option key={level} value={level}>{level}</option>
-                      ))}
+                      <option value="none">Sem acesso</option>
+                      <option value="0">Visualizador</option>
+                      <option value="1">Usuario</option>
+                      <option value="2">Administrador</option>
                     </select>
                   </div>
                 </div>
@@ -274,11 +278,11 @@ export function CreateUserModal({
             })}
           </div>
           {formData.permission === 2 ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="pt-1 text-xs text-slate-500 dark:text-slate-400">
               Owner recebe acesso amplo pelo backend; as selecoes de modulos adicionais nao sao enviadas neste caso.
             </p>
           ) : null}
-        </div>
+        </section>
       </div>
     </Dialog>
   );
