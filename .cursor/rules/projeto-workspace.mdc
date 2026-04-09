@@ -87,6 +87,20 @@ alwaysApply: true
   - `start`: `node dist/server.js`
   - `main`: `dist/server.js`
 
+## README de servicos
+- Todo servico em `services/` deve ter um `README.md` proprio.
+- Ao criar um servico novo ou alterar contrato/porta/variaveis relevantes de um servico existente, atualizar tambem o `README.md`.
+- O README deve seguir o padrao atual usado em `services/`, com secoes curtas e objetivas:
+  - titulo com o nome do servico
+  - breve descricao do servico
+  - `## Porta local` com a porta padrao atual do env
+  - `## Variaveis de ambiente` apontando para `src/config/env.ts` e destacando as principais
+  - `## Gateway` ou `## Upstreams`, quando aplicavel
+  - `## Desenvolvimento` com o comando `pnpm --filter @workspace/<nome-do-pacote> dev`
+- Quando houver prefixo publico no gateway, documentar o prefixo e exemplos de paths publicos.
+- Quando houver URL configurada no gateway, documentar a variavel e o exemplo com a porta atual.
+- Nao deixar README com portas, URLs ou nomes de variaveis desatualizados em relacao ao codigo.
+
 ## Testes
 - Toda alteracao de contrato HTTP deve alinhar:
   - rota do servico
