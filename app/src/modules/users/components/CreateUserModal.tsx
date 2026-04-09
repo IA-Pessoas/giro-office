@@ -3,6 +3,10 @@ import { toast } from 'react-toastify';
 
 import { Dialog } from '@shared/components';
 
+import {
+  CREATE_USER_MODULE_OPTIONS,
+  CREATE_USER_PERMISSION_OPTIONS,
+} from '../constants/createUserConfig';
 import type { AdminCreateUserData, UserItem, UserPermission, UserType } from '../types';
 
 interface CreateUserModalProps {
@@ -29,45 +33,7 @@ const INITIAL_FORM_DATA: {
   permission: 0,
 };
 
-const PERMISSION_OPTIONS: Array<{ value: UserPermission; label: string }> = [
-  { value: 0, label: 'User' },
-  { value: 1, label: 'Admin' },
-  { value: 2, label: 'Owner' },
-];
-
-// Temporary local department catalog until the backend exposes the proper flow.
-const DEPARTMENTS = [
-  { id: 'default-department', label: 'Administracao' },
-  { id: 'dept-comercial', label: 'Comercial' },
-  { id: 'dept-contabil', label: 'Contabil' },
-  { id: 'dept-financeiro', label: 'Financeiro' },
-  { id: 'dept-fiscal', label: 'Fiscal' },
-  { id: 'dept-pessoal', label: 'Pessoal' },
-  { id: 'dept-rh', label: 'Recursos Humanos' },
-  { id: 'dept-ti', label: 'Tecnologia' },
-] as const;
-
-const MODULE_PERMISSION_OPTIONS = [0, 1, 2] as const;
-
-const MODULE_OPTIONS = [
-  { key: 'atendimento', label: 'Atendimento' },
-  { key: 'certificado', label: 'Certificado' },
-  { key: 'comercial', label: 'Comercial' },
-  { key: 'contabil', label: 'Contabil' },
-  { key: 'financeiro', label: 'Financeiro' },
-  { key: 'fiscal', label: 'Fiscal' },
-  { key: 'integracao', label: 'Integracao' },
-  { key: 'marketing', label: 'Marketing' },
-  { key: 'parcelamento', label: 'Parcelamento' },
-  { key: 'pec', label: 'PEC' },
-  { key: 'pessoal', label: 'Pessoal' },
-  { key: 'regularize', label: 'Regularize' },
-  { key: 'rh', label: 'RH' },
-  { key: 'triagem', label: 'Triagem' },
-  { key: 'wiki', label: 'Wiki' },
-] as const;
-
-type ModuleKey = (typeof MODULE_OPTIONS)[number]['key'];
+type ModuleKey = (typeof CREATE_USER_MODULE_OPTIONS)[number]['key'];
 
 type ModuleSelectionState = Record<ModuleKey, { enabled: boolean; level: 0 | 1 | 2 }>;
 
