@@ -39,10 +39,22 @@ type ModuleSelectionState = Record<ModuleKey, { enabled: boolean; level: 0 | 1 |
 type ModuleSelectValue = 'none' | '0' | '1' | '2';
 
 const FIELD_CLASSNAME =
-  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition-all outline-none placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-80';
+  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition-all outline-none placeholder:text-slate-400 focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-80';
 
 const MODULE_CARD_CLASSNAME =
   'rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-700 dark:bg-slate-800/70';
+
+const PRIMARY_ACTION_CLASSNAME =
+  'rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] disabled:cursor-not-allowed disabled:opacity-70';
+
+const FIELD_LABEL_CLASSNAME =
+  'dialog-neutral-label mb-2 block text-sm font-medium text-black dark:text-white';
+
+const SECTION_TITLE_CLASSNAME =
+  'dialog-neutral-label block text-sm font-medium text-black dark:text-white';
+
+const SECTION_DESCRIPTION_CLASSNAME =
+  'dialog-neutral-muted text-xs text-slate-600 dark:text-slate-300';
 
 function createInitialModuleSelections(): ModuleSelectionState {
   return CREATE_USER_MODULE_OPTIONS.reduce((acc, moduleOption) => {
@@ -182,7 +194,7 @@ export function CreateUserModal({
           </button>
           <button
             type="button"
-            className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-700 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-950/20 transition-all hover:from-violet-700 hover:to-purple-800 disabled:cursor-not-allowed disabled:opacity-70"
+            className={PRIMARY_ACTION_CLASSNAME}
             disabled={isLoading}
             onClick={handleCadastrar}
           >
@@ -194,19 +206,19 @@ export function CreateUserModal({
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="md:col-span-3">
-            <label htmlFor="user-name" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Nome</label>
+            <label htmlFor="user-name" className={FIELD_LABEL_CLASSNAME}>Nome</label>
             <input id="user-name" name="name" value={formData.name} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
           </div>
           <div>
-            <label htmlFor="user-login" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Login</label>
+            <label htmlFor="user-login" className={FIELD_LABEL_CLASSNAME}>Login</label>
             <input id="user-login" name="login" value={formData.login} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
           </div>
           <div className="md:col-span-2">
-            <label htmlFor="user-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Senha</label>
+            <label htmlFor="user-password" className={FIELD_LABEL_CLASSNAME}>Senha</label>
             <input id="user-password" type="password" name="password" value={formData.password} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
           </div>
           <div className="md:col-span-2">
-            <label htmlFor="user-department" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Departamento</label>
+            <label htmlFor="user-department" className={FIELD_LABEL_CLASSNAME}>Departamento</label>
             <select
               id="user-department"
               name="department_id"
@@ -222,7 +234,7 @@ export function CreateUserModal({
             </select>
           </div>
           <div>
-            <label htmlFor="user-permission" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Permissao</label>
+            <label htmlFor="user-permission" className={FIELD_LABEL_CLASSNAME}>Permissao</label>
             <select
               id="user-permission"
               name="permission"
@@ -239,8 +251,8 @@ export function CreateUserModal({
 
         <section className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40">
           <div className="mb-4 space-y-1">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Modulos adicionais</label>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <label className={SECTION_TITLE_CLASSNAME}>Modulos adicionais</label>
+            <p className={SECTION_DESCRIPTION_CLASSNAME}>
               Defina o nível de acesso por departamento.
             </p>
           </div>
@@ -252,7 +264,7 @@ export function CreateUserModal({
                 <div key={moduleOption.key} className={MODULE_CARD_CLASSNAME}>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_180px] md:items-center">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{moduleOption.label}</p>
+                      <p className="dialog-neutral-text truncate text-sm font-medium text-slate-700 dark:text-white">{moduleOption.label}</p>
                     </div>
                     <select
                       value={getModuleSelectValue(selection)}

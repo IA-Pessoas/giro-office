@@ -31,7 +31,7 @@ export function Dialog({
           className={`fixed left-1/2 top-1/2 z-[1500] w-[min(92vw,680px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark] ${contentClassName}`}
         >
           <header className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
-            <DialogPrimitive.Title className="text-lg font-semibold text-[var(--colors-blue-500)] dark:text-white">
+            <DialogPrimitive.Title className="dialog-neutral-title text-lg font-semibold text-black dark:text-white">
               {title}
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">{description}</DialogPrimitive.Description>
