@@ -8,8 +8,8 @@ import {
 import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
 
-import { AuthService } from "../services/authService.js";
-import { UserService } from "../services/userService.js";
+import { AuthService } from "../services/AuthService.js";
+import { UserService } from "../services/UserService.js";
 import { loginBodySchema } from "../schemas/auth.schemas.js";
 
 const router: ReturnType<typeof Router> = Router();

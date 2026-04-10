@@ -7,7 +7,7 @@ import {
   permissionUserIdParamsSchema,
   updatePermissionBodySchema,
 } from "../schemas/permission.schemas.js";
-import { PermissionService } from "../services/permissionService.js";
+import { PermissionService } from "../services/PermissionService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const permissionService = new PermissionService();

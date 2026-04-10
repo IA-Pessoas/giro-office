@@ -41,7 +41,7 @@ vi.mock("jsonwebtoken", () => ({
   default: jwtMock,
 }));
 
-import { AuthService } from "../services/authService.js";
+import { AuthService } from "../services/AuthService.js";
 
 describe("AuthService", () => {
   beforeEach(() => {

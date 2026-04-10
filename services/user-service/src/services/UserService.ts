@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import prismaClient from "../prisma/index.js";
-import { PermissionService } from "./permissionService.js";
+import { PermissionService } from "./PermissionService.js";
 
 const USER_PUBLIC_SELECT = {
   id: true,

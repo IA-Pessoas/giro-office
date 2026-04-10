@@ -48,25 +48,25 @@ const userRouteMocks: UserRouteMocks = vi.hoisted((): UserRouteMocks => ({
   },
 }));
 
-vi.mock("../services/authService.js", () => ({
+vi.mock("../services/AuthService.js", () => ({
   AuthService: vi.fn(function AuthService() {
     return userRouteMocks.authServiceMock;
   }),
 }));
 
-vi.mock("../services/userService.js", () => ({
+vi.mock("../services/UserService.js", () => ({
   UserService: vi.fn(function UserService() {
     return userRouteMocks.userServiceMock;
   }),
 }));
 
-vi.mock("../services/permissionService.js", () => ({
+vi.mock("../services/PermissionService.js", () => ({
   PermissionService: vi.fn(function PermissionService() {
     return userRouteMocks.permissionServiceMock;
   }),
 }));
 
-vi.mock("../services/storageService.js", () => ({
+vi.mock("../services/StorageService.js", () => ({
   StorageService: vi.fn(function StorageService() {
     return userRouteMocks.storageServiceMock;
   }),
