@@ -40,8 +40,8 @@ const rhEnvSchema = z
       .default("30")
       .transform((val) => {
         const parsed = Number.parseInt(val, 10);
-        if (Number.isNaN(parsed) || parsed < 1) {
-          return 1;
+        if (Number.isNaN(parsed) || parsed < 0) {
+          return 0;
         }
         return parsed;
       }),

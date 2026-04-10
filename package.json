@@ -20,7 +20,9 @@
     "format:check": "biome format .",
     "check": "biome check .",
     "fix": "biome check --write .",
-    "fix:unsafe": "biome check --write --unsafe ."
+    "fix:unsafe": "biome check --write --unsafe .",
+    "smoke": "node scripts/all-services-smoke.mjs",
+    "smoke:coverage": "node scripts/check-smoke-spec-coverage.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.5",

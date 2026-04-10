@@ -15,7 +15,9 @@ function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
 }
 
-const envSchema = z
+const photoStorageModeSchema = z.enum(["supabase", "local"]);
+
+const rawEnvSchema = z
   .object({
     port: z
       .string()
@@ -30,8 +32,10 @@ const envSchema = z
     adminPassword: z.string().min(1, "ADMIN_PASSWORD não definido."),
     nodeEnv: z.string().optional().default("development"),
     logLevel: loggerLevelSchema.optional().default("info"),
-    supabaseUrl: z.string().url("SUPABASE_URL não definida."),
-    supabaseServiceRoleKey: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY não definida."),
+    supabaseUrl: z.string().trim().optional(),
+    supabaseServiceRoleKey: z.string().trim().optional(),
+    photoStorageMode: photoStorageModeSchema.optional().default("supabase"),
+    photoStorageDir: z.string().optional().default(".data/user-photo-uploads"),
     logPretty: z
       .string()
       .optional()
@@ -39,18 +43,46 @@ const envSchema = z
       .transform((value) => parseBoolean(value)),
     enableApiDocsEnv: z.string().optional(),
   })
-  .transform((env) => {
-    const { enableApiDocsEnv, ...rest } = env;
-    const enableApiDocs =
-      enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
-        ? parseBoolean(enableApiDocsEnv)
-        : rest.nodeEnv !== "production";
-    return {
-      ...rest,
-      logPretty: rest.nodeEnv !== "production" && rest.logPretty,
-      enableApiDocs,
-    };
+  .superRefine((env, ctx) => {
+    if (env.photoStorageMode === "supabase") {
+      if (!env.supabaseUrl) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SUPABASE_URL não definida.",
+          path: ["supabaseUrl"],
+        });
+      } else if (!z.string().url().safeParse(env.supabaseUrl).success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SUPABASE_URL não definida.",
+          path: ["supabaseUrl"],
+        });
+      }
+
+      if (!env.supabaseServiceRoleKey) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SUPABASE_SERVICE_ROLE_KEY não definida.",
+          path: ["supabaseServiceRoleKey"],
+        });
+      }
+    }
   });
+
+const envSchema = rawEnvSchema.transform((env) => {
+  const { enableApiDocsEnv, ...rest } = env;
+  const enableApiDocs =
+    enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
+      ? parseBoolean(enableApiDocsEnv)
+      : rest.nodeEnv !== "production";
+  return {
+    ...rest,
+    supabaseUrl: rest.supabaseUrl ?? "",
+    supabaseServiceRoleKey: rest.supabaseServiceRoleKey ?? "",
+    logPretty: rest.nodeEnv !== "production" && rest.logPretty,
+    enableApiDocs,
+  };
+});
 
 export type UserServiceEnv = z.infer<typeof envSchema>;
 
@@ -63,6 +95,8 @@ export function getUserServiceEnv(): UserServiceEnv {
     nodeEnv: process.env.NODE_ENV,
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    photoStorageMode: process.env.USER_PHOTO_STORAGE_MODE,
+    photoStorageDir: process.env.USER_PHOTO_STORAGE_DIR,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,

@@ -16,7 +16,7 @@ export const integracaoTaskCreateBodySchema = z
     project_id: zNonEmptyText("project_id"),
     client_id: zNonEmptyText("client_id"),
     prospecting_status: prospectingStatusZod,
-    observations: z.string(),
+    observations: z.string().optional().default(""),
     urgency: zNonEmptyText("urgency"),
   })
   .strict();
