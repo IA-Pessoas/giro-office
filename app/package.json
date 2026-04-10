@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "typecheck": "tsc --noEmit && pnpm run typecheck:usefetch",
     "start": "next start",
     "migration:audit:chakra": "node scripts/audit-chakra-usage.mjs",
     "migration:validate:criteria": "node scripts/validate-acceptance-criteria.mjs",

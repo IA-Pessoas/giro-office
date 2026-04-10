@@ -4,7 +4,6 @@ import { IoAdd, IoTrash } from "react-icons/io5";
 import { setupAPIClient } from '@shared/services/api';
 import { integracaoService } from '../services/integracaoService';
 import { useTaskModels } from '../hooks/useTaskModels';
-import type { TaskModel, ProjectTaskItem } from '../types';
 import { toast as toastifyToast } from 'react-toastify';
 
 // --- Chakra shims local (para remover dependência de @chakra-ui/react sem reescrever toda a UI) ---
@@ -413,8 +412,8 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
                 name: projectName,
                 objective: projectObjective,
                 sponsor_id: sponsorId || null,
-                start_date: startDate ? new Date(startDate) : null,
-                end_date: endDate ? new Date(endDate) : null,
+                start_date: startDate || null,
+                end_date: endDate || null,
             };
 
             // A) Salvar/Criar Projeto

@@ -10,7 +10,7 @@ import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   DepsTasksService,
   type DepsTasksService as DepsTasksServiceType,
-} from "../services/depsTasksService.js";
+} from "../services/DepsTasksService.js";
 
 export type DepsTasksRouteDeps = Pick<DepsTasksServiceType, "listDepartmentsWithTaskModels">;
 

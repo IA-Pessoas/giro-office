@@ -23,13 +23,13 @@ const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
 
 vi.mock("../prisma/index.js", () => ({ default: prismaMock }));
 vi.mock("../integrations/audit.js", () => auditMock);
-vi.mock("../services/taskWorkflowService.js", () => ({
+vi.mock("../services/TaskWorkflowService.js", () => ({
   TaskWorkflowService: vi.fn(function TaskWorkflowService() {
     return workflowMock;
   }),
 }));
 
-import { TaskLifecycleService } from "../services/taskLifecycleService.js";
+import { TaskLifecycleService } from "../services/TaskLifecycleService.js";
 
 describe("TaskLifecycleService", () => {
   beforeEach(() => {

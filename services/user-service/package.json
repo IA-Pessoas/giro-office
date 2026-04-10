@@ -10,6 +10,7 @@
     "predev": "pnpm sync:prisma",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
+    "typecheck": "pnpm sync:prisma && tsc --noEmit",
     "start": "node dist/server.js",
     "test": "pnpm exec vitest run",
     "test:watch": "pnpm exec vitest"

@@ -12,9 +12,9 @@ import {
   type ProjectProgressRouteDeps,
 } from "./routes/projectProgress.routes.js";
 import { buildProjectServiceOpenApiSpec } from "./openapi/spec.js";
-import { createProjectCrudRoutes, type ProjectCrudRouteDeps } from "./routes/projectCrud.routes.js";
-import { ProjectCrudService } from "./services/projectCrudService.js";
-import { ProjectProgressService } from "./services/projectProgressService.js";
+import { createProjectCrudRoutes, type ProjectCrudRouteDeps } from "./routes/projectcrud.routes.js";
+import { ProjectCrudService } from "./services/ProjectCrudService.js";
+import { ProjectProgressService } from "./services/ProjectProgressService.js";
 
 function projectServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;

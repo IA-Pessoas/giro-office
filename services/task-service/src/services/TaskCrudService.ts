@@ -4,7 +4,7 @@ import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import { TaskWorkflowService } from "./taskWorkflowService.js";
+import { TaskWorkflowService } from "./TaskWorkflowService.js";
 
 const TASK_DETAIL_SELECT = {
   id: true,

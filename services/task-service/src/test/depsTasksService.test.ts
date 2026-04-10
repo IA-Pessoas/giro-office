@@ -1,7 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
-import { DepsTasksService } from "../services/depsTasksService.js";
+import { DepsTasksService } from "../services/DepsTasksService.js";
 
 describe("DepsTasksService", () => {
   it("lista departamentos ativos com modelos de tarefa por organizacao", async () => {

@@ -8,7 +8,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { TaskDependentService } from "../services/taskDependentService.js";
+import { TaskDependentService } from "../services/TaskDependentService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const taskDependentService = new TaskDependentService();

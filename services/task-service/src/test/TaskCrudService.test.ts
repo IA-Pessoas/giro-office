@@ -36,13 +36,13 @@ vi.mock("../prisma/index.js", () => ({
 
 vi.mock("../integrations/audit.js", () => auditMock);
 
-vi.mock("../services/taskWorkflowService.js", () => ({
+vi.mock("../services/TaskWorkflowService.js", () => ({
   TaskWorkflowService: vi.fn(function TaskWorkflowService() {
     return workflowMock;
   }),
 }));
 
-import { TaskCrudService } from "../services/taskCrudService.js";
+import { TaskCrudService } from "../services/TaskCrudService.js";
 
 describe("TaskCrudService", () => {
   beforeEach(() => {

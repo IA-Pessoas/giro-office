@@ -9,7 +9,7 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { comercialTaskUpdateBodySchema } from "../schemas/comercialTaskUpdateBody.schema.js";
-import { TaskComercialService } from "../services/taskComercialService.js";
+import { TaskComercialService } from "../services/TaskComercialService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const taskComercialService = new TaskComercialService();

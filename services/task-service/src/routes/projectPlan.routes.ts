@@ -22,7 +22,7 @@ import {
 import {
   ProjectPlanService,
   type ProjectPlanService as ProjectPlanServiceType,
-} from "../services/projectPlanService.js";
+} from "../services/ProjectPlanService.js";
 
 export type ProjectPlanRouteDeps = Pick<
   ProjectPlanServiceType,

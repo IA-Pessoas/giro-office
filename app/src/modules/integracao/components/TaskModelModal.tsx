@@ -3,7 +3,7 @@ import { IoAdd, IoTrash } from "react-icons/io5";
 import { toast } from 'react-toastify';
 import { setupAPIClient } from '@shared/services/api';
 import { integracaoService } from '../services/integracaoService';
-import type { TaskModel, TaskDependent } from '../types';
+import type { TaskModel } from '../types';
 
 // --- Chakra shims local (para remover dependência de @chakra-ui/react sem reescrever toda a UI) ---
 // Observação: estes shims aplicam apenas um subconjunto de estilo via inline; a lógica/estrutura permanece.

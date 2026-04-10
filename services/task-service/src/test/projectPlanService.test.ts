@@ -1,7 +1,7 @@
-import type { ProjectPlanAudit, ProjectPlanPrisma } from "../services/projectPlanService.js";
-import type { CreateTaskCrudRequest } from "../services/taskCrudService.js";
-import { ProjectPlanService } from "../services/projectPlanService.js";
-import { TaskCrudService } from "../services/taskCrudService.js";
+import type { ProjectPlanAudit, ProjectPlanPrisma } from "../services/ProjectPlanService.js";
+import type { CreateTaskCrudRequest } from "../services/TaskCrudService.js";
+import { ProjectPlanService } from "../services/ProjectPlanService.js";
+import { TaskCrudService } from "../services/TaskCrudService.js";
 import { describe, expect, it } from "vitest";
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";

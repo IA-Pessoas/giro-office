@@ -9,7 +9,7 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { financeiroTaskUpdateBodySchema } from "../schemas/financeiroTaskUpdateBody.schema.js";
-import { TaskFinanceiroService } from "../services/taskFinanceiroService.js";
+import { TaskFinanceiroService } from "../services/TaskFinanceiroService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const taskFinanceiroService = new TaskFinanceiroService();

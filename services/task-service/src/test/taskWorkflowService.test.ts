@@ -1,5 +1,5 @@
 import type { ProjectProgressIntegration } from "../integrations/projectProgress.js";
-import { TaskWorkflowService } from "../services/taskWorkflowService.js";
+import { TaskWorkflowService } from "../services/TaskWorkflowService.js";
 import { describe, expect, it } from "vitest";
 
 describe("TaskWorkflowService", () => {

@@ -9,7 +9,7 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { integracaoProjectProgressBodySchema } from "../schemas/projectProgress.schemas.js";
-import type { ProjectProgressService } from "../services/projectProgressService.js";
+import type { ProjectProgressService } from "../services/ProjectProgressService.js";
 
 export type ProjectProgressRouteDeps = Pick<ProjectProgressService, "recalculateFromTasks">;
 
