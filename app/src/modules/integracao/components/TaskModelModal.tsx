@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { IoAdd, IoTrash } from "react-icons/io5";
 import { toast } from 'react-toastify';
 import { setupAPIClient } from '@shared/services/api';
+import { extractUsersList } from '@modules/users/services/userService';
 import { integracaoService } from '../services/integracaoService';
 import type { TaskModel, TaskDependent } from '../types';
 
@@ -257,7 +258,7 @@ export function TaskModelModal({ isOpen, onClose, initialData, onSave }: ModalPr
                     apiClient.get('/integracao-tasksModel') 
                 ]);
 
-                setUsers(usersRes.data);
+                setUsers(extractUsersList(usersRes.data));
                 setDepartments(depsRes.data);
                 setAllTasks(tasksRes.data); // Assume que retorna array com id e name
 

@@ -1,11 +1,44 @@
 import { setupAPIClient } from '@shared/services/api';
 import type { UserItem, CreateUserData, AdminCreateUserData, UpdateUserData } from '../types';
 
+type UsersListEnvelope = {
+  users?: UserItem[];
+};
+
+function extractUsersList(payload: unknown): UserItem[] {
+  if (Array.isArray(payload)) {
+    return payload as UserItem[];
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return [];
+  }
+
+  const directUsers = (payload as UsersListEnvelope).users;
+  if (Array.isArray(directUsers)) {
+    return directUsers;
+  }
+
+  const nestedData = (payload as { data?: unknown }).data;
+  if (Array.isArray(nestedData)) {
+    return nestedData as UserItem[];
+  }
+
+  if (nestedData && typeof nestedData === 'object') {
+    const nestedUsers = (nestedData as UsersListEnvelope).users;
+    if (Array.isArray(nestedUsers)) {
+      return nestedUsers;
+    }
+  }
+
+  return [];
+}
+
 export const userService = {
   list: async (filters?: { status?: string }): Promise<UserItem[]> => {
     const api = setupAPIClient();
     const response = await api.get('/users', { params: filters });
-    return response.data;
+    return extractUsersList(response.data);
   },
 
   getById: async (id: string): Promise<UserItem> => {
@@ -38,3 +71,5 @@ export const userService = {
     return response.data;
   },
 };
+
+export { extractUsersList };

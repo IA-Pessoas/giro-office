@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { IoAdd, IoTrash } from "react-icons/io5";
 
 import { setupAPIClient } from '@shared/services/api';
+import { extractUsersList } from '@modules/users/services/userService';
 import { integracaoService } from '../services/integracaoService';
 import { useTaskModels } from '../hooks/useTaskModels';
 import type { TaskModel, ProjectTaskItem } from '../types';
@@ -276,7 +277,7 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
                 try {
                     const apiClient = setupAPIClient();
                     const response = await apiClient.get('/users', { params: { status: 'Ativo' } });
-                    setUsers(response.data);
+                    setUsers(extractUsersList(response.data));
                 } catch (error) {
                     console.error("Erro ao buscar usuários");
                 }
