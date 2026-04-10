@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, BarChart3, KeyRound, Lock, Plus, Shield, Users } from "lucide-react";
+import { BarChart3, KeyRound, Lock, Plus, Shield, Users } from "lucide-react";
 
 import { CreateUserModal, userService, type UserItem } from "@modules/users";
 import { TEMPORARY_DEPARTMENTS } from "@modules/users/constants/createUserConfig";
@@ -8,24 +8,31 @@ import { setupAPIClient } from "@shared/services/api";
 import { useFetch } from "@shared/hooks";
 
 export function Administracao() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'permissions' | 'logs'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'permissions'>('dashboard');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
   const [isLoadingOrganizationId, setIsLoadingOrganizationId] = useState(false);
   const { user } = useAuth();
 
-  const authOrganizationId =
-    user && "organization_id" in user
-      ? (user as { organization_id?: string }).organization_id
-      : undefined;
-
   const { data: users = [], refetch: refetchUsers } = useFetch(["users"], () => userService.list());
+  const dashboardCards = [
+    {
+      title: "Usuários Ativos",
+      value: users.length,
+      icon: Users,
+      iconClassName:
+        "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
+    },
+    {
+      title: "Perfis de Acesso",
+      value: 12,
+      icon: KeyRound,
+      iconClassName:
+        "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+    },
+  ];
 
   useEffect(() => {
-    if (authOrganizationId) {
-      setOrganizationId(authOrganizationId);
-    }
-
     if (!user?.id) {
       setOrganizationId(undefined);
       return;
@@ -39,7 +46,10 @@ export function Administracao() {
         const api = setupAPIClient();
         const response = await api.get("/me");
         const meData = response.data?.data ?? response.data?.user;
-        const nextOrganizationId = meData?.organization_id;
+        const nextOrganizationId =
+          typeof meData?.organization_id === "string" && meData.organization_id.trim().length > 0
+            ? meData.organization_id
+            : undefined;
 
         if (isMounted) {
           setOrganizationId(nextOrganizationId);
@@ -61,7 +71,7 @@ export function Administracao() {
     return () => {
       isMounted = false;
     };
-  }, [authOrganizationId, user?.id]);
+  }, [user?.id]);
 
   const handleOpenCreateModal = () => setIsCreateModalOpen(true);
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);
@@ -84,11 +94,11 @@ export function Administracao() {
           </p>
         </div>
         <button
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-700 px-4 py-2.5 text-white shadow-lg shadow-violet-950/20 transition-all hover:from-violet-700 hover:to-purple-800"
+          className="self-end lg:self-auto w-fit flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-700 px-4 py-2.5 text-white shadow-lg shadow-violet-950/20 transition-all hover:from-violet-700 hover:to-purple-800"
           type="button"
           onClick={handleOpenCreateModal}
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="w-5 h-5" />
           Novo Usuário
         </button>
       </div>
@@ -99,7 +109,6 @@ export function Administracao() {
             { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
             { key: 'users', label: 'Usuários', icon: Users },
             { key: 'permissions', label: 'Permissões', icon: Lock },
-            { key: 'logs', label: 'Logs', icon: Activity },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
@@ -124,43 +133,27 @@ export function Administracao() {
       </div>
 
       {activeTab === 'dashboard' ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">Usuários Ativos</p>
-                <p className="text-2xl font-semibold text-slate-900 dark:text-white">{users.length}</p>
-              </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                <Users className="h-5 w-5" />
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {dashboardCards.map((card) => {
+            const Icon = card.icon;
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">Perfis de Acesso</p>
-                <p className="text-2xl font-semibold text-slate-900 dark:text-white">12</p>
+            return (
+              <div
+                key={card.title}
+                className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">{card.title}</p>
+                    <p className="text-2xl font-semibold text-slate-900 dark:text-white">{card.value}</p>
+                  </div>
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${card.iconClassName}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                </div>
               </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
-                <KeyRound className="h-5 w-5" />
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">Logs de Auditoria</p>
-                <p className="text-2xl font-semibold text-slate-900 dark:text-white">1.543</p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Últimos 30 dias</p>
-              </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                <Activity className="h-5 w-5" />
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/80 p-8 text-center dark:border-slate-700 dark:bg-slate-900/70">
