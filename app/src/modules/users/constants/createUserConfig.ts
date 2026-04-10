@@ -2,6 +2,7 @@ import type { UserPermission } from "../types";
 
 export const TEMPORARY_DEPARTMENTS = [
   { id: "default-department", name: "Administracao" },
+  { id: "dept-admin", name: "Administracao" },
   { id: "dept-comercial", name: "Comercial" },
   { id: "dept-contabil", name: "Contabil" },
   { id: "dept-financeiro", name: "Financeiro" },
@@ -12,9 +13,9 @@ export const TEMPORARY_DEPARTMENTS = [
 ] as const;
 
 export const CREATE_USER_PERMISSION_OPTIONS: Array<{ value: UserPermission; label: string }> = [
-  { value: 0, label: "User" },
-  { value: 1, label: "Admin" },
-  { value: 2, label: "Owner" },
+  { value: 0, label: "Visualizador" },
+  { value: 1, label: "Usuário" },
+  { value: 2, label: "Administrador" },
 ];
 
 export const CREATE_USER_MODULE_OPTIONS = [

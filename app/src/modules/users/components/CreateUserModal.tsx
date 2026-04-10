@@ -192,13 +192,6 @@ export function CreateUserModal({
       )}
     >
       <div className="space-y-6">
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Novo Usuario</p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Preencha os dados principais e configure o acesso por modulo sem alterar as regras atuais do sistema.
-          </p>
-        </div>
-
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="md:col-span-3">
             <label htmlFor="user-name" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Nome</label>
@@ -248,7 +241,7 @@ export function CreateUserModal({
           <div className="mb-4 space-y-1">
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Modulos adicionais</label>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Defina o nivel de acesso por modulo. Selecoes em &quot;Sem acesso&quot; nao entram no payload.
+              Defina o nível de acesso por departamento.
             </p>
           </div>
           <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1">
@@ -277,11 +270,6 @@ export function CreateUserModal({
               );
             })}
           </div>
-          {formData.permission === 2 ? (
-            <p className="pt-1 text-xs text-slate-500 dark:text-slate-400">
-              Owner recebe acesso amplo pelo backend; as selecoes de modulos adicionais nao sao enviadas neste caso.
-            </p>
-          ) : null}
         </section>
       </div>
     </Dialog>
