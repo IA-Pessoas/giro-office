@@ -377,6 +377,60 @@ function registerCleanup(label, fn) {
 async function writeArtifact(opId, responseText) {
   const filePath = path.join(env.tmpDir, `${sanitizeFileName(opId)}.response.txt`);
   await fs.promises.writeFile(filePath, responseText, "utf8");
+  return filePath;
+}
+
+function isBadExpectation(op) {
+  return op.expectationKind === "bad";
+}
+
+function summarizeResponse(body, text) {
+  const raw =
+    body !== undefined
+      ? JSON.stringify(body)
+      : text && text.trim()
+        ? text.replace(/\s+/g, " ")
+        : "<empty>";
+  return raw.length > 220 ? `${raw.slice(0, 217)}...` : raw;
+}
+
+function shouldLogEndpointResult(label) {
+  return !label.startsWith("helper-");
+}
+
+async function buildNegativeRequestOverrides(op) {
+  switch (op.negativeCase) {
+    case "unauthorized401":
+      return {
+        auth: "public",
+        headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+        expectedStatus: op.expectedStatus,
+        expectEnvelope: false,
+      };
+    case "lowPermission403": {
+      const token = await ensureRhTargetUserToken();
+      return {
+        auth: "public",
+        headers: { Authorization: `Bearer ${token}` },
+        expectedStatus: op.expectedStatus,
+        expectEnvelope: false,
+      };
+    }
+    case "internalToken401":
+    case "internalToken403":
+      return {
+        auth: "public",
+        headers: { "x-internal-service-token": "smoke_invalid_internal_token" },
+        expectedStatus: op.expectedStatus,
+        expectEnvelope: false,
+      };
+    default:
+      return null;
+  }
+}
+
+function formatExpectedStatus(expectedStatus) {
+  return expectedStatus.join(", ");
 }
 
 const REQUEST_TIMEOUT_MS = Number(process.env.SMOKE_REQUEST_TIMEOUT_MS) || 30_000;
@@ -398,25 +452,36 @@ async function diagnoseUpstream(service) {
 }
 
 async function httpRequest(op, options) {
+  const opOverrides = await buildNegativeRequestOverrides(op);
   const {
-    method = op.method,
-    path: requestPath = op.path,
-    target = op.target,
-    service = op.service,
-    auth = op.auth,
+    method: optionMethod,
+    path: optionPath,
+    target: optionTarget,
+    service: optionService,
+    auth: optionAuth,
     query,
     json,
     form,
-    headers = {},
-    expectedStatus = [200],
-    expectEnvelope = expectedStatus.every((status) => status < 400),
+    headers: optionHeaders = {},
+    expectedStatus: optionExpectedStatus,
+    expectEnvelope: optionExpectEnvelope,
     label = op.id,
   } = options;
+
+  const method = opOverrides?.method ?? optionMethod ?? op.method;
+  const requestPath = opOverrides?.path ?? optionPath ?? op.path;
+  const target = opOverrides?.target ?? optionTarget ?? op.target;
+  const service = opOverrides?.service ?? optionService ?? op.service;
+  const auth = opOverrides?.auth ?? optionAuth ?? op.auth;
+  const expectedStatus = opOverrides?.expectedStatus ?? optionExpectedStatus ?? op.expectedStatus ?? [200];
+  const expectEnvelope =
+    opOverrides?.expectEnvelope ?? optionExpectEnvelope ?? expectedStatus.every((status) => status < 400);
 
   const url = buildUrl(target, service, requestPath, query);
   const requestHeaders = new Headers({
     ...getAuthHeaders(auth, service),
-    ...headers,
+    ...optionHeaders,
+    ...(opOverrides?.headers ?? {}),
   });
 
   const fetchOptions = {
@@ -467,7 +532,7 @@ async function httpRequest(op, options) {
   }
 
   text = await response.text();
-  await writeArtifact(label, text);
+  const artifactPath = await writeArtifact(label, text);
 
   if (cli.verbose) {
     log("INFO", `${color.dim}<- ${response.status} (${text.length} bytes)${color.reset}`);
@@ -478,6 +543,14 @@ async function httpRequest(op, options) {
     body = text ? JSON.parse(text) : undefined;
   } catch {
     body = undefined;
+  }
+
+  const summary = summarizeResponse(body, text);
+  if (shouldLogEndpointResult(label)) {
+    log(
+      "INFO",
+      `${method} ${url.pathname}${url.search} => expected ${op.expectedLabel} [${formatExpectedStatus(expectedStatus)}], got ${response.status}, body=${summary}, artifact=${artifactPath}`,
+    );
   }
 
   if (!expectedStatus.includes(response.status)) {
@@ -493,7 +566,7 @@ async function httpRequest(op, options) {
     ensureSuccessEnvelope(op, body);
   }
 
-  return { status: response.status, body, text };
+  return { status: response.status, body, text, artifactPath, summary };
 }
 
 async function helperCall(label, options) {
@@ -797,6 +870,9 @@ const handlers = {
 
   async userMe(op) {
     const response = await httpRequest(op, { expectedStatus: [200] });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.baselineDepartmentId =
       resolveDepartmentIdFromResponse(response.body) || state.baselineDepartmentId;
   },
@@ -806,6 +882,9 @@ const handlers = {
       expectedStatus: [200],
       query: { skip: 0, take: 5 },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.baselineDepartmentId =
       resolveDepartmentIdFromResponse(response.body) || state.baselineDepartmentId;
   },
@@ -827,6 +906,9 @@ const handlers = {
         modules: { integracao: 1, rh: 1 },
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.tempUserId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
@@ -906,6 +988,9 @@ const handlers = {
         cnpj: uniqueDigits(14),
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.tempOrganizationId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
@@ -961,6 +1046,9 @@ const handlers = {
         service_unique: false,
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.primaryClientId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
@@ -1005,6 +1093,9 @@ const handlers = {
         service_unique: false,
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.secondaryClientId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
@@ -1108,6 +1199,9 @@ const handlers = {
         },
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.clientHistoryId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
@@ -1135,6 +1229,9 @@ const handlers = {
       path: `/client/${requireState("primaryClientId")}/histories/pending`,
       json: { reason: uniqueText("Smoke pending history") },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.clientHistoryPendingId =
       pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
@@ -1174,6 +1271,9 @@ const handlers = {
         sponsor_id: "",
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.projectId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
   },
 
@@ -1229,6 +1329,13 @@ const handlers = {
     });
   },
 
+  async projectDeleteAutoForbidden(op) {
+    await httpRequest(op, {
+      expectedStatus: [403],
+      json: { project_id: requireState("projectId") },
+    });
+  },
+
   async taskDepsList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
@@ -1245,6 +1352,9 @@ const handlers = {
         type: "regularize",
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.taskModelPrimaryId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
     await ensureSecondaryTaskModel();
   },
@@ -1288,6 +1398,9 @@ const handlers = {
         observation: "Smoke dependent link",
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.taskDependentId =
       pickFirst(response.body, "data.created.id") ?? pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
@@ -1308,6 +1421,9 @@ const handlers = {
         referring_type: "process",
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.taskIntegrationId =
       pickFirst(response.body, "data.id") ??
       pickFirst(response.body, "data.create.id") ??
@@ -1333,6 +1449,9 @@ const handlers = {
         urgency: "Alta",
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.taskId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
   },
 
@@ -1430,6 +1549,9 @@ const handlers = {
       path: "/task/project-plan",
       json: { name: uniqueText("Smoke Project Plan"), color: "#1F6FEB" },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.planId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
   },
 
@@ -1469,6 +1591,9 @@ const handlers = {
         task_id: requireState("taskModelSecondaryId"),
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.planTaskId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
   },
 
@@ -1517,6 +1642,17 @@ const handlers = {
       json: {
         plan_id: requireState("planId"),
         project_id: hireProjectId,
+      },
+    });
+  },
+
+  async taskProjectPlanHireAutoForbidden(op) {
+    await httpRequest(op, {
+      expectedStatus: [403],
+      path: "/task/project-plan/hire",
+      json: {
+        plan_id: requireState("planId"),
+        project_id: requireState("projectId"),
       },
     });
   },
@@ -1612,6 +1748,9 @@ const handlers = {
       auth: "public",
       headers: { Authorization: `Bearer ${targetToken}` },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     if (response.status === 200) {
       state.rhPointId = pickFirst(response.body, "data.point.id") ?? state.rhPointId;
     } else {
@@ -1661,6 +1800,9 @@ const handlers = {
         justification: "Smoke point adjustment",
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.rhAdjustmentId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
@@ -1682,6 +1824,9 @@ const handlers = {
       path: "/rh/categories",
       json: { name: uniqueText("Smoke RH Category"), active: true },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.rhCategoryId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
@@ -1721,6 +1866,9 @@ const handlers = {
         urgency: "High",
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.rhRequestId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
@@ -1764,6 +1912,9 @@ const handlers = {
       path: "/rh/score/questions",
       json: { question: uniqueText("Smoke score question"), type: "behavioral" },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.rhScoreQuestionId =
       pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
@@ -1799,6 +1950,9 @@ const handlers = {
       path: "/rh/score/quarters/generate",
       json: { target_user_id: await ensureRhTargetUser(), quarter: "2026-Q2" },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     if (response.status === 200) {
       state.rhScoreId =
         pickFirst(response.body, "data.id") ??
@@ -1835,6 +1989,9 @@ const handlers = {
       expectedStatus: [200],
       path: "/rh/score/quarters/me",
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.rhScoreId =
       state.rhScoreId ||
       findFirstId(response.body?.data);
@@ -1856,6 +2013,9 @@ const handlers = {
       auth: "public",
       headers: { Authorization: `Bearer ${targetToken}` },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.rhScoreEvaluationId =
       pickFirst(response.body, "data.0.id") ??
       pickFirst(response.body, "data.items.0.id") ??
@@ -1883,6 +2043,9 @@ const handlers = {
       path: "/rh/holidays",
       json: { name: uniqueText("Smoke Holiday"), date: new Date().toISOString() },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.rhHolidayId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
@@ -1932,6 +2095,9 @@ const handlers = {
         reason: "Smoke overtime",
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.rhTimeBankReleaseId =
       pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
@@ -1954,6 +2120,9 @@ const handlers = {
         type: "Message",
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     if (!state.rhRequestId) {
       state.rhRequestId = pickFirst(response.body, "data.request_id") ?? state.rhRequestId;
     }
@@ -1979,6 +2148,9 @@ const handlers = {
         end_time: end.toISOString(),
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
     state.rhTimeSheetId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
@@ -2011,12 +2183,12 @@ const handlers = {
   },
 
   async auditInternalIngest(op) {
-    state.auditRequestId = crypto.randomUUID();
+    const requestId = crypto.randomUUID();
     await httpRequest(op, {
       expectedStatus: [201],
       path: "/internal/audit/requests",
       json: {
-        requestId: state.auditRequestId,
+        requestId,
         organizationId: requireState("session").organization_id,
         userId: requireState("session").id,
         permission: 2,
@@ -2028,6 +2200,10 @@ const handlers = {
         createdAt: new Date().toISOString(),
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.auditRequestId = requestId;
   },
 
   async auditList(op) {
@@ -2372,9 +2548,9 @@ async function run() {
         continue;
       }
 
-      const handler = handlers[op.action];
+      const handler = handlers[op.handlerAction ?? op.action];
       if (!handler) {
-        const msg = `No handler registered for action ${op.action}.`;
+        const msg = `No handler registered for action ${op.handlerAction ?? op.action}.`;
         if (cli.continueOnFailure) {
           failures.push({ id: op.id, error: msg });
           log("FAIL", `${op.method} ${op.path} — ${msg}`);
@@ -2384,7 +2560,10 @@ async function run() {
       }
 
       if (cli.dryRun) {
-        log("INFO", `[dry-run] ${op.method} ${op.path} (${op.service}) -> ${op.action}`);
+        log(
+          "INFO",
+          `[dry-run] ${op.method} ${op.path} (${op.service}) -> ${op.action} expects ${op.expectedLabel} [${formatExpectedStatus(op.expectedStatus)}]`,
+        );
         executed.push(op.id);
         continue;
       }

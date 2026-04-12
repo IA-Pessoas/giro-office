@@ -1,3 +1,163 @@
+const EXEMPT_ROUTE_KEYS = new Set([
+  "GET|/health",
+  "GET|/ready",
+  "POST|/user/session",
+  "POST|/user/start-config",
+]);
+
+const GOOD_STATUS_OVERRIDES = new Map([
+  ["userStartConfig", [200, 409]],
+  ["userCreate", [201]],
+  ["organizationCreate", [201]],
+  ["clientCreate", [201]],
+  ["clientIntegrationCreate", [201]],
+  ["clientPAPost", [201]],
+  ["clientHistoriesPendingCreate", [201]],
+  ["clientHistoriesCreate", [201]],
+  ["projectCreate", [201]],
+  ["taskModelCreate", [201]],
+  ["taskModelDependentCreate", [201]],
+  ["taskIntegrationCreate", [201]],
+  ["taskCreate", [201]],
+  ["taskProjectPlanCreate", [201]],
+  ["taskProjectPlanTaskCreate", [201]],
+  ["rhPointRegister", [200, 400]],
+  ["rhScoreQuarterGenerate", [200, 409]],
+  ["auditInternalIngest", [201]],
+]);
+
+const GENERATED_NEGATIVE_CASES = {
+  unauthorized401: {
+    suffix: "AutoUnauthorized",
+    expectedStatus: [401],
+    expectedLabel: "unauthorized",
+  },
+  lowPermission403: {
+    suffix: "AutoForbidden",
+    expectedStatus: [403],
+    expectedLabel: "forbidden",
+  },
+  internalToken401: {
+    suffix: "AutoInternalUnauthorized",
+    expectedStatus: [401],
+    expectedLabel: "invalid internal token",
+  },
+  internalToken403: {
+    suffix: "AutoInternalForbidden",
+    expectedStatus: [403],
+    expectedLabel: "invalid internal token",
+  },
+};
+
+const GENERATED_HANDLER_OVERRIDES = {
+  projectDelete: "projectDeleteAutoForbidden",
+  taskProjectPlanHire: "taskProjectPlanHireAutoForbidden",
+};
+
+const ROUTE_NEGATIVE_CASE_OVERRIDES = new Map([
+  ["client-service|DELETE|/client/{id}", "lowPermission403"],
+  ["client-service|DELETE|/client/histories/pending/{pendingId}", "lowPermission403"],
+  ["project-service|DELETE|/project", "lowPermission403"],
+  ["task-service|PUT|/task/model", "lowPermission403"],
+  ["task-service|PUT|/task/complete-request", "lowPermission403"],
+  ["task-service|DELETE|/task", "lowPermission403"],
+  ["task-service|GET|/task/project-plan", "unauthorized401"],
+  ["task-service|PUT|/task/project-plan", "lowPermission403"],
+  ["task-service|GET|/task/project-plan/list", "unauthorized401"],
+  ["task-service|POST|/task/project-plan/task", "lowPermission403"],
+  ["task-service|GET|/task/project-plan/task/list", "unauthorized401"],
+  ["task-service|PUT|/task/project-plan/task", "lowPermission403"],
+  ["task-service|POST|/task/project-plan/hire", "lowPermission403"],
+  ["task-service|DELETE|/task/project-plan/task", "lowPermission403"],
+  ["task-service|DELETE|/task/project-plan", "lowPermission403"],
+  ["task-service|POST|/task/model/dependent", "unauthorized401"],
+  ["task-service|DELETE|/task/model/dependent", "unauthorized401"],
+  ["task-service|POST|/task/integration", "unauthorized401"],
+  ["task-service|DELETE|/task/integration", "unauthorized401"],
+  ["task-service|PUT|/task", "unauthorized401"],
+  ["task-service|PUT|/task/financeiro", "unauthorized401"],
+  ["task-service|PUT|/task/comercial", "unauthorized401"],
+  ["task-service|PUT|/task/conclusion", "unauthorized401"],
+]);
+
+const GENERATED_BAD_CASES_BEFORE = new Set([
+  "taskModelCreate",
+  "taskProjectPlanCreate",
+]);
+
+function inferNegativeCaseFromAction(action) {
+  if (/Unauthorized/i.test(action)) return "unauthorized401";
+  if (/Forbidden/i.test(action)) return "lowPermission403";
+  if (/NotFound/i.test(action)) return "notFound404";
+  if (/Invalid/i.test(action)) return "invalid400";
+  if (/Conflict/i.test(action)) return "conflict409";
+  return null;
+}
+
+function inferExpectedStatus({
+  action,
+  expectationKind,
+  expectedStatus,
+  negativeCase,
+  method,
+  path,
+}) {
+  if (Array.isArray(expectedStatus) && expectedStatus.length > 0) {
+    return expectedStatus;
+  }
+
+  if (negativeCase && GENERATED_NEGATIVE_CASES[negativeCase]) {
+    return GENERATED_NEGATIVE_CASES[negativeCase].expectedStatus;
+  }
+
+  if (expectationKind === "bad") {
+    const actionCase = inferNegativeCaseFromAction(action);
+    if (actionCase === "unauthorized401") return [401];
+    if (actionCase === "lowPermission403") return [403];
+    if (actionCase === "notFound404") return [404];
+    if (actionCase === "invalid400") return [400];
+    if (actionCase === "conflict409") return [409];
+  }
+
+  if (GOOD_STATUS_OVERRIDES.has(action)) {
+    return GOOD_STATUS_OVERRIDES.get(action);
+  }
+
+  if (method === "GET" && path === "/health") {
+    return [200];
+  }
+
+  if (method === "GET" && path === "/ready") {
+    return [200];
+  }
+
+  return [200];
+}
+
+function inferExpectedLabel({ action, expectationKind, expectedStatus, negativeCase, path }) {
+  if (expectationKind === "bad") {
+    if (negativeCase && GENERATED_NEGATIVE_CASES[negativeCase]) {
+      return GENERATED_NEGATIVE_CASES[negativeCase].expectedLabel;
+    }
+    const actionCase = inferNegativeCaseFromAction(action);
+    if (actionCase === "unauthorized401") return "unauthorized";
+    if (actionCase === "lowPermission403") return "forbidden";
+    if (actionCase === "notFound404") return "not found";
+    if (actionCase === "invalid400") return "invalid request";
+    if (actionCase === "conflict409") return "conflict";
+  }
+
+  if (path === "/health") return "health check";
+  if (path === "/ready") return "readiness check";
+  if (expectedStatus.includes(201)) return "created";
+  if (expectedStatus.includes(409)) return "success or already configured";
+  return "success";
+}
+
+function isPairCoverageExempt(method, path, explicitValue = false) {
+  return explicitValue || EXEMPT_ROUTE_KEYS.has(`${method}|${path}`);
+}
+
 const op = ({
   service,
   method,
@@ -7,8 +167,15 @@ const op = ({
   auth,
   specOperation = true,
   condition = null,
+  expectationKind,
+  expectedStatus,
+  expectedLabel,
+  pairCoverageExempt = false,
+  negativeCase = null,
+  handlerAction = action,
 }) => ({
-  id: `${service}|${method}|${path}`,
+  id: `${service}|${method}|${path}|${action}`,
+  routeKey: `${service}|${method}|${path}`,
   service,
   method,
   path,
@@ -17,7 +184,112 @@ const op = ({
   auth,
   specOperation,
   condition,
+  handlerAction,
+  negativeCase,
+  expectationKind: expectationKind ?? (specOperation === false ? "bad" : "good"),
+  expectedStatus: inferExpectedStatus({
+    action,
+    expectationKind: expectationKind ?? (specOperation === false ? "bad" : "good"),
+    expectedStatus,
+    negativeCase,
+    method,
+    path,
+  }),
+  expectedLabel:
+    expectedLabel ??
+    inferExpectedLabel({
+      action,
+      expectationKind: expectationKind ?? (specOperation === false ? "bad" : "good"),
+      expectedStatus: inferExpectedStatus({
+        action,
+        expectationKind: expectationKind ?? (specOperation === false ? "bad" : "good"),
+        expectedStatus,
+        negativeCase,
+        method,
+        path,
+      }),
+      negativeCase,
+      path,
+    }),
+  pairCoverageExempt: isPairCoverageExempt(method, path, pairCoverageExempt),
 });
+
+function determineGeneratedNegativeCase(entry) {
+  if (entry.pairCoverageExempt) {
+    return null;
+  }
+
+  const routeOverride = ROUTE_NEGATIVE_CASE_OVERRIDES.get(entry.routeKey);
+  if (routeOverride) {
+    return routeOverride;
+  }
+
+  if (entry.auth === "internal-token") {
+    if (entry.service === "client-service") return "internalToken403";
+    if (entry.service === "audit-service") return "internalToken401";
+  }
+
+  if (entry.auth === "admin-bearer" || entry.auth === "bearer") {
+    return "unauthorized401";
+  }
+
+  return null;
+}
+
+function shouldInsertGeneratedBadBefore(entry, negativeCase) {
+  return entry.method === "DELETE" || (negativeCase === "lowPermission403" && GENERATED_BAD_CASES_BEFORE.has(entry.action));
+}
+
+function buildGeneratedBadOp(entry) {
+  if (entry.expectationKind !== "good" || entry.pairCoverageExempt) {
+    return null;
+  }
+
+  const negativeCase = determineGeneratedNegativeCase(entry);
+  if (!negativeCase) {
+    return null;
+  }
+
+  const generated = GENERATED_NEGATIVE_CASES[negativeCase];
+  return op({
+    service: entry.service,
+    method: entry.method,
+    path: entry.path,
+    action: `${entry.action}${generated.suffix}`,
+    handlerAction: GENERATED_HANDLER_OVERRIDES[entry.action] ?? entry.action,
+    target: entry.target,
+    auth: entry.auth,
+    specOperation: false,
+    condition: entry.condition,
+    expectationKind: "bad",
+    expectedStatus: generated.expectedStatus,
+    expectedLabel: generated.expectedLabel,
+    negativeCase,
+  });
+}
+
+function buildManifest(entries) {
+  const routeHasBad = new Set(
+    entries
+      .filter((entry) => entry.expectationKind === "bad")
+      .map((entry) => entry.routeKey),
+  );
+
+  return entries.flatMap((entry) => {
+    if (entry.expectationKind !== "good" || routeHasBad.has(entry.routeKey)) {
+      return [entry];
+    }
+
+    const generatedBadOp = buildGeneratedBadOp(entry);
+    if (!generatedBadOp) {
+      return [entry];
+    }
+
+    return shouldInsertGeneratedBadBefore(entry, generatedBadOp.negativeCase)
+      ? [generatedBadOp, entry]
+      : [entry, generatedBadOp];
+  });
+}
 
 export const specFiles = {
   "audit-service": "services/audit-service/src/openapi/spec.ts",
@@ -29,7 +301,7 @@ export const specFiles = {
   "user-service": "services/user-service/src/openapi/spec.ts",
 };
 
-export const manifest = [
+const baseManifest = [
   op({
     service: "gateway",
     method: "GET",
@@ -330,6 +602,8 @@ export const manifest = [
     target: "gateway",
     auth: "bearer",
     specOperation: false,
+    expectedStatus: [200],
+    expectedLabel: "missing client handled",
   }),
   op({
     service: "client-service",
@@ -614,6 +888,19 @@ export const manifest = [
     service: "task-service",
     method: "POST",
     path: "/task/model",
+    action: "taskModelCreateForbidden",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    handlerAction: "taskModelCreate",
+    negativeCase: "lowPermission403",
+    expectedStatus: [403],
+    expectedLabel: "forbidden",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/model",
     action: "taskModelCreate",
     target: "gateway",
     auth: "admin-bearer",
@@ -797,6 +1084,19 @@ export const manifest = [
     action: "taskModelDependentDelete",
     target: "gateway",
     auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/project-plan",
+    action: "taskProjectPlanCreateForbidden",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    handlerAction: "taskProjectPlanCreate",
+    negativeCase: "lowPermission403",
+    expectedStatus: [403],
+    expectedLabel: "forbidden",
   }),
   op({
     service: "task-service",
@@ -1326,3 +1626,5 @@ export const manifest = [
     condition: "auditEnabled",
   }),
 ];
+
+export const manifest = buildManifest(baseManifest);

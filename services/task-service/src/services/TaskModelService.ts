@@ -62,6 +62,20 @@ export type TaskModelRow = TaskModelGetPayload<{ select: typeof TASK_MODEL_SELEC
 export type TaskModelListItem = TaskModelGetPayload<{ select: typeof TASK_MODEL_LIST_SELECT }>;
 
 export class TaskModelService {
+  async #requireManagerPermission(userId: string): Promise<void> {
+    const user = await prismaClient.user.findFirst({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new ServiceError(404, "Usuário não encontrado.");
+    }
+
+    if (user.permission < 2) {
+      throw new ServiceError(403, "Usuário não tem permissão.");
+    }
+  }
+
   async createModel(data: CreateModelRequest): Promise<{ create: TaskModelRow }> {
     try {
       const exists = await prismaClient.taskModel.findFirst({
@@ -75,6 +89,8 @@ export class TaskModelService {
       if (exists) {
         throw new ServiceError(409, "Tarefa com esse nome nesse departamento já foi cadastrada.");
       }
+
+      await this.#requireManagerPermission(data.user_id);
 
       const create = await prismaClient.taskModel.create({
         data: {
@@ -138,6 +154,8 @@ export class TaskModelService {
       if (!exists) {
         throw new ServiceError(404, "Tarefa não existe.");
       }
+
+      await this.#requireManagerPermission(data.user_id);
 
       const updated = await prismaClient.taskModel.update({
         where: { id: data.task_id, organization_id: organizationId },
@@ -208,17 +226,7 @@ export class TaskModelService {
         throw new ServiceError(404, "Tarefa não existe.");
       }
 
-      const user = await prismaClient.user.findFirst({
-        where: { id: data.user_id },
-      });
-
-      if (!user) {
-        throw new ServiceError(404, "Usuário não encontrado.");
-      }
-
-      if (user.permission < 2) {
-        throw new ServiceError(403, "Usuário não tem permissão.");
-      }
+      await this.#requireManagerPermission(data.user_id);
 
       await prismaClient.taskModel.delete({
         where: { id: data.task_id, organization_id: organizationId },

@@ -175,12 +175,13 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
   router.put("/project-plan/task", isAuthenticated, async (req: Request, res: Response, next) => {
     try {
       const body = parseWithZod(projectPlanReorderTaskBodySchema, req.body);
-      const { organization_id } = requireAuthenticatedRequestContext(req);
+      const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
 
       const result = await service.reorderTask({
         plan_id: body.plan_id,
         plan_task_id: body.plan_task_id,
         direction: body.direction,
+        user_id,
         organization_id,
       });
 
@@ -197,11 +198,12 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
     async (req: Request, res: Response, next) => {
       try {
         const body = parseWithZod(projectPlanDeleteTaskBodySchema, req.body);
-        const { organization_id } = requireAuthenticatedRequestContext(req);
+        const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
 
         const result = await service.deleteTask({
           plan_id: body.plan_id,
           plan_task_id: body.plan_task_id,
+          user_id,
           organization_id,
         });
 

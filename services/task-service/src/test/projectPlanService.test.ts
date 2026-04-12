@@ -177,11 +177,149 @@ describe("ProjectPlanService", () => {
     await expect(service.detail(PLAN_ID, ORG_ID)).rejects.toMatchObject({ statusCode: 404 });
   });
 
+  it("create lança 403 quando usuário não tem permissão", async () => {
+    const prisma = createBasePrisma();
+    prisma.user.findFirst = async () => ({ id: USER_ID, permission: 1 });
+    const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
+
+    await expect(
+      service.create({
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+        name: "Plano",
+        color: "#ffffff",
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("update lança 403 quando usuário não tem permissão", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID, name: "Plano", color: "#000000" });
+    prisma.user.findFirst = async () => ({ id: USER_ID, permission: 1 });
+    const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
+
+    await expect(
+      service.update({
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+        id: PLAN_ID,
+        name: "Plano",
+        color: "#ffffff",
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("addTask lança 403 quando usuário não tem permissão", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
+    prisma.taskModel.findFirst = async () => ({ id: "model-1" });
+    prisma.user.findFirst = async () => ({ id: USER_ID, permission: 1 });
+    const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
+
+    await expect(
+      service.addTask({
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+        plan_id: PLAN_ID,
+        task_id: "model-1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("reorderTask lança 403 quando usuário não tem permissão", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlanTasks.findFirst = async (args?: { where?: { id?: string; order?: number } }) => {
+      if (args?.where?.id === "plan-task-1") {
+        return { id: "plan-task-1", order: 2 };
+      }
+      if (args?.where?.order === 1) {
+        return { id: "plan-task-2", order: 1 };
+      }
+      return null;
+    };
+    prisma.user.findFirst = async () => ({ id: USER_ID, permission: 1 });
+    const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
+
+    await expect(
+      service.reorderTask({
+        plan_id: PLAN_ID,
+        plan_task_id: "plan-task-1",
+        direction: "up",
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("deleteTask lança 403 quando usuário não tem permissão", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlanTasks.findFirst = async () =>
+      ({
+        id: "plan-task-1",
+        plan_id: PLAN_ID,
+        task_id: "model-1",
+        order: 1,
+        tasks: {
+          id: "model-1",
+          name: "Modelo",
+          department_id: "dep-1",
+          billing: "Realizar",
+          prevision: 3,
+          type: "regularize",
+        },
+      });
+    prisma.user.findFirst = async () => ({ id: USER_ID, permission: 1 });
+    const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
+
+    await expect(
+      service.deleteTask({
+        plan_id: PLAN_ID,
+        plan_task_id: "plan-task-1",
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("hirePlan lança 403 quando usuário não tem permissão", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
+    prisma.project.findFirst = async () => ({ client_id: CLIENT_ID });
+    prisma.client.findFirst = async () => ({ prospecting_status: "Fechado" });
+    prisma.user.findFirst = async () => ({ id: USER_ID, permission: 1 });
+    const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
+
+    await expect(
+      service.hirePlan({
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+        project_id: PROJECT_ID,
+        plan_id: PLAN_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("delete lança 403 quando usuário não tem permissão", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
+    prisma.user.findFirst = async () => ({ id: USER_ID, permission: 1 });
+    const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
+
+    await expect(
+      service.delete({
+        id: PLAN_ID,
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
   it("hirePlan instancia as tarefas na ordem do plano", async () => {
     const prisma = createBasePrisma();
     prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
     prisma.project.findFirst = async () => ({ client_id: CLIENT_ID });
     prisma.client.findFirst = async () => ({ prospecting_status: "Fechado" });
+    prisma.user.findFirst = async () => ({ id: USER_ID, permission: 2 });
     prisma.projectPlanTasks.findMany = async () => [{ task_id: "model-2" }, { task_id: "model-1" }];
     const taskCrud = new TaskCrudServiceStub();
     const service = new ProjectPlanService(taskCrud, prisma, createAudit());

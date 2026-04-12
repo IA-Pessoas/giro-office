@@ -41,11 +41,62 @@ function asKey(entry) {
   return `${entry.service}|${entry.method}|${entry.path}`;
 }
 
+function hasValidExpectedStatus(entry) {
+  return (
+    Array.isArray(entry.expectedStatus) &&
+    entry.expectedStatus.length > 0 &&
+    entry.expectedStatus.every(
+      (status) => Number.isInteger(status) && status >= 100 && status <= 599,
+    )
+  );
+}
+
 const specOperations = Object.entries(specFiles).flatMap(([service, relativeSpecPath]) =>
   extractSpecOperations(path.join(rootDir, relativeSpecPath), service),
 );
 
 const manifestOperations = manifest.filter((entry) => entry.specOperation !== false);
+const malformedEntries = manifest.filter(
+  (entry) =>
+    !["good", "bad"].includes(entry.expectationKind) ||
+    !hasValidExpectedStatus(entry) ||
+    typeof entry.expectedLabel !== "string" ||
+    entry.expectedLabel.trim() === "",
+);
+
+const routeGroups = new Map();
+for (const entry of manifest) {
+  const key = asKey(entry);
+  if (!routeGroups.has(key)) {
+    routeGroups.set(key, []);
+  }
+  routeGroups.get(key).push(entry);
+}
+
+const missingGood = [];
+const missingBad = [];
+const malformedGroups = [];
+
+for (const [key, entries] of routeGroups.entries()) {
+  if (entries.some((entry) => entry.pairCoverageExempt)) {
+    continue;
+  }
+
+  const goodCount = entries.filter((entry) => entry.expectationKind === "good").length;
+  const badCount = entries.filter((entry) => entry.expectationKind === "bad").length;
+
+  if (goodCount !== 1) {
+    malformedGroups.push(`${key} (good entries: ${goodCount})`);
+  }
+
+  if (goodCount < 1) {
+    missingGood.push(key);
+  }
+
+  if (badCount < 1) {
+    missingBad.push(key);
+  }
+}
 
 const specKeys = new Set(specOperations.map(asKey));
 const manifestKeys = new Set(manifestOperations.map(asKey));
@@ -53,7 +104,14 @@ const manifestKeys = new Set(manifestOperations.map(asKey));
 const missing = [...specKeys].filter((key) => !manifestKeys.has(key));
 const extra = [...manifestKeys].filter((key) => !specKeys.has(key));
 
-if (missing.length > 0 || extra.length > 0) {
+if (
+  missing.length > 0 ||
+  extra.length > 0 ||
+  malformedEntries.length > 0 ||
+  malformedGroups.length > 0 ||
+  missingGood.length > 0 ||
+  missingBad.length > 0
+) {
   if (missing.length > 0) {
     console.error("Missing manifest operations:");
     for (const key of missing) {
@@ -68,7 +126,37 @@ if (missing.length > 0 || extra.length > 0) {
     }
   }
 
+  if (malformedEntries.length > 0) {
+    console.error("Manifest entries with malformed expectation metadata:");
+    for (const entry of malformedEntries) {
+      console.error(`  - ${entry.id}`);
+    }
+  }
+
+  if (malformedGroups.length > 0) {
+    console.error("Route groups with malformed good/bad structure:");
+    for (const key of malformedGroups) {
+      console.error(`  - ${key}`);
+    }
+  }
+
+  if (missingGood.length > 0) {
+    console.error("Route groups missing a good expectation:");
+    for (const key of missingGood) {
+      console.error(`  - ${key}`);
+    }
+  }
+
+  if (missingBad.length > 0) {
+    console.error("Route groups missing a bad expectation:");
+    for (const key of missingBad) {
+      console.error(`  - ${key}`);
+    }
+  }
+
   process.exit(1);
 }
 
-console.log(`Smoke manifest coverage OK: ${manifestOperations.length}/${specOperations.length} operations mapped.`);
+console.log(
+  `Smoke manifest coverage OK: ${manifestOperations.length}/${specOperations.length} operations mapped with paired expectations.`,
+);
