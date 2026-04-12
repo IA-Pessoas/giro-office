@@ -1,6 +1,6 @@
 import { Writable } from "node:stream";
 
-import { createExpressErrorHandler } from "@workspace/shared";
+import { createExpressErrorHandler, ServiceError } from "@workspace/shared";
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
@@ -213,6 +213,161 @@ describe("projectPlan routes", () => {
       organization_id: ORG_ID,
       project_id: PROJECT_ID,
       plan_id: PLAN_ID,
+    });
+  });
+
+  it("PUT /task/project-plan com auth do gateway chama update", async () => {
+    let received: Record<string, unknown> | null = null;
+    const deps = createRouteDeps();
+    deps.update = async (data) => {
+      received = data as unknown as Record<string, unknown>;
+      return { id: PLAN_ID, name: "Plano atualizado", color: "#654321" };
+    };
+    const app = createTestApp(deps);
+
+    const response = await request(app)
+      .put("/task/project-plan")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ id: PLAN_ID, name: "Plano atualizado", color: "#654321" });
+
+    expect(response.status).toBe(200);
+    expect(received).toEqual({
+      user_id: USER_ID,
+      organization_id: ORG_ID,
+      id: PLAN_ID,
+      name: "Plano atualizado",
+      color: "#654321",
+    });
+  });
+
+  it("PUT /task/project-plan/task com auth do gateway encaminha user_id para reorderTask", async () => {
+    let received: Record<string, unknown> | null = null;
+    const deps = createRouteDeps();
+    deps.reorderTask = async (data) => {
+      received = data as unknown as Record<string, unknown>;
+      return { message: "Reordenado." };
+    };
+    const app = createTestApp(deps);
+
+    const response = await request(app)
+      .put("/task/project-plan/task")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({
+        plan_id: PLAN_ID,
+        plan_task_id: "33333333-3333-3333-3333-333333333333",
+        direction: "up",
+      });
+
+    expect(response.status).toBe(200);
+    expect(received).toEqual({
+      plan_id: PLAN_ID,
+      plan_task_id: "33333333-3333-3333-3333-333333333333",
+      direction: "up",
+      user_id: USER_ID,
+      organization_id: ORG_ID,
+    });
+  });
+
+  it("DELETE /task/project-plan/task com auth do gateway encaminha user_id para deleteTask", async () => {
+    let received: Record<string, unknown> | null = null;
+    const deps = createRouteDeps();
+    deps.deleteTask = async (data) => {
+      received = data as unknown as Record<string, unknown>;
+      return {
+        deleted: {
+          id: "33333333-3333-3333-3333-333333333333",
+          plan_id: PLAN_ID,
+          task_id: "44444444-4444-4444-4444-444444444444",
+          order: 1,
+        },
+      } as never;
+    };
+    const app = createTestApp(deps);
+
+    const response = await request(app)
+      .delete("/task/project-plan/task")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({
+        plan_id: PLAN_ID,
+        plan_task_id: "33333333-3333-3333-3333-333333333333",
+      });
+
+    expect(response.status).toBe(200);
+    expect(received).toEqual({
+      plan_id: PLAN_ID,
+      plan_task_id: "33333333-3333-3333-3333-333333333333",
+      user_id: USER_ID,
+      organization_id: ORG_ID,
+    });
+  });
+
+  it("POST /task/project-plan retorna 403 quando o servico nega permissao", async () => {
+    const deps = createRouteDeps();
+    deps.create = async () => {
+      throw new ServiceError(403, "Sem permissao.");
+    };
+    const app = createTestApp(deps);
+
+    const response = await request(app)
+      .post("/task/project-plan")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ name: "Plano", color: "#123456" });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Sem permissao.",
+    });
+  });
+
+  it("PUT /task/project-plan/task retorna 403 quando o servico nega permissao", async () => {
+    const deps = createRouteDeps();
+    deps.reorderTask = async () => {
+      throw new ServiceError(403, "Sem permissao.");
+    };
+    const app = createTestApp(deps);
+
+    const response = await request(app)
+      .put("/task/project-plan/task")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({
+        plan_id: PLAN_ID,
+        plan_task_id: "33333333-3333-3333-3333-333333333333",
+        direction: "up",
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Sem permissao.",
+    });
+  });
+
+  it("DELETE /task/project-plan/task retorna 403 quando o servico nega permissao", async () => {
+    const deps = createRouteDeps();
+    deps.deleteTask = async () => {
+      throw new ServiceError(403, "Sem permissao.");
+    };
+    const app = createTestApp(deps);
+
+    const response = await request(app)
+      .delete("/task/project-plan/task")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({
+        plan_id: PLAN_ID,
+        plan_task_id: "33333333-3333-3333-3333-333333333333",
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Sem permissao.",
     });
   });
 });

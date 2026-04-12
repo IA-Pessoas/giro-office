@@ -93,7 +93,7 @@ function createHttpProxy(resolveTargetUrl: (request: Request) => string): Reques
       const fetchOptions: RequestInit = {
         method: request.method,
         headers: buildForwardHeaders(request),
-        body: body as BodyInit,
+        body: body as RequestInit["body"],
       };
 
       if (body !== undefined && typeof body !== "string") {
