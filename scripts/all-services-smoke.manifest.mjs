@@ -268,17 +268,41 @@ function buildGeneratedBadOp(entry) {
   });
 }
 
+// Map an expectedStatus array to the negativeCase dimension it covers (for
+// suppression logic). Only auth-dimension cases suppress auto-generation;
+// 400/404/409 tests are orthogonal and should not suppress a 401/403 auto-gen.
+function inferNegativeCaseFromStatus(expectedStatus) {
+  const code = expectedStatus?.[0];
+  if (code === 401) return "unauthorized401";
+  if (code === 403) return "lowPermission403";
+  return null;
+}
+
 function buildManifest(entries) {
-  const routeHasBad = new Set(
-    entries
-      .filter((entry) => entry.expectationKind === "bad")
-      .map((entry) => entry.routeKey),
-  );
+  // Map from routeKey → set of negativeCase strings already explicitly covered.
+  // Only auth-dimension cases (401/403) suppress auto-generation; 400/404/409
+  // explicit tests are orthogonal and should not suppress a 401/403 auto-gen.
+  const routeExplicitBadCases = new Map();
+  for (const entry of entries) {
+    if (entry.expectationKind === "bad") {
+      const nc = entry.negativeCase ?? inferNegativeCaseFromStatus(entry.expectedStatus);
+      if (nc) {
+        const existing = routeExplicitBadCases.get(entry.routeKey) ?? new Set();
+        existing.add(nc);
+        routeExplicitBadCases.set(entry.routeKey, existing);
+      }
+    }
+  }
 
   return entries.flatMap((entry) => {
-    if (entry.expectationKind !== "good" || routeHasBad.has(entry.routeKey)) {
-      return [entry];
-    }
+    if (entry.expectationKind !== "good") return [entry];
+
+    const negativeCase = determineGeneratedNegativeCase(entry);
+    if (!negativeCase) return [entry];
+
+    // Only suppress auto-gen when this exact negativeCase is already covered.
+    const coveredCases = routeExplicitBadCases.get(entry.routeKey);
+    if (coveredCases?.has(negativeCase)) return [entry];
 
     const generatedBadOp = buildGeneratedBadOp(entry);
     if (!generatedBadOp) {
@@ -336,6 +360,17 @@ const baseManifest = [
     action: "userSession",
     target: "gateway",
     auth: "public",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user/session",
+    action: "userSessionInvalid",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+    expectedStatus: [401],
+    expectedLabel: "wrong credentials",
   }),
   op({
     service: "user-service",
@@ -423,6 +458,17 @@ const baseManifest = [
   }),
   op({
     service: "user-service",
+    method: "PATCH",
+    path: "/user/{id}",
+    action: "userPatchNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [404],
+    expectedLabel: "not found",
+  }),
+  op({
+    service: "user-service",
     method: "POST",
     path: "/user/{id}/photo",
     action: "userPhotoUpload",
@@ -494,6 +540,17 @@ const baseManifest = [
     action: "organizationCreate",
     target: "gateway",
     auth: "bearer",
+  }),
+  op({
+    service: "organization-service",
+    method: "POST",
+    path: "/organizations",
+    action: "organizationCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid request",
   }),
   op({
     service: "organization-service",
@@ -629,6 +686,17 @@ const baseManifest = [
     action: "clientPatch",
     target: "gateway",
     auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "PATCH",
+    path: "/client/{id}",
+    action: "clientPatchNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [404],
+    expectedLabel: "not found",
   }),
   op({
     service: "client-service",
@@ -811,6 +879,17 @@ const baseManifest = [
   }),
   op({
     service: "project-service",
+    method: "POST",
+    path: "/project",
+    action: "projectCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid request",
+  }),
+  op({
+    service: "project-service",
     method: "GET",
     path: "/project",
     action: "projectGetNotFound",
@@ -833,6 +912,17 @@ const baseManifest = [
     action: "projectPut",
     target: "gateway",
     auth: "bearer",
+  }),
+  op({
+    service: "project-service",
+    method: "PUT",
+    path: "/project",
+    action: "projectPutNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [404],
+    expectedLabel: "not found",
   }),
   op({
     service: "project-service",
@@ -938,6 +1028,17 @@ const baseManifest = [
     action: "taskModelPut",
     target: "gateway",
     auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "PUT",
+    path: "/task/model",
+    action: "taskModelPutNotFound",
+    target: "gateway",
+    auth: "admin-bearer",
+    specOperation: false,
+    expectedStatus: [404],
+    expectedLabel: "not found",
   }),
   op({
     service: "task-service",
@@ -1288,6 +1389,17 @@ const baseManifest = [
   }),
   op({
     service: "rh-service",
+    method: "POST",
+    path: "/rh/categories",
+    action: "rhCategoryCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid request",
+  }),
+  op({
+    service: "rh-service",
     method: "PUT",
     path: "/rh/categories",
     action: "rhCategoryPut",
@@ -1317,6 +1429,17 @@ const baseManifest = [
     action: "rhRequestCreate",
     target: "gateway",
     auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/requests",
+    action: "rhRequestCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid request",
   }),
   op({
     service: "rh-service",
@@ -1353,6 +1476,17 @@ const baseManifest = [
   }),
   op({
     service: "rh-service",
+    method: "PUT",
+    path: "/rh/requests",
+    action: "rhRequestPutNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [404],
+    expectedLabel: "not found",
+  }),
+  op({
+    service: "rh-service",
     method: "DELETE",
     path: "/rh/requests",
     action: "rhRequestDelete",
@@ -1366,6 +1500,17 @@ const baseManifest = [
     action: "rhScoreQuestionCreate",
     target: "gateway",
     auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/score/questions",
+    action: "rhScoreQuestionCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid request",
   }),
   op({
     service: "rh-service",

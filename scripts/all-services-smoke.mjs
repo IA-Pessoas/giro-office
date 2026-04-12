@@ -2222,6 +2222,130 @@ const handlers = {
   },
 
   // -------------------------------------------------------------------------
+  // Error-path handlers: wrong credentials (session login)
+  // -------------------------------------------------------------------------
+
+  async userSessionInvalid(op) {
+    // Correct login, wrong password → 401
+    await httpRequest(op, {
+      expectedStatus: [401],
+      expectEnvelope: false,
+      json: { login: env.login, password: "wrong-password-smoke-invalid-test" },
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Error-path handlers: 404 Not Found on mutations (PUT/PATCH non-existent)
+  // -------------------------------------------------------------------------
+
+  async userPatchNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/user/00000000-0000-0000-0000-000000000000",
+      json: { name: "Smoke Not Found" },
+    });
+  },
+
+  async clientPatchNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/client/00000000-0000-0000-0000-000000000000",
+      json: { name: "Smoke Not Found" },
+    });
+  },
+
+  async projectCreateInvalid(op) {
+    // Missing required 'name' field → 400
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        client_id: requireState("primaryClientId"),
+        start_date: new Date().toISOString(),
+        objective: "Smoke invalid project",
+        sponsor_id: "",
+      },
+    });
+  },
+
+  async projectPutNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      json: {
+        project_id: "00000000-0000-0000-0000-000000000000",
+        name: "Smoke Not Found",
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 86400000).toISOString(),
+        objective: "Smoke not found project update.",
+        sponsor_id: "",
+      },
+    });
+  },
+
+  async taskModelPutNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      json: {
+        task_id: "00000000-0000-0000-0000-000000000000",
+        name: "Smoke Not Found",
+        department_id: requireState("baselineDepartmentId"),
+        responsible_id: requireState("session").id,
+        billing: "Realizar",
+        prevision: 1,
+        type: "regularize",
+      },
+    });
+  },
+
+  async organizationCreateInvalid(op) {
+    // Missing required 'cnpj' field → 400
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        name: uniqueText("Smoke Invalid Org"),
+        email_created_by: uniqueEmail("smoke-invalid-org"),
+      },
+    });
+  },
+
+  async rhCategoryCreateInvalid(op) {
+    // Missing required 'name' field → 400
+    await httpRequest(op, {
+      expectedStatus: [400],
+      path: "/rh/categories",
+      json: { active: true },
+    });
+  },
+
+  async rhRequestCreateInvalid(op) {
+    // Missing required 'title' field → 400
+    await httpRequest(op, {
+      expectedStatus: [400],
+      path: "/rh/requests",
+      json: {
+        description: "Smoke invalid request",
+        category_id: requireState("rhCategoryId"),
+      },
+    });
+  },
+
+  async rhRequestPutNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/rh/requests",
+      json: { id: "00000000-0000-0000-0000-000000000000", status: "In_Progress" },
+    });
+  },
+
+  async rhScoreQuestionCreateInvalid(op) {
+    // Missing required 'question' field → 400
+    await httpRequest(op, {
+      expectedStatus: [400],
+      path: "/rh/score/questions",
+      json: { type: "behavioral" },
+    });
+  },
+
+  // -------------------------------------------------------------------------
   // Error-path handlers: 401 Unauthorized (invalid token → gateway rejects)
   // -------------------------------------------------------------------------
 
