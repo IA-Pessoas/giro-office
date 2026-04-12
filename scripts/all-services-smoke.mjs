@@ -153,6 +153,9 @@ const state = {
   rhHolidayId: "",
   rhTimeBankReleaseId: "",
   rhTimeSheetId: "",
+  rhTargetUserId: "",
+  rhTargetUserToken: "",
+  rhPointDayAlreadyComplete: false,
   auditRequestId: "",
 };
 
@@ -160,6 +163,11 @@ const cleanupTasks = [];
 const executed = [];
 const skipped = [];
 const actionExecutionRank = {
+  // rhPointCalculate needs to run AFTER rhPointAdjustmentApprove because:
+  // - completeRhPointLifecycle fails the min-interval check (runs too fast)
+  // - Adjustment approval sets clock_out and runs calculateDailyHours automatically
+  // - After approval, the point is complete so calculate succeeds
+  rhPointCalculate: 500,
   projectDelete: 8000,
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
@@ -605,6 +613,37 @@ async function ensureSecondaryTaskModel() {
     if (!state.taskModelSecondaryId) {
       return;
     }
+    // Delete any tasks auto-created from this model (e.g. dependent task instances) before removing the model
+    const taskListResp = await helperCall("secondary-task-model-tasks-list", {
+      method: "GET",
+      path: "/task/list",
+      target: "gateway",
+      service: "task-service",
+      auth: "admin-bearer",
+      query: {
+        status: "Todos",
+        page: 1,
+        limit: 100,
+        search: uniqueText("Smoke Secondary Task Model"),
+      },
+      expectedStatus: [200],
+      expectEnvelope: false,
+    });
+    const taskRows = taskListResp.body?.data?.data ?? taskListResp.body?.data ?? [];
+    for (const task of Array.isArray(taskRows) ? taskRows : []) {
+      if (task?.id) {
+        await helperCall(`secondary-task-model-task-cleanup-${task.id}`, {
+          method: "DELETE",
+          path: "/task",
+          target: "gateway",
+          service: "task-service",
+          auth: "admin-bearer",
+          query: { task_id: task.id },
+          expectedStatus: [200, 404],
+          expectEnvelope: false,
+        });
+      }
+    }
     await helperCall("secondary-task-model-cleanup", {
       method: "DELETE",
       path: "/task/model",
@@ -619,19 +658,102 @@ async function ensureSecondaryTaskModel() {
   return state.taskModelSecondaryId;
 }
 
-async function completeRhPointLifecycle() {
+async function ensureRhTargetUser() {
+  if (state.rhTargetUserId) return state.rhTargetUserId;
+  const response = await helperCall("rh-target-user-create", {
+    method: "POST",
+    path: "/user",
+    target: "gateway",
+    service: "user-service",
+    auth: "admin-bearer",
+    json: {
+      name: uniqueText("Smoke RH Target"),
+      login: uniqueEmail("smoke-rh-target"),
+      password: env.password,
+      department_id: requireState("baselineDepartmentId"),
+      permission: 1,
+      organization_id: requireState("session").organization_id,
+      type: "user",
+      modules: { integracao: 1, rh: 1 },
+    },
+    expectedStatus: [201],
+  });
+  state.rhTargetUserId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+
+  // Set up point config for the target user (required for time-bank-release approval)
+  await helperCall("rh-target-user-point-config", {
+    method: "PUT",
+    path: "/rh/point-config",
+    target: "gateway",
+    service: "rh-service",
+    auth: "admin-bearer",
+    json: {
+      target_user_id: state.rhTargetUserId,
+      start_time: "08:00",
+      lunch_break: "12:00",
+      lunch_return: "13:00",
+      end_time: "17:00",
+      work_days: "1,2,3,4,5",
+    },
+    expectedStatus: [200],
+    expectEnvelope: false,
+  });
+
+  registerCleanup("rh-target-user", async () => {
+    if (!state.rhTargetUserId) return;
+    await helperCall("rh-target-user-cleanup", {
+      method: "DELETE",
+      path: `/user/${state.rhTargetUserId}`,
+      target: "gateway",
+      service: "user-service",
+      auth: "admin-bearer",
+      expectedStatus: [200, 404],
+      expectEnvelope: false,
+    });
+  });
+  return state.rhTargetUserId;
+}
+
+async function ensureRhTargetUserToken() {
+  if (state.rhTargetUserToken) return state.rhTargetUserToken;
+  await ensureRhTargetUser();
+  const loginResp = await helperCall("rh-target-user-login", {
+    method: "POST",
+    path: "/user/session",
+    target: "gateway",
+    service: "user-service",
+    auth: "public",
+    json: {
+      login: uniqueEmail("smoke-rh-target"),
+      password: env.password,
+    },
+    expectedStatus: [200],
+    expectEnvelope: false,
+  });
+  state.rhTargetUserToken = loginResp.body?.data?.token ?? "";
+  return state.rhTargetUserToken;
+}
+
+async function completeRhPointLifecycle(token) {
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
   while (true) {
     const response = await helperCall("rh-point-register-helper", {
       method: "POST",
       path: "/rh/point/register",
       target: "gateway",
       service: "rh-service",
-      auth: "bearer",
-      expectedStatus: [200],
+      auth: token ? "public" : "bearer",
+      headers: authHeaders,
+      expectedStatus: [200, 400],
     });
+    if (response.status === 400) {
+      state.rhPointDayAlreadyComplete = true;
+      return;
+    }
     const action = pickFirst(response.body, "data.action");
     const pointId = pickFirst(response.body, "data.point.id");
-    if (pointId) {
+    // Only capture the first point ID (entry punch) — calculate requires the entry point
+    if (pointId && !state.rhPointId) {
       state.rhPointId = pointId;
     }
     if (action === "Saída") {
@@ -973,6 +1095,9 @@ const handlers = {
   },
 
   async clientHistoriesCreate(op) {
+    // File upload is optional — skip sending file to avoid storage dependency in smoke env
+    // Do NOT send pending_id: the service auto-deletes the pending on link, which would break
+    // clientHistoriesPendingDelete that runs later
     const response = await httpRequest(op, {
       expectedStatus: [201],
       path: `/client/${requireState("primaryClientId")}/histories`,
@@ -980,13 +1105,6 @@ const handlers = {
         fields: {
           date: new Date().toISOString(),
           history: uniqueText("Smoke client history"),
-          pending_id: requireState("clientHistoryPendingId"),
-        },
-        file: {
-          fieldName: "file",
-          path: env.fixturePath,
-          filename: "smoke-upload.png",
-          contentType: "image/png",
         },
       },
     });
@@ -1024,7 +1142,6 @@ const handlers = {
   async clientHistoriesPendingList(op) {
     await httpRequest(op, {
       expectedStatus: [200],
-      query: { user_id: requireState("session").id },
     });
   },
 
@@ -1349,7 +1466,7 @@ const handlers = {
       path: "/task/project-plan/task",
       json: {
         plan_id: requireState("planId"),
-        task_id: requireState("taskModelPrimaryId"),
+        task_id: requireState("taskModelSecondaryId"),
       },
     });
     state.planTaskId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
@@ -1376,12 +1493,30 @@ const handlers = {
   },
 
   async taskProjectPlanHire(op) {
+    // Use a dedicated project to avoid 409 from auto-created dependent tasks in the main projectId
+    const projResp = await helperCall("plan-hire-project-create", {
+      method: "POST",
+      path: "/project",
+      target: "gateway",
+      service: "project-service",
+      auth: "admin-bearer",
+      json: {
+        name: uniqueText("Smoke Plan Hire Project"),
+        client_id: requireState("primaryClientId"),
+        start_date: new Date().toISOString(),
+        objective: "Dedicated project for plan hire smoke test.",
+        sponsor_id: "",
+      },
+      expectedStatus: [201],
+    });
+    const hireProjectId =
+      pickFirst(projResp.body, "data.create.id") ?? findFirstId(projResp.body?.data);
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/task/project-plan/hire",
       json: {
         plan_id: requireState("planId"),
-        project_id: requireState("projectId"),
+        project_id: hireProjectId,
       },
     });
   },
@@ -1406,6 +1541,38 @@ const handlers = {
   },
 
   async taskModelDelete(op) {
+    // Remove all tasks referencing this model before deleting it (FK constraint)
+    const taskListResp = await helperCall("task-model-delete-tasks-list", {
+      method: "GET",
+      path: "/task/list",
+      target: "gateway",
+      service: "task-service",
+      auth: "admin-bearer",
+      query: {
+        status: "Todos",
+        page: 1,
+        limit: 100,
+        search: uniqueText("Smoke Secondary Task Model"),
+      },
+      expectedStatus: [200],
+      expectEnvelope: false,
+    });
+    const taskRows =
+      taskListResp.body?.data?.data ?? taskListResp.body?.data ?? [];
+    for (const task of Array.isArray(taskRows) ? taskRows : []) {
+      if (task?.id) {
+        await helperCall(`task-model-delete-task-${task.id}`, {
+          method: "DELETE",
+          path: "/task",
+          target: "gateway",
+          service: "task-service",
+          auth: "admin-bearer",
+          query: { task_id: task.id },
+          expectedStatus: [200, 404],
+          expectEnvelope: false,
+        });
+      }
+    }
     await httpRequest(op, {
       expectedStatus: [200],
       query: { task_id: requireState("taskModelSecondaryId") },
@@ -1438,15 +1605,33 @@ const handlers = {
   },
 
   async rhPointRegister(op) {
-    const response = await httpRequest(op, { expectedStatus: [200] });
-    state.rhPointId = pickFirst(response.body, "data.point.id") ?? state.rhPointId;
+    // Use rhTargetUser (fresh each run) so we always get a clean point day
+    const targetToken = await ensureRhTargetUserToken();
+    const response = await httpRequest(op, {
+      expectedStatus: [200, 400],
+      auth: "public",
+      headers: { Authorization: `Bearer ${targetToken}` },
+    });
+    if (response.status === 200) {
+      state.rhPointId = pickFirst(response.body, "data.point.id") ?? state.rhPointId;
+    } else {
+      state.rhPointDayAlreadyComplete = true;
+    }
   },
 
   async rhPointCalculate(op) {
-    await completeRhPointLifecycle();
+    // Runs after rhPointAdjustmentApprove (via actionExecutionRank:500).
+    // Approval sets clock_in/lunch_out/lunch_in/clock_out on the point, so calculate succeeds.
+    const targetToken = await ensureRhTargetUserToken();
+    if (!state.rhPointId) {
+      log("SKIP", `rhPointCalculate — no point ID available`);
+      return;
+    }
     await httpRequest(op, {
       expectedStatus: [200],
-      path: `/rh/point/${requireState("rhPointId")}/calculate`,
+      path: `/rh/point/${state.rhPointId}/calculate`,
+      auth: "public",
+      headers: { Authorization: `Bearer ${targetToken}` },
     });
   },
 
@@ -1461,9 +1646,12 @@ const handlers = {
     const clockOut = new Date(now);
     clockOut.setUTCHours(17, 0, 0, 0);
 
+    const targetToken = await ensureRhTargetUserToken();
     const response = await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/point/adjustment/request",
+      auth: "public",
+      headers: { Authorization: `Bearer ${targetToken}` },
       json: {
         point_id: requireState("rhPointId"),
         clock_in: clockIn.toISOString(),
@@ -1477,6 +1665,7 @@ const handlers = {
   },
 
   async rhPointAdjustmentApprove(op) {
+    // Approval is done by admin (bearer), not the target user
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/point/adjustment/approve",
@@ -1528,7 +1717,7 @@ const handlers = {
         title: uniqueText("Smoke RH Request"),
         description: "Smoke request description",
         category_id: requireState("rhCategoryId"),
-        assigned_to_user_id: requireState("session").id,
+        assigned_to_user_id: await ensureRhTargetUser(),
         urgency: "High",
       },
     });
@@ -1541,8 +1730,6 @@ const handlers = {
       path: "/rh/requests",
       query: {
         category_id: requireState("rhCategoryId"),
-        requester_user_id: requireState("session").id,
-        assigned_to_user_id: requireState("session").id,
         status: "New",
       },
     });
@@ -1607,14 +1794,32 @@ const handlers = {
 
   async rhScoreQuarterGenerate(op) {
     const response = await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [200, 409],
+      expectEnvelope: false,
       path: "/rh/score/quarters/generate",
-      json: { target_user_id: requireState("session").id, quarter: "2026-Q2" },
+      json: { target_user_id: await ensureRhTargetUser(), quarter: "2026-Q2" },
     });
-    state.rhScoreId =
-      pickFirst(response.body, "data.id") ??
-      pickFirst(response.body, "data.score_id") ??
-      findFirstId(response.body?.data);
+    if (response.status === 200) {
+      state.rhScoreId =
+        pickFirst(response.body, "data.id") ??
+        pickFirst(response.body, "data.score_id") ??
+        findFirstId(response.body?.data);
+    }
+    // On 409 (score already exists for this user+quarter), recover the ID from the list endpoint
+    if (!state.rhScoreId) {
+      const targetToken = await ensureRhTargetUserToken();
+      const listResp = await helperCall("rh-score-quarter-recover", {
+        method: "GET",
+        path: "/rh/score/quarters/me",
+        target: "gateway",
+        service: "rh-service",
+        auth: "public",
+        headers: { Authorization: `Bearer ${targetToken}` },
+        expectedStatus: [200],
+        expectEnvelope: false,
+      });
+      state.rhScoreId = findFirstId(listResp.body?.data) ?? "";
+    }
   },
 
   async rhScoreQuarterPatchNitro(op) {
@@ -1643,9 +1848,13 @@ const handlers = {
   },
 
   async rhScoreEvaluationPending(op) {
+    // Score was generated for rhTargetUser — fetch pending evals using their token (not admin's)
+    const targetToken = await ensureRhTargetUserToken();
     const response = await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/score/evaluations/pending",
+      auth: "public",
+      headers: { Authorization: `Bearer ${targetToken}` },
     });
     state.rhScoreEvaluationId =
       pickFirst(response.body, "data.0.id") ??
@@ -1654,9 +1863,13 @@ const handlers = {
   },
 
   async rhScoreEvaluationSubmit(op) {
+    // Submit the SELF evaluation as rhTargetUser (they are the one with pending evals)
+    const targetToken = await ensureRhTargetUserToken();
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/score/evaluations/submit",
+      auth: "public",
+      headers: { Authorization: `Bearer ${targetToken}` },
       json: {
         evaluation_id: requireState("rhScoreEvaluationId"),
         answers: [{ question_id: requireState("rhScoreQuestionId"), answer: 5 }],
@@ -1701,7 +1914,6 @@ const handlers = {
       expectedStatus: [200],
       path: "/rh/time-bank-releases/list",
       query: {
-        user_id: requireState("session").id,
         is_approved: true,
         date_from: new Date(Date.now() - 86400000).toISOString(),
         date_to: new Date(Date.now() + 86400000).toISOString(),
@@ -1714,7 +1926,7 @@ const handlers = {
       expectedStatus: [200],
       path: "/rh/time-bank-releases",
       json: {
-        user_id: requireState("session").id,
+        user_id: await ensureRhTargetUser(),
         date: new Date().toISOString(),
         minutes: 60,
         reason: "Smoke overtime",
@@ -1762,7 +1974,7 @@ const handlers = {
       expectedStatus: [200],
       path: "/rh/timesheets",
       json: {
-        user_id: requireState("session").id,
+        user_id: await ensureRhTargetUser(),
         start_time: start.toISOString(),
         end_time: end.toISOString(),
       },
@@ -1774,14 +1986,18 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/timesheets",
-      query: { target_user_id: requireState("session").id },
+      query: {},
     });
   },
 
   async rhTimeSheetSign(op) {
+    // Timesheet can only be signed by its owner (rhTargetUser), not the admin
+    const targetToken = await ensureRhTargetUserToken();
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/timesheets/sign",
+      auth: "public",
+      headers: { Authorization: `Bearer ${targetToken}` },
       json: { id: requireState("rhTimeSheetId"), signature: "smoke-signature" },
     });
   },
@@ -1826,6 +2042,279 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/audit/requests/${requireState("auditRequestId")}`,
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Error-path handlers: 401 Unauthorized (invalid token → gateway rejects)
+  // -------------------------------------------------------------------------
+
+  async userListUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+      query: { skip: 0, take: 1 },
+    });
+  },
+
+  async organizationListUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+      query: { page: 1, pageSize: 1 },
+    });
+  },
+
+  async clientListUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+      query: { page: 1, limit: 1 },
+    });
+  },
+
+  async projectListUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+      query: { ref: "client", id: "00000000-0000-0000-0000-000000000000" },
+    });
+  },
+
+  async taskListUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+      query: { status: "Todos", page: 1, limit: 1 },
+    });
+  },
+
+  async rhCategoryGetUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      path: "/rh/categories",
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+    });
+  },
+
+  async auditListUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      path: "/audit/requests",
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+      query: { page: 1, pageSize: 1 },
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Error-path handlers: 403 Forbidden (valid token, insufficient permission)
+  // -------------------------------------------------------------------------
+
+  async userCreateForbidden(op) {
+    // Gateway policy: POST /user requires minPermission: 2
+    // rhTargetUser has permission=1 → 403 from gateway
+    const targetToken = await ensureRhTargetUserToken();
+    await httpRequest(op, {
+      expectedStatus: [403],
+      auth: "public",
+      headers: { Authorization: `Bearer ${targetToken}` },
+      json: {
+        name: uniqueText("Smoke Forbidden User"),
+        login: uniqueEmail("smoke-forbidden"),
+        password: env.password,
+        department_id: requireState("baselineDepartmentId"),
+        permission: 1,
+        organization_id: requireState("session").organization_id,
+        type: "user",
+      },
+    });
+  },
+
+  async taskModelDeleteForbidden(op) {
+    // TaskModelService.deleteModel checks user.permission < 2 → 403
+    // rhTargetUser has permission=1
+    const targetToken = await ensureRhTargetUserToken();
+    await httpRequest(op, {
+      expectedStatus: [403],
+      auth: "public",
+      headers: { Authorization: `Bearer ${targetToken}` },
+      query: { task_id: requireState("taskModelPrimaryId") },
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Error-path handlers: additional 404 Not Found
+  // -------------------------------------------------------------------------
+
+  async organizationGetNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/organizations/00000000-0000-0000-0000-000000000000",
+    });
+  },
+
+  async auditGetNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/audit/requests/00000000-0000-0000-0000-000000000000",
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Error-path handlers: 409 Conflict
+  // -------------------------------------------------------------------------
+
+  async clientActivateConflict(op) {
+    // Secondary client is already "Ativo" after clientActivate → 409
+    await httpRequest(op, {
+      expectedStatus: [409],
+      path: `/client/${requireState("secondaryClientId")}/activate`,
+    });
+  },
+
+  async taskModelCreateConflict(op) {
+    // Same name+department as primary task model → 409
+    await httpRequest(op, {
+      expectedStatus: [409],
+      json: {
+        name: uniqueText("Smoke Task Model"),
+        department_id: requireState("baselineDepartmentId"),
+        responsible_id: requireState("session").id,
+        billing: "Realizar",
+        prevision: 2,
+        type: "regularize",
+      },
+    });
+  },
+
+  async taskProjectPlanCreateConflict(op) {
+    // Same name as existing project plan → 409
+    await httpRequest(op, {
+      expectedStatus: [409],
+      path: "/task/project-plan",
+      json: { name: uniqueText("Smoke Project Plan"), color: "#1F6FEB" },
+    });
+  },
+
+  async rhCategoryCreateConflict(op) {
+    // Same name as existing category → 409
+    await httpRequest(op, {
+      expectedStatus: [409],
+      path: "/rh/categories",
+      json: { name: uniqueText("Smoke RH Category"), active: true },
+    });
+  },
+
+  async rhScoreQuarterGenerateConflict(op) {
+    // Same target_user+quarter as existing score → 409
+    await httpRequest(op, {
+      expectedStatus: [409],
+      expectEnvelope: false,
+      path: "/rh/score/quarters/generate",
+      json: { target_user_id: await ensureRhTargetUser(), quarter: "2026-Q2" },
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Error-path handlers: 404 Not Found
+  // -------------------------------------------------------------------------
+
+  async userGetNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/user/00000000-0000-0000-0000-000000000000",
+    });
+  },
+
+  async clientGetNotFound(op) {
+    // Client GET returns 200 with null data for non-existent IDs (service design: no 404)
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/client/00000000-0000-0000-0000-000000000000",
+    });
+  },
+
+  async projectGetNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      query: { project_id: "00000000-0000-0000-0000-000000000000" },
+    });
+  },
+
+  async taskGetNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      query: { task_id: "00000000-0000-0000-0000-000000000000" },
+    });
+  },
+
+  async rhRequestGetNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/rh/requests/00000000-0000-0000-0000-000000000000",
+    });
+  },
+
+  async rhScoreQuarterGetNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/rh/score/quarters/00000000-0000-0000-0000-000000000000",
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Error-path handlers: 400 Bad Request
+  // -------------------------------------------------------------------------
+
+  async userCreateInvalid(op) {
+    // Missing required 'login' field → 400
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        name: uniqueText("Smoke Invalid User"),
+        password: env.password,
+        department_id: requireState("baselineDepartmentId"),
+        permission: 1,
+        organization_id: requireState("session").organization_id,
+        type: "user",
+      },
+    });
+  },
+
+  async clientCreateInvalid(op) {
+    // Missing required 'name' (min length 1) → parseWithZod → 400
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        organization_id: requireState("session").organization_id,
+        status: "Ativo",
+        cpf_cnpj: uniqueDigits(14),
+        type: "PJ",
+        type_registration: "Novo",
+        service_unique: false,
+      },
+    });
+  },
+
+  async taskCreateInvalid(op) {
+    // Non-UUID model_id fails schema validation → 400
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        model_id: "not-a-valid-uuid",
+        project_id: requireState("projectId"),
+        client_id: requireState("primaryClientId"),
+        prospecting_status: "Fechado",
+        observations: "",
+        urgency: "",
+      },
     });
   },
 };

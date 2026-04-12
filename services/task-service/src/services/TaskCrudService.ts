@@ -487,7 +487,7 @@ export class TaskCrudService {
         throw new ServiceError(404, "Usuário não encontrado.");
       }
 
-      if (user.permission !== 2) {
+      if (user.permission < 2) {
         throw new ServiceError(403, "Usuário não tem permissão.");
       }
 

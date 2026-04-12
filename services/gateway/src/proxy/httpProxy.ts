@@ -7,16 +7,27 @@ import {
 } from "@workspace/shared";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
+import { Readable } from "node:stream";
+
 function hasRequestBody(method: string): boolean {
   const upperMethod = method.toUpperCase();
   return upperMethod !== "GET" && upperMethod !== "HEAD";
 }
 
-function getRequestBody(request: Request): string | undefined {
-  if (!hasRequestBody(request.method) || request.body === undefined) {
+function getRequestBody(request: Request): string | ReadableStream | undefined {
+  if (!hasRequestBody(request.method)) {
     return undefined;
   }
-  return JSON.stringify(request.body);
+  if (request.headers["content-type"]?.includes("application/json")) {
+    return JSON.stringify(request.body ?? {});
+  }
+  if (request.headers["content-type"]?.includes("application/x-www-form-urlencoded")) {
+    // If it was parsed by express.urlencoded
+    if (request.body && Object.keys(request.body).length > 0) {
+      return new URLSearchParams(request.body).toString();
+    }
+  }
+  return Readable.toWeb(request) as unknown as ReadableStream;
 }
 
 function buildForwardHeaders(request: Request): Headers {
@@ -79,11 +90,17 @@ function createHttpProxy(resolveTargetUrl: (request: Request) => string): Reques
     const body = getRequestBody(request);
 
     try {
-      const upstreamResponse = await fetch(upstreamUrl, {
+      const fetchOptions: RequestInit = {
         method: request.method,
         headers: buildForwardHeaders(request),
-        body,
-      });
+        body: body as BodyInit,
+      };
+
+      if (body !== undefined && typeof body !== "string") {
+        (fetchOptions as any).duplex = "half";
+      }
+
+      const upstreamResponse = await fetch(upstreamUrl, fetchOptions);
 
       response.status(upstreamResponse.status);
 

@@ -271,7 +271,7 @@ export class ProjectPlanService {
         throw new ServiceError(404, "Usuario nao encontrado.");
       }
 
-      if (user.permission !== 2) {
+      if (user.permission < 2) {
         throw new ServiceError(403, "Usuario nao tem permissao.");
       }
 
