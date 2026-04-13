@@ -107,6 +107,18 @@ alwaysApply: true
   - OpenAPI do servico
   - gateway, se aplicavel
   - testes do servico e do gateway
+- Toda rota nova exposta em `services/<servico>/src/openapi/spec.ts` deve entrar tambem no smoke end-to-end do workspace.
+- Ao criar um servico novo com contrato HTTP:
+  - registrar o `spec.ts` do servico em `scripts/all-services-smoke.manifest.mjs` (`specFiles`)
+  - adicionar cobertura do contrato no manifesto do smoke
+- O smoke deve refletir o contrato publico real:
+  - rotas publicas via gateway devem usar o path publico do gateway
+  - rotas internas ou de infraestrutura devem usar `target: "direct"` quando esse for o contrato real
+- A cobertura do smoke por rota deve preservar o padrao atual do workspace:
+  - 1 expectativa `good` por `service|method|path`
+  - ao menos 1 expectativa `bad` por rota, explicita ou gerada automaticamente pelas regras ja existentes
+  - excecoes continuam restritas aos casos ja tratados com `pairCoverageExempt`
+- Ao alterar rotas, OpenAPI ou manifesto do smoke, validar com `pnpm smoke:coverage`.
 - O padrao oficial de organizacao de testes em servicos e:
   - `src/test/`
   - um arquivo `camelCaseService.test.ts` para o service

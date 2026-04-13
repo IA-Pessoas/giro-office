@@ -122,6 +122,41 @@ import { describe, expect, it, vi } from "vitest";
 - Fluxo via `createApp()` ou app factory equivalente, sem infraestrutura real desnecessaria.
 - Servidor em porta efemera apenas quando realmente necessario.
 
+## Smoke end-to-end do workspace
+
+- O smoke oficial do workspace vive em:
+  - `scripts/all-services-smoke.mjs`
+  - `scripts/all-services-smoke.manifest.mjs`
+  - `scripts/check-smoke-spec-coverage.mjs`
+- Toda rota nova descrita no `spec.ts` do servico deve ser adicionada ao manifesto do smoke.
+- Ao criar um servico novo exposto via HTTP, incluir tambem seu `spec.ts` em `specFiles` no manifesto para que `pnpm smoke:coverage` compare OpenAPI x smoke.
+- O padrao por rota (`service|method|path`) e:
+  - exatamente 1 expectativa `good`
+  - ao menos 1 expectativa `bad`
+  - so usar `pairCoverageExempt` nas excecoes ja existentes de infraestrutura/bootstrap
+- O caso `good` deve representar o caminho feliz real da rota:
+  - usar o status de sucesso correto do contrato (`200` por padrao, `201` em criacoes, ou excecao documentada)
+  - manter `expectEnvelope` ativo quando a rota segue o envelope padrao de sucesso
+  - validar o path publico real (`gateway`) ou interno (`direct`) conforme o contrato
+- O caso `bad` deve cobrir pelo menos uma falha real do contrato HTTP, priorizando:
+  - `400` para body/query/params invalidos
+  - `401` para ausencia de autenticacao ou token invalido
+  - `403` para permissao insuficiente
+  - `404` para recurso inexistente
+  - `409` para conflito de dominio
+- Respostas de sucesso do smoke devem seguir o envelope compartilhado do workspace:
+  - `{ success: true, data: ... }`
+- Respostas de erro do contrato continuam seguindo o envelope compartilhado do workspace:
+  - `{ success: false, error: string, code: string, requestId?: string }`
+- No smoke, todo caso `bad` deve ao menos deixar `expectedStatus` e `expectedLabel` coerentes com esse contrato; quando for necessario validar o corpo de erro em detalhe, complementar com teste de rota.
+- So usar `expectEnvelope: false` quando a rota realmente nao seguir o envelope compartilhado atual e isso fizer parte do contrato existente.
+- Preserve a geracao automatica de casos negativos ja existente para autenticacao/autorizacao quando ela representar corretamente o contrato; so criar handler `bad` explicito quando a falha for especifica da rota ou quando o caso automatico nao for suficiente.
+- Em entradas explicitas do manifesto, manter claro:
+  - `expectedStatus` com o(s) status aceito(s)
+  - `expectedLabel` descrevendo o resultado esperado
+  - `specOperation: false` para cenarios negativos ou excecoes fora do contrato OpenAPI principal
+- Depois de alterar o manifesto ou qualquer `spec.ts`, rodar `pnpm smoke:coverage`.
+
 ## O que evitar
 
 - Banco real.
@@ -176,4 +211,5 @@ Ao criar ou alterar testes neste workspace:
 - prefira `describe`, `it`, `expect` e `vi` quando fizer sentido;
 - mantenha os testes focados em comportamento observavel;
 - para codigo HTTP, teste contrato;
-- para services, teste regra de negocio, falhas e integracoes mockadas nas bordas.
+- para services, teste regra de negocio, falhas e integracoes mockadas nas bordas;
+- ao criar rota nova em servico HTTP, atualize tambem o smoke manifesto do workspace e preserve o pareamento `good`/`bad` por rota.
