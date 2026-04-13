@@ -1,0 +1,615 @@
+@import "./new-layout/index.css";
+@import "./tokens.css";
+
+/* Tailwind v4 is now provided by `./new-layout/tailwind.css` (kept here as a single entrypoint). */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+}
+
+/*
+  Stage 3 - Styling conventions baseline
+  - HTML-first structure with semantic class names
+  - Keep layout primitives minimal and reusable
+*/
+@layer base {
+    .app-shell {}
+
+    .page-section {
+        width: 100%;
+    }
+
+    .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+    }
+
+    .section-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .card-surface {
+        border-radius: var(--radii-xl);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 12%, transparent);
+        box-shadow: var(--shadows-sm);
+    }
+}
+
+@layer utilities {
+    .u-flex {
+        display: flex;
+    }
+
+    .u-stack {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .u-grid {
+        display: grid;
+    }
+
+    .u-items-center {
+        align-items: center;
+    }
+
+    .u-justify-between {
+        justify-content: space-between;
+    }
+
+    .u-gap-2 {
+        gap: var(--space-2);
+    }
+
+    .u-gap-3 {
+        gap: var(--space-3);
+    }
+
+    .u-gap-4 {
+        gap: var(--space-4);
+    }
+
+    .u-grid-auto {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    @media (max-width: 800px) {
+        .u-mobile-stack {
+            display: flex;
+            flex-direction: column;
+        }
+    }
+
+    .u-grid-kpi {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-6);
+    }
+
+    .u-grid-two-up {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-6);
+    }
+
+    @media (min-width: 768px) {
+        .u-grid-kpi {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .u-grid-kpi,
+        .u-grid-two-up {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .u-grid-two-up {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    .u-table-row {
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .u-table-row:hover {
+        background: #f8fafc;
+    }
+
+    .u-split-panel {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    @media (min-width: 768px) {
+        .u-split-panel {
+            flex-direction: row;
+            height: 90vh;
+        }
+    }
+
+    .u-responsive-3cols {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+    }
+
+    @media (min-width: 768px) {
+        .u-responsive-3cols {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    .u-horizontal-scroll-cards {
+        display: flex;
+        width: 100%;
+        flex-direction: row;
+        padding-bottom: var(--space-2);
+    }
+
+    @media (min-width: 768px) {
+        .u-horizontal-scroll-cards {
+            flex-direction: column;
+        }
+    }
+
+    .u-grid-clients-desktop {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+    }
+
+    @media (min-width: 768px) {
+        .u-grid-clients-desktop {
+            grid-template-columns: 1fr 4fr 3fr 2fr;
+        }
+    }
+
+    .u-scroll-y-panel {
+        overflow-y: auto;
+    }
+}
+
+@layer components {
+    .ui-surface {
+        border-radius: var(--radii-2xl);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 10%, transparent);
+        box-shadow: var(--shadows-md);
+        background: color-mix(in srgb, var(--colors-white) 96%, transparent);
+    }
+
+    .ui-panel {
+        padding: var(--space-4);
+        border-radius: var(--radii-xl);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 8%, transparent);
+    }
+
+    .ui-title {
+        font-size: 1.125rem;
+        line-height: 1.4;
+        font-weight: 700;
+    }
+
+    .ui-subtitle {
+        font-size: 0.875rem;
+        line-height: 1.4;
+        opacity: 0.85;
+    }
+
+    .ui-button-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-4);
+        border-radius: var(--radii-lg);
+        border: 1px solid transparent;
+        background: var(--colors-blue-500);
+        color: var(--colors-white);
+        transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+
+    .ui-button-primary:hover {
+        transform: translateY(-1px);
+        opacity: 0.95;
+    }
+
+    .ui-input {
+        width: 100%;
+        border-radius: var(--radii-lg);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 16%, transparent);
+        padding: var(--space-2) var(--space-3);
+        background: var(--colors-white);
+        color: color-mix(in srgb, var(--colors-black) 84%, transparent);
+    }
+
+    .ui-input:focus-visible {
+        outline: 2px solid var(--colors-blue-500);
+        outline-offset: 1px;
+    }
+
+    .dashboard-shell {
+        width: 100%;
+        min-height: 100vh;
+    }
+
+    .dashboard-card {
+        background: var(--colors-white);
+        border-left: 4px solid var(--colors-blue-500);
+        border-radius: var(--radii-lg);
+        box-shadow: var(--shadows-md);
+        padding: var(--space-6);
+    }
+
+    .dashboard-card-title {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: #334155;
+    }
+
+    .dashboard-card-subtitle {
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+
+    .dashboard-quick-actions {
+        margin-bottom: var(--space-6);
+    }
+
+    .dashboard-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .dashboard-table th,
+    .dashboard-table td {
+        padding: var(--space-2) 0;
+    }
+
+    .users-shell {
+        width: 99%;
+        position: relative;
+    }
+
+    .users-sidebar {
+        border-radius: var(--radii-md);
+        background: var(--colors-white);
+        box-shadow: var(--shadows-md);
+    }
+
+    .users-detail-panel {
+        background: var(--colors-white);
+        border: 1px solid color-mix(in srgb, var(--colors-black) 10%, transparent);
+        border-radius: var(--radii-lg);
+        box-shadow: var(--shadows-md);
+    }
+
+    .users-form-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+    }
+
+    @media (min-width: 768px) {
+        .users-form-grid.cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    .users-section-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--colors-blue-500);
+    }
+
+    .clients-shell {
+        width: 99%;
+        position: relative;
+    }
+
+    .clients-sidebar {
+        border-radius: var(--radii-md);
+        background: var(--colors-white);
+        box-shadow: var(--shadows-md);
+    }
+
+    .clients-table-header {
+        position: sticky;
+        top: 0;
+        background: var(--colors-white);
+        border-bottom: 2px solid var(--colors-blue-500);
+    }
+
+    .clients-table-row {
+        border-bottom: 1px solid #e2e8f0;
+        border-radius: var(--radii-md);
+        transition: background-color 0.2s ease;
+    }
+
+    .clients-table-row:hover {
+        background: #f8fafc;
+    }
+    .organizations-shell {
+        width: 99%;
+        position: relative;
+    }
+
+    .organizations-sidebar {
+        border-radius: var(--radii-md);
+        background: var(--colors-white);
+        box-shadow: var(--shadows-md);
+    }
+
+    .organization-status-badge {
+        border-radius: var(--radii-md);
+        padding: 0.25rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    .u-content-stack {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    .u-sidebar-card-list {
+        display: flex;
+        width: 100%;
+        flex-direction: row;
+        padding-bottom: var(--space-2);
+    }
+
+    @media (min-width: 768px) {
+        .u-sidebar-card-list {
+            flex-direction: column;
+        }
+    }
+}
+
+:root {
+    --main: #2f406a;
+    --main-integracao: #ef5a8b;
+    --main-comercial: #990033;
+    --main-regularize: #cf6363;
+}
+
+/* Gerais */
+.hide-on-print {
+    display: flex;
+}
+
+.main {
+    margin-left: 100px;
+    margin-top: 10px;
+    width: calc(100% - 100px);
+    min-height: 90vh;
+}
+
+.box {
+    border: 1px solid #676767;
+    border-radius: 10px;
+}
+
+.custom-tab {
+  color: var(--main);
+  display: flex;
+  align-items: center;
+}
+
+
+/* icons */
+.icon-integracao {
+  color: var(--main-integracao);
+  fill: var(--main-integracao);
+  stroke: var(--main-integracao);
+  margin-right: 8px;
+}
+.icon-comercial {
+  color: var(--main-comercial);
+  fill: var(--main-comercial);
+  stroke: var(--main-comercial);
+  margin-right: 8px;
+}
+.icon-regularize {
+  color: var(--main-regularize);
+  fill: var(--main-regularize);
+  stroke: var(--main-regularize);
+  margin-right: 8px;
+}
+
+/* Dark-mode typographic refinement: softer golden secondary text */
+html[data-theme="dark"] .text-slate-500,
+html[data-theme="dark"] .text-slate-400,
+html[data-theme="dark"] .text-slate-700,
+html[data-theme="dark"] .text-slate-800,
+html[data-theme="dark"] .text-gray-500,
+html[data-theme="dark"] .text-gray-400,
+.chakra-ui-dark .text-slate-500,
+.chakra-ui-dark .text-slate-400,
+.chakra-ui-dark .text-slate-700,
+.chakra-ui-dark .text-slate-800,
+.chakra-ui-dark .text-gray-500,
+.chakra-ui-dark .text-gray-400 {
+    color: var(--colors-text-secondary-dark) !important;
+}
+
+/* Dashboard (dark mode): cards stay white (like light), so use dark typography for contrast */
+html[data-theme="dark"] .dashboard-card,
+.chakra-ui-dark .dashboard-card {
+    background: var(--colors-white) !important;
+    border-color: color-mix(in srgb, var(--colors-black) 10%, transparent) !important;
+}
+
+html[data-theme="dark"] .dashboard-card-title,
+.chakra-ui-dark .dashboard-card-title {
+    color: #0f172a !important;
+}
+
+html[data-theme="dark"] .dashboard-card-subtitle,
+.chakra-ui-dark .dashboard-card-subtitle {
+    color: #334155 !important;
+}
+
+html[data-theme="dark"] .dashboard-shell .text-slate-800,
+.chakra-ui-dark .dashboard-shell .text-slate-800 {
+    color: #0f172a !important;
+}
+
+html[data-theme="dark"] .dashboard-shell .text-slate-500,
+.chakra-ui-dark .dashboard-shell .text-slate-500 {
+    color: #475569 !important;
+}
+
+/* Clients (dark mode): match dashboard (white surfaces + brand blue typography) */
+html[data-theme="dark"] .clients-shell,
+.chakra-ui-dark .clients-shell {
+    /* In dark mode, --colors-blue-500 is repurposed to gold for the sidebar.
+       Inside the Clients page we want the classic brand blue tone. */
+    --colors-blue-500: var(--colors-brand-blue);
+}
+
+html[data-theme="dark"] .clients-shell .clients-sidebar,
+html[data-theme="dark"] .clients-shell .clients-table-header,
+html[data-theme="dark"] .clients-shell .clients-table-row,
+.chakra-ui-dark .clients-shell .clients-sidebar,
+.chakra-ui-dark .clients-shell .clients-table-header,
+.chakra-ui-dark .clients-shell .clients-table-row {
+    background: var(--colors-white) !important;
+    border-color: color-mix(in srgb, var(--colors-black) 10%, transparent) !important;
+}
+
+html[data-theme="dark"] .clients-shell .ui-input,
+.chakra-ui-dark .clients-shell .ui-input {
+    background: var(--colors-white) !important;
+    color: #0f172a !important;
+    border-color: color-mix(in srgb, var(--colors-black) 16%, transparent) !important;
+}
+
+html[data-theme="dark"] .clients-shell .ui-input::placeholder,
+.chakra-ui-dark .clients-shell .ui-input::placeholder {
+    color: #64748b !important;
+}
+
+html[data-theme="dark"] .clients-shell .clients-table-header {
+    border-bottom-color: var(--colors-brand-blue) !important;
+}
+
+html[data-theme="dark"] .clients-shell .clients-table-row:hover,
+.chakra-ui-dark .clients-shell .clients-table-row:hover {
+    background: #f8fafc !important;
+}
+
+/* Organizations (dark mode): match dashboard/clients (white surfaces + brand blue typography) */
+html[data-theme="dark"] .organizations-shell,
+.chakra-ui-dark .organizations-shell {
+    --colors-blue-500: var(--colors-brand-blue);
+}
+
+html[data-theme="dark"] .organizations-shell .organizations-sidebar,
+html[data-theme="dark"] .organizations-shell .users-detail-panel,
+.chakra-ui-dark .organizations-shell .organizations-sidebar,
+.chakra-ui-dark .organizations-shell .users-detail-panel {
+    background: var(--colors-white) !important;
+    border-color: color-mix(in srgb, var(--colors-black) 10%, transparent) !important;
+}
+
+html[data-theme="dark"] .organizations-shell .ui-input,
+.chakra-ui-dark .organizations-shell .ui-input {
+    background: var(--colors-white) !important;
+    color: #0f172a !important;
+    border-color: color-mix(in srgb, var(--colors-black) 16%, transparent) !important;
+}
+
+html[data-theme="dark"] .organizations-shell .ui-input::placeholder,
+.chakra-ui-dark .organizations-shell .ui-input::placeholder {
+    color: #64748b !important;
+}
+
+html[data-theme="dark"] .organizations-shell .ui-button-primary,
+.chakra-ui-dark .organizations-shell .ui-button-primary {
+    background: var(--colors-brand-blue) !important;
+    color: var(--colors-white) !important;
+}
+
+html[data-theme="dark"] .ui-input::placeholder,
+.chakra-ui-dark .ui-input::placeholder {
+    color: var(--colors-text-muted-dark);
+}
+
+/* Dark-mode surface background: default system blue */
+html[data-theme="dark"],
+html[data-theme="dark"] body,
+.chakra-ui-dark,
+.chakra-ui-dark body {
+    background: var(--colors-surface-dark);
+}
+
+html[data-theme="dark"] .users-sidebar,
+html[data-theme="dark"] .organizations-sidebar,
+html[data-theme="dark"] .users-detail-panel,
+html[data-theme="dark"] .ui-surface,
+html[data-theme="dark"] .ui-panel,
+html[data-theme="dark"] .ui-input,
+.chakra-ui-dark .users-sidebar,
+.chakra-ui-dark .organizations-sidebar,
+.chakra-ui-dark .users-detail-panel,
+.chakra-ui-dark .ui-surface,
+.chakra-ui-dark .ui-panel,
+.chakra-ui-dark .ui-input {
+    background: var(--colors-surface-dark-soft) !important;
+    border-color: color-mix(in srgb, var(--colors-gold-500) 30%, transparent) !important;
+}
+
+/* Clients hover handled inside .clients-shell override above */
+
+@media (max-width: 800px) {
+    .main {
+        margin-left: 0px;
+        padding: 10px;
+        width: 100%;
+    }
+}
+
+@media print {
+    .hide-on-print {
+        display: none !important;
+    }
+}
+  
+/* Animação de piscar */
+@keyframes blink {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* Animação de rotação do spinner */
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
