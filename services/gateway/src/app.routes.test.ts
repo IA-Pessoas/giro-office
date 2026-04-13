@@ -193,6 +193,84 @@ it("returns shared forbidden response when permission is insufficient", async ()
   }
 });
 
+it("returns shared forbidden response when permission update is attempted without admin permission", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+  });
+
+  try {
+    const response = await fetch(`${baseUrl}/user/permission/user-3`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        users: 2,
+      }),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(403);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Acesso negado para esta rota.");
+    expect(body.code).toBe("FORBIDDEN");
+    expect(body.requestId).toBeTruthy();
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("proxies permission updates to the user service when permission is sufficient", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  let seenMethod = "";
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenMethod = request.method ?? "";
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { updated: true } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/permission/user-3`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        users: 2,
+      }),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenMethod).toBe("PUT");
+    expect(seenUrl).toBe("/user/permission/user-3");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("returns shared upstream error when the upstream service is unreachable", async () => {
   const app = createApp(
     createEnv({
