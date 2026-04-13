@@ -7,6 +7,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
+import type { ClientRouterDeps } from "../clientRouterDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { clientIdParamsSchema } from "../schemas/client.schemas.js";
 import {
@@ -18,7 +19,7 @@ import {
   createIntegrationClient,
   updateIntegrationClient,
 } from "../services/clientIntegrationService.js";
-import { type ClientRouterDeps, resolveOrganizationId } from "./clientRouteHelpers.js";
+import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
   const { prisma } = deps;

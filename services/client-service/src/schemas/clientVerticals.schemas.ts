@@ -173,6 +173,18 @@ export const historyIdParamsSchema = z
   })
   .strict();
 
+export const pendingListQuerySchema = z
+  .object({
+    user_id: z.string().uuid().optional(),
+  })
+  .strict();
+
+export const pendingDeleteParamsSchema = z
+  .object({
+    pendingId: z.string().uuid(),
+  })
+  .strict();
+
 export type CreateIntegrationBody = z.infer<typeof createIntegrationBodySchema>;
 export type UpdateIntegrationBody = z.infer<typeof updateIntegrationBodySchema>;
 export type UpdateCommercialBody = z.infer<typeof updateCommercialBodySchema>;

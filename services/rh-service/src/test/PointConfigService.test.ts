@@ -12,7 +12,7 @@ const { prismaMock } = vi.hoisted(() => ({
 
 vi.mock("../integrations/prisma.js", () => ({ prismaClient: prismaMock }));
 
-import { PointConfigService } from "../services/PointConfigService.js";
+import { PointConfigService } from "../services/pointConfigService.js";
 
 describe("PointConfigService", () => {
   beforeEach(() => vi.clearAllMocks());

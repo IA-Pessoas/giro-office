@@ -2,8 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
+import { warn as logWarn } from "@workspace/shared";
 import { deletePhotosByPrefix, uploadPhoto } from "@workspace/shared/storage";
-import { warn as logWarn } from "@workspace/shared/logger";
 
 import { getUserServiceEnv, type UserServiceEnv } from "../config/env.js";
 

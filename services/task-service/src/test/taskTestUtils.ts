@@ -78,43 +78,43 @@ const taskRouteMocks: TaskRouteMocks = vi.hoisted((): TaskRouteMocks => ({
   },
 }));
 
-vi.mock("../services/TaskCrudService.js", () => ({
+vi.mock("../services/taskCrudService.js", () => ({
   TaskCrudService: vi.fn(function TaskCrudService() {
     return taskRouteMocks.taskCrudServiceMock;
   }),
 }));
 
-vi.mock("../services/TaskModelService.js", () => ({
+vi.mock("../services/taskModelService.js", () => ({
   TaskModelService: vi.fn(function TaskModelService() {
     return taskRouteMocks.taskModelServiceMock;
   }),
 }));
 
-vi.mock("../services/TaskDependentService.js", () => ({
+vi.mock("../services/taskDependentService.js", () => ({
   TaskDependentService: vi.fn(function TaskDependentService() {
     return taskRouteMocks.taskDependentServiceMock;
   }),
 }));
 
-vi.mock("../services/TaskIntegrationRegularizeService.js", () => ({
+vi.mock("../services/taskIntegrationRegularizeService.js", () => ({
   TaskIntegrationRegularizeService: vi.fn(function TaskIntegrationRegularizeService() {
     return taskRouteMocks.taskIntegrationRegularizeServiceMock;
   }),
 }));
 
-vi.mock("../services/TaskLifecycleService.js", () => ({
+vi.mock("../services/taskLifecycleService.js", () => ({
   TaskLifecycleService: vi.fn(function TaskLifecycleService() {
     return taskRouteMocks.taskLifecycleServiceMock;
   }),
 }));
 
-vi.mock("../services/TaskComercialService.js", () => ({
+vi.mock("../services/taskComercialService.js", () => ({
   TaskComercialService: vi.fn(function TaskComercialService() {
     return taskRouteMocks.taskComercialServiceMock;
   }),
 }));
 
-vi.mock("../services/TaskFinanceiroService.js", () => ({
+vi.mock("../services/taskFinanceiroService.js", () => ({
   TaskFinanceiroService: vi.fn(function TaskFinanceiroService() {
     return taskRouteMocks.taskFinanceiroServiceMock;
   }),

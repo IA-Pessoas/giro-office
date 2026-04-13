@@ -14,6 +14,8 @@ import {
   createHistoryBodySchema,
   createHistoryPendingBodySchema,
   historyIdParamsSchema,
+  pendingDeleteParamsSchema,
+  pendingListQuerySchema,
   updateHistoryBodySchema,
 } from "../schemas/clientVerticals.schemas.js";
 import {
@@ -26,12 +28,8 @@ import {
   updateClientHistory,
   uploadHistoryFileAndPath,
 } from "../services/clientHistoryService.js";
-import {
-  type ClientRouterDeps,
-  pendingDeleteParamsSchema,
-  pendingListQuerySchema,
-  resolveOrganizationId,
-} from "./clientRouteHelpers.js";
+import type { ClientRouterDeps } from "../clientRouterDeps.js";
+import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 

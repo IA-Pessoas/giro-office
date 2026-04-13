@@ -9,8 +9,8 @@ import {
   updateUserBodySchema,
   userIdParamsSchema,
 } from "../schemas/user.schemas.js";
-import { StorageService } from "../services/StorageService.js";
-import { UserService } from "../services/UserService.js";
+import { StorageService } from "../services/storageService.js";
+import { UserService } from "../services/userService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const upload = createPhotoUploadMiddleware();

@@ -13,9 +13,9 @@ import {
   type AuditRequestRepository,
   createAuditRequestRepository,
 } from "../integrations/prisma/auditRequestRepository.js";
-import { createAuditEnabledMiddleware } from "../middleware/auditEnabled.js";
-import { assertAuditAdmin, getAuthFromHeaders } from "../middleware/getAuthFromHeaders.js";
-import { createInternalServiceTokenMiddleware } from "../middleware/internalServiceToken.js";
+import { createAuditEnabledMiddleware } from "../middlewares/auditEnabled.js";
+import { assertAuditAdmin, getAuthFromHeaders } from "../middlewares/getAuthFromHeaders.js";
+import { createInternalServiceTokenMiddleware } from "../middlewares/internalServiceToken.js";
 import { createAuditRequestService } from "../services/auditRequestService.js";
 
 interface CreateAuditRouterOptions {

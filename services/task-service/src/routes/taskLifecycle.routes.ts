@@ -10,7 +10,7 @@ import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { integracaoTaskCompleteRequestBodySchema } from "../schemas/integracaoTaskCompleteRequestBody.schema.js";
 import { integracaoTaskConclusionBodySchema } from "../schemas/integracaoTaskConclusionBody.schema.js";
-import { TaskLifecycleService } from "../services/TaskLifecycleService.js";
+import { TaskLifecycleService } from "../services/taskLifecycleService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const taskLifecycleService = new TaskLifecycleService();

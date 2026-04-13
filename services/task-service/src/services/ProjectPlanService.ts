@@ -5,7 +5,7 @@ import type * as Prisma from "../generated/prisma/internal/prismaNamespace.js";
 import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import { TaskCrudService, type TaskCreateRow } from "./TaskCrudService.js";
+import { TaskCrudService, type TaskCreateRow } from "./taskCrudService.js";
 
 const PROJECT_PLAN_SELECT = {
   id: true,

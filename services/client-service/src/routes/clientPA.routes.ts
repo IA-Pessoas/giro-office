@@ -2,6 +2,7 @@ import { createSuccessResponse, error as logError, parseWithZod } from "@workspa
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
+import type { ClientRouterDeps } from "../clientRouterDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { clientIdParamsSchema } from "../schemas/client.schemas.js";
 import {
@@ -9,7 +10,7 @@ import {
   updateClientPABodySchema,
 } from "../schemas/clientVerticals.schemas.js";
 import { createClientPA, getClientPADetail, updateClientPA } from "../services/clientPAService.js";
-import { type ClientRouterDeps, resolveOrganizationId } from "./clientRouteHelpers.js";
+import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 export function createClientPARouter(deps: ClientRouterDeps): Router {
   const { prisma } = deps;
