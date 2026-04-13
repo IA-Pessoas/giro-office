@@ -173,7 +173,7 @@ export function AuthProvider({ children }: AuthProviderProps){
     async function logoutUser(){
         try{
             clearAuthCookie()
-            toast.success("SessÃ£o encerrada!")
+            toast.success("Sessão encerrada!")
             Router.push('/login')
             setUser(null);
         }catch(err){

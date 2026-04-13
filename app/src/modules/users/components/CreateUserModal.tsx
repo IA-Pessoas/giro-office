@@ -156,7 +156,6 @@ export function CreateUserModal({
         status: 'active',
         ...(type !== 'owner' && Object.keys(modules).length > 0 ? { modules } : {}),
         ...(invitedBy ? { invited_by: invitedBy } : {}),
-        ...(type === 'owner' ? { first_owner_flag: true } : {}),
       };
 
       const newUser = await userService.create(payload);
@@ -209,11 +208,11 @@ export function CreateUserModal({
             <label htmlFor="user-name" className={FIELD_LABEL_CLASSNAME}>Nome</label>
             <input id="user-name" name="name" value={formData.name} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
           </div>
-          <div>
+          <div className="md:col-span-2">
             <label htmlFor="user-login" className={FIELD_LABEL_CLASSNAME}>Login</label>
             <input id="user-login" name="login" value={formData.login} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
           </div>
-          <div className="md:col-span-2">
+          <div className="md:col-span-1">
             <label htmlFor="user-password" className={FIELD_LABEL_CLASSNAME}>Senha</label>
             <input id="user-password" type="password" name="password" value={formData.password} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
           </div>
@@ -234,7 +233,7 @@ export function CreateUserModal({
             </select>
           </div>
           <div>
-            <label htmlFor="user-permission" className={FIELD_LABEL_CLASSNAME}>Permissao</label>
+            <label htmlFor="user-permission" className={FIELD_LABEL_CLASSNAME}>Permissão</label>
             <select
               id="user-permission"
               name="permission"
