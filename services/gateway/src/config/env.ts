@@ -34,6 +34,7 @@ const gatewayEnvSchema = z
         return Number.isNaN(parsed) ? 3334 : parsed;
       }),
     userServiceUrl: z.string().url().default("http://localhost:3335"),
+    departmentServiceUrl: z.string().url().default("http://localhost:3341"),
     taskServiceUrl: z.string().url().default("http://localhost:3337"),
     projectServiceUrl: z.string().url().default("http://localhost:3338"),
     websocketUpstreamUrl: z
@@ -76,6 +77,7 @@ export interface GatewayEnv {
   auditServiceUrl: string;
   port: number;
   userServiceUrl: string;
+  departmentServiceUrl: string;
   taskServiceUrl: string;
   projectServiceUrl: string;
   websocketUpstreamUrl?: string;
@@ -93,6 +95,7 @@ export function getGatewayEnv(): GatewayEnv {
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     port: process.env.GATEWAY_PORT,
     userServiceUrl: process.env.USER_SERVICE_URL,
+    departmentServiceUrl: process.env.DEPARTMENT_SERVICE_URL,
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,

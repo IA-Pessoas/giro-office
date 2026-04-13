@@ -10,10 +10,12 @@ export function isUserServiceRoute(path: string): boolean {
   );
 }
 
-/**
- * Gateway sends matching paths to **task-service** (`TASK_SERVICE_URL`). Unlisted paths hit the
- * legacy upstream. Add new exact paths here when exposing more task APIs through the gateway.
- */
+const DEPARTMENT_SERVICE_EXACT_PATHS = new Set(["/departments", "/department"]);
+
+export function isDepartmentServiceRoute(path: string): boolean {
+  return DEPARTMENT_SERVICE_EXACT_PATHS.has(path);
+}
+
 const TASK_SERVICE_EXACT_PATHS = new Set([
   "/integracao-tasksModel",
   "/integracao-taskModel",

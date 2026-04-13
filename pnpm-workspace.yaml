@@ -12,3 +12,4 @@ packages:
   - "services/task-service"
   - "services/client-service"
   - "services/project-service"
+  - "services/department-service"

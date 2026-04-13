@@ -10,7 +10,6 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
 import { getClientServiceEnv } from "../config/env.js";
-import { PrismaClient } from "../generated/prisma/client.js";
 import { ClientService } from "../services/clientService.js";
 import { LocalHistoryFileStorage } from "../services/historyStorage.js";
 
@@ -19,11 +18,13 @@ const runIntegration = process.env.CLIENT_SERVICE_INTEGRATION === "1";
 describe.skipIf(!runIntegration)("client-service Postgres integration", () => {
   const INTEGRATION_JWT_SECRET = "integration-jwt-secret-client-service";
 
-  let prisma: PrismaClient;
+  let prisma: import("@prisma/client").PrismaClient;
   let organizationId: string;
   let clientId: string;
 
   beforeAll(async () => {
+    const { PrismaClient } = await import("@prisma/client");
+
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl?.trim()) {
       throw new Error("DATABASE_URL é obrigatório quando CLIENT_SERVICE_INTEGRATION=1.");

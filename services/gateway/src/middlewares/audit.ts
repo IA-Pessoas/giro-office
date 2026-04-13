@@ -8,6 +8,7 @@ import type {
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
 import {
+  isDepartmentServiceRoute,
   isProjectServiceRoute,
   isTaskServiceRoute,
   isUserServiceRoute,
@@ -72,6 +73,7 @@ function getOutcome(statusCode: number): AuditOutcome {
 function getRouteTarget(request: Request): string {
   if (request.originalUrl.startsWith("/audit")) return "audit-service";
   if (isUserServiceRoute(request.path)) return "user-service";
+  if (isDepartmentServiceRoute(request.path)) return "department-service";
   if (isTaskServiceRoute(request.path)) return "task-service";
   if (isProjectServiceRoute(request.path)) return "project-service";
   return "legacy-api";

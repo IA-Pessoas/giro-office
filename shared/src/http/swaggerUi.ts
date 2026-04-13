@@ -1,10 +1,7 @@
 import type { Express, Request, Response } from "express";
 import swaggerUi from "swagger-ui-express";
 
-<<<<<<< HEAD
-=======
 /** OpenAPI 3.x document (estrutura validada em runtime pelo Swagger UI). */
->>>>>>> develop
 export type OpenApiDocument = Record<string, unknown> & {
   openapi: string;
   info: { title: string; version: string; description?: string };
@@ -19,12 +16,9 @@ export interface MountOpenApiDocsOptions {
   siteTitle?: string;
 }
 
-<<<<<<< HEAD
-=======
 /**
  * Registra `GET <jsonPath>` com o JSON do spec e `GET <docsPath>` com Swagger UI.
  */
->>>>>>> develop
 export function mountOpenApiDocs(app: Express, options: MountOpenApiDocsOptions): void {
   const {
     spec,

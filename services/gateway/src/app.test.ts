@@ -1,7 +1,7 @@
 import { once } from "node:events";
 import { createServer, type IncomingMessage, request as nodeRequest, type Server } from "node:http";
 import { Writable } from "node:stream";
-import { expect, it } from "vitest";
+import { expect, it, test } from "vitest";
 
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -125,7 +125,9 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     auditServiceUrl: "http://127.0.0.1:3335",
     port: 0,
     userServiceUrl: "http://127.0.0.1:3335",
+    departmentServiceUrl: "http://127.0.0.1:3341",
     taskServiceUrl: "http://127.0.0.1:3337",
+    projectServiceUrl: "http://127.0.0.1:3338",
     organizationServiceUrl: "http://127.0.0.1:3400",
     clientServiceUrl: "http://127.0.0.1:3410",
     rhServiceUrl: "http://127.0.0.1:3339",
@@ -781,9 +783,9 @@ test("proxies /me to the user service with forwarded auth headers", async () => 
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 200);
-    assert.equal(body.success, true);
-    assert.equal(seenUrl.startsWith("/me"), true);
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl.startsWith("/me")).toBe(true);
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -816,9 +818,9 @@ test("proxies /organizations to the organization microservice", async () => {
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 200);
-    assert.equal(body.success, true);
-    assert.equal(seenUrl, "/organizations/smoke");
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl).toBe("/organizations/smoke");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -851,9 +853,9 @@ test("proxies /clients to the client microservice", async () => {
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 200);
-    assert.equal(body.success, true);
-    assert.equal(seenUrl, "/clients/smoke");
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl).toBe("/clients/smoke");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -886,9 +888,9 @@ test("proxies /rh to the rh microservice", async () => {
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 200);
-    assert.equal(body.success, true);
-    assert.equal(seenUrl, "/rh/smoke");
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl).toBe("/rh/smoke");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -921,9 +923,9 @@ test("proxies task-service paths from the gateway", async () => {
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    assert.equal(response.status, 200);
-    assert.equal(body.success, true);
-    assert.equal(seenUrl, "/comercial-tasks");
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl).toBe("/comercial-tasks");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

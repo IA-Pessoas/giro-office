@@ -8,46 +8,57 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
       "default": "./dist/index.js"
     },
     "./auth": {
       "types": "./dist/auth/index.d.ts",
+      "development": "./src/auth/index.ts",
       "default": "./dist/auth/index.js"
     },
     "./audit": {
       "types": "./dist/audit/index.d.ts",
+      "development": "./src/audit/index.ts",
       "default": "./dist/audit/index.js"
     },
     "./datetime": {
       "types": "./dist/datetime/index.d.ts",
+      "development": "./src/datetime/index.ts",
       "default": "./dist/datetime/index.js"
     },
     "./http": {
       "types": "./dist/http/index.d.ts",
+      "development": "./src/http/index.ts",
       "default": "./dist/http/index.js"
     },
     "./logger": {
       "types": "./dist/logger/index.d.ts",
+      "development": "./src/logger/index.ts",
       "default": "./dist/logger/index.js"
     },
     "./routes/services": {
       "types": "./dist/routes/services.d.ts",
+      "development": "./src/routes/services.ts",
       "default": "./dist/routes/services.js"
     },
     "./schemas": {
       "types": "./dist/schemas/index.d.ts",
+      "development": "./src/schemas/index.ts",
       "default": "./dist/schemas/index.js"
     },
     "./storage": {
       "types": "./dist/storage/index.d.ts",
+      "development": "./src/storage/index.ts",
       "default": "./dist/storage/index.js"
     },
     "./upload": {
       "types": "./dist/upload/index.d.ts",
+      "development": "./src/upload/index.ts",
       "default": "./dist/upload/index.js"
     },
     "./validation": {
       "types": "./dist/validation/index.d.ts",
+      "development": "./src/validation/index.ts",
       "default": "./dist/validation/index.js"
     }
   },

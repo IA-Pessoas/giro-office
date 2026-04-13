@@ -24,6 +24,7 @@ import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
 import {
+  isDepartmentServiceRoute,
   isProjectServiceRoute,
   isTaskServiceRoute,
   isUserServiceRoute,
@@ -95,6 +96,10 @@ function getUpstreamContext(url: string, request: Request) {
 function getProxyTargetUrl(env: GatewayEnv, request: Request): string | null {
   if (isUserServiceRoute(request.path)) {
     return env.userServiceUrl;
+  }
+
+  if (isDepartmentServiceRoute(request.path)) {
+    return env.departmentServiceUrl;
   }
 
   if (isTaskServiceRoute(request.path)) {
