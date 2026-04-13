@@ -9,13 +9,15 @@ import { Router } from "express";
 import multer from "multer";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { ADMIN_PERMISSION, clientIdParamsSchema } from "../schemas/client.schema.js";
+import { ADMIN_PERMISSION, clientIdParamsSchema } from "../schemas/client.schemas.js";
 import {
   createHistoryBodySchema,
   createHistoryPendingBodySchema,
   historyIdParamsSchema,
+  pendingDeleteParamsSchema,
+  pendingListQuerySchema,
   updateHistoryBodySchema,
-} from "../schemas/clientVerticals.schema.js";
+} from "../schemas/clientVerticals.schemas.js";
 import {
   createClientHistory,
   createHistoryPending,
@@ -26,12 +28,8 @@ import {
   updateClientHistory,
   uploadHistoryFileAndPath,
 } from "../services/clientHistoryService.js";
-import {
-  type ClientRouterDeps,
-  pendingDeleteParamsSchema,
-  pendingListQuerySchema,
-  resolveOrganizationId,
-} from "./clientRouteHelpers.js";
+import type { ClientRouterDeps } from "../clientRouterDeps.js";
+import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -40,7 +38,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   const router: ReturnType<typeof Router> = Router();
 
   router.post(
-    "/clients/:id/histories",
+    "/:id/histories",
     isAuthenticated,
     upload.single("file"),
     async (request: Request, response: Response, next: NextFunction) => {
@@ -78,7 +76,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.get(
-    "/clients/:id/histories",
+    "/:id/histories",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -94,7 +92,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.get(
-    "/clients/:id/histories/:historyId",
+    "/:id/histories/:historyId",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -113,7 +111,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.patch(
-    "/clients/:id/histories/:historyId",
+    "/:id/histories/:historyId",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -136,7 +134,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.post(
-    "/clients/:id/histories/pending",
+    "/:id/histories/pending",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -159,7 +157,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.get(
-    "/clients/histories/pending",
+    "/histories/pending",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -175,7 +173,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.delete(
-    "/clients/histories/pending/:pendingId",
+    "/histories/pending/:pendingId",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {

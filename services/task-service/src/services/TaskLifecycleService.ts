@@ -2,8 +2,8 @@ import { error as logError, ServiceError } from "@workspace/shared";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import type { IntegracaoTaskConclusionBody } from "../schemas/integracao-task-conclusion-body.schema.js";
-import { TaskWorkflowService } from "./TaskWorkflowService.js";
+import type { IntegracaoTaskConclusionBody } from "../schemas/integracaoTaskConclusionBody.schema.js";
+import { TaskWorkflowService } from "./taskWorkflowService.js";
 
 const CONCLUSION_UPDATE_SELECT = {
   id: true,
@@ -152,7 +152,7 @@ export class TaskLifecycleService {
         where: { user_id, organization_id },
       });
 
-      if (!perm || perm.integracao !== 2) {
+      if (!perm || perm.integracao < 2) {
         throw new ServiceError(403, "Sem cargo para completar.");
       }
 
@@ -160,7 +160,7 @@ export class TaskLifecycleService {
         where: { user_id, organization_id },
       });
 
-      if (!permConclusion || permConclusion.task_completion !== true) {
+      if (perm.integracao < 3 && (!permConclusion || permConclusion.task_completion !== true)) {
         throw new ServiceError(403, "Sem permissão para completar.");
       }
 

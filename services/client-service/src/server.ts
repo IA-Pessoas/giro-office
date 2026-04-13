@@ -1,13 +1,16 @@
 import "dotenv/config";
 
+import { createClient } from "@supabase/supabase-js";
 import { createLogger } from "@workspace/shared/logger";
 
 import { createApp } from "./app.js";
 import { getClientServiceEnv } from "./config/env.js";
 import { prismaClient } from "./integrations/prisma.js";
-import { supabase } from "./integrations/supabase.js";
 import { ClientService } from "./services/clientService.js";
-import { SupabaseHistoryFileStorage } from "./services/historyStorage.js";
+import {
+  LocalHistoryFileStorage,
+  SupabaseHistoryFileStorage,
+} from "./services/historyStorageService.js";
 
 const env = getClientServiceEnv();
 const logger = createLogger({
@@ -18,7 +21,13 @@ const logger = createLogger({
 });
 
 const clientService = new ClientService(prismaClient);
-const historyStorage = new SupabaseHistoryFileStorage(supabase, env.historyStorageBucket);
+const historyStorage =
+  env.historyStorageMode === "local"
+    ? new LocalHistoryFileStorage(env.historyStorageDir)
+    : new SupabaseHistoryFileStorage(
+        createClient(env.supabaseUrl, env.supabaseServiceRoleKey),
+        env.historyStorageBucket,
+      );
 
 const app = createApp({
   clientService,

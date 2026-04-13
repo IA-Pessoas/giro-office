@@ -368,7 +368,16 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/integracao-tasks": {
+      "/ready": {
+        get: {
+          tags: ["Health"],
+          summary: "Readiness check",
+          responses: {
+            "200": { description: "Ready", ...successJson },
+          },
+        },
+      },
+      "/task": {
         post: {
           tags: ["IntegracaoTasks"],
           summary: "Criar tarefa",
@@ -376,6 +385,29 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           ...createTaskRequestBody,
           responses: { "201": { description: "Criada", ...successJson } },
         },
+        get: {
+          tags: ["IntegracaoTasks"],
+          summary: "Detalhe da tarefa",
+          security: bearer,
+          parameters: [{ name: "task_id", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Detalhe", ...successJson } },
+        },
+        put: {
+          tags: ["IntegracaoTasks"],
+          summary: "Atualizar tarefa",
+          security: bearer,
+          ...updateTaskRequestBody,
+          responses: { "200": { description: "Atualizada", ...successJson } },
+        },
+        delete: {
+          tags: ["IntegracaoTasks"],
+          summary: "Excluir tarefa",
+          security: bearer,
+          parameters: [{ name: "task_id", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Excluida", ...successJson } },
+        },
+      },
+      "/task/list": {
         get: {
           tags: ["IntegracaoTasks"],
           summary: "Listar tarefas",
@@ -390,31 +422,8 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           ],
           responses: { "200": { description: "Lista", ...successJson } },
         },
-        put: {
-          tags: ["IntegracaoTasks"],
-          summary: "Atualizar tarefa",
-          security: bearer,
-          ...updateTaskRequestBody,
-          responses: { "200": { description: "Atualizada", ...successJson } },
-        },
       },
-      "/integracao-task": {
-        get: {
-          tags: ["IntegracaoTasks"],
-          summary: "Detalhe da tarefa",
-          security: bearer,
-          parameters: [{ name: "task_id", in: "query", schema: { type: "string" } }],
-          responses: { "200": { description: "Detalhe", ...successJson } },
-        },
-        delete: {
-          tags: ["IntegracaoTasks"],
-          summary: "Excluir tarefa",
-          security: bearer,
-          parameters: [{ name: "task_id", in: "query", schema: { type: "string" } }],
-          responses: { "200": { description: "Excluida", ...successJson } },
-        },
-      },
-      "/integracao-tasksModel": {
+      "/task/model": {
         post: {
           tags: ["TaskModel"],
           summary: "Criar modelo de tarefa",
@@ -422,6 +431,29 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           ...createTaskModelRequestBody,
           responses: { "201": { description: "Criado", ...successJson } },
         },
+        get: {
+          tags: ["TaskModel"],
+          summary: "Detalhe do modelo",
+          security: bearer,
+          parameters: [{ name: "task_id", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Detalhe", ...successJson } },
+        },
+        put: {
+          tags: ["TaskModel"],
+          summary: "Atualizar modelo",
+          security: bearer,
+          ...updateTaskModelRequestBody,
+          responses: { "200": { description: "Atualizado", ...successJson } },
+        },
+        delete: {
+          tags: ["TaskModel"],
+          summary: "Excluir modelo",
+          security: bearer,
+          parameters: [{ name: "task_id", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Excluido", ...successJson } },
+        },
+      },
+      "/task/model/list": {
         get: {
           tags: ["TaskModel"],
           summary: "Listar modelos (type e billing)",
@@ -432,116 +464,8 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           ],
           responses: { "200": { description: "Lista", ...successJson } },
         },
-        put: {
-          tags: ["TaskModel"],
-          summary: "Atualizar modelo",
-          security: bearer,
-          ...updateTaskModelRequestBody,
-          responses: { "200": { description: "Atualizado", ...successJson } },
-        },
       },
-      "/integracao-taskModel": {
-        get: {
-          tags: ["TaskModel"],
-          summary: "Detalhe do modelo",
-          security: bearer,
-          parameters: [{ name: "task_id", in: "query", schema: { type: "string" } }],
-          responses: { "200": { description: "Detalhe", ...successJson } },
-        },
-        delete: {
-          tags: ["TaskModel"],
-          summary: "Excluir modelo",
-          security: bearer,
-          parameters: [{ name: "task_id", in: "query", schema: { type: "string" } }],
-          responses: { "200": { description: "Excluido", ...successJson } },
-        },
-      },
-      "/integracao-depsTasks": {
-        get: {
-          tags: ["TaskModel"],
-          summary: "Listar departamentos com modelos de tarefa",
-          security: bearer,
-          responses: { "200": { description: "Lista", ...successJson } },
-        },
-      },
-      "/integracao-plans": {
-        post: {
-          tags: ["ProjectPlan"],
-          summary: "Criar plano de projeto",
-          security: bearer,
-          ...createProjectPlanRequestBody,
-          responses: { "201": { description: "Criado", ...successJson } },
-        },
-        get: {
-          tags: ["ProjectPlan"],
-          summary: "Listar planos de projeto",
-          security: bearer,
-          responses: { "200": { description: "Lista", ...successJson } },
-        },
-        put: {
-          tags: ["ProjectPlan"],
-          summary: "Atualizar plano de projeto",
-          security: bearer,
-          ...updateProjectPlanRequestBody,
-          responses: { "200": { description: "Atualizado", ...successJson } },
-        },
-        delete: {
-          tags: ["ProjectPlan"],
-          summary: "Excluir plano de projeto",
-          security: bearer,
-          parameters: [{ name: "id", in: "query", schema: { type: "string" } }],
-          responses: { "200": { description: "Excluido", ...successJson } },
-        },
-      },
-      "/integracao-plan": {
-        get: {
-          tags: ["ProjectPlan"],
-          summary: "Detalhar plano de projeto",
-          security: bearer,
-          parameters: [{ name: "plan_id", in: "query", schema: { type: "string" } }],
-          responses: { "200": { description: "Detalhe", ...successJson } },
-        },
-      },
-      "/integracao-plans-tasks": {
-        post: {
-          tags: ["ProjectPlan"],
-          summary: "Adicionar tarefa-modelo ao plano",
-          security: bearer,
-          ...addProjectPlanTaskRequestBody,
-          responses: { "201": { description: "Adicionada", ...successJson } },
-        },
-        get: {
-          tags: ["ProjectPlan"],
-          summary: "Listar tarefas do plano",
-          security: bearer,
-          parameters: [{ name: "plan_id", in: "query", schema: { type: "string" } }],
-          responses: { "200": { description: "Lista", ...successJson } },
-        },
-        put: {
-          tags: ["ProjectPlan"],
-          summary: "Reordenar tarefa do plano",
-          security: bearer,
-          ...reorderProjectPlanTaskRequestBody,
-          responses: { "200": { description: "Reordenada", ...successJson } },
-        },
-        delete: {
-          tags: ["ProjectPlan"],
-          summary: "Excluir tarefa do plano",
-          security: bearer,
-          ...deleteProjectPlanTaskRequestBody,
-          responses: { "200": { description: "Excluida", ...successJson } },
-        },
-      },
-      "/integracao-plans-hire": {
-        post: {
-          tags: ["ProjectPlan"],
-          summary: "Contratar plano para um projeto",
-          security: bearer,
-          ...hireProjectPlanRequestBody,
-          responses: { "200": { description: "Contratado", ...successJson } },
-        },
-      },
-      "/integracao-tasksModel-dependent": {
+      "/task/model/dependent": {
         post: {
           tags: ["TaskDependent"],
           summary: "Adicionar dependente ao modelo",
@@ -564,7 +488,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: { "200": { description: "Removido", ...successJson } },
         },
       },
-      "/integracao-tasksIntegration": {
+      "/task/integration": {
         post: {
           tags: ["TaskIntegration"],
           summary: "Criar vinculo Regularize",
@@ -587,7 +511,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: { "200": { description: "Lista", ...successJson } },
         },
       },
-      "/financeiro-tasks": {
+      "/task/financeiro": {
         put: {
           tags: ["Financeiro"],
           summary: "Atualizar cobranca financeira",
@@ -596,7 +520,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: { "200": { description: "Atualizado", ...successJson } },
         },
       },
-      "/comercial-tasks": {
+      "/task/comercial": {
         put: {
           tags: ["Comercial"],
           summary: "Atualizar cobranca comercial",
@@ -605,7 +529,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: { "200": { description: "Atualizado", ...successJson } },
         },
       },
-      "/integracao-tasks-conclusion": {
+      "/task/conclusion": {
         put: {
           tags: ["Lifecycle"],
           summary: "Concluir tarefa (fluxo de status)",
@@ -614,13 +538,100 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: { "200": { description: "Concluido", ...successJson } },
         },
       },
-      "/integracao-tasks-completeRequest": {
+      "/task/complete-request": {
         put: {
           tags: ["Lifecycle"],
           summary: "Aprovar pedido de conclusao",
           security: bearer,
           ...approveConclusionRequestBody,
           responses: { "200": { description: "Aprovado", ...successJson } },
+        },
+      },
+      "/task/project-plan": {
+        post: {
+          tags: ["ProjectPlan"],
+          summary: "Criar plano de projeto",
+          security: bearer,
+          ...createProjectPlanRequestBody,
+          responses: { "201": { description: "Criado", ...successJson } },
+        },
+        get: {
+          tags: ["ProjectPlan"],
+          summary: "Detalhar plano de projeto",
+          security: bearer,
+          parameters: [{ name: "plan_id", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Detalhe", ...successJson } },
+        },
+        put: {
+          tags: ["ProjectPlan"],
+          summary: "Atualizar plano de projeto",
+          security: bearer,
+          ...updateProjectPlanRequestBody,
+          responses: { "200": { description: "Atualizado", ...successJson } },
+        },
+        delete: {
+          tags: ["ProjectPlan"],
+          summary: "Excluir plano de projeto",
+          security: bearer,
+          parameters: [{ name: "id", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Excluido", ...successJson } },
+        },
+      },
+      "/task/project-plan/list": {
+        get: {
+          tags: ["ProjectPlan"],
+          summary: "Listar planos de projeto",
+          security: bearer,
+          responses: { "200": { description: "Lista", ...successJson } },
+        },
+      },
+      "/task/project-plan/task": {
+        post: {
+          tags: ["ProjectPlan"],
+          summary: "Adicionar tarefa ao plano",
+          security: bearer,
+          ...addProjectPlanTaskRequestBody,
+          responses: { "201": { description: "Criada", ...successJson } },
+        },
+        put: {
+          tags: ["ProjectPlan"],
+          summary: "Reordenar tarefa do plano",
+          security: bearer,
+          ...reorderProjectPlanTaskRequestBody,
+          responses: { "200": { description: "Reordenada", ...successJson } },
+        },
+        delete: {
+          tags: ["ProjectPlan"],
+          summary: "Remover tarefa do plano",
+          security: bearer,
+          ...deleteProjectPlanTaskRequestBody,
+          responses: { "200": { description: "Removida", ...successJson } },
+        },
+      },
+      "/task/project-plan/task/list": {
+        get: {
+          tags: ["ProjectPlan"],
+          summary: "Listar tarefas do plano",
+          security: bearer,
+          parameters: [{ name: "plan_id", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "Lista", ...successJson } },
+        },
+      },
+      "/task/project-plan/hire": {
+        post: {
+          tags: ["ProjectPlan"],
+          summary: "Contratar plano em projeto",
+          security: bearer,
+          ...hireProjectPlanRequestBody,
+          responses: { "200": { description: "Contratado", ...successJson } },
+        },
+      },
+      "/task/deps/list": {
+        get: {
+          tags: ["TaskDependent"],
+          summary: "Listar departamentos com modelos de tarefa",
+          security: bearer,
+          responses: { "200": { description: "Lista", ...successJson } },
         },
       },
     },

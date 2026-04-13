@@ -12,8 +12,8 @@ import { requireInternalToken } from "./middlewares/requireInternalToken.js";
 import { buildClientServiceOpenApiSpec } from "./openapi/spec.js";
 import { createClientRouter } from "./routes/client.routes.js";
 import type { IClientService } from "./services/clientService.js";
-import { runCompetenceOutputUpdate } from "./services/competenceOutputRoutine.js";
-import type { HistoryFileStorage } from "./services/historyStorage.js";
+import { runCompetenceOutputUpdate } from "./services/competenceOutputRoutineService.js";
+import type { HistoryFileStorage } from "./services/historyStorageService.js";
 
 function clientServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -59,6 +59,15 @@ export function createApp({
     );
   });
 
+  app.get("/ready", (_request, response) => {
+    response.status(200).json(
+      createSuccessResponse({
+        status: "ready",
+        service: "client-service",
+      }),
+    );
+  });
+
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {
       spec: buildClientServiceOpenApiSpec(env),
@@ -79,7 +88,7 @@ export function createApp({
     },
   );
 
-  app.use(createClientRouter({ clientService, prisma, historyStorage }));
+  app.use("/client", createClientRouter({ clientService, prisma, historyStorage }));
 
   app.use(
     createExpressErrorHandler({

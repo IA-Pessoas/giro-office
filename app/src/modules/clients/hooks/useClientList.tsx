@@ -16,8 +16,6 @@ export const useClientList = (initialFilters: Filters) => {
     const [hasMore, setHasMore] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const loaderRef = useRef<HTMLDivElement>(null);
-    const apiClient = setupAPIClient();
-
     const fetchClients = useCallback(async (currentPage: number, shouldReset: boolean = false) => {
         if (isLoading) return;
         setIsLoading(true);

@@ -2,7 +2,6 @@ packages:
   - "packages/*"
   - "app"
   - "infra"
-  - "services/src" # TODO: remove this
   - "services/gateway"
   - "services/organization-service"
   - "services/audit-service"

@@ -33,6 +33,7 @@ export type ProjectProgressResult = {
 };
 
 export type ProjectProgressPrisma = typeof prismaClient;
+type ProjectProgressTransaction = Pick<ProjectProgressPrisma, "project" | "client">;
 
 export class ProjectProgressService {
   constructor(private readonly prisma: ProjectProgressPrisma = prismaClient) {}
@@ -89,7 +90,7 @@ export class ProjectProgressService {
         roundedPercentage === 100 ? PROJECT_STATUS_COMPLETED : PROJECT_STATUS_IN_PROGRESS;
 
       if (roundedPercentage === 100) {
-        return await this.prisma.$transaction(async (tx) => {
+        return await this.prisma.$transaction(async (tx: ProjectProgressTransaction) => {
           const project = await tx.project.update({
             where: { id: projectId },
             data: {

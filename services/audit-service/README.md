@@ -4,7 +4,7 @@ Ingestão e consulta de pedidos de auditoria. O gateway pode proxyar `/audit` e 
 
 ## Porta local
 
-Por defeito: **3336** (variável específica do serviço em `src/config/env.ts`).
+Por defeito: **3020** (variável específica do serviço em `src/config/env.ts`).
 
 ## Variáveis de ambiente
 

@@ -1,6 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import type { HistoryFileStorage } from "./historyStorage.js";
+import type { HistoryFileStorage } from "./historyStorageService.js";
 
 export async function createClientHistory(
   prisma: PrismaClient,

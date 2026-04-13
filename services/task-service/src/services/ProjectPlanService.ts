@@ -2,10 +2,10 @@ import { error as logError, ServiceError } from "@workspace/shared";
 import type { ProjectPlanGetPayload } from "../generated/prisma/models/ProjectPlan.js";
 import type { ProjectPlanTasksGetPayload } from "../generated/prisma/models/ProjectPlanTasks.js";
 import type * as Prisma from "../generated/prisma/internal/prismaNamespace.js";
-import type { ProspectingStatus } from "../constants/prospecting-status.js";
+import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import { TaskCrudService, type TaskCreateRow } from "./TaskCrudService.js";
+import { TaskCrudService, type TaskCreateRow } from "./taskCrudService.js";
 
 const PROJECT_PLAN_SELECT = {
   id: true,
@@ -76,12 +76,14 @@ export interface ReorderProjectPlanTaskRequest {
   plan_id: string;
   plan_task_id: string;
   direction: "up" | "down";
+  user_id: string;
   organization_id: string;
 }
 
 export interface DeleteProjectPlanTaskRequest {
   plan_id: string;
   plan_task_id: string;
+  user_id: string;
   organization_id: string;
 }
 
@@ -128,6 +130,20 @@ export class ProjectPlanService {
     this.#audit = auditIntegration;
   }
 
+  async #requireManagerPermission(userId: string): Promise<void> {
+    const user = await this.#prisma.user.findFirst({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new ServiceError(404, "Usuario nao encontrado.");
+    }
+
+    if (user.permission < 2) {
+      throw new ServiceError(403, "Usuario nao tem permissao.");
+    }
+  }
+
   async create(data: CreateProjectPlanRequest): Promise<{ create: ProjectPlanRow }> {
     try {
       const exists = await this.#prisma.projectPlan.findFirst({
@@ -140,6 +156,8 @@ export class ProjectPlanService {
       if (exists) {
         throw new ServiceError(409, "Plano com esse nome ja foi cadastrado.");
       }
+
+      await this.#requireManagerPermission(data.user_id);
 
       const create = await this.#prisma.projectPlan.create({
         data: {
@@ -180,6 +198,8 @@ export class ProjectPlanService {
       if (!exists) {
         throw new ServiceError(404, "Plano nao encontrado.");
       }
+
+      await this.#requireManagerPermission(data.user_id);
 
       const updated = await this.#prisma.projectPlan.update({
         where: {
@@ -263,17 +283,7 @@ export class ProjectPlanService {
         throw new ServiceError(404, "Plano nao encontrado.");
       }
 
-      const user = await this.#prisma.user.findFirst({
-        where: { id: data.user_id },
-      });
-
-      if (!user) {
-        throw new ServiceError(404, "Usuario nao encontrado.");
-      }
-
-      if (user.permission !== 2) {
-        throw new ServiceError(403, "Usuario nao tem permissao.");
-      }
+      await this.#requireManagerPermission(data.user_id);
 
       await this.#prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         await tx.projectPlanTasks.deleteMany({
@@ -321,6 +331,8 @@ export class ProjectPlanService {
       if (!taskModel) {
         throw new ServiceError(404, "Modelo de tarefa nao encontrado.");
       }
+
+      await this.#requireManagerPermission(data.user_id);
 
       const lastTaskInPlan = await this.#prisma.projectPlanTasks.findFirst({
         where: {
@@ -399,6 +411,8 @@ export class ProjectPlanService {
         throw new ServiceError(404, "Tarefa nao encontrada neste plano.");
       }
 
+      await this.#requireManagerPermission(data.user_id);
+
       if (data.direction === "up" && taskA.order === 1) {
         return { message: "A tarefa ja esta no topo." };
       }
@@ -454,6 +468,8 @@ export class ProjectPlanService {
         if (!taskToDelete) {
           throw new ServiceError(404, "Tarefa nao encontrada neste plano.");
         }
+
+        await this.#requireManagerPermission(data.user_id);
 
         await tx.projectPlanTasks.delete({
           where: {
@@ -527,6 +543,8 @@ export class ProjectPlanService {
       if (!client) {
         throw new ServiceError(404, "Cliente nao encontrado.");
       }
+
+      await this.#requireManagerPermission(data.user_id);
 
       const planTasks = await this.#prisma.projectPlanTasks.findMany({
         where: {

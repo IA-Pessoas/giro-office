@@ -1,9 +1,9 @@
-import "./env-bootstrap.js";
+import "./envBootstrap.js";
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { ProjectCrudPrisma } from "../services/ProjectCrudService.js";
-import { ProjectCrudService } from "../services/ProjectCrudService.js";
+import type { ProjectCrudPrisma } from "../services/projectCrudService.js";
+import { ProjectCrudService } from "../services/projectCrudService.js";
 
 const ORG_ID = "a0000000-0000-4000-8000-000000000001";
 const CLIENT_ID = "b0000000-0000-4000-8000-000000000001";

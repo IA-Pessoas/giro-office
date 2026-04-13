@@ -30,3 +30,6 @@ docs/
 # Figma reference project (local only)
 novo layout/
 .cursor/plans/
+
+# Smoke test artifacts
+smoke-*/

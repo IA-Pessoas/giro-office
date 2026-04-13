@@ -1,3 +1,4 @@
+export * from "./auth-context.js";
 export * from "./errors.js";
 export * from "./express.js";
 export * from "./headers.js";

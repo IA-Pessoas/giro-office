@@ -3,7 +3,7 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import type {
   CreateIntegrationBody,
   UpdateIntegrationBody,
-} from "../schemas/clientVerticals.schema.js";
+} from "../schemas/clientVerticals.schemas.js";
 import { cleanDocument } from "../utils/documents.js";
 
 export async function createIntegrationClient(

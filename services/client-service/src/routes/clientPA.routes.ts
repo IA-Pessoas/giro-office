@@ -2,21 +2,22 @@ import { createSuccessResponse, error as logError, parseWithZod } from "@workspa
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
+import type { ClientRouterDeps } from "../clientRouterDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { clientIdParamsSchema } from "../schemas/client.schema.js";
+import { clientIdParamsSchema } from "../schemas/client.schemas.js";
 import {
   createClientPABodySchema,
   updateClientPABodySchema,
-} from "../schemas/clientVerticals.schema.js";
+} from "../schemas/clientVerticals.schemas.js";
 import { createClientPA, getClientPADetail, updateClientPA } from "../services/clientPAService.js";
-import { type ClientRouterDeps, resolveOrganizationId } from "./clientRouteHelpers.js";
+import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 export function createClientPARouter(deps: ClientRouterDeps): Router {
   const { prisma } = deps;
   const router: ReturnType<typeof Router> = Router();
 
   router.post(
-    "/clients/:id/pa",
+    "/:id/pa",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -33,7 +34,7 @@ export function createClientPARouter(deps: ClientRouterDeps): Router {
   );
 
   router.get(
-    "/clients/:id/pa",
+    "/:id/pa",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -49,7 +50,7 @@ export function createClientPARouter(deps: ClientRouterDeps): Router {
   );
 
   router.patch(
-    "/clients/:id/pa",
+    "/:id/pa",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {

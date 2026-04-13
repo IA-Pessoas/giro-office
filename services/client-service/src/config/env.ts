@@ -1,19 +1,31 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { type LoggerLevel, loggerLevelSchema } from "@workspace/shared";
+import dotenv from "dotenv";
 import { z } from "zod";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const serviceEnvPath = path.resolve(__dirname, "../../.env");
+
+dotenv.config({ path: serviceEnvPath });
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
 }
 
-const clientServiceEnvSchema = z
+const historyStorageModeSchema = z.enum(["supabase", "local"]);
+
+const rawClientServiceEnvSchema = z
   .object({
     port: z
       .string()
       .optional()
-      .default("3410")
+      .default("3035")
       .transform((val: string) => {
         const parsed = Number.parseInt(val, 10);
-        return Number.isNaN(parsed) ? 3410 : parsed;
+        return Number.isNaN(parsed) ? 3035 : parsed;
       }),
     nodeEnv: z.string().optional().default("development"),
     databaseUrl: z.string().min(1, "DATABASE_URL nao definido para o client-service."),
@@ -24,26 +36,55 @@ const clientServiceEnvSchema = z
       .optional()
       .default("false")
       .transform((value) => parseBoolean(value)),
-    supabaseUrl: z.string().url("SUPABASE_URL nao definida."),
-    supabaseServiceRoleKey: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY nao definida."),
+    supabaseUrl: z.string().trim().optional(),
+    supabaseServiceRoleKey: z.string().trim().optional(),
+    historyStorageMode: historyStorageModeSchema.optional().default("supabase"),
     historyStorageBucket: z.string().optional().default("ClientHistory"),
     historyStorageDir: z.string().optional().default(".data/client-history-uploads"),
     internalServiceToken: z.string().optional(),
     enableApiDocsEnv: z.string().optional(),
   })
-  .transform((env) => {
-    const { enableApiDocsEnv, ...rest } = env;
-    const enableApiDocs =
-      enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
-        ? parseBoolean(enableApiDocsEnv)
-        : rest.nodeEnv !== "production";
+  .superRefine((env, ctx) => {
+    if (env.historyStorageMode === "supabase") {
+      if (!env.supabaseUrl) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SUPABASE_URL nao definida.",
+          path: ["supabaseUrl"],
+        });
+      } else if (!z.string().url().safeParse(env.supabaseUrl).success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SUPABASE_URL nao definida.",
+          path: ["supabaseUrl"],
+        });
+      }
 
-    return {
-      ...rest,
-      logPretty: rest.nodeEnv !== "production" && rest.logPretty,
-      enableApiDocs,
-    };
+      if (!env.supabaseServiceRoleKey) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SUPABASE_SERVICE_ROLE_KEY nao definida.",
+          path: ["supabaseServiceRoleKey"],
+        });
+      }
+    }
   });
+
+const clientServiceEnvSchema = rawClientServiceEnvSchema.transform((env) => {
+  const { enableApiDocsEnv, ...rest } = env;
+  const enableApiDocs =
+    enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
+      ? parseBoolean(enableApiDocsEnv)
+      : rest.nodeEnv !== "production";
+
+  return {
+    ...rest,
+    supabaseUrl: rest.supabaseUrl ?? "",
+    supabaseServiceRoleKey: rest.supabaseServiceRoleKey ?? "",
+    logPretty: rest.nodeEnv !== "production" && rest.logPretty,
+    enableApiDocs,
+  };
+});
 
 export type ClientServiceEnv = z.infer<typeof clientServiceEnvSchema> & {
   logLevel: LoggerLevel;
@@ -60,6 +101,7 @@ export function getClientServiceEnv(): ClientServiceEnv {
     logPretty: process.env.LOG_PRETTY,
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    historyStorageMode: process.env.CLIENT_HISTORY_STORAGE_MODE,
     historyStorageBucket: process.env.CLIENT_HISTORY_STORAGE_BUCKET,
     historyStorageDir: process.env.CLIENT_HISTORY_STORAGE_DIR,
     internalServiceToken: process.env.CLIENT_SERVICE_INTERNAL_TOKEN,

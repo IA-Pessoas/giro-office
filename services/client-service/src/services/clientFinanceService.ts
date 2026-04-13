@@ -1,6 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import type { UpdateFinanceBody } from "../schemas/clientVerticals.schema.js";
+import type { UpdateFinanceBody } from "../schemas/clientVerticals.schemas.js";
 
 export async function updateFinanceClient(
   prisma: PrismaClient,
