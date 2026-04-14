@@ -1,7 +1,7 @@
 import type { OpenApiDocument } from "@workspace/shared/http";
-import { getServiceUrls } from "@workspace/shared/routes/services";
 
 import { buildAuditServiceOpenApiSpec } from "../../../audit-service/src/openapi/spec.js";
+import { buildClientServiceOpenApiSpec } from "../../../client-service/src/openapi/spec.js";
 import { buildDepartmentServiceOpenApiSpec } from "../../../department-service/src/openapi/spec.js";
 import { buildOrganizationServiceOpenApiSpec } from "../../../organization-service/src/openapi/spec.js";
 import { buildProjectServiceOpenApiSpec } from "../../../project-service/src/openapi/spec.js";
@@ -49,8 +49,6 @@ function getMutableComponents(spec: AggregatedOpenApiDocument): OpenApiComponent
 }
 
 function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
-  const { organizationServiceUrl, rhServiceUrl } = getServiceUrls();
-
   return [
     {
       key: "user-service",
@@ -83,18 +81,26 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       includePath: (path) => path !== "/health",
     },
     {
+      key: "client-service",
+      label: "Client Service",
+      buildSpec: () =>
+        buildClientServiceOpenApiSpec({ port: getPortFromUrl(env.clientServiceUrl) } as never),
+      includePath: (path) => path !== "/health" && path !== "/ready",
+    },
+    {
       key: "organization-service",
       label: "Organization Service",
       buildSpec: () =>
         buildOrganizationServiceOpenApiSpec({
-          port: getPortFromUrl(organizationServiceUrl),
+          port: getPortFromUrl(env.organizationServiceUrl),
         } as never),
       includePath: (path) => path !== "/health",
     },
     {
       key: "rh-service",
       label: "RH Service",
-      buildSpec: () => buildRhServiceOpenApiSpec({ port: getPortFromUrl(rhServiceUrl) } as never),
+      buildSpec: () =>
+        buildRhServiceOpenApiSpec({ port: getPortFromUrl(env.rhServiceUrl) } as never),
       includePath: (path) => path !== "/health",
     },
     {
@@ -172,7 +178,7 @@ function getGatewayOperationSecurity(
   definition: ServiceSpecDefinition,
   security: Array<Record<string, string[]>> | undefined,
 ): Array<Record<string, string[]>> | undefined {
-  if (path === "/me") {
+  if (path === "/user/me") {
     return [{ bearerAuth: [] }];
   }
 
@@ -424,7 +430,7 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
       title: "office-gateway",
       version: "1.0.0",
       description:
-        "Gateway OpenAPI document aggregating user-service, department-service, task-service, project-service, organization-service, rh-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
+        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, organization-service, rh-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
     },
     servers: [{ url: "http://localhost" }],
     tags: [

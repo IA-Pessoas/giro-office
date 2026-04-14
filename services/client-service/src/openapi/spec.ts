@@ -66,7 +66,19 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients": {
+      "/ready": {
+        get: {
+          tags: ["Health"],
+          summary: "Readiness check",
+          responses: {
+            "200": {
+              description: "Servico pronto",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
+      },
+      "/client/list": {
         get: {
           tags: ["Clients"],
           summary: "Listar clientes",
@@ -86,6 +98,8 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
             },
           },
         },
+      },
+      "/client": {
         post: {
           tags: ["Clients"],
           summary: "Criar cliente",
@@ -131,7 +145,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/{id}": {
+      "/client/{id}": {
         get: {
           tags: ["Clients"],
           summary: "Obter cliente por ID",
@@ -191,7 +205,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/{id}/activate": {
+      "/client/{id}/activate": {
         post: {
           tags: ["Clients"],
           summary: "Reativar cliente",
@@ -207,7 +221,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/integration": {
+      "/client/integration": {
         post: {
           tags: ["Integration"],
           summary: "Criar cliente pela integracao",
@@ -242,7 +256,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/{id}/integration": {
+      "/client/{id}/integration": {
         patch: {
           tags: ["Integration"],
           summary: "Atualizar cliente de integracao",
@@ -273,7 +287,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/{id}/pa": {
+      "/client/{id}/pa": {
         get: {
           tags: ["Clients"],
           summary: "Obter PA do cliente",
@@ -344,7 +358,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/{id}/commercial": {
+      "/client/{id}/commercial": {
         patch: {
           tags: ["Verticals"],
           summary: "Atualizar dados comerciais",
@@ -378,7 +392,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/{id}/termination": {
+      "/client/{id}/termination": {
         patch: {
           tags: ["Verticals"],
           summary: "Registrar distrato do cliente",
@@ -411,7 +425,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/{id}/finance": {
+      "/client/{id}/finance": {
         patch: {
           tags: ["Verticals"],
           summary: "Atualizar dados financeiros",
@@ -442,7 +456,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/{id}/regularize": {
+      "/client/{id}/regularize": {
         patch: {
           tags: ["Verticals"],
           summary: "Atualizar dados de regularizacao",
@@ -474,7 +488,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/{id}/histories": {
+      "/client/{id}/histories": {
         get: {
           tags: ["Histories"],
           summary: "Listar historicos do cliente",
@@ -521,7 +535,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/{id}/histories/{historyId}": {
+      "/client/{id}/histories/{historyId}": {
         get: {
           tags: ["Histories"],
           summary: "Obter detalhe de historico",
@@ -579,7 +593,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/{id}/histories/pending": {
+      "/client/{id}/histories/pending": {
         post: {
           tags: ["Histories"],
           summary: "Criar pendencia de historico",
@@ -610,7 +624,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/histories/pending": {
+      "/client/histories/pending": {
         get: {
           tags: ["Histories"],
           summary: "Listar pendencias de historico",
@@ -626,7 +640,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/clients/histories/pending/{pendingId}": {
+      "/client/histories/pending/{pendingId}": {
         delete: {
           tags: ["Histories"],
           summary: "Remover pendencia de historico",

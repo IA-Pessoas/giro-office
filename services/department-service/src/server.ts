@@ -15,7 +15,7 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-const app = createDepartmentApp(env, logger);
+const app = createDepartmentApp({ env, logger });
 const server = http.createServer(app);
 
 server.listen(env.port, () => {

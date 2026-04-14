@@ -1,9 +1,9 @@
 import {
+  requireAuthenticatedRequestContext,
   createSuccessResponse,
   getSingleQueryValue,
   error as logError,
   parseWithZod,
-  ServiceError,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
@@ -15,72 +15,64 @@ import {
   listDepartmentsQuerySchema,
   updateDepartmentBodySchema,
 } from "../schemas/department.schemas.js";
-import { DepartmentService } from "../services/DepartmentService.js";
+import type { DepartmentService } from "../services/departmentService.js";
 
-function requireAuthContext(req: Request): { user_id: string; organization_id: string } {
-  const user_id = req.user_id;
-  const organization_id = req.organization_id;
+export type DepartmentRouteDeps = Pick<DepartmentService, "create" | "detail" | "list" | "update">;
 
-  if (!user_id || !organization_id) {
-    throw new ServiceError(401, "Contexto de autenticação inválido.");
-  }
-
-  return { user_id, organization_id };
+function requireDepartmentAuthContext(req: Request): { user_id: string; organization_id: string } {
+  return requireAuthenticatedRequestContext(req, {
+    statusCode: 401,
+    userIdMessage: "Contexto de autenticação inválido.",
+    organizationIdMessage: "Contexto de autenticação inválido.",
+  });
 }
 
-const router: ReturnType<typeof Router> = Router();
-const departmentService = new DepartmentService();
+export function createDepartmentRoutes(service: DepartmentRouteDeps): ReturnType<typeof Router> {
+  const router: ReturnType<typeof Router> = Router();
 
-router.get(
-  "/departments",
-  isAuthenticated,
-  async (req: Request, res: Response, next: NextFunction) => {
+  router.get(
+    "/list",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { organization_id } = requireDepartmentAuthContext(req);
+        const parsedQuery = parseWithZod(listDepartmentsQuerySchema, {
+          status: getSingleQueryValue(req.query.status),
+        });
+        const status = parsedQuery.status;
+        const result = await service.list(status, organization_id);
+
+        res.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao listar departamentos", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { organization_id } = requireAuthContext(req);
-      const parsedQuery = parseWithZod(listDepartmentsQuerySchema, {
-        status: getSingleQueryValue(req.query.status),
-      });
-      const status = parsedQuery.status;
-      const result = await departmentService.list(status, organization_id);
-
-      res.json(createSuccessResponse(result));
-    } catch (err) {
-      logError("Erro ao listar departamentos", { err });
-      next(err);
-    }
-  },
-);
-
-router.get(
-  "/department",
-  isAuthenticated,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { organization_id } = requireAuthContext(req);
+      const { organization_id } = requireDepartmentAuthContext(req);
       const parsedQuery = parseWithZod(departmentDetailQuerySchema, {
         dep_id: getSingleQueryValue(req.query.dep_id),
       });
       const { dep_id } = parsedQuery;
 
-      const result = await departmentService.detail(dep_id, organization_id);
+      const result = await service.detail(dep_id, organization_id);
       res.json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro ao detalhar departamento", { err });
       next(err);
     }
-  },
-);
+  });
 
-router.post(
-  "/departments",
-  isAuthenticated,
-  async (req: Request, res: Response, next: NextFunction) => {
+  router.post("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { user_id, organization_id } = requireAuthContext(req);
+      const { user_id, organization_id } = requireDepartmentAuthContext(req);
       const body = parseWithZod(createDepartmentBodySchema, req.body);
       const { name, color, solution } = body;
 
-      const result = await departmentService.create({
+      const result = await service.create({
         user_id,
         organization_id,
         name,
@@ -93,19 +85,15 @@ router.post(
       logError("Erro ao criar departamento", { err });
       next(err);
     }
-  },
-);
+  });
 
-router.put(
-  "/departments",
-  isAuthenticated,
-  async (req: Request, res: Response, next: NextFunction) => {
+  router.put("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { user_id, organization_id } = requireAuthContext(req);
+      const { user_id, organization_id } = requireDepartmentAuthContext(req);
       const body = parseWithZod(updateDepartmentBodySchema, req.body);
       const { dep_id, name, color, status, solution } = body;
 
-      const result = await departmentService.update({
+      const result = await service.update({
         user_id,
         organization_id,
         dep_id,
@@ -120,7 +108,7 @@ router.put(
       logError("Erro ao atualizar departamento", { err });
       next(err);
     }
-  },
-);
+  });
 
-export { router as departmentRoutes };
+  return router;
+}

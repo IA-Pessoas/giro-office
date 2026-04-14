@@ -4,7 +4,7 @@ Microserviço de utilizadores, sessão e permissões. Integra com o **gateway** 
 
 ## Porta local
 
-Por defeito: **3335** (`PORT`).
+Por defeito: **3030** (`PORT`).
 
 ## Variáveis de ambiente
 
@@ -19,7 +19,7 @@ O gateway encaminha estes prefixos/caminhos para `USER_SERVICE_URL` (ver [`gatew
 - `/users`, `/users/*`
 - `/permission/*`
 
-Configurar no `.env` da raiz ou do gateway: `USER_SERVICE_URL=http://localhost:3335`.
+Configurar no `.env` da raiz ou do gateway: `USER_SERVICE_URL=http://localhost:3030`.
 
 ## Desenvolvimento
 

@@ -92,7 +92,7 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
     try {
         const apiClient = setupAPIClient(ctx);
         const [meResponse, dep] = await Promise.all([
-            apiClient.get('/me'),
+            apiClient.get('/user/me'),
             departmentService.getById(id as string)
         ]);
 

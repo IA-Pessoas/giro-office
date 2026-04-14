@@ -1,15 +1,15 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loggerLevelSchema, type LoggerLevel } from "@workspace/shared";
+import { type LoggerLevel, loggerLevelSchema } from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootEnvPath = path.resolve(__dirname, "../../../../.env");
+const serviceEnvPath = path.resolve(__dirname, "../../.env");
 
-dotenv.config({ path: rootEnvPath });
+dotenv.config({ path: serviceEnvPath });
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
@@ -24,19 +24,22 @@ const gatewayEnvSchema = z
       .default("false")
       .transform((value) => parseBoolean(value)),
     auditServiceToken: z.string().optional().default("audit-service-token"),
-    auditServiceUrl: z.string().url().default("http://localhost:3336"),
+    auditServiceUrl: z.string().url().default("http://localhost:3020"),
     port: z
       .string()
       .optional()
-      .default("3334")
+      .default("3010")
       .transform((val: string) => {
         const parsed = Number.parseInt(val, 10);
-        return Number.isNaN(parsed) ? 3334 : parsed;
+        return Number.isNaN(parsed) ? 3010 : parsed;
       }),
-    userServiceUrl: z.string().url().default("http://localhost:3335"),
-    departmentServiceUrl: z.string().url().default("http://localhost:3341"),
-    taskServiceUrl: z.string().url().default("http://localhost:3337"),
-    projectServiceUrl: z.string().url().default("http://localhost:3338"),
+    organizationServiceUrl: z.string().url().default("http://localhost:3031"),
+    rhServiceUrl: z.string().url().default("http://localhost:3034"),
+    userServiceUrl: z.string().url().default("http://localhost:3030"),
+    departmentServiceUrl: z.string().url().default("http://localhost:3036"),
+    taskServiceUrl: z.string().url().default("http://localhost:3032"),
+    projectServiceUrl: z.string().url().default("http://localhost:3033"),
+    clientServiceUrl: z.string().url().default("http://localhost:3035"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -76,10 +79,13 @@ export interface GatewayEnv {
   auditServiceToken: string;
   auditServiceUrl: string;
   port: number;
+  organizationServiceUrl: string;
+  rhServiceUrl: string;
   userServiceUrl: string;
   departmentServiceUrl: string;
   taskServiceUrl: string;
   projectServiceUrl: string;
+  clientServiceUrl: string;
   websocketUpstreamUrl?: string;
   jwtSecret: string;
   logLevel: LoggerLevel;
@@ -94,10 +100,13 @@ export function getGatewayEnv(): GatewayEnv {
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     port: process.env.GATEWAY_PORT,
+    organizationServiceUrl: process.env.ORGANIZATION_SERVICE_URL,
+    rhServiceUrl: process.env.RH_SERVICE_URL,
     userServiceUrl: process.env.USER_SERVICE_URL,
     departmentServiceUrl: process.env.DEPARTMENT_SERVICE_URL,
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
+    clientServiceUrl: process.env.CLIENT_SERVICE_URL,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,

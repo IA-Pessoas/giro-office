@@ -4,7 +4,7 @@ CRUD e operações de organizações. Montado no gateway no prefixo **`/organiza
 
 ## Porta local
 
-Por defeito: **3400** (`PORT`).
+Por defeito: **3031** (`PORT`).
 
 ## Variáveis de ambiente
 
@@ -12,7 +12,7 @@ Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET` (alin
 
 ## Gateway
 
-- URL upstream: `ORGANIZATION_SERVICE_URL` (ex.: `http://localhost:3400`), definida no [env do gateway](../gateway/src/config/env.ts).
+- URL upstream: `ORGANIZATION_SERVICE_URL` (ex.: `http://localhost:3031`), definida no [env do gateway](../gateway/src/config/env.ts).
 - O cliente chama o gateway em caminhos como `GET /organizations/organizations` (o micro expõe rotas sob `/organizations`).
 
 ## Desenvolvimento

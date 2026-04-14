@@ -1,19 +1,28 @@
-import "./env-bootstrap.js";
+import "./envBootstrap.js";
 
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
+  createLogger,
 } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
 import { createProjectApplication } from "../app.js";
-import type { ProjectCrudRouteDeps } from "../routes/projectcrud.routes.js";
+import { getProjectServiceEnv } from "../config/env.js";
+import type { ProjectCrudRouteDeps } from "../routes/projectCrud.routes.js";
 
 const ORG_ID = "a0000000-0000-4000-8000-000000000001";
 const USER_ID = "c0000000-0000-4000-8000-000000000001";
 const INTERNAL_TOKEN = "audit-service-token";
+const env = getProjectServiceEnv();
+const logger = createLogger({
+  service: "project-service",
+  env: env.nodeEnv,
+  level: env.logLevel,
+  pretty: env.logPretty,
+});
 
 function gatewayHeaders(): Record<string, string> {
   return {
@@ -24,7 +33,7 @@ function gatewayHeaders(): Record<string, string> {
 }
 
 describe("projectcrud routes", () => {
-  it("POST /integracao-projects sem token interno retorna 401", async () => {
+  it("POST /project sem token interno retorna 401", async () => {
     const deps: ProjectCrudRouteDeps = {
       create: vi.fn(async () => ({ create: {} })),
       list: vi.fn(async () => []),
@@ -32,10 +41,10 @@ describe("projectcrud routes", () => {
       detail: vi.fn(async () => ({ detail: {} })),
       delete: vi.fn(async () => ({ response: {} })),
     };
-    const { app } = createProjectApplication({ projectCrudService: deps });
+    const app = createProjectApplication({ env, logger, projectCrudService: deps });
 
     const res = await request(app)
-      .post("/integracao-projects")
+      .post("/project")
       .set("Content-Type", "application/json")
       .send({});
 
@@ -43,7 +52,7 @@ describe("projectcrud routes", () => {
     expect(deps.create).not.toHaveBeenCalled();
   });
 
-  it("POST /integracao-projects com auth gateway chama create e retorna 201", async () => {
+  it("POST /project com auth gateway chama create e retorna 201", async () => {
     const payload = {
       create: {
         id: "d0000000-0000-4000-8000-000000000001",
@@ -57,7 +66,7 @@ describe("projectcrud routes", () => {
       detail: vi.fn(async () => ({ detail: {} })),
       delete: vi.fn(async () => ({ response: {} })),
     };
-    const { app } = createProjectApplication({ projectCrudService: deps });
+    const app = createProjectApplication({ env, logger, projectCrudService: deps });
 
     const body = {
       name: "Novo",
@@ -67,7 +76,7 @@ describe("projectcrud routes", () => {
     };
 
     const res = await request(app)
-      .post("/integracao-projects")
+      .post("/project")
       .set("Content-Type", "application/json")
       .set(gatewayHeaders())
       .send(body);
@@ -85,10 +94,10 @@ describe("projectcrud routes", () => {
       detail: vi.fn(async () => ({ detail: {} })),
       delete: vi.fn(async () => ({ response: {} })),
     };
-    const { app } = createProjectApplication({ projectCrudService: deps });
+    const app = createProjectApplication({ env, logger, projectCrudService: deps });
 
     const res = await request(app)
-      .get("/integracao-projects")
+      .get("/project/list")
       .query({ ref: "invalido", id: "b0000000-0000-4000-8000-000000000001" })
       .set(gatewayHeaders());
 

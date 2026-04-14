@@ -8,7 +8,11 @@ import "express-async-errors";
 import type { DepartmentServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildDepartmentServiceOpenApiSpec } from "./openapi/spec.js";
-import { departmentRoutes } from "./routes/department.routes.js";
+import {
+  createDepartmentRoutes,
+  type DepartmentRouteDeps,
+} from "./routes/department.routes.js";
+import { DepartmentService } from "./services/departmentService.js";
 
 function departmentServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -26,7 +30,15 @@ function departmentServiceErrorLogContext(request: Request): Record<string, unkn
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export function createDepartmentApp(env: DepartmentServiceEnv, logger: Logger): Express {
+interface CreateDepartmentAppOptions {
+  env: DepartmentServiceEnv;
+  logger: Logger;
+  departmentService?: DepartmentRouteDeps;
+}
+
+export function createDepartmentApp(options: CreateDepartmentAppOptions): Express {
+  const { env, logger } = options;
+  const departmentService = options.departmentService ?? new DepartmentService();
   const app = express();
 
   app.use(cors());
@@ -44,7 +56,7 @@ export function createDepartmentApp(env: DepartmentServiceEnv, logger: Logger): 
     });
   }
 
-  app.use(departmentRoutes);
+  app.use("/department", createDepartmentRoutes(departmentService));
 
   app.use(
     createExpressErrorHandler({

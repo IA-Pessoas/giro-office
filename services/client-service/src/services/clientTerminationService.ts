@@ -1,7 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
-import type { TerminationBody } from "../schemas/clientVerticals.schema.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import type { TerminationBody } from "../schemas/clientVerticals.schemas.js";
 
 const OPEN_TASK_STATUSES = ["A Realizar", "Em andamento", "Em Espera", "Pendente"] as const;
 
@@ -35,7 +35,7 @@ export async function terminateClient(
 
   const competenceDate = parseCompetenceEndOfMonth(input.competence_output);
 
-  const created = await prisma.$transaction(async (tx) => {
+  const created = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.task.updateMany({
       where: {
         status: { in: [...OPEN_TASK_STATUSES] },

@@ -6,8 +6,8 @@ import {
   type ListClientsFilters,
   mapSimpleListStatusToDb,
   type UpdateClientBody,
-} from "../schemas/client.schema.js";
-import { buildLegacyListStatusWhere, mergeClientListSearchWhere } from "./clientListQuery.js";
+} from "../schemas/client.schemas.js";
+import { buildLegacyListStatusWhere, mergeClientListSearchWhere } from "./clientListQueryService.js";
 
 export type OrganizationPublic = {
   id: string;

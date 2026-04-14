@@ -7,15 +7,12 @@ import type {
 } from "@workspace/shared";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
-import {
-  isDepartmentServiceRoute,
-  isProjectServiceRoute,
-  isTaskServiceRoute,
-  isUserServiceRoute,
-} from "../utils/routeUtils.js";
+import type { GatewayEnv } from "../config/env.js";
+import { resolveGatewayService } from "../config/serviceRegistry.js";
 
 interface BuildAuditLifecycleMiddlewareOptions {
   enabled: boolean;
+  env: GatewayEnv;
   logger: Logger;
   recordAuditRequest: AuditRecorder;
 }
@@ -70,17 +67,18 @@ function getOutcome(statusCode: number): AuditOutcome {
   return statusCode >= 400 ? "error" : "success";
 }
 
-function getRouteTarget(request: Request): string {
+function getRouteTarget(env: GatewayEnv, request: Request): string {
   if (request.originalUrl.startsWith("/audit")) return "audit-service";
-  if (isUserServiceRoute(request.path)) return "user-service";
-  if (isDepartmentServiceRoute(request.path)) return "department-service";
-  if (isTaskServiceRoute(request.path)) return "task-service";
-  if (isProjectServiceRoute(request.path)) return "project-service";
+  const service = resolveGatewayService(env, request.originalUrl);
+  if (service) {
+    return service.auditTarget;
+  }
   return "legacy-api";
 }
 
 export function buildAuditLifecycleMiddleware({
   enabled,
+  env,
   logger,
   recordAuditRequest,
 }: BuildAuditLifecycleMiddlewareOptions) {
@@ -130,7 +128,7 @@ export function buildAuditLifecycleMiddleware({
         finishedAt: new Date().toISOString(),
         metadata: {
           responseSizeBytes: getResponseSizeBytes(response) ?? null,
-          routeTarget: getRouteTarget(request),
+          routeTarget: getRouteTarget(env, request),
         },
       };
 

@@ -8,9 +8,9 @@ export interface ServiceDefinition {
 export const SERVICES = {
   gateway: {
     name: "gateway",
-    defaultPort: 3334,
+    defaultPort: 3010,
     envVar: "GATEWAY_URL",
-    defaultUrl: "http://localhost:3334",
+    defaultUrl: "http://localhost:3010",
   },
   legacyApi: {
     name: "legacy-api",
@@ -20,15 +20,15 @@ export const SERVICES = {
   },
   clientService: {
     name: "client-service",
-    defaultPort: 3410,
+    defaultPort: 3035,
     envVar: "CLIENT_SERVICE_URL",
-    defaultUrl: "http://localhost:3410",
+    defaultUrl: "http://localhost:3035",
   },
   userService: {
     name: "user-service",
-    defaultPort: 3335,
+    defaultPort: 3030,
     envVar: "USER_SERVICE_URL",
-    defaultUrl: "http://localhost:3335",
+    defaultUrl: "http://localhost:3030",
   },
 } as const satisfies Record<string, ServiceDefinition>;
 

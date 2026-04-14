@@ -4,7 +4,6 @@ import { IoAdd, IoTrash } from "react-icons/io5";
 import { setupAPIClient } from '@shared/services/api';
 import { integracaoService } from '../services/integracaoService';
 import { useTaskModels } from '../hooks/useTaskModels';
-import type { TaskModel, ProjectTaskItem } from '../types';
 import { toast as toastifyToast } from 'react-toastify';
 
 // --- Chakra shims local (para remover dependência de @chakra-ui/react sem reescrever toda a UI) ---
@@ -275,7 +274,7 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
             const fetchUsers = async () => {
                 try {
                     const apiClient = setupAPIClient();
-                    const response = await apiClient.get('/users', { params: { status: 'Ativo' } });
+                    const response = await apiClient.get('/user/users', { params: { status: 'Ativo' } });
                     setUsers(response.data);
                 } catch (error) {
                     console.error("Erro ao buscar usuários");
@@ -309,7 +308,7 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
         setIsLoadingDetails(true);
         try {
             const apiClient = setupAPIClient();
-            const response = await apiClient.get('/integracao-project', {
+            const response = await apiClient.get('/project/project', {
                 params: { project_id: projectId }
             });
 
@@ -380,7 +379,7 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
             
             try {
                 const apiClient = setupAPIClient();
-                await apiClient.delete('/integracao-task', { data: { task_id: item.originalId } });
+                await apiClient.delete('/task/task', { data: { task_id: item.originalId } });
                 toast({ title: 'Tarefa removida do sistema.', status: 'success' });
             } catch (error) {
                 toast({ title: 'Erro ao remover tarefa.', status: 'error' });
@@ -413,8 +412,8 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
                 name: projectName,
                 objective: projectObjective,
                 sponsor_id: sponsorId || null,
-                start_date: startDate ? new Date(startDate) : null,
-                end_date: endDate ? new Date(endDate) : null,
+                start_date: startDate || null,
+                end_date: endDate || null,
             };
 
             // A) Salvar/Criar Projeto
@@ -438,7 +437,7 @@ export function ProjectCreateModal({ isOpen, onClose, clientId, clientProspectin
 
             if (newTasks.length > 0) {
                 await Promise.all(newTasks.map(task => {
-                    return apiClient.post('/integracao-tasks', {
+                    return apiClient.post('/task/tasks', {
                         model_id: task.modelId,
                         project_id: projectId,
                         client_id: clientId,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Loader from '../Loader';
+import Loader from '../../shared/components/Loader';
 import styles from './Details.module.css';
 
 interface DetailsViewProps {

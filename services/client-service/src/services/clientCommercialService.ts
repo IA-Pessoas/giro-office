@@ -1,6 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import type { UpdateCommercialBody } from "../schemas/clientVerticals.schema.js";
+import type { UpdateCommercialBody } from "../schemas/clientVerticals.schemas.js";
 
 const OPEN_TASK_STATUSES = ["A Realizar", "Em andamento", "Em Espera", "Pendente"] as const;
 

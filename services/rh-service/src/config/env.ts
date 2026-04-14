@@ -1,7 +1,15 @@
-import "dotenv/config";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
+import dotenv from "dotenv";
 import { loggerLevelSchema } from "@workspace/shared/logger";
 import { z } from "zod";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const serviceEnvPath = path.resolve(__dirname, "../../.env");
+
+dotenv.config({ path: serviceEnvPath });
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
@@ -12,10 +20,10 @@ const rhEnvSchema = z
     port: z
       .string()
       .optional()
-      .default("3339")
+      .default("3034")
       .transform((val: string) => {
         const parsed = Number.parseInt(val, 10);
-        return Number.isNaN(parsed) ? 3339 : parsed;
+        return Number.isNaN(parsed) ? 3034 : parsed;
       }),
     databaseUrl: z.string().min(1, "DATABASE_URL não definido para o rh-service."),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o rh-service."),
@@ -32,8 +40,8 @@ const rhEnvSchema = z
       .default("30")
       .transform((val) => {
         const parsed = Number.parseInt(val, 10);
-        if (Number.isNaN(parsed) || parsed < 1) {
-          return 1;
+        if (Number.isNaN(parsed) || parsed < 0) {
+          return 0;
         }
         return parsed;
       }),

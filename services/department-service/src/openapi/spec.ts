@@ -109,13 +109,35 @@ export function buildDepartmentServiceOpenApiSpec(env: DepartmentServiceEnv): Op
           },
         },
       },
-      "/departments": {
+      "/department/list": {
         get: {
           tags: ["Departments"],
           summary: "Listar departamentos",
           security: bearer,
-          parameters: [{ name: "status", in: "query", schema: { type: "string" } }],
+          parameters: [
+            {
+              name: "status",
+              in: "query",
+              schema: { type: "string", enum: ["Todos", "Ativo", "Inativo"] },
+            },
+          ],
           responses: { "200": { description: "Lista", ...successJson } },
+        },
+      },
+      "/department": {
+        get: {
+          tags: ["Departments"],
+          summary: "Detalhar departamento",
+          security: bearer,
+          parameters: [
+            {
+              name: "dep_id",
+              in: "query",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: { "200": { description: "Detalhe", ...successJson } },
         },
         post: {
           tags: ["Departments"],
@@ -130,15 +152,6 @@ export function buildDepartmentServiceOpenApiSpec(env: DepartmentServiceEnv): Op
           security: bearer,
           ...updateDepartmentRequestBody,
           responses: { "200": { description: "Atualizado", ...successJson } },
-        },
-      },
-      "/department": {
-        get: {
-          tags: ["Departments"],
-          summary: "Detalhar departamento",
-          security: bearer,
-          parameters: [{ name: "dep_id", in: "query", schema: { type: "string" } }],
-          responses: { "200": { description: "Detalhe", ...successJson } },
         },
       },
     },

@@ -1,8 +1,8 @@
 /** Defaults aligned with gateway `GatewayEnv` (organization, client, rh URLs). */
 const SERVICE_DEFAULTS = {
-  organizationServiceUrl: "http://localhost:3400",
-  rhServiceUrl: "http://localhost:3339",
-  clientServiceUrl: "http://localhost:3410",
+  organizationServiceUrl: "http://localhost:3031",
+  rhServiceUrl: "http://localhost:3034",
+  clientServiceUrl: "http://localhost:3035",
 } as const;
 
 export interface ServiceUrls {

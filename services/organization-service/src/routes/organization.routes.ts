@@ -20,7 +20,7 @@ const router: ReturnType<typeof Router> = Router();
 const organizationService = new OrganizationService();
 
 router.get(
-  "/organizations",
+  "/",
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
@@ -38,7 +38,7 @@ router.get(
 );
 
 router.post(
-  "/organizations",
+  "/",
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
@@ -53,7 +53,7 @@ router.post(
 );
 
 router.get(
-  "/organizations/:id",
+  "/:id",
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
@@ -68,7 +68,7 @@ router.get(
 );
 
 router.patch(
-  "/organizations/:id/status",
+  "/:id/status",
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
@@ -84,7 +84,7 @@ router.patch(
 );
 
 router.patch(
-  "/organizations/:id/subscription-plan",
+  "/:id/subscription-plan",
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
@@ -103,7 +103,7 @@ router.patch(
 );
 
 router.patch(
-  "/organizations/:id/logo-url",
+  "/:id/logo-url",
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {

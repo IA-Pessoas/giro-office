@@ -1,4 +1,5 @@
 import {
+  createSuccessResponse,
   createExpressErrorHandler,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
@@ -10,9 +11,9 @@ import "express-async-errors";
 
 import type { AuditServiceEnv } from "./config/env.js";
 import { buildAuditServiceOpenApiSpec } from "./openapi/spec.js";
-import type { AuditRequestRepository } from "./integrations/prisma/audit-request-repository.js";
+import type { AuditRequestRepository } from "./integrations/prisma/auditRequestRepository.js";
 import { requestContext } from "./middlewares/requestContext.js";
-import { createAuditRouter } from "./routes/index.js";
+import { createAuditInternalRouter, createAuditPublicRouter } from "./routes/audit.routes.js";
 
 function auditErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.headers[FORWARDED_AUTH_USER_ID_HEADER];
@@ -40,6 +41,24 @@ export function createApp({ env, logger, repository }: CreateAppOptions): expres
   app.use(express.json());
   app.use(requestContext);
 
+  app.get("/health", (_request, response) => {
+    response.status(200).json(
+      createSuccessResponse({
+        status: "ok",
+        service: "audit-service",
+      }),
+    );
+  });
+
+  app.get("/ready", (_request, response) => {
+    response.status(200).json(
+      createSuccessResponse({
+        status: "ready",
+        service: "audit-service",
+      }),
+    );
+  });
+
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {
       spec: buildAuditServiceOpenApiSpec(env),
@@ -47,7 +66,8 @@ export function createApp({ env, logger, repository }: CreateAppOptions): expres
     });
   }
 
-  app.use(createAuditRouter({ env, logger, repository }));
+  app.use("/audit", createAuditPublicRouter({ env, logger, repository }));
+  app.use("/internal", createAuditInternalRouter({ env, logger, repository }));
   app.use(
     createExpressErrorHandler({
       logger,

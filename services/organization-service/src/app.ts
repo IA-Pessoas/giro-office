@@ -44,7 +44,7 @@ export function createOrganizationApp(env: OrganizationEnv, logger: Logger): exp
     });
   }
 
-  app.use(organizationRoutes);
+  app.use("/organizations", organizationRoutes);
 
   app.use(
     createExpressErrorHandler({

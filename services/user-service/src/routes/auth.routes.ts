@@ -2,13 +2,15 @@ import {
   createSuccessResponse,
   error as logError,
   FORWARDED_AUTH_USER_ID_HEADER,
+  parseWithZod,
   ServiceError,
 } from "@workspace/shared";
 import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
 
-import { AuthService } from "../services/AuthService.js";
-import { UserService } from "../services/UserService.js";
+import { AuthService } from "../services/authService.js";
+import { UserService } from "../services/userService.js";
+import { loginBodySchema } from "../schemas/auth.schemas.js";
 
 const router: ReturnType<typeof Router> = Router();
 const authService = new AuthService();
@@ -16,7 +18,7 @@ const userService = new UserService();
 
 router.post("/session", async (request: Request, response: Response, next: NextFunction) => {
   try {
-    const { login, password } = request.body;
+    const { login, password } = parseWithZod(loginBodySchema, request.body);
 
     const session = await authService.login({ login, password });
 

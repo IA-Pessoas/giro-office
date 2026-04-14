@@ -3,69 +3,79 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "development": "./src/index.ts",
+      "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./auth": {
       "types": "./dist/auth/index.d.ts",
-      "development": "./src/auth/index.ts",
+      "import": "./dist/auth/index.js",
       "default": "./dist/auth/index.js"
     },
     "./audit": {
       "types": "./dist/audit/index.d.ts",
-      "development": "./src/audit/index.ts",
+      "import": "./dist/audit/index.js",
       "default": "./dist/audit/index.js"
     },
     "./datetime": {
       "types": "./dist/datetime/index.d.ts",
-      "development": "./src/datetime/index.ts",
+      "import": "./dist/datetime/index.js",
       "default": "./dist/datetime/index.js"
     },
     "./http": {
       "types": "./dist/http/index.d.ts",
-      "development": "./src/http/index.ts",
+      "import": "./dist/http/index.js",
       "default": "./dist/http/index.js"
     },
     "./logger": {
       "types": "./dist/logger/index.d.ts",
+      "import": "./dist/logger/index.js",
       "development": "./src/logger/index.ts",
       "default": "./dist/logger/index.js"
     },
     "./routes/services": {
       "types": "./dist/routes/services.d.ts",
+      "import": "./dist/routes/services.js",
       "development": "./src/routes/services.ts",
       "default": "./dist/routes/services.js"
     },
     "./schemas": {
       "types": "./dist/schemas/index.d.ts",
+      "import": "./dist/schemas/index.js",
       "development": "./src/schemas/index.ts",
       "default": "./dist/schemas/index.js"
     },
     "./storage": {
       "types": "./dist/storage/index.d.ts",
+      "import": "./dist/storage/index.js",
       "development": "./src/storage/index.ts",
       "default": "./dist/storage/index.js"
     },
     "./upload": {
       "types": "./dist/upload/index.d.ts",
-      "development": "./src/upload/index.ts",
+      "import": "./dist/upload/index.js",
       "default": "./dist/upload/index.js"
     },
     "./validation": {
       "types": "./dist/validation/index.d.ts",
-      "development": "./src/validation/index.ts",
+      "import": "./dist/validation/index.js",
       "default": "./dist/validation/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
+  "files": [
+    "dist",
+    "package.json"
+  ],
   "scripts": {
     "build": "node -e \"import('node:fs').then((fs) => { fs.rmSync('dist', { recursive: true, force: true }); fs.rmSync('tsconfig.tsbuildinfo', { force: true }); })\" && tsc -p tsconfig.json",
-    "dev": "tsc --watch",
-    "test": "pnpm run build && tsx --test tests/**/*.test.ts",
+    "dev": "tsc --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test tests/**/*.test.ts",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check ."

@@ -1,34 +1,29 @@
 import {
+  type AuthLogContext,
   createAuditRecorder,
   createExpressErrorHandler,
   createSuccessResponse,
   gatewayError,
   INTERNAL_SERVICE_TOKEN_HEADER,
-  ServiceError,
-  type AuthLogContext,
   type Logger,
   type LogLevel,
+  ServiceError,
 } from "@workspace/shared";
 import { mountOpenApiDocs } from "@workspace/shared/http";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
 import type { GatewayEnv } from "./config/env.js";
+import { getGatewayServiceDefinitions, resolveGatewayService } from "./config/serviceRegistry.js";
 import {
   buildAuditErrorCaptureMiddleware,
   buildAuditLifecycleMiddleware,
 } from "./middlewares/audit.js";
 import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
-import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
+import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
-import {
-  isDepartmentServiceRoute,
-  isProjectServiceRoute,
-  isTaskServiceRoute,
-  isUserServiceRoute,
-} from "./utils/routeUtils.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
   return {
@@ -92,25 +87,6 @@ function getUpstreamContext(url: string, request: Request) {
   } catch {
     return undefined;
   }
-}
-function getProxyTargetUrl(env: GatewayEnv, request: Request): string | null {
-  if (isUserServiceRoute(request.path)) {
-    return env.userServiceUrl;
-  }
-
-  if (isDepartmentServiceRoute(request.path)) {
-    return env.departmentServiceUrl;
-  }
-
-  if (isTaskServiceRoute(request.path)) {
-    return env.taskServiceUrl;
-  }
-
-  if (isProjectServiceRoute(request.path)) {
-    return env.projectServiceUrl;
-  }
-
-  return null;
 }
 
 function getResponseSizeBytes(response: Response): number | undefined {
@@ -206,6 +182,7 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   app.use(
     buildAuditLifecycleMiddleware({
       enabled: env.auditEnabled,
+      env,
       logger,
       recordAuditRequest,
     }),
@@ -256,9 +233,11 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     );
   });
 
-  app.use("/organizations", buildHttpProxyMiddleware(env.organizationServiceUrl));
-  app.use("/clients", buildHttpProxyMiddleware(env.clientServiceUrl));
-  app.use("/rh", buildHttpProxyMiddleware(env.rhServiceUrl));
+  for (const service of getGatewayServiceDefinitions(env)) {
+    for (const routePrefix of service.routePrefixes) {
+      app.use(routePrefix, buildHttpProxyMiddleware(service.targetUrl));
+    }
+  }
   if (env.auditEnabled) {
     app.use(
       "/audit",
@@ -271,12 +250,12 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   }
 
   app.use((request, response, next) => {
-    const targetUrl = getProxyTargetUrl(env, request);
-    if (targetUrl === null) {
+    const service = resolveGatewayService(env, request.originalUrl);
+    if (service === null) {
       next(new ServiceError(404, "Rota não mapeada no gateway."));
       return;
     }
-    return buildHttpProxyMiddleware(targetUrl)(request, response, next);
+    return buildHttpProxyMiddleware(service.targetUrl)(request, response, next);
   });
   app.use(buildAuditErrorCaptureMiddleware());
   app.use(
@@ -285,10 +264,10 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
       event: "gateway.error",
       fallbackMessage: "Erro interno no gateway.",
       getContext: (request) => {
-        const targetUrl = getProxyTargetUrl(env, request);
+        const service = resolveGatewayService(env, request.originalUrl);
         return {
           auth: getAuthLogContext(request),
-          upstream: targetUrl ? getUpstreamContext(targetUrl, request) : undefined,
+          upstream: service ? getUpstreamContext(service.targetUrl, request) : undefined,
         };
       },
     }),

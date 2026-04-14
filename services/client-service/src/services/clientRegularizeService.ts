@@ -1,6 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import type { UpdateRegularizeBody } from "../schemas/clientVerticals.schema.js";
+import type { UpdateRegularizeBody } from "../schemas/clientVerticals.schemas.js";
 import { cleanDocument } from "../utils/documents.js";
 
 export async function updateRegularizeClient(

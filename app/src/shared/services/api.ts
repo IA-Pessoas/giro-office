@@ -11,7 +11,7 @@ const SERVER_ERROR_TOAST_MESSAGE =
 
 export function setupAPIClient(ctx = undefined, onUnauthorized?: () => void) {
   return createApiClient({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3334",
+    baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3010",
     getAccessToken: () => {
       const cookies = parseCookies(ctx);
       return cookies[TOKEN_COOKIE];

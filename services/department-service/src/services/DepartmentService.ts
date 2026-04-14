@@ -1,6 +1,6 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
-import * as audit from "../integrations/audit.js";
+import * as departmentAudit from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
 
 const DEPARTMENT_SELECT = {
@@ -63,10 +63,24 @@ function normalizeStatusValue(status?: string): DepartmentStatus | undefined {
   throw new ServiceError(400, "status deve ser Ativo ou Inativo.");
 }
 
+export type DepartmentPrismaDeps = Pick<typeof prismaClient, "department">;
+
+export interface DepartmentAuditDeps {
+  createLog: typeof departmentAudit.createLog;
+  logUpdateIfChanged: typeof departmentAudit.logUpdateIfChanged;
+}
+
+const defaultAuditDeps: DepartmentAuditDeps = departmentAudit;
+
 export class DepartmentService {
+  constructor(
+    private readonly prisma: DepartmentPrismaDeps = prismaClient,
+    private readonly audit: DepartmentAuditDeps = defaultAuditDeps,
+  ) {}
+
   async create(data: CreateDepartmentRequest): Promise<{ dep: DepartmentItem }> {
     try {
-      const exists = await prismaClient.department.findFirst({
+      const exists = await this.prisma.department.findFirst({
         where: {
           name: data.name,
           organization_id: data.organization_id,
@@ -77,7 +91,7 @@ export class DepartmentService {
         throw new ServiceError(409, "Departamento já cadastrado.");
       }
 
-      const dep = await prismaClient.department.create({
+      const dep = await this.prisma.department.create({
         data: {
           name: data.name,
           color: data.color,
@@ -88,7 +102,7 @@ export class DepartmentService {
         select: DEPARTMENT_SELECT,
       });
 
-      await audit.createLog({
+      await this.audit.createLog({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Cadastro",
@@ -107,7 +121,7 @@ export class DepartmentService {
 
   async detail(dep_id: string, organization_id: string): Promise<{ dep: DepartmentItem }> {
     try {
-      const dep = await prismaClient.department.findFirst({
+      const dep = await this.prisma.department.findFirst({
         where: {
           id: dep_id,
           organization_id,
@@ -129,7 +143,7 @@ export class DepartmentService {
 
   async update(data: UpdateDepartmentRequest): Promise<DepartmentItem> {
     try {
-      const current = await prismaClient.department.findFirst({
+      const current = await this.prisma.department.findFirst({
         where: {
           id: data.dep_id,
           organization_id: data.organization_id,
@@ -143,7 +157,7 @@ export class DepartmentService {
 
       const nextName = data.name ?? current.name;
       if (nextName !== current.name) {
-        const duplicate = await prismaClient.department.findFirst({
+        const duplicate = await this.prisma.department.findFirst({
           where: {
             name: nextName,
             organization_id: data.organization_id,
@@ -157,7 +171,7 @@ export class DepartmentService {
         }
       }
 
-      const updated = await prismaClient.department.update({
+      const updated = await this.prisma.department.update({
         where: {
           id: data.dep_id,
         },
@@ -170,7 +184,7 @@ export class DepartmentService {
         select: DEPARTMENT_SELECT,
       });
 
-      await audit.logUpdateIfChanged({
+      await this.audit.logUpdateIfChanged({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Atualização",
@@ -192,7 +206,7 @@ export class DepartmentService {
     try {
       const normalizedStatus = normalizeStatusFilter(status);
 
-      return await prismaClient.department.findMany({
+      return await this.prisma.department.findMany({
         where: {
           organization_id,
           ...(normalizedStatus ? { status: normalizedStatus } : {}),
