@@ -1,6 +1,7 @@
 **/node_modules
 *.env
 .env.local
+.env.vps.*
 *generated/
 tsconfig*
 
@@ -26,7 +27,8 @@ Thumbs.db
 
 
 # docs
-docs/
+docs/*
+!docs/vps-deploy.md
 # Figma reference project (local only)
 novo layout/
 .cursor/plans/

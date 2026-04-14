@@ -3,11 +3,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
-import { PrismaClient } from "../../services/src/src/generated/prisma/client.js";
+import { PrismaClient } from "../generated/prisma/client.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootEnvPath = path.resolve(__dirname, '../../.env');
+const rootEnvPath = path.resolve(__dirname, "../../.env");
 
 dotenv.config({ path: rootEnvPath });
 
