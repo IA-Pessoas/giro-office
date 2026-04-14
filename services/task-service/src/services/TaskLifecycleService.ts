@@ -151,8 +151,9 @@ export class TaskLifecycleService {
       const perm = await prismaClient.permission.findFirst({
         where: { user_id, organization_id },
       });
+      const integrationLevel = perm?.integracao ?? 0;
 
-      if (!perm || perm.integracao < 2) {
+      if (integrationLevel < 2) {
         throw new ServiceError(403, "Sem cargo para completar.");
       }
 
@@ -160,7 +161,7 @@ export class TaskLifecycleService {
         where: { user_id, organization_id },
       });
 
-      if (perm.integracao < 3 && (!permConclusion || permConclusion.task_completion !== true)) {
+      if (integrationLevel < 3 && (!permConclusion || permConclusion.task_completion !== true)) {
         throw new ServiceError(403, "Sem permissão para completar.");
       }
 

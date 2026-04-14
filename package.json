@@ -13,7 +13,7 @@
     "dev:api": "turbo run dev --filter=@workspace/legacy-api",
     "dev:gateway": "turbo run dev --filter=@workspace/gateway",
     "build:gateway": "turbo run build --filter=@workspace/gateway",
-    "prisma:generate": "pnpm --filter @workspace/infra run prisma:generate",
+    "prisma:generate": "node scripts/prisma-generate.mjs",
     "prisma:migrate": "pnpm --filter @workspace/infra run prisma:migrate",
     "prepare": "husky",
     "format": "biome format --write .",

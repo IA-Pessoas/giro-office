@@ -73,7 +73,7 @@ function getRouteTarget(env: GatewayEnv, request: Request): string {
   if (service) {
     return service.auditTarget;
   }
-  return "legacy-api";
+  return "unmapped-route";
 }
 
 export function buildAuditLifecycleMiddleware({

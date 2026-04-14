@@ -5,9 +5,12 @@
   "type": "module",
   "main": "dist/src/server.js",
   "scripts": {
+    "prisma:generate": "node ../../scripts/prisma-generate.mjs",
+    "prebuild": "pnpm prisma:generate",
+    "predev": "pnpm prisma:generate",
     "dev": "tsx watch src/server.ts",
     "build": "node -e \"import('node:fs').then((fs) => { fs.rmSync('dist', { recursive: true, force: true }); fs.rmSync('tsconfig.tsbuildinfo', { force: true }); })\" && tsc",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm prisma:generate && tsc --noEmit",
     "start": "node dist/src/server.js",
     "test": "pnpm exec vitest run",
     "test:watch": "pnpm exec vitest",
