@@ -1,19 +1,9 @@
 import { createLogger } from "@workspace/shared/logger";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
 import request from "supertest";
-import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { createTaskApp } from "../app.js";
 import { getTaskServiceEnv } from "../config/env.js";
-
-class MemoryLogStream extends Writable {
-  _write(
-    _chunk: string | Uint8Array,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
-    callback();
-  }
-}
 
 describe("task-service", () => {
   it("GET /health returns success envelope", async () => {

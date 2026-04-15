@@ -65,6 +65,12 @@
       "import": "./dist/validation/index.js",
       "default": "./dist/validation/index.js"
     },
+    "./testUtils": {
+      "types": "./dist/testUtils/index.d.ts",
+      "import": "./dist/testUtils/index.js",
+      "development": "./src/testUtils/index.ts",
+      "default": "./dist/testUtils/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

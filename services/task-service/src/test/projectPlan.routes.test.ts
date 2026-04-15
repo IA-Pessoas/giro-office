@@ -1,5 +1,3 @@
-import { Writable } from "node:stream";
-
 import { createExpressErrorHandler, ServiceError } from "@workspace/shared";
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -7,6 +5,7 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared/http";
 import { createLogger } from "@workspace/shared/logger";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
@@ -21,16 +20,6 @@ const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const PLAN_ID = "11111111-1111-1111-1111-111111111111";
 const PROJECT_ID = "22222222-2222-2222-2222-222222222222";
-
-class MemoryLogStream extends Writable {
-  override _write(
-    _chunk: string | Uint8Array,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
-    callback();
-  }
-}
 
 function createTestLogger() {
   return createLogger({

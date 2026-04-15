@@ -1,13 +1,12 @@
 import "./envBootstrap.js";
 
-import { Writable } from "node:stream";
-
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
 } from "@workspace/shared";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
 import { createLogger } from "@workspace/shared/logger";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,16 +17,6 @@ import type { DepartmentRouteDeps } from "../routes/department.routes.js";
 
 const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
 const USER_ID = "c0000000-0000-4000-8000-000000000001";
-
-class MemoryLogStream extends Writable {
-  _write(
-    _chunk: string | Uint8Array,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
-    callback();
-  }
-}
 
 function createDepartmentServiceMock(): DepartmentRouteDeps {
   return {

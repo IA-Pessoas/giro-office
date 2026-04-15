@@ -1,6 +1,5 @@
-import { Writable } from "node:stream";
-
 import { createLogger } from "@workspace/shared/logger";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
 import type { NextFunction } from "express";
 import { vi } from "vitest";
 
@@ -195,16 +194,6 @@ vi.mock("../middlewares/isAuthenticated.js", () => ({
 
 import { createApp } from "../app.js";
 import type { RhEnv } from "../config/env.js";
-
-class MemoryLogStream extends Writable {
-  _write(
-    _chunk: string | Uint8Array,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
-    callback();
-  }
-}
 
 export function createTestApp() {
   const env = {

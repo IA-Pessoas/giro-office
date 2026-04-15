@@ -1,6 +1,5 @@
 ﻿import { once } from "node:events";
 import { createServer, type IncomingMessage, request as nodeRequest, type Server } from "node:http";
-import { Writable } from "node:stream";
 
 import type { CreateAuditRequestPayload } from "@workspace/shared";
 import {
@@ -9,21 +8,12 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
 import jwt from "jsonwebtoken";
 import { expect, it } from "vitest";
 
 import { createApp } from "./app.js";
 import type { GatewayEnv } from "./config/env.js";
-
-class MemoryLogStream extends Writable {
-  _write(
-    _chunk: string | Uint8Array,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
-    callback();
-  }
-}
 
 async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
