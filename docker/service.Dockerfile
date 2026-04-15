@@ -24,6 +24,7 @@ COPY packages ./packages
 COPY shared ./shared
 COPY infra ./infra
 COPY services ./services
+COPY scripts ./scripts
 
 ARG WORKSPACE_PACKAGE
 ARG SERVICE_DIR

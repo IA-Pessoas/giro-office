@@ -14,8 +14,8 @@ services:
     env_file:
       - .env.vps.reverse-proxy
     ports:
-      - "80:80"
-      - "443:443"
+      - "8085:80"
+      # - "443:443"
     volumes:
       - ./docker/nginx/generate-nginx-config.sh:/opt/generate-nginx-config.sh:ro
       - ./docker/nginx/certs:/etc/nginx/certs:ro
