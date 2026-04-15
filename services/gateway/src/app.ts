@@ -1,13 +1,13 @@
 import {
+  type AuthLogContext,
   createAuditRecorder,
   createExpressErrorHandler,
   createSuccessResponse,
   gatewayError,
   INTERNAL_SERVICE_TOKEN_HEADER,
-  ServiceError,
-  type AuthLogContext,
   type Logger,
   type LogLevel,
+  ServiceError,
 } from "@workspace/shared";
 import { mountOpenApiDocs } from "@workspace/shared/http";
 import cors from "cors";
@@ -21,8 +21,8 @@ import {
 } from "./middlewares/audit.js";
 import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
-import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
+import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
 
 function createCorsOptions(env: GatewayEnv): cors.CorsOptions {

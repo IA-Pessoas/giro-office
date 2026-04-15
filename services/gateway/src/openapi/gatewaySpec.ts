@@ -2,6 +2,7 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import { buildAuditServiceOpenApiSpec } from "../../../audit-service/src/openapi/spec.js";
 import { buildClientServiceOpenApiSpec } from "../../../client-service/src/openapi/spec.js";
+import { buildDepartmentServiceOpenApiSpec } from "../../../department-service/src/openapi/spec.js";
 import { buildOrganizationServiceOpenApiSpec } from "../../../organization-service/src/openapi/spec.js";
 import { buildProjectServiceOpenApiSpec } from "../../../project-service/src/openapi/spec.js";
 import { buildRhServiceOpenApiSpec } from "../../../rh-service/src/openapi/spec.js";
@@ -54,6 +55,15 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "User Service",
       buildSpec: () =>
         buildUserServiceOpenApiSpec({ port: getPortFromUrl(env.userServiceUrl) } as never),
+      includePath: (path) => path !== "/health",
+    },
+    {
+      key: "department-service",
+      label: "Department Service",
+      buildSpec: () =>
+        buildDepartmentServiceOpenApiSpec({
+          port: getPortFromUrl(env.departmentServiceUrl),
+        } as never),
       includePath: (path) => path !== "/health",
     },
     {

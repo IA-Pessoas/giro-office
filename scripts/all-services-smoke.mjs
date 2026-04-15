@@ -85,6 +85,7 @@ const INTERNAL_SERVICE_TOKENS = {
 const SERVICE_URL_ENV_KEYS = {
   "audit-service": "AUDIT_SERVICE_URL",
   "client-service": "CLIENT_SERVICE_URL",
+  "department-service": "DEPARTMENT_SERVICE_URL",
   "organization-service": "ORGANIZATION_SERVICE_URL",
   "project-service": "PROJECT_SERVICE_URL",
   "rh-service": "RH_SERVICE_URL",
@@ -129,6 +130,7 @@ const state = {
   bearerToken: "",
   adminBearerToken: "",
   baselineDepartmentId: env.smokeDepartmentId,
+  departmentId: "",
   tempUserId: "",
   tempOrganizationId: "",
   primaryClientId: "",
@@ -653,10 +655,34 @@ function resolveDepartmentIdFromResponse(responseBody) {
   return pickFirst(
     responseBody,
     "data.department_id",
+    "data.dep.id",
     "data.user.department_id",
     "data.users.0.department_id",
     "data.0.department_id",
   );
+}
+
+async function ensureDepartmentId() {
+  if (state.departmentId) {
+    return state.departmentId;
+  }
+
+  const response = await helperCall("department-create-helper", {
+    method: "POST",
+    path: "/department",
+    target: "gateway",
+    service: "department-service",
+    auth: "bearer",
+    json: {
+      name: uniqueText("Smoke Department"),
+      color: "#0F766E",
+      solution: true,
+    },
+    expectedStatus: [201],
+  });
+
+  state.departmentId = pickFirst(response.body, "data.dep.id") ?? findFirstId(response.body?.data);
+  return state.departmentId;
 }
 
 async function ensureSecondaryTaskModel() {
@@ -1022,6 +1048,48 @@ const handlers = {
       expectedStatus: [200],
       path: `/organizations/${requireState("tempOrganizationId")}/logo-url`,
       json: { logo_url: "https://example.com/smoke-logo.png" },
+    });
+  },
+
+  async departmentList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { status: "Ativo" },
+    });
+  },
+
+  async departmentCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        name: uniqueText("Smoke Department"),
+        color: "#0F766E",
+        solution: true,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.departmentId = pickFirst(response.body, "data.dep.id") ?? findFirstId(response.body?.data);
+  },
+
+  async departmentGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { dep_id: await ensureDepartmentId() },
+    });
+  },
+
+  async departmentPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        dep_id: await ensureDepartmentId(),
+        name: uniqueText("Smoke Department Updated"),
+        color: "#1D4ED8",
+        status: "Ativo",
+        solution: false,
+      },
     });
   },
 

@@ -6,6 +6,8 @@ const RH_SERVICE_PREFIXES = ["/rh"] as const;
 
 const USER_SERVICE_PREFIXES = ["/user"] as const;
 
+const DEPARTMENT_SERVICE_PREFIXES = ["/department"] as const;
+
 const TASK_SERVICE_PREFIXES = ["/task"] as const;
 
 const PROJECT_SERVICE_PREFIXES = ["/project"] as const;
@@ -50,6 +52,12 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.userServiceUrl,
       auditTarget: "user-service",
       routePrefixes: [...USER_SERVICE_PREFIXES],
+    },
+    {
+      key: "department-service",
+      targetUrl: env.departmentServiceUrl,
+      auditTarget: "department-service",
+      routePrefixes: [...DEPARTMENT_SERVICE_PREFIXES],
     },
     {
       key: "task-service",
