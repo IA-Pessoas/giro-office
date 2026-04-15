@@ -1,0 +1,272 @@
+services:
+  reverse-proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    command:
+      [
+        "/bin/sh",
+        "-c",
+        "/opt/generate-nginx-config.sh && exec nginx -g 'daemon off;'",
+      ]
+    depends_on:
+      gateway:
+        condition: service_healthy
+    env_file:
+      - .env.vps.reverse-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/generate-nginx-config.sh:/opt/generate-nginx-config.sh:ro
+      - ./docker/nginx/certs:/etc/nginx/certs:ro
+    networks:
+      - edge
+      - backend
+
+  gateway:
+    image: workspace-gateway:vps
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/gateway"
+        SERVICE_DIR: services/gateway
+    env_file:
+      - .env.vps.gateway
+    ports:
+      - "3010:3010"
+    depends_on:
+      organization-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      task-service:
+        condition: service_healthy
+      project-service:
+        condition: service_healthy
+      client-service:
+        condition: service_healthy
+      rh-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3010/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - edge
+      - backend
+
+  organization-service:
+    image: workspace-organization-service:vps
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/organization-service"
+        SERVICE_DIR: services/organization-service
+    env_file:
+      - .env.vps.organization-service
+    expose:
+      - "3031"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3031/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+
+  user-service:
+    image: workspace-user-service:vps
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/user-service"
+        SERVICE_DIR: services/user-service
+    env_file:
+      - .env.vps.user-service
+    expose:
+      - "3030"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3030/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+
+  task-service:
+    image: workspace-task-service:vps
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/task-service"
+        SERVICE_DIR: services/task-service
+    env_file:
+      - .env.vps.task-service
+    expose:
+      - "3032"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3032/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+
+  project-service:
+    image: workspace-project-service:vps
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/project-service"
+        SERVICE_DIR: services/project-service
+    env_file:
+      - .env.vps.project-service
+    expose:
+      - "3033"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3033/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+
+  client-service:
+    image: workspace-client-service:vps
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/client-service"
+        SERVICE_DIR: services/client-service
+    env_file:
+      - .env.vps.client-service
+    expose:
+      - "3035"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3035/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+
+  rh-service:
+    image: workspace-rh-service:vps
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/rh-service"
+        SERVICE_DIR: services/rh-service
+    env_file:
+      - .env.vps.rh-service
+    expose:
+      - "3034"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3034/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+
+  audit-service:
+    image: workspace-audit-service:vps
+    restart: unless-stopped
+    profiles:
+      - audit
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/audit-service"
+        SERVICE_DIR: services/audit-service
+    env_file:
+      - .env.vps.audit-service
+    command: ["node", "dist/src/server.js"]
+    expose:
+      - "3020"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3020/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+
+networks:
+  edge:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
