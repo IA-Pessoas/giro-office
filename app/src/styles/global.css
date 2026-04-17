@@ -313,7 +313,23 @@ body {
     .users-section-title {
         font-size: 0.875rem;
         font-weight: 600;
-        color: var(--colors-blue-500);
+        color: #0f172a;
+    }
+
+    .dialog-neutral-title {
+        color: #000000;
+    }
+
+    .dialog-neutral-label {
+        color: #000000;
+    }
+
+    .dialog-neutral-muted {
+        color: #475569;
+    }
+
+    .dialog-neutral-text {
+        color: #0f172a;
     }
 
     .clients-shell {
@@ -473,6 +489,20 @@ html[data-theme="dark"] .dashboard-shell .text-slate-800,
 html[data-theme="dark"] .dashboard-shell .text-slate-500,
 .chakra-ui-dark .dashboard-shell .text-slate-500 {
     color: #475569 !important;
+}
+
+html[data-theme="dark"] .dialog-neutral-title,
+html[data-theme="dark"] .dialog-neutral-label,
+html[data-theme="dark"] .dialog-neutral-text,
+.chakra-ui-dark .dialog-neutral-title,
+.chakra-ui-dark .dialog-neutral-label,
+.chakra-ui-dark .dialog-neutral-text {
+    color: #ffffff !important;
+}
+
+html[data-theme="dark"] .dialog-neutral-muted,
+.chakra-ui-dark .dialog-neutral-muted {
+    color: #cbd5e1 !important;
 }
 
 /* Clients (dark mode): match dashboard (white surfaces + brand blue typography) */
