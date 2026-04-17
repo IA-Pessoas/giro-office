@@ -79,7 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps){
         const { '@cw.token': token } = parseCookies();
 
         if (token) {
-            api.get('/me').then(response => {
+            api.get('/user/me').then(response => {
                 const userData = response.data?.data;
 
                 if (isValidAuthUser(userData)) {
@@ -103,7 +103,7 @@ export function AuthProvider({ children }: AuthProviderProps){
 
     async function signIn({ login, password }: SignInProps) {
         try {
-            const response = await api.post('/session', {
+            const response = await api.post('/user/session', {
                 login,
                 password
             })

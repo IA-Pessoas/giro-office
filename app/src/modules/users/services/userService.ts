@@ -37,20 +37,21 @@ function extractUsersList(payload: unknown): UserItem[] {
 export const userService = {
   list: async (filters?: { status?: string }): Promise<UserItem[]> => {
     const api = setupAPIClient();
-    const response = await api.get('/users', { params: filters });
+    const response = await api.get('/user', { params: filters });
     return extractUsersList(response.data);
   },
 
   getById: async (id: string): Promise<UserItem> => {
     const api = setupAPIClient();
-    const response = await api.get('/users-detail', { params: { user_id: id } });
+    const response = await api.get(`/user/${id}`);
     return response.data.user;
   },
 
   create: async (data: CreateUserData | AdminCreateUserData): Promise<UserItem> => {
     const api = setupAPIClient();
-    const response = await api.post('/users', data);
-    return response.data.data;
+    console.log('Payload que vai para o backend:', data);
+    const response = await api.post('/user', data);
+    return response.data.data ?? response.data?.data ?? response.data;
   },
 
   update: async (id: string, data: UpdateUserData): Promise<UserItem> => {
@@ -65,7 +66,7 @@ export const userService = {
     if (data.status) formData.append('status', data.status);
     if (data.file) formData.append('file', data.file);
 
-    const response = await api.put('/users', formData, {
+    const response = await api.patch(`/user/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;

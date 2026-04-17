@@ -53,7 +53,7 @@ export function Administracao() {
       setIsLoadingOrganizationId(true);
       try {
         const api = setupAPIClient();
-        const response = await api.get("/me");
+        const response = await api.get("/user/me");
         const meData = response.data?.data ?? response.data?.user;
         const nextOrganizationId =
           typeof meData?.organization_id === "string" && meData.organization_id.trim().length > 0
