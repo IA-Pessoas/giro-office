@@ -118,7 +118,7 @@ export function AuthProvider({ children }: AuthProviderProps){
             }
         
             setCookie(undefined, '@cw.token', sessionData.token, {
-                maxAge: 60 * 60 * 24 * 30,
+                maxAge: 60 * 60 * 24 * 7,
                 path: '/'
             })
 
