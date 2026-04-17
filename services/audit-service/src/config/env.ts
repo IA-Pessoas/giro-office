@@ -7,9 +7,9 @@ import { z } from "zod";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootEnvPath = path.resolve(__dirname, "../../../../.env");
+const serviceEnvPath = path.resolve(__dirname, "../../.env");
 
-dotenv.config({ path: rootEnvPath });
+dotenv.config({ path: serviceEnvPath });
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
@@ -26,10 +26,10 @@ const auditServiceEnvSchema = z
     auditServicePort: z
       .string()
       .optional()
-      .default("3336")
+      .default("3020")
       .transform((value) => {
         const parsed = Number.parseInt(value, 10);
-        return Number.isNaN(parsed) ? 3336 : parsed;
+        return Number.isNaN(parsed) ? 3020 : parsed;
       }),
     auditServiceToken: z.string().optional().default("audit-service-token"),
     databaseUrl: z.string().min(1, "DATABASE_URL não definido para o audit-service."),

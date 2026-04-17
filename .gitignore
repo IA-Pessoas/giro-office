@@ -1,8 +1,9 @@
 **/node_modules
 *.env
 .env.local
+.env.vps.*
 *generated/
-tsconfig.tsbuildinfo
+tsconfig*
 
 # Turborepo
 .turbo/
@@ -26,6 +27,11 @@ Thumbs.db
 
 
 # docs
-docs/
+docs/*
+!docs/vps-deploy.md
 # Figma reference project (local only)
 novo layout/
+.cursor/plans/
+
+# Smoke test artifacts
+smoke-*/

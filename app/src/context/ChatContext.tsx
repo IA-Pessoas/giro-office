@@ -5,7 +5,7 @@ import { parseCookies } from 'nookies';
 import { chatService } from '../modules/chat/services/chatService';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
-import type { ChatParticipant, User, Message, Chat, ChatContextType } from '../modules/chat/types';
+import type { ChatParticipant, User, Message, Chat } from '../modules/chat/types';
 
 export interface ChatContextType {
     chats: Chat[];

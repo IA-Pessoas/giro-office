@@ -30,7 +30,7 @@ export const comercialTab = ({ client, perms }: ClientTabProps) => {
     useEffect(() => {
         const fetchIntegrationData = async () => {
             try {
-                const response = await apiClient.get('/integracao-projects', {
+                const response = await apiClient.get('/project/projects', {
                     params: {
                         ref: 'client',
                         id: client.id

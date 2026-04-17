@@ -5,15 +5,18 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
+    "prebuild": "pnpm prisma:generate",
+    "predev": "pnpm prisma:generate",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
+    "typecheck": "pnpm prisma:generate && tsc --noEmit",
     "start": "node dist/server.js",
-    "prisma:generate": "pnpm --filter @workspace/infra run prisma:generate",
+    "prisma:generate": "node ../../scripts/prisma-generate.mjs",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check .",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "pnpm exec vitest run",
+    "test:watch": "pnpm exec vitest"
   },
   "dependencies": {
     "@workspace/shared": "workspace:*",

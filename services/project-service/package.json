@@ -3,16 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/server.js",
   "scripts": {
-    "prisma:generate": "pnpm --filter @workspace/infra run prisma:generate",
+    "prisma:generate": "node ../../scripts/prisma-generate.mjs",
     "prebuild": "pnpm prisma:generate",
     "predev": "pnpm prisma:generate",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "typecheck": "pnpm prisma:generate && tsc --noEmit",
+    "start": "node dist/server.js",
+    "test": "pnpm exec vitest run",
+    "test:watch": "pnpm exec vitest"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",
