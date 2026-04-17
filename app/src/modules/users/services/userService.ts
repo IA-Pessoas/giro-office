@@ -49,7 +49,6 @@ export const userService = {
 
   create: async (data: CreateUserData | AdminCreateUserData): Promise<UserItem> => {
     const api = setupAPIClient();
-    console.log('Payload que vai para o backend:', data);
     const response = await api.post('/user', data);
     return response.data.data ?? response.data?.data ?? response.data;
   },

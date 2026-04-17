@@ -45,22 +45,22 @@ export interface Project {
   id: string;
   name: string;
   objective: string;
-  start_date: string;
-  end_date: string;
-  sponsor_id: string;
+  start_date: string | null;
+  end_date: string | null;
+  sponsor_id: string | null;
   client_id: string;
-  prospecting_status: string;
+  prospecting_status?: string;
   [key: string]: any;
 }
 
 export interface CreateProjectData {
   name: string;
   objective: string;
-  start_date: string;
-  end_date: string;
-  sponsor_id: string;
+  start_date: string | null;
+  end_date: string | null;
+  sponsor_id: string | null;
   client_id: string;
-  prospecting_status: string;
+  prospecting_status?: string;
   tasks?: ProjectTaskItem[];
 }
 

@@ -1,5 +1,4 @@
 import "dotenv/config";
-import { serverError, serviceStart } from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import http from "node:http";
 
@@ -18,9 +17,17 @@ const app = createOrganizationApp(env, logger);
 const server = http.createServer(app);
 
 server.listen(env.port, () => {
-  serviceStart({ service: "organization-service", port: env.port });
+  logger.info({
+    event: "server.start",
+    message: "organization-service rodando",
+    data: { port: env.port },
+  });
 });
 
 server.on("error", (err) => {
-  serverError("Erro no servidor organization-service", err);
+  logger.error({
+    event: "server.error",
+    message: "Erro no servidor organization-service",
+    err,
+  });
 });

@@ -69,7 +69,7 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
           },
         },
       },
-      "/integracao-projects": {
+      "/project": {
         post: {
           tags: ["Projetos"],
           summary: "Criar projeto",
@@ -107,15 +107,19 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
         },
         get: {
           tags: ["Projetos"],
-          summary: "Listar projetos",
+          summary: "Detalhe do projeto",
           security: [{ bearerAuth: [] }],
           parameters: [
-            { name: "ref", in: "query", schema: { type: "string" } },
-            { name: "id", in: "query", schema: { type: "string", format: "uuid" } },
+            {
+              name: "project_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
           ],
           responses: {
             "200": {
-              description: "Lista",
+              description: "Detalhe",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/SuccessEnvelope" },
@@ -160,31 +164,6 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
             },
           },
         },
-      },
-      "/integracao-project": {
-        get: {
-          tags: ["Projetos"],
-          summary: "Detalhe do projeto",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              name: "project_id",
-              in: "query",
-              required: true,
-              schema: { type: "string", format: "uuid" },
-            },
-          ],
-          responses: {
-            "200": {
-              description: "Detalhe",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
         delete: {
           tags: ["Projetos"],
           summary: "Excluir projeto",
@@ -220,7 +199,28 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
           },
         },
       },
-      "/integracao-project-progress": {
+      "/project/list": {
+        get: {
+          tags: ["Projetos"],
+          summary: "Listar projetos",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "ref", in: "query", schema: { type: "string" } },
+            { name: "id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Lista",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/project/progress": {
         post: {
           tags: ["Progresso"],
           summary: "Recalcular progresso a partir das tarefas",

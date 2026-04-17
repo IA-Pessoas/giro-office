@@ -433,7 +433,7 @@ Busca as permissões de um usuário.
 
 Atualiza as permissões de um usuário.
 
-**Autenticação:** Obrigatória
+**Autenticação:** Obrigatória (minPermission: 2 no gateway)
 
 **Path params:**
 | Parametro | Tipo   | Descrição |

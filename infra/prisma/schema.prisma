@@ -1,6 +1,30 @@
-generator client {
+generator infraClient {
   provider        = "prisma-client"
-  output          = "../../services/src/src/generated/prisma"
+  output          = "../generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+generator userServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/user-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+generator taskServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/task-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+generator projectServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/project-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+generator clientServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/client-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
@@ -21,9 +45,9 @@ generator rh_service_client {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
-generator project_service_client {
+generator department_service_client {
   provider        = "prisma-client"
-  output          = "../../services/project-service/src/generated/prisma"
+  output          = "../../services/department-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 

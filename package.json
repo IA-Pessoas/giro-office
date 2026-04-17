@@ -6,20 +6,23 @@
     "dev": "pnpm run dev:reset && turbo run dev --parallel",
     "dev:reset": "node scripts/dev-reset.mjs",
     "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "lint": "biome lint .",
     "dev:app": "turbo run dev --filter=@workspace/app",
     "dev:api": "turbo run dev --filter=@workspace/legacy-api",
     "dev:gateway": "turbo run dev --filter=@workspace/gateway",
     "build:gateway": "turbo run build --filter=@workspace/gateway",
-    "prisma:generate": "pnpm --filter @workspace/infra run prisma:generate",
+    "prisma:generate": "node scripts/prisma-generate.mjs",
     "prisma:migrate": "pnpm --filter @workspace/infra run prisma:migrate",
     "prepare": "husky",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "check": "biome check .",
     "fix": "biome check --write .",
-    "fix:unsafe": "biome check --write --unsafe ."
+    "fix:unsafe": "biome check --write --unsafe .",
+    "smoke": "node scripts/all-services-smoke.mjs",
+    "smoke:coverage": "node scripts/check-smoke-spec-coverage.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.5",
@@ -35,6 +38,7 @@
   },
   "pnpm": {
     "overrides": {
+      "typescript": "5.3.3",
       "prisma": "7.4.1",
       "@prisma/client": "7.4.1"
     }

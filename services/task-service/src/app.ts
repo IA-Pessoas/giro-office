@@ -7,14 +7,24 @@ import "express-async-errors";
 
 import type { TaskServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
-import { taskComercialRoutes } from "./routes/task-comercial.routes.js";
-import { taskCrudRoutes } from "./routes/task-crud.routes.js";
-import { taskDependentRoutes } from "./routes/task-dependent.routes.js";
-import { taskFinanceiroRoutes } from "./routes/task-financeiro.routes.js";
-import { taskIntegrationRegularizeRoutes } from "./routes/task-integration-regularize.routes.js";
-import { taskLifecycleRoutes } from "./routes/task-lifecycle.routes.js";
-import { taskModelRoutes } from "./routes/task-model.routes.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
+import {
+  createDepsTasksRoutes,
+  type DepsTasksRouteDeps,
+  depsTasksRoutes,
+} from "./routes/depsTasks.routes.js";
+import {
+  createProjectPlanRoutes,
+  type ProjectPlanRouteDeps,
+  projectPlanRoutes,
+} from "./routes/projectPlan.routes.js";
+import { taskComercialRoutes } from "./routes/taskComercial.routes.js";
+import { taskCrudRoutes } from "./routes/taskCrud.routes.js";
+import { taskDependentRoutes } from "./routes/taskDependent.routes.js";
+import { taskFinanceiroRoutes } from "./routes/taskFinanceiro.routes.js";
+import { taskIntegrationRegularizeRoutes } from "./routes/taskIntegrationRegularize.routes.js";
+import { taskLifecycleRoutes } from "./routes/taskLifecycle.routes.js";
+import { taskModelRoutes } from "./routes/taskModel.routes.js";
 
 function taskServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -29,8 +39,21 @@ function taskServiceErrorLogContext(request: Request): Record<string, unknown> |
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export function createTaskApp(env: TaskServiceEnv, logger: Logger): Express {
+export function createTaskApp(
+  env: TaskServiceEnv,
+  logger: Logger,
+  options?: {
+    projectPlanService?: ProjectPlanRouteDeps;
+    depsTasksService?: DepsTasksRouteDeps;
+  },
+): Express {
   const app = express();
+  const resolvedProjectPlanRoutes = options?.projectPlanService
+    ? createProjectPlanRoutes(options.projectPlanService)
+    : projectPlanRoutes;
+  const resolvedDepsTasksRoutes = options?.depsTasksService
+    ? createDepsTasksRoutes(options.depsTasksService)
+    : depsTasksRoutes;
 
   app.use(cors());
   app.use(express.json());
@@ -40,6 +63,10 @@ export function createTaskApp(env: TaskServiceEnv, logger: Logger): Express {
     res.status(200).json(createSuccessResponse({ status: "ok", service: "task-service" }));
   });
 
+  app.get("/ready", (_req, res) => {
+    res.status(200).json(createSuccessResponse({ status: "ready", service: "task-service" }));
+  });
+
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {
       spec: buildTaskServiceOpenApiSpec(env),
@@ -47,13 +74,15 @@ export function createTaskApp(env: TaskServiceEnv, logger: Logger): Express {
     });
   }
 
-  app.use(taskModelRoutes);
-  app.use(taskDependentRoutes);
-  app.use(taskIntegrationRegularizeRoutes);
-  app.use(taskLifecycleRoutes);
-  app.use(taskComercialRoutes);
-  app.use(taskFinanceiroRoutes);
-  app.use(taskCrudRoutes);
+  app.use("/task", taskModelRoutes);
+  app.use("/task", taskDependentRoutes);
+  app.use("/task", taskIntegrationRegularizeRoutes);
+  app.use("/task", taskLifecycleRoutes);
+  app.use("/task", taskComercialRoutes);
+  app.use("/task", taskFinanceiroRoutes);
+  app.use("/task", taskCrudRoutes);
+  app.use("/task", resolvedProjectPlanRoutes);
+  app.use("/task", resolvedDepsTasksRoutes);
 
   app.use(
     createExpressErrorHandler({

@@ -43,9 +43,9 @@ export function createUserApp(env: UserServiceEnv, logger: Logger): Express {
     });
   }
 
-  app.use(authRoutes);
-  app.use("/users", userRoutes);
-  app.use("/permission", permissionRoutes);
+  app.use("/user", authRoutes);
+  app.use("/user", userRoutes);
+  app.use("/user/permission", permissionRoutes);
 
   app.use(
     createExpressErrorHandler({

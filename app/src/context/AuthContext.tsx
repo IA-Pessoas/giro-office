@@ -10,6 +10,7 @@ interface UserProps {
     id: string;
     name: string;
     login: string;
+    email?: string;
     permission: number;
 }
 
