@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { BarChart3, KeyRound, Lock, Plus, Shield, Users } from "lucide-react";
 
-import { CreateUserModal, userService, type UserItem } from "@modules/users";
-import { TEMPORARY_DEPARTMENTS } from "@modules/users/constants/createUserConfig";
+import { departmentService, type DepItem } from "@modules/departments";
+import { CreateUserModal, type UserItem } from "@modules/users";
+import { listAdminUsers } from "@modules/users/services/adminUsersService";
 import { useAuth } from "@/context/AuthContext";
 import { setupAPIClient } from "@shared/services/api";
 import { useFetch } from "@shared/hooks";
@@ -23,7 +24,12 @@ export function Administracao() {
   const [isLoadingOrganizationId, setIsLoadingOrganizationId] = useState(false);
   const { user } = useAuth();
 
-  const { data: users = [], refetch: refetchUsers } = useFetch(["users"], () => userService.list());
+  const { data: users = [], refetch: refetchUsers } = useFetch(["admin-users", "active"], () =>
+    listAdminUsers("active"),
+  );
+  const { data: departments = [] } = useFetch<DepItem[]>(["admin-departments"], () =>
+    departmentService.list(),
+  );
   const dashboardCards = [
     {
       title: "Usuários Ativos",
@@ -179,7 +185,7 @@ export function Administracao() {
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
         onUserCreated={handleUserCreated}
-        departments={TEMPORARY_DEPARTMENTS}
+        departments={departments}
         organizationId={organizationId}
         organizationIdLoading={isLoadingOrganizationId}
         invitedBy={user?.id}
