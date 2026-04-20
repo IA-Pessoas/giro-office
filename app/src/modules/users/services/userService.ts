@@ -3,35 +3,87 @@ import type { UserItem, CreateUserData, AdminCreateUserData, UpdateUserData } fr
 
 type UsersListEnvelope = {
   users?: UserItem[];
+  total?: number;
+  skip?: number;
+  take?: number;
 };
 
-function extractUsersList(payload: unknown): UserItem[] {
+export interface UserListFilters {
+  skip?: number;
+  take?: number;
+  status?: string;
+}
+
+export interface UsersListPage {
+  users: UserItem[];
+  total: number | null;
+  skip: number | null;
+  take: number | null;
+}
+
+function extractUsersListPage(payload: unknown): UsersListPage {
   if (Array.isArray(payload)) {
-    return payload as UserItem[];
+    return {
+      users: payload as UserItem[],
+      total: payload.length,
+      skip: null,
+      take: null,
+    };
   }
 
   if (!payload || typeof payload !== 'object') {
-    return [];
+    return {
+      users: [],
+      total: 0,
+      skip: null,
+      take: null,
+    };
   }
 
-  const directUsers = (payload as UsersListEnvelope).users;
-  if (Array.isArray(directUsers)) {
-    return directUsers;
+  const directPayload = payload as UsersListEnvelope & { data?: unknown };
+  const directUsers = Array.isArray(directPayload.users) ? directPayload.users : null;
+
+  if (directUsers) {
+    return {
+      users: directUsers,
+      total: typeof directPayload.total === 'number' ? directPayload.total : null,
+      skip: typeof directPayload.skip === 'number' ? directPayload.skip : null,
+      take: typeof directPayload.take === 'number' ? directPayload.take : null,
+    };
   }
 
-  const nestedData = (payload as { data?: unknown }).data;
+  const nestedData = directPayload.data;
   if (Array.isArray(nestedData)) {
-    return nestedData as UserItem[];
+    return {
+      users: nestedData as UserItem[],
+      total: nestedData.length,
+      skip: null,
+      take: null,
+    };
   }
 
   if (nestedData && typeof nestedData === 'object') {
     const nestedUsers = (nestedData as UsersListEnvelope).users;
     if (Array.isArray(nestedUsers)) {
-      return nestedUsers;
+      return {
+        users: nestedUsers,
+        total: typeof (nestedData as UsersListEnvelope).total === 'number' ? (nestedData as UsersListEnvelope).total : null,
+        skip: typeof (nestedData as UsersListEnvelope).skip === 'number' ? (nestedData as UsersListEnvelope).skip : null,
+        take: typeof (nestedData as UsersListEnvelope).take === 'number' ? (nestedData as UsersListEnvelope).take : null,
+      };
     }
   }
 
-  return [];
+  return {
+    users: [],
+    total: 0,
+    skip: null,
+    take: null,
+  };
+}
+
+function extractUsersList(payload: unknown): UserItem[] {
+  return extractUsersListPage(payload).users;
 }
 
 function extractUser(payload: unknown): UserItem {
@@ -60,10 +112,16 @@ function extractUser(payload: unknown): UserItem {
 }
 
 export const userService = {
-  list: async (filters?: { status?: string }): Promise<UserItem[]> => {
+  list: async (filters?: UserListFilters): Promise<UserItem[]> => {
     const api = setupAPIClient();
     const response = await api.get('/user', { params: filters });
     return extractUsersList(response.data);
+  },
+
+  listPage: async (filters?: UserListFilters): Promise<UsersListPage> => {
+    const api = setupAPIClient();
+    const response = await api.get('/user', { params: filters });
+    return extractUsersListPage(response.data);
   },
 
   getById: async (id: string): Promise<UserItem> => {
@@ -93,4 +151,4 @@ export const userService = {
   },
 };
 
-export { extractUser, extractUsersList };
+export { extractUser, extractUsersList, extractUsersListPage };

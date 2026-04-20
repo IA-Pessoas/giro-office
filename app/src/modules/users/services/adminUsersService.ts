@@ -42,7 +42,35 @@ export function filterAdminUsersByStatus(users: UserItem[], status?: AdminUserSt
   return users.filter((user) => normalizeAdminUserStatus(user.status) === status);
 }
 
+const ADMIN_USERS_PAGE_SIZE = 100;
+
+async function listAllAdminUsers(): Promise<UserItem[]> {
+  const allUsers: UserItem[] = [];
+  let skip = 0;
+
+  while (true) {
+    const page = await userService.listPage({
+      skip,
+      take: ADMIN_USERS_PAGE_SIZE,
+    });
+
+    allUsers.push(...page.users);
+
+    if (page.users.length < ADMIN_USERS_PAGE_SIZE) {
+      break;
+    }
+
+    if (page.total !== null && allUsers.length >= page.total) {
+      break;
+    }
+
+    skip += ADMIN_USERS_PAGE_SIZE;
+  }
+
+  return allUsers;
+}
+
 export async function listAdminUsers(status?: AdminUserStatus): Promise<UserItem[]> {
-  const users = await userService.list();
+  const users = await listAllAdminUsers();
   return filterAdminUsersByStatus(users, status);
 }
