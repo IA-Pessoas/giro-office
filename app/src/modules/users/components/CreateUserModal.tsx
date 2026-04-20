@@ -219,8 +219,8 @@ export function CreateUserModal({
         ) : null}
 
         {!organizationIdLoading && departments.length === 0 ? (
-          <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-4 dark:border-amber-700 dark:bg-amber-950/20">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
               Nenhum departamento disponivel. O cadastro depende dos dados retornados pelo backend.
             </p>
           </div>

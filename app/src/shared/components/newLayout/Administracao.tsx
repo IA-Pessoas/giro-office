@@ -23,6 +23,21 @@ const ADMIN_GRADIENT_BUTTON_CLASSNAME =
 const ADMIN_ACTIVE_TAB_CLASSNAME =
   "bg-[var(--colors-brand-soft)] text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300";
 
+const ADMIN_PANEL_CLASSNAME =
+  "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
+
+const ADMIN_SUBPANEL_CLASSNAME =
+  "rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-950/40";
+
+const ADMIN_FEEDBACK_PANEL_CLASSNAME =
+  "rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40";
+
+const ADMIN_LABEL_CLASSNAME = "dialog-neutral-label block text-sm font-medium text-slate-700 dark:text-white";
+
+const ADMIN_TEXT_CLASSNAME = "dialog-neutral-text text-sm text-slate-700 dark:text-white";
+
+const ADMIN_MUTED_CLASSNAME = "dialog-neutral-muted text-sm text-slate-500 dark:text-slate-300";
+
 export function Administracao() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "permissions">("dashboard");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -46,7 +61,10 @@ export function Administracao() {
     data: departments = [],
     error: departmentsError,
     isLoading: isDepartmentsLoading,
-  } = useFetch<DepItem[]>(["admin-departments"], () => departmentService.list());
+    refetch: refetchDepartments,
+  } = useFetch<DepItem[]>(["admin-departments"], () => departmentService.list(), {
+    enabled: activeTab === "users" || isCreateModalOpen,
+  });
 
   const filteredUsers = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -130,20 +148,36 @@ export function Administracao() {
     });
   }, [users]);
 
-  const isCreateBlockedByDepartments = Boolean(departmentsError) || (!isDepartmentsLoading && departments.length === 0);
+  const hasDepartmentFetchSettled = activeTab === "users" || isCreateModalOpen || Boolean(departmentsError) || departments.length > 0;
+  const isCreateBlockedByDepartments =
+    hasDepartmentFetchSettled && (Boolean(departmentsError) || (!isDepartmentsLoading && departments.length === 0));
 
-  const handleOpenCreateModal = () => {
-    if (departmentsError) {
-      toast.error("Nao foi possivel carregar os departamentos. A criacao de usuarios esta indisponivel.");
-      return;
-    }
-
+  const handleOpenCreateModal = async () => {
     if (isDepartmentsLoading) {
       toast.info("Carregando departamentos. Tente novamente em instantes.");
       return;
     }
 
-    if (departments.length === 0) {
+    let availableDepartments = departments;
+
+    if (departmentsError || departments.length === 0) {
+      const result = await refetchDepartments();
+      const nextDepartments = Array.isArray(result.data) ? result.data : [];
+
+      if (result.error) {
+        toast.error("Nao foi possivel carregar os departamentos. A criacao de usuarios esta indisponivel.");
+        return;
+      }
+
+      if (nextDepartments.length === 0) {
+        toast.warn("Nenhum departamento disponivel para criar usuarios.");
+        return;
+      }
+
+      availableDepartments = nextDepartments;
+    }
+
+    if (availableDepartments.length === 0) {
       toast.warn("Nenhum departamento disponivel para criar usuarios.");
       return;
     }
@@ -237,47 +271,47 @@ export function Administracao() {
           })}
         </div>
       ) : activeTab === "users" ? (
-        <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <aside className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <div className="space-y-4">
+        <div className="grid gap-4 xl:h-[90vh] xl:grid-cols-[360px_minmax(0,1fr)] xl:items-stretch">
+          <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 xl:h-full`}>
+            <div className="flex h-full min-h-0 flex-col space-y-4">
               <div className="space-y-1">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">Usuarios</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+                <p className={ADMIN_MUTED_CLASSNAME}>
                   Busque e selecione um usuario para continuar.
                 </p>
               </div>
 
               {departmentsError ? (
-                <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-3 dark:border-amber-700 dark:bg-amber-950/20">
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
+                  <p className={ADMIN_TEXT_CLASSNAME}>
                     Departamentos indisponiveis. A criacao de usuarios foi bloqueada ate a integracao voltar.
                   </p>
                 </div>
               ) : !isDepartmentsLoading && departments.length === 0 ? (
-                <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-3 dark:border-amber-700 dark:bg-amber-950/20">
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
+                  <p className={ADMIN_TEXT_CLASSNAME}>
                     Nenhum departamento foi retornado pelo backend. A criacao de usuarios esta indisponivel.
                   </p>
                 </div>
               ) : null}
 
               {usersError ? (
-                <div className="rounded-2xl border border-rose-300 bg-rose-50/80 p-3 dark:border-rose-800 dark:bg-rose-950/20">
-                  <p className="text-sm font-medium text-rose-700 dark:text-rose-300">
+                <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
+                  <p className={ADMIN_TEXT_CLASSNAME}>
                     Nao foi possivel carregar a lista de usuarios.
                   </p>
                   <button
                     type="button"
                     onClick={() => void refetchUsers()}
-                    className="mt-3 rounded-xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                    className="mt-3 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                   >
                     Tentar novamente
                   </button>
                 </div>
               ) : null}
 
-              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-950/40">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Busca</label>
+              <div className={`${ADMIN_SUBPANEL_CLASSNAME} space-y-3 p-3`}>
+                <label className={ADMIN_LABEL_CLASSNAME}>Busca</label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
@@ -289,7 +323,7 @@ export function Administracao() {
                   />
                 </div>
 
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Status</label>
+                <label className={ADMIN_LABEL_CLASSNAME}>Status</label>
                 <select
                   value={userStatusFilter}
                   onChange={(event) => setUserStatusFilter(event.target.value as AdminUserStatus)}
@@ -303,9 +337,9 @@ export function Administracao() {
                 </select>
               </div>
 
-              <div className="space-y-3">
+              <div className="flex min-h-0 flex-1 flex-col space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <p className={ADMIN_TEXT_CLASSNAME}>
                     {filteredUsers.length} usuario{filteredUsers.length === 1 ? "" : "s"}
                   </p>
                   <span className="rounded-full bg-[var(--colors-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
@@ -313,23 +347,23 @@ export function Administracao() {
                   </span>
                 </div>
 
-                <div className="space-y-3">
+                <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
                   {isUsersLoading ? (
-                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Carregando usuarios...</p>
+                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                      <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuarios...</p>
                     </div>
                   ) : usersError ? (
-                    <div className="rounded-2xl border border-dashed border-rose-300 bg-rose-50/80 p-6 text-center dark:border-rose-800 dark:bg-rose-950/20">
-                      <p className="text-sm text-rose-700 dark:text-rose-300">
+                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                      <p className={ADMIN_MUTED_CLASSNAME}>
                         A listagem nao esta disponivel no momento.
                       </p>
                     </div>
                   ) : filteredUsers.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
-                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                      <p className={ADMIN_TEXT_CLASSNAME}>
                         Nenhum usuario encontrado.
                       </p>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      <p className={`mt-1 ${ADMIN_MUTED_CLASSNAME}`}>
                         Ajuste a busca ou troque o filtro para ver outros resultados.
                       </p>
                     </div>
@@ -339,7 +373,7 @@ export function Administracao() {
                       const departmentName =
                         departments.find((department) => department.id === candidate.department_id)?.name ??
                         candidate.department?.name ??
-                        "Departamento nao informado";
+                        "Sem departamento";
 
                       return (
                         <button
@@ -348,7 +382,7 @@ export function Administracao() {
                           onClick={() => setSelectedUserId(candidate.id)}
                           className={`w-full rounded-2xl border p-4 text-left transition-all ${
                             isSelected
-                              ? "border-[var(--colors-brand-gradient-end)] bg-[var(--colors-brand-soft)]/60 shadow-sm dark:bg-blue-900/20"
+                              ? "border-[var(--colors-brand-gradient-end)] bg-slate-50 shadow-sm dark:bg-slate-950/60"
                               : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800/70"
                           }`}
                         >
@@ -357,11 +391,11 @@ export function Administracao() {
                               <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                                 {candidate.name}
                               </p>
-                              <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+                              <p className="dialog-neutral-muted truncate text-sm text-slate-600 dark:text-slate-300">
                                 {departmentName}
                               </p>
                             </div>
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                               {getAdminUserStatusLabel(candidate.status)}
                             </span>
                           </div>
@@ -374,7 +408,7 @@ export function Administracao() {
             </div>
           </aside>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <section className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-6 xl:h-full`}>
             <AdminUserDetailsPanel
               userId={selectedUserId}
               departments={departments}
@@ -385,10 +419,10 @@ export function Administracao() {
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/80 p-8 text-center dark:border-slate-700 dark:bg-slate-900/70">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+          <p className={ADMIN_TEXT_CLASSNAME}>
             Esta aba permanece somente visual neste refactor.
           </p>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <p className={`mt-2 ${ADMIN_MUTED_CLASSNAME}`}>
             O fluxo real de criacao continua disponivel pelo botao "Novo Usuario".
           </p>
         </div>

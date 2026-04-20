@@ -18,6 +18,18 @@ const FIELD_CLASSNAME =
 const PRIMARY_ACTION_CLASSNAME =
   "rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] disabled:cursor-not-allowed disabled:opacity-70";
 
+const PANEL_CLASSNAME =
+  "rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-950/40";
+
+const FEEDBACK_PANEL_CLASSNAME =
+  "rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40";
+
+const LABEL_CLASSNAME = "dialog-neutral-label block text-sm font-medium text-slate-700 dark:text-white";
+
+const TEXT_CLASSNAME = "dialog-neutral-text text-sm text-slate-700 dark:text-white";
+
+const MUTED_CLASSNAME = "dialog-neutral-muted text-sm text-slate-500 dark:text-slate-300";
+
 interface FormState {
   login: string;
   name: string;
@@ -134,10 +146,10 @@ export function AdminUserDetailsPanel({
 
   if (!userId) {
     return (
-      <div className="flex min-h-[480px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
+      <div className={`flex h-full min-h-[480px] items-center justify-center ${PANEL_CLASSNAME} border-dashed p-6 text-center`}>
         <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Nenhum usuario selecionado.</p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className={TEXT_CLASSNAME}>Nenhum usuario selecionado.</p>
+          <p className={MUTED_CLASSNAME}>
             Selecione um usuario na lista para abrir o painel de detalhes.
           </p>
         </div>
@@ -147,13 +159,13 @@ export function AdminUserDetailsPanel({
 
   if (loadError) {
     return (
-      <div className="flex min-h-[480px] items-center justify-center rounded-2xl border border-dashed border-rose-300 bg-rose-50/80 p-6 text-center dark:border-rose-800 dark:bg-rose-950/20">
+      <div className={`flex h-full min-h-[480px] items-center justify-center ${PANEL_CLASSNAME} border-dashed p-6 text-center`}>
         <div className="space-y-2">
-          <p className="text-sm font-medium text-rose-700 dark:text-rose-300">{loadError}</p>
+          <p className={TEXT_CLASSNAME}>{loadError}</p>
           <button
             type="button"
             onClick={() => void loadUser(userId)}
-            className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-900/40"
+            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             Tentar novamente
           </button>
@@ -164,118 +176,128 @@ export function AdminUserDetailsPanel({
 
   if (isLoadingUser || !formData) {
     return (
-      <div className="flex min-h-[480px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
-        <p className="text-sm text-slate-500 dark:text-slate-400">Carregando detalhes do usuario...</p>
+      <div className={`flex h-full min-h-[480px] items-center justify-center ${PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+        <p className={MUTED_CLASSNAME}>Carregando detalhes do usuario...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
+    <div className="flex h-full min-h-[480px] flex-col overflow-hidden">
+      <div className="space-y-1 pb-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{user?.name}</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className={MUTED_CLASSNAME}>
           Atualize os dados do usuario selecionado usando os contratos atuais do backend.
         </p>
       </div>
 
-      {departmentsError ? (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-4 dark:border-amber-700 dark:bg-amber-950/20">
-          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-            Nao foi possivel carregar os departamentos. A edicao foi bloqueada ate a lista estar disponivel.
-          </p>
-        </div>
-      ) : null}
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="space-y-6">
+          {departmentsError ? (
+            <div className={FEEDBACK_PANEL_CLASSNAME}>
+              <p className={TEXT_CLASSNAME}>
+                Nao foi possivel carregar os departamentos. A edicao foi bloqueada ate a lista estar disponivel.
+              </p>
+            </div>
+          ) : null}
 
-      {saveError ? (
-        <div className="rounded-2xl border border-rose-300 bg-rose-50/80 p-4 dark:border-rose-800 dark:bg-rose-950/20">
-          <p className="text-sm font-medium text-rose-700 dark:text-rose-300">{saveError}</p>
-        </div>
-      ) : null}
+          {saveError ? (
+            <div className={FEEDBACK_PANEL_CLASSNAME}>
+              <p className={TEXT_CLASSNAME}>{saveError}</p>
+            </div>
+          ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Login</label>
-          <input value={formData.login} readOnly className={`${FIELD_CLASSNAME} bg-slate-100 dark:bg-slate-800`} />
-        </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className={LABEL_CLASSNAME}>Login</label>
+              <input
+                value={formData.login}
+                readOnly
+                className={`${FIELD_CLASSNAME} bg-slate-100 dark:bg-slate-800`}
+              />
+            </div>
 
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Status</label>
-          <select
-            name="status"
-            value={formData.status}
-            onChange={handleInputChange}
-            className={FIELD_CLASSNAME}
-            disabled={departmentsError}
-          >
-            {Object.entries(ADMIN_USER_STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
+            <div className="space-y-2">
+              <label className={LABEL_CLASSNAME}>Status</label>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleInputChange}
+                className={FIELD_CLASSNAME}
+                disabled={departmentsError}
+              >
+                {Object.entries(ADMIN_USER_STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="space-y-2 md:col-span-2">
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Nome</label>
-          <input name="name" value={formData.name} onChange={handleInputChange} className={FIELD_CLASSNAME} />
-        </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className={LABEL_CLASSNAME}>Nome</label>
+              <input name="name" value={formData.name} onChange={handleInputChange} className={FIELD_CLASSNAME} />
+            </div>
 
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Nova senha</label>
-          <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleInputChange}
-            placeholder="Deixe em branco para manter"
-            className={FIELD_CLASSNAME}
-          />
-        </div>
+            <div className="space-y-2">
+              <label className={LABEL_CLASSNAME}>Nova senha</label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                placeholder="Deixe em branco para manter"
+                className={FIELD_CLASSNAME}
+              />
+            </div>
 
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Permissao</label>
-          <input
-            type="number"
-            name="permission"
-            value={formData.permission}
-            onChange={handleInputChange}
-            className={FIELD_CLASSNAME}
-            inputMode="numeric"
-            min={0}
-          />
-        </div>
+            <div className="space-y-2">
+              <label className={LABEL_CLASSNAME}>Permissao</label>
+              <input
+                type="number"
+                name="permission"
+                value={formData.permission}
+                onChange={handleInputChange}
+                className={FIELD_CLASSNAME}
+                inputMode="numeric"
+                min={0}
+              />
+            </div>
 
-        <div className="space-y-2 md:col-span-2">
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Departamento</label>
-          <select
-            name="department_id"
-            value={formData.department_id}
-            onChange={handleInputChange}
-            className={FIELD_CLASSNAME}
-            disabled={departmentsError}
-          >
-            <option value="">Selecione um departamento</option>
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.name}
-              </option>
-            ))}
-          </select>
+            <div className="space-y-2 md:col-span-2">
+              <label className={LABEL_CLASSNAME}>Departamento</label>
+              <select
+                name="department_id"
+                value={formData.department_id}
+                onChange={handleInputChange}
+                className={FIELD_CLASSNAME}
+                disabled={departmentsError}
+              >
+                <option value="">Selecione um departamento</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className={`${PANEL_CLASSNAME} p-4`}>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Status atual</p>
+            <p className={`mt-2 ${TEXT_CLASSNAME}`}>
+              {ADMIN_USER_STATUS_LABELS[formData.status]}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Status atual</p>
-        <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
-          {ADMIN_USER_STATUS_LABELS[formData.status]}
-        </p>
-      </div>
-
-      <div className="flex justify-end">
-        <button type="button" onClick={handleSave} className={PRIMARY_ACTION_CLASSNAME} disabled={isSaveDisabled}>
-          {isSaving ? "Salvando..." : "Salvar alteracoes"}
-        </button>
+      <div className="border-t border-slate-200 pt-6 dark:border-slate-700">
+        <div className="flex justify-end">
+          <button type="button" onClick={handleSave} className={PRIMARY_ACTION_CLASSNAME} disabled={isSaveDisabled}>
+            {isSaving ? "Salvando..." : "Salvar alteracoes"}
+          </button>
+        </div>
       </div>
     </div>
   );
