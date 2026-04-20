@@ -34,6 +34,31 @@ function extractUsersList(payload: unknown): UserItem[] {
   return [];
 }
 
+function extractUser(payload: unknown): UserItem {
+  if (payload && typeof payload === 'object') {
+    const directUser = (payload as { user?: UserItem }).user;
+    if (directUser && typeof directUser === 'object') {
+      return directUser;
+    }
+
+    const nestedData = (payload as { data?: unknown }).data;
+    if (nestedData && typeof nestedData === 'object' && !Array.isArray(nestedData)) {
+      const nestedUser = (nestedData as { user?: UserItem }).user;
+      if (nestedUser && typeof nestedUser === 'object') {
+        return nestedUser;
+      }
+
+      return nestedData as UserItem;
+    }
+
+    if (!Array.isArray(payload)) {
+      return payload as UserItem;
+    }
+  }
+
+  throw new Error('Unexpected user payload shape.');
+}
+
 export const userService = {
   list: async (filters?: { status?: string }): Promise<UserItem[]> => {
     const api = setupAPIClient();
@@ -44,7 +69,7 @@ export const userService = {
   getById: async (id: string): Promise<UserItem> => {
     const api = setupAPIClient();
     const response = await api.get(`/user/${id}`);
-    return response.data.user;
+    return extractUser(response.data);
   },
 
   create: async (data: CreateUserData | AdminCreateUserData): Promise<UserItem> => {
@@ -55,21 +80,17 @@ export const userService = {
 
   update: async (id: string, data: UpdateUserData): Promise<UserItem> => {
     const api = setupAPIClient();
-    const formData = new FormData();
-    formData.append('user_id', id);
-    
-    if (data.name) formData.append('name', data.name);
-    if (data.password) formData.append('password', data.password);
-    if (data.permission !== undefined) formData.append('permission', String(data.permission));
-    if (data.department_id) formData.append('department_id', data.department_id);
-    if (data.status) formData.append('status', data.status);
-    if (data.file) formData.append('file', data.file);
+    const payload: Record<string, unknown> = {};
 
-    const response = await api.patch(`/user/${id}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
+    if (data.name !== undefined) payload.name = data.name;
+    if (data.password !== undefined) payload.password = data.password;
+    if (data.permission !== undefined) payload.permission = data.permission;
+    if (data.department_id !== undefined) payload.department_id = data.department_id;
+    if (data.status !== undefined) payload.status = data.status;
+
+    const response = await api.patch(`/user/${id}`, payload);
+    return extractUser(response.data);
   },
 };
 
-export { extractUsersList };
+export { extractUser, extractUsersList };

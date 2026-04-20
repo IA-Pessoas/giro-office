@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BarChart3, KeyRound, Lock, Plus, Search, Shield, Users } from "lucide-react";
 
 import { departmentService, type DepItem } from "@modules/departments";
-import { CreateUserModal, type UserItem } from "@modules/users";
+import { AdminUserDetailsPanel, CreateUserModal, type UserItem } from "@modules/users";
 import {
   ADMIN_USER_STATUS_LABELS,
   type AdminUserStatus,
@@ -36,7 +36,7 @@ export function Administracao() {
     ["admin-users", userStatusFilter],
     () => listAdminUsers(userStatusFilter),
   );
-  const { data: departments = [] } = useFetch<DepItem[]>(["admin-departments"], () =>
+  const { data: departments = [], error: departmentsError } = useFetch<DepItem[]>(["admin-departments"], () =>
     departmentService.list(),
   );
 
@@ -49,11 +49,6 @@ export function Administracao() {
 
     return users.filter((candidate) => candidate.name.toLowerCase().includes(normalizedSearch));
   }, [searchTerm, users]);
-
-  const selectedUser = useMemo(
-    () => users.find((candidate) => candidate.id === selectedUserId) ?? null,
-    [selectedUserId, users],
-  );
 
   const dashboardCards = [
     {
@@ -317,49 +312,12 @@ export function Administracao() {
           </aside>
 
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            {selectedUser ? (
-              <div className="flex min-h-[480px] flex-col justify-between gap-6">
-                <div className="space-y-1">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{selectedUser.name}</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Painel reservado para os detalhes e a edicao do usuario selecionado.
-                  </p>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Login</p>
-                    <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{selectedUser.login}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Status</p>
-                    <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
-                      {getAdminUserStatusLabel(selectedUser.status)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 dark:border-slate-700 dark:bg-slate-950/40">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    A edicao detalhada entra no proximo passo.
-                  </p>
-                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                    Esta area ja esta pronta para receber o formulario do usuario selecionado.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex min-h-[480px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    Nenhum usuario selecionado.
-                  </p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Selecione um usuario na lista para preparar o painel de detalhes.
-                  </p>
-                </div>
-              </div>
-            )}
+            <AdminUserDetailsPanel
+              userId={selectedUserId}
+              departments={departments}
+              departmentsError={Boolean(departmentsError)}
+              onUserUpdated={() => refetchUsers()}
+            />
           </section>
         </div>
       ) : (
