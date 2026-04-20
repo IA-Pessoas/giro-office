@@ -1,23 +1,56 @@
 import { setupAPIClient } from '@shared/services/api';
-import type { UserItem, CreateUserData, UpdateUserData } from '../types';
+import type { UserItem, CreateUserData, AdminCreateUserData, UpdateUserData } from '../types';
+
+type UsersListEnvelope = {
+  users?: UserItem[];
+};
+
+function extractUsersList(payload: unknown): UserItem[] {
+  if (Array.isArray(payload)) {
+    return payload as UserItem[];
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return [];
+  }
+
+  const directUsers = (payload as UsersListEnvelope).users;
+  if (Array.isArray(directUsers)) {
+    return directUsers;
+  }
+
+  const nestedData = (payload as { data?: unknown }).data;
+  if (Array.isArray(nestedData)) {
+    return nestedData as UserItem[];
+  }
+
+  if (nestedData && typeof nestedData === 'object') {
+    const nestedUsers = (nestedData as UsersListEnvelope).users;
+    if (Array.isArray(nestedUsers)) {
+      return nestedUsers;
+    }
+  }
+
+  return [];
+}
 
 export const userService = {
   list: async (filters?: { status?: string }): Promise<UserItem[]> => {
     const api = setupAPIClient();
-    const response = await api.get('/user/users', { params: filters });
-    return response.data;
+    const response = await api.get('/user', { params: filters });
+    return extractUsersList(response.data);
   },
 
   getById: async (id: string): Promise<UserItem> => {
     const api = setupAPIClient();
-    const response = await api.get('/users-detail', { params: { user_id: id } });
+    const response = await api.get(`/user/${id}`);
     return response.data.user;
   },
 
-  create: async (data: CreateUserData): Promise<UserItem> => {
+  create: async (data: CreateUserData | AdminCreateUserData): Promise<UserItem> => {
     const api = setupAPIClient();
-    const response = await api.post('/user/users', data);
-    return response.data.user;
+    const response = await api.post('/user', data);
+    return response.data.data ?? response.data?.data ?? response.data;
   },
 
   update: async (id: string, data: UpdateUserData): Promise<UserItem> => {
@@ -32,9 +65,11 @@ export const userService = {
     if (data.status) formData.append('status', data.status);
     if (data.file) formData.append('file', data.file);
 
-    const response = await api.put('/users', formData, {
+    const response = await api.patch(`/user/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 };
+
+export { extractUsersList };

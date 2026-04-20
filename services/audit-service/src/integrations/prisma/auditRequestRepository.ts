@@ -12,7 +12,7 @@ import {
   type PrismaClient,
 } from "../../../generated/prisma/client.js";
 
-import { getPrismaClient } from "./prisma-client.js";
+import { getPrismaClient } from "./prismaClient.js";
 
 export interface AuditRequestRepository {
   create(payload: CreateAuditRequestPayload): Promise<void>;

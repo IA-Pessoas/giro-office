@@ -1,3 +1,10 @@
+x-service-defaults: &service_defaults
+  dns:
+    - 1.1.1.1
+    - 8.8.8.8
+  dns_opt:
+    - use-vc
+
 services:
   reverse-proxy:
     image: nginx:1.27-alpine
@@ -24,8 +31,10 @@ services:
       - backend
 
   gateway:
+    <<: *service_defaults
     image: workspace-gateway:vps
     restart: unless-stopped
+    command: ["node", "dist/services/gateway/src/server.js"]
     build:
       context: .
       dockerfile: docker/service.Dockerfile
@@ -66,6 +75,7 @@ services:
       - backend
 
   organization-service:
+    <<: *service_defaults
     image: workspace-organization-service:vps
     restart: unless-stopped
     build:
@@ -92,8 +102,10 @@ services:
       start_period: 20s
     networks:
       - backend
+      - egress
 
   user-service:
+    <<: *service_defaults
     image: workspace-user-service:vps
     restart: unless-stopped
     build:
@@ -120,8 +132,10 @@ services:
       start_period: 20s
     networks:
       - backend
+      - egress
 
   task-service:
+    <<: *service_defaults
     image: workspace-task-service:vps
     restart: unless-stopped
     build:
@@ -148,8 +162,10 @@ services:
       start_period: 20s
     networks:
       - backend
+      - egress
 
   project-service:
+    <<: *service_defaults
     image: workspace-project-service:vps
     restart: unless-stopped
     build:
@@ -176,8 +192,10 @@ services:
       start_period: 20s
     networks:
       - backend
+      - egress
 
   client-service:
+    <<: *service_defaults
     image: workspace-client-service:vps
     restart: unless-stopped
     build:
@@ -204,8 +222,10 @@ services:
       start_period: 20s
     networks:
       - backend
+      - egress
 
   rh-service:
+    <<: *service_defaults
     image: workspace-rh-service:vps
     restart: unless-stopped
     build:
@@ -232,8 +252,10 @@ services:
       start_period: 20s
     networks:
       - backend
+      - egress
 
   audit-service:
+    <<: *service_defaults
     image: workspace-audit-service:vps
     restart: unless-stopped
     profiles:
@@ -263,6 +285,7 @@ services:
       start_period: 20s
     networks:
       - backend
+      - egress
 
 networks:
   edge:
@@ -270,3 +293,6 @@ networks:
   backend:
     driver: bridge
     internal: true
+  egress:
+    driver: bridge
+    internal: false

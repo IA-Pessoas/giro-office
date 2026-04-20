@@ -1,6 +1,12 @@
 :root {
   --colors-brand-blue: #2f406a;
   --colors-blue-500: #2f406a;
+  --colors-brand-gradient-start: #2563eb;
+  --colors-brand-gradient-end: #1d4ed8;
+  --colors-brand-gradient-hover-start: #1d4ed8;
+  --colors-brand-gradient-hover-end: #1e40af;
+  --colors-brand-soft: #dbeafe;
+  --colors-brand-strong: #1d4ed8;
   --colors-gold-500: #d0ab70;
   --colors-gold-400: #e1c28d;
   --colors-gold-300: #ecd9b6;

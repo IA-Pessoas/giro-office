@@ -36,6 +36,29 @@
       "suspicious": {}
     }
   },
+  "overrides": [
+    {
+      "includes": [
+        "services/**/*.{js,cjs,mjs,jsx,ts,tsx}",
+        "!services/src/**",
+        "!services/**/generated/**",
+        "!services/**/src/generated/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": {
+              "level": "error",
+              "options": {
+                "filenameCases": ["camelCase"],
+                "strictCase": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "double",

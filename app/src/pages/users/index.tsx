@@ -6,6 +6,7 @@ import { FaUsers } from 'react-icons/fa';
 import { canSSRAuth } from '@modules/auth';
 import { setupAPIClient } from '@shared/services/api';
 import { UserFilters, UserList, CreateUserModal, UserDetailsView, userService, type UserItem } from '@modules/users';
+import { extractUsersList } from '@modules/users/services/userService';
 import type { DepItem } from '@modules/departments';
 
 interface Props { users: UserItem[]; deps: DepItem[]; me: any; }
@@ -123,7 +124,7 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
     return {
       props: {
         me: meResponse.data.user,
-        users: usersResponse.data,
+        users: extractUsersList(usersResponse.data),
         deps: depsResponse.data,
       }
     };

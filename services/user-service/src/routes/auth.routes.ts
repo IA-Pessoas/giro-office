@@ -29,7 +29,7 @@ router.post("/session", async (request: Request, response: Response, next: NextF
   }
 });
 
-router.post("/start-config", async (request: Request, response: Response, next: NextFunction) => {
+router.post("/start-config", async (_request: Request, response: Response, next: NextFunction) => {
   try {
     const user = await authService.firstCreate();
 

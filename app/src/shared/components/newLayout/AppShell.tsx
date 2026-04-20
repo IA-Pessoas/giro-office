@@ -264,7 +264,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div key={category.name}>
               {isSidebarOpen ? (
                 <div className="px-3 mb-2">
-                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <span className="text-xs font-semibold text-black dark:text-white uppercase tracking-wider">
                     {category.name}
                   </span>
                 </div>
