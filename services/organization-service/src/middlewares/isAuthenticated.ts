@@ -50,8 +50,8 @@ export async function isAuthenticated(
       return;
     }
 
-    const headerUserId = request.headers["user_id"];
-    const headerOrganizationId = request.headers["organization_id"];
+    const headerUserId = request.headers.user_id;
+    const headerOrganizationId = request.headers.organization_id;
 
     if (headerUserId && headerUserId !== claims.user_id) {
       response.status(400).json({
