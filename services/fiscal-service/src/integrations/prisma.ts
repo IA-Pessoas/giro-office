@@ -1,8 +1,8 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { getRhEnv } from "../config/env.js";
+import { getFiscalServiceEnv } from "../config/env.js";
 import { PrismaClient } from "../generated/prisma/client.js";
 
-const { databaseUrl } = getRhEnv();
+const { databaseUrl } = getFiscalServiceEnv();
 
 const adapter = new PrismaPg({
   connectionString: databaseUrl,
