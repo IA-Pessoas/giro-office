@@ -3,12 +3,12 @@ import { isAxiosError } from "axios";
 import type { UserItem } from "../types";
 import { userService } from "./userService";
 
-export type AdminUserStatus = "active" | "inactive";
-
-export const ADMIN_USER_STATUS_LABELS: Record<AdminUserStatus, string> = {
+export const ADMIN_USER_STATUS_LABELS = {
   active: "Ativo",
   inactive: "Inativo",
-};
+} as const;
+
+export type AdminUserStatus = keyof typeof ADMIN_USER_STATUS_LABELS;
 
 export function normalizeAdminUserStatus(status: string | null | undefined): AdminUserStatus | null {
   if (status === "active" || status === "inactive") {

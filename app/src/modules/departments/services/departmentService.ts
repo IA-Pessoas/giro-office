@@ -1,13 +1,17 @@
 import { setupAPIClient } from '@shared/services/api';
 import type { DepItem, CreateDepData, UpdateDepData } from '../types';
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}
+
 function extractDepartmentList(payload: unknown): DepItem[] {
   if (Array.isArray(payload)) {
     return payload as DepItem[];
   }
 
-  if (payload && typeof payload === 'object') {
-    const nestedData = (payload as { data?: unknown }).data;
+  if (isObject(payload)) {
+    const nestedData = payload.data;
     if (Array.isArray(nestedData)) {
       return nestedData as DepItem[];
     }
@@ -17,23 +21,22 @@ function extractDepartmentList(payload: unknown): DepItem[] {
 }
 
 function extractDepartment(payload: unknown): DepItem {
-  if (payload && typeof payload === 'object') {
-    const nestedData = (payload as { data?: unknown }).data;
+  if (!isObject(payload)) {
+    throw new Error('Unexpected department payload shape.');
+  }
 
-    if (nestedData && typeof nestedData === 'object') {
-      const nestedDepartment = (nestedData as { dep?: DepItem }).dep;
+  const data = payload.data;
 
-      if (nestedDepartment && typeof nestedDepartment === 'object') {
-        return nestedDepartment;
-      }
-
-      return nestedData as DepItem;
+  if (isObject(data)) {
+    if (isObject(data.dep)) {
+      return data.dep as unknown as DepItem;
     }
 
-    const directDepartment = (payload as { dep?: DepItem }).dep;
-    if (directDepartment && typeof directDepartment === 'object') {
-      return directDepartment;
-    }
+    return data as unknown as DepItem;
+  }
+
+  if (isObject(payload.dep)) {
+    return payload.dep as unknown as DepItem;
   }
 
   throw new Error('Unexpected department payload shape.');
