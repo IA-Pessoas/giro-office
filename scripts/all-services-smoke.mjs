@@ -7,11 +7,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 
-// Load .env from workspace root (if present) without requiring dotenv package.
-// Variables already set in process.env take precedence (dotenv convention).
-const envFilePath = path.join(rootDir, ".env");
-if (fs.existsSync(envFilePath)) {
-  const envContent = fs.readFileSync(envFilePath, "utf8");
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return;
+  }
+
+  const envContent = fs.readFileSync(filePath, "utf8");
   for (const line of envContent.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
@@ -19,16 +20,19 @@ if (fs.existsSync(envFilePath)) {
     if (eqIndex === -1) continue;
     const key = trimmed.slice(0, eqIndex).trim();
     let value = trimmed.slice(eqIndex + 1).trim();
-    // Strip surrounding quotes if present
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     }
-    // Only set if not already defined — caller-set env wins
     if (!(key in process.env)) {
       process.env[key] = value;
     }
   }
 }
+
+// Mirror the shell wrapper: gateway env first, then workspace root env, with
+// explicit caller-provided variables taking precedence over both.
+loadEnvFile(path.join(rootDir, "services", "gateway", ".env"));
+loadEnvFile(path.join(rootDir, ".env"));
 
 const { manifest } = await import(pathToFileURL(path.join(__dirname, "all-services-smoke.manifest.mjs")).href);
 
@@ -93,6 +97,17 @@ const SERVICE_URL_ENV_KEYS = {
   "user-service": "USER_SERVICE_URL",
 };
 
+const SERVICE_URL_DEFAULTS = {
+  "audit-service": "http://localhost:3020",
+  "client-service": "http://localhost:3035",
+  "department-service": "http://localhost:3036",
+  "organization-service": "http://localhost:3031",
+  "project-service": "http://localhost:3033",
+  "rh-service": "http://localhost:3034",
+  "task-service": "http://localhost:3032",
+  "user-service": "http://localhost:3030",
+};
+
 const env = {
   gatewayUrl: process.env.GATEWAY_URL,
   gatewayPort: process.env.GATEWAY_PORT ?? "3010",
@@ -117,7 +132,7 @@ if (!env.gatewayUrl) {
 }
 
 for (const [service, envKey] of Object.entries(SERVICE_URL_ENV_KEYS)) {
-  env[envKey] = process.env[envKey]?.trim() || "";
+  env[envKey] = process.env[envKey]?.trim() || SERVICE_URL_DEFAULTS[service] || "";
   env[service] = env[envKey];
 }
 

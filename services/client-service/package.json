@@ -11,6 +11,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "typecheck": "pnpm prisma:generate && tsc --noEmit",
+    "prestart": "pnpm build",
     "start": "node dist/server.js",
     "lint": "biome lint .",
     "format": "biome format --write .",
