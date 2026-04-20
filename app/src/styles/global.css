@@ -448,19 +448,21 @@ body {
   margin-right: 8px;
 }
 
-/* Dark-mode typographic refinement: softer golden secondary text */
 html[data-theme="dark"] .text-slate-500,
 html[data-theme="dark"] .text-slate-400,
-html[data-theme="dark"] .text-slate-700,
-html[data-theme="dark"] .text-slate-800,
 html[data-theme="dark"] .text-gray-500,
 html[data-theme="dark"] .text-gray-400,
 .chakra-ui-dark .text-slate-500,
 .chakra-ui-dark .text-slate-400,
-.chakra-ui-dark .text-slate-700,
-.chakra-ui-dark .text-slate-800,
 .chakra-ui-dark .text-gray-500,
 .chakra-ui-dark .text-gray-400 {
+    color: var(--colors-text-muted-dark) !important;
+}
+
+html[data-theme="dark"] .text-slate-700,
+html[data-theme="dark"] .text-slate-800,
+.chakra-ui-dark .text-slate-700,
+.chakra-ui-dark .text-slate-800 {
     color: var(--colors-text-secondary-dark) !important;
 }
 
@@ -505,11 +507,39 @@ html[data-theme="dark"] .dialog-neutral-muted,
     color: #cbd5e1 !important;
 }
 
+html[data-theme="dark"] .admin-users-shell .text-slate-500,
+html[data-theme="dark"] .admin-users-shell .text-slate-400,
+html[data-theme="dark"] .admin-users-shell .text-gray-500,
+html[data-theme="dark"] .admin-users-shell .text-gray-400,
+html[data-theme="dark"] .admin-users-modal .text-slate-500,
+html[data-theme="dark"] .admin-users-modal .text-slate-400,
+html[data-theme="dark"] .admin-users-modal .text-gray-500,
+html[data-theme="dark"] .admin-users-modal .text-gray-400,
+.chakra-ui-dark .admin-users-shell .text-slate-500,
+.chakra-ui-dark .admin-users-shell .text-slate-400,
+.chakra-ui-dark .admin-users-shell .text-gray-500,
+.chakra-ui-dark .admin-users-shell .text-gray-400,
+.chakra-ui-dark .admin-users-modal .text-slate-500,
+.chakra-ui-dark .admin-users-modal .text-slate-400,
+.chakra-ui-dark .admin-users-modal .text-gray-500,
+.chakra-ui-dark .admin-users-modal .text-gray-400 {
+    color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] .admin-users-shell .text-slate-700,
+html[data-theme="dark"] .admin-users-shell .text-slate-800,
+html[data-theme="dark"] .admin-users-modal .text-slate-700,
+html[data-theme="dark"] .admin-users-modal .text-slate-800,
+.chakra-ui-dark .admin-users-shell .text-slate-700,
+.chakra-ui-dark .admin-users-shell .text-slate-800,
+.chakra-ui-dark .admin-users-modal .text-slate-700,
+.chakra-ui-dark .admin-users-modal .text-slate-800 {
+    color: #ffffff !important;
+}
+
 /* Clients (dark mode): match dashboard (white surfaces + brand blue typography) */
 html[data-theme="dark"] .clients-shell,
 .chakra-ui-dark .clients-shell {
-    /* In dark mode, --colors-blue-500 is repurposed to gold for the sidebar.
-       Inside the Clients page we want the classic brand blue tone. */
     --colors-blue-500: var(--colors-brand-blue);
 }
 
@@ -602,7 +632,7 @@ html[data-theme="dark"] .ui-input,
 .chakra-ui-dark .ui-panel,
 .chakra-ui-dark .ui-input {
     background: var(--colors-surface-dark-soft) !important;
-    border-color: color-mix(in srgb, var(--colors-gold-500) 30%, transparent) !important;
+    border-color: color-mix(in srgb, var(--colors-brand-blue) 28%, transparent) !important;
 }
 
 /* Clients hover handled inside .clients-shell override above */
