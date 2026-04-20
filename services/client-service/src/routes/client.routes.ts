@@ -4,7 +4,7 @@ import type { ClientRouterDeps } from "../clientRouterDeps.js";
 import { createClientCoreRouter } from "./clientCore.routes.js";
 import { createClientHistoriesRouter } from "./clientHistories.routes.js";
 import { createClientIntegrationRouter } from "./clientIntegration.routes.js";
-import { createClientPARouter } from "./clientPA.routes.js";
+import { createClientPARouter } from "./clientPa.routes.js";
 import { createClientVerticalsRouter } from "./clientVerticals.routes.js";
 
 export function createClientRouter(deps: ClientRouterDeps): RouterType {
