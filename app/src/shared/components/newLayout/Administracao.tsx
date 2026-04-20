@@ -1,9 +1,14 @@
-import { useEffect, useState } from "react";
-import { BarChart3, KeyRound, Lock, Plus, Shield, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BarChart3, KeyRound, Lock, Plus, Search, Shield, Users } from "lucide-react";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { CreateUserModal, type UserItem } from "@modules/users";
-import { listAdminUsers } from "@modules/users/services/adminUsersService";
+import {
+  ADMIN_USER_STATUS_LABELS,
+  type AdminUserStatus,
+  getAdminUserStatusLabel,
+  listAdminUsers,
+} from "@modules/users/services/adminUsersService";
 import { useAuth } from "@/context/AuthContext";
 import { setupAPIClient } from "@shared/services/api";
 import { useFetch } from "@shared/hooks";
@@ -18,21 +23,41 @@ const ADMIN_ACTIVE_TAB_CLASSNAME =
   "bg-[var(--colors-brand-soft)] text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300";
 
 export function Administracao() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'permissions'>('dashboard');
+  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "permissions">("dashboard");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
   const [isLoadingOrganizationId, setIsLoadingOrganizationId] = useState(false);
+  const [userStatusFilter, setUserStatusFilter] = useState<AdminUserStatus>("active");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const { user } = useAuth();
 
-  const { data: users = [], refetch: refetchUsers } = useFetch(["admin-users", "active"], () =>
-    listAdminUsers("active"),
+  const { data: users = [], refetch: refetchUsers, isLoading: isUsersLoading } = useFetch(
+    ["admin-users", userStatusFilter],
+    () => listAdminUsers(userStatusFilter),
   );
   const { data: departments = [] } = useFetch<DepItem[]>(["admin-departments"], () =>
     departmentService.list(),
   );
+
+  const filteredUsers = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return users;
+    }
+
+    return users.filter((candidate) => candidate.name.toLowerCase().includes(normalizedSearch));
+  }, [searchTerm, users]);
+
+  const selectedUser = useMemo(
+    () => users.find((candidate) => candidate.id === selectedUserId) ?? null,
+    [selectedUserId, users],
+  );
+
   const dashboardCards = [
     {
-      title: "Usuários Ativos",
+      title: "Usuarios Ativos",
       value: users.length,
       icon: Users,
       iconClassName:
@@ -42,8 +67,7 @@ export function Administracao() {
       title: "Perfis de Acesso",
       value: 12,
       icon: KeyRound,
-      iconClassName:
-        "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+      iconClassName: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
     },
   ];
 
@@ -88,6 +112,21 @@ export function Administracao() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (users.length === 0) {
+      setSelectedUserId(null);
+      return;
+    }
+
+    setSelectedUserId((currentSelectedUserId) => {
+      if (currentSelectedUserId && users.some((candidate) => candidate.id === currentSelectedUserId)) {
+        return currentSelectedUserId;
+      }
+
+      return users[0]?.id ?? null;
+    });
+  }, [users]);
+
   const handleOpenCreateModal = () => setIsCreateModalOpen(true);
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);
   const handleUserCreated = (_user: UserItem) => {
@@ -99,13 +138,15 @@ export function Administracao() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${ADMIN_GRADIENT_ICON_CLASSNAME}`}>
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-xl ${ADMIN_GRADIENT_ICON_CLASSNAME}`}
+            >
               <Shield className="h-6 w-6 text-white" />
             </div>
-            Administração
+            Administracao
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Gestão de usuários, permissões e configurações do sistema
+            Gestao de usuarios, permissoes e configuracoes do sistema
           </p>
         </div>
         <button
@@ -113,17 +154,17 @@ export function Administracao() {
           type="button"
           onClick={handleOpenCreateModal}
         >
-          <Plus className="w-5 h-5" />
-          Novo Usuário
+          <Plus className="h-5 w-5" />
+          Novo Usuario
         </button>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center gap-1 overflow-x-auto">
           {[
-            { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-            { key: 'users', label: 'Usuários', icon: Users },
-            { key: 'permissions', label: 'Permissões', icon: Lock },
+            { key: "dashboard", label: "Dashboard", icon: BarChart3 },
+            { key: "users", label: "Usuarios", icon: Users },
+            { key: "permissions", label: "Permissoes", icon: Lock },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
@@ -136,7 +177,7 @@ export function Administracao() {
                 className={`min-w-fit flex-1 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
                   isActive
                     ? ADMIN_ACTIVE_TAB_CLASSNAME
-                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
                 }`}
               >
                 <Icon className="mr-2 inline-block h-4 w-4" />
@@ -147,7 +188,7 @@ export function Administracao() {
         </div>
       </div>
 
-      {activeTab === 'dashboard' ? (
+      {activeTab === "dashboard" ? (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
           {dashboardCards.map((card) => {
             const Icon = card.icon;
@@ -162,7 +203,9 @@ export function Administracao() {
                     <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">{card.title}</p>
                     <p className="text-2xl font-semibold text-slate-900 dark:text-white">{card.value}</p>
                   </div>
-                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${card.iconClassName}`}>
+                  <div
+                    className={`flex h-11 w-11 items-center justify-center rounded-xl ${card.iconClassName}`}
+                  >
                     <Icon className="h-5 w-5" />
                   </div>
                 </div>
@@ -170,13 +213,162 @@ export function Administracao() {
             );
           })}
         </div>
+      ) : activeTab === "users" ? (
+        <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+          <aside className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Usuarios</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Busque e selecione um usuario para continuar.
+                </p>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-950/40">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Busca</label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Buscar por nome"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+                  />
+                </div>
+
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Status</label>
+                <select
+                  value={userStatusFilter}
+                  onChange={(event) => setUserStatusFilter(event.target.value as AdminUserStatus)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                >
+                  {Object.entries(ADMIN_USER_STATUS_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {filteredUsers.length} usuario{filteredUsers.length === 1 ? "" : "s"}
+                  </p>
+                  <span className="rounded-full bg-[var(--colors-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
+                    {ADMIN_USER_STATUS_LABELS[userStatusFilter]}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {isUsersLoading ? (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Carregando usuarios...</p>
+                    </div>
+                  ) : filteredUsers.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                        Nenhum usuario encontrado.
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Ajuste a busca ou troque o filtro para ver outros resultados.
+                      </p>
+                    </div>
+                  ) : (
+                    filteredUsers.map((candidate) => {
+                      const isSelected = candidate.id === selectedUserId;
+                      const departmentName =
+                        departments.find((department) => department.id === candidate.department_id)?.name ??
+                        candidate.department?.name ??
+                        "Departamento nao informado";
+
+                      return (
+                        <button
+                          key={candidate.id}
+                          type="button"
+                          onClick={() => setSelectedUserId(candidate.id)}
+                          className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                            isSelected
+                              ? "border-[var(--colors-brand-gradient-end)] bg-[var(--colors-brand-soft)]/60 shadow-sm dark:bg-blue-900/20"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800/70"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                                {candidate.name}
+                              </p>
+                              <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+                                {departmentName}
+                              </p>
+                            </div>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                              {getAdminUserStatusLabel(candidate.status)}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            {selectedUser ? (
+              <div className="flex min-h-[480px] flex-col justify-between gap-6">
+                <div className="space-y-1">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{selectedUser.name}</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Painel reservado para os detalhes e a edicao do usuario selecionado.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Login</p>
+                    <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{selectedUser.login}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Status</p>
+                    <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
+                      {getAdminUserStatusLabel(selectedUser.status)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 dark:border-slate-700 dark:bg-slate-950/40">
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    A edicao detalhada entra no proximo passo.
+                  </p>
+                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    Esta area ja esta pronta para receber o formulario do usuario selecionado.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex min-h-[480px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Nenhum usuario selecionado.
+                  </p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Selecione um usuario na lista para preparar o painel de detalhes.
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/80 p-8 text-center dark:border-slate-700 dark:bg-slate-900/70">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
             Esta aba permanece somente visual neste refactor.
           </p>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            O fluxo real de criação continua disponível pelo botão &quot;Novo Usuário&quot;.
+            O fluxo real de criacao continua disponivel pelo botao "Novo Usuario".
           </p>
         </div>
       )}
