@@ -33,7 +33,12 @@ export function Administracao() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const { user } = useAuth();
 
-  const { data: users = [], refetch: refetchUsers, isLoading: isUsersLoading } = useFetch(
+  const {
+    data: users = [],
+    refetch: refetchUsers,
+    isLoading: isUsersLoading,
+    error: usersError,
+  } = useFetch(
     ["admin-users", userStatusFilter],
     () => listAdminUsers(userStatusFilter),
   );
@@ -256,6 +261,21 @@ export function Administracao() {
                 </div>
               ) : null}
 
+              {usersError ? (
+                <div className="rounded-2xl border border-rose-300 bg-rose-50/80 p-3 dark:border-rose-800 dark:bg-rose-950/20">
+                  <p className="text-sm font-medium text-rose-700 dark:text-rose-300">
+                    Nao foi possivel carregar a lista de usuarios.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void refetchUsers()}
+                    className="mt-3 rounded-xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : null}
+
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-950/40">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Busca</label>
                 <div className="relative">
@@ -297,6 +317,12 @@ export function Administracao() {
                   {isUsersLoading ? (
                     <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
                       <p className="text-sm text-slate-500 dark:text-slate-400">Carregando usuarios...</p>
+                    </div>
+                  ) : usersError ? (
+                    <div className="rounded-2xl border border-dashed border-rose-300 bg-rose-50/80 p-6 text-center dark:border-rose-800 dark:bg-rose-950/20">
+                      <p className="text-sm text-rose-700 dark:text-rose-300">
+                        A listagem nao esta disponivel no momento.
+                      </p>
                     </div>
                   ) : filteredUsers.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">

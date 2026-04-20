@@ -104,9 +104,11 @@ export function CreateUserModal({
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [moduleSelections, setModuleSelections] = useState<ModuleSelectionState>(createInitialModuleSelections);
   const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    setSubmitError(null);
     setFormData((prev) => ({
       ...prev,
       [name]: name === 'permission' ? Number(value) as UserPermission : value,
@@ -114,6 +116,7 @@ export function CreateUserModal({
   };
 
   const handleModuleLevelChange = (moduleKey: ModuleKey, value: ModuleSelectValue) => {
+    setSubmitError(null);
     setModuleSelections((prev) => ({
       ...prev,
       [moduleKey]: {
@@ -124,6 +127,8 @@ export function CreateUserModal({
   };
 
   const handleCadastrar = async () => {
+    setSubmitError(null);
+
     if (!formData.name || !formData.login || !formData.password || !formData.department_id) {
       toast.warn('Preencha todos os campos obrigatorios!');
       return;
@@ -165,6 +170,7 @@ export function CreateUserModal({
       setFormData(INITIAL_FORM_DATA);
       setModuleSelections(createInitialModuleSelections());
     } catch (err) {
+      setSubmitError('Nao foi possivel concluir o cadastro com os dados informados.');
       toast.error('Erro ao cadastrar usuario.');
       console.error(err);
     } finally {
@@ -176,7 +182,10 @@ export function CreateUserModal({
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open) {
+          setSubmitError(null);
+          onClose();
+        }
       }}
       title="Cadastrar Novo Usuario"
       description="Formulario para cadastro de novo usuario"
@@ -203,6 +212,20 @@ export function CreateUserModal({
       )}
     >
       <div className="space-y-6">
+        {submitError ? (
+          <div className="rounded-2xl border border-rose-300 bg-rose-50/80 p-4 dark:border-rose-800 dark:bg-rose-950/20">
+            <p className="text-sm font-medium text-rose-700 dark:text-rose-300">{submitError}</p>
+          </div>
+        ) : null}
+
+        {!organizationIdLoading && departments.length === 0 ? (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-4 dark:border-amber-700 dark:bg-amber-950/20">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              Nenhum departamento disponivel. O cadastro depende dos dados retornados pelo backend.
+            </p>
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="md:col-span-3">
             <label htmlFor="user-name" className={FIELD_LABEL_CLASSNAME}>Nome</label>
