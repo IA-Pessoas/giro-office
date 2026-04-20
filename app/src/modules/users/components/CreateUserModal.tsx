@@ -44,6 +44,14 @@ type ModuleSelectValue = 'none' | '0' | '1' | '2';
 const FIELD_CLASSNAME =
   'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition-all outline-none placeholder:text-slate-400 focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-80';
 
+const SELECT_FIELD_CLASSNAME =
+  'w-full appearance-none rounded-lg border border-slate-200 bg-white bg-[length:14px] bg-[position:right_0.95rem_center] bg-no-repeat px-3 py-2.5 pr-11 text-sm text-slate-900 shadow-sm transition-all outline-none focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 disabled:cursor-not-allowed disabled:opacity-80';
+
+const SELECT_ARROW_STYLE = {
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+} as const;
+
 const MODULE_CARD_CLASSNAME =
   'rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-700 dark:bg-slate-800/70';
 
@@ -283,7 +291,8 @@ export function CreateUserModal({
               name="department_id"
               value={formData.department_id}
               onChange={handleInputChange}
-              className={FIELD_CLASSNAME}
+              className={SELECT_FIELD_CLASSNAME}
+              style={SELECT_ARROW_STYLE}
               disabled={departmentsLoading || departmentsError || departments.length === 0}
               required
             >
@@ -300,7 +309,8 @@ export function CreateUserModal({
               name="permission"
               value={formData.permission}
               onChange={handleInputChange}
-              className={FIELD_CLASSNAME}
+              className={SELECT_FIELD_CLASSNAME}
+              style={SELECT_ARROW_STYLE}
             >
               {CREATE_USER_PERMISSION_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -330,7 +340,8 @@ export function CreateUserModal({
                       value={getModuleSelectValue(selection)}
                       onChange={(e) => handleModuleLevelChange(moduleOption.key, e.target.value as ModuleSelectValue)}
                       disabled={formData.permission === 2}
-                      className={`${FIELD_CLASSNAME} h-10 px-3 text-sm`}
+                      className={`${SELECT_FIELD_CLASSNAME} h-10 px-3 text-sm`}
+                      style={SELECT_ARROW_STYLE}
                     >
                       <option value="none">Sem acesso</option>
                       <option value="0">Visualizador</option>

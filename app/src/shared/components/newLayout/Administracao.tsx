@@ -38,6 +38,14 @@ const ADMIN_TEXT_CLASSNAME = "dialog-neutral-text text-sm text-slate-700 dark:te
 
 const ADMIN_MUTED_CLASSNAME = "dialog-neutral-muted text-sm text-slate-500 dark:text-slate-300";
 
+const ADMIN_SELECT_CLASSNAME =
+  "w-full appearance-none rounded-lg border border-slate-200 bg-white bg-[length:14px] bg-[position:right_0.95rem_center] bg-no-repeat px-3 py-2.5 pr-11 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white";
+
+const ADMIN_SELECT_ARROW_STYLE = {
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+} as const;
+
 export function Administracao() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "permissions">("dashboard");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -335,7 +343,8 @@ export function Administracao() {
                 <select
                   value={userStatusFilter}
                   onChange={(event) => setUserStatusFilter(event.target.value as AdminUserStatus)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  className={ADMIN_SELECT_CLASSNAME}
+                  style={ADMIN_SELECT_ARROW_STYLE}
                 >
                   {Object.entries(ADMIN_USER_STATUS_LABELS).map(([value, label]) => (
                     <option key={value} value={value}>
