@@ -62,6 +62,17 @@ export function Administracao() {
     },
   );
   const {
+    data: activeUsers = [],
+  } = useFetch(
+    ["admin-users-summary", "active"],
+    () => listAdminUsers("active"),
+    {
+      enabled: activeTab === "dashboard",
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const {
     data: departments = [],
     error: departmentsError,
     isLoading: isDepartmentsLoading,
@@ -85,7 +96,7 @@ export function Administracao() {
   const dashboardCards = [
     {
       title: "Usuarios Ativos",
-      value: users.length,
+      value: activeUsers.length,
       icon: Users,
       iconClassName:
         "bg-[var(--colors-brand-soft)] text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300",
@@ -159,11 +170,17 @@ export function Administracao() {
     hasDepartmentFetchSettled && (Boolean(departmentsError) || (!isDepartmentsLoading && departments.length === 0));
 
   const handleOpenCreateModal = () => {
+    if (!isDepartmentsLoading && (departmentsError || departments.length === 0)) {
+      void refetchDepartments();
+    }
     setIsCreateModalOpen(true);
   };
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);
   const handleUserCreated = (_user: UserItem) => {
     void refetchUsers();
+  };
+  const handleRetryDepartments = () => {
+    void refetchDepartments();
   };
 
   return (
@@ -263,12 +280,26 @@ export function Administracao() {
                   <p className={ADMIN_TEXT_CLASSNAME}>
                     Departamentos indisponiveis. A criacao de usuarios foi bloqueada ate a integracao voltar.
                   </p>
+                  <button
+                    type="button"
+                    onClick={handleRetryDepartments}
+                    className="mt-3 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    Tentar novamente
+                  </button>
                 </div>
               ) : !isDepartmentsLoading && departments.length === 0 ? (
                 <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
                   <p className={ADMIN_TEXT_CLASSNAME}>
                     Nenhum departamento foi retornado pelo backend. A criacao de usuarios esta indisponivel.
                   </p>
+                  <button
+                    type="button"
+                    onClick={handleRetryDepartments}
+                    className="mt-3 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    Atualizar lista
+                  </button>
                 </div>
               ) : null}
 
@@ -412,6 +443,7 @@ export function Administracao() {
         departments={departments}
         departmentsLoading={isDepartmentsLoading}
         departmentsError={Boolean(departmentsError)}
+        onRetryDepartments={handleRetryDepartments}
         organizationId={organizationId}
         organizationIdLoading={isLoadingOrganizationId}
         invitedBy={user?.id}

@@ -13,7 +13,7 @@ function extractDepartmentList(payload: unknown): DepItem[] {
     }
   }
 
-  return [];
+  throw new Error('Unexpected department list payload shape.');
 }
 
 function extractDepartment(payload: unknown): DepItem {

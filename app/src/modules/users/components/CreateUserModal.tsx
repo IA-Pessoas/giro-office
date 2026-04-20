@@ -16,6 +16,7 @@ interface CreateUserModalProps {
   departments?: ReadonlyArray<{ id: string; name: string }>;
   departmentsLoading?: boolean;
   departmentsError?: boolean;
+  onRetryDepartments?: () => void;
   organizationId?: string;
   organizationIdLoading?: boolean;
   invitedBy?: string;
@@ -101,6 +102,7 @@ export function CreateUserModal({
   departments = [],
   departmentsLoading = false,
   departmentsError = false,
+  onRetryDepartments,
   organizationId,
   organizationIdLoading = false,
   invitedBy,
@@ -228,6 +230,15 @@ export function CreateUserModal({
             <p className="dialog-neutral-text text-sm font-medium text-slate-700 dark:text-white">
               Nao foi possivel carregar os departamentos. O cadastro foi bloqueado ate a integracao voltar.
             </p>
+            {onRetryDepartments ? (
+              <button
+                type="button"
+                onClick={onRetryDepartments}
+                className="mt-3 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Tentar novamente
+              </button>
+            ) : null}
           </div>
         ) : departmentsLoading ? (
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
@@ -240,6 +251,15 @@ export function CreateUserModal({
             <p className="dialog-neutral-text text-sm font-medium text-slate-700 dark:text-white">
               Nenhum departamento disponivel. O cadastro depende dos dados retornados pelo backend.
             </p>
+            {onRetryDepartments ? (
+              <button
+                type="button"
+                onClick={onRetryDepartments}
+                className="mt-3 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Atualizar lista
+              </button>
+            ) : null}
           </div>
         ) : null}
 
