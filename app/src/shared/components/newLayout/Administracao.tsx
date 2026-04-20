@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, KeyRound, Lock, Plus, Search, Shield, Users } from "lucide-react";
+import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { AdminUserDetailsPanel, CreateUserModal, type UserItem } from "@modules/users";
@@ -36,9 +37,11 @@ export function Administracao() {
     ["admin-users", userStatusFilter],
     () => listAdminUsers(userStatusFilter),
   );
-  const { data: departments = [], error: departmentsError } = useFetch<DepItem[]>(["admin-departments"], () =>
-    departmentService.list(),
-  );
+  const {
+    data: departments = [],
+    error: departmentsError,
+    isLoading: isDepartmentsLoading,
+  } = useFetch<DepItem[]>(["admin-departments"], () => departmentService.list());
 
   const filteredUsers = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -122,7 +125,26 @@ export function Administracao() {
     });
   }, [users]);
 
-  const handleOpenCreateModal = () => setIsCreateModalOpen(true);
+  const isCreateBlockedByDepartments = Boolean(departmentsError) || (!isDepartmentsLoading && departments.length === 0);
+
+  const handleOpenCreateModal = () => {
+    if (departmentsError) {
+      toast.error("Nao foi possivel carregar os departamentos. A criacao de usuarios esta indisponivel.");
+      return;
+    }
+
+    if (isDepartmentsLoading) {
+      toast.info("Carregando departamentos. Tente novamente em instantes.");
+      return;
+    }
+
+    if (departments.length === 0) {
+      toast.warn("Nenhum departamento disponivel para criar usuarios.");
+      return;
+    }
+
+    setIsCreateModalOpen(true);
+  };
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);
   const handleUserCreated = (_user: UserItem) => {
     void refetchUsers();
@@ -148,6 +170,7 @@ export function Administracao() {
           className={`self-end lg:self-auto w-fit flex items-center gap-2 rounded-xl px-4 py-2.5 text-white ${ADMIN_GRADIENT_BUTTON_CLASSNAME}`}
           type="button"
           onClick={handleOpenCreateModal}
+          aria-disabled={isCreateBlockedByDepartments}
         >
           <Plus className="h-5 w-5" />
           Novo Usuario
@@ -218,6 +241,20 @@ export function Administracao() {
                   Busque e selecione um usuario para continuar.
                 </p>
               </div>
+
+              {departmentsError ? (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-3 dark:border-amber-700 dark:bg-amber-950/20">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                    Departamentos indisponiveis. A criacao de usuarios foi bloqueada ate a integracao voltar.
+                  </p>
+                </div>
+              ) : !isDepartmentsLoading && departments.length === 0 ? (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-3 dark:border-amber-700 dark:bg-amber-950/20">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                    Nenhum departamento foi retornado pelo backend. A criacao de usuarios esta indisponivel.
+                  </p>
+                </div>
+              ) : null}
 
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-950/40">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Busca</label>
