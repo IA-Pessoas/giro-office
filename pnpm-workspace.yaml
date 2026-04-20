@@ -12,3 +12,4 @@ packages:
   - "services/client-service"
   - "services/project-service"
   - "services/department-service"
+  - "services/fiscal-service"

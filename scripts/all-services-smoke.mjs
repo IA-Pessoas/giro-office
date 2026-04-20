@@ -86,6 +86,7 @@ const SERVICE_URL_ENV_KEYS = {
   "audit-service": "AUDIT_SERVICE_URL",
   "client-service": "CLIENT_SERVICE_URL",
   "department-service": "DEPARTMENT_SERVICE_URL",
+  "fiscal-service": "FISCAL_SERVICE_URL",
   "organization-service": "ORGANIZATION_SERVICE_URL",
   "project-service": "PROJECT_SERVICE_URL",
   "rh-service": "RH_SERVICE_URL",
@@ -121,6 +122,11 @@ for (const [service, envKey] of Object.entries(SERVICE_URL_ENV_KEYS)) {
   env[service] = env[envKey];
 }
 
+if (!env["fiscal-service"]) {
+  env.FISCAL_SERVICE_URL = "http://localhost:3037";
+  env["fiscal-service"] = env.FISCAL_SERVICE_URL;
+}
+
 for (const envKey of Object.values(INTERNAL_SERVICE_TOKENS)) {
   env[envKey] = process.env[envKey]?.trim() || "";
 }
@@ -137,6 +143,8 @@ const state = {
   secondaryClientId: "",
   clientHistoryPendingId: "",
   clientHistoryId: "",
+  fiscalNcmId: "",
+  fiscalNcmCode: "",
   projectId: "",
   taskModelPrimaryId: "",
   taskModelSecondaryId: "",
@@ -1401,6 +1409,65 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [403],
       json: { project_id: requireState("projectId") },
+    });
+  },
+
+  async fiscalNcmCreate(op) {
+    const ncmCode = uniqueDigits(8);
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        tax_regime: "Simples Nacional",
+        ncm_code: ncmCode,
+        federal_taxation_type: "Monofásica",
+        description: uniqueText("Smoke Fiscal NCM"),
+        validity_start_date: new Date().toISOString(),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.fiscalNcmId =
+      pickFirst(response.body, "data.create.id") ??
+      pickFirst(response.body, "data.id") ??
+      findFirstId(response.body?.data);
+    state.fiscalNcmCode = ncmCode;
+  },
+
+  async fiscalNcmCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        ncm_code: uniqueDigits(8),
+      },
+    });
+  },
+
+  async fiscalNcmGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ncm_id: requireState("fiscalNcmId") },
+    });
+  },
+
+  async fiscalNcmList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ncmCodes: requireState("fiscalNcmCode") },
+    });
+  },
+
+  async fiscalNcmPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        ncm_id: requireState("fiscalNcmId"),
+        tax_regime: "Simples Nacional",
+        ncm_code: requireState("fiscalNcmCode"),
+        federal_taxation_type: "Monofásica",
+        description: uniqueText("Smoke Fiscal NCM Updated"),
+        validity_start_date: new Date().toISOString(),
+      },
     });
   },
 

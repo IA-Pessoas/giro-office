@@ -15,6 +15,7 @@ const GOOD_STATUS_OVERRIDES = new Map([
   ["clientHistoriesPendingCreate", [201]],
   ["clientHistoriesCreate", [201]],
   ["projectCreate", [201]],
+  ["fiscalNcmCreate", [201]],
   ["taskModelCreate", [201]],
   ["taskModelDependentCreate", [201]],
   ["taskIntegrationCreate", [201]],
@@ -324,6 +325,7 @@ export const specFiles = {
   "rh-service": "services/rh-service/src/openapi/spec.ts",
   "task-service": "services/task-service/src/openapi/spec.ts",
   "user-service": "services/user-service/src/openapi/spec.ts",
+  "fiscal-service": "services/fiscal-service/src/openapi/spec.ts",
 };
 
 const baseManifest = [
@@ -981,6 +983,58 @@ const baseManifest = [
     action: "projectDelete",
     target: "gateway",
     auth: "admin-bearer",
+  }),
+
+  op({
+    service: "fiscal-service",
+    method: "GET",
+    path: "/health",
+    action: "serviceHealth",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "fiscal-service",
+    method: "POST",
+    path: "/fiscal/ncm",
+    action: "fiscalNcmCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "fiscal-service",
+    method: "POST",
+    path: "/fiscal/ncm",
+    action: "fiscalNcmCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid request",
+  }),
+  op({
+    service: "fiscal-service",
+    method: "GET",
+    path: "/fiscal/ncm",
+    action: "fiscalNcmGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "fiscal-service",
+    method: "GET",
+    path: "/fiscal/ncm/list",
+    action: "fiscalNcmList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "fiscal-service",
+    method: "PUT",
+    path: "/fiscal/ncm",
+    action: "fiscalNcmPut",
+    target: "gateway",
+    auth: "bearer",
   }),
 
   op({

@@ -1,0 +1,221 @@
+import type { OpenApiDocument } from "@workspace/shared/http";
+
+import type { FiscalServiceEnv } from "../config/env.js";
+
+export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDocument {
+  const baseUrl = `http://localhost:${env.port}`;
+
+  const createNcmExample = {
+    tax_regime: "Simples Nacional",
+    ncm_code: "84719012",
+    federal_taxation_type: "Monofásica",
+    description: "Unidade de processamento digital",
+    validity_start_date: "2026-01-01T00:00:00.000Z",
+  };
+
+  const updateNcmExample = {
+    ncm_id: "ncm-uuid",
+    tax_regime: "Simples Nacional",
+    ncm_code: "84719012",
+    federal_taxation_type: "Monofásica",
+    description: "Unidade de processamento digital - atualizado",
+    validity_start_date: "2026-01-01T00:00:00.000Z",
+  };
+
+  return {
+    openapi: "3.0.3",
+    info: {
+      title: "fiscal-service",
+      version: "1.0.0",
+      description: "API fiscal da PR 1: CRUD de NCM. Requer JWT válido nos endpoints autenticados.",
+    },
+    servers: [{ url: baseUrl }],
+    tags: [
+      { name: "Health", description: "Saúde do serviço" },
+      { name: "NCM", description: "CRUD de NCM" },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+      schemas: {
+        SuccessEnvelope: {
+          type: "object",
+          description: "Resposta de sucesso padrão do workspace",
+          additionalProperties: true,
+        },
+      },
+    },
+    paths: {
+      "/health": {
+        get: {
+          tags: ["Health"],
+          summary: "Health check",
+          responses: {
+            "200": {
+              description: "Serviço disponível",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/fiscal/ncm": {
+        post: {
+          tags: ["NCM"],
+          summary: "Criar NCM",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    tax_regime: { type: "string" },
+                    ncm_code: { type: "string" },
+                    federal_taxation_type: { type: "string" },
+                    description: { type: "string" },
+                    ncm_notes: { type: "string" },
+                    cst_pis_outgoing: { type: "string" },
+                    cst_cofins_outgoing: { type: "string" },
+                    product_group: { type: "string" },
+                    validity_start_date: { type: "string", format: "date-time" },
+                    information_source: { type: "string" },
+                    reference_legislation: { type: "string" },
+                    validity_end_date: { type: "string", format: "date-time" },
+                  },
+                  required: [
+                    "tax_regime",
+                    "ncm_code",
+                    "federal_taxation_type",
+                    "description",
+                    "validity_start_date",
+                  ],
+                  additionalProperties: true,
+                  example: createNcmExample,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Criado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        get: {
+          tags: ["NCM"],
+          summary: "Detalhe do NCM",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "ncm_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Detalhe",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        put: {
+          tags: ["NCM"],
+          summary: "Atualizar NCM",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ncm_id: { type: "string", format: "uuid" },
+                    tax_regime: { type: "string" },
+                    ncm_code: { type: "string" },
+                    federal_taxation_type: { type: "string" },
+                    description: { type: "string" },
+                    ncm_notes: { type: "string" },
+                    cst_pis_outgoing: { type: "string" },
+                    cst_cofins_outgoing: { type: "string" },
+                    product_group: { type: "string" },
+                    validity_start_date: { type: "string", format: "date-time" },
+                    information_source: { type: "string" },
+                    reference_legislation: { type: "string" },
+                    validity_end_date: { type: "string", format: "date-time" },
+                  },
+                  required: [
+                    "ncm_id",
+                    "tax_regime",
+                    "ncm_code",
+                    "federal_taxation_type",
+                    "description",
+                    "validity_start_date",
+                  ],
+                  additionalProperties: true,
+                  example: updateNcmExample,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/fiscal/ncm/list": {
+        get: {
+          tags: ["NCM"],
+          summary: "Listar NCMs por códigos",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "ncmCodes",
+              in: "query",
+              required: true,
+              schema: { type: "string" },
+              description: "Códigos NCM separados por vírgula",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Lista",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
