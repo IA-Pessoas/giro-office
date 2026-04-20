@@ -14,6 +14,8 @@ interface CreateUserModalProps {
   onClose: () => void;
   onUserCreated: (newUser: UserItem) => void;
   departments?: ReadonlyArray<{ id: string; name: string }>;
+  departmentsLoading?: boolean;
+  departmentsError?: boolean;
   organizationId?: string;
   organizationIdLoading?: boolean;
   invitedBy?: string;
@@ -97,6 +99,8 @@ export function CreateUserModal({
   onClose,
   onUserCreated,
   departments = [],
+  departmentsLoading = false,
+  departmentsError = false,
   organizationId,
   organizationIdLoading = false,
   invitedBy,
@@ -105,6 +109,7 @@ export function CreateUserModal({
   const [moduleSelections, setModuleSelections] = useState<ModuleSelectionState>(createInitialModuleSelections);
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const isCreateBlocked = departmentsLoading || departmentsError || departments.length === 0 || organizationIdLoading || !organizationId;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -131,6 +136,21 @@ export function CreateUserModal({
 
     if (!formData.name || !formData.login || !formData.password || !formData.department_id) {
       toast.warn('Preencha todos os campos obrigatorios!');
+      return;
+    }
+
+    if (departmentsLoading) {
+      toast.info('Carregando departamentos. Tente novamente em instantes.');
+      return;
+    }
+
+    if (departmentsError) {
+      toast.error('Nao foi possivel carregar os departamentos. O cadastro esta bloqueado no momento.');
+      return;
+    }
+
+    if (departments.length === 0) {
+      toast.warn('Nenhum departamento disponivel para criar usuarios.');
       return;
     }
 
@@ -189,7 +209,7 @@ export function CreateUserModal({
       }}
       title="Cadastrar Novo Usuario"
       description="Formulario para cadastro de novo usuario"
-      contentClassName="flex max-h-[90vh] flex-col overflow-hidden border border-slate-200 bg-white shadow-2xl sm:max-h-[88vh] dark:border-slate-700 dark:bg-slate-900"
+      contentClassName="admin-users-modal flex max-h-[90vh] flex-col overflow-hidden border border-slate-200 bg-white shadow-2xl sm:max-h-[88vh] dark:border-slate-700 dark:bg-slate-900"
       bodyClassName="overflow-y-auto"
       footer={(
         <>
@@ -203,7 +223,7 @@ export function CreateUserModal({
           <button
             type="button"
             className={PRIMARY_ACTION_CLASSNAME}
-            disabled={isLoading}
+            disabled={isLoading || isCreateBlocked}
             onClick={handleCadastrar}
           >
             {isLoading ? 'Salvando...' : 'Criar Usuario'}
@@ -218,9 +238,21 @@ export function CreateUserModal({
           </div>
         ) : null}
 
-        {!organizationIdLoading && departments.length === 0 ? (
+        {departmentsError ? (
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            <p className="dialog-neutral-text text-sm font-medium text-slate-700 dark:text-white">
+              Nao foi possivel carregar os departamentos. O cadastro foi bloqueado ate a integracao voltar.
+            </p>
+          </div>
+        ) : departmentsLoading ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+            <p className="dialog-neutral-text text-sm font-medium text-slate-700 dark:text-white">
+              Carregando departamentos para habilitar o cadastro.
+            </p>
+          </div>
+        ) : !organizationIdLoading && departments.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+            <p className="dialog-neutral-text text-sm font-medium text-slate-700 dark:text-white">
               Nenhum departamento disponivel. O cadastro depende dos dados retornados pelo backend.
             </p>
           </div>
@@ -247,6 +279,7 @@ export function CreateUserModal({
               value={formData.department_id}
               onChange={handleInputChange}
               className={FIELD_CLASSNAME}
+              disabled={departmentsLoading || departmentsError || departments.length === 0}
               required
             >
               <option value="">Selecione um departamento</option>

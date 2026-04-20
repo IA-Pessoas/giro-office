@@ -153,33 +153,8 @@ export function Administracao() {
     hasDepartmentFetchSettled && (Boolean(departmentsError) || (!isDepartmentsLoading && departments.length === 0));
 
   const handleOpenCreateModal = async () => {
-    if (isDepartmentsLoading) {
-      toast.info("Carregando departamentos. Tente novamente em instantes.");
-      return;
-    }
-
-    let availableDepartments = departments;
-
-    if (departmentsError || departments.length === 0) {
-      const result = await refetchDepartments();
-      const nextDepartments = Array.isArray(result.data) ? result.data : [];
-
-      if (result.error) {
-        toast.error("Nao foi possivel carregar os departamentos. A criacao de usuarios esta indisponivel.");
-        return;
-      }
-
-      if (nextDepartments.length === 0) {
-        toast.warn("Nenhum departamento disponivel para criar usuarios.");
-        return;
-      }
-
-      availableDepartments = nextDepartments;
-    }
-
-    if (availableDepartments.length === 0) {
-      toast.warn("Nenhum departamento disponivel para criar usuarios.");
-      return;
+    if (!isDepartmentsLoading && (departmentsError || departments.length === 0)) {
+      void refetchDepartments();
     }
 
     setIsCreateModalOpen(true);
@@ -271,7 +246,7 @@ export function Administracao() {
           })}
         </div>
       ) : activeTab === "users" ? (
-        <div className="grid gap-4 xl:h-[90vh] xl:grid-cols-[360px_minmax(0,1fr)] xl:items-stretch">
+        <div className="admin-users-shell grid gap-4 xl:h-[90vh] xl:grid-cols-[360px_minmax(0,1fr)] xl:items-stretch">
           <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 xl:h-full`}>
             <div className="flex h-full min-h-0 flex-col space-y-4">
               <div className="space-y-1">
@@ -433,6 +408,8 @@ export function Administracao() {
         onClose={handleCloseCreateModal}
         onUserCreated={handleUserCreated}
         departments={departments}
+        departmentsLoading={isDepartmentsLoading}
+        departmentsError={Boolean(departmentsError)}
         organizationId={organizationId}
         organizationIdLoading={isLoadingOrganizationId}
         invitedBy={user?.id}
