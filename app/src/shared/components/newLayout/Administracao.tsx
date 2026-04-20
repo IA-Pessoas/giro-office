@@ -56,6 +56,10 @@ export function Administracao() {
   } = useFetch(
     ["admin-users", userStatusFilter],
     () => listAdminUsers(userStatusFilter),
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
   );
   const {
     data: departments = [],
@@ -64,6 +68,8 @@ export function Administracao() {
     refetch: refetchDepartments,
   } = useFetch<DepItem[]>(["admin-departments"], () => departmentService.list(), {
     enabled: activeTab === "users" || isCreateModalOpen,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
   const filteredUsers = useMemo(() => {
@@ -152,11 +158,7 @@ export function Administracao() {
   const isCreateBlockedByDepartments =
     hasDepartmentFetchSettled && (Boolean(departmentsError) || (!isDepartmentsLoading && departments.length === 0));
 
-  const handleOpenCreateModal = async () => {
-    if (!isDepartmentsLoading && (departmentsError || departments.length === 0)) {
-      void refetchDepartments();
-    }
-
+  const handleOpenCreateModal = () => {
     setIsCreateModalOpen(true);
   };
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);

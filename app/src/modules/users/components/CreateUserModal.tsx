@@ -139,21 +139,6 @@ export function CreateUserModal({
       return;
     }
 
-    if (departmentsLoading) {
-      toast.info('Carregando departamentos. Tente novamente em instantes.');
-      return;
-    }
-
-    if (departmentsError) {
-      toast.error('Nao foi possivel carregar os departamentos. O cadastro esta bloqueado no momento.');
-      return;
-    }
-
-    if (departments.length === 0) {
-      toast.warn('Nenhum departamento disponivel para criar usuarios.');
-      return;
-    }
-
     if (organizationIdLoading) {
       toast.info('Carregando o contexto da organizacao. Tente novamente em instantes.');
       return;
