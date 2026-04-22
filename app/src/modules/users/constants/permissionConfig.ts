@@ -22,10 +22,10 @@ export const PERMISSION_MODULE_LABELS: Record<KnownPermissionModuleKey, string> 
   atendimento: "Atendimento",
   certificado: "Certificado",
   comercial: "Comercial",
-  contabil: "Contabil",
+  contabil: "Contábil",
   financeiro: "Financeiro",
   fiscal: "Fiscal",
-  integracao: "Integracao",
+  integracao: "Integração",
   marketing: "Marketing",
   parcelamento: "Parcelamento",
   pec: "PEC",
@@ -46,7 +46,7 @@ export const PERMISSION_MODULE_GROUPS = [
     keys: ["contabil", "financeiro", "fiscal", "parcelamento", "regularize"],
   },
   {
-    title: "Pessoas e Operacao",
+    title: "Pessoas e Operação",
     keys: ["pessoal", "rh", "triagem", "pec"],
   },
   {
@@ -61,7 +61,7 @@ export const PERMISSION_MODULE_GROUPS = [
 export const PERMISSION_SELECT_OPTIONS = [
   { value: "null", label: "Sem acesso" },
   { value: "0", label: "Visualizador" },
-  { value: "1", label: "Usuario" },
+  { value: "1", label: "Usuário" },
   { value: "2", label: "Administrador" },
 ] as const;
 

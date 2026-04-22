@@ -217,7 +217,7 @@ export function Administracao() {
 
   const dashboardCards = [
     {
-      title: "Usuarios Ativos",
+      title: "Usuários ativos",
       value: activeUsers.length,
       icon: Users,
       iconClassName:
@@ -257,7 +257,7 @@ export function Administracao() {
         if (isMounted) {
           setOrganizationId(undefined);
         }
-        console.error("Erro ao carregar organization_id do usuario logado", error);
+        console.error("Erro ao carregar organization_id do usuário logado", error);
       } finally {
         if (isMounted) {
           setIsLoadingOrganizationId(false);
@@ -387,7 +387,7 @@ export function Administracao() {
 
     if (isDirty) {
       const shouldDiscardChanges = window.confirm(
-        "Existem alteracoes pendentes para este usuario. Deseja descartar e trocar de contexto?",
+        "Existem alterações pendentes para este usuário. Deseja descartar e trocar de contexto?",
       );
 
       if (!shouldDiscardChanges) {
@@ -447,10 +447,10 @@ export function Administracao() {
         userId: selectedPermissionUserId,
         raw,
       });
-      toast.success("Permissoes atualizadas com sucesso.");
+      toast.success("Permissões atualizadas com sucesso.");
     } catch (error) {
       setPermissionSaveError(
-        getPermissionErrorMessage(error, "Nao foi possivel salvar as permissoes agora."),
+        getPermissionErrorMessage(error, "Não foi possível salvar as permissões agora."),
       );
     } finally {
       setIsSavingPermissions(false);
@@ -467,10 +467,10 @@ export function Administracao() {
             >
               <Shield className="h-6 w-6 text-white" />
             </div>
-            Administracao
+            Administração
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Gestao de usuarios, permissoes e configuracoes do sistema
+            Gestão de usuários, permissões e configurações do sistema
           </p>
         </div>
         <button
@@ -480,7 +480,7 @@ export function Administracao() {
           aria-disabled={isCreateBlockedByDepartments}
         >
           <Plus className="h-5 w-5" />
-          Novo Usuario
+          Novo usuário
         </button>
       </div>
 
@@ -488,8 +488,8 @@ export function Administracao() {
         <div className="flex items-center gap-1 overflow-x-auto">
           {[
             { key: "dashboard", label: "Dashboard", icon: BarChart3 },
-            { key: "users", label: "Usuarios", icon: Users },
-            { key: "permissions", label: "Permissoes", icon: Lock },
+            { key: "users", label: "Usuários", icon: Users },
+            { key: "permissions", label: "Permissões", icon: Lock },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
@@ -543,16 +543,16 @@ export function Administracao() {
           <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 xl:h-full`}>
             <div className="flex h-full min-h-0 flex-col space-y-4">
               <div className="space-y-1">
-                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Usuarios</h2>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Usuários</h2>
                 <p className={ADMIN_MUTED_CLASSNAME}>
-                  Busque e selecione um usuario para continuar.
+                  Busque e selecione um usuário para continuar.
                 </p>
               </div>
 
               {departmentsError ? (
                 <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    Departamentos indisponiveis. A criacao de usuarios foi bloqueada ate a integracao voltar.
+                    Departamentos indisponíveis. A criação de usuários foi bloqueada até a integração voltar.
                   </p>
                   <button
                     type="button"
@@ -565,7 +565,7 @@ export function Administracao() {
               ) : !isDepartmentsLoading && departments.length === 0 ? (
                 <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    Nenhum departamento foi retornado pelo backend. A criacao de usuarios esta indisponivel.
+                    Nenhum departamento foi retornado pelo backend. A criação de usuários está indisponível.
                   </p>
                   <button
                     type="button"
@@ -580,7 +580,7 @@ export function Administracao() {
               {usersError ? (
                 <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    Nao foi possivel carregar a lista de usuarios.
+                    Não foi possível carregar a lista de usuários.
                   </p>
                   <button
                     type="button"
@@ -623,7 +623,7 @@ export function Administracao() {
               <div className="flex min-h-0 flex-1 flex-col space-y-3">
                 <div className="flex items-center justify-between">
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    {filteredUsers.length} usuario{filteredUsers.length === 1 ? "" : "s"}
+                    {filteredUsers.length} usuário{filteredUsers.length === 1 ? "" : "s"}
                   </p>
                   <span className="rounded-full bg-[var(--colors-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
                     {ADMIN_USER_STATUS_LABELS[userStatusFilter]}
@@ -633,18 +633,18 @@ export function Administracao() {
                 <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
                   {isUsersLoading ? (
                     <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
-                      <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuarios...</p>
+                      <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuários...</p>
                     </div>
                   ) : usersError ? (
                     <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
                       <p className={ADMIN_MUTED_CLASSNAME}>
-                        A listagem nao esta disponivel no momento.
+                        A listagem não está disponível no momento.
                       </p>
                     </div>
                   ) : filteredUsers.length === 0 ? (
                     <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
                       <p className={ADMIN_TEXT_CLASSNAME}>
-                        Nenhum usuario encontrado.
+                        Nenhum usuário encontrado.
                       </p>
                       <p className={`mt-1 ${ADMIN_MUTED_CLASSNAME}`}>
                         Ajuste a busca ou troque o filtro para ver outros resultados.
@@ -706,17 +706,17 @@ export function Administracao() {
             <div className="flex h-full min-h-0 flex-col space-y-4">
               <div className="space-y-1">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-                  Usuarios ativos
+                  Usuários ativos
                 </h2>
                 <p className={ADMIN_MUTED_CLASSNAME}>
-                  Escolha um usuario para carregar e editar as permissoes.
+                  Escolha um usuário para carregar e editar as permissões.
                 </p>
               </div>
 
               {permissionUsersError ? (
                 <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    Nao foi possivel carregar os usuarios ativos.
+                    Não foi possível carregar os usuários ativos.
                   </p>
                   <button
                     type="button"
@@ -731,7 +731,7 @@ export function Administracao() {
               <div className="flex min-h-0 flex-1 flex-col space-y-3">
                 <div className="flex items-center justify-between">
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    {permissionUsers.length} usuario{permissionUsers.length === 1 ? "" : "s"}
+                    {permissionUsers.length} usuário{permissionUsers.length === 1 ? "" : "s"}
                   </p>
                   <span className="rounded-full bg-[var(--colors-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
                     Ativo
@@ -741,17 +741,17 @@ export function Administracao() {
                 <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
                   {isPermissionUsersLoading ? (
                     <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
-                      <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuarios ativos...</p>
+                      <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuários ativos...</p>
                     </div>
                   ) : permissionUsersError ? (
                     <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
                       <p className={ADMIN_MUTED_CLASSNAME}>
-                        A listagem de usuarios ativos nao esta disponivel.
+                        A listagem de usuários ativos não está disponível.
                       </p>
                     </div>
                   ) : permissionUsers.length === 0 ? (
                     <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
-                      <p className={ADMIN_TEXT_CLASSNAME}>Nenhum usuario ativo encontrado.</p>
+                      <p className={ADMIN_TEXT_CLASSNAME}>Nenhum usuário ativo encontrado.</p>
                     </div>
                   ) : (
                     permissionUsers.map((candidate) => {
@@ -795,14 +795,14 @@ export function Administracao() {
               <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center dark:border-slate-700 dark:bg-slate-950/30">
                 <div>
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    Selecione um usuario para editar as permissoes.
+                    Selecione um usuário para editar as permissões.
                   </p>
                 </div>
               </div>
             ) : canShowPermissionLoader ? (
               <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center dark:border-slate-700 dark:bg-slate-950/30">
                 <div>
-                  <p className={ADMIN_TEXT_CLASSNAME}>Carregando permissoes...</p>
+                  <p className={ADMIN_TEXT_CLASSNAME}>Carregando permissões...</p>
                 </div>
               </div>
             ) : permissionQuery.isError ? (
@@ -810,8 +810,8 @@ export function Administracao() {
                 <div>
                   <p className="text-sm font-semibold">
                     {isPermissionQuery404
-                      ? "Permissoes nao configuradas para este usuario. Solicite criacao/configuracao via suporte."
-                      : "Nao foi possivel carregar as permissoes deste usuario."}
+                      ? "Permissões não configuradas para este usuário. Solicite criação/configuração via suporte."
+                      : "Não foi possível carregar as permissões deste usuário."}
                   </p>
                   <button
                     type="button"
@@ -838,7 +838,7 @@ export function Administracao() {
                     ) : null}
                     {isDirty ? (
                       <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200">
-                        Alteracoes pendentes
+                        Alterações pendentes
                       </span>
                     ) : null}
                   </div>
@@ -850,9 +850,9 @@ export function Administracao() {
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className={ADMIN_TEXT_CLASSNAME}>Niveis da permissao por modulo.</p>
+                    <p className={ADMIN_TEXT_CLASSNAME}>Níveis da permissão por módulo.</p>
                     <p className={ADMIN_MUTED_CLASSNAME}>
-                      Ajuste os acessos em lote para o usuario selecionado.
+                      Ajuste os acessos em lote para o usuário selecionado.
                     </p>
                   </div>
                   <button
@@ -872,7 +872,7 @@ export function Administracao() {
 
                 {permissionSaveError ? (
                   <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100">
-                    <p className="text-sm font-semibold">Nao foi possivel salvar as permissoes.</p>
+                    <p className="text-sm font-semibold">Não foi possível salvar as permissões.</p>
                     <p className="mt-1 text-sm opacity-90">{permissionSaveError}</p>
                     <button
                       type="button"
@@ -889,7 +889,7 @@ export function Administracao() {
                 {isSelectedPermissionOwner ? (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-slate-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-white">
                     <p className="text-sm font-semibold">
-                      Owners recebem acesso maximo e nao sao editaveis nesta tela.
+                      Owners recebem acesso máximo e não são editáveis nesta tela.
                     </p>
                   </div>
                 ) : null}
