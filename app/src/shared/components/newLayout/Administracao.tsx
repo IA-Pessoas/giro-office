@@ -1,15 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, KeyRound, Lock, Plus, Search, Shield, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
+import { BarChart3, KeyRound, Lock, Plus, RotateCcw, Search, Shield, Users } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { AdminUserDetailsPanel, CreateUserModal, type UserItem } from "@modules/users";
+import { permissionService } from "@modules/users/services/permissionService";
 import {
   ADMIN_USER_STATUS_LABELS,
   type AdminUserStatus,
   getAdminUserStatusLabel,
   listAdminUsers,
 } from "@modules/users/services/adminUsersService";
+import type { PermissionDraft } from "@modules/users/types";
+import {
+  freezePermissionSnapshot,
+  normalizePermissionDraft,
+  normalizePermissionResponse,
+} from "@modules/users/utils/permissionUtils";
 import { useAuth } from "@/context/AuthContext";
 import { setupAPIClient } from "@shared/services/api";
 import { useFetch } from "@shared/hooks";
@@ -46,6 +55,11 @@ const ADMIN_SELECT_ARROW_STYLE = {
     "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
 } as const;
 
+type PermissionQueryResult = {
+  userId: string;
+  raw: Record<string, unknown>;
+};
+
 export function Administracao() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "permissions">("dashboard");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -55,6 +69,16 @@ export function Administracao() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedPermissionUserId, setSelectedPermissionUserId] = useState<string | null>(null);
+  const [permissionDraft, setPermissionDraft] = useState<PermissionDraft>(() =>
+    normalizePermissionDraft({}),
+  );
+  const [permissionSnapshot, setPermissionSnapshot] = useState<Readonly<PermissionDraft> | null>(
+    null,
+  );
+  const [permissionExtraKeys, setPermissionExtraKeys] = useState<string[]>([]);
+  const [loadedPermissionUserId, setLoadedPermissionUserId] = useState<string | null>(null);
+  const [permissionSaveError, setPermissionSaveError] = useState<string | null>(null);
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false);
   const { user } = useAuth();
 
   const {
@@ -123,6 +147,21 @@ export function Administracao() {
   const selectedPermissionUser = useMemo(() => {
     return permissionUsers.find((candidate) => candidate.id === selectedPermissionUserId) ?? null;
   }, [permissionUsers, selectedPermissionUserId]);
+
+  const permissionQuery = useQuery<PermissionQueryResult>({
+    queryKey: ["admin", "permissions", selectedPermissionUserId],
+    enabled: activeTab === "permissions" && !!selectedPermissionUserId,
+    retry: false,
+    queryFn: async ({ queryKey, signal }) => {
+      const [, , userId] = queryKey as [string, string, string];
+      const raw = await permissionService.getByUserId(userId, undefined, { signal });
+
+      return {
+        userId,
+        raw,
+      };
+    },
+  });
 
   const dashboardCards = [
     {
@@ -214,6 +253,50 @@ export function Administracao() {
     });
   }, [permissionUsers]);
 
+  useEffect(() => {
+    if (!selectedPermissionUserId) {
+      setPermissionDraft(normalizePermissionDraft({}));
+      setPermissionSnapshot(null);
+      setPermissionExtraKeys([]);
+      setLoadedPermissionUserId(null);
+      setPermissionSaveError(null);
+      return;
+    }
+
+    if (selectedPermissionUserId !== loadedPermissionUserId) {
+      setPermissionDraft(normalizePermissionDraft({}));
+      setPermissionSnapshot(null);
+      setPermissionExtraKeys([]);
+      setPermissionSaveError(null);
+    }
+  }, [loadedPermissionUserId, selectedPermissionUserId]);
+
+  useEffect(() => {
+    if (!permissionQuery.data) {
+      return;
+    }
+
+    if (permissionQuery.data.userId !== selectedPermissionUserId) {
+      return;
+    }
+
+    const normalizationResult = normalizePermissionResponse(permissionQuery.data.raw);
+    const nextExtraKeys = Object.keys(normalizationResult.extras);
+    const nextDraft = normalizePermissionDraft(
+      {
+        ...normalizationResult.known,
+        ...normalizationResult.extras,
+      },
+      nextExtraKeys,
+    );
+
+    setPermissionDraft(nextDraft);
+    setPermissionSnapshot(freezePermissionSnapshot(nextDraft));
+    setPermissionExtraKeys(nextExtraKeys);
+    setLoadedPermissionUserId(permissionQuery.data.userId);
+    setPermissionSaveError(null);
+  }, [permissionQuery.data, selectedPermissionUserId]);
+
   const hasDepartmentFetchSettled = activeTab === "users" || isCreateModalOpen || Boolean(departmentsError) || departments.length > 0;
   const isCreateBlockedByDepartments =
     hasDepartmentFetchSettled && (Boolean(departmentsError) || (!isDepartmentsLoading && departments.length === 0));
@@ -231,6 +314,12 @@ export function Administracao() {
   const handleRetryDepartments = () => {
     void refetchDepartments();
   };
+
+  const isPermissionQuery404 =
+    isAxiosError(permissionQuery.error) && permissionQuery.error.response?.status === 404;
+  const canShowPermissionLoader =
+    permissionQuery.isLoading ||
+    (permissionQuery.isFetching && loadedPermissionUserId !== selectedPermissionUserId);
 
   const getDepartmentName = (candidate: UserItem): string => {
     return (
@@ -582,6 +671,31 @@ export function Administracao() {
                   </p>
                 </div>
               </div>
+            ) : canShowPermissionLoader ? (
+              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center dark:border-slate-700 dark:bg-slate-950/30">
+                <div>
+                  <p className={ADMIN_TEXT_CLASSNAME}>Carregando permissoes...</p>
+                </div>
+              </div>
+            ) : permissionQuery.isError ? (
+              <div className="flex h-full items-center rounded-2xl border border-amber-200 bg-amber-50/90 p-8 text-slate-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-white">
+                <div>
+                  <p className="text-sm font-semibold">
+                    {isPermissionQuery404
+                      ? "Permissoes nao configuradas para este usuario. Solicite criacao/configuracao via suporte."
+                      : "Nao foi possivel carregar as permissoes deste usuario."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void permissionQuery.refetch()}
+                    className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    disabled={permissionQuery.isFetching}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Tentar novamente
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="flex h-full min-h-0 flex-col space-y-6">
                 <div className="space-y-2 border-b border-slate-200 pb-5 dark:border-slate-700">
@@ -597,10 +711,10 @@ export function Administracao() {
                 <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center dark:border-slate-700 dark:bg-slate-950/30">
                   <div>
                     <p className={ADMIN_TEXT_CLASSNAME}>
-                      Estrutura da aba Permissoes preparada.
+                      Permissoes carregadas para {selectedPermissionUser.name}.
                     </p>
                     <p className={`mt-2 ${ADMIN_MUTED_CLASSNAME}`}>
-                      O carregamento das permissoes entra na proxima etapa.
+                      O editor entra na proxima etapa, sem exibir dados antigos durante a troca.
                     </p>
                   </div>
                 </div>
