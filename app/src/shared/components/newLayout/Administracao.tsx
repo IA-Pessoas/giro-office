@@ -54,6 +54,7 @@ export function Administracao() {
   const [userStatusFilter, setUserStatusFilter] = useState<AdminUserStatus>("active");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedPermissionUserId, setSelectedPermissionUserId] = useState<string | null>(null);
   const { user } = useAuth();
 
   const {
@@ -81,12 +82,26 @@ export function Administracao() {
     },
   );
   const {
+    data: permissionUsers = [],
+    isLoading: isPermissionUsersLoading,
+    error: permissionUsersError,
+    refetch: refetchPermissionUsers,
+  } = useFetch(
+    ["admin-users-summary", "permissions-active"],
+    () => listAdminUsers("active"),
+    {
+      enabled: activeTab === "permissions",
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const {
     data: departments = [],
     error: departmentsError,
     isLoading: isDepartmentsLoading,
     refetch: refetchDepartments,
   } = useFetch<DepItem[]>(["admin-departments"], () => departmentService.list(), {
-    enabled: activeTab === "users" || isCreateModalOpen,
+    enabled: activeTab === "users" || activeTab === "permissions" || isCreateModalOpen,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -100,6 +115,14 @@ export function Administracao() {
 
     return users.filter((candidate) => candidate.name.toLowerCase().includes(normalizedSearch));
   }, [searchTerm, users]);
+
+  const departmentNameById = useMemo(() => {
+    return new Map(departments.map((department) => [department.id, department.name]));
+  }, [departments]);
+
+  const selectedPermissionUser = useMemo(() => {
+    return permissionUsers.find((candidate) => candidate.id === selectedPermissionUserId) ?? null;
+  }, [permissionUsers, selectedPermissionUserId]);
 
   const dashboardCards = [
     {
@@ -173,6 +196,24 @@ export function Administracao() {
     });
   }, [users]);
 
+  useEffect(() => {
+    if (permissionUsers.length === 0) {
+      setSelectedPermissionUserId(null);
+      return;
+    }
+
+    setSelectedPermissionUserId((currentSelectedPermissionUserId) => {
+      if (
+        currentSelectedPermissionUserId &&
+        permissionUsers.some((candidate) => candidate.id === currentSelectedPermissionUserId)
+      ) {
+        return currentSelectedPermissionUserId;
+      }
+
+      return permissionUsers[0]?.id ?? null;
+    });
+  }, [permissionUsers]);
+
   const hasDepartmentFetchSettled = activeTab === "users" || isCreateModalOpen || Boolean(departmentsError) || departments.length > 0;
   const isCreateBlockedByDepartments =
     hasDepartmentFetchSettled && (Boolean(departmentsError) || (!isDepartmentsLoading && departments.length === 0));
@@ -189,6 +230,14 @@ export function Administracao() {
   };
   const handleRetryDepartments = () => {
     void refetchDepartments();
+  };
+
+  const getDepartmentName = (candidate: UserItem): string => {
+    return (
+      departmentNameById.get(candidate.department_id) ??
+      candidate.department?.name ??
+      "Sem departamento"
+    );
   };
 
   return (
@@ -435,13 +484,129 @@ export function Administracao() {
           </section>
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/80 p-8 text-center dark:border-slate-700 dark:bg-slate-900/70">
-          <p className={ADMIN_TEXT_CLASSNAME}>
-            Esta aba permanece somente visual neste refactor.
-          </p>
-          <p className={`mt-2 ${ADMIN_MUTED_CLASSNAME}`}>
-            O fluxo real de criacao continua disponivel pelo botao "Novo Usuario".
-          </p>
+        <div className="grid gap-4 xl:h-[90vh] xl:grid-cols-[320px_minmax(0,1fr)] xl:items-stretch">
+          <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 xl:h-full`}>
+            <div className="flex h-full min-h-0 flex-col space-y-4">
+              <div className="space-y-1">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+                  Usuarios ativos
+                </h2>
+                <p className={ADMIN_MUTED_CLASSNAME}>
+                  Escolha um usuario para carregar e editar as permissoes.
+                </p>
+              </div>
+
+              {permissionUsersError ? (
+                <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
+                  <p className={ADMIN_TEXT_CLASSNAME}>
+                    Nao foi possivel carregar os usuarios ativos.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void refetchPermissionUsers()}
+                    className="mt-3 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="flex min-h-0 flex-1 flex-col space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className={ADMIN_TEXT_CLASSNAME}>
+                    {permissionUsers.length} usuario{permissionUsers.length === 1 ? "" : "s"}
+                  </p>
+                  <span className="rounded-full bg-[var(--colors-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
+                    Ativo
+                  </span>
+                </div>
+
+                <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
+                  {isPermissionUsersLoading ? (
+                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                      <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuarios ativos...</p>
+                    </div>
+                  ) : permissionUsersError ? (
+                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                      <p className={ADMIN_MUTED_CLASSNAME}>
+                        A listagem de usuarios ativos nao esta disponivel.
+                      </p>
+                    </div>
+                  ) : permissionUsers.length === 0 ? (
+                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                      <p className={ADMIN_TEXT_CLASSNAME}>Nenhum usuario ativo encontrado.</p>
+                    </div>
+                  ) : (
+                    permissionUsers.map((candidate) => {
+                      const isSelected = candidate.id === selectedPermissionUserId;
+
+                      return (
+                        <button
+                          key={candidate.id}
+                          type="button"
+                          onClick={() => setSelectedPermissionUserId(candidate.id)}
+                          className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                            isSelected
+                              ? "border-[var(--colors-brand-gradient-end)] bg-slate-50 shadow-sm dark:bg-slate-950/60"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800/70"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                                {candidate.name}
+                              </p>
+                              <p className="dialog-neutral-muted truncate text-sm text-slate-600 dark:text-slate-300">
+                                {getDepartmentName(candidate)}
+                              </p>
+                            </div>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                              {getAdminUserStatusLabel(candidate.status)}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <section className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-6 xl:h-full`}>
+            {!selectedPermissionUser ? (
+              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center dark:border-slate-700 dark:bg-slate-950/30">
+                <div>
+                  <p className={ADMIN_TEXT_CLASSNAME}>
+                    Selecione um usuario para editar as permissoes.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex h-full min-h-0 flex-col space-y-6">
+                <div className="space-y-2 border-b border-slate-200 pb-5 dark:border-slate-700">
+                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                    {selectedPermissionUser.name}
+                  </h2>
+                  <p className={ADMIN_MUTED_CLASSNAME}>
+                    {getDepartmentName(selectedPermissionUser)} -{" "}
+                    {getAdminUserStatusLabel(selectedPermissionUser.status)}
+                  </p>
+                </div>
+
+                <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center dark:border-slate-700 dark:bg-slate-950/30">
+                  <div>
+                    <p className={ADMIN_TEXT_CLASSNAME}>
+                      Estrutura da aba Permissoes preparada.
+                    </p>
+                    <p className={`mt-2 ${ADMIN_MUTED_CLASSNAME}`}>
+                      O carregamento das permissoes entra na proxima etapa.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       )}
 
