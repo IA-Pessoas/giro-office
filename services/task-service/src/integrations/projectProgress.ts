@@ -1,9 +1,9 @@
 import {
+  debug,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
-  debug,
 } from "@workspace/shared";
 
 import { getTaskServiceEnv } from "../config/env.js";

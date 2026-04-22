@@ -1,6 +1,6 @@
 import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
-import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
+import { Router } from "express";
 
 import {
   permissionQuerySchema,

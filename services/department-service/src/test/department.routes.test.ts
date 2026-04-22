@@ -6,8 +6,8 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
 } from "@workspace/shared";
-import { MemoryLogStream } from "@workspace/shared/testUtils";
 import { createLogger } from "@workspace/shared/logger";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

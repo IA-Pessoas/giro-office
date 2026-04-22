@@ -1,11 +1,11 @@
 import { error as logError, ServiceError } from "@workspace/shared";
+import type { ProspectingStatus } from "../constants/prospectingStatus.js";
+import type * as Prisma from "../generated/prisma/internal/prismaNamespace.js";
 import type { ProjectPlanGetPayload } from "../generated/prisma/models/ProjectPlan.js";
 import type { ProjectPlanTasksGetPayload } from "../generated/prisma/models/ProjectPlanTasks.js";
-import type * as Prisma from "../generated/prisma/internal/prismaNamespace.js";
-import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import { TaskCrudService, type TaskCreateRow } from "./taskCrudService.js";
+import { type TaskCreateRow, TaskCrudService } from "./taskCrudService.js";
 
 const PROJECT_PLAN_SELECT = {
   id: true,
@@ -45,8 +45,12 @@ const PROJECT_PLAN_DETAIL_SELECT = {
 } as const;
 
 export type ProjectPlanRow = ProjectPlanGetPayload<{ select: typeof PROJECT_PLAN_SELECT }>;
-export type ProjectPlanDetailRow = ProjectPlanGetPayload<{ select: typeof PROJECT_PLAN_DETAIL_SELECT }>;
-export type ProjectPlanTaskRow = ProjectPlanTasksGetPayload<{ select: typeof PROJECT_PLAN_TASK_SELECT }>;
+export type ProjectPlanDetailRow = ProjectPlanGetPayload<{
+  select: typeof PROJECT_PLAN_DETAIL_SELECT;
+}>;
+export type ProjectPlanTaskRow = ProjectPlanTasksGetPayload<{
+  select: typeof PROJECT_PLAN_TASK_SELECT;
+}>;
 
 export interface CreateProjectPlanRequest {
   user_id: string;
@@ -397,7 +401,9 @@ export class ProjectPlanService {
 
   async reorderTask(
     data: ReorderProjectPlanTaskRequest,
-  ): Promise<{ message: string } | { updatedTaskA: ProjectPlanTaskRow; updatedTaskB: ProjectPlanTaskRow }> {
+  ): Promise<
+    { message: string } | { updatedTaskA: ProjectPlanTaskRow; updatedTaskB: ProjectPlanTaskRow }
+  > {
     try {
       const taskA = await this.#prisma.projectPlanTasks.findFirst({
         where: {
@@ -451,9 +457,7 @@ export class ProjectPlanService {
     }
   }
 
-  async deleteTask(
-    data: DeleteProjectPlanTaskRequest,
-  ): Promise<{ deleted: ProjectPlanTaskRow }> {
+  async deleteTask(data: DeleteProjectPlanTaskRequest): Promise<{ deleted: ProjectPlanTaskRow }> {
     try {
       const deleted = await this.#prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const taskToDelete = await tx.projectPlanTasks.findFirst({

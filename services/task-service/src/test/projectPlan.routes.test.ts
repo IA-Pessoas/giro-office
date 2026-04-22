@@ -10,7 +10,10 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { createProjectPlanRoutes, type ProjectPlanRouteDeps } from "../routes/projectPlan.routes.js";
+import {
+  createProjectPlanRoutes,
+  type ProjectPlanRouteDeps,
+} from "../routes/projectPlan.routes.js";
 
 process.env.DATABASE_URL ??= "postgresql://localhost:5432/task-service-test";
 process.env.JWT_SECRET ??= "task-service-secret";

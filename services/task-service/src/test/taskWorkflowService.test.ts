@@ -1,6 +1,6 @@
+import { describe, expect, it } from "vitest";
 import type { ProjectProgressIntegration } from "../integrations/projectProgress.js";
 import { TaskWorkflowService } from "../services/taskWorkflowService.js";
-import { describe, expect, it } from "vitest";
 
 describe("TaskWorkflowService", () => {
   it("aciona o project-service apos criar tarefa", async () => {

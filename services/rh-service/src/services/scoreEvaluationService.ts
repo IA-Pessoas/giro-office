@@ -107,10 +107,7 @@ export class ScoreEvaluationService {
    * Recalcula médias por eixo e `final_score` do trimestre (avaliações concluídas + Nitro).
    * Usado após submeter uma avaliação ou quando o trimestre é alterado por Nitro.
    */
-  async recalculateScoreQuarterAggregates(
-    scoreId: string,
-    organizationId: string,
-  ): Promise<void> {
+  async recalculateScoreQuarterAggregates(scoreId: string, organizationId: string): Promise<void> {
     const orgId = assertNonEmptyString(organizationId, "organization_id");
     const sid = assertNonEmptyString(scoreId, "score_id");
 

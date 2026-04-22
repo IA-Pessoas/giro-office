@@ -1,6 +1,6 @@
 import {
-  createSuccessResponse,
   createExpressErrorHandler,
+  createSuccessResponse,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   type Logger,
@@ -10,9 +10,9 @@ import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { AuditServiceEnv } from "./config/env.js";
-import { buildAuditServiceOpenApiSpec } from "./openapi/spec.js";
 import type { AuditRequestRepository } from "./integrations/prisma/auditRequestRepository.js";
 import { requestContext } from "./middlewares/requestContext.js";
+import { buildAuditServiceOpenApiSpec } from "./openapi/spec.js";
 import { createAuditInternalRouter, createAuditPublicRouter } from "./routes/audit.routes.js";
 
 function auditErrorLogContext(request: Request): Record<string, unknown> | undefined {

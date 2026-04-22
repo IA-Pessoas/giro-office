@@ -25,7 +25,7 @@
     "smoke:coverage": "node scripts/check-smoke-spec-coverage.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.5",
+    "@biomejs/biome": "2.4.5",
     "@types/node": "^25.3.3",
     "husky": "^9.1.7",
     "lint-staged": "^16.3.2",
@@ -38,6 +38,7 @@
   },
   "pnpm": {
     "overrides": {
+      "@biomejs/biome": "2.4.5",
       "typescript": "5.3.3",
       "prisma": "7.4.1",
       "@prisma/client": "7.4.1"

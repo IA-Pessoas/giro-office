@@ -1,7 +1,7 @@
 import {
   createSuccessResponse,
-  error as logError,
   getSingleTrimmedQueryValue,
+  error as logError,
   parseWithZod,
   requireAuthenticatedRequestContext,
 } from "@workspace/shared";
@@ -24,7 +24,9 @@ const requestService = new RequestService();
 
 router.post("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { organization_id, user_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
+    const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+      statusCode: 400,
+    });
     const body = parseWithZod(createRequestBodySchema, req.body);
 
     const result = await requestService.create({

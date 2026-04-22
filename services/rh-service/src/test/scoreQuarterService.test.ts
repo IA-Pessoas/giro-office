@@ -34,16 +34,20 @@ describe("ScoreQuarterService", () => {
   it("generateQuarterlyScore lança 409 quando trimestre já existe", async () => {
     prismaMock.scoreQuarter.findUnique.mockResolvedValue({ id: "score-1" });
     const service = new ScoreQuarterService();
-    await expect(service.generateQuarterlyScore({
-      organization_id: "org-1",
-      target_user_id: "user-1",
-      quarter: "2026-Q1",
-    })).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      service.generateQuarterlyScore({
+        organization_id: "org-1",
+        target_user_id: "user-1",
+        quarter: "2026-Q1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
   });
 
   it("getDetail lança 404 quando score não existe", async () => {
     prismaMock.scoreQuarter.findUnique.mockResolvedValue(null);
     const service = new ScoreQuarterService();
-    await expect(service.getDetail({ organization_id: "org-1", score_id: "score-1" })).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      service.getDetail({ organization_id: "org-1", score_id: "score-1" }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 });

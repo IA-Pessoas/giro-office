@@ -19,7 +19,7 @@ function extractSpecOperations(specPath, service) {
 
   for (const line of source.split(/\r?\n/)) {
     const pathMatch = line.match(/^\s*"([^"]+)":\s*{$/);
-    if (pathMatch && pathMatch[1].startsWith("/")) {
+    if (pathMatch?.[1].startsWith("/")) {
       currentPath = pathMatch[1];
       continue;
     }

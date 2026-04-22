@@ -7,12 +7,12 @@ import "express-async-errors";
 
 import type { ProjectServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
+import { buildProjectServiceOpenApiSpec } from "./openapi/spec.js";
+import { createProjectCrudRoutes, type ProjectCrudRouteDeps } from "./routes/projectCrud.routes.js";
 import {
   createProjectProgressRoutes,
   type ProjectProgressRouteDeps,
 } from "./routes/projectProgress.routes.js";
-import { buildProjectServiceOpenApiSpec } from "./openapi/spec.js";
-import { createProjectCrudRoutes, type ProjectCrudRouteDeps } from "./routes/projectCrud.routes.js";
 import { ProjectCrudService } from "./services/projectCrudService.js";
 import { ProjectProgressService } from "./services/projectProgressService.js";
 

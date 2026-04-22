@@ -20,7 +20,10 @@ function loadEnvFile(filePath) {
     if (eqIndex === -1) continue;
     const key = trimmed.slice(0, eqIndex).trim();
     let value = trimmed.slice(eqIndex + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1);
     }
     if (!(key in process.env)) {
@@ -34,7 +37,9 @@ function loadEnvFile(filePath) {
 loadEnvFile(path.join(rootDir, "services", "gateway", ".env"));
 loadEnvFile(path.join(rootDir, ".env"));
 
-const { manifest } = await import(pathToFileURL(path.join(__dirname, "all-services-smoke.manifest.mjs")).href);
+const { manifest } = await import(
+  pathToFileURL(path.join(__dirname, "all-services-smoke.manifest.mjs")).href
+);
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -114,13 +119,11 @@ const env = {
   login: process.env.LOGIN ?? "Admin",
   password: process.env.PASSWORD ?? process.env.ADMIN_PASSWORD ?? "senha123",
   jwtSecret: process.env.JWT_SECRET ?? "",
-  auditEnabled:
-    process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
+  auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   namespace:
     process.env.SMOKE_NAMESPACE?.trim() ||
     `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-  tmpDir:
-    process.env.SMOKE_TMP_DIR?.trim() || fs.mkdtempSync(path.join(process.cwd(), "smoke-")),
+  tmpDir: process.env.SMOKE_TMP_DIR?.trim() || fs.mkdtempSync(path.join(process.cwd(), "smoke-")),
   smokeDepartmentId: process.env.SMOKE_DEPARTMENT_ID?.trim() || "",
   fixturePath:
     process.env.SMOKE_UPLOAD_FIXTURE?.trim() ||
@@ -209,8 +212,7 @@ function ensureServiceUrl(service) {
 }
 
 function buildUrl(target, service, routePath, query) {
-  const base =
-    target === "gateway" ? env.gatewayUrl : ensureServiceUrl(service);
+  const base = target === "gateway" ? env.gatewayUrl : ensureServiceUrl(service);
   const url = new URL(routePath, base);
   if (query) {
     for (const [key, rawValue] of Object.entries(query)) {
@@ -405,7 +407,7 @@ function summarizeResponse(body, text) {
   const raw =
     body !== undefined
       ? JSON.stringify(body)
-      : text && text.trim()
+      : text?.trim()
         ? text.replace(/\s+/g, " ")
         : "<empty>";
   return raw.length > 220 ? `${raw.slice(0, 217)}...` : raw;
@@ -490,9 +492,13 @@ async function httpRequest(op, options) {
   const target = opOverrides?.target ?? optionTarget ?? op.target;
   const service = opOverrides?.service ?? optionService ?? op.service;
   const auth = opOverrides?.auth ?? optionAuth ?? op.auth;
-  const expectedStatus = opOverrides?.expectedStatus ?? optionExpectedStatus ?? op.expectedStatus ?? [200];
+  const expectedStatus = opOverrides?.expectedStatus ??
+    optionExpectedStatus ??
+    op.expectedStatus ?? [200];
   const expectEnvelope =
-    opOverrides?.expectEnvelope ?? optionExpectEnvelope ?? expectedStatus.every((status) => status < 400);
+    opOverrides?.expectEnvelope ??
+    optionExpectEnvelope ??
+    expectedStatus.every((status) => status < 400);
 
   const url = buildUrl(target, service, requestPath, query);
   const requestHeaders = new Headers({
@@ -538,7 +544,8 @@ async function httpRequest(op, options) {
     // Single retry for transient network errors (ECONNREFUSED, etc.)
     const isTransient =
       fetchError instanceof TypeError ||
-      (fetchError instanceof Error && /ECONNREFUSED|ECONNRESET|EPIPE|UND_ERR/.test(fetchError.message));
+      (fetchError instanceof Error &&
+        /ECONNREFUSED|ECONNRESET|EPIPE|UND_ERR/.test(fetchError.message));
     if (isTransient) {
       log("WARN", `${label}: transient error, retrying in 2s...`);
       await new Promise((r) => setTimeout(r, 2_000));
@@ -722,7 +729,8 @@ async function ensureSecondaryTaskModel() {
     expectedStatus: [201],
   });
 
-  state.taskModelSecondaryId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
+  state.taskModelSecondaryId =
+    pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
   registerCleanup("secondary-task-model", async () => {
     if (!state.taskModelSecondaryId) {
       return;
@@ -848,7 +856,7 @@ async function ensureRhTargetUserToken() {
   return state.rhTargetUserToken;
 }
 
-async function completeRhPointLifecycle(token) {
+async function _completeRhPointLifecycle(token) {
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
   while (true) {
     const response = await helperCall("rh-point-register-helper", {
@@ -893,13 +901,16 @@ const handlers = {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
-  async userSession(op) {
+  async userSession(_op) {
     const session = await bootstrapAndLogin();
     state.session = session;
     state.bearerToken = session.token;
     state.adminBearerToken = session.permission === 2 ? session.token : createAdminToken();
     state.baselineDepartmentId = session.department_id || state.baselineDepartmentId;
-    log("PASS", `Authenticated as user_id=${session.id} organization_id=${session.organization_id}`);
+    log(
+      "PASS",
+      `Authenticated as user_id=${session.id} organization_id=${session.organization_id}`,
+    );
   },
 
   async userStartConfig(op) {
@@ -1032,7 +1043,8 @@ const handlers = {
     if (isBadExpectation(op)) {
       return;
     }
-    state.tempOrganizationId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    state.tempOrganizationId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
   async organizationGet(op) {
@@ -1085,7 +1097,8 @@ const handlers = {
     if (isBadExpectation(op)) {
       return;
     }
-    state.departmentId = pickFirst(response.body, "data.dep.id") ?? findFirstId(response.body?.data);
+    state.departmentId =
+      pickFirst(response.body, "data.dep.id") ?? findFirstId(response.body?.data);
   },
 
   async departmentGet(op) {
@@ -1179,7 +1192,8 @@ const handlers = {
     if (isBadExpectation(op)) {
       return;
     }
-    state.secondaryClientId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    state.secondaryClientId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
   async clientIntegrationPatch(op) {
@@ -1357,7 +1371,8 @@ const handlers = {
     if (isBadExpectation(op)) {
       return;
     }
-    state.projectId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
+    state.projectId =
+      pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
   },
 
   async projectGet(op) {
@@ -1438,7 +1453,8 @@ const handlers = {
     if (isBadExpectation(op)) {
       return;
     }
-    state.taskModelPrimaryId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
+    state.taskModelPrimaryId =
+      pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
     await ensureSecondaryTaskModel();
   },
 
@@ -1485,7 +1501,9 @@ const handlers = {
       return;
     }
     state.taskDependentId =
-      pickFirst(response.body, "data.created.id") ?? pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+      pickFirst(response.body, "data.created.id") ??
+      pickFirst(response.body, "data.id") ??
+      findFirstId(response.body?.data);
   },
 
   async taskModelDependentList(op) {
@@ -1677,7 +1695,8 @@ const handlers = {
     if (isBadExpectation(op)) {
       return;
     }
-    state.planTaskId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
+    state.planTaskId =
+      pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
   },
 
   async taskProjectPlanTaskList(op) {
@@ -1776,8 +1795,7 @@ const handlers = {
       expectedStatus: [200],
       expectEnvelope: false,
     });
-    const taskRows =
-      taskListResp.body?.data?.data ?? taskListResp.body?.data ?? [];
+    const taskRows = taskListResp.body?.data?.data ?? taskListResp.body?.data ?? [];
     for (const task of Array.isArray(taskRows) ? taskRows : []) {
       if (task?.id) {
         await helperCall(`task-model-delete-task-${task.id}`, {
@@ -1917,7 +1935,11 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/categories",
-      json: { id: requireState("rhCategoryId"), name: uniqueText("Smoke RH Category Updated"), active: true },
+      json: {
+        id: requireState("rhCategoryId"),
+        name: uniqueText("Smoke RH Category Updated"),
+        active: true,
+      },
     });
   },
 
@@ -2006,7 +2028,10 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/score/questions",
-      json: { id: requireState("rhScoreQuestionId"), question: uniqueText("Smoke score question updated") },
+      json: {
+        id: requireState("rhScoreQuestionId"),
+        question: uniqueText("Smoke score question updated"),
+      },
     });
   },
 
@@ -2075,9 +2100,7 @@ const handlers = {
     if (isBadExpectation(op)) {
       return;
     }
-    state.rhScoreId =
-      state.rhScoreId ||
-      findFirstId(response.body?.data);
+    state.rhScoreId = state.rhScoreId || findFirstId(response.body?.data);
   },
 
   async rhScoreQuarterGet(op) {
@@ -2136,7 +2159,11 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/holidays",
-      json: { id: requireState("rhHolidayId"), name: uniqueText("Smoke Holiday Updated"), date: new Date().toISOString() },
+      json: {
+        id: requireState("rhHolidayId"),
+        name: uniqueText("Smoke Holiday Updated"),
+        date: new Date().toISOString(),
+      },
     });
   },
 
@@ -2808,7 +2835,10 @@ async function run() {
         await task.fn();
         log("PASS", `cleanup ${task.label}`);
       } catch (error) {
-        log("WARN", `cleanup ${task.label} failed: ${error instanceof Error ? error.message : String(error)}`);
+        log(
+          "WARN",
+          `cleanup ${task.label} failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   }

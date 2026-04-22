@@ -57,7 +57,10 @@ describe("organization routes", () => {
   });
 
   it("PATCH /organizations/:id/status atualiza status", async () => {
-    organizationServiceMock.updateStatus.mockResolvedValue({ id: organizationId, status: "active" });
+    organizationServiceMock.updateStatus.mockResolvedValue({
+      id: organizationId,
+      status: "active",
+    });
     const app = createTestApp();
 
     const res = await request(app)
@@ -77,7 +80,10 @@ describe("organization routes", () => {
       .send({ subscription_plan: "pro" });
 
     expect(res.status).toBe(200);
-    expect(organizationServiceMock.updateSubscriptionPlan).toHaveBeenCalledWith(organizationId, "pro");
+    expect(organizationServiceMock.updateSubscriptionPlan).toHaveBeenCalledWith(
+      organizationId,
+      "pro",
+    );
   });
 
   it("PATCH /organizations/:id/logo-url atualiza logo", async () => {

@@ -1,7 +1,7 @@
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
 import type { NextFunction } from "express";
-import { vi, type Mock } from "vitest";
+import { type Mock, vi } from "vitest";
 
 interface UserRouteMocks {
   authServiceMock: {
@@ -25,27 +25,29 @@ interface UserRouteMocks {
   };
 }
 
-const userRouteMocks: UserRouteMocks = vi.hoisted((): UserRouteMocks => ({
-  authServiceMock: {
-    login: vi.fn(),
-    firstCreate: vi.fn(),
-  },
-  userServiceMock: {
-    list: vi.fn(),
-    getById: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  permissionServiceMock: {
-    getByUserId: vi.fn(),
-    update: vi.fn(),
-  },
-  storageServiceMock: {
-    uploadUserPhoto: vi.fn(),
-    deleteUserPhoto: vi.fn(),
-  },
-}));
+const userRouteMocks: UserRouteMocks = vi.hoisted(
+  (): UserRouteMocks => ({
+    authServiceMock: {
+      login: vi.fn(),
+      firstCreate: vi.fn(),
+    },
+    userServiceMock: {
+      list: vi.fn(),
+      getById: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    permissionServiceMock: {
+      getByUserId: vi.fn(),
+      update: vi.fn(),
+    },
+    storageServiceMock: {
+      uploadUserPhoto: vi.fn(),
+      deleteUserPhoto: vi.fn(),
+    },
+  }),
+);
 
 vi.mock("../services/authService.js", () => ({
   AuthService: vi.fn(function AuthService() {

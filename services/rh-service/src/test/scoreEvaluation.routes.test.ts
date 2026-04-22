@@ -25,10 +25,12 @@ describe("scoreEvaluation routes", () => {
 
   it("POST /rh/score/evaluations/submit envia avaliacao", async () => {
     const app = createTestApp();
-    const res = await request(app).post("/rh/score/evaluations/submit").send({
-      evaluation_id: itemId,
-      answers: [{ question_id: itemId, answer: 5 }],
-    });
+    const res = await request(app)
+      .post("/rh/score/evaluations/submit")
+      .send({
+        evaluation_id: itemId,
+        answers: [{ question_id: itemId, answer: 5 }],
+      });
 
     expect(res.status).toBe(200);
     expect(scoreEvaluationServiceMock.submitEvaluation).toHaveBeenCalledTimes(1);

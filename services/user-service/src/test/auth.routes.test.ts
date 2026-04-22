@@ -2,7 +2,12 @@ import { FORWARDED_AUTH_USER_ID_HEADER } from "@workspace/shared";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { authServiceMock, createTestApp, resetUserRouteMocks, userServiceMock } from "./userTestUtils.js";
+import {
+  authServiceMock,
+  createTestApp,
+  resetUserRouteMocks,
+  userServiceMock,
+} from "./userTestUtils.js";
 
 describe("auth routes", () => {
   beforeEach(() => {
@@ -36,9 +41,7 @@ describe("auth routes", () => {
     userServiceMock.getById.mockResolvedValue({ id: "user-1" });
     const app = createTestApp();
 
-    const res = await request(app)
-      .get("/user/me")
-      .set(FORWARDED_AUTH_USER_ID_HEADER, "user-1");
+    const res = await request(app).get("/user/me").set(FORWARDED_AUTH_USER_ID_HEADER, "user-1");
 
     expect(res.status).toBe(200);
     expect(userServiceMock.getById).toHaveBeenCalledWith("user-1");

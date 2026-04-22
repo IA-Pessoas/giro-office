@@ -51,17 +51,11 @@ describe("terminateClient", () => {
       $transaction: transaction,
     };
 
-    const result = await terminateClient(
-      prisma as never,
-      "client-1",
-      "org-1",
-      "user-1",
-      {
-        reason: "Pedido",
-        description: "Descricao",
-        competence_output: "2026-03",
-      },
-    );
+    const result = await terminateClient(prisma as never, "client-1", "org-1", "user-1", {
+      reason: "Pedido",
+      description: "Descricao",
+      competence_output: "2026-03",
+    });
 
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(updateMany).toHaveBeenCalledWith({

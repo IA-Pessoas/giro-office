@@ -1,16 +1,15 @@
 import {
   createSuccessResponse,
-  error as logError,
   FORWARDED_AUTH_USER_ID_HEADER,
+  error as logError,
   parseWithZod,
   ServiceError,
 } from "@workspace/shared";
-import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
-
+import { Router } from "express";
+import { loginBodySchema } from "../schemas/auth.schemas.js";
 import { AuthService } from "../services/authService.js";
 import { UserService } from "../services/userService.js";
-import { loginBodySchema } from "../schemas/auth.schemas.js";
 
 const router: ReturnType<typeof Router> = Router();
 const authService = new AuthService();
