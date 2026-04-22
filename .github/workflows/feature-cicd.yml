@@ -27,7 +27,7 @@ name: Feature CICD
 on:
   push:
     branches:
-      - feature/CICD_test
+      - feature/CICD-test
   workflow_dispatch:
 
 permissions:
