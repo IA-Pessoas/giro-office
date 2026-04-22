@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { BarChart3, KeyRound, Lock, Plus, RotateCcw, Search, Shield, Users } from "lucide-react";
+import { BarChart3, KeyRound, Lock, Plus, RotateCcw, Save, Search, Shield, Users } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
@@ -21,6 +21,7 @@ import {
 import type { PermissionDraft } from "@modules/users/types";
 import {
   arePermissionDraftsEqual,
+  buildPermissionUpdatePayload,
   freezePermissionSnapshot,
   getExtraPermissionLabel,
   isOwnerUser,
@@ -78,6 +79,21 @@ function getPermissionSelectValue(value: number | null | undefined): PermissionS
   return "null";
 }
 
+function getPermissionErrorMessage(error: unknown, fallbackMessage: string): string {
+  if (isAxiosError(error)) {
+    const responseMessage = error.response?.data?.error;
+    if (typeof responseMessage === "string" && responseMessage.trim().length > 0) {
+      return responseMessage;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return fallbackMessage;
+}
+
 export function Administracao() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "permissions">("dashboard");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -98,6 +114,7 @@ export function Administracao() {
   const [permissionSaveError, setPermissionSaveError] = useState<string | null>(null);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const {
     data: users = [],
@@ -391,6 +408,53 @@ export function Administracao() {
       ),
     );
     setPermissionSaveError(null);
+  };
+  const handleSavePermissions = async () => {
+    if (!selectedPermissionUserId || !permissionSnapshot || isSelectedPermissionOwner) {
+      return;
+    }
+
+    if (isSavingPermissions) {
+      return;
+    }
+
+    const payload = buildPermissionUpdatePayload(permissionDraft, permissionExtraKeys);
+    if (arePermissionDraftsEqual(payload, permissionSnapshot)) {
+      return;
+    }
+
+    setIsSavingPermissions(true);
+    setPermissionSaveError(null);
+
+    try {
+      const raw = await permissionService.update(selectedPermissionUserId, payload);
+      const normalizationResult = normalizePermissionResponse(raw);
+      const nextExtraKeys = Object.keys(normalizationResult.extras);
+      const nextDraft = normalizePermissionDraft(
+        {
+          ...normalizationResult.known,
+          ...normalizationResult.extras,
+        },
+        nextExtraKeys,
+      );
+
+      setPermissionDraft(nextDraft);
+      setPermissionSnapshot(freezePermissionSnapshot(nextDraft));
+      setPermissionExtraKeys(nextExtraKeys);
+      setLoadedPermissionUserId(selectedPermissionUserId);
+      setPermissionSaveError(null);
+      queryClient.setQueryData(["admin", "permissions", selectedPermissionUserId], {
+        userId: selectedPermissionUserId,
+        raw,
+      });
+      toast.success("Permissoes atualizadas com sucesso.");
+    } catch (error) {
+      setPermissionSaveError(
+        getPermissionErrorMessage(error, "Nao foi possivel salvar as permissoes agora."),
+      );
+    } finally {
+      setIsSavingPermissions(false);
+    }
   };
 
   return (
@@ -793,12 +857,34 @@ export function Administracao() {
                   </div>
                   <button
                     type="button"
-                    className="rounded-xl bg-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-                    disabled
+                    onClick={() => void handleSavePermissions()}
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-all ${
+                      isDirty && !isSelectedPermissionOwner && !isSavingPermissions
+                        ? `${ADMIN_GRADIENT_BUTTON_CLASSNAME}`
+                        : "bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                    }`}
+                    disabled={!isDirty || isSelectedPermissionOwner || isSavingPermissions}
                   >
-                    Salvar
+                    <Save className="h-4 w-4" />
+                    {isSavingPermissions ? "Salvando..." : "Salvar"}
                   </button>
                 </div>
+
+                {permissionSaveError ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100">
+                    <p className="text-sm font-semibold">Nao foi possivel salvar as permissoes.</p>
+                    <p className="mt-1 text-sm opacity-90">{permissionSaveError}</p>
+                    <button
+                      type="button"
+                      onClick={() => void handleSavePermissions()}
+                      className="mt-3 inline-flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-900 transition-colors hover:bg-rose-100 dark:border-rose-900/60 dark:text-rose-100 dark:hover:bg-rose-900/30"
+                      disabled={isSelectedPermissionOwner || isSavingPermissions}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Tentar novamente
+                    </button>
+                  </div>
+                ) : null}
 
                 {isSelectedPermissionOwner ? (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-slate-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-white">
