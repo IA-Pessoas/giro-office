@@ -6,6 +6,11 @@ import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { AdminUserDetailsPanel, CreateUserModal, type UserItem } from "@modules/users";
+import {
+  PERMISSION_MODULE_GROUPS,
+  PERMISSION_SELECT_OPTIONS,
+  getPermissionModuleLabel,
+} from "@modules/users/constants/permissionConfig";
 import { permissionService } from "@modules/users/services/permissionService";
 import {
   ADMIN_USER_STATUS_LABELS,
@@ -15,7 +20,10 @@ import {
 } from "@modules/users/services/adminUsersService";
 import type { PermissionDraft } from "@modules/users/types";
 import {
+  arePermissionDraftsEqual,
   freezePermissionSnapshot,
+  getExtraPermissionLabel,
+  isOwnerUser,
   normalizePermissionDraft,
   normalizePermissionResponse,
 } from "@modules/users/utils/permissionUtils";
@@ -59,6 +67,16 @@ type PermissionQueryResult = {
   userId: string;
   raw: Record<string, unknown>;
 };
+
+type PermissionSelectValue = (typeof PERMISSION_SELECT_OPTIONS)[number]["value"];
+
+function getPermissionSelectValue(value: number | null | undefined): PermissionSelectValue {
+  if (value === 0 || value === 1 || value === 2) {
+    return String(value) as Exclude<PermissionSelectValue, "null">;
+  }
+
+  return "null";
+}
 
 export function Administracao() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "permissions">("dashboard");
@@ -147,6 +165,23 @@ export function Administracao() {
   const selectedPermissionUser = useMemo(() => {
     return permissionUsers.find((candidate) => candidate.id === selectedPermissionUserId) ?? null;
   }, [permissionUsers, selectedPermissionUserId]);
+  const normalizedPermissionDraft = useMemo(() => {
+    return normalizePermissionDraft(permissionDraft, permissionExtraKeys);
+  }, [permissionDraft, permissionExtraKeys]);
+  const isDirty = useMemo(() => {
+    if (!permissionSnapshot) {
+      return false;
+    }
+
+    return !arePermissionDraftsEqual(normalizedPermissionDraft, permissionSnapshot);
+  }, [normalizedPermissionDraft, permissionSnapshot]);
+  const isSelectedPermissionOwner = isOwnerUser(selectedPermissionUser);
+  const permissionExtraModules = useMemo(() => {
+    return permissionExtraKeys.map((moduleKey) => ({
+      key: moduleKey,
+      label: getExtraPermissionLabel(moduleKey),
+    }));
+  }, [permissionExtraKeys]);
 
   const permissionQuery = useQuery<PermissionQueryResult>({
     queryKey: ["admin", "permissions", selectedPermissionUserId],
@@ -327,6 +362,35 @@ export function Administracao() {
       candidate.department?.name ??
       "Sem departamento"
     );
+  };
+  const handleSelectPermissionUser = (nextUserId: string) => {
+    if (nextUserId === selectedPermissionUserId || isSavingPermissions) {
+      return;
+    }
+
+    if (isDirty) {
+      const shouldDiscardChanges = window.confirm(
+        "Existem alteracoes pendentes para este usuario. Deseja descartar e trocar de contexto?",
+      );
+
+      if (!shouldDiscardChanges) {
+        return;
+      }
+    }
+
+    setSelectedPermissionUserId(nextUserId);
+  };
+  const handlePermissionChange = (moduleKey: string, nextValue: PermissionSelectValue) => {
+    setPermissionDraft((currentDraft) =>
+      normalizePermissionDraft(
+        {
+          ...currentDraft,
+          [moduleKey]: nextValue === "null" ? null : Number(nextValue),
+        },
+        permissionExtraKeys,
+      ),
+    );
+    setPermissionSaveError(null);
   };
 
   return (
@@ -633,7 +697,7 @@ export function Administracao() {
                         <button
                           key={candidate.id}
                           type="button"
-                          onClick={() => setSelectedPermissionUserId(candidate.id)}
+                            onClick={() => handleSelectPermissionUser(candidate.id)}
                           className={`w-full rounded-2xl border p-4 text-left transition-all ${
                             isSelected
                               ? "border-[var(--colors-brand-gradient-end)] bg-slate-50 shadow-sm dark:bg-slate-950/60"
@@ -699,25 +763,134 @@ export function Administracao() {
             ) : (
               <div className="flex h-full min-h-0 flex-col space-y-6">
                 <div className="space-y-2 border-b border-slate-200 pb-5 dark:border-slate-700">
-                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-                    {selectedPermissionUser.name}
-                  </h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                      {selectedPermissionUser.name}
+                    </h2>
+                    {isSelectedPermissionOwner ? (
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-slate-900 dark:bg-amber-950/50 dark:text-white">
+                        Owner
+                      </span>
+                    ) : null}
+                    {isDirty ? (
+                      <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200">
+                        Alteracoes pendentes
+                      </span>
+                    ) : null}
+                  </div>
                   <p className={ADMIN_MUTED_CLASSNAME}>
                     {getDepartmentName(selectedPermissionUser)} -{" "}
                     {getAdminUserStatusLabel(selectedPermissionUser.status)}
                   </p>
                 </div>
 
-                <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center dark:border-slate-700 dark:bg-slate-950/30">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className={ADMIN_TEXT_CLASSNAME}>
-                      Permissoes carregadas para {selectedPermissionUser.name}.
-                    </p>
-                    <p className={`mt-2 ${ADMIN_MUTED_CLASSNAME}`}>
-                      O editor entra na proxima etapa, sem exibir dados antigos durante a troca.
+                    <p className={ADMIN_TEXT_CLASSNAME}>Niveis da permissao por modulo.</p>
+                    <p className={ADMIN_MUTED_CLASSNAME}>
+                      Ajuste os acessos em lote para o usuario selecionado.
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    className="rounded-xl bg-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                    disabled
+                  >
+                    Salvar
+                  </button>
                 </div>
+
+                {isSelectedPermissionOwner ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-slate-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-white">
+                    <p className="text-sm font-semibold">
+                      Owners recebem acesso maximo e nao sao editaveis nesta tela.
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {PERMISSION_MODULE_GROUPS.map((group) => (
+                    <section key={group.title} className={`${ADMIN_SUBPANEL_CLASSNAME} p-4`}>
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                          {group.title}
+                        </h3>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        {group.keys.map((moduleKey) => (
+                          <div
+                            key={moduleKey}
+                            className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
+                          >
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {getPermissionModuleLabel(moduleKey)}
+                            </label>
+                            <select
+                              value={getPermissionSelectValue(normalizedPermissionDraft[moduleKey])}
+                              onChange={(event) =>
+                                handlePermissionChange(
+                                  moduleKey,
+                                  event.target.value as PermissionSelectValue,
+                                )
+                              }
+                              className={ADMIN_SELECT_CLASSNAME}
+                              style={ADMIN_SELECT_ARROW_STYLE}
+                              disabled={isSelectedPermissionOwner}
+                            >
+                              {PERMISSION_SELECT_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+
+                {permissionExtraModules.length > 0 ? (
+                  <section className={`${ADMIN_SUBPANEL_CLASSNAME} p-4`}>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                        Outros
+                      </h3>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      {permissionExtraModules.map((moduleItem) => (
+                        <div
+                          key={moduleItem.key}
+                          className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
+                        >
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {moduleItem.label}
+                          </label>
+                          <select
+                            value={getPermissionSelectValue(normalizedPermissionDraft[moduleItem.key])}
+                            onChange={(event) =>
+                              handlePermissionChange(
+                                moduleItem.key,
+                                event.target.value as PermissionSelectValue,
+                              )
+                            }
+                            className={ADMIN_SELECT_CLASSNAME}
+                            style={ADMIN_SELECT_ARROW_STYLE}
+                            disabled={isSelectedPermissionOwner}
+                          >
+                            {PERMISSION_SELECT_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
               </div>
             )}
           </section>
