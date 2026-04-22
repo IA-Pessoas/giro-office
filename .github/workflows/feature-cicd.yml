@@ -38,9 +38,9 @@ jobs:
     name: Qualidade (Biome, typecheck, testes)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # prisma.config.ts (infra) exige DATABASE_URL; prisma generate não conecta ao banco, só precisa da variável resolvida.
+    # prisma.config.ts (infra) exige DATABASE_URL. Use placeholder (não use secret vazio): `prisma generate` não conecta ao DB.
     env:
-      DATABASE_URL: ${{ secrets.ENV_VPS_DATABASE_URL }}
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci_ci_typecheck?schema=public
     steps:
       - uses: actions/checkout@v4
 
