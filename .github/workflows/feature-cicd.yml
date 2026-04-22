@@ -19,9 +19,6 @@
 # Pós-merge: cadastrar todos os segredos em Settings → Secrets and variables → Actions,
 # garantir DATABASE_URL/SUPABASE acessíveis a partir dos runners do GitHub e validar na aba Actions.
 #
-# Cache BuildKit: `actions/cache` guarda `/tmp/.buildx-cache`; o passo de build usa
-# `--cache-from` / `--cache-to type=local` para reutilizar camadas entre execuções.
-
 name: Feature CICD
 
 on:
@@ -77,14 +74,6 @@ jobs:
       - name: Configurar Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ hashFiles('pnpm-lock.yaml', 'docker/service.Dockerfile', 'docker-compose.vps.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
       - name: Materializar .env.vps.* a partir dos segredos
         env:
           ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
@@ -123,24 +112,16 @@ jobs:
           printf '%s\n' "$ENV_VPS_RH_SERVICE" > .env.vps.rh-service
           echo "::endgroup::"
 
-      - name: Build imagens (cache BuildKit local)
+      # BuildKit acelera builds; `docker compose build` nos runners do GHA não aceita
+      # --cache-to/--cache-from (versão do plugin Compose). Cache entre jobs: bake ou registry.
+      - name: Build imagens Compose
         env:
           DOCKER_BUILDKIT: 1
           COMPOSE_DOCKER_CLI_BUILD: 1
         run: |
           set -eo pipefail
-          mkdir -p /tmp/.buildx-cache
-          echo "::group::docker compose build (cache-from / cache-to)"
-          if find /tmp/.buildx-cache -mindepth 1 -print -quit 2>/dev/null | grep -q .; then
-            docker compose -f docker-compose.vps.yml build \
-              --cache-from "type=local,src=/tmp/.buildx-cache" \
-              --cache-to "type=local,dest=/tmp/.buildx-cache-new,mode=max"
-          else
-            docker compose -f docker-compose.vps.yml build \
-              --cache-to "type=local,dest=/tmp/.buildx-cache-new,mode=max"
-          fi
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          echo "::group::docker compose build"
+          docker compose -f docker-compose.vps.yml build
           echo "::endgroup::"
 
       - name: Subir stack e aguardar healthchecks
