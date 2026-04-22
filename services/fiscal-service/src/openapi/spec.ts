@@ -5,6 +5,29 @@ import type { FiscalServiceEnv } from "../config/env.js";
 export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
 
+  const createIcmsExample = {
+    state: "SP",
+    item_number: "1001",
+    cest_code: "12.345.67",
+    description: "ICMS example description",
+    interstate_agreement: "Convênio ICMS",
+    applied_original_mva: "10.00",
+    adjusted_mva: "12.00",
+    original_mva: "8.00",
+  };
+
+  const updateIcmsExample = {
+    icms_id: "icms-uuid",
+    state: "SP",
+    item_number: "1001",
+    cest_code: "12.345.67",
+    description: "ICMS example description updated",
+    interstate_agreement: "Convênio ICMS",
+    applied_original_mva: "10.00",
+    adjusted_mva: "12.00",
+    original_mva: "8.00",
+  };
+
   const createNcmExample = {
     tax_regime: "Simples Nacional",
     ncm_code: "84719012",
@@ -27,11 +50,12 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
     info: {
       title: "fiscal-service",
       version: "1.0.0",
-      description: "API fiscal da PR 1: CRUD de NCM. Requer JWT válido nos endpoints autenticados.",
+      description: "API fiscal das PRs 1 e 2: CRUD de NCM e ICMS. Requer JWT válido nos endpoints autenticados.",
     },
     servers: [{ url: baseUrl }],
     tags: [
       { name: "Health", description: "Saúde do serviço" },
+      { name: "ICMS", description: "CRUD de ICMS" },
       { name: "NCM", description: "CRUD de NCM" },
     ],
     components: {
@@ -202,6 +226,134 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
               required: true,
               schema: { type: "string" },
               description: "Códigos NCM separados por vírgula",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Lista",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/fiscal/icms": {
+        post: {
+          tags: ["ICMS"],
+          summary: "Criar ICMS",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    state: { type: "string" },
+                    item_number: { type: "string" },
+                    cest_code: { type: "string" },
+                    description: { type: "string" },
+                    interstate_agreement: { type: "string" },
+                    applied_original_mva: { type: "string" },
+                    adjusted_mva: { type: "string" },
+                    original_mva: { type: "string" },
+                  },
+                  required: ["state", "description"],
+                  additionalProperties: true,
+                  example: createIcmsExample,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Criado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        get: {
+          tags: ["ICMS"],
+          summary: "Detalhe do ICMS",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "icms_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Detalhe",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        put: {
+          tags: ["ICMS"],
+          summary: "Atualizar ICMS",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    icms_id: { type: "string", format: "uuid" },
+                    state: { type: "string" },
+                    item_number: { type: "string" },
+                    cest_code: { type: "string" },
+                    description: { type: "string" },
+                    interstate_agreement: { type: "string" },
+                    applied_original_mva: { type: "string" },
+                    adjusted_mva: { type: "string" },
+                    original_mva: { type: "string" },
+                  },
+                  required: ["icms_id", "state", "description"],
+                  additionalProperties: true,
+                  example: updateIcmsExample,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/fiscal/icms/list": {
+        get: {
+          tags: ["ICMS"],
+          summary: "Listar ICMS por códigos",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "icmsCodes",
+              in: "query",
+              required: true,
+              schema: { type: "string" },
+              description: "Códigos ICMS separados por vírgula",
             },
           ],
           responses: {

@@ -158,6 +158,8 @@ const state = {
   secondaryClientId: "",
   clientHistoryPendingId: "",
   clientHistoryId: "",
+  fiscalIcmsId: "",
+  fiscalIcmsCode: "",
   fiscalNcmId: "",
   fiscalNcmCode: "",
   projectId: "",
@@ -1482,6 +1484,71 @@ const handlers = {
         federal_taxation_type: "Monofásica",
         description: uniqueText("Smoke Fiscal NCM Updated"),
         validity_start_date: new Date().toISOString(),
+      },
+    });
+  },
+
+  async fiscalIcmsCreate(op) {
+    const icmsCode = uniqueText("Smoke Fiscal ICMS");
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        state: "SP",
+        item_number: uniqueDigits(4),
+        cest_code: `${uniqueDigits(2)}.${uniqueDigits(3)}.${uniqueDigits(2)}`,
+        description: icmsCode,
+        interstate_agreement: "Convênio ICMS",
+        applied_original_mva: "10.00",
+        adjusted_mva: "12.00",
+        original_mva: "8.00",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.fiscalIcmsId =
+      pickFirst(response.body, "data.create.id") ??
+      pickFirst(response.body, "data.id") ??
+      findFirstId(response.body?.data);
+    state.fiscalIcmsCode = icmsCode;
+  },
+
+  async fiscalIcmsCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        description: uniqueText("Smoke Invalid ICMS"),
+      },
+    });
+  },
+
+  async fiscalIcmsGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { icms_id: requireState("fiscalIcmsId") },
+    });
+  },
+
+  async fiscalIcmsList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { icmsCodes: requireState("fiscalIcmsCode") },
+    });
+  },
+
+  async fiscalIcmsPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        icms_id: requireState("fiscalIcmsId"),
+        state: "SP",
+        item_number: uniqueDigits(4),
+        cest_code: `${uniqueDigits(2)}.${uniqueDigits(3)}.${uniqueDigits(2)}`,
+        description: requireState("fiscalIcmsCode"),
+        interstate_agreement: "Convênio ICMS atualizado",
+        applied_original_mva: "11.00",
+        adjusted_mva: "13.00",
+        original_mva: "9.00",
       },
     });
   },

@@ -1,6 +1,6 @@
 # fiscal-service
 
-Microservico fiscal. Na PR 1, este servico expoe apenas o CRUD de NCM e o health check. O gateway encaminha esse servico pelo prefixo publico **`/fiscal`**.
+Microservico fiscal. Até a PR 2, este servico expoe CRUD de NCM, CRUD de ICMS e o health check. O gateway encaminha esse servico pelo prefixo publico **`/fiscal`**.
 
 ## Porta local
 
@@ -23,6 +23,8 @@ Exemplos de paths publicos:
 
 - `/fiscal/ncm`
 - `/fiscal/ncm/list`
+- `/fiscal/icms`
+- `/fiscal/icms/list`
 - `/health`
 
 ## Desenvolvimento

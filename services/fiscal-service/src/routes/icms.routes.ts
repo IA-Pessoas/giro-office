@@ -9,32 +9,28 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
-  createNcmBodySchema,
-  detailNcmQuerySchema,
-  listNcmQuerySchema,
-  updateNcmBodySchema,
-} from "../schemas/ncm.schemas.js";
-import type { NcmService } from "../services/ncmService.js";
+  createIcmsBodySchema,
+  detailIcmsQuerySchema,
+  listIcmsQuerySchema,
+  updateIcmsBodySchema,
+} from "../schemas/icms.schemas.js";
+import type { IcmsService } from "../services/icmsService.js";
 
-export type FiscalRouteDeps = {
-  ncmService: Pick<NcmService, "create" | "update" | "detail" | "list">;
-};
+export type IcmsRouteDeps = Pick<IcmsService, "create" | "update" | "detail" | "list">;
 
 function firstQueryValue(value: unknown): unknown {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export function createFiscalRoutes(deps: FiscalRouteDeps): ReturnType<typeof Router> {
+export function createIcmsRoutes(service: IcmsRouteDeps): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
 
-  // --- NCM ---
-
-  router.post("/ncm", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
+  router.post("/icms", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const body = parseWithZod(createNcmBodySchema, req.body);
+      const body = parseWithZod(createIcmsBodySchema, req.body);
       const auth = requireAuthenticatedRequestContext(req);
 
-      const result = await deps.ncmService.create({
+      const result = await service.create({
         userId: auth.user_id,
         organizationId: auth.organization_id,
         permission: auth.permission,
@@ -43,17 +39,17 @@ export function createFiscalRoutes(deps: FiscalRouteDeps): ReturnType<typeof Rou
 
       res.status(201).json(createSuccessResponse(result));
     } catch (err) {
-      logError("Erro ao criar NCM", { err });
+      logError("Erro ao criar ICMS", { err });
       next(err);
     }
   });
 
-  router.put("/ncm", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
+  router.put("/icms", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const body = parseWithZod(updateNcmBodySchema, req.body);
+      const body = parseWithZod(updateIcmsBodySchema, req.body);
       const auth = requireAuthenticatedRequestContext(req);
 
-      const result = await deps.ncmService.update({
+      const result = await service.update({
         userId: auth.user_id,
         organizationId: auth.organization_id,
         permission: auth.permission,
@@ -62,40 +58,40 @@ export function createFiscalRoutes(deps: FiscalRouteDeps): ReturnType<typeof Rou
 
       res.json(createSuccessResponse(result));
     } catch (err) {
-      logError("Erro ao atualizar NCM", { err });
+      logError("Erro ao atualizar ICMS", { err });
       next(err);
     }
   });
 
-  router.get("/ncm", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
+  router.get("/icms", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rawObj = { ncm_id: firstQueryValue(req.query.ncm_id) };
-      const query = parseWithZod(detailNcmQuerySchema, rawObj);
+      const rawObj = { icms_id: firstQueryValue(req.query.icms_id) };
+      const query = parseWithZod(detailIcmsQuerySchema, rawObj);
       const auth = requireAuthenticatedRequestContext(req);
 
-      const result = await deps.ncmService.detail(query.ncm_id, auth.organization_id);
+      const result = await service.detail(query.icms_id, auth.organization_id);
 
       res.json(createSuccessResponse(result));
     } catch (err) {
-      logError("Erro ao buscar NCM", { err });
+      logError("Erro ao buscar ICMS", { err });
       next(err);
     }
   });
 
   router.get(
-    "/ncm/list",
+    "/icms/list",
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const rawObj = { ncmCodes: req.query.ncmCodes };
-        const query = parseWithZod(listNcmQuerySchema, rawObj);
+        const rawObj = { icmsCodes: req.query.icmsCodes };
+        const query = parseWithZod(listIcmsQuerySchema, rawObj);
         const auth = requireAuthenticatedRequestContext(req);
 
-        const result = await deps.ncmService.list(query.ncmCodes, auth.organization_id);
+        const result = await service.list(query.icmsCodes, auth.organization_id);
 
         res.json(createSuccessResponse(result));
       } catch (err) {
-        logError("Erro ao listar NCM", { err });
+        logError("Erro ao listar ICMS", { err });
         next(err);
       }
     },

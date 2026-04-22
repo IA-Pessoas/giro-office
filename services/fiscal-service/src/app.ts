@@ -8,7 +8,9 @@ import "express-async-errors";
 import type { FiscalServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildFiscalServiceOpenApiSpec } from "./openapi/spec.js";
-import { createFiscalRoutes, type FiscalRouteDeps } from "./routes/fiscal.routes.js";
+import { createIcmsRoutes, type IcmsRouteDeps } from "./routes/icms.routes.js";
+import { createNcmRoutes, type NcmRouteDeps } from "./routes/ncm.routes.js";
+import { IcmsService } from "./services/icmsService.js";
 import { NcmService } from "./services/ncmService.js";
 
 function fiscalServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -31,14 +33,12 @@ function fiscalServiceErrorLogContext(request: Request): Record<string, unknown>
 export function createFiscalApp(options: {
   env: FiscalServiceEnv;
   logger: Logger;
-  fiscalRouteDeps?: FiscalRouteDeps;
+  icmsRouteDeps?: IcmsRouteDeps;
+  ncmRouteDeps?: NcmRouteDeps;
 }): express.Express {
   const { env, logger } = options;
-
-  const defaultDeps: FiscalRouteDeps = {
-    ncmService: new NcmService(),
-  };
-  const fiscalRouteDeps = options.fiscalRouteDeps ?? defaultDeps;
+  const icmsRouteDeps = options.icmsRouteDeps ?? new IcmsService();
+  const ncmRouteDeps = options.ncmRouteDeps ?? new NcmService();
 
   const app = express();
 
@@ -57,7 +57,8 @@ export function createFiscalApp(options: {
     });
   }
 
-  app.use("/fiscal", createFiscalRoutes(fiscalRouteDeps));
+  app.use("/fiscal", createNcmRoutes(ncmRouteDeps));
+  app.use("/fiscal", createIcmsRoutes(icmsRouteDeps));
 
   app.use(
     createExpressErrorHandler({
