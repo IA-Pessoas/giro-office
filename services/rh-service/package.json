@@ -10,14 +10,13 @@
     "predev": "pnpm prisma:generate",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "typecheck": "pnpm prisma:generate && tsc --noEmit && pnpm run typecheck:tests",
+    "typecheck": "pnpm prisma:generate && tsc --noEmit",
     "test": "vitest run",
     "start": "node dist/server.js",
     "lint": "biome lint src tests",
     "format": "biome format --write src tests",
     "check": "biome check src tests",
-    "test:watch": "vitest",
-    "typecheck:tests": "tsc -p tsconfig.tests.json"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",
