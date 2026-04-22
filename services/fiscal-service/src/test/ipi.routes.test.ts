@@ -1,0 +1,138 @@
+import "./envBootstrap.js";
+
+import {
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+  createLogger,
+} from "@workspace/shared";
+import request from "supertest";
+import { describe, expect, it, vi } from "vitest";
+
+import { createFiscalApp } from "../app.js";
+import { getFiscalServiceEnv } from "../config/env.js";
+import type { IpiRouteDeps } from "../routes/ipi.routes.js";
+
+const ORG_ID = "a0000000-0000-4000-8000-000000000001";
+const USER_ID = "c0000000-0000-4000-8000-000000000001";
+const IPI_ID = "f0000000-0000-4000-8000-000000000001";
+const INTERNAL_TOKEN = "audit-service-token";
+const env = getFiscalServiceEnv();
+const logger = createLogger({
+  service: "fiscal-service",
+  env: env.nodeEnv,
+  level: env.logLevel,
+  pretty: env.logPretty,
+});
+
+function gatewayHeaders(): Record<string, string> {
+  return {
+    [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
+    [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
+    [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORG_ID,
+  };
+}
+
+function createMockDeps(): IpiRouteDeps {
+  return {
+    create: vi.fn(async () => ({ create: {} })),
+    update: vi.fn(async () => ({})),
+    detail: vi.fn(async () => ({ detail: {} })),
+    list: vi.fn(async () => []),
+  };
+}
+
+describe("ipi routes", () => {
+  it("POST /fiscal/ipi sem token interno retorna 401", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, ipiRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/fiscal/ipi")
+      .set("Content-Type", "application/json")
+      .send({});
+
+    expect(res.status).toBe(401);
+    expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /fiscal/ipi com auth gateway e body válido retorna 201", async () => {
+    const payload = { create: { id: IPI_ID, ncm: "84719012" } };
+    const deps = createMockDeps();
+    deps.create = vi.fn(async () => payload);
+    const app = createFiscalApp({ env, logger, ipiRouteDeps: deps });
+
+    const body = {
+      ncm: "84719012",
+      ex: "001",
+      description: "IPI route test",
+      aliquot: "10.00",
+    };
+
+    const res = await request(app)
+      .post("/fiscal/ipi")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send(body);
+
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ success: true, data: payload });
+    expect(deps.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /fiscal/ipi com body inválido retorna 400", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, ipiRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/fiscal/ipi")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ description: "sem ncm" });
+
+    expect(res.status).toBe(400);
+    expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("GET /fiscal/ipi sem ipi_id válido retorna 400", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, ipiRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/fiscal/ipi")
+      .query({ ipi_id: "invalido" })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(400);
+    expect(deps.detail).not.toHaveBeenCalled();
+  });
+
+  it("GET /fiscal/ipi com ipi_id válido retorna 200", async () => {
+    const deps = createMockDeps();
+    deps.detail = vi.fn(async () => ({ detail: { id: IPI_ID } }));
+    const app = createFiscalApp({ env, logger, ipiRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/fiscal/ipi")
+      .query({ ipi_id: IPI_ID })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(deps.detail).toHaveBeenCalledTimes(1);
+  });
+
+  it("GET /fiscal/ipi/list com ipiCodes retorna 200", async () => {
+    const deps = createMockDeps();
+    deps.list = vi.fn(async () => [{ id: IPI_ID }]);
+    const app = createFiscalApp({ env, logger, ipiRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/fiscal/ipi/list")
+      .query({ ipiCodes: "84719012,84719013" })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
