@@ -22,6 +22,41 @@ const baseCreateInput = {
   original_mva: "8.00",
 };
 
+const expectedCreateWhere = {
+  organization_id: ORG_ID,
+  state: baseCreateInput.state,
+  item_number: baseCreateInput.item_number,
+  cest_code: baseCreateInput.cest_code,
+  description: baseCreateInput.description,
+  interstate_agreement: baseCreateInput.interstate_agreement,
+  applied_original_mva: baseCreateInput.applied_original_mva,
+  adjusted_mva: baseCreateInput.adjusted_mva,
+  original_mva: baseCreateInput.original_mva,
+};
+
+const expectedCreateData = {
+  organization_id: ORG_ID,
+  state: baseCreateInput.state,
+  item_number: baseCreateInput.item_number,
+  cest_code: baseCreateInput.cest_code,
+  description: baseCreateInput.description,
+  interstate_agreement: baseCreateInput.interstate_agreement,
+  applied_original_mva: baseCreateInput.applied_original_mva,
+  adjusted_mva: baseCreateInput.adjusted_mva,
+  original_mva: baseCreateInput.original_mva,
+};
+
+const expectedUpdateData = {
+  state: baseCreateInput.state,
+  item_number: baseCreateInput.item_number,
+  cest_code: baseCreateInput.cest_code,
+  description: baseCreateInput.description,
+  interstate_agreement: baseCreateInput.interstate_agreement,
+  applied_original_mva: baseCreateInput.applied_original_mva,
+  adjusted_mva: baseCreateInput.adjusted_mva,
+  original_mva: baseCreateInput.original_mva,
+};
+
 function createMockPrisma(): IcmsServicePrisma {
   return {
     icms: {
@@ -49,6 +84,8 @@ describe("IcmsService", () => {
 
     await expect(service.create(baseCreateInput)).rejects.toMatchObject({ statusCode: 409 });
     expect(audit.createLog).not.toHaveBeenCalled();
+    expect(prisma.icms.findFirst).toHaveBeenCalledWith({ where: expectedCreateWhere });
+    expect(prisma.icms.create).not.toHaveBeenCalled();
   });
 
   it("create persiste ICMS e registra auditoria", async () => {
@@ -63,6 +100,12 @@ describe("IcmsService", () => {
 
     expect(result).toEqual({ create: created });
     expect(audit.createLog).toHaveBeenCalledTimes(1);
+    expect(prisma.icms.findFirst).toHaveBeenCalledWith({ where: expectedCreateWhere });
+    expect(prisma.icms.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expectedCreateData,
+      }),
+    );
   });
 
   it("detail lança 404 quando ICMS não existe", async () => {
@@ -71,6 +114,10 @@ describe("IcmsService", () => {
     const service = new IcmsService(prisma, createMockAudit());
 
     await expect(service.detail(ICMS_ID, ORG_ID)).rejects.toMatchObject({ statusCode: 404 });
+    expect(prisma.icms.findFirst).toHaveBeenCalledWith({
+      where: { id: ICMS_ID, organization_id: ORG_ID },
+      select: expect.any(Object),
+    });
   });
 
   it("detail retorna registro quando existe", async () => {
@@ -81,6 +128,10 @@ describe("IcmsService", () => {
 
     const result = await service.detail(ICMS_ID, ORG_ID);
     expect(result).toEqual({ detail: row });
+    expect(prisma.icms.findFirst).toHaveBeenCalledWith({
+      where: { id: ICMS_ID, organization_id: ORG_ID },
+      select: expect.any(Object),
+    });
   });
 
   it("update lança 404 quando ICMS não existe", async () => {
@@ -94,6 +145,10 @@ describe("IcmsService", () => {
         icms_id: ICMS_ID,
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
+    expect(prisma.icms.findFirst).toHaveBeenCalledWith({
+      where: { id: ICMS_ID, organization_id: ORG_ID },
+    });
+    expect(prisma.icms.update).not.toHaveBeenCalled();
   });
 
   it("update persiste e registra auditoria quando ICMS existe", async () => {
@@ -112,6 +167,15 @@ describe("IcmsService", () => {
 
     expect(result).toEqual(updated);
     expect(audit.logUpdateIfChanged).toHaveBeenCalledTimes(1);
+    expect(prisma.icms.findFirst).toHaveBeenCalledWith({
+      where: { id: ICMS_ID, organization_id: ORG_ID },
+    });
+    expect(prisma.icms.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: ICMS_ID },
+        data: expectedUpdateData,
+      }),
+    );
   });
 
   it("list retorna array vazio quando não há códigos", async () => {
