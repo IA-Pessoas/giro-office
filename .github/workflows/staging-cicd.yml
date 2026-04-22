@@ -1,38 +1,34 @@
-# CI para a branch feature/CICD_test (dispara em push após merge de PR; combine com branch protection para exigir aprovação).
+# Staging — espelho da realidade: imagens Docker, varredura de segurança, stack Compose,
+# smoke (contrato HTTP + healthchecks) e gancho para E2E (Playwright) quando existir no app.
 #
-# Segurança: `.env.vps.*` está em `.gitignore` na raiz; os arquivos só existem no runner durante o job.
-# Segredos vazios no GitHub viram env definida com string vazia — `set -u` não detecta isso; por isso
-# validamos não-vazio antes de gravar.
+# Gatilhos:
+#   • push em `develop` (após merge de PR).
+#   • pull_request com base `staging` (validação antes de integrar na branch staging).
 #
-# Segredos do repositório → arquivos gerados na raiz (gitignored no dev; necessários para docker-compose.vps.yml):
-#   ENV_VPS_REVERSE_PROXY        → .env.vps.reverse-proxy
-#   ENV_VPS_GATEWAY              → .env.vps.gateway
-#   ENV_VPS_ORGANIZATION_SERVICE → .env.vps.organization-service
-#   ENV_VPS_USER_SERVICE         → .env.vps.user-service
-#   ENV_VPS_TASK_SERVICE         → .env.vps.task-service
-#   ENV_VPS_PROJECT_SERVICE      → .env.vps.project-service
-#   ENV_VPS_CLIENT_SERVICE       → .env.vps.client-service
-#   ENV_VPS_RH_SERVICE           → .env.vps.rh-service
+# Segredos (mesmo conjunto do test-cicd / stack VPS) — obrigatórios para build e subida:
+#   ENV_VPS_REVERSE_PROXY, ENV_VPS_GATEWAY, ENV_VPS_ORGANIZATION_SERVICE, ENV_VPS_USER_SERVICE,
+#   ENV_VPS_TASK_SERVICE, ENV_VPS_PROJECT_SERVICE, ENV_VPS_CLIENT_SERVICE, ENV_VPS_RH_SERVICE
 #
-# Opcional (somente se usar --profile audit no compose): ENV_VPS_AUDIT_SERVICE → .env.vps.audit-service
+# Opcional — testes de integração com Postgres real (Vitest em client-service):
+#   STAGING_DATABASE_URL — usado com CLIENT_SERVICE_INTEGRATION=1 após a stack estar no ar.
+#   Se não existir ou estiver vazio, o passo é ignorado (somente aviso).
 #
-# Pós-merge: cadastrar todos os segredos em Settings → Secrets and variables → Actions,
-# garantir DATABASE_URL/SUPABASE acessíveis a partir dos runners do GitHub e validar na aba Actions.
-#
-name: Teste CICD
+# E2E: quando `app/node_modules/@playwright/test` existir após `pnpm install`, executa Playwright.
+
+name: Staging CI/CD
 
 on:
   push:
     branches:
-      - feature/CICD-test
+      - develop
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
-      - feature/CICD
+      - staging
   workflow_dispatch:
 
 concurrency:
-  group: test-cicd-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  group: staging-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 permissions:
@@ -43,13 +39,11 @@ jobs:
     name: Qualidade (Biome, typecheck, testes)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # prisma.config.ts (infra) exige DATABASE_URL. Use placeholder (não use secret vazio): `prisma generate` não conecta ao DB.
     env:
       DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci_ci_typecheck?schema=public
     steps:
       - uses: actions/checkout@v4
 
-      # `setup-node` com `cache: pnpm` exige que `pnpm` já exista no PATH (documentação setup-node).
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.0
@@ -71,84 +65,8 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Testes
+      - name: Testes unitários / pacote (Vitest em serviços)
         run: pnpm test
-
-  docker-stack:
-    name: Docker Compose (stack VPS)
-    needs: quality
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configurar Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Materializar .env.vps.* a partir dos segredos
-        env:
-          ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
-          ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
-          ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
-          ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
-          ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
-          ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
-          ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
-          ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
-        run: |
-          set -eo pipefail
-          echo "::group::Validar segredos e materializar .env.vps.*"
-          for name in \
-            ENV_VPS_REVERSE_PROXY \
-            ENV_VPS_GATEWAY \
-            ENV_VPS_ORGANIZATION_SERVICE \
-            ENV_VPS_USER_SERVICE \
-            ENV_VPS_TASK_SERVICE \
-            ENV_VPS_PROJECT_SERVICE \
-            ENV_VPS_CLIENT_SERVICE \
-            ENV_VPS_RH_SERVICE
-          do
-            if [ -z "${!name:-}" ]; then
-              echo "::error::Configure o secret do repositório: $name"
-              exit 1
-            fi
-          done
-          printf '%s\n' "$ENV_VPS_REVERSE_PROXY" > .env.vps.reverse-proxy
-          printf '%s\n' "$ENV_VPS_GATEWAY" > .env.vps.gateway
-          printf '%s\n' "$ENV_VPS_ORGANIZATION_SERVICE" > .env.vps.organization-service
-          printf '%s\n' "$ENV_VPS_USER_SERVICE" > .env.vps.user-service
-          printf '%s\n' "$ENV_VPS_TASK_SERVICE" > .env.vps.task-service
-          printf '%s\n' "$ENV_VPS_PROJECT_SERVICE" > .env.vps.project-service
-          printf '%s\n' "$ENV_VPS_CLIENT_SERVICE" > .env.vps.client-service
-          printf '%s\n' "$ENV_VPS_RH_SERVICE" > .env.vps.rh-service
-          echo "::endgroup::"
-
-      # BuildKit acelera builds; `docker compose build` nos runners do GHA não aceita
-      # --cache-to/--cache-from (versão do plugin Compose). Cache entre jobs: bake ou registry.
-      - name: Build imagens Compose
-        env:
-          DOCKER_BUILDKIT: 1
-          COMPOSE_DOCKER_CLI_BUILD: 1
-        run: |
-          set -eo pipefail
-          echo "::group::docker compose build"
-          docker compose -f docker-compose.vps.yml build
-          echo "::endgroup::"
-
-      - name: Subir stack e aguardar healthchecks
-        env:
-          DOCKER_BUILDKIT: 1
-          COMPOSE_DOCKER_CLI_BUILD: 1
-        run: |
-          set -eo pipefail
-          docker compose version
-          docker compose -f docker-compose.vps.yml up -d --wait --wait-timeout 900
-
-      - name: Docker Compose down
-        if: always()
-        run: |
-          # -v remove volumes nomeados; útil também em runner self-hosted (evita nomes/dados presos).
-          docker compose -f docker-compose.vps.yml down -v || true
 
   staging-environment:
     name: Staging — Docker, scan, integração, smoke, E2E
