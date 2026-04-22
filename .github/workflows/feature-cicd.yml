@@ -1,0 +1,157 @@
+# CI para a branch feature/CICD_test (dispara em push após merge de PR; combine com branch protection para exigir aprovação).
+#
+# Segurança: `.env.vps.*` está em `.gitignore` na raiz; os arquivos só existem no runner durante o job.
+# Segredos vazios no GitHub viram env definida com string vazia — `set -u` não detecta isso; por isso
+# validamos não-vazio antes de gravar.
+#
+# Segredos do repositório → arquivos gerados na raiz (gitignored no dev; necessários para docker-compose.vps.yml):
+#   ENV_VPS_REVERSE_PROXY        → .env.vps.reverse-proxy
+#   ENV_VPS_GATEWAY              → .env.vps.gateway
+#   ENV_VPS_ORGANIZATION_SERVICE → .env.vps.organization-service
+#   ENV_VPS_USER_SERVICE         → .env.vps.user-service
+#   ENV_VPS_TASK_SERVICE         → .env.vps.task-service
+#   ENV_VPS_PROJECT_SERVICE      → .env.vps.project-service
+#   ENV_VPS_CLIENT_SERVICE       → .env.vps.client-service
+#   ENV_VPS_RH_SERVICE           → .env.vps.rh-service
+#
+# Opcional (somente se usar --profile audit no compose): ENV_VPS_AUDIT_SERVICE → .env.vps.audit-service
+#
+# Pós-merge: cadastrar todos os segredos em Settings → Secrets and variables → Actions,
+# garantir DATABASE_URL/SUPABASE acessíveis a partir dos runners do GitHub e validar na aba Actions.
+#
+# Cache BuildKit: `actions/cache` guarda `/tmp/.buildx-cache`; o passo de build usa
+# `--cache-from` / `--cache-to type=local` para reutilizar camadas entre execuções.
+
+name: Feature CICD
+
+on:
+  push:
+    branches:
+      - feature/CICD_test
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Qualidade (Biome, typecheck, testes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Ativar pnpm (packageManager do root)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+          pnpm --version
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Biome check
+        run: pnpm check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Testes
+        run: pnpm test
+
+  docker-stack:
+    name: Docker Compose (stack VPS)
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('pnpm-lock.yaml', 'docker/service.Dockerfile', 'docker-compose.vps.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Materializar .env.vps.* a partir dos segredos
+        env:
+          ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+          ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+          ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+          ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+          ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+          ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+          ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+          ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+        run: |
+          set -eo pipefail
+          echo "::group::Validar segredos e materializar .env.vps.*"
+          for name in \
+            ENV_VPS_REVERSE_PROXY \
+            ENV_VPS_GATEWAY \
+            ENV_VPS_ORGANIZATION_SERVICE \
+            ENV_VPS_USER_SERVICE \
+            ENV_VPS_TASK_SERVICE \
+            ENV_VPS_PROJECT_SERVICE \
+            ENV_VPS_CLIENT_SERVICE \
+            ENV_VPS_RH_SERVICE
+          do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Configure o secret do repositório: $name"
+              exit 1
+            fi
+          done
+          printf '%s\n' "$ENV_VPS_REVERSE_PROXY" > .env.vps.reverse-proxy
+          printf '%s\n' "$ENV_VPS_GATEWAY" > .env.vps.gateway
+          printf '%s\n' "$ENV_VPS_ORGANIZATION_SERVICE" > .env.vps.organization-service
+          printf '%s\n' "$ENV_VPS_USER_SERVICE" > .env.vps.user-service
+          printf '%s\n' "$ENV_VPS_TASK_SERVICE" > .env.vps.task-service
+          printf '%s\n' "$ENV_VPS_PROJECT_SERVICE" > .env.vps.project-service
+          printf '%s\n' "$ENV_VPS_CLIENT_SERVICE" > .env.vps.client-service
+          printf '%s\n' "$ENV_VPS_RH_SERVICE" > .env.vps.rh-service
+          echo "::endgroup::"
+
+      - name: Build imagens (cache BuildKit local)
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+        run: |
+          set -eo pipefail
+          mkdir -p /tmp/.buildx-cache
+          echo "::group::docker compose build (cache-from / cache-to)"
+          if find /tmp/.buildx-cache -mindepth 1 -print -quit 2>/dev/null | grep -q .; then
+            docker compose -f docker-compose.vps.yml build \
+              --cache-from "type=local,src=/tmp/.buildx-cache" \
+              --cache-to "type=local,dest=/tmp/.buildx-cache-new,mode=max"
+          else
+            docker compose -f docker-compose.vps.yml build \
+              --cache-to "type=local,dest=/tmp/.buildx-cache-new,mode=max"
+          fi
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          echo "::endgroup::"
+
+      - name: Subir stack e aguardar healthchecks
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+        run: |
+          set -eo pipefail
+          docker compose version
+          docker compose -f docker-compose.vps.yml up -d --wait --wait-timeout 900
+
+      - name: Docker Compose down
+        if: always()
+        run: |
+          # -v remove volumes nomeados; útil também em runner self-hosted (evita nomes/dados presos).
+          docker compose -f docker-compose.vps.yml down -v || true
