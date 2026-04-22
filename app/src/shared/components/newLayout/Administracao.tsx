@@ -23,7 +23,6 @@ import {
   arePermissionDraftsEqual,
   buildPermissionUpdatePayload,
   freezePermissionSnapshot,
-  getExtraPermissionLabel,
   isOwnerUser,
   normalizePermissionDraft,
   normalizePermissionResponse,
@@ -193,12 +192,6 @@ export function Administracao() {
     return !arePermissionDraftsEqual(normalizedPermissionDraft, permissionSnapshot);
   }, [normalizedPermissionDraft, permissionSnapshot]);
   const isSelectedPermissionOwner = isOwnerUser(selectedPermissionUser);
-  const permissionExtraModules = useMemo(() => {
-    return permissionExtraKeys.map((moduleKey) => ({
-      key: moduleKey,
-      label: getExtraPermissionLabel(moduleKey),
-    }));
-  }, [permissionExtraKeys]);
 
   const permissionQuery = useQuery<PermissionQueryResult>({
     queryKey: ["admin", "permissions", selectedPermissionUserId],
@@ -761,7 +754,7 @@ export function Administracao() {
                         <button
                           key={candidate.id}
                           type="button"
-                            onClick={() => handleSelectPermissionUser(candidate.id)}
+                          onClick={() => handleSelectPermissionUser(candidate.id)}
                           className={`w-full rounded-2xl border p-4 text-left transition-all ${
                             isSelected
                               ? "border-[var(--colors-brand-gradient-end)] bg-slate-50 shadow-sm dark:bg-slate-950/60"
@@ -870,113 +863,74 @@ export function Administracao() {
                   </button>
                 </div>
 
-                {permissionSaveError ? (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100">
-                    <p className="text-sm font-semibold">Não foi possível salvar as permissões.</p>
-                    <p className="mt-1 text-sm opacity-90">{permissionSaveError}</p>
-                    <button
-                      type="button"
-                      onClick={() => void handleSavePermissions()}
-                      className="mt-3 inline-flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-900 transition-colors hover:bg-rose-100 dark:border-rose-900/60 dark:text-rose-100 dark:hover:bg-rose-900/30"
-                      disabled={isSelectedPermissionOwner || isSavingPermissions}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      Tentar novamente
-                    </button>
-                  </div>
-                ) : null}
-
-                {isSelectedPermissionOwner ? (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-slate-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-white">
-                    <p className="text-sm font-semibold">
-                      Owners recebem acesso máximo e não são editáveis nesta tela.
-                    </p>
-                  </div>
-                ) : null}
-
-                <div className="grid gap-4 lg:grid-cols-2">
-                  {PERMISSION_MODULE_GROUPS.map((group) => (
-                    <section key={group.title} className={`${ADMIN_SUBPANEL_CLASSNAME} p-4`}>
-                      <div className="space-y-1">
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                          {group.title}
-                        </h3>
-                      </div>
-
-                      <div className="mt-4 space-y-3">
-                        {group.keys.map((moduleKey) => (
-                          <div
-                            key={moduleKey}
-                            className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
-                          >
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {getPermissionModuleLabel(moduleKey)}
-                            </label>
-                            <select
-                              value={getPermissionSelectValue(normalizedPermissionDraft[moduleKey])}
-                              onChange={(event) =>
-                                handlePermissionChange(
-                                  moduleKey,
-                                  event.target.value as PermissionSelectValue,
-                                )
-                              }
-                              className={ADMIN_SELECT_CLASSNAME}
-                              style={ADMIN_SELECT_ARROW_STYLE}
-                              disabled={isSelectedPermissionOwner}
-                            >
-                              {PERMISSION_SELECT_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-
-                {permissionExtraModules.length > 0 ? (
-                  <section className={`${ADMIN_SUBPANEL_CLASSNAME} p-4`}>
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                        Outros
-                      </h3>
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+                  {permissionSaveError ? (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100">
+                      <p className="text-sm font-semibold">Não foi possível salvar as permissões.</p>
+                      <p className="mt-1 text-sm opacity-90">{permissionSaveError}</p>
+                      <button
+                        type="button"
+                        onClick={() => void handleSavePermissions()}
+                        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-900 transition-colors hover:bg-rose-100 dark:border-rose-900/60 dark:text-rose-100 dark:hover:bg-rose-900/30"
+                        disabled={isSelectedPermissionOwner || isSavingPermissions}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Tentar novamente
+                      </button>
                     </div>
+                  ) : null}
 
-                    <div className="mt-4 space-y-3">
-                      {permissionExtraModules.map((moduleItem) => (
-                        <div
-                          key={moduleItem.key}
-                          className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
-                        >
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                            {moduleItem.label}
-                          </label>
-                          <select
-                            value={getPermissionSelectValue(normalizedPermissionDraft[moduleItem.key])}
-                            onChange={(event) =>
-                              handlePermissionChange(
-                                moduleItem.key,
-                                event.target.value as PermissionSelectValue,
-                              )
-                            }
-                            className={ADMIN_SELECT_CLASSNAME}
-                            style={ADMIN_SELECT_ARROW_STYLE}
-                            disabled={isSelectedPermissionOwner}
-                          >
-                            {PERMISSION_SELECT_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
+                  {isSelectedPermissionOwner ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-slate-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-white">
+                      <p className="text-sm font-semibold">
+                        Owners recebem acesso máximo e não são editáveis nesta tela.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {PERMISSION_MODULE_GROUPS.map((group) => (
+                      <section key={group.title} className={`${ADMIN_SUBPANEL_CLASSNAME} p-4`}>
+                        <div className="space-y-1">
+                          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {group.title}
+                          </h3>
                         </div>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
+
+                        <div className="mt-4 space-y-3">
+                          {group.keys.map((moduleKey) => (
+                            <div
+                              key={moduleKey}
+                              className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
+                            >
+                              <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {getPermissionModuleLabel(moduleKey)}
+                              </label>
+                              <select
+                                value={getPermissionSelectValue(normalizedPermissionDraft[moduleKey])}
+                                onChange={(event) =>
+                                  handlePermissionChange(
+                                    moduleKey,
+                                    event.target.value as PermissionSelectValue,
+                                  )
+                                }
+                                className={ADMIN_SELECT_CLASSNAME}
+                                style={ADMIN_SELECT_ARROW_STYLE}
+                                disabled={isSelectedPermissionOwner}
+                              >
+                                {PERMISSION_SELECT_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </section>
