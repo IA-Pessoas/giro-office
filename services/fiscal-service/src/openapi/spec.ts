@@ -28,6 +28,21 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
     original_mva: "8.00",
   };
 
+  const createIpiExample = {
+    ncm: "84719012",
+    ex: "001",
+    description: "IPI example description",
+    aliquot: "10.00",
+  };
+
+  const updateIpiExample = {
+    ipi_id: "ipi-uuid",
+    ncm: "84719012",
+    ex: "001",
+    description: "IPI example description updated",
+    aliquot: "12.00",
+  };
+
   const createNcmExample = {
     tax_regime: "Simples Nacional",
     ncm_code: "84719012",
@@ -50,12 +65,14 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
     info: {
       title: "fiscal-service",
       version: "1.0.0",
-      description: "API fiscal das PRs 1 e 2: CRUD de NCM e ICMS. Requer JWT válido nos endpoints autenticados.",
+      description:
+        "API fiscal das PRs 1 a 3: CRUD de NCM, ICMS e IPI. Requer JWT válido nos endpoints autenticados.",
     },
     servers: [{ url: baseUrl }],
     tags: [
       { name: "Health", description: "Saúde do serviço" },
       { name: "ICMS", description: "CRUD de ICMS" },
+      { name: "IPI", description: "CRUD de IPI" },
       { name: "NCM", description: "CRUD de NCM" },
     ],
     components: {
@@ -354,6 +371,126 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
               required: true,
               schema: { type: "string" },
               description: "Códigos ICMS separados por vírgula",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Lista",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/fiscal/ipi": {
+        post: {
+          tags: ["IPI"],
+          summary: "Criar IPI",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ncm: { type: "string" },
+                    ex: { type: "string" },
+                    description: { type: "string" },
+                    aliquot: { type: "string" },
+                  },
+                  required: ["ncm"],
+                  additionalProperties: true,
+                  example: createIpiExample,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Criado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        get: {
+          tags: ["IPI"],
+          summary: "Detalhe do IPI",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "ipi_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Detalhe",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        put: {
+          tags: ["IPI"],
+          summary: "Atualizar IPI",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ipi_id: { type: "string", format: "uuid" },
+                    ncm: { type: "string" },
+                    ex: { type: "string" },
+                    description: { type: "string" },
+                    aliquot: { type: "string" },
+                  },
+                  required: ["ipi_id", "ncm"],
+                  additionalProperties: true,
+                  example: updateIpiExample,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/fiscal/ipi/list": {
+        get: {
+          tags: ["IPI"],
+          summary: "Listar IPI por códigos NCM",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "ipiCodes",
+              in: "query",
+              required: true,
+              schema: { type: "string" },
+              description: "Códigos NCM separados por vírgula",
             },
           ],
           responses: {

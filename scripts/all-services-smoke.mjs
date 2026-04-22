@@ -160,6 +160,8 @@ const state = {
   clientHistoryId: "",
   fiscalIcmsId: "",
   fiscalIcmsCode: "",
+  fiscalIpiId: "",
+  fiscalIpiNcm: "",
   fiscalNcmId: "",
   fiscalNcmCode: "",
   projectId: "",
@@ -1549,6 +1551,63 @@ const handlers = {
         applied_original_mva: "11.00",
         adjusted_mva: "13.00",
         original_mva: "9.00",
+      },
+    });
+  },
+
+  async fiscalIpiCreate(op) {
+    const ncm = uniqueDigits(8);
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        ncm,
+        ex: uniqueDigits(3),
+        description: uniqueText("Smoke Fiscal IPI"),
+        aliquot: "10.00",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.fiscalIpiId =
+      pickFirst(response.body, "data.create.id") ??
+      pickFirst(response.body, "data.id") ??
+      findFirstId(response.body?.data);
+    state.fiscalIpiNcm = ncm;
+  },
+
+  async fiscalIpiCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        description: uniqueText("Smoke Invalid IPI"),
+      },
+    });
+  },
+
+  async fiscalIpiGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ipi_id: requireState("fiscalIpiId") },
+    });
+  },
+
+  async fiscalIpiList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ipiCodes: requireState("fiscalIpiNcm") },
+    });
+  },
+
+  async fiscalIpiPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        ipi_id: requireState("fiscalIpiId"),
+        ncm: requireState("fiscalIpiNcm"),
+        ex: uniqueDigits(3),
+        description: uniqueText("Smoke Fiscal IPI Updated"),
+        aliquot: "12.00",
       },
     });
   },
