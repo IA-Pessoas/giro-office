@@ -19,13 +19,21 @@
 # Pós-merge: cadastrar todos os segredos em Settings → Secrets and variables → Actions,
 # garantir DATABASE_URL/SUPABASE acessíveis a partir dos runners do GitHub e validar na aba Actions.
 #
-name: Feature CICD
+name: Teste CICD
 
 on:
   push:
     branches:
       - feature/CICD-test
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - feature/CICD
   workflow_dispatch:
+
+concurrency:
+  group: test-cicd-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -53,6 +61,9 @@ jobs:
 
       - name: Instalar dependências
         run: pnpm install --frozen-lockfile
+
+      - name: Auditoria de dependências
+        run: pnpm audit:ci
 
       - name: Biome check
         run: pnpm check

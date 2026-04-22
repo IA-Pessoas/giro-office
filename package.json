@@ -19,6 +19,7 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "check": "biome check .",
+    "audit:ci": "pnpm audit --audit-level moderate",
     "fix": "biome check --write .",
     "fix:unsafe": "biome check --write --unsafe .",
     "smoke": "node scripts/all-services-smoke.mjs",
