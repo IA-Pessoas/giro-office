@@ -85,7 +85,7 @@ export default function Login() {
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                       <span className="text-xs font-bold text-white">OF</span>
                     </div>
-                    <span className="text-xl font-bold tracking-tight text-[#111827]">Office</span>
+                    <span className="text-xl font-bold tracking-tight" style={{ color: "#111827" }}>Office</span>
                   </div>
                 </div>
 
@@ -145,7 +145,7 @@ export default function Login() {
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                       <span className="text-xs font-bold text-white">OF</span>
                     </div>
-                    <span className="text-xl font-bold tracking-tight text-[#111827]">Office</span>
+                    <span className="text-xl font-bold tracking-tight" style={{ color: "#111827" }}>Office</span>
                   </div>
                 </div>
               </div>
@@ -154,7 +154,7 @@ export default function Login() {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500 to-indigo-600 opacity-10 rounded-bl-full" />
 
                 <div className="relative z-10">
-                  <div className="mb-5">
+                  <div className="mb-5" style={{ color: "#111827" }}>
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles className="w-5 h-5 text-blue-600" />
                       <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">

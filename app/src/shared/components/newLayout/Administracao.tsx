@@ -533,7 +533,7 @@ export function Administracao() {
         </div>
       ) : activeTab === "users" ? (
         <div className="admin-users-shell grid gap-4 xl:h-[90vh] xl:grid-cols-[360px_minmax(0,1fr)] xl:items-stretch">
-          <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 xl:h-full`}>
+          <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 max-xl:h-[680px] xl:h-full`}>
             <div className="flex h-full min-h-0 flex-col space-y-4">
               <div className="space-y-1">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">Usuários</h2>
@@ -684,7 +684,7 @@ export function Administracao() {
             </div>
           </aside>
 
-          <section className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-6 xl:h-full`}>
+          <section className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-6 max-xl:h-[680px] xl:h-full`}>
             <AdminUserDetailsPanel
               userId={selectedUserId}
               departments={departments}
@@ -695,7 +695,7 @@ export function Administracao() {
         </div>
       ) : (
         <div className="grid gap-4 xl:h-[90vh] xl:grid-cols-[320px_minmax(0,1fr)] xl:items-stretch">
-          <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 xl:h-full`}>
+          <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 max-xl:h-[680px] xl:h-full`}>
             <div className="flex h-full min-h-0 flex-col space-y-4">
               <div className="space-y-1">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">
