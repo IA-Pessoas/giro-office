@@ -55,6 +55,19 @@ describe("fiscal search routes", () => {
     expect(deps.searchByNcmCode).not.toHaveBeenCalled();
   });
 
+  it("GET /fiscal/ncm-search com ncmCode vazio retorna 400", async () => {
+    const deps = createMockFiscalSearchDeps();
+    const app = createFiscalApp({ env, logger, fiscalSearchRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/fiscal/ncm-search")
+      .query({ ncmCode: "" })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(400);
+    expect(deps.searchByNcmCode).not.toHaveBeenCalled();
+  });
+
   it("GET /fiscal/ncm-search com ncmCode chama o serviço e retorna 200", async () => {
     const payload = { ncm: { id: "n1" }, icms: [{ id: "i" }], ipi: [] };
     const deps = createMockFiscalSearchDeps();
