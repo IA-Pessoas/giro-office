@@ -31,9 +31,10 @@ ARG SERVICE_DIR
 
 RUN pnpm install --frozen-lockfile
 RUN pnpm turbo run build --filter="${WORKSPACE_PACKAGE}"
-# Só dependências de produção na camada copiada para runtime (menos CVEs no Trivy — ex.: picomatch via vitest/vite).
-# --ignore-scripts: evita `prepare` (husky) após remover devDeps — senão `husky: not found`.
-RUN pnpm prune --prod --ignore-scripts
+# Runtime: só produção (reduz CVEs no Trivy). Não usar `pnpm prune`: em alguns runs re-dispara install e o `prepare` (husky) quebra.
+# Reinstalar com --prod evita lifecycle e remove devDeps de forma determinística.
+RUN rm -rf node_modules \
+  && npm_config_ignore_scripts=true pnpm install --frozen-lockfile --prod
 
 FROM base AS runtime
 
