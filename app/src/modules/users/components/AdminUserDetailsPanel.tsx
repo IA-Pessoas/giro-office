@@ -323,7 +323,7 @@ export function AdminUserDetailsPanel({
         </div>
       </div>
 
-      <div className="pt-6">
+      <div className="border-t border-slate-200 pt-6 dark:border-slate-700">
         <div className="flex justify-end">
           <button type="button" onClick={handleSave} className={PRIMARY_ACTION_CLASSNAME} disabled={isSaveDisabled}>
             {isSaving ? "Salvando..." : "Salvar alteracoes"}

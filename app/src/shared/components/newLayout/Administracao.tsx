@@ -93,14 +93,6 @@ function getPermissionErrorMessage(error: unknown, fallbackMessage: string): str
   return fallbackMessage;
 }
 
-function normalizeSearchText(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
-}
-
 export function Administracao() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "permissions">("dashboard");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -173,21 +165,13 @@ export function Administracao() {
   });
 
   const filteredUsers = useMemo(() => {
-    const normalizedSearch = normalizeSearchText(searchTerm);
+    const normalizedSearch = searchTerm.trim().toLowerCase();
 
     if (!normalizedSearch) {
       return users;
     }
 
-    return users.filter((candidate) => {
-      const normalizedName = normalizeSearchText(candidate.name);
-
-      if (normalizedName.startsWith(normalizedSearch)) {
-        return true;
-      }
-
-      return normalizedName.split(/\s+/).some((part) => part.startsWith(normalizedSearch));
-    });
+    return users.filter((candidate) => candidate.name.toLowerCase().includes(normalizedSearch));
   }, [searchTerm, users]);
 
   const departmentNameById = useMemo(() => {
@@ -548,7 +532,7 @@ export function Administracao() {
           })}
         </div>
       ) : activeTab === "users" ? (
-        <div className="admin-users-shell grid gap-4 xl:h-[742px] xl:grid-cols-[350px_minmax(0,1fr)] xl:items-stretch">
+        <div className="admin-users-shell grid gap-4 xl:h-[90vh] xl:grid-cols-[360px_minmax(0,1fr)] xl:items-stretch">
           <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 max-xl:h-[680px] xl:h-full`}>
             <div className="flex h-full min-h-0 flex-col space-y-4">
               <div className="space-y-1">
@@ -710,7 +694,7 @@ export function Administracao() {
           </section>
         </div>
       ) : (
-        <div className="grid gap-4 xl:h-[92vh] xl:grid-cols-[350px_minmax(0,1fr)] xl:items-stretch">
+        <div className="grid gap-4 xl:h-[90vh] xl:grid-cols-[320px_minmax(0,1fr)] xl:items-stretch">
           <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 max-xl:h-[680px] xl:h-full`}>
             <div className="flex h-full min-h-0 flex-col space-y-4">
               <div className="space-y-1">
@@ -834,10 +818,10 @@ export function Administracao() {
                 </div>
               </div>
             ) : (
-              <div className="flex h-full min-h-0 flex-col">
-                <div className="space-y-1 pb-6">
+              <div className="flex h-full min-h-0 flex-col space-y-6">
+                <div className="space-y-2 border-b border-slate-200 pb-5 dark:border-slate-700">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
                       {selectedPermissionUser.name}
                     </h2>
                     {isSelectedPermissionOwner ? (
@@ -857,11 +841,9 @@ export function Administracao() {
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 pb-6">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-slate-700 dark:text-white">
-                      Níveis da permissão por módulo
-                    </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className={ADMIN_TEXT_CLASSNAME}>Níveis da permissão por módulo.</p>
                     <p className={ADMIN_MUTED_CLASSNAME}>
                       Ajuste os acessos em lote para o usuário selecionado.
                     </p>
