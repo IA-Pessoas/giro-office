@@ -32,7 +32,8 @@ ARG SERVICE_DIR
 RUN pnpm install --frozen-lockfile
 RUN pnpm turbo run build --filter="${WORKSPACE_PACKAGE}"
 # Só dependências de produção na camada copiada para runtime (menos CVEs no Trivy — ex.: picomatch via vitest/vite).
-RUN pnpm prune --prod
+# --ignore-scripts: evita `prepare` (husky) após remover devDeps — senão `husky: not found`.
+RUN pnpm prune --prod --ignore-scripts
 
 FROM base AS runtime
 
