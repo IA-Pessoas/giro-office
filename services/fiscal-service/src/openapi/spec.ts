@@ -66,11 +66,12 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       title: "fiscal-service",
       version: "1.0.0",
       description:
-        "API fiscal das PRs 1 a 3: CRUD de NCM, ICMS e IPI. Requer JWT válido nos endpoints autenticados.",
+        "API fiscal: CRUD de NCM, ICMS e IPI e busca agregada por NCM. Requer JWT válido nos endpoints autenticados.",
     },
     servers: [{ url: baseUrl }],
     tags: [
       { name: "Health", description: "Saúde do serviço" },
+      { name: "Busca Fiscal", description: "Busca agregada NCM + ICMS + IPI" },
       { name: "ICMS", description: "CRUD de ICMS" },
       { name: "IPI", description: "CRUD de IPI" },
       { name: "NCM", description: "CRUD de NCM" },
@@ -496,6 +497,32 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           responses: {
             "200": {
               description: "Lista",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/fiscal/ncm-search": {
+        get: {
+          tags: ["Busca Fiscal"],
+          summary: "Busca agregada por código NCM",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "ncmCode",
+              in: "query",
+              required: true,
+              schema: { type: "string" },
+              description: "Código NCM (completo)",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Objeto com ncm (ou null), listas icms e ipi",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/SuccessEnvelope" },
