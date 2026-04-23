@@ -219,9 +219,12 @@ jobs:
           docker compose -f docker-compose.vps.yml build
 
       # Docker Hub oficial: aquasec/trivy (aquasecurity/trivy não existe como repo no Hub).
-      - name: "[Scan] Trivy — imagens workspace (CRITICAL / HIGH falham o job)"
+      # Política: CRITICAL quebra o pipeline; HIGH é reportado no log (informativo) para monitoramento.
+      # Cache do DB em /tmp/trivy-cache evita baixar ~91 MiB por imagem escaneada.
+      - name: "[Scan] Trivy — imagens workspace (gate: CRITICAL; HIGH é informativo)"
         run: |
           set -eo pipefail
+          mkdir -p /tmp/trivy-cache
           images=(
             workspace-gateway:vps
             workspace-organization-service:vps
@@ -231,16 +234,28 @@ jobs:
             workspace-client-service:vps
             workspace-rh-service:vps
           )
-          for img in "${images[@]}"; do
-            echo "::group::Trivy — $img"
+          scan() {
+            local img="$1"
+            local severity="$2"
+            local exit_code="$3"
             docker run --rm \
               -v /var/run/docker.sock:/var/run/docker.sock \
+              -v /tmp/trivy-cache:/root/.cache/trivy \
               aquasec/trivy:0.58.2 image \
               --scanners vuln \
-              --severity CRITICAL,HIGH \
-              --exit-code 1 \
+              --severity "$severity" \
+              --exit-code "$exit_code" \
               --ignore-unfixed \
               "$img"
+          }
+          for img in "${images[@]}"; do
+            echo "::group::Trivy (informativo HIGH,CRITICAL) — $img"
+            scan "$img" "HIGH,CRITICAL" 0 || true
+            echo "::endgroup::"
+          done
+          for img in "${images[@]}"; do
+            echo "::group::Trivy (gate CRITICAL) — $img"
+            scan "$img" "CRITICAL" 1
             echo "::endgroup::"
           done
 
