@@ -136,6 +136,8 @@ jobs:
           set -eo pipefail
           docker compose -f docker-compose.vps.yml build
 
+      # Imagem oficial no Docker Hub: aquasec/trivy (o nome aquasecurity/trivy não existe lá).
+      # GHCR alternativo: ghcr.io/aquasecurity/trivy:<tag>
       - name: "[Scan] Trivy — imagens workspace (CRITICAL / HIGH falham o job)"
         run: |
           set -eo pipefail
@@ -152,7 +154,7 @@ jobs:
             echo "::group::Trivy — $img"
             docker run --rm \
               -v /var/run/docker.sock:/var/run/docker.sock \
-              aquasecurity/trivy:0.58.1 image \
+              aquasec/trivy:0.58.2 image \
               --severity CRITICAL,HIGH \
               --exit-code 1 \
               --ignore-unfixed \
