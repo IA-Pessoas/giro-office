@@ -31,6 +31,8 @@ ARG SERVICE_DIR
 
 RUN pnpm install --frozen-lockfile
 RUN pnpm turbo run build --filter="${WORKSPACE_PACKAGE}"
+# Só dependências de produção na camada copiada para runtime (menos CVEs no Trivy — ex.: picomatch via vitest/vite).
+RUN pnpm prune --prod
 
 FROM base AS runtime
 
