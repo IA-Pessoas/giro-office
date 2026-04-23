@@ -1490,6 +1490,20 @@ const handlers = {
     });
   },
 
+  async fiscalNcmSearch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ncmCode: requireState("fiscalNcmCode") },
+    });
+  },
+
+  async fiscalNcmSearchInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      query: { ncmCode: "" },
+    });
+  },
+
   async fiscalIcmsCreate(op) {
     const icmsCode = uniqueText("Smoke Fiscal ICMS");
     const response = await httpRequest(op, {
