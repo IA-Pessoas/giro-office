@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 
 import { useMe } from "@shared/hooks";
+import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
 
 function getInitials(name: string): string {
@@ -135,6 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [aiQuery, setAiQuery] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [hasUserPhotoLoadError, setHasUserPhotoLoadError] = useState(false);
   const notifications = [
     {
       id: "1",
@@ -167,8 +169,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = router.asPath.split("?")[0] ?? "";
   const displayUserName = meQuery.data?.name ?? user?.name ?? "Admin";
   const displayUserLogin = meQuery.data?.login ?? user?.email ?? user?.login ?? "";
-  const displayUserPhoto = meQuery.data?.photo_url ?? null;
+  const displayUserPhoto = resolvePhotoUrl(meQuery.data?.photo_url ?? null);
   const displayUserInitials = getInitials(displayUserName);
+
+  useEffect(() => {
+    setHasUserPhotoLoadError(false);
+  }, [displayUserPhoto]);
 
   const handleLogout = () => {
     logoutUser();
@@ -407,11 +413,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   type="button"
                 >
                   <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-500 to-blue-600">
-                    {displayUserPhoto ? (
+                    {displayUserPhoto && !hasUserPhotoLoadError ? (
                       <img
                         src={displayUserPhoto}
                         alt={`Foto de ${displayUserName}`}
                         className="h-full w-full object-cover"
+                        onError={() => setHasUserPhotoLoadError(true)}
                       />
                     ) : (
                       <span className="text-xs font-semibold text-white">{displayUserInitials}</span>
