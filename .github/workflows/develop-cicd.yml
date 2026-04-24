@@ -1,0 +1,61 @@
+# CI rápido para develop: lint/format (Biome), typecheck, auditoria de dependências e testes.
+# Não inclui Docker — ver test-cicd.yml ou workflow de staging para stack completa.
+#
+# Política de PR (recomendado no GitHub): Settings → Rules → ruleset ou branch protection em `develop`:
+# - Exigir status check do job "Qualidade (Biome, typecheck, testes)" deste workflow (inclui pnpm audit).
+# - Exigir PR antes do merge (sem push direto), revisões se aplicável.
+# Template de PR: .github/pull_request_template.md
+
+name: Develop CI
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: develop-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Qualidade (Biome, typecheck, testes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # prisma.config.ts (infra) exige DATABASE_URL. Placeholder: prisma generate não conecta ao DB.
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci_ci_typecheck?schema=public
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Auditoria de dependências
+        run: pnpm audit:ci
+
+      - name: Biome check
+        run: pnpm check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Testes
+        run: pnpm test

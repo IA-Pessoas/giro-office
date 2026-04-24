@@ -1,0 +1,185 @@
+# Staging — espelho da realidade: imagens Docker, varredura de segurança, stack Compose,
+# smoke (contrato HTTP + healthchecks) e gancho para E2E (Playwright) quando existir no app.
+#
+# Gatilhos:
+#   • push em `develop` (após merge de PR).
+#   • pull_request com base `staging` (validação antes de integrar na branch staging).
+#
+# Segredos (mesmo conjunto do test-cicd / stack VPS) — obrigatórios para build e subida.
+# Pares secret → arquivo: scripts/ci/vps-secrets.manifest (ao novo serviço, atualize manifest + env abaixo).
+#
+# Opcional — testes de integração com Postgres real (Vitest em client-service):
+#   STAGING_DATABASE_URL — usado com CLIENT_SERVICE_INTEGRATION=1 após a stack estar no ar.
+#   Se não existir ou estiver vazio, o passo é ignorado (somente aviso).
+#
+# E2E: quando `app/node_modules/@playwright/test` existir após `pnpm install`, executa Playwright.
+
+name: Staging CI/CD
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - staging
+  workflow_dispatch:
+
+concurrency:
+  group: staging-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Qualidade (Biome, typecheck, testes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci_ci_typecheck?schema=public
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Auditoria de dependências
+        run: pnpm audit:ci
+
+      - name: Biome check
+        run: pnpm check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Testes unitários / pacote (Vitest em serviços)
+        run: pnpm test
+
+  staging-environment:
+    name: Staging — Docker, scan, integração, smoke, E2E
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Instalar dependências (pnpm smoke / Playwright em app)
+        run: pnpm install --frozen-lockfile
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Materializar .env.vps.* a partir dos segredos
+        env:
+          ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+          ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+          ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+          ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+          ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+          ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+          ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+          ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+        run: bash scripts/ci/materialize-vps-env.sh
+
+      - name: "[Build] Imagens Docker (docker-compose.vps.yml)"
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+        run: |
+          set -eo pipefail
+          docker compose -f docker-compose.vps.yml build
+
+      # Imagem oficial no Docker Hub: aquasec/trivy (o nome aquasecurity/trivy não existe lá).
+      # GHCR alternativo: ghcr.io/aquasecurity/trivy:<tag>
+      # Lista de imagens: scripts/ci/list-workspace-vps-images.sh (deriva de docker-compose.vps.yml).
+      # Política: CRITICAL quebra o pipeline; HIGH é reportado no log (informativo) para monitoramento.
+      # Cache do DB em /tmp/trivy-cache evita baixar ~91 MiB por imagem escaneada.
+      - name: "[Scan] Trivy — imagens workspace (gate: CRITICAL; HIGH é informativo)"
+        run: |
+          set -eo pipefail
+          mkdir -p /tmp/trivy-cache
+          mapfile -t images < <(bash scripts/ci/list-workspace-vps-images.sh)
+          scan() {
+            local img="$1"
+            local severity="$2"
+            local exit_code="$3"
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v /tmp/trivy-cache:/root/.cache/trivy \
+              aquasec/trivy:0.58.2 image \
+              --scanners vuln \
+              --severity "$severity" \
+              --exit-code "$exit_code" \
+              --ignore-unfixed \
+              "$img"
+          }
+          for img in "${images[@]}"; do
+            echo "::group::Trivy (informativo HIGH,CRITICAL) — $img"
+            scan "$img" "HIGH,CRITICAL" 0 || true
+            echo "::endgroup::"
+          done
+          for img in "${images[@]}"; do
+            echo "::group::Trivy (gate CRITICAL) — $img"
+            scan "$img" "CRITICAL" 1
+            echo "::endgroup::"
+          done
+
+      - name: "[Deploy temporário] Subir stack e aguardar healthchecks"
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+        run: |
+          set -eo pipefail
+          docker compose version
+          docker compose -f docker-compose.vps.yml up -d --wait --wait-timeout 900
+
+      - name: "[Integration] Vitest — client-service com Postgres (opcional)"
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          CLIENT_SERVICE_INTEGRATION: "1"
+        run: |
+          set -eo pipefail
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::Secret STAGING_DATABASE_URL não configurado — pulando testes de integração com Postgres."
+            exit 0
+          fi
+          pnpm --filter @workspace/client-service test
+
+      - name: "[Smoke + integração HTTP] Contrato público via gateway (pnpm smoke)"
+        run: pnpm smoke
+
+      - name: "[E2E] Playwright (executa quando @playwright/test existir no workspace)"
+        run: |
+          set -eo pipefail
+          if [ ! -d app/node_modules/@playwright/test ] && [ ! -d node_modules/@playwright/test ]; then
+            echo "::notice::Playwright não instalado — adicione @playwright/test ao app e playwright.config.ts para ativar E2E."
+            exit 0
+          fi
+          cd app
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright test
+
+      - name: Encerrar stack
+        if: always()
+        run: |
+          docker compose -f docker-compose.vps.yml down -v || true

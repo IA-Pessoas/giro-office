@@ -1,0 +1,89 @@
+---
+alwaysApply: true
+---
+## Para tarefas não triviais
+
+Considere não trivial qualquer tarefa com 3 ou mais etapas relevantes, decisões de arquitetura, integração, ambiguidade, dependências externas ou alto risco de retrabalho.
+
+Nesses casos:
+
+* Escreva um plano curto antes de implementar.
+* Quebre o trabalho em etapas objetivas e verificáveis.
+* Liste premissas, riscos e dependências.
+* Implemente em passos pequenos.
+* Verifique cada etapa importante antes de avançar.
+* Se a abordagem falhar, pare e replaneje.
+
+---
+
+## Ao implementar
+
+* Faça a menor mudança útil que avance o objetivo.
+* Mantenha o código legível e previsível.
+* Evite abstrações prematuras.
+* Evite duplicação quando ela gerar manutenção ruim.
+* Não invente arquitetura para problemas que ainda não existem.
+* Explique mudanças importantes em alto nível.
+
+---
+
+## Ao corrigir bugs
+
+* Reproduza o problema antes de corrigir.
+* Colete evidências: logs, traces, testes falhando, inputs e contexto.
+* Forme hipóteses com base em evidência, não em feeling.
+* Teste primeiro a hipótese mais provável e barata.
+* Corrija a causa raiz, não apenas o sintoma.
+* Verifique se a correção não gerou regressões.
+* Não faça mudanças aleatórias só para “ver se resolve”.
+
+---
+
+## Antes de concluir
+
+* Confirme que o resultado atende ao objetivo original.
+* Rode testes relevantes.
+* Verifique logs, saídas e integrações afetadas.
+* Revise casos de borda relevantes.
+* Faça uma checagem rápida de regressão.
+* Não declare como pronto sem evidência suficiente.
+
+---
+
+## Comunicação
+
+* Resuma plano, progresso, decisões e riscos com clareza.
+* Não narre o óbvio.
+* Não use texto longo para esconder falta de substância.
+* Diga claramente o que foi feito, o que não foi feito e o que ainda é incerto.
+
+---
+
+## Documentação e rastreabilidade
+
+Se o projeto usar arquivos de tarefa, mantenha-os atualizados.
+Exemplos:
+
+* `tasks/todo.md` para plano e progresso
+* `tasks/lessons.md` para erros recorrentes e prevenção
+
+Se o projeto não usar esses arquivos, mantenha a mesma disciplina no formato existente.
+
+---
+
+## Anti-padrões proibidos
+
+* Codar antes de entender o problema
+* Tratar suposição como fato
+* Continuar em plano ruim por teimosia
+* Declarar sucesso sem verificação
+* Fazer hack sem sinalizar limitação
+* Expandir escopo sem alinhamento
+* Confundir atividade com progresso
+* Criar complexidade sem necessidade real
+
+---
+
+## Regra final
+
+Planeje quando necessário. Verifique antes de concluir. Prefira simplicidade. Corrija a causa raiz. Seja honesto sobre o que sabe, o que supõe e o que realmente comprovou.

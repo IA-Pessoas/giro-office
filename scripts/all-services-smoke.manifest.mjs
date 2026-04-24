@@ -1,0 +1,1817 @@
+const EXEMPT_ROUTE_KEYS = new Set([
+  "GET|/health",
+  "GET|/ready",
+  "POST|/user/session",
+  "POST|/user/start-config",
+]);
+
+const GOOD_STATUS_OVERRIDES = new Map([
+  ["userStartConfig", [200, 409]],
+  ["userCreate", [201]],
+  ["organizationCreate", [201]],
+  ["clientCreate", [201]],
+  ["clientIntegrationCreate", [201]],
+  ["clientPAPost", [201]],
+  ["clientHistoriesPendingCreate", [201]],
+  ["clientHistoriesCreate", [201]],
+  ["projectCreate", [201]],
+  ["taskModelCreate", [201]],
+  ["taskModelDependentCreate", [201]],
+  ["taskIntegrationCreate", [201]],
+  ["taskCreate", [201]],
+  ["taskProjectPlanCreate", [201]],
+  ["taskProjectPlanTaskCreate", [201]],
+  ["rhPointRegister", [200, 400]],
+  ["rhScoreQuarterGenerate", [200, 409]],
+  ["auditInternalIngest", [201]],
+]);
+
+const GENERATED_NEGATIVE_CASES = {
+  unauthorized401: {
+    suffix: "AutoUnauthorized",
+    expectedStatus: [401],
+    expectedLabel: "unauthorized",
+  },
+  lowPermission403: {
+    suffix: "AutoForbidden",
+    expectedStatus: [403],
+    expectedLabel: "forbidden",
+  },
+  internalToken401: {
+    suffix: "AutoInternalUnauthorized",
+    expectedStatus: [401],
+    expectedLabel: "invalid internal token",
+  },
+  internalToken403: {
+    suffix: "AutoInternalForbidden",
+    expectedStatus: [403],
+    expectedLabel: "invalid internal token",
+  },
+};
+
+const GENERATED_HANDLER_OVERRIDES = {
+  projectDelete: "projectDeleteAutoForbidden",
+  taskProjectPlanHire: "taskProjectPlanHireAutoForbidden",
+};
+
+const ROUTE_NEGATIVE_CASE_OVERRIDES = new Map([
+  ["client-service|DELETE|/client/{id}", "lowPermission403"],
+  ["client-service|DELETE|/client/histories/pending/{pendingId}", "lowPermission403"],
+  ["project-service|DELETE|/project", "lowPermission403"],
+  ["task-service|PUT|/task/model", "lowPermission403"],
+  ["task-service|PUT|/task/complete-request", "lowPermission403"],
+  ["task-service|DELETE|/task", "lowPermission403"],
+  ["task-service|GET|/task/project-plan", "unauthorized401"],
+  ["task-service|PUT|/task/project-plan", "lowPermission403"],
+  ["task-service|GET|/task/project-plan/list", "unauthorized401"],
+  ["task-service|POST|/task/project-plan/task", "lowPermission403"],
+  ["task-service|GET|/task/project-plan/task/list", "unauthorized401"],
+  ["task-service|PUT|/task/project-plan/task", "lowPermission403"],
+  ["task-service|POST|/task/project-plan/hire", "lowPermission403"],
+  ["task-service|DELETE|/task/project-plan/task", "lowPermission403"],
+  ["task-service|DELETE|/task/project-plan", "lowPermission403"],
+  ["task-service|POST|/task/model/dependent", "unauthorized401"],
+  ["task-service|DELETE|/task/model/dependent", "unauthorized401"],
+  ["task-service|POST|/task/integration", "unauthorized401"],
+  ["task-service|DELETE|/task/integration", "unauthorized401"],
+  ["task-service|PUT|/task", "unauthorized401"],
+  ["task-service|PUT|/task/financeiro", "unauthorized401"],
+  ["task-service|PUT|/task/comercial", "unauthorized401"],
+  ["task-service|PUT|/task/conclusion", "unauthorized401"],
+]);
+
+const GENERATED_BAD_CASES_BEFORE = new Set(["taskModelCreate", "taskProjectPlanCreate"]);
+
+function inferNegativeCaseFromAction(action) {
+  if (/Unauthorized/i.test(action)) return "unauthorized401";
+  if (/Forbidden/i.test(action)) return "lowPermission403";
+  if (/NotFound/i.test(action)) return "notFound404";
+  if (/Invalid/i.test(action)) return "invalid400";
+  if (/Conflict/i.test(action)) return "conflict409";
+  return null;
+}
+
+function inferExpectedStatus({
+  action,
+  expectationKind,
+  expectedStatus,
+  negativeCase,
+  method,
+  path,
+}) {
+  if (Array.isArray(expectedStatus) && expectedStatus.length > 0) {
+    return expectedStatus;
+  }
+
+  if (negativeCase && GENERATED_NEGATIVE_CASES[negativeCase]) {
+    return GENERATED_NEGATIVE_CASES[negativeCase].expectedStatus;
+  }
+
+  if (expectationKind === "bad") {
+    const actionCase = inferNegativeCaseFromAction(action);
+    if (actionCase === "unauthorized401") return [401];
+    if (actionCase === "lowPermission403") return [403];
+    if (actionCase === "notFound404") return [404];
+    if (actionCase === "invalid400") return [400];
+    if (actionCase === "conflict409") return [409];
+  }
+
+  if (GOOD_STATUS_OVERRIDES.has(action)) {
+    return GOOD_STATUS_OVERRIDES.get(action);
+  }
+
+  if (method === "GET" && path === "/health") {
+    return [200];
+  }
+
+  if (method === "GET" && path === "/ready") {
+    return [200];
+  }
+
+  return [200];
+}
+
+function inferExpectedLabel({ action, expectationKind, expectedStatus, negativeCase, path }) {
+  if (expectationKind === "bad") {
+    if (negativeCase && GENERATED_NEGATIVE_CASES[negativeCase]) {
+      return GENERATED_NEGATIVE_CASES[negativeCase].expectedLabel;
+    }
+    const actionCase = inferNegativeCaseFromAction(action);
+    if (actionCase === "unauthorized401") return "unauthorized";
+    if (actionCase === "lowPermission403") return "forbidden";
+    if (actionCase === "notFound404") return "not found";
+    if (actionCase === "invalid400") return "invalid request";
+    if (actionCase === "conflict409") return "conflict";
+  }
+
+  if (path === "/health") return "health check";
+  if (path === "/ready") return "readiness check";
+  if (expectedStatus.includes(201)) return "created";
+  if (expectedStatus.includes(409)) return "success or already configured";
+  return "success";
+}
+
+function isPairCoverageExempt(method, path, explicitValue = false) {
+  return explicitValue || EXEMPT_ROUTE_KEYS.has(`${method}|${path}`);
+}
+
+const op = ({
+  service,
+  method,
+  path,
+  action,
+  target,
+  auth,
+  specOperation = true,
+  condition = null,
+  expectationKind,
+  expectedStatus,
+  expectedLabel,
+  pairCoverageExempt = false,
+  negativeCase = null,
+  handlerAction = action,
+}) => ({
+  id: `${service}|${method}|${path}|${action}`,
+  routeKey: `${service}|${method}|${path}`,
+  service,
+  method,
+  path,
+  action,
+  target,
+  auth,
+  specOperation,
+  condition,
+  handlerAction,
+  negativeCase,
+  expectationKind: expectationKind ?? (specOperation === false ? "bad" : "good"),
+  expectedStatus: inferExpectedStatus({
+    action,
+    expectationKind: expectationKind ?? (specOperation === false ? "bad" : "good"),
+    expectedStatus,
+    negativeCase,
+    method,
+    path,
+  }),
+  expectedLabel:
+    expectedLabel ??
+    inferExpectedLabel({
+      action,
+      expectationKind: expectationKind ?? (specOperation === false ? "bad" : "good"),
+      expectedStatus: inferExpectedStatus({
+        action,
+        expectationKind: expectationKind ?? (specOperation === false ? "bad" : "good"),
+        expectedStatus,
+        negativeCase,
+        method,
+        path,
+      }),
+      negativeCase,
+      path,
+    }),
+  pairCoverageExempt: isPairCoverageExempt(method, path, pairCoverageExempt),
+});
+
+function determineGeneratedNegativeCase(entry) {
+  if (entry.pairCoverageExempt) {
+    return null;
+  }
+
+  const routeOverride = ROUTE_NEGATIVE_CASE_OVERRIDES.get(entry.routeKey);
+  if (routeOverride) {
+    return routeOverride;
+  }
+
+  if (entry.auth === "internal-token") {
+    if (entry.service === "client-service") return "internalToken403";
+    if (entry.service === "audit-service") return "internalToken401";
+  }
+
+  if (entry.auth === "admin-bearer" || entry.auth === "bearer") {
+    return "unauthorized401";
+  }
+
+  return null;
+}
+
+function shouldInsertGeneratedBadBefore(entry, negativeCase) {
+  return (
+    entry.method === "DELETE" ||
+    (negativeCase === "lowPermission403" && GENERATED_BAD_CASES_BEFORE.has(entry.action))
+  );
+}
+
+function buildGeneratedBadOp(entry) {
+  if (entry.expectationKind !== "good" || entry.pairCoverageExempt) {
+    return null;
+  }
+
+  const negativeCase = determineGeneratedNegativeCase(entry);
+  if (!negativeCase) {
+    return null;
+  }
+
+  const generated = GENERATED_NEGATIVE_CASES[negativeCase];
+  return op({
+    service: entry.service,
+    method: entry.method,
+    path: entry.path,
+    action: `${entry.action}${generated.suffix}`,
+    handlerAction: GENERATED_HANDLER_OVERRIDES[entry.action] ?? entry.action,
+    target: entry.target,
+    auth: entry.auth,
+    specOperation: false,
+    condition: entry.condition,
+    expectationKind: "bad",
+    expectedStatus: generated.expectedStatus,
+    expectedLabel: generated.expectedLabel,
+    negativeCase,
+  });
+}
+
+// Map an expectedStatus array to the negativeCase dimension it covers (for
+// suppression logic). Only auth-dimension cases suppress auto-generation;
+// 400/404/409 tests are orthogonal and should not suppress a 401/403 auto-gen.
+function inferNegativeCaseFromStatus(expectedStatus) {
+  const code = expectedStatus?.[0];
+  if (code === 401) return "unauthorized401";
+  if (code === 403) return "lowPermission403";
+  return null;
+}
+
+function buildManifest(entries) {
+  // Map from routeKey → set of negativeCase strings already explicitly covered.
+  // Only auth-dimension cases (401/403) suppress auto-generation; 400/404/409
+  // explicit tests are orthogonal and should not suppress a 401/403 auto-gen.
+  const routeExplicitBadCases = new Map();
+  for (const entry of entries) {
+    if (entry.expectationKind === "bad") {
+      const nc = entry.negativeCase ?? inferNegativeCaseFromStatus(entry.expectedStatus);
+      if (nc) {
+        const existing = routeExplicitBadCases.get(entry.routeKey) ?? new Set();
+        existing.add(nc);
+        routeExplicitBadCases.set(entry.routeKey, existing);
+      }
+    }
+  }
+
+  return entries.flatMap((entry) => {
+    if (entry.expectationKind !== "good") return [entry];
+
+    const negativeCase = determineGeneratedNegativeCase(entry);
+    if (!negativeCase) return [entry];
+
+    // Only suppress auto-gen when this exact negativeCase is already covered.
+    const coveredCases = routeExplicitBadCases.get(entry.routeKey);
+    if (coveredCases?.has(negativeCase)) return [entry];
+
+    const generatedBadOp = buildGeneratedBadOp(entry);
+    if (!generatedBadOp) {
+      return [entry];
+    }
+
+    return shouldInsertGeneratedBadBefore(entry, generatedBadOp.negativeCase)
+      ? [generatedBadOp, entry]
+      : [entry, generatedBadOp];
+  });
+}
+
+export const specFiles = {
+  "audit-service": "services/audit-service/src/openapi/spec.ts",
+  "client-service": "services/client-service/src/openapi/spec.ts",
+  "department-service": "services/department-service/src/openapi/spec.ts",
+  "organization-service": "services/organization-service/src/openapi/spec.ts",
+  "project-service": "services/project-service/src/openapi/spec.ts",
+  "rh-service": "services/rh-service/src/openapi/spec.ts",
+  "task-service": "services/task-service/src/openapi/spec.ts",
+  "user-service": "services/user-service/src/openapi/spec.ts",
+};
+
+const baseManifest = [
+  op({
+    service: "gateway",
+    method: "GET",
+    path: "/health",
+    action: "gatewayHealth",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+  }),
+  op({
+    service: "gateway",
+    method: "GET",
+    path: "/ready",
+    action: "gatewayReady",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+  }),
+
+  op({
+    service: "user-service",
+    method: "GET",
+    path: "/health",
+    action: "serviceHealth",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user/session",
+    action: "userSession",
+    target: "gateway",
+    auth: "public",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user/session",
+    action: "userSessionInvalid",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+    expectedStatus: [401],
+    expectedLabel: "wrong credentials",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user/start-config",
+    action: "userStartConfig",
+    target: "gateway",
+    auth: "public",
+  }),
+  op({
+    service: "user-service",
+    method: "GET",
+    path: "/user",
+    action: "userListUnauthorized",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+  }),
+  op({
+    service: "user-service",
+    method: "GET",
+    path: "/user/me",
+    action: "userMe",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "GET",
+    path: "/user",
+    action: "userList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user",
+    action: "userCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "GET",
+    path: "/user/{id}",
+    action: "userGetNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user",
+    action: "userCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user",
+    action: "userCreateForbidden",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "user-service",
+    method: "GET",
+    path: "/user/{id}",
+    action: "userGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "PATCH",
+    path: "/user/{id}",
+    action: "userPatch",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "PATCH",
+    path: "/user/{id}",
+    action: "userPatchNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [404],
+    expectedLabel: "not found",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user/{id}/photo",
+    action: "userPhotoUpload",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "DELETE",
+    path: "/user/{id}/photo",
+    action: "userPhotoDelete",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "GET",
+    path: "/user/permission/{userId}",
+    action: "userPermissionGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "PUT",
+    path: "/user/permission/{userId}",
+    action: "userPermissionPut",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "DELETE",
+    path: "/user/{id}",
+    action: "userDelete",
+    target: "gateway",
+    auth: "bearer",
+  }),
+
+  op({
+    service: "department-service",
+    method: "GET",
+    path: "/health",
+    action: "serviceHealth",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "department-service",
+    method: "GET",
+    path: "/department/list",
+    action: "departmentList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "department-service",
+    method: "POST",
+    path: "/department",
+    action: "departmentCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "department-service",
+    method: "GET",
+    path: "/department",
+    action: "departmentGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "department-service",
+    method: "PUT",
+    path: "/department",
+    action: "departmentPut",
+    target: "gateway",
+    auth: "bearer",
+  }),
+
+  op({
+    service: "organization-service",
+    method: "GET",
+    path: "/health",
+    action: "serviceHealth",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "organization-service",
+    method: "GET",
+    path: "/organizations",
+    action: "organizationListUnauthorized",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+  }),
+  op({
+    service: "organization-service",
+    method: "GET",
+    path: "/organizations",
+    action: "organizationList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "organization-service",
+    method: "POST",
+    path: "/organizations",
+    action: "organizationCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "organization-service",
+    method: "POST",
+    path: "/organizations",
+    action: "organizationCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid request",
+  }),
+  op({
+    service: "organization-service",
+    method: "GET",
+    path: "/organizations/{id}",
+    action: "organizationGetNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "organization-service",
+    method: "GET",
+    path: "/organizations/{id}",
+    action: "organizationGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "organization-service",
+    method: "PATCH",
+    path: "/organizations/{id}/status",
+    action: "organizationPatchStatus",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "organization-service",
+    method: "PATCH",
+    path: "/organizations/{id}/subscription-plan",
+    action: "organizationPatchSubscriptionPlan",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "organization-service",
+    method: "PATCH",
+    path: "/organizations/{id}/logo-url",
+    action: "organizationPatchLogoUrl",
+    target: "gateway",
+    auth: "bearer",
+  }),
+
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/health",
+    action: "serviceHealth",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/ready",
+    action: "serviceReady",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/client/list",
+    action: "clientListUnauthorized",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+  }),
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/client/list",
+    action: "clientList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "POST",
+    path: "/client",
+    action: "clientCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "POST",
+    path: "/client/integration",
+    action: "clientIntegrationCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "PATCH",
+    path: "/client/{id}/integration",
+    action: "clientIntegrationPatch",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/client/{id}",
+    action: "clientGetNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [200],
+    expectedLabel: "missing client handled",
+  }),
+  op({
+    service: "client-service",
+    method: "POST",
+    path: "/client",
+    action: "clientCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/client/{id}",
+    action: "clientGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "PATCH",
+    path: "/client/{id}",
+    action: "clientPatch",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "PATCH",
+    path: "/client/{id}",
+    action: "clientPatchNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [404],
+    expectedLabel: "not found",
+  }),
+  op({
+    service: "client-service",
+    method: "DELETE",
+    path: "/client/{id}",
+    action: "clientDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "POST",
+    path: "/client/{id}/activate",
+    action: "clientActivate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "POST",
+    path: "/client/{id}/activate",
+    action: "clientActivateConflict",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/client/{id}/pa",
+    action: "clientPAGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "POST",
+    path: "/client/{id}/pa",
+    action: "clientPAPost",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "PATCH",
+    path: "/client/{id}/pa",
+    action: "clientPAPatch",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "PATCH",
+    path: "/client/{id}/commercial",
+    action: "clientPatchCommercial",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "PATCH",
+    path: "/client/{id}/termination",
+    action: "clientPatchTermination",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "PATCH",
+    path: "/client/{id}/finance",
+    action: "clientPatchFinance",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "PATCH",
+    path: "/client/{id}/regularize",
+    action: "clientPatchRegularize",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/client/{id}/histories",
+    action: "clientHistoriesList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "POST",
+    path: "/client/{id}/histories/pending",
+    action: "clientHistoriesPendingCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/client/histories/pending",
+    action: "clientHistoriesPendingList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "POST",
+    path: "/client/{id}/histories",
+    action: "clientHistoriesCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/client/{id}/histories/{historyId}",
+    action: "clientHistoriesGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "PATCH",
+    path: "/client/{id}/histories/{historyId}",
+    action: "clientHistoriesPatch",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "DELETE",
+    path: "/client/histories/pending/{pendingId}",
+    action: "clientHistoriesPendingDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "POST",
+    path: "/internal/competence-output-update",
+    action: "clientInternalCompetenceOutputUpdate",
+    target: "direct",
+    auth: "internal-token",
+  }),
+
+  op({
+    service: "project-service",
+    method: "GET",
+    path: "/health",
+    action: "serviceHealth",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "project-service",
+    method: "GET",
+    path: "/project/list",
+    action: "projectListUnauthorized",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+  }),
+  op({
+    service: "project-service",
+    method: "GET",
+    path: "/project/list",
+    action: "projectList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "project-service",
+    method: "POST",
+    path: "/project",
+    action: "projectCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "project-service",
+    method: "POST",
+    path: "/project",
+    action: "projectCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid request",
+  }),
+  op({
+    service: "project-service",
+    method: "GET",
+    path: "/project",
+    action: "projectGetNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "project-service",
+    method: "GET",
+    path: "/project",
+    action: "projectGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "project-service",
+    method: "PUT",
+    path: "/project",
+    action: "projectPut",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "project-service",
+    method: "PUT",
+    path: "/project",
+    action: "projectPutNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [404],
+    expectedLabel: "not found",
+  }),
+  op({
+    service: "project-service",
+    method: "POST",
+    path: "/project/progress",
+    action: "projectProgress",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "project-service",
+    method: "DELETE",
+    path: "/project",
+    action: "projectDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/health",
+    action: "serviceHealth",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/ready",
+    action: "serviceReady",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/list",
+    action: "taskListUnauthorized",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/deps/list",
+    action: "taskDepsList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/model",
+    action: "taskModelCreateForbidden",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    handlerAction: "taskModelCreate",
+    negativeCase: "lowPermission403",
+    expectedStatus: [403],
+    expectedLabel: "forbidden",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/model",
+    action: "taskModelCreate",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/model",
+    action: "taskModelCreateConflict",
+    target: "gateway",
+    auth: "admin-bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "task-service",
+    method: "DELETE",
+    path: "/task/model",
+    action: "taskModelDeleteForbidden",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/model",
+    action: "taskModelGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "PUT",
+    path: "/task/model",
+    action: "taskModelPut",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "PUT",
+    path: "/task/model",
+    action: "taskModelPutNotFound",
+    target: "gateway",
+    auth: "admin-bearer",
+    specOperation: false,
+    expectedStatus: [404],
+    expectedLabel: "not found",
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/model/list",
+    action: "taskModelList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/model/dependent",
+    action: "taskModelDependentCreate",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/model/dependent",
+    action: "taskModelDependentList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/integration",
+    action: "taskIntegrationCreate",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/integration",
+    action: "taskIntegrationList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task",
+    action: "taskCreate",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task",
+    action: "taskGetNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task",
+    action: "taskCreateInvalid",
+    target: "gateway",
+    auth: "admin-bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task",
+    action: "taskGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "PUT",
+    path: "/task",
+    action: "taskPut",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/list",
+    action: "taskList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "PUT",
+    path: "/task/financeiro",
+    action: "taskFinanceiroPut",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "PUT",
+    path: "/task/comercial",
+    action: "taskComercialPut",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "PUT",
+    path: "/task/conclusion",
+    action: "taskConclusionPut",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "PUT",
+    path: "/task/complete-request",
+    action: "taskCompleteRequestPut",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "DELETE",
+    path: "/task",
+    action: "taskDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "DELETE",
+    path: "/task/integration",
+    action: "taskIntegrationDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "DELETE",
+    path: "/task/model/dependent",
+    action: "taskModelDependentDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/project-plan",
+    action: "taskProjectPlanCreateForbidden",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    handlerAction: "taskProjectPlanCreate",
+    negativeCase: "lowPermission403",
+    expectedStatus: [403],
+    expectedLabel: "forbidden",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/project-plan",
+    action: "taskProjectPlanCreate",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/project-plan",
+    action: "taskProjectPlanCreateConflict",
+    target: "gateway",
+    auth: "admin-bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/project-plan",
+    action: "taskProjectPlanGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "PUT",
+    path: "/task/project-plan",
+    action: "taskProjectPlanPut",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/project-plan/list",
+    action: "taskProjectPlanList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/project-plan/task",
+    action: "taskProjectPlanTaskCreate",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/project-plan/task/list",
+    action: "taskProjectPlanTaskList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "PUT",
+    path: "/task/project-plan/task",
+    action: "taskProjectPlanTaskReorder",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/project-plan/hire",
+    action: "taskProjectPlanHire",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "DELETE",
+    path: "/task/project-plan/task",
+    action: "taskProjectPlanTaskDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "DELETE",
+    path: "/task/project-plan",
+    action: "taskProjectPlanDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "DELETE",
+    path: "/task/model",
+    action: "taskModelDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/health",
+    action: "serviceHealth",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/categories",
+    action: "rhCategoryGetUnauthorized",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/point-config",
+    action: "rhPointConfigPut",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/point-config",
+    action: "rhPointConfigGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/point-config/{userId}",
+    action: "rhPointConfigGetByUser",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/point/register",
+    action: "rhPointRegister",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/point/{pointId}/calculate",
+    action: "rhPointCalculate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/point/adjustment/request",
+    action: "rhPointAdjustmentCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/point/adjustment/approve",
+    action: "rhPointAdjustmentApprove",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/categories",
+    action: "rhCategoryCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/categories",
+    action: "rhCategoryCreateConflict",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/categories",
+    action: "rhCategoryCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid request",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/categories",
+    action: "rhCategoryPut",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/categories",
+    action: "rhCategoryGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "DELETE",
+    path: "/rh/categories",
+    action: "rhCategoryDelete",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/requests",
+    action: "rhRequestCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/requests",
+    action: "rhRequestCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid request",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/requests/{id}",
+    action: "rhRequestGetNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/requests",
+    action: "rhRequestList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/requests/{id}",
+    action: "rhRequestGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/requests",
+    action: "rhRequestPut",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/requests",
+    action: "rhRequestPutNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [404],
+    expectedLabel: "not found",
+  }),
+  op({
+    service: "rh-service",
+    method: "DELETE",
+    path: "/rh/requests",
+    action: "rhRequestDelete",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/score/questions",
+    action: "rhScoreQuestionCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/score/questions",
+    action: "rhScoreQuestionCreateInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid request",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/score/questions",
+    action: "rhScoreQuestionPut",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/score/questions",
+    action: "rhScoreQuestionList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "DELETE",
+    path: "/rh/score/questions",
+    action: "rhScoreQuestionDelete",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/score/quarters/generate",
+    action: "rhScoreQuarterGenerate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/score/quarters/generate",
+    action: "rhScoreQuarterGenerateConflict",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/score/quarters/{id}",
+    action: "rhScoreQuarterGetNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+  }),
+  op({
+    service: "rh-service",
+    method: "PATCH",
+    path: "/rh/score/quarters/nitro",
+    action: "rhScoreQuarterPatchNitro",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/score/quarters/me",
+    action: "rhScoreQuarterListMe",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/score/quarters/{id}",
+    action: "rhScoreQuarterGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/score/evaluations/pending",
+    action: "rhScoreEvaluationPending",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/score/evaluations/submit",
+    action: "rhScoreEvaluationSubmit",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/holidays",
+    action: "rhHolidayCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/holidays",
+    action: "rhHolidayPut",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/holidays",
+    action: "rhHolidayList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "DELETE",
+    path: "/rh/holidays",
+    action: "rhHolidayDelete",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/time-bank-releases/list",
+    action: "rhTimeBankList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/time-bank-releases",
+    action: "rhTimeBankCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/time-bank-releases/approve",
+    action: "rhTimeBankApprove",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/messages",
+    action: "rhMessageCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/messages",
+    action: "rhMessageList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "POST",
+    path: "/rh/timesheets",
+    action: "rhTimeSheetCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/timesheets",
+    action: "rhTimeSheetList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/timesheets/sign",
+    action: "rhTimeSheetSign",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/score/nitro/update",
+    action: "rhScoreNitroUpdate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+
+  op({
+    service: "audit-service",
+    method: "GET",
+    path: "/health",
+    action: "serviceHealth",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "audit-service",
+    method: "GET",
+    path: "/ready",
+    action: "serviceReady",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "audit-service",
+    method: "GET",
+    path: "/audit/requests",
+    action: "auditListUnauthorized",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+    condition: "auditEnabled",
+  }),
+  op({
+    service: "audit-service",
+    method: "POST",
+    path: "/internal/audit/requests",
+    action: "auditInternalIngest",
+    target: "direct",
+    auth: "internal-token",
+    condition: "auditEnabled",
+  }),
+  op({
+    service: "audit-service",
+    method: "GET",
+    path: "/audit/requests",
+    action: "auditList",
+    target: "gateway",
+    auth: "bearer",
+    condition: "auditEnabled",
+  }),
+  op({
+    service: "audit-service",
+    method: "GET",
+    path: "/audit/requests/{requestId}",
+    action: "auditGetNotFound",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    condition: "auditEnabled",
+  }),
+  op({
+    service: "audit-service",
+    method: "GET",
+    path: "/audit/requests/{requestId}",
+    action: "auditGet",
+    target: "gateway",
+    auth: "bearer",
+    condition: "auditEnabled",
+  }),
+];
+
+export const manifest = buildManifest(baseManifest);

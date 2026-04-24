@@ -1,0 +1,233 @@
+# CI para a branch feature/CICD_test (dispara em push após merge de PR; combine com branch protection para exigir aprovação).
+#
+# Segurança: `.env.vps.*` está em `.gitignore` na raiz; os arquivos só existem no runner durante o job.
+# Segredos vazios no GitHub viram env definida com string vazia — `set -u` não detecta isso; por isso
+# validamos não-vazio antes de gravar.
+#
+# Segredos do repositório → arquivos na raiz (gitignored). Pares: scripts/ci/vps-secrets.manifest.
+#
+# Opcional (somente se usar --profile audit no compose): ENV_VPS_AUDIT_SERVICE → .env.vps.audit-service
+#
+# Pós-merge: cadastrar todos os segredos em Settings → Secrets and variables → Actions,
+# garantir DATABASE_URL/SUPABASE acessíveis a partir dos runners do GitHub e validar na aba Actions.
+#
+name: Teste CICD
+
+on:
+  push:
+    branches:
+      - feature/CICD-test
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - feature/CICD
+  workflow_dispatch:
+
+concurrency:
+  group: test-cicd-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Qualidade (Biome, typecheck, testes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # prisma.config.ts (infra) exige DATABASE_URL. Use placeholder (não use secret vazio): `prisma generate` não conecta ao DB.
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci_ci_typecheck?schema=public
+    steps:
+      - uses: actions/checkout@v4
+
+      # `setup-node` com `cache: pnpm` exige que `pnpm` já exista no PATH (documentação setup-node).
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Auditoria de dependências
+        run: pnpm audit:ci
+
+      - name: Biome check
+        run: pnpm check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Testes
+        run: pnpm test
+
+  docker-stack:
+    name: Docker Compose (stack VPS)
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Materializar .env.vps.* a partir dos segredos
+        env:
+          ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+          ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+          ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+          ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+          ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+          ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+          ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+          ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+        run: bash scripts/ci/materialize-vps-env.sh
+
+      # BuildKit acelera builds; `docker compose build` nos runners do GHA não aceita
+      # --cache-to/--cache-from (versão do plugin Compose). Cache entre jobs: bake ou registry.
+      - name: Build imagens Compose
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+        run: |
+          set -eo pipefail
+          echo "::group::docker compose build"
+          docker compose -f docker-compose.vps.yml build
+          echo "::endgroup::"
+
+      - name: Subir stack e aguardar healthchecks
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+        run: |
+          set -eo pipefail
+          docker compose version
+          docker compose -f docker-compose.vps.yml up -d --wait --wait-timeout 900
+
+      - name: Docker Compose down
+        if: always()
+        run: |
+          # -v remove volumes nomeados; útil também em runner self-hosted (evita nomes/dados presos).
+          docker compose -f docker-compose.vps.yml down -v || true
+
+  staging-environment:
+    name: Staging — Docker, scan, integração, smoke, E2E
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Instalar dependências (pnpm smoke / Playwright em app)
+        run: pnpm install --frozen-lockfile
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Materializar .env.vps.* a partir dos segredos
+        env:
+          ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+          ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+          ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+          ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+          ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+          ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+          ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+          ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+        run: bash scripts/ci/materialize-vps-env.sh
+
+      - name: "[Build] Imagens Docker (docker-compose.vps.yml)"
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+        run: |
+          set -eo pipefail
+          docker compose -f docker-compose.vps.yml build
+
+      # Docker Hub oficial: aquasec/trivy (aquasecurity/trivy não existe como repo no Hub).
+      # Lista de imagens: scripts/ci/list-workspace-vps-images.sh (deriva de docker-compose.vps.yml).
+      # Política: CRITICAL quebra o pipeline; HIGH é reportado no log (informativo) para monitoramento.
+      # Cache do DB em /tmp/trivy-cache evita baixar ~91 MiB por imagem escaneada.
+      - name: "[Scan] Trivy — imagens workspace (gate: CRITICAL; HIGH é informativo)"
+        run: |
+          set -eo pipefail
+          mkdir -p /tmp/trivy-cache
+          mapfile -t images < <(bash scripts/ci/list-workspace-vps-images.sh)
+          scan() {
+            local img="$1"
+            local severity="$2"
+            local exit_code="$3"
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v /tmp/trivy-cache:/root/.cache/trivy \
+              aquasec/trivy:0.58.2 image \
+              --scanners vuln \
+              --severity "$severity" \
+              --exit-code "$exit_code" \
+              --ignore-unfixed \
+              "$img"
+          }
+          for img in "${images[@]}"; do
+            echo "::group::Trivy (informativo HIGH,CRITICAL) — $img"
+            scan "$img" "HIGH,CRITICAL" 0 || true
+            echo "::endgroup::"
+          done
+          for img in "${images[@]}"; do
+            echo "::group::Trivy (gate CRITICAL) — $img"
+            scan "$img" "CRITICAL" 1
+            echo "::endgroup::"
+          done
+
+      - name: "[Deploy temporário] Subir stack e aguardar healthchecks"
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+        run: |
+          set -eo pipefail
+          docker compose version
+          docker compose -f docker-compose.vps.yml up -d --wait --wait-timeout 900
+
+      - name: "[Integration] Vitest — client-service com Postgres (opcional)"
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          CLIENT_SERVICE_INTEGRATION: "1"
+        run: |
+          set -eo pipefail
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::Secret STAGING_DATABASE_URL não configurado — pulando testes de integração com Postgres."
+            exit 0
+          fi
+          pnpm --filter @workspace/client-service test
+
+      - name: "[Smoke + integração HTTP] Contrato público via gateway (pnpm smoke)"
+        run: pnpm smoke
+
+      - name: "[E2E] Playwright (executa quando @playwright/test existir no workspace)"
+        run: |
+          set -eo pipefail
+          if [ ! -d app/node_modules/@playwright/test ] && [ ! -d node_modules/@playwright/test ]; then
+            echo "::notice::Playwright não instalado — adicione @playwright/test ao app e playwright.config.ts para ativar E2E."
+            exit 0
+          fi
+          cd app
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright test
+
+      - name: Encerrar stack
+        if: always()
+        run: |
+          docker compose -f docker-compose.vps.yml down -v || true
