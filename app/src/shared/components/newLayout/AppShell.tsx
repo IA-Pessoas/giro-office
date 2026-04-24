@@ -24,7 +24,19 @@ import {
   X,
 } from "lucide-react";
 
+import { useMe } from "@shared/hooks";
 import { useAuth } from "../../../context/AuthContext";
+
+function getInitials(name: string): string {
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "AD"
+  );
+}
 
 function Logo({ showText }: { showText: boolean }) {
   return (
@@ -113,6 +125,7 @@ type ChatMessage = {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
+  const meQuery = useMe();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -152,6 +165,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const pathname = router.asPath.split("?")[0] ?? "";
+  const displayUserName = meQuery.data?.name ?? user?.name ?? "Admin";
+  const displayUserLogin = meQuery.data?.login ?? user?.email ?? user?.login ?? "";
+  const displayUserPhoto = meQuery.data?.photo_url ?? null;
+  const displayUserInitials = getInitials(displayUserName);
 
   const handleLogout = () => {
     logoutUser();
@@ -389,13 +406,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                   type="button"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                    <span className="text-xs font-semibold text-white">
-                      {user?.name?.slice(0, 2)?.toUpperCase() ?? "AD"}
-                    </span>
+                  <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-500 to-blue-600">
+                    {displayUserPhoto ? (
+                      <img
+                        src={displayUserPhoto}
+                        alt={`Foto de ${displayUserName}`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-xs font-semibold text-white">{displayUserInitials}</span>
+                    )}
                   </div>
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300 hidden md:block">
-                    {user?.name ?? "Admin"}
+                    {displayUserName}
                   </span>
                   <ChevronDown className="w-4 h-4 text-gray-500 dark:text-slate-400" />
                 </button>
@@ -406,9 +429,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50">
                       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {user?.name ?? "Admin"}
+                          {displayUserName}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email ?? ""}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{displayUserLogin}</p>
                       </div>
                       <Link
                         href="/configuracoes"
