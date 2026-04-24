@@ -20,7 +20,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
       title: "user-service",
       version: "1.0.0",
       description:
-        "Autenticação, usuários e permissões. Rotas autenticadas costumam receber JWT via gateway; /me usa o header x-auth-user-id encaminhado.",
+        "Autenticação, usuários e permissões. Rotas autenticadas aceitam Bearer JWT (mesmo segredo que o gateway) ou, em chamadas internas, o token de serviço (`x-internal-service-token` igual a AUDIT_SERVICE_TOKEN) com `x-auth-user-id` e `x-auth-organization-id`, como o gateway encaminha.",
     },
     servers: [{ url: baseUrl }],
     tags: [
@@ -35,11 +35,6 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
-        },
-        forwardedAuthUserId: {
-          type: "apiKey",
-          in: "header",
-          name: "x-auth-user-id",
         },
       },
       schemas: {
@@ -100,8 +95,8 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
       "/user/me": {
         get: {
           tags: ["Auth"],
-          summary: "Usuário autenticado (via header encaminhado)",
-          security: [{ forwardedAuthUserId: [] }],
+          summary: "Usuário autenticado (JWT ou contexto encaminhado pelo gateway)",
+          security: bearer,
           responses: {
             "200": { description: "Dados do usuário", ...successJson },
           },
@@ -248,6 +243,36 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         },
       },
       "/user/{id}/photo": {
+        get: {
+          tags: ["Users"],
+          summary: "Obter foto do usuário (binário ou redirecionamento)",
+          description:
+            "Com armazenamento local devolve o ficheiro da imagem. Com URL pública (ex.: Supabase) responde 302 para essa URL.",
+          security: bearer,
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": {
+              description: "Corpo binário da imagem (armazenamento local)",
+              content: {
+                "image/png": { schema: { type: "string", format: "binary" } },
+                "image/jpeg": { schema: { type: "string", format: "binary" } },
+                "image/webp": { schema: { type: "string", format: "binary" } },
+                "image/gif": { schema: { type: "string", format: "binary" } },
+                "application/octet-stream": { schema: { type: "string", format: "binary" } },
+              },
+            },
+            "302": {
+              description: "Redireciona para a URL pública da foto",
+              headers: {
+                Location: {
+                  schema: { type: "string" },
+                  description: "URL da imagem",
+                },
+              },
+            },
+            "404": { description: "Usuário ou foto não encontrados" },
+          },
+        },
         post: {
           tags: ["Users"],
           summary: "Upload de foto do usuário",

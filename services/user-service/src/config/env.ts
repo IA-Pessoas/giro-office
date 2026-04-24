@@ -42,6 +42,8 @@ const rawEnvSchema = z
       .default("false")
       .transform((value) => parseBoolean(value)),
     enableApiDocsEnv: z.string().optional(),
+    /** Token interno igual ao do gateway (`AUDIT_SERVICE_TOKEN`) para pedidos com headers x-auth-* */
+    auditServiceToken: z.string().optional().default("audit-service-token"),
   })
   .superRefine((env, ctx) => {
     if (env.photoStorageMode === "supabase") {
@@ -100,5 +102,6 @@ export function getUserServiceEnv(): UserServiceEnv {
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
+    auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
   });
 }

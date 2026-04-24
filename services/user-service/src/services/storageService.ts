@@ -2,12 +2,25 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
-import { warn as logWarn } from "@workspace/shared";
+import { ServiceError, warn as logWarn } from "@workspace/shared";
 import { deletePhotosByPrefix, uploadPhoto } from "@workspace/shared/storage";
 
 import { getUserServiceEnv, type UserServiceEnv } from "../config/env.js";
 
 const BUCKET = "Fotos";
+
+export type UserPhotoReadResult =
+  | { kind: "file"; buffer: Buffer; contentType: string }
+  | { kind: "redirect"; url: string };
+
+function contentTypeFromPhotoPath(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".png") return "image/png";
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".webp") return "image/webp";
+  if (ext === ".gif") return "image/gif";
+  return "application/octet-stream";
+}
 
 /**
  * Returns the effective storage mode.
@@ -53,6 +66,44 @@ class StorageService {
 
     const supabase = createClient(this.#env.supabaseUrl, this.#env.supabaseServiceRoleKey);
     return uploadPhoto(supabase, filePath, file, { bucket: BUCKET });
+  }
+
+  /**
+   * URL absoluta (ex.: Supabase) → redirect; caminho relativo (armazenamento local) → bytes em disco.
+   */
+  async readUserPhoto(
+    userId: string,
+    photoUrl: string | null | undefined,
+  ): Promise<UserPhotoReadResult | null> {
+    if (!photoUrl?.trim()) return null;
+    const trimmed = photoUrl.trim();
+    if (/^https?:\/\//i.test(trimmed)) {
+      return { kind: "redirect", url: trimmed };
+    }
+
+    if (this.#mode !== "local") {
+      return null;
+    }
+
+    const baseDir = path.resolve(this.#env.photoStorageDir, "users", userId);
+    const fullPath = path.resolve(this.#env.photoStorageDir, trimmed);
+    const relativeToBase = path.relative(baseDir, fullPath);
+    if (relativeToBase.startsWith("..") || path.isAbsolute(relativeToBase)) {
+      throw new ServiceError(400, "Caminho de foto invalido.");
+    }
+
+    try {
+      const buffer = await fs.readFile(fullPath);
+      return { kind: "file", buffer, contentType: contentTypeFromPhotoPath(fullPath) };
+    } catch (err: unknown) {
+      const code =
+        err && typeof err === "object" && "code" in err
+          ? (err as NodeJS.ErrnoException).code
+          : undefined;
+      if (code === "ENOENT") return null;
+      logWarn("Erro ao ler foto local do usuario", { userId, err });
+      throw new ServiceError(500, "Erro ao ler a foto do usuario.");
+    }
   }
 
   async deleteUserPhoto(userId: string): Promise<void> {
