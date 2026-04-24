@@ -151,6 +151,11 @@ export function Configuracoes() {
   };
 
   const handleSelectPhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (isSaving) {
+      event.target.value = "";
+      return;
+    }
+
     const selectedFile = event.target.files?.[0];
 
     if (!selectedFile) {
@@ -333,6 +338,11 @@ export function Configuracoes() {
                   <p className={SETTINGS_MUTED_CLASSNAME}>
                     Formatos aceitos: JPEG, PNG ou WebP. Tamanho maximo: 5 MB.
                   </p>
+                  {pendingPhotoFile ? (
+                    <p className="text-sm font-medium text-[var(--colors-brand-gradient-end)] dark:text-blue-300">
+                      Nova foto selecionada: {pendingPhotoFile.name}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -430,7 +440,10 @@ export function Configuracoes() {
               </div>
             </div>
 
-            <div className={`${SETTINGS_SUBPANEL_CLASSNAME} flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between`}>
+            <div
+              className={`${SETTINGS_SUBPANEL_CLASSNAME} flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between`}
+              aria-live="polite"
+            >
               <div>
                 <p className={SETTINGS_TEXT_CLASSNAME}>
                   {hasPendingProfileChanges
