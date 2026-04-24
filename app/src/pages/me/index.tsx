@@ -60,12 +60,9 @@ export default function Me() {
       return;
     }
 
-    const permission = user?.permission ?? profileQuery.data?.permission ?? 2;
-
     updateUserMutation.mutate({
       name,
-      permission,
-      status: "Ativo",
+      ...(newPassword.trim() ? { password: newPassword } : {}),
     });
   }
 
