@@ -245,22 +245,12 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
       "/user/{id}/photo": {
         get: {
           tags: ["Users"],
-          summary: "Obter foto do usuário (binário ou redirecionamento)",
+          summary: "Obter foto do usuário (redirecionamento)",
           description:
-            "Com armazenamento local devolve o ficheiro da imagem. Com URL pública (ex.: Supabase) responde 302 para essa URL.",
+            "Redireciona (302) para a URL pública em `photo_url` (ex.: Supabase Storage). Se não houver URL pública, responde 404.",
           security: bearer,
           parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
           responses: {
-            "200": {
-              description: "Corpo binário da imagem (armazenamento local)",
-              content: {
-                "image/png": { schema: { type: "string", format: "binary" } },
-                "image/jpeg": { schema: { type: "string", format: "binary" } },
-                "image/webp": { schema: { type: "string", format: "binary" } },
-                "image/gif": { schema: { type: "string", format: "binary" } },
-                "application/octet-stream": { schema: { type: "string", format: "binary" } },
-              },
-            },
             "302": {
               description: "Redireciona para a URL pública da foto",
               headers: {

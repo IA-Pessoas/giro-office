@@ -82,42 +82,33 @@ describe("user routes", () => {
       id: "user-3",
       photo_url: "https://cdn/avatar.png",
     });
-    storageServiceMock.readUserPhoto.mockResolvedValue({
-      kind: "redirect",
-      url: "https://cdn/avatar.png",
-    });
+    storageServiceMock.readUserPhoto.mockReturnValue("https://cdn/avatar.png");
     const app = createTestApp();
 
     const res = await request(app).get("/user/user-3/photo").set(gatewayAuthHeaders());
 
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe("https://cdn/avatar.png");
-    expect(storageServiceMock.readUserPhoto).toHaveBeenCalledWith("user-3", "https://cdn/avatar.png");
+    expect(storageServiceMock.readUserPhoto).toHaveBeenCalledWith("https://cdn/avatar.png");
   });
 
-  it("GET /user/:id/photo devolve binario quando a foto e local", async () => {
+  it("GET /user/:id/photo retorna 404 quando photo_url nao e URL publica", async () => {
     userServiceMock.getById.mockResolvedValue({
       id: "user-3",
       photo_url: "users/user-3/photo.png",
     });
-    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    storageServiceMock.readUserPhoto.mockResolvedValue({
-      kind: "file",
-      buffer: png,
-      contentType: "image/png",
-    });
+    storageServiceMock.readUserPhoto.mockReturnValue(null);
     const app = createTestApp();
 
     const res = await request(app).get("/user/user-3/photo").set(gatewayAuthHeaders());
 
-    expect(res.status).toBe(200);
-    expect(res.headers["content-type"]).toMatch(/image\/png/);
-    expect(res.body).toEqual(png);
+    expect(res.status).toBe(404);
+    expect(storageServiceMock.readUserPhoto).toHaveBeenCalledWith("users/user-3/photo.png");
   });
 
   it("GET /user/:id/photo retorna 404 quando nao ha foto", async () => {
     userServiceMock.getById.mockResolvedValue({ id: "user-3", photo_url: null });
-    storageServiceMock.readUserPhoto.mockResolvedValue(null);
+    storageServiceMock.readUserPhoto.mockReturnValue(null);
     const app = createTestApp();
 
     const res = await request(app).get("/user/user-3/photo").set(gatewayAuthHeaders());

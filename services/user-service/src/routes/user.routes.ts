@@ -56,20 +56,13 @@ router.get(
       requireUserAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
       const user = await userService.getById(id);
-      const photo = await storageService.readUserPhoto(id, user.photo_url);
+      const publicPhotoUrl = storageService.readUserPhoto(user.photo_url);
 
-      if (!photo) {
+      if (!publicPhotoUrl) {
         throw new ServiceError(404, "Foto nao encontrada.");
       }
 
-      if (photo.kind === "redirect") {
-        response.redirect(302, photo.url);
-        return;
-      }
-
-      response.setHeader("Content-Type", photo.contentType);
-      response.setHeader("Cache-Control", "private, max-age=3600");
-      response.send(photo.buffer);
+      response.redirect(302, publicPhotoUrl);
     } catch (err) {
       logError("Erro ao obter foto do usuario", { err });
       next(err);
