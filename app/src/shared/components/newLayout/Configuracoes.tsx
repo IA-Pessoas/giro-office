@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Bell, Moon, Palette, Shield, Sun, User } from "lucide-react";
 import { grantMeProfileAccess } from "@shared/utils/meProfileAccessGate";
+import { applyTheme, getCurrentTheme } from "@shared/utils/theme";
 import { useAuth } from "../../../context/AuthContext";
 
 export function Configuracoes() {
@@ -18,7 +19,7 @@ export function Configuracoes() {
     if (typeof window === "undefined") {
       return;
     }
-    setIsDark(document.documentElement.classList.contains("dark"));
+    setIsDark(getCurrentTheme() === "dark");
   }, []);
 
   const toggleTheme = () => {
@@ -26,7 +27,7 @@ export function Configuracoes() {
       return;
     }
     const next = !isDark;
-    document.documentElement.classList.toggle("dark", next);
+    applyTheme(next ? "dark" : "light");
     setIsDark(next);
   };
 

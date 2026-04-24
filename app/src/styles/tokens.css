@@ -32,7 +32,8 @@
   --dashboard-text-color: #334155;
 }
 
-[data-theme="dark"],
+html[data-theme="dark"],
+html.dark,
 .chakra-ui-dark {
   --colors-blue-500: var(--colors-brand-blue);
   /* Dashboard: in dark mode we keep cards white, so use dark text for readability */
