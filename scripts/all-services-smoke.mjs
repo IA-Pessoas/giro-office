@@ -90,6 +90,7 @@ const SERVICE_URL_ENV_KEYS = {
   "audit-service": "AUDIT_SERVICE_URL",
   "client-service": "CLIENT_SERVICE_URL",
   "department-service": "DEPARTMENT_SERVICE_URL",
+  "fiscal-service": "FISCAL_SERVICE_URL",
   "organization-service": "ORGANIZATION_SERVICE_URL",
   "project-service": "PROJECT_SERVICE_URL",
   "rh-service": "RH_SERVICE_URL",
@@ -136,6 +137,11 @@ for (const [service, envKey] of Object.entries(SERVICE_URL_ENV_KEYS)) {
   env[service] = env[envKey];
 }
 
+if (!env["fiscal-service"]) {
+  env.FISCAL_SERVICE_URL = "http://localhost:3037";
+  env["fiscal-service"] = env.FISCAL_SERVICE_URL;
+}
+
 for (const envKey of Object.values(INTERNAL_SERVICE_TOKENS)) {
   env[envKey] = process.env[envKey]?.trim() || "";
 }
@@ -152,6 +158,12 @@ const state = {
   secondaryClientId: "",
   clientHistoryPendingId: "",
   clientHistoryId: "",
+  fiscalIcmsId: "",
+  fiscalIcmsCode: "",
+  fiscalIpiId: "",
+  fiscalIpiNcm: "",
+  fiscalNcmId: "",
+  fiscalNcmCode: "",
   projectId: "",
   taskModelPrimaryId: "",
   taskModelSecondaryId: "",
@@ -1416,6 +1428,201 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [403],
       json: { project_id: requireState("projectId") },
+    });
+  },
+
+  async fiscalNcmCreate(op) {
+    const ncmCode = uniqueDigits(8);
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        tax_regime: "Simples Nacional",
+        ncm_code: ncmCode,
+        federal_taxation_type: "Monofásica",
+        description: uniqueText("Smoke Fiscal NCM"),
+        validity_start_date: new Date().toISOString(),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.fiscalNcmId =
+      pickFirst(response.body, "data.create.id") ??
+      pickFirst(response.body, "data.id") ??
+      findFirstId(response.body?.data);
+    state.fiscalNcmCode = ncmCode;
+  },
+
+  async fiscalNcmCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        ncm_code: uniqueDigits(8),
+      },
+    });
+  },
+
+  async fiscalNcmGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ncm_id: requireState("fiscalNcmId") },
+    });
+  },
+
+  async fiscalNcmList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ncmCodes: requireState("fiscalNcmCode") },
+    });
+  },
+
+  async fiscalNcmPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        ncm_id: requireState("fiscalNcmId"),
+        tax_regime: "Simples Nacional",
+        ncm_code: requireState("fiscalNcmCode"),
+        federal_taxation_type: "Monofásica",
+        description: uniqueText("Smoke Fiscal NCM Updated"),
+        validity_start_date: new Date().toISOString(),
+      },
+    });
+  },
+
+  async fiscalNcmSearch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ncmCode: requireState("fiscalNcmCode") },
+    });
+  },
+
+  async fiscalNcmSearchInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      query: { ncmCode: "" },
+    });
+  },
+
+  async fiscalIcmsCreate(op) {
+    const icmsCode = uniqueText("Smoke Fiscal ICMS");
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        state: "SP",
+        item_number: uniqueDigits(4),
+        cest_code: `${uniqueDigits(2)}.${uniqueDigits(3)}.${uniqueDigits(2)}`,
+        description: icmsCode,
+        interstate_agreement: "Convênio ICMS",
+        applied_original_mva: "10.00",
+        adjusted_mva: "12.00",
+        original_mva: "8.00",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.fiscalIcmsId =
+      pickFirst(response.body, "data.create.id") ??
+      pickFirst(response.body, "data.id") ??
+      findFirstId(response.body?.data);
+    state.fiscalIcmsCode = icmsCode;
+  },
+
+  async fiscalIcmsCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        description: uniqueText("Smoke Invalid ICMS"),
+      },
+    });
+  },
+
+  async fiscalIcmsGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { icms_id: requireState("fiscalIcmsId") },
+    });
+  },
+
+  async fiscalIcmsList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { icmsCodes: requireState("fiscalIcmsCode") },
+    });
+  },
+
+  async fiscalIcmsPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        icms_id: requireState("fiscalIcmsId"),
+        state: "SP",
+        item_number: uniqueDigits(4),
+        cest_code: `${uniqueDigits(2)}.${uniqueDigits(3)}.${uniqueDigits(2)}`,
+        description: requireState("fiscalIcmsCode"),
+        interstate_agreement: "Convênio ICMS atualizado",
+        applied_original_mva: "11.00",
+        adjusted_mva: "13.00",
+        original_mva: "9.00",
+      },
+    });
+  },
+
+  async fiscalIpiCreate(op) {
+    const ncm = uniqueDigits(8);
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        ncm,
+        ex: uniqueDigits(3),
+        description: uniqueText("Smoke Fiscal IPI"),
+        aliquot: "10.00",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.fiscalIpiId =
+      pickFirst(response.body, "data.create.id") ??
+      pickFirst(response.body, "data.id") ??
+      findFirstId(response.body?.data);
+    state.fiscalIpiNcm = ncm;
+  },
+
+  async fiscalIpiCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        description: uniqueText("Smoke Invalid IPI"),
+      },
+    });
+  },
+
+  async fiscalIpiGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ipi_id: requireState("fiscalIpiId") },
+    });
+  },
+
+  async fiscalIpiList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ipiCodes: requireState("fiscalIpiNcm") },
+    });
+  },
+
+  async fiscalIpiPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        ipi_id: requireState("fiscalIpiId"),
+        ncm: requireState("fiscalIpiNcm"),
+        ex: uniqueDigits(3),
+        description: uniqueText("Smoke Fiscal IPI Updated"),
+        aliquot: "12.00",
+      },
     });
   },
 

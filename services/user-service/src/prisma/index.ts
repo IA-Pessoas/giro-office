@@ -8,4 +8,5 @@ connectionString: getUserServiceEnv().databaseUrl,
 });
 
 export const prismaClient = new PrismaClient({ adapter });
+
 export default prismaClient;

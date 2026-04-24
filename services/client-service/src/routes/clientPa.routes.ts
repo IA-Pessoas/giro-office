@@ -9,7 +9,7 @@ import {
   createClientPABodySchema,
   updateClientPABodySchema,
 } from "../schemas/clientVerticals.schemas.js";
-import { createClientPA, getClientPADetail, updateClientPA } from "../services/clientPaService.js";
+import { createClientPA, getClientPADetail, updateClientPA } from "../services/clientPAService.js";
 import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 export function createClientPARouter(deps: ClientRouterDeps): Router {
