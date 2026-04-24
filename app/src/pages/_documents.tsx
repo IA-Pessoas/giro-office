@@ -8,7 +8,7 @@ export default class Mydocument extends Document {
                 <body>
                     <script
                       dangerouslySetInnerHTML={{
-                        __html: "(function(){try{var m=localStorage.getItem('chakra-ui-color-mode');document.documentElement.setAttribute('data-theme',m==='dark'?'dark':'light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();",
+                        __html: "(function(){try{var root=document.documentElement;var workspaceTheme=localStorage.getItem('workspace-theme');var legacyTheme=localStorage.getItem('chakra-ui-color-mode');var theme=workspaceTheme==='dark'||workspaceTheme==='light'?workspaceTheme:legacyTheme==='dark'||legacyTheme==='light'?legacyTheme:'light';root.classList.remove('light','dark');root.classList.add(theme);root.setAttribute('data-theme',theme);}catch(e){document.documentElement.classList.remove('light','dark');document.documentElement.classList.add('light');document.documentElement.setAttribute('data-theme','light');}})();",
                       }}
                     />
                     <Main/>

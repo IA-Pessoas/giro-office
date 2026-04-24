@@ -452,6 +452,10 @@ html[data-theme="dark"] .text-slate-500,
 html[data-theme="dark"] .text-slate-400,
 html[data-theme="dark"] .text-gray-500,
 html[data-theme="dark"] .text-gray-400,
+html.dark .text-slate-500,
+html.dark .text-slate-400,
+html.dark .text-gray-500,
+html.dark .text-gray-400,
 .chakra-ui-dark .text-slate-500,
 .chakra-ui-dark .text-slate-400,
 .chakra-ui-dark .text-gray-500,
@@ -461,34 +465,53 @@ html[data-theme="dark"] .text-gray-400,
 
 html[data-theme="dark"] .text-slate-700,
 html[data-theme="dark"] .text-slate-800,
+html[data-theme="dark"] .text-slate-900,
+html[data-theme="dark"] .text-gray-700,
+html[data-theme="dark"] .text-gray-800,
+html[data-theme="dark"] .text-gray-900,
+html.dark .text-slate-700,
+html.dark .text-slate-800,
+html.dark .text-slate-900,
+html.dark .text-gray-700,
+html.dark .text-gray-800,
+html.dark .text-gray-900,
 .chakra-ui-dark .text-slate-700,
-.chakra-ui-dark .text-slate-800 {
+.chakra-ui-dark .text-slate-800,
+.chakra-ui-dark .text-slate-900,
+.chakra-ui-dark .text-gray-700,
+.chakra-ui-dark .text-gray-800,
+.chakra-ui-dark .text-gray-900 {
     color: var(--colors-text-secondary-dark) !important;
 }
 
 /* Dashboard (dark mode): cards stay white (like light), so use dark typography for contrast */
 html[data-theme="dark"] .dashboard-card,
+html.dark .dashboard-card,
 .chakra-ui-dark .dashboard-card {
     background: var(--colors-white) !important;
     border-color: color-mix(in srgb, var(--colors-black) 10%, transparent) !important;
 }
 
 html[data-theme="dark"] .dashboard-card-title,
+html.dark .dashboard-card-title,
 .chakra-ui-dark .dashboard-card-title {
     color: #0f172a !important;
 }
 
 html[data-theme="dark"] .dashboard-card-subtitle,
+html.dark .dashboard-card-subtitle,
 .chakra-ui-dark .dashboard-card-subtitle {
     color: #334155 !important;
 }
 
 html[data-theme="dark"] .dashboard-shell .text-slate-800,
+html.dark .dashboard-shell .text-slate-800,
 .chakra-ui-dark .dashboard-shell .text-slate-800 {
     color: #0f172a !important;
 }
 
 html[data-theme="dark"] .dashboard-shell .text-slate-500,
+html.dark .dashboard-shell .text-slate-500,
 .chakra-ui-dark .dashboard-shell .text-slate-500 {
     color: #475569 !important;
 }
@@ -496,6 +519,9 @@ html[data-theme="dark"] .dashboard-shell .text-slate-500,
 html[data-theme="dark"] .dialog-neutral-title,
 html[data-theme="dark"] .dialog-neutral-label,
 html[data-theme="dark"] .dialog-neutral-text,
+html.dark .dialog-neutral-title,
+html.dark .dialog-neutral-label,
+html.dark .dialog-neutral-text,
 .chakra-ui-dark .dialog-neutral-title,
 .chakra-ui-dark .dialog-neutral-label,
 .chakra-ui-dark .dialog-neutral-text {
@@ -503,6 +529,7 @@ html[data-theme="dark"] .dialog-neutral-text,
 }
 
 html[data-theme="dark"] .dialog-neutral-muted,
+html.dark .dialog-neutral-muted,
 .chakra-ui-dark .dialog-neutral-muted {
     color: #cbd5e1 !important;
 }
@@ -515,6 +542,14 @@ html[data-theme="dark"] .admin-users-modal .text-slate-500,
 html[data-theme="dark"] .admin-users-modal .text-slate-400,
 html[data-theme="dark"] .admin-users-modal .text-gray-500,
 html[data-theme="dark"] .admin-users-modal .text-gray-400,
+html.dark .admin-users-shell .text-slate-500,
+html.dark .admin-users-shell .text-slate-400,
+html.dark .admin-users-shell .text-gray-500,
+html.dark .admin-users-shell .text-gray-400,
+html.dark .admin-users-modal .text-slate-500,
+html.dark .admin-users-modal .text-slate-400,
+html.dark .admin-users-modal .text-gray-500,
+html.dark .admin-users-modal .text-gray-400,
 .chakra-ui-dark .admin-users-shell .text-slate-500,
 .chakra-ui-dark .admin-users-shell .text-slate-400,
 .chakra-ui-dark .admin-users-shell .text-gray-500,
@@ -528,17 +563,28 @@ html[data-theme="dark"] .admin-users-modal .text-gray-400,
 
 html[data-theme="dark"] .admin-users-shell .text-slate-700,
 html[data-theme="dark"] .admin-users-shell .text-slate-800,
+html[data-theme="dark"] .admin-users-shell .text-slate-900,
 html[data-theme="dark"] .admin-users-modal .text-slate-700,
 html[data-theme="dark"] .admin-users-modal .text-slate-800,
+html[data-theme="dark"] .admin-users-modal .text-slate-900,
+html.dark .admin-users-shell .text-slate-700,
+html.dark .admin-users-shell .text-slate-800,
+html.dark .admin-users-shell .text-slate-900,
+html.dark .admin-users-modal .text-slate-700,
+html.dark .admin-users-modal .text-slate-800,
+html.dark .admin-users-modal .text-slate-900,
 .chakra-ui-dark .admin-users-shell .text-slate-700,
 .chakra-ui-dark .admin-users-shell .text-slate-800,
+.chakra-ui-dark .admin-users-shell .text-slate-900,
 .chakra-ui-dark .admin-users-modal .text-slate-700,
-.chakra-ui-dark .admin-users-modal .text-slate-800 {
+.chakra-ui-dark .admin-users-modal .text-slate-800,
+.chakra-ui-dark .admin-users-modal .text-slate-900 {
     color: #ffffff !important;
 }
 
 /* Clients (dark mode): match dashboard (white surfaces + brand blue typography) */
 html[data-theme="dark"] .clients-shell,
+html.dark .clients-shell,
 .chakra-ui-dark .clients-shell {
     --colors-blue-500: var(--colors-brand-blue);
 }
@@ -546,6 +592,9 @@ html[data-theme="dark"] .clients-shell,
 html[data-theme="dark"] .clients-shell .clients-sidebar,
 html[data-theme="dark"] .clients-shell .clients-table-header,
 html[data-theme="dark"] .clients-shell .clients-table-row,
+html.dark .clients-shell .clients-sidebar,
+html.dark .clients-shell .clients-table-header,
+html.dark .clients-shell .clients-table-row,
 .chakra-ui-dark .clients-shell .clients-sidebar,
 .chakra-ui-dark .clients-shell .clients-table-header,
 .chakra-ui-dark .clients-shell .clients-table-row {
@@ -554,6 +603,7 @@ html[data-theme="dark"] .clients-shell .clients-table-row,
 }
 
 html[data-theme="dark"] .clients-shell .ui-input,
+html.dark .clients-shell .ui-input,
 .chakra-ui-dark .clients-shell .ui-input {
     background: var(--colors-white) !important;
     color: #0f172a !important;
@@ -561,6 +611,7 @@ html[data-theme="dark"] .clients-shell .ui-input,
 }
 
 html[data-theme="dark"] .clients-shell .ui-input::placeholder,
+html.dark .clients-shell .ui-input::placeholder,
 .chakra-ui-dark .clients-shell .ui-input::placeholder {
     color: #64748b !important;
 }
@@ -570,18 +621,22 @@ html[data-theme="dark"] .clients-shell .clients-table-header {
 }
 
 html[data-theme="dark"] .clients-shell .clients-table-row:hover,
+html.dark .clients-shell .clients-table-row:hover,
 .chakra-ui-dark .clients-shell .clients-table-row:hover {
     background: #f8fafc !important;
 }
 
 /* Organizations (dark mode): match dashboard/clients (white surfaces + brand blue typography) */
 html[data-theme="dark"] .organizations-shell,
+html.dark .organizations-shell,
 .chakra-ui-dark .organizations-shell {
     --colors-blue-500: var(--colors-brand-blue);
 }
 
 html[data-theme="dark"] .organizations-shell .organizations-sidebar,
 html[data-theme="dark"] .organizations-shell .users-detail-panel,
+html.dark .organizations-shell .organizations-sidebar,
+html.dark .organizations-shell .users-detail-panel,
 .chakra-ui-dark .organizations-shell .organizations-sidebar,
 .chakra-ui-dark .organizations-shell .users-detail-panel {
     background: var(--colors-white) !important;
@@ -589,6 +644,7 @@ html[data-theme="dark"] .organizations-shell .users-detail-panel,
 }
 
 html[data-theme="dark"] .organizations-shell .ui-input,
+html.dark .organizations-shell .ui-input,
 .chakra-ui-dark .organizations-shell .ui-input {
     background: var(--colors-white) !important;
     color: #0f172a !important;
@@ -596,17 +652,20 @@ html[data-theme="dark"] .organizations-shell .ui-input,
 }
 
 html[data-theme="dark"] .organizations-shell .ui-input::placeholder,
+html.dark .organizations-shell .ui-input::placeholder,
 .chakra-ui-dark .organizations-shell .ui-input::placeholder {
     color: #64748b !important;
 }
 
 html[data-theme="dark"] .organizations-shell .ui-button-primary,
+html.dark .organizations-shell .ui-button-primary,
 .chakra-ui-dark .organizations-shell .ui-button-primary {
     background: var(--colors-brand-blue) !important;
     color: var(--colors-white) !important;
 }
 
 html[data-theme="dark"] .ui-input::placeholder,
+html.dark .ui-input::placeholder,
 .chakra-ui-dark .ui-input::placeholder {
     color: var(--colors-text-muted-dark);
 }
@@ -614,6 +673,8 @@ html[data-theme="dark"] .ui-input::placeholder,
 /* Dark-mode surface background: default system blue */
 html[data-theme="dark"],
 html[data-theme="dark"] body,
+html.dark,
+html.dark body,
 .chakra-ui-dark,
 .chakra-ui-dark body {
     background: var(--colors-surface-dark);
@@ -625,6 +686,12 @@ html[data-theme="dark"] .users-detail-panel,
 html[data-theme="dark"] .ui-surface,
 html[data-theme="dark"] .ui-panel,
 html[data-theme="dark"] .ui-input,
+html.dark .users-sidebar,
+html.dark .organizations-sidebar,
+html.dark .users-detail-panel,
+html.dark .ui-surface,
+html.dark .ui-panel,
+html.dark .ui-input,
 .chakra-ui-dark .users-sidebar,
 .chakra-ui-dark .organizations-sidebar,
 .chakra-ui-dark .users-detail-panel,
@@ -633,6 +700,33 @@ html[data-theme="dark"] .ui-input,
 .chakra-ui-dark .ui-input {
     background: var(--colors-surface-dark-soft) !important;
     border-color: color-mix(in srgb, var(--colors-brand-blue) 28%, transparent) !important;
+}
+
+html[data-theme="dark"] .ui-panel,
+html[data-theme="dark"] .ui-surface,
+html[data-theme="dark"] .ui-title,
+html[data-theme="dark"] .users-section-title,
+html.dark .ui-panel,
+html.dark .ui-surface,
+html.dark .ui-title,
+html.dark .users-section-title,
+.chakra-ui-dark .ui-panel,
+.chakra-ui-dark .ui-surface,
+.chakra-ui-dark .ui-title,
+.chakra-ui-dark .users-section-title {
+    color: #ffffff;
+}
+
+html[data-theme="dark"] .ui-subtitle,
+html.dark .ui-subtitle,
+.chakra-ui-dark .ui-subtitle {
+    color: var(--colors-text-muted-dark);
+}
+
+html[data-theme="dark"] .ui-input,
+html.dark .ui-input,
+.chakra-ui-dark .ui-input {
+    color: #ffffff !important;
 }
 
 /* Clients hover handled inside .clients-shell override above */

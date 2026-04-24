@@ -51,6 +51,12 @@ generator department_service_client {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator fiscalServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/fiscal-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }

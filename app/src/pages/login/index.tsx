@@ -16,6 +16,10 @@ import {
 import { canSSRGuest } from "@modules/auth";
 import { AuthContext } from "../../context/AuthContext";
 
+const LOGIN_CARD_PRIMARY_TEXT_CLASSNAME = "text-[#111827]";
+const LOGIN_CARD_SECONDARY_TEXT_CLASSNAME = "text-[#4b5563]";
+const LOGIN_CARD_LABEL_TEXT_CLASSNAME = "text-[#374151]";
+
 export default function Login() {
   const { signIn } = useContext(AuthContext);
   const router = useRouter();
@@ -85,7 +89,9 @@ export default function Login() {
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                       <span className="text-xs font-bold text-white">OF</span>
                     </div>
-                    <span className="text-xl font-bold tracking-tight text-gray-900">Office</span>
+                    <span className={`text-xl font-bold tracking-tight ${LOGIN_CARD_PRIMARY_TEXT_CLASSNAME}`}>
+                      Office
+                    </span>
                   </div>
                 </div>
 
@@ -145,28 +151,35 @@ export default function Login() {
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                       <span className="text-xs font-bold text-white">OF</span>
                     </div>
-                    <span className="text-xl font-bold tracking-tight text-gray-900">Office</span>
+                    <span className={`text-xl font-bold tracking-tight ${LOGIN_CARD_PRIMARY_TEXT_CLASSNAME}`}>
+                      Office
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 relative overflow-hidden w-full max-w-md mt-20 lg:mt-0">
+              <div className="bg-white dark:bg-white rounded-3xl shadow-2xl p-6 md:p-8 relative overflow-hidden w-full max-w-md mt-20 lg:mt-0">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500 to-indigo-600 opacity-10 rounded-bl-full" />
 
                 <div className="relative z-10">
-                  <div className="mb-5">
+                  <div className={`mb-5 ${LOGIN_CARD_PRIMARY_TEXT_CLASSNAME}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles className="w-5 h-5 text-blue-600" />
                       <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                         Bem-vindo
                       </h2>
                     </div>
-                    <p className="text-gray-600 text-sm">Entre com suas credenciais para acessar</p>
+                    <p className={`text-sm ${LOGIN_CARD_SECONDARY_TEXT_CLASSNAME}`}>
+                      Entre com suas credenciais para acessar
+                    </p>
                   </div>
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="group">
-                      <label htmlFor="login" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      <label
+                        htmlFor="login"
+                        className={`mb-1.5 block text-sm font-semibold ${LOGIN_CARD_LABEL_TEXT_CLASSNAME}`}
+                      >
                         Login
                       </label>
                       <div className="relative">
@@ -192,7 +205,7 @@ export default function Login() {
                             onFocus={() => setFocusedField("login")}
                             onBlur={() => setFocusedField(null)}
                             placeholder="Digite seu login"
-                            className="w-full pl-11 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-transparent transition-all duration-300 text-gray-900 placeholder:text-gray-400 text-sm"
+                            className={`w-full rounded-xl border-2 border-gray-200 bg-white py-2.5 pl-11 pr-4 text-sm transition-all duration-300 placeholder:text-[#9ca3af] focus:border-transparent focus:outline-none dark:border-gray-200 dark:bg-white ${LOGIN_CARD_PRIMARY_TEXT_CLASSNAME}`}
                             disabled={loading}
                             autoComplete="username"
                           />
@@ -201,7 +214,10 @@ export default function Login() {
                     </div>
 
                     <div className="group">
-                      <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      <label
+                        htmlFor="password"
+                        className={`mb-1.5 block text-sm font-semibold ${LOGIN_CARD_LABEL_TEXT_CLASSNAME}`}
+                      >
                         Senha
                       </label>
                       <div className="relative">
@@ -227,7 +243,7 @@ export default function Login() {
                             onFocus={() => setFocusedField("password")}
                             onBlur={() => setFocusedField(null)}
                             placeholder="••••••••"
-                            className="w-full pl-11 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-transparent transition-all duration-300 text-gray-900 text-sm"
+                            className={`w-full rounded-xl border-2 border-gray-200 bg-white py-2.5 pl-11 pr-4 text-sm transition-all duration-300 placeholder:text-[#9ca3af] focus:border-transparent focus:outline-none dark:border-gray-200 dark:bg-white ${LOGIN_CARD_PRIMARY_TEXT_CLASSNAME}`}
                             disabled={loading}
                             autoComplete="current-password"
                           />
@@ -248,7 +264,9 @@ export default function Login() {
                           type="checkbox"
                           className="w-4 h-4 text-blue-600 border-2 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                         />
-                        <span className="text-gray-700 font-medium group-hover:text-blue-600 transition-colors">
+                        <span
+                          className={`font-medium transition-colors group-hover:text-blue-600 ${LOGIN_CARD_LABEL_TEXT_CLASSNAME}`}
+                        >
                           Lembrar-me
                         </span>
                       </label>
@@ -281,7 +299,7 @@ export default function Login() {
                     </button>
                   </form>
 
-                  <p className="text-center text-xs text-gray-600 mt-4">
+                  <p className={`mt-4 text-center text-xs ${LOGIN_CARD_SECONDARY_TEXT_CLASSNAME}`}>
                     Não tem conta?{" "}
                     <Link
                       href="/solicitar-acesso"
