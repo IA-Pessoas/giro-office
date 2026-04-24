@@ -5,9 +5,8 @@
 #   • push em `develop` (após merge de PR).
 #   • pull_request com base `staging` (validação antes de integrar na branch staging).
 #
-# Segredos (mesmo conjunto do test-cicd / stack VPS) — obrigatórios para build e subida:
-#   ENV_VPS_REVERSE_PROXY, ENV_VPS_GATEWAY, ENV_VPS_ORGANIZATION_SERVICE, ENV_VPS_USER_SERVICE,
-#   ENV_VPS_TASK_SERVICE, ENV_VPS_PROJECT_SERVICE, ENV_VPS_CLIENT_SERVICE, ENV_VPS_RH_SERVICE
+# Segredos (mesmo conjunto do test-cicd / stack VPS) — obrigatórios para build e subida.
+# Pares secret → arquivo: scripts/ci/vps-secrets.manifest (ao novo serviço, atualize manifest + env abaixo).
 #
 # Opcional — testes de integração com Postgres real (Vitest em client-service):
 #   STAGING_DATABASE_URL — usado com CLIENT_SERVICE_INTEGRATION=1 após a stack estar no ar.
@@ -100,33 +99,7 @@ jobs:
           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
-        run: |
-          set -eo pipefail
-          echo "::group::Validar segredos e materializar .env.vps.*"
-          for name in \
-            ENV_VPS_REVERSE_PROXY \
-            ENV_VPS_GATEWAY \
-            ENV_VPS_ORGANIZATION_SERVICE \
-            ENV_VPS_USER_SERVICE \
-            ENV_VPS_TASK_SERVICE \
-            ENV_VPS_PROJECT_SERVICE \
-            ENV_VPS_CLIENT_SERVICE \
-            ENV_VPS_RH_SERVICE
-          do
-            if [ -z "${!name:-}" ]; then
-              echo "::error::Configure o secret do repositório: $name"
-              exit 1
-            fi
-          done
-          printf '%s\n' "$ENV_VPS_REVERSE_PROXY" > .env.vps.reverse-proxy
-          printf '%s\n' "$ENV_VPS_GATEWAY" > .env.vps.gateway
-          printf '%s\n' "$ENV_VPS_ORGANIZATION_SERVICE" > .env.vps.organization-service
-          printf '%s\n' "$ENV_VPS_USER_SERVICE" > .env.vps.user-service
-          printf '%s\n' "$ENV_VPS_TASK_SERVICE" > .env.vps.task-service
-          printf '%s\n' "$ENV_VPS_PROJECT_SERVICE" > .env.vps.project-service
-          printf '%s\n' "$ENV_VPS_CLIENT_SERVICE" > .env.vps.client-service
-          printf '%s\n' "$ENV_VPS_RH_SERVICE" > .env.vps.rh-service
-          echo "::endgroup::"
+        run: bash scripts/ci/materialize-vps-env.sh
 
       - name: "[Build] Imagens Docker (docker-compose.vps.yml)"
         env:
@@ -138,21 +111,14 @@ jobs:
 
       # Imagem oficial no Docker Hub: aquasec/trivy (o nome aquasecurity/trivy não existe lá).
       # GHCR alternativo: ghcr.io/aquasecurity/trivy:<tag>
+      # Lista de imagens: scripts/ci/list-workspace-vps-images.sh (deriva de docker-compose.vps.yml).
       # Política: CRITICAL quebra o pipeline; HIGH é reportado no log (informativo) para monitoramento.
       # Cache do DB em /tmp/trivy-cache evita baixar ~91 MiB por imagem escaneada.
       - name: "[Scan] Trivy — imagens workspace (gate: CRITICAL; HIGH é informativo)"
         run: |
           set -eo pipefail
           mkdir -p /tmp/trivy-cache
-          images=(
-            workspace-gateway:vps
-            workspace-organization-service:vps
-            workspace-user-service:vps
-            workspace-task-service:vps
-            workspace-project-service:vps
-            workspace-client-service:vps
-            workspace-rh-service:vps
-          )
+          mapfile -t images < <(bash scripts/ci/list-workspace-vps-images.sh)
           scan() {
             local img="$1"
             local severity="$2"
