@@ -1,6 +1,12 @@
 # contabil-service
 
-Microserviço contábil (scaffold PR 1). Por ora expõe apenas o health check; as rotas `/contabil/*` serão adicionadas nas PRs seguintes.
+Microserviço contábil. Health em `/health`. Domínio **controls** (checklist por cliente e competência) em `/contabil/controls` — ver OpenAPI na PR 5. Demais prefixos `/contabil/*` nas PRs 3–4.
+
+Rotas atuais de controls (autenticação obrigatória):
+
+- `POST /contabil/controls` — corpo JSON: `client_id` (UUID), `competence` (texto não vazio); cria ou retorna existente (`201` / `200`).
+- `GET /contabil/controls` — query: `client_id`, `competence`.
+- `PATCH /contabil/controls/:id` — corpo: `field` (whitelist) e `value` (boolean ou string para `notes`).
 
 ## Porta local
 
