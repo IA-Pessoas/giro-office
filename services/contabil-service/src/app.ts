@@ -6,6 +6,8 @@ import "express-async-errors";
 
 import type { ContabilServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
+import { type ControlRouteDeps, createControlRoutes } from "./routes/control.routes.js";
+import { ControlService } from "./services/controlService.js";
 
 function contabilServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -25,14 +27,15 @@ function contabilServiceErrorLogContext(request: Request): Record<string, unknow
 }
 
 /**
- * Composição mínima (PR 1): apenas infraestrutura e `/health`.
- * Rotas de domínio `/contabil/*` entram nas PRs seguintes.
+ * Composição da app: infraestrutura, `/health` e rotas de domínio sob `/contabil`.
  */
 export function createContabilApp(options: {
   env: ContabilServiceEnv;
   logger: Logger;
+  controlRouteDeps?: ControlRouteDeps;
 }): express.Express {
   const { logger } = options;
+  const controlRouteDeps = options.controlRouteDeps ?? new ControlService();
 
   const app = express();
 
@@ -43,6 +46,8 @@ export function createContabilApp(options: {
   app.get("/health", (_req, res) => {
     res.status(200).json(createSuccessResponse({ status: "ok", service: "contabil-service" }));
   });
+
+  app.use("/contabil", createControlRoutes(controlRouteDeps));
 
   app.use(
     createExpressErrorHandler({
