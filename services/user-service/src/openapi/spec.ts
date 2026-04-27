@@ -245,20 +245,15 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
       "/user/{id}/photo": {
         get: {
           tags: ["Users"],
-          summary: "Obter foto do usuário (redirecionamento)",
+          summary: "Obter URL pública da foto do usuário",
           description:
-            "Redireciona (302) para a URL pública em `photo_url` (ex.: Supabase Storage). Se não houver URL pública, responde 404.",
+            "Retorna no envelope de sucesso `data.url` com a URL pública armazenada em `photo_url` (ex.: Supabase Storage). Se não houver URL pública, responde 404.",
           security: bearer,
           parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
           responses: {
-            "302": {
-              description: "Redireciona para a URL pública da foto",
-              headers: {
-                Location: {
-                  schema: { type: "string" },
-                  description: "URL da imagem",
-                },
-              },
+            "200": {
+              description: "URL pública da foto",
+              ...successJson,
             },
             "404": { description: "Usuário ou foto não encontrados" },
           },

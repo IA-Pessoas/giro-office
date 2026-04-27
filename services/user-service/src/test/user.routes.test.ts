@@ -77,7 +77,7 @@ describe("user routes", () => {
     });
   });
 
-  it("GET /user/:id/photo redireciona quando a foto e URL publica", async () => {
+  it("GET /user/:id/photo retorna JSON com url quando a foto e URL publica", async () => {
     userServiceMock.getById.mockResolvedValue({
       id: "user-3",
       photo_url: "https://cdn/avatar.png",
@@ -87,8 +87,11 @@ describe("user routes", () => {
 
     const res = await request(app).get("/user/user-3/photo").set(gatewayAuthHeaders());
 
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe("https://cdn/avatar.png");
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      success: true,
+      data: { url: "https://cdn/avatar.png" },
+    });
     expect(storageServiceMock.readUserPhoto).toHaveBeenCalledWith("https://cdn/avatar.png");
   });
 

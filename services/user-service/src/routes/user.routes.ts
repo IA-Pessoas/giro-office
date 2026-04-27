@@ -62,7 +62,7 @@ router.get(
         throw new ServiceError(404, "Foto nao encontrada.");
       }
 
-      response.redirect(302, publicPhotoUrl);
+      response.json(createSuccessResponse({ url: publicPhotoUrl }));
     } catch (err) {
       logError("Erro ao obter foto do usuario", { err });
       next(err);

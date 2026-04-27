@@ -995,6 +995,13 @@ const handlers = {
     });
   },
 
+  async userPhotoGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/user/${requireState("tempUserId")}/photo`,
+    });
+  },
+
   async userPhotoDelete(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -2700,6 +2707,15 @@ const handlers = {
       auth: "public",
       headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
       query: { page: 1, pageSize: 1 },
+    });
+  },
+
+  async userPhotoUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      path: `/user/${requireState("tempUserId")}/photo`,
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
     });
   },
 
