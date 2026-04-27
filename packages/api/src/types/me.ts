@@ -1,19 +1,19 @@
-/** GET /me — sessão atual (campos dependem do backend). */
-export interface MeSessionUser {
-  id?: string;
-  name?: string;
-  login?: string;
-  permission?: number;
+export interface MeProfile {
+  name: string;
+  login: string;
+  permission: number;
+  photo_url: string | null;
 }
 
+export interface MeSessionUser extends MeProfile {}
+
 export interface MeApiResponse {
-  user: MeSessionUser;
+  success?: boolean;
+  data?: MeProfile;
+  user?: MeProfile;
 }
 
 export interface UpdateCurrentUserPayload {
   name: string;
-  permission: number;
-  status: string;
-  /** Incluir apenas quando a UI permitir alteração de senha. */
   password?: string;
 }
