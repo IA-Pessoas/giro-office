@@ -18,8 +18,23 @@ import type { ControlService } from "../services/controlService.js";
 
 export type ControlRouteDeps = Pick<ControlService, "create" | "detail" | "updateField">;
 
-function firstQueryValue(value: unknown): unknown {
-  return Array.isArray(value) ? value[0] : value;
+/**
+ * Express pode entregar query como string ou array (chave repetida). Para Zod, normalizamos a um único string.
+ */
+function firstQueryString(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    return firstQueryString(value[0]);
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return undefined;
 }
 
 export function createControlRoutes(service: ControlRouteDeps): ReturnType<typeof Router> {
@@ -55,8 +70,8 @@ export function createControlRoutes(service: ControlRouteDeps): ReturnType<typeo
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const rawObj = {
-          client_id: firstQueryValue(req.query.client_id),
-          competence: firstQueryValue(req.query.competence),
+          client_id: firstQueryString(req.query.client_id),
+          competence: firstQueryString(req.query.competence),
         };
         const query = parseWithZod(detailControlQuerySchema, rawObj);
         const auth = requireAuthenticatedRequestContext(req);
