@@ -17,13 +17,19 @@ const ORGANIZATION_SELECT_CLASSNAME =
 interface OrganizationPlanFormProps {
   currentPlan: string;
   planDraft: OrganizationPlanOption;
+  isSaving: boolean;
+  canSave: boolean;
   onPlanDraftChange: (nextValue: OrganizationPlanOption) => void;
+  onSave: () => void;
 }
 
 export function OrganizationPlanForm({
   currentPlan,
   planDraft,
+  isSaving,
+  canSave,
   onPlanDraftChange,
+  onSave,
 }: OrganizationPlanFormProps) {
   return (
     <div className={`${ORGANIZATION_SUBPANEL_CLASSNAME} space-y-4 p-5`}>
@@ -46,6 +52,7 @@ export function OrganizationPlanForm({
           value={planDraft}
           onChange={(event) => onPlanDraftChange(event.target.value as OrganizationPlanOption)}
           className={ORGANIZATION_SELECT_CLASSNAME}
+          disabled={isSaving}
         >
           {ORGANIZATION_PLAN_OPTIONS.map((planOption) => (
             <option key={planOption} value={planOption}>
@@ -57,11 +64,12 @@ export function OrganizationPlanForm({
 
       <button
         type="button"
-        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2 text-sm font-semibold text-white opacity-70"
-        disabled
+        onClick={onSave}
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-70"
+        disabled={!canSave}
       >
-        <Save className="h-4 w-4" />
-        Salvar plano
+        <Save className={`h-4 w-4 ${isSaving ? "animate-pulse" : ""}`} />
+        {isSaving ? "Salvando..." : "Salvar plano"}
       </button>
     </div>
   );

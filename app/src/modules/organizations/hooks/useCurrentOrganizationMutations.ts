@@ -17,8 +17,20 @@ function shouldSkipToastForServerError(error: unknown): boolean {
 async function refetchCurrentOrganization(
   queryClient: ReturnType<typeof useQueryClient>,
   organizationId: string,
+  partialOrganization: Partial<Organization>,
 ): Promise<void> {
   const queryKey = getCurrentOrganizationQueryKey(organizationId);
+
+  queryClient.setQueryData<Organization | undefined>(queryKey, (currentOrganization) => {
+    if (!currentOrganization) {
+      return currentOrganization;
+    }
+
+    return {
+      ...currentOrganization,
+      ...partialOrganization,
+    };
+  });
 
   await queryClient.invalidateQueries({ queryKey });
 
@@ -40,8 +52,8 @@ export function useUpdateOrganizationLogo(): UseMutationResult<
   return useMutation({
     mutationFn: ({ organizationId, logoUrl }) =>
       organizationService.updateLogoUrl(organizationId, logoUrl),
-    onSuccess: async (_organization, { organizationId }) => {
-      await refetchCurrentOrganization(queryClient, organizationId);
+    onSuccess: async (organization, { organizationId }) => {
+      await refetchCurrentOrganization(queryClient, organizationId, organization);
       toast.success("Logo da organizacao atualizada com sucesso!");
     },
     onError: (error: unknown) => {
@@ -66,8 +78,8 @@ export function useUpdateOrganizationPlan(): UseMutationResult<
   return useMutation({
     mutationFn: ({ organizationId, subscriptionPlan }) =>
       organizationService.updateSubscriptionPlan(organizationId, subscriptionPlan),
-    onSuccess: async (_organization, { organizationId }) => {
-      await refetchCurrentOrganization(queryClient, organizationId);
+    onSuccess: async (organization, { organizationId }) => {
+      await refetchCurrentOrganization(queryClient, organizationId, organization);
       toast.success("Plano da organizacao atualizado com sucesso!");
     },
     onError: (error: unknown) => {

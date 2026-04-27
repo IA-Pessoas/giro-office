@@ -17,17 +17,26 @@ interface OrganizationLogoFormProps {
   organizationName: string;
   logoDraft: string;
   logoUrl: string | null;
+  isSaving: boolean;
+  canSave: boolean;
   onLogoDraftChange: (nextValue: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
 }
 
 export function OrganizationLogoForm({
   organizationName,
   logoDraft,
   logoUrl,
+  isSaving,
+  canSave,
   onLogoDraftChange,
+  onSave,
+  onCancel,
 }: OrganizationLogoFormProps) {
   const resolvedLogoUrl = resolvePhotoUrl(logoUrl);
   const resolvedLogoDraftUrl = resolvePhotoUrl(logoDraft.trim() || null);
+  const hasLogo = Boolean(resolvedLogoDraftUrl || resolvedLogoUrl);
 
   return (
     <div className={`${ORGANIZATION_SUBPANEL_CLASSNAME} space-y-4 p-5`}>
@@ -56,6 +65,12 @@ export function OrganizationLogoForm({
         </div>
 
         <div className="min-w-0 flex-1 space-y-4">
+          {!hasLogo ? (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+              Nenhuma logo configurada. Informe uma URL para adicionar a primeira imagem.
+            </div>
+          ) : null}
+
           <div className="space-y-2">
             <label className={ORGANIZATION_LABEL_CLASSNAME} htmlFor="organization-logo-url">
               URL da logo
@@ -67,23 +82,26 @@ export function OrganizationLogoForm({
               onChange={(event) => onLogoDraftChange(event.target.value)}
               placeholder="https://exemplo.com/logo.png"
               className={ORGANIZATION_INPUT_CLASSNAME}
+              disabled={isSaving}
             />
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2 text-sm font-semibold text-white opacity-70"
-              disabled
+              onClick={onSave}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-70"
+              disabled={!canSave}
             >
-              <Save className="h-4 w-4" />
-              Salvar
+              <Save className={`h-4 w-4 ${isSaving ? "animate-pulse" : ""}`} />
+              {isSaving ? "Salvando..." : "Salvar"}
             </button>
 
             <button
               type="button"
+              onClick={onCancel}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              disabled
+              disabled={isSaving}
             >
               <X className="h-4 w-4" />
               Cancelar
