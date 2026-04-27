@@ -125,8 +125,8 @@ export function Configuracoes() {
   const currentLogin = meQuery.data?.login ?? "";
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
   const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuario";
-  const ownerOrganizationId =
-    meQuery.data?.type === "owner" && meQuery.data.organization_id
+  const managedOrganizationId =
+    meQuery.data?.permission === 2 && meQuery.data.organization_id
       ? meQuery.data.organization_id
       : null;
   const resolvedCurrentPhotoUrl = resolvePhotoUrl(currentPhotoUrl);
@@ -466,7 +466,7 @@ export function Configuracoes() {
           </div>
         </section>
 
-        {ownerOrganizationId ? <MyOrganizationSection organizationId={ownerOrganizationId} /> : null}
+        {managedOrganizationId ? <MyOrganizationSection organizationId={managedOrganizationId} /> : null}
 
         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
           <section className={`${SETTINGS_PANEL_CLASSNAME} p-6`}>
