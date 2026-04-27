@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
+import { MyOrganizationSection } from "@modules/organizations";
 import { useDeleteMePhoto, useMe, useUpdateMe, useUploadMePhoto } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
 
@@ -124,6 +125,10 @@ export function Configuracoes() {
   const currentLogin = meQuery.data?.login ?? "";
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
   const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuario";
+  const ownerOrganizationId =
+    meQuery.data?.type === "owner" && meQuery.data.organization_id
+      ? meQuery.data.organization_id
+      : null;
   const resolvedCurrentPhotoUrl = resolvePhotoUrl(currentPhotoUrl);
 
   const displayedAvatar = pendingPhotoPreviewUrl ?? resolvedCurrentPhotoUrl;
@@ -460,6 +465,8 @@ export function Configuracoes() {
             </div>
           </div>
         </section>
+
+        {ownerOrganizationId ? <MyOrganizationSection organizationId={ownerOrganizationId} /> : null}
 
         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
           <section className={`${SETTINGS_PANEL_CLASSNAME} p-6`}>

@@ -3,6 +3,7 @@ export { OrganizationList } from "./components/OrganizationList";
 export { OrganizationDetailsView } from "./components/OrganizationDetailsView";
 export { OrganizationProfile } from "./components/OrganizationProfile";
 export { OrganizationAccessRequestForm } from "./components/OrganizationAccessRequestForm";
+export { MyOrganizationSection } from "./ui/MyOrganizationSection";
 
 export { organizationService } from "./services/organizationService";
 export {
