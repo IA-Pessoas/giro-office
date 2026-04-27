@@ -13,3 +13,4 @@ packages:
   - "services/project-service"
   - "services/department-service"
   - "services/fiscal-service"
+  - "services/contabil-service"
