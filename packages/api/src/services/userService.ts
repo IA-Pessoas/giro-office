@@ -4,7 +4,6 @@ import type { MeProfile, MeApiResponse, MeSessionUser, UpdateCurrentUserPayload 
 import type { UserDetailApiResponse, UserItem } from "../types/user.js";
 
 interface InternalMeRecord extends MeProfile {
-  id: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -60,15 +59,23 @@ function extractMeRecord(payload: unknown): InternalMeRecord {
     login,
     permission,
     photo_url: readOptionalString(userPayload.photo_url),
+    organization_id: readOptionalString(userPayload.organization_id),
+    type:
+      userPayload.type === "owner" || userPayload.type === "admin" || userPayload.type === "user"
+        ? userPayload.type
+        : null,
   };
 }
 
-function stripInternalId(record: InternalMeRecord): MeSessionUser {
+function toMeSessionUser(record: InternalMeRecord): MeSessionUser {
   return {
+    id: record.id,
     name: record.name,
     login: record.login,
     permission: record.permission,
     photo_url: record.photo_url,
+    organization_id: record.organization_id,
+    type: record.type,
   };
 }
 
@@ -129,7 +136,7 @@ export async function getUserById(client: AxiosInstance, id: string): Promise<Us
 
 export async function getMe(client: AxiosInstance): Promise<MeSessionUser> {
   const currentUser = await getInternalMeRecord(client);
-  return stripInternalId(currentUser);
+  return toMeSessionUser(currentUser);
 }
 
 export async function updateCurrentUser(
@@ -144,7 +151,7 @@ export async function updateCurrentUser(
   }
 
   const { data } = await client.patch(`/user/${currentUser.id}`, body);
-  return stripInternalId(extractMeRecord(data));
+  return toMeSessionUser(extractMeRecord(data));
 }
 
 export async function uploadCurrentUserPhoto(
@@ -162,12 +169,12 @@ export async function uploadCurrentUserPhoto(
     },
   });
 
-  return stripInternalId(extractMeRecord(data));
+  return toMeSessionUser(extractMeRecord(data));
 }
 
 export async function deleteCurrentUserPhoto(client: AxiosInstance): Promise<MeSessionUser> {
   const currentUser = await getInternalMeRecord(client);
   const { data } = await client.delete(`/user/${currentUser.id}/photo`);
 
-  return stripInternalId(extractMeRecord(data));
+  return toMeSessionUser(extractMeRecord(data));
 }
