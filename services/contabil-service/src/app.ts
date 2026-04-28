@@ -8,7 +8,9 @@ import type { ContabilServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { type ControlRouteDeps, createControlRoutes } from "./routes/control.routes.js";
 import { type ResponsibleRouteDeps, createResponsibleRoutes } from "./routes/responsible.routes.js";
+import { type RelationshipRouteDeps, createRelationshipRoutes } from "./routes/relationship.routes.js";
 import { ControlService } from "./services/controlService.js";
+import { RelationshipService } from "./services/relationshipService.js";
 import { ResponsibleService } from "./services/responsibleService.js";
 
 function contabilServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -36,10 +38,12 @@ export function createContabilApp(options: {
   logger: Logger;
   controlRouteDeps?: ControlRouteDeps;
   responsibleRouteDeps?: ResponsibleRouteDeps;
+  relationshipRouteDeps?: RelationshipRouteDeps;
 }): express.Express {
   const { logger } = options;
   const controlRouteDeps = options.controlRouteDeps ?? new ControlService();
   const responsibleRouteDeps = options.responsibleRouteDeps ?? new ResponsibleService();
+  const relationshipRouteDeps = options.relationshipRouteDeps ?? new RelationshipService();
 
   const app = express();
 
@@ -53,6 +57,7 @@ export function createContabilApp(options: {
 
   app.use("/contabil", createControlRoutes(controlRouteDeps));
   app.use("/contabil", createResponsibleRoutes(responsibleRouteDeps));
+  app.use("/contabil", createRelationshipRoutes(relationshipRouteDeps));
 
   app.use(
     createExpressErrorHandler({
