@@ -33,6 +33,11 @@ docs/*
 novo layout/
 .cursor/plans/
 
+# CI local (runner / desenvolvimento)
+.ci-remote-env
+.ci-known_hosts
+.ci-vps-ssh-key
+
 # Smoke test artifacts
 smoke-*/
 services_env_summary.md

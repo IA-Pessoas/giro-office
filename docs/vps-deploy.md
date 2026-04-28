@@ -80,6 +80,37 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
 - Audit service: `GET /ready`
 - Organization, user, project and RH services: `GET /health`
 
+## CI/CD (GitHub Actions → VPS)
+
+- Push em **`develop`**: workflow **Develop CI** (`.github/workflows/develop-cicd.yml`) — `build-and-push` + `vps-deploy` no slot `/opt/workspace-develop` (`workspace-develop`).
+- Push em **`staging`**: workflow **Staging CI/CD** (`.github/workflows/staging-cicd.yml`) — o mesmo padrão no slot `/opt/workspace-staging` (`workspace-staging`).
+
+Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em falha.
+
+### Segredos no repositório (Actions)
+
+| Segredo | Uso |
+|---------|-----|
+| `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | Push no CI e `docker login` na VPS |
+| `ENV_VPS_*` | Igual ao manifest `scripts/ci/vps-secrets.manifest` — `.env.vps.*` copiados para a VPS em cada deploy |
+| `VPS_HOST`, `VPS_USER` | SSH |
+| `VPS_SSH_PRIVATE_KEY` | Preferencial (chave privada PEM) |
+| `VPS_SSH_PASSWORD` | Alternativa (requer `sshpass` no runner — instalado no job) |
+
+### Primeira vez na VPS
+
+1. Instalar Docker e Compose plugin.
+2. Clonar o repositório nos paths usados pelo CI (ajuste conforme o seu fork):
+
+   - **develop:** `/opt/workspace-develop` (branch `develop`)
+   - **staging:** `/opt/workspace-staging` (branch `staging`)
+
+3. O segundo slot usa portas diferentes (`docker-compose.vps.slot-staging.yml`: proxy `8086`, gateway `3011`) para conviver com o primeiro na mesma máquina.
+
+### Smoke / logs
+
+O deploy remoto corre na VPS; se falhar, o script tenta reverter as imagens `workspace-*:vps` anteriores e imprime `docker compose ps` e `docker compose logs` no log do GitHub Actions.
+
 ## Current scope
 
 This VPS stack is meant for the stable microservices only:

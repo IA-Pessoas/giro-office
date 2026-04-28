@@ -1,28 +1,20 @@
-# Staging — espelho da realidade: imagens Docker, varredura de segurança, stack Compose,
-# smoke (contrato HTTP + healthchecks) e gancho para E2E (Playwright) quando existir no app.
+# Staging CI/CD — PR: stack completa no runner (Trivy, smoke, E2E). Push branch `staging`:
+# quality → build/push registry → deploy na VPS (slot `/opt/workspace-staging`, projeto `workspace-staging`).
+# Deploy da branch `develop` está em develop-cicd.yml.
 #
-# Gatilhos:
-#   • push em `develop` (após merge de PR).
-#   • pull_request com base `staging` (validação antes de integrar na branch staging).
+# Segredos obrigatórios (registry + env VPS): ver scripts/ci/vps-secrets.manifest e variáveis materializadas abaixo.
+#   DOCKER_REGISTRY_URL, DOCKER_REGISTRY_USERNAME, DOCKER_REGISTRY_PASSWORD
+#   VPS_HOST, VPS_USER, e VPS_SSH_PRIVATE_KEY (recomendado) ou VPS_SSH_PASSWORD
+# Na VPS: clone em /opt/workspace-staging (primeira vez manual ou bootstrap).
 #
-# Com DOCKER_REGISTRY_* configurado, ao fim (após smoke/E2E) o pipeline publica imagens
-# {registry}/{serviço}:<GITHUB_SHA> — o `main`/`promote` faz `pull` dessa tag.
-#
-# Segredos (mesmo conjunto do test-cicd / stack VPS) — obrigatórios para build e subida.
-# Pares secret → arquivo: scripts/ci/vps-secrets.manifest (ao novo serviço, atualize manifest + env abaixo).
-#
-# Opcional — testes de integração com Postgres real (Vitest em client-service):
-#   STAGING_DATABASE_URL — usado com CLIENT_SERVICE_INTEGRATION=1 após a stack estar no ar.
-#   Se não existir ou estiver vazio, o passo é ignorado (somente aviso).
-#
-# E2E: quando `app/node_modules/@playwright/test` existir após `pnpm install`, executa Playwright.
+# Com DOCKER_REGISTRY_* configurado, imagens {registry}/{serviço}:<GITHUB_SHA> — o main faz pull dessa tag.
 
 name: Staging CI/CD
 
 on:
   push:
     branches:
-      - develop
+      - staging
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
@@ -30,7 +22,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: staging-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  group: staging-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ github.sha }}
   cancel-in-progress: true
 
 permissions:
@@ -71,8 +63,9 @@ jobs:
         run: pnpm test
 
   staging-environment:
-    name: Staging — Docker, scan, integração, smoke, E2E
+    name: Staging — Docker no runner (apenas PR para staging)
     needs: quality
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -91,6 +84,17 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - uses: docker/setup-buildx-action@v3
+
+      - id: reg
+        name: Registro Docker configurado?
+        env:
+          R: ${{ secrets.DOCKER_REGISTRY_URL }}
+        run: |
+          if [ -n "$R" ]; then
+            echo "has=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Materializar .env.vps.* a partir dos segredos
         env:
@@ -112,11 +116,6 @@ jobs:
           set -eo pipefail
           docker compose -f docker-compose.vps.yml build
 
-      # Imagem oficial no Docker Hub: aquasec/trivy (o nome aquasecurity/trivy não existe lá).
-      # GHCR alternativo: ghcr.io/aquasecurity/trivy:<tag>
-      # Lista de imagens: scripts/ci/list-workspace-vps-images.sh (deriva de docker-compose.vps.yml).
-      # Política: CRITICAL quebra o pipeline; HIGH é reportado no log (informativo) para monitoramento.
-      # Cache do DB em /tmp/trivy-cache evita baixar ~91 MiB por imagem escaneada.
       - name: "[Scan] Trivy — imagens workspace (gate: CRITICAL; HIGH é informativo)"
         run: |
           set -eo pipefail
@@ -182,8 +181,8 @@ jobs:
           pnpm exec playwright install --with-deps chromium
           pnpm exec playwright test
 
-      - name: "[Registry] Publicar imagens (tag=commit) para o promote em `main`"
-        if: success() && secrets.DOCKER_REGISTRY_URL != ''
+      - name: "[Registry] Login"
+        if: success() && steps.reg.outputs.has == 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.DOCKER_REGISTRY_URL }}
@@ -191,7 +190,7 @@ jobs:
           password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
 
       - name: "[Registry] push workspace-*:vps → {registry}/*:<GITHUB_SHA>"
-        if: success() && secrets.DOCKER_REGISTRY_URL != ''
+        if: success() && steps.reg.outputs.has == 'true'
         env:
           DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
           STAGING_DOCKER_TAG: ${{ github.sha }}
@@ -201,3 +200,139 @@ jobs:
         if: always()
         run: |
           docker compose -f docker-compose.vps.yml down -v || true
+
+  build-and-push:
+    name: Build e push registry (push staging)
+    needs: quality
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      pull_services: ${{ steps.scope.outputs.pull_services }}
+      push_services: ${{ steps.scope.outputs.push_services }}
+    env:
+      DOCKER_BUILDKIT: 1
+      COMPOSE_DOCKER_CLI_BUILD: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: reg
+        name: Registro Docker configurado?
+        env:
+          R: ${{ secrets.DOCKER_REGISTRY_URL }}
+        run: |
+          if [ -n "$R" ]; then
+            echo "has=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Exige registry para deploy na VPS
+        if: steps.reg.outputs.has != 'true'
+        run: |
+          echo "::error::Configure DOCKER_REGISTRY_URL (e credenciais) para build/push e deploy na VPS."
+          exit 1
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Materializar .env.vps.* a partir dos segredos
+        env:
+          ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+          ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+          ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+          ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+          ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+          ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+          ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+          ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+        run: bash scripts/ci/materialize-vps-env.sh
+
+      - id: scope
+        name: Detetar serviços alterados (incremental)
+        run: |
+          set -eo pipefail
+          DET="$(bash scripts/ci/detect-changed-vps-services.sh "${{ github.event.before }}" "${{ github.sha }}")"
+          echo "detected=$DET"
+          echo "detected=$DET" >> "$GITHUB_OUTPUT"
+          if [[ "$DET" == "ALL" ]]; then
+            echo "pull_services=ALL" >> "$GITHUB_OUTPUT"
+            echo "push_services=ALL" >> "$GITHUB_OUTPUT"
+          else
+            ws="$(echo "$DET" | tr ' ' '\n' | grep -v '^reverse-proxy$' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+            if [[ -z "$ws" ]]; then
+              echo "pull_services=NONE" >> "$GITHUB_OUTPUT"
+              echo "push_services=NONE" >> "$GITHUB_OUTPUT"
+            else
+              echo "pull_services=$ws" >> "$GITHUB_OUTPUT"
+              echo "push_services=$ws" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Login no registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY_URL }}
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+
+      - name: Build imagens Docker (seletivo ou completo)
+        run: |
+          set -eo pipefail
+          PULL="${{ steps.scope.outputs.pull_services }}"
+          if [[ "$PULL" == "ALL" ]]; then
+            docker compose -f docker-compose.vps.yml build
+          elif [[ "$PULL" == "NONE" ]]; then
+            echo "::notice::Sem alterações em imagens workspace — sem build."
+          else
+            docker compose -f docker-compose.vps.yml build $PULL
+          fi
+
+      - name: Push imagens para o registry
+        env:
+          DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+          STAGING_DOCKER_TAG: ${{ github.sha }}
+          VPS_PUSH_SERVICES: ${{ steps.scope.outputs.push_services }}
+        run: bash scripts/ci/compose-vps-staging-push.sh
+
+  vps-deploy:
+    name: Deploy na VPS — slot staging (SSH)
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+      VPS_SSH_PASSWORD: ${{ secrets.VPS_SSH_PASSWORD }}
+      DEPLOY_PATH: /data/workspace-staging
+      DEPLOY_SLOT: staging
+      COMPOSE_PROJECT: workspace-staging
+      GITHUB_SHA: ${{ github.sha }}
+      DOCKER_IMAGE_TAG: ${{ github.sha }}
+      VPS_PULL_SERVICES: ${{ needs.build-and-push.outputs.pull_services }}
+      DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+      DOCKER_REGISTRY_USERNAME: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+      DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Materializar .env.vps.* para cópia SCP
+        env:
+          ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+          ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+          ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+          ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+          ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+          ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+          ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+          ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+        run: bash scripts/ci/materialize-vps-env.sh
+
+      - name: Instalar sshpass (opcional, deploy por senha SSH)
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Deploy remoto (logs da VPS no output do step)
+        run: bash scripts/ci/run-vps-deploy-from-github.sh
