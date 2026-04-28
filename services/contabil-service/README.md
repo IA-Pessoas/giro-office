@@ -1,24 +1,44 @@
 # contabil-service
 
-Microserviço contábil. Health em `/health`. Domínio **controls** (checklist por cliente e competência) em `/contabil/controls` — ver OpenAPI na PR 5. Demais prefixos `/contabil/*` nas PRs 3–4.
-
-Rotas atuais de controls (autenticação obrigatória):
-
-- `POST /contabil/controls` — corpo JSON: `client_id` (UUID), `competence` (texto não vazio); cria ou retorna existente (`201` / `200`).
-- `GET /contabil/controls` — query: `client_id`, `competence`.
-- `PATCH /contabil/controls/:id` — corpo: `field` (whitelist) e `value` (boolean ou string para `notes`).
+Microserviço de domínio contábil: checklist operacional por cliente e competência (**controls**), **responsibles** e **relationships** do cliente. Todas as rotas de negócio ficam sob o prefixo `/contabil` e exigem autenticação (JWT ou headers encaminhados pelo gateway).
 
 ## Porta local
 
-Por padrão: **3038** (`PORT`).
+Por padrão: **3038** (`PORT` em [`src/config/env.ts`](src/config/env.ts)).
 
 ## Variáveis de ambiente
 
-Ver [`src/config/env.ts`](src/config/env.ts):
+Definição e defaults em [`src/config/env.ts`](src/config/env.ts):
 
-- `DATABASE_URL`
-- `JWT_SECRET`
-- `AUDIT_*` quando a auditoria estiver ativa
+- `DATABASE_URL` — PostgreSQL (Prisma)
+- `JWT_SECRET` — validação do Bearer nas rotas autenticadas
+- `PORT` — porta HTTP (default `3038`)
+- `AUDIT_ENABLED`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN` — auditoria via `integrations/audit.ts`
+- `ENABLE_API_DOCS` — documentação OpenAPI em `/docs` (em produção o default é desligado)
+
+## Gateway
+
+No gateway, configure o upstream:
+
+- `CONTABIL_SERVICE_URL` — URL base do serviço (ex.: `http://localhost:3038`)
+
+Prefixo público no gateway: **`/contabil`**.
+
+Exemplos de paths públicos (via gateway, com `Authorization: Bearer …`):
+
+- `GET http://localhost:3010/contabil/controls?client_id=<uuid>&competence=<texto>`
+- `POST http://localhost:3010/contabil/controls`
+- `PATCH http://localhost:3010/contabil/controls/<id>`
+- `POST http://localhost:3010/contabil/responsibles`
+- `GET http://localhost:3010/contabil/responsibles/client/<clientId>`
+- `PUT http://localhost:3010/contabil/responsibles/<id>`
+- `DELETE http://localhost:3010/contabil/responsibles/<id>`
+- `POST http://localhost:3010/contabil/relationships`
+- `GET http://localhost:3010/contabil/relationships/client/<clientId>`
+- `PUT http://localhost:3010/contabil/relationships/<id>`
+- `DELETE http://localhost:3010/contabil/relationships/<id>`
+
+Health direto no serviço: `GET http://localhost:3038/health`.
 
 ## Desenvolvimento
 
@@ -26,4 +46,4 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 pnpm --filter @workspace/contabil-service dev
 ```
 
-Gerar Prisma: `pnpm --filter @workspace/contabil-service prisma:generate`.
+Gerar cliente Prisma: `pnpm --filter @workspace/contabil-service prisma:generate`.
