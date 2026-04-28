@@ -1,7 +1,7 @@
 import { BadgeCheck, Save } from "lucide-react";
 
 import type { OrganizationPlanOption } from "../utils/organizationUi";
-import { ORGANIZATION_PLAN_OPTIONS } from "../utils/organizationUi";
+import { getOrganizationPlanLabel, ORGANIZATION_PLAN_OPTIONS } from "../utils/organizationUi";
 
 const ORGANIZATION_SUBPANEL_CLASSNAME =
   "rounded-xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-950/40";
@@ -38,14 +38,28 @@ export function OrganizationPlanForm({
           <BadgeCheck className="h-4 w-4 text-[var(--colors-brand-gradient-end)]" />
           <h3 className="text-base font-semibold text-slate-900 dark:text-white">Plano de assinatura</h3>
         </div>
-        <p className={ORGANIZATION_MUTED_CLASSNAME}>
-          Plano atual: <span className="font-medium text-slate-700 dark:text-slate-200">{currentPlan}</span>
-        </p>
+        <p className={ORGANIZATION_MUTED_CLASSNAME}>Atualize o plano exibido.</p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <p className={ORGANIZATION_MUTED_CLASSNAME}>Plano atual</p>
+          <p className="mt-1 text-base font-semibold text-slate-900 dark:text-white">
+            {getOrganizationPlanLabel(currentPlan)}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <p className={ORGANIZATION_MUTED_CLASSNAME}>Novo plano</p>
+          <p className="mt-1 text-base font-semibold text-slate-900 dark:text-white">
+            {getOrganizationPlanLabel(planDraft)}
+          </p>
+        </div>
       </div>
 
       <div className="space-y-2">
         <label className={ORGANIZATION_LABEL_CLASSNAME} htmlFor="organization-plan">
-          Novo plano
+          Selecionar Plano
         </label>
         <select
           id="organization-plan"
@@ -56,7 +70,7 @@ export function OrganizationPlanForm({
         >
           {ORGANIZATION_PLAN_OPTIONS.map((planOption) => (
             <option key={planOption} value={planOption}>
-              {planOption}
+              {getOrganizationPlanLabel(planOption)}
             </option>
           ))}
         </select>

@@ -36,3 +36,29 @@ export function getOrganizationDrafts(organization: Organization | undefined) {
 export function isOrganizationPlanOption(value: string | null | undefined): value is OrganizationPlanOption {
   return ORGANIZATION_PLAN_OPTIONS.includes(value as OrganizationPlanOption);
 }
+
+export function getOrganizationPlanLabel(plan: string): string {
+  if (plan === "trial") {
+    return "Trial";
+  }
+
+  if (plan === "pro") {
+    return "Pro";
+  }
+
+  if (plan === "enterprise") {
+    return "Enterprise";
+  }
+
+  return plan;
+}
+
+export function formatOrganizationCnpj(cnpj: string): string {
+  const digits = cnpj.replace(/\D/g, "");
+
+  if (digits.length !== 14) {
+    return cnpj;
+  }
+
+  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+}

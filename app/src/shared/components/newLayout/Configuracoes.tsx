@@ -50,7 +50,7 @@ const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
 
 const PERMISSION_LABELS: Record<number, string> = {
   0: "Visualizador",
-  1: "Usuario",
+  1: "Usuário",
   2: "Administrador",
 };
 
@@ -124,7 +124,7 @@ export function Configuracoes() {
   const currentName = meQuery.data?.name ?? "";
   const currentLogin = meQuery.data?.login ?? "";
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
-  const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuario";
+  const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário";
   const managedOrganizationId =
     meQuery.data?.permission === 2 && meQuery.data.organization_id
       ? meQuery.data.organization_id
@@ -192,7 +192,7 @@ export function Configuracoes() {
     }
 
     if (selectedFile.size > MAX_PHOTO_SIZE_BYTES) {
-      toast.error("A imagem deve ter no maximo 5 MB.");
+      toast.error("A imagem deve ter no máximo 5 MB.");
       event.target.value = "";
       return;
     }
@@ -257,15 +257,15 @@ export function Configuracoes() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Configuracoes</h1>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Configurações</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Carregando preferencias e dados do perfil...
+            Carregando preferências e dados do perfil...
           </p>
         </div>
 
         <div className={`${SETTINGS_FEEDBACK_PANEL_CLASSNAME} flex items-center gap-3 p-6`}>
           <LoaderCircle className="h-5 w-5 animate-spin text-[var(--colors-brand-gradient-end)]" />
-          <p className={SETTINGS_MUTED_CLASSNAME}>Carregando dados do usuario atual.</p>
+          <p className={SETTINGS_MUTED_CLASSNAME}>Carregando dados do usuário atual.</p>
         </div>
       </div>
     );
@@ -275,15 +275,15 @@ export function Configuracoes() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Configuracoes</h1>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Configurações</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Nao foi possivel carregar os dados do perfil.
+            Não foi possível carregar os dados do perfil.
           </p>
         </div>
 
         <div className={`${SETTINGS_FEEDBACK_PANEL_CLASSNAME} space-y-3 p-6`}>
           <p className="text-sm text-slate-700 dark:text-white">
-            A leitura do usuario autenticado falhou. Tente carregar novamente.
+            A leitura do usuário autenticado falhou. Tente carregar novamente.
           </p>
           <button
             type="button"
@@ -420,12 +420,11 @@ export function Configuracoes() {
                       <ChevronDown className="h-4 w-4" />
                     )}
                   </button>
-
                 </div>
               </div>
 
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                JPEG, PNG ou WebP . max. 5 MB
+                JPEG, PNG ou WebP. máx. 5 MB
               </p>
 
               {isAccessSectionOpen ? (
@@ -466,7 +465,9 @@ export function Configuracoes() {
           </div>
         </section>
 
-        {managedOrganizationId ? <MyOrganizationSection organizationId={managedOrganizationId} /> : null}
+        {managedOrganizationId ? (
+          <MyOrganizationSection organizationId={managedOrganizationId} userEmail={currentLogin} />
+        ) : null}
 
         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
           <section className={`${SETTINGS_PANEL_CLASSNAME} p-6`}>
@@ -479,16 +480,16 @@ export function Configuracoes() {
                 <p className={SETTINGS_MUTED_CLASSNAME}>Escolha o visual da interface.</p>
               </div>
 
-              <div className={`${SETTINGS_SUBPANEL_CLASSNAME} flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between`}>
+              <div
+                className={`${SETTINGS_SUBPANEL_CLASSNAME} flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between`}
+              >
                 <div className="flex items-center gap-3">
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--colors-brand-soft)] text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
                     {isDark ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-slate-900 dark:text-white">Modo escuro</p>
-                    <p className={SETTINGS_MUTED_CLASSNAME}>
-                      {isDark ? "Ativado" : "Desativado"}
-                    </p>
+                    <p className={SETTINGS_MUTED_CLASSNAME}>{isDark ? "Ativado" : "Desativado"}</p>
                   </div>
                 </div>
 

@@ -37,7 +37,7 @@ async function refetchCurrentOrganization(
   try {
     await queryClient.refetchQueries({ queryKey, type: "active" });
   } catch {
-    toast.warn("A organizacao foi atualizada, mas os dados nao puderam ser recarregados agora.");
+    toast.warn("A organização foi atualizada, mas os dados não puderam ser recarregados agora.");
   }
 }
 
@@ -54,14 +54,14 @@ export function useUpdateOrganizationLogo(): UseMutationResult<
       organizationService.updateLogoUrl(organizationId, logoUrl),
     onSuccess: async (organization, { organizationId }) => {
       await refetchCurrentOrganization(queryClient, organizationId, organization);
-      toast.success("Logo da organizacao atualizada com sucesso!");
+      toast.success("Logo da organização atualizada com sucesso!");
     },
     onError: (error: unknown) => {
       if (shouldSkipToastForServerError(error)) {
         return;
       }
 
-      toast.error("Nao foi possivel atualizar a logo da organizacao.");
+      toast.error("Não foi possível atualizar a logo da organização.");
       console.log(error);
     },
   });
@@ -80,14 +80,14 @@ export function useUpdateOrganizationPlan(): UseMutationResult<
       organizationService.updateSubscriptionPlan(organizationId, subscriptionPlan),
     onSuccess: async (organization, { organizationId }) => {
       await refetchCurrentOrganization(queryClient, organizationId, organization);
-      toast.success("Plano da organizacao atualizado com sucesso!");
+      toast.success("Plano da organização atualizado com sucesso!");
     },
     onError: (error: unknown) => {
       if (shouldSkipToastForServerError(error)) {
         return;
       }
 
-      toast.error("Nao foi possivel atualizar o plano da organizacao.");
+      toast.error("Não foi possível atualizar o plano da organização.");
       console.log(error);
     },
   });

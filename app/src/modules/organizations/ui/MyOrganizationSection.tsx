@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Building2, LoaderCircle } from "lucide-react";
+import { Building2, ChevronDown, ChevronUp, LoaderCircle, Sparkles } from "lucide-react";
 
 import { useCurrentOrganization } from "../hooks/useCurrentOrganization";
 import {
@@ -21,12 +21,14 @@ const ORGANIZATION_MUTED_CLASSNAME = "dialog-neutral-muted text-sm text-slate-50
 
 interface MyOrganizationSectionProps {
   organizationId: string;
+  userEmail: string;
 }
 
-export function MyOrganizationSection({ organizationId }: MyOrganizationSectionProps) {
+export function MyOrganizationSection({ organizationId, userEmail }: MyOrganizationSectionProps) {
   const organizationQuery = useCurrentOrganization(organizationId);
   const updateOrganizationLogoMutation = useUpdateOrganizationLogo();
   const updateOrganizationPlanMutation = useUpdateOrganizationPlan();
+  const [isEditSectionOpen, setIsEditSectionOpen] = useState(false);
   const [logoDraft, setLogoDraft] = useState("");
   const [planDraft, setPlanDraft] = useState<OrganizationPlanOption>("trial");
 
@@ -55,7 +57,7 @@ export function MyOrganizationSection({ organizationId }: MyOrganizationSectionP
 
   const handleSaveLogo = async () => {
     if (!canSaveLogo) {
-      return;
+      return false;
     }
 
     try {
@@ -63,13 +65,33 @@ export function MyOrganizationSection({ organizationId }: MyOrganizationSectionP
         organizationId,
         logoUrl: logoDraft.trim() || null,
       });
+      return true;
     } catch {
       // Toasts are handled by the mutation hook.
+      return false;
     }
   };
 
   const handleCancelLogo = () => {
     setLogoDraft(serverDrafts.logoDraft);
+  };
+
+  const handleRemoveLogo = async () => {
+    if (isSavingLogo || !organizationQuery.data?.logo_url) {
+      return false;
+    }
+
+    try {
+      setLogoDraft("");
+      await updateOrganizationLogoMutation.mutateAsync({
+        organizationId,
+        logoUrl: null,
+      });
+      return true;
+    } catch {
+      setLogoDraft(serverDrafts.logoDraft);
+      return false;
+    }
   };
 
   const handleSavePlan = async () => {
@@ -90,27 +112,41 @@ export function MyOrganizationSection({ organizationId }: MyOrganizationSectionP
   return (
     <section className={`${ORGANIZATION_PANEL_CLASSNAME} p-6 lg:p-8`}>
       <div className="space-y-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-[var(--colors-brand-gradient-end)]" />
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Minha organizacao</h2>
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-[var(--colors-brand-gradient-end)]" />
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Minha organização</h2>
+            </div>
+            <p className={ORGANIZATION_MUTED_CLASSNAME}>Consulte os dados da sua organização.</p>
           </div>
-          <p className={ORGANIZATION_MUTED_CLASSNAME}>
-            Consulte os dados da sua organizacao e mantenha a configuracao atualizada.
-          </p>
+
+          <button
+            type="button"
+            onClick={() => setIsEditSectionOpen((currentValue) => !currentValue)}
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 lg:w-fit"
+          >
+            <Sparkles className="h-4 w-4 text-[var(--colors-brand-gradient-end)]" />
+            {isEditSectionOpen ? "Ocultar edição" : "Editar organização"}
+            {isEditSectionOpen ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
         </div>
 
         {organizationQuery.isLoading ? (
           <div className={`${ORGANIZATION_FEEDBACK_PANEL_CLASSNAME} flex items-center gap-3 p-6`}>
             <LoaderCircle className="h-5 w-5 animate-spin text-[var(--colors-brand-gradient-end)]" />
-            <p className={ORGANIZATION_MUTED_CLASSNAME}>Carregando dados da organizacao.</p>
+            <p className={ORGANIZATION_MUTED_CLASSNAME}>Carregando dados da organização.</p>
           </div>
         ) : null}
 
         {shouldShowFetchError ? (
           <div className={`${ORGANIZATION_FEEDBACK_PANEL_CLASSNAME} space-y-3 p-6`}>
             <p className="text-sm text-slate-700 dark:text-white">
-              Nao foi possivel carregar os dados da organizacao atual.
+              Não foi possível carregar os dados da organização atual.
             </p>
             <button
               type="button"
@@ -127,30 +163,45 @@ export function MyOrganizationSection({ organizationId }: MyOrganizationSectionP
             {shouldShowRefetchWarning ? (
               <div className={`${ORGANIZATION_FEEDBACK_PANEL_CLASSNAME} space-y-2`}>
                 <p className="text-sm text-slate-700 dark:text-white">
-                  Os dados mais recentes da organizacao nao puderam ser recarregados agora.
+                  Os dados mais recentes da organização não puderam ser recarregados agora.
                 </p>
               </div>
             ) : null}
 
-            <OrganizationInfoPanel organization={organizationQuery.data} />
-            <OrganizationLogoForm
-              organizationName={organizationQuery.data.name}
-              logoDraft={logoDraft}
-              logoUrl={organizationQuery.data.logo_url}
-              isSaving={isSavingLogo}
-              canSave={canSaveLogo}
-              onLogoDraftChange={setLogoDraft}
-              onSave={() => void handleSaveLogo()}
-              onCancel={handleCancelLogo}
-            />
-            <OrganizationPlanForm
-              currentPlan={organizationQuery.data.subscription_plan}
-              planDraft={planDraft}
-              isSaving={isSavingPlan}
-              canSave={canSavePlan}
-              onPlanDraftChange={setPlanDraft}
-              onSave={() => void handleSavePlan()}
-            />
+            <OrganizationInfoPanel organization={organizationQuery.data} userEmail={userEmail} />
+
+            {isEditSectionOpen ? (
+              <div className="space-y-4 border-t border-slate-200 pt-5 dark:border-slate-700">
+                <div className="space-y-1">
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                    Edição da organização
+                  </h3>
+                  <p className={ORGANIZATION_MUTED_CLASSNAME}>Atualize logo e plano.</p>
+                </div>
+
+                <div className="grid gap-5 xl:grid-cols-2">
+                  <OrganizationLogoForm
+                    organizationName={organizationQuery.data.name}
+                    logoDraft={logoDraft}
+                    logoUrl={organizationQuery.data.logo_url}
+                    isSaving={isSavingLogo}
+                    canSave={canSaveLogo}
+                    onLogoDraftChange={setLogoDraft}
+                    onSave={handleSaveLogo}
+                    onRemove={handleRemoveLogo}
+                    onCancel={handleCancelLogo}
+                  />
+                  <OrganizationPlanForm
+                    currentPlan={organizationQuery.data.subscription_plan}
+                    planDraft={planDraft}
+                    isSaving={isSavingPlan}
+                    canSave={canSavePlan}
+                    onPlanDraftChange={setPlanDraft}
+                    onSave={() => void handleSavePlan()}
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
