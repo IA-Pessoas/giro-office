@@ -36,7 +36,7 @@ function contabilServiceErrorLogContext(request: Request): Record<string, unknow
 }
 
 /**
- * Composição da app: infraestrutura, `/health` e rotas de domínio sob `/contabil`.
+ * Composição da app: infraestrutura (`/health`, `/ready`), documentação e rotas de domínio sob `/contabil`.
  */
 export function createContabilApp(options: {
   env: ContabilServiceEnv;
@@ -58,6 +58,10 @@ export function createContabilApp(options: {
 
   app.get("/health", (_req, res) => {
     res.status(200).json(createSuccessResponse({ status: "ok", service: "contabil-service" }));
+  });
+
+  app.get("/ready", (_req, res) => {
+    res.status(200).json(createSuccessResponse({ status: "ready", service: "contabil-service" }));
   });
 
   if (env.enableApiDocs) {

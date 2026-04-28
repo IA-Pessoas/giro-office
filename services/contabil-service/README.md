@@ -14,6 +14,7 @@ Definição e defaults em [`src/config/env.ts`](src/config/env.ts):
 - `JWT_SECRET` — validação do Bearer nas rotas autenticadas
 - `PORT` — porta HTTP (default `3038`)
 - `AUDIT_ENABLED`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN` — auditoria via `integrations/audit.ts`
+- `INTERNAL_SERVICE_TOKEN` — token esperado no header interno quando o gateway encaminha usuário/organização (opcional; se omitido, usa o mesmo valor que `AUDIT_SERVICE_TOKEN`)
 - `ENABLE_API_DOCS` — documentação OpenAPI em `/docs` (em produção o default é desligado)
 
 ## Gateway
@@ -38,7 +39,7 @@ Exemplos de paths públicos (via gateway, com `Authorization: Bearer …`):
 - `PUT http://localhost:3010/contabil/relationships/<id>`
 - `DELETE http://localhost:3010/contabil/relationships/<id>`
 
-Health direto no serviço: `GET http://localhost:3038/health`.
+Infraestrutura direto no serviço: `GET http://localhost:3038/health` e `GET http://localhost:3038/ready`.
 
 ## Desenvolvimento
 

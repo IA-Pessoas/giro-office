@@ -42,16 +42,23 @@ const envSchema = z
       .transform((value) => parseBoolean(value)),
     auditServiceUrl: z.string().url().default("http://localhost:3020"),
     auditServiceToken: z.string().default("audit-service-token"),
+    /** Quando vazio, reutiliza `auditServiceToken` (compatível com deploys que só definem AUDIT_SERVICE_TOKEN). */
+    internalServiceTokenEnv: z.string().optional(),
     enableApiDocsEnv: z.string().optional(),
   })
   .transform((env) => {
-    const { enableApiDocsEnv, ...rest } = env;
+    const { enableApiDocsEnv, internalServiceTokenEnv, ...rest } = env;
     const enableApiDocs =
       enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
         ? parseBoolean(enableApiDocsEnv)
         : rest.nodeEnv !== "production";
+    const internalServiceToken =
+      internalServiceTokenEnv !== undefined && internalServiceTokenEnv !== ""
+        ? internalServiceTokenEnv
+        : rest.auditServiceToken;
     return {
       ...rest,
+      internalServiceToken,
       logPretty: rest.nodeEnv !== "production" && rest.logPretty,
       enableApiDocs,
     };
@@ -70,6 +77,7 @@ export function getContabilServiceEnv(): ContabilServiceEnv {
     auditEnabled: process.env.AUDIT_ENABLED,
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
+    internalServiceTokenEnv: process.env.INTERNAL_SERVICE_TOKEN,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
   });
 }

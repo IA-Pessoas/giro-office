@@ -1940,6 +1940,14 @@ const baseManifest = [
   }),
   op({
     service: "contabil-service",
+    method: "GET",
+    path: "/ready",
+    action: "serviceReady",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "contabil-service",
     method: "POST",
     path: "/contabil/controls",
     action: "contabilControlCreate",

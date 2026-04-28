@@ -21,16 +21,19 @@ function parseForwardedPermission(headerValue: string | undefined): number | und
 }
 
 export function isAuthenticated(request: Request, _response: Response, next: NextFunction): void {
+  const env = getContabilServiceEnv();
   const forwardedUserId = request.get(FORWARDED_AUTH_USER_ID_HEADER);
   const forwardedOrgId = request.get(FORWARDED_AUTH_ORGANIZATION_ID_HEADER);
   const forwardedPermission = parseForwardedPermission(
     request.get(FORWARDED_AUTH_PERMISSION_HEADER) ?? undefined,
   );
   const internalToken = request.get(INTERNAL_SERVICE_TOKEN_HEADER);
-  const { auditServiceToken } = getContabilServiceEnv();
 
   const isFromGateway =
-    internalToken && internalToken === auditServiceToken && forwardedUserId && forwardedOrgId;
+    internalToken &&
+    internalToken === env.internalServiceToken &&
+    forwardedUserId &&
+    forwardedOrgId;
 
   if (isFromGateway) {
     request.user_id = forwardedUserId;
@@ -47,9 +50,8 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
   }
 
   try {
-    const { jwtSecret } = getContabilServiceEnv();
     const token = extractBearerToken(authorizationHeader);
-    const claims = verifyJwtToken(token, jwtSecret);
+    const claims = verifyJwtToken(token, env.jwtSecret);
 
     request.user_id = claims.user_id;
     request.organization_id = claims.organization_id ?? "";

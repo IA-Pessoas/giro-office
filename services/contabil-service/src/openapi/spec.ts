@@ -49,7 +49,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
     },
     servers: [{ url: baseUrl }],
     tags: [
-      { name: "Health", description: "Saúde do serviço" },
+      { name: "Health", description: "Saúde e readiness do serviço" },
       { name: "Controls", description: "Checklist operacional por cliente e competência" },
       { name: "Responsibles", description: "Responsáveis contábeis por cliente" },
       { name: "Relationships", description: "Relacionamento contábil do cliente" },
@@ -78,6 +78,22 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           responses: {
             "200": {
               description: "Serviço disponível",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/ready": {
+        get: {
+          tags: ["Health"],
+          summary: "Readiness check",
+          responses: {
+            "200": {
+              description: "Serviço pronto para tráfego",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/SuccessEnvelope" },
