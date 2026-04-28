@@ -5,6 +5,9 @@
 #   • push em `develop` (após merge de PR).
 #   • pull_request com base `staging` (validação antes de integrar na branch staging).
 #
+# Com DOCKER_REGISTRY_* configurado, ao fim (após smoke/E2E) o pipeline publica imagens
+# {registry}/{serviço}:<GITHUB_SHA> — o `main`/`promote` faz `pull` dessa tag.
+#
 # Segredos (mesmo conjunto do test-cicd / stack VPS) — obrigatórios para build e subida.
 # Pares secret → arquivo: scripts/ci/vps-secrets.manifest (ao novo serviço, atualize manifest + env abaixo).
 #
@@ -178,6 +181,21 @@ jobs:
           cd app
           pnpm exec playwright install --with-deps chromium
           pnpm exec playwright test
+
+      - name: "[Registry] Publicar imagens (tag=commit) para o promote em `main`"
+        if: success() && secrets.DOCKER_REGISTRY_URL != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY_URL }}
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+
+      - name: "[Registry] push workspace-*:vps → {registry}/*:<GITHUB_SHA>"
+        if: success() && secrets.DOCKER_REGISTRY_URL != ''
+        env:
+          DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+          STAGING_DOCKER_TAG: ${{ github.sha }}
+        run: bash scripts/ci/compose-vps-staging-push.sh
 
       - name: Encerrar stack
         if: always()

@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Puxa imagens do registry no formato {REG}/{service}:{SOURCE_TAG} e reetiqueta para o nome
+# esperado por docker-compose.vps.yml (ex.: workspace-gateway:vps).
+#
+# Obrigatório: DOCKER_REGISTRY_URL, DOCKER_STAGING_RESOLVED_TAG
+set -eo pipefail
+
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+
+if [[ -z "${DOCKER_REGISTRY_URL:-}" ]]; then
+  echo "::error::compose-vps-pull-and-tag: DOCKER_REGISTRY_URL é obrigatório"
+  exit 1
+fi
+if [[ -z "${DOCKER_STAGING_RESOLVED_TAG:-}" ]]; then
+  echo "::error::compose-vps-pull-and-tag: DOCKER_STAGING_RESOLVED_TAG é obrigatório"
+  exit 1
+fi
+
+REG="${DOCKER_REGISTRY_URL#https://}"
+REG="${REG#http://}"
+# Remove barra final, se houver
+REG="${REG%/}"
+
+list_images() {
+  bash scripts/ci/list-workspace-vps-images.sh
+}
+
+if ! head -1 < <(list_images) &>/dev/null; then
+  list_images
+  echo "::error::Nenhuma imagem workspace listada" >&2
+  exit 1
+fi
+
+mapfile -t local_imgs < <(list_images)
+
+for local_img in "${local_imgs[@]}"; do
+  # workspace-foo-service:vps -> foo-service
+  name="${local_img#workspace-}"
+  name="${name%:vps}"
+  remote="${REG}/${name}:${DOCKER_STAGING_RESOLVED_TAG}"
+  echo "::group::pull+tag: $local_img <- $remote"
+  docker pull "$remote"
+  docker tag "$remote" "$local_img"
+  echo "::endgroup::"
+done
