@@ -7,7 +7,9 @@ import "express-async-errors";
 import type { ContabilServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { type ControlRouteDeps, createControlRoutes } from "./routes/control.routes.js";
+import { type ResponsibleRouteDeps, createResponsibleRoutes } from "./routes/responsible.routes.js";
 import { ControlService } from "./services/controlService.js";
+import { ResponsibleService } from "./services/responsibleService.js";
 
 function contabilServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -33,9 +35,11 @@ export function createContabilApp(options: {
   env: ContabilServiceEnv;
   logger: Logger;
   controlRouteDeps?: ControlRouteDeps;
+  responsibleRouteDeps?: ResponsibleRouteDeps;
 }): express.Express {
   const { logger } = options;
   const controlRouteDeps = options.controlRouteDeps ?? new ControlService();
+  const responsibleRouteDeps = options.responsibleRouteDeps ?? new ResponsibleService();
 
   const app = express();
 
@@ -48,6 +52,7 @@ export function createContabilApp(options: {
   });
 
   app.use("/contabil", createControlRoutes(controlRouteDeps));
+  app.use("/contabil", createResponsibleRoutes(responsibleRouteDeps));
 
   app.use(
     createExpressErrorHandler({
