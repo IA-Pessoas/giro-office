@@ -39,7 +39,7 @@ alwaysApply: true
 ## Arquitetura e estrutura
 - O padrao oficial do projeto esta em `services/`.
 - A estrutura legado fora desse padrao nao deve ser usada como referencia para novos contratos ou novas implementacoes.
-- Servicos atuais: `user-service`, `audit-service`, `organization-service`, `rh-service`, `task-service`, `project-service` e `gateway`.
+- Servicos atuais: `user-service`, `audit-service`, `organization-service`, `rh-service`, `task-service`, `project-service`, `contabil-service` e `gateway`.
 - Codigo compartilhado fica em `shared`.
 - Convencao oficial de nomes de arquivos nos servicos atuais:
   - services: `camelCaseService.ts`

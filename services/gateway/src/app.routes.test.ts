@@ -122,6 +122,8 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     projectServiceUrl: "http://127.0.0.1:3033",
     clientServiceUrl: "http://127.0.0.1:3035",
     departmentServiceUrl: "http://127.0.0.1:3336",
+    fiscalServiceUrl: "http://127.0.0.1:3037",
+    contabilServiceUrl: "http://127.0.0.1:3038",
 
     jwtSecret: "test-secret",
     logLevel: "silent",
@@ -368,6 +370,8 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/client/list"]).toBeTruthy();
     expect(body.paths["/organizations"]).toBeTruthy();
     expect(body.paths["/rh/point-config"]).toBeTruthy();
+    expect(body.paths["/fiscal/ncm"]).toBeTruthy();
+    expect(body.paths["/contabil/controls"]).toBeTruthy();
     expect(body.paths["/audit/requests"]).toBeTruthy();
   } finally {
     await stopServer(server);
@@ -390,6 +394,8 @@ it("does not duplicate gateway path prefixes in the aggregated OpenAPI JSON", as
     expect(body.paths["/rh/rh/point-config"]).toBe(undefined);
     expect(body.paths["/audit/audit/requests"]).toBe(undefined);
     expect(body.paths["/client/client/list"]).toBe(undefined);
+    expect(body.paths["/fiscal/fiscal/ncm"]).toBe(undefined);
+    expect(body.paths["/contabil/contabil/controls"]).toBe(undefined);
   } finally {
     await stopServer(server);
   }
