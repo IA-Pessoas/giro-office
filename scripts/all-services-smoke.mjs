@@ -91,6 +91,7 @@ const SERVICE_URL_ENV_KEYS = {
   "client-service": "CLIENT_SERVICE_URL",
   "department-service": "DEPARTMENT_SERVICE_URL",
   "fiscal-service": "FISCAL_SERVICE_URL",
+  "contabil-service": "CONTABIL_SERVICE_URL",
   "organization-service": "ORGANIZATION_SERVICE_URL",
   "project-service": "PROJECT_SERVICE_URL",
   "rh-service": "RH_SERVICE_URL",
@@ -102,6 +103,8 @@ const SERVICE_URL_DEFAULTS = {
   "audit-service": "http://localhost:3020",
   "client-service": "http://localhost:3035",
   "department-service": "http://localhost:3036",
+  "fiscal-service": "http://localhost:3037",
+  "contabil-service": "http://localhost:3038",
   "organization-service": "http://localhost:3031",
   "project-service": "http://localhost:3033",
   "rh-service": "http://localhost:3034",
@@ -140,6 +143,11 @@ for (const [service, envKey] of Object.entries(SERVICE_URL_ENV_KEYS)) {
 if (!env["fiscal-service"]) {
   env.FISCAL_SERVICE_URL = "http://localhost:3037";
   env["fiscal-service"] = env.FISCAL_SERVICE_URL;
+}
+
+if (!env["contabil-service"]) {
+  env.CONTABIL_SERVICE_URL = "http://localhost:3038";
+  env["contabil-service"] = env.CONTABIL_SERVICE_URL;
 }
 
 for (const envKey of Object.values(INTERNAL_SERVICE_TOKENS)) {
@@ -186,6 +194,10 @@ const state = {
   rhTargetUserToken: "",
   rhPointDayAlreadyComplete: false,
   auditRequestId: "",
+  contabilControlId: "",
+  contabilControlCompetence: "",
+  contabilResponsibleId: "",
+  contabilRelationshipId: "",
 };
 
 const cleanupTasks = [];
@@ -1630,6 +1642,172 @@ const handlers = {
         description: uniqueText("Smoke Fiscal IPI Updated"),
         aliquot: "12.00",
       },
+    });
+  },
+
+  async contabilControlCreate(op) {
+    const competence =
+      `${env.namespace}`.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40) || `comp-${uniqueDigits(8)}`;
+    state.contabilControlCompetence = competence;
+    const response = await httpRequest(op, {
+      expectedStatus: [200, 201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    const id =
+      pickFirst(response.body, "data.control.id", "data.id") ?? findFirstId(response.body?.data);
+    if (id) {
+      state.contabilControlId = id;
+    }
+  },
+
+  async contabilControlCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { client_id: "not-a-uuid", competence: "" },
+    });
+  },
+
+  async contabilControlDetail(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("contabilControlCompetence"),
+      },
+    });
+  },
+
+  async contabilControlPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/controls/${requireState("contabilControlId")}`,
+      json: { field: "monthly_closing", value: true },
+    });
+  },
+
+  async contabilControlPatchNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/contabil/controls/00000000-0000-0000-0000-000000000000",
+      json: { field: "monthly_closing", value: false },
+    });
+  },
+
+  async contabilResponsibleCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("secondaryClientId"),
+        customer_with_movement: true,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) {
+      state.contabilResponsibleId = id;
+    }
+  },
+
+  async contabilResponsibleCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {},
+    });
+  },
+
+  async contabilResponsibleGetByClient(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/responsibles/client/${requireState("secondaryClientId")}`,
+    });
+  },
+
+  async contabilResponsibleUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/responsibles/${requireState("contabilResponsibleId")}`,
+      json: { customer_with_movement: false },
+    });
+  },
+
+  async contabilResponsibleUpdateNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/contabil/responsibles/00000000-0000-0000-0000-000000000000",
+      json: { customer_with_movement: true },
+    });
+  },
+
+  async contabilResponsibleDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/responsibles/${requireState("contabilResponsibleId")}`,
+    });
+  },
+
+  async contabilRelationshipCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        bidding: false,
+        chart_accounts: uniqueText("Smoke chart"),
+        tool: "Ferramenta smoke",
+        system: "Sistema smoke",
+        note: uniqueText("Smoke relationship note"),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) {
+      state.contabilRelationshipId = id;
+    }
+  },
+
+  async contabilRelationshipCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async contabilRelationshipGetByClient(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/relationships/client/${requireState("primaryClientId")}`,
+    });
+  },
+
+  async contabilRelationshipUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/relationships/${requireState("contabilRelationshipId")}`,
+      json: { note: uniqueText("Smoke relationship updated") },
+    });
+  },
+
+  async contabilRelationshipUpdateNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/contabil/relationships/00000000-0000-0000-0000-000000000000",
+      json: { note: "not found smoke" },
+    });
+  },
+
+  async contabilRelationshipDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/relationships/${requireState("contabilRelationshipId")}`,
     });
   },
 

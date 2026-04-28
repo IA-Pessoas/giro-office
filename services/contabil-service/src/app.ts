@@ -1,4 +1,5 @@
 import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import cors from "cors";
 import express, { type Request } from "express";
@@ -6,9 +7,13 @@ import "express-async-errors";
 
 import type { ContabilServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
+import { buildContabilServiceOpenApiSpec } from "./openapi/spec.js";
 import { type ControlRouteDeps, createControlRoutes } from "./routes/control.routes.js";
-import { type ResponsibleRouteDeps, createResponsibleRoutes } from "./routes/responsible.routes.js";
-import { type RelationshipRouteDeps, createRelationshipRoutes } from "./routes/relationship.routes.js";
+import {
+  createRelationshipRoutes,
+  type RelationshipRouteDeps,
+} from "./routes/relationship.routes.js";
+import { createResponsibleRoutes, type ResponsibleRouteDeps } from "./routes/responsible.routes.js";
 import { ControlService } from "./services/controlService.js";
 import { RelationshipService } from "./services/relationshipService.js";
 import { ResponsibleService } from "./services/responsibleService.js";
@@ -40,7 +45,7 @@ export function createContabilApp(options: {
   responsibleRouteDeps?: ResponsibleRouteDeps;
   relationshipRouteDeps?: RelationshipRouteDeps;
 }): express.Express {
-  const { logger } = options;
+  const { env, logger } = options;
   const controlRouteDeps = options.controlRouteDeps ?? new ControlService();
   const responsibleRouteDeps = options.responsibleRouteDeps ?? new ResponsibleService();
   const relationshipRouteDeps = options.relationshipRouteDeps ?? new RelationshipService();
@@ -54,6 +59,13 @@ export function createContabilApp(options: {
   app.get("/health", (_req, res) => {
     res.status(200).json(createSuccessResponse({ status: "ok", service: "contabil-service" }));
   });
+
+  if (env.enableApiDocs) {
+    mountOpenApiDocs(app, {
+      spec: buildContabilServiceOpenApiSpec(env),
+      siteTitle: "contabil-service — OpenAPI",
+    });
+  }
 
   app.use("/contabil", createControlRoutes(controlRouteDeps));
   app.use("/contabil", createResponsibleRoutes(responsibleRouteDeps));
