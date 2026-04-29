@@ -97,7 +97,7 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 
 | Segredo | Uso |
 |---------|-----|
-| `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | Push no CI e `docker login` na VPS |
+| `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | Push no CI e `docker login` na VPS. O URL/path é normalizado em minúsculas nos scripts de imagem (evita `name invalid` no registry). |
 | `ENV_VPS_*` | Igual ao manifest `scripts/ci/vps-secrets.manifest` — `.env.vps.*` copiados para a VPS em cada deploy |
 | `VPS_HOST`, `VPS_USER` | SSH |
 | `VPS_SSH_PRIVATE_KEY` | Preferencial (chave privada PEM) |

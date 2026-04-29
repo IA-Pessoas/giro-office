@@ -17,10 +17,7 @@ if [[ -z "${DOCKER_STAGING_RESOLVED_TAG:-}" ]]; then
   exit 1
 fi
 
-REG="${DOCKER_REGISTRY_URL#https://}"
-REG="${REG#http://}"
-# Remove barra final, se houver
-REG="${REG%/}"
+REF_HELPER="$ROOT/scripts/ci/docker-registry-image-ref.sh"
 
 list_images() {
   bash scripts/ci/list-workspace-vps-images.sh
@@ -38,7 +35,7 @@ for local_img in "${local_imgs[@]}"; do
   # workspace-foo-service:vps -> foo-service
   name="${local_img#workspace-}"
   name="${name%:vps}"
-  remote="${REG}/${name}:${DOCKER_STAGING_RESOLVED_TAG}"
+  remote="$(bash "$REF_HELPER" "$DOCKER_REGISTRY_URL" "$name" "${DOCKER_STAGING_RESOLVED_TAG}")"
   echo "::group::pull+tag: $local_img <- $remote"
   docker pull "$remote"
   docker tag "$remote" "$local_img"

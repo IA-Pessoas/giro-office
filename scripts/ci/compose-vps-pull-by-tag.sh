@@ -11,16 +11,14 @@ if [[ -z "${DOCKER_REGISTRY_URL:-}" || -z "${DOCKER_IMAGE_TAG:-}" ]]; then
   exit 1
 fi
 
-REG="${DOCKER_REGISTRY_URL#https://}"
-REG="${REG#http://}"
-REG="${REG%/}"
+REF_HELPER="$ROOT/scripts/ci/docker-registry-image-ref.sh"
 
 mapfile -t local_imgs < <(bash scripts/ci/list-workspace-vps-images.sh)
 
 for local_img in "${local_imgs[@]}"; do
   name="${local_img#workspace-}"
   name="${name%:vps}"
-  remote="${REG}/${name}:${DOCKER_IMAGE_TAG}"
+  remote="$(bash "$REF_HELPER" "$DOCKER_REGISTRY_URL" "$name" "${DOCKER_IMAGE_TAG}")"
   echo "::group::pull+tag: $local_img <- $remote"
   docker pull "$remote"
   docker tag "$remote" "$local_img"
