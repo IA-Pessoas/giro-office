@@ -2,12 +2,11 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState, type ChangeEvent } from "react";
-import { ArrowLeft, Power, RotateCcw } from "lucide-react";
+import { ArrowLeft, FileText, Power, RotateCcw } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { canSSRAuth } from "@modules/auth";
 import { ClientForm } from "@modules/clients/components/ClientForm";
-import { ClientPASection } from "@modules/clients/components/ClientPASection";
 import {
   useActivateClientMutation,
   useClient,
@@ -288,8 +287,24 @@ export default function ClientDetailPage() {
                 disabled={updateClientMutation.isPending}
               />
             </section>
+            <section className={`${PANEL_CLASSNAME} p-6`}>
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-1">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">PA</h2>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Gerencie os dados de PA do cliente em uma página dedicada.
+                  </p>
+                </div>
 
-            <ClientPASection clientId={client.id} />
+                <Link
+                  href={`/clients/${client.id}/pa`}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
+                >
+                  <FileText className="h-4 w-4" />
+                  Abrir PA
+                </Link>
+              </div>
+            </section>
           </>
         )}
       </div>
