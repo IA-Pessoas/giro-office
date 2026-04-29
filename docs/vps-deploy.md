@@ -85,6 +85,12 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
 - Push em **`develop`**: workflow **Develop CI** (`.github/workflows/develop-cicd.yml`) — `build-and-push` + `vps-deploy` no slot `/data/workspace-develop` (`workspace-develop`).
 - Push em **`staging`**: workflow **Staging CI/CD** (`.github/workflows/staging-cicd.yml`) — o mesmo padrão no slot `/data/workspace-staging` (`workspace-staging`).
 
+- **Branches de teste de deploy** (mesmos segredos; paths e projetos Compose distintos na VPS):
+  - `test/deploy-develop` → `test-deploy-develop-cicd.yml` — `/data/workspace-teste-develop`, `DEPLOY_SLOT=test-develop`, projeto `workspace-teste-develop` — portas **8087** (proxy) / **3013** (gateway), ficheiro `docker-compose.vps.slot-test-develop.yml`.
+  - `test/deploy-staging` → `test-deploy-staging-cicd.yml` — `/data/workspace-teste-staging`, `DEPLOY_SLOT=test-staging`, projeto `workspace-teste-staging` — portas **8086** (proxy) / **3012** (gateway), ficheiro `docker-compose.vps.slot-test-staging.yml`.
+
+  Slots **reais**: develop **8086**/**3011**, staging **8085**/**3010** (ver `vps-remote-deploy.sh`). Os slots de teste usam portas acima para reduzir choque com produção; ainda assim **8086** no teste-staging coincide com o proxy do **develop** real — não corras os dois no mesmo host sem ajustar um deles.
+
 Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em falha.
 
 ### Segredos no repositório (Actions)
@@ -104,6 +110,8 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 
    - **develop:** `/data/workspace-develop` (branch `develop`)
    - **staging:** `/data/workspace-staging` (branch `staging`)
+   - **teste develop:** `/data/workspace-teste-develop` (branch `test/deploy-develop`)
+   - **teste staging:** `/data/workspace-teste-staging` (branch `test/deploy-staging`)
 
 3. Com **develop** e **staging** na mesma VPS: **staging** usa só `docker-compose.vps.yml` (proxy **8085**, gateway **3010**). **develop** usa `docker-compose.vps.yml` + `docker-compose.vps.slot-develop.yml` (proxy **8086**, gateway **3011**). O `vps-remote-deploy.sh` aplica o override quando `DEPLOY_SLOT=develop`.
 

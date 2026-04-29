@@ -1,0 +1,9 @@
+# Portas do slot de **teste** staging (`workspace-teste-staging`, branch `test/deploy-staging`).
+# Staging real usa só o compose base (8085 / 3010).
+services:
+  reverse-proxy:
+    ports:
+      - "8086:80"
+  gateway:
+    ports:
+      - "3012:3010"

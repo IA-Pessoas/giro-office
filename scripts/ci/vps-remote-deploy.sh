@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Executar na VPS (diretório do repositório = DEPLOY_PATH), após git checkout no commit e .env.vps.* atualizados.
-# Variáveis: DEPLOY_SLOT (develop|staging), COMPOSE_PROJECT, DOCKER_IMAGE_TAG, DOCKER_REGISTRY_* ,
+# Variáveis: DEPLOY_SLOT (develop|staging|test-develop|test-staging), COMPOSE_PROJECT, DOCKER_IMAGE_TAG, DOCKER_REGISTRY_* ,
 # VPS_PULL_SERVICES (ALL ou lista de nomes curtos gateway, user-service, …).
 set -euo pipefail
 
@@ -29,16 +29,42 @@ if [[ -z "${DOCKER_REGISTRY_URL:-}" || -z "${DOCKER_REGISTRY_USERNAME:-}" || -z 
 fi
 
 COMPOSE_ARGS=( -f docker-compose.vps.yml )
-# Staging: só o compose base → proxy 8085, gateway 3010 (docker-compose.vps.yml).
-# Develop na mesma VPS: merge com override 8086 / 3011 (docker-compose.vps.slot-develop.yml).
-if [[ "$DEPLOY_SLOT" == "develop" ]]; then
-  SLOT_OVERRIDE="docker-compose.vps.slot-develop.yml"
-  if [[ ! -f "$SLOT_OVERRIDE" ]]; then
-    echo "::error::$SLOT_OVERRIDE não encontrado (override de portas do slot develop)" >&2
+# staging: só base → 8085 / 3010
+# develop: + slot-develop → 8086 / 3011
+# test-develop: + slot-test-develop → 8087 / 3013
+# test-staging: + slot-test-staging → 8086 / 3012
+case "${DEPLOY_SLOT:-}" in
+  develop)
+    SLOT_OVERRIDE="docker-compose.vps.slot-develop.yml"
+    if [[ ! -f "$SLOT_OVERRIDE" ]]; then
+      echo "::error::$SLOT_OVERRIDE não encontrado (override develop)" >&2
+      exit 1
+    fi
+    COMPOSE_ARGS+=( -f "$SLOT_OVERRIDE" )
+    ;;
+  test-develop)
+    SLOT_OVERRIDE="docker-compose.vps.slot-test-develop.yml"
+    if [[ ! -f "$SLOT_OVERRIDE" ]]; then
+      echo "::error::$SLOT_OVERRIDE não encontrado (override test-develop)" >&2
+      exit 1
+    fi
+    COMPOSE_ARGS+=( -f "$SLOT_OVERRIDE" )
+    ;;
+  test-staging)
+    SLOT_OVERRIDE="docker-compose.vps.slot-test-staging.yml"
+    if [[ ! -f "$SLOT_OVERRIDE" ]]; then
+      echo "::error::$SLOT_OVERRIDE não encontrado (override test-staging)" >&2
+      exit 1
+    fi
+    COMPOSE_ARGS+=( -f "$SLOT_OVERRIDE" )
+    ;;
+  staging)
+    ;;
+  *)
+    echo "::error::vps-remote-deploy: DEPLOY_SLOT inválido: ${DEPLOY_SLOT:-}(esperado develop, staging, test-develop ou test-staging)" >&2
     exit 1
-  fi
-  COMPOSE_ARGS+=( -f "$SLOT_OVERRIDE" )
-fi
+    ;;
+esac
 
 compose() {
   docker compose -p "$COMPOSE_PROJECT" "${COMPOSE_ARGS[@]}" "$@"

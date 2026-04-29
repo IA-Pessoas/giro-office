@@ -1,0 +1,9 @@
+# Portas do slot de **teste** develop (`workspace-teste-develop`, branch `test/deploy-develop`).
+# Develop real usa `docker-compose.vps.slot-develop.yml` (8086 / 3011).
+services:
+  reverse-proxy:
+    ports:
+      - "8087:80"
+  gateway:
+    ports:
+      - "3013:3010"
