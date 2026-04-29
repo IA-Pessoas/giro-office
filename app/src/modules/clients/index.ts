@@ -12,7 +12,12 @@ export { useClientFormIntegracao } from './hooks/useFormIntegracao';
 export { useClientFormRegularize } from './hooks/useFormRegularize';
 
 export { clientService } from './services/clientService';
-export { mapClientStatusFromApi, mapClientStatusToApi } from './utils/statusMapper';
+export {
+  mapClientStatusFromApi,
+  mapClientStatusToApi,
+  type ClientStatusApi,
+  type ClientStatusForm,
+} from './utils/statusMapper';
 
 export type {
   Client,

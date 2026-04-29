@@ -70,10 +70,7 @@ export function useUpdateClientMutation(
   return useMutation({
     mutationFn: (payload) => clientService.update(id, payload),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: clientDetailQueryKey(id) }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
     },
   });
 }
@@ -84,10 +81,7 @@ export function useDeactivateClientMutation(id: string): UseMutationResult<Clien
   return useMutation({
     mutationFn: () => clientService.deactivate(id),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: clientDetailQueryKey(id) }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
     },
   });
 }
@@ -98,10 +92,7 @@ export function useActivateClientMutation(id: string): UseMutationResult<Client,
   return useMutation({
     mutationFn: () => clientService.activate(id),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: clientDetailQueryKey(id) }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
     },
   });
 }

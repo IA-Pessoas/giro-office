@@ -1,4 +1,12 @@
-export function mapClientStatusFromApi(status: string | null | undefined): string {
+/** Status literals returned by the API for the simplified client status field. */
+export type ClientStatusApi = "Prospecção" | "active" | "inactive";
+
+/** Normalized status values used in forms and detail UI. */
+export type ClientStatusForm = "Prospect" | "Ativo" | "Inativo";
+
+export function mapClientStatusFromApi(
+  status: ClientStatusApi | string | null | undefined,
+): ClientStatusForm | string {
   if (status === "Prospecção") {
     return "Prospect";
   }
@@ -14,7 +22,9 @@ export function mapClientStatusFromApi(status: string | null | undefined): strin
   return status ?? "";
 }
 
-export function mapClientStatusToApi(status: string | null | undefined): string {
+export function mapClientStatusToApi(
+  status: ClientStatusForm | string | null | undefined,
+): ClientStatusApi | string {
   if (status === "Prospect") {
     return "Prospecção";
   }
