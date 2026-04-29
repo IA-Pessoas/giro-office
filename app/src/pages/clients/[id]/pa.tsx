@@ -53,6 +53,10 @@ export default function ClientPAPage() {
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
             Cliente inválido.
           </section>
+        ) : !client ? (
+          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
+            Cliente não encontrado.
+          </section>
         ) : (
           <ClientPASection clientId={clientId} />
         )}

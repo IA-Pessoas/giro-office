@@ -114,9 +114,33 @@ function normalizeNumberValue(value: string): number | null {
     return null;
   }
 
-  const parsed = Number.parseInt(trimmed, 10);
+  const parsed = Number(trimmed);
 
-  return Number.isNaN(parsed) ? null : parsed;
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function getInvalidIntegerFieldLabel(values: ClientPaFormValues): string | null {
+  if (values.registered_collabortors.trim().length > 0) {
+    const parsed = Number(values.registered_collabortors.trim());
+
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+      return "Colaboradores registrados";
+    }
+  }
+
+  if (values.unregistered_collabortors.trim().length > 0) {
+    const parsed = Number(values.unregistered_collabortors.trim());
+
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+      return "Colaboradores não registrados";
+    }
+  }
+
+  return null;
 }
 
 function normalizeBooleanValue(value: BooleanInputValue): boolean | null {
@@ -253,6 +277,13 @@ export function ClientPASection({ clientId }: { clientId: string }) {
 
   const handleUpdate = async () => {
     if (!pa || !hasChanges) {
+      return;
+    }
+
+    const invalidIntegerField = getInvalidIntegerFieldLabel(formValues);
+
+    if (invalidIntegerField) {
+      toast.error(`${invalidIntegerField} deve ser um número inteiro.`);
       return;
     }
 
@@ -604,7 +635,15 @@ function NumberField({
   return (
     <label className="space-y-1.5">
       <span className="block text-sm font-medium text-slate-700 dark:text-white">{label}</span>
-      <input name={name} value={value} onChange={onChange} type="number" min="0" className={INPUT_CLASSNAME} />
+      <input
+        name={name}
+        value={value}
+        onChange={onChange}
+        type="number"
+        min="0"
+        step="1"
+        className={INPUT_CLASSNAME}
+      />
     </label>
   );
 }
