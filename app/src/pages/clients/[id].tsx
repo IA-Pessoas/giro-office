@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 
 import { canSSRAuth } from "@modules/auth";
 import { ClientForm } from "@modules/clients/components/ClientForm";
+import { ClientPASection } from "@modules/clients/components/ClientPASection";
 import {
   useActivateClientMutation,
   useClient,
@@ -287,6 +288,8 @@ export default function ClientDetailPage() {
                 disabled={updateClientMutation.isPending}
               />
             </section>
+
+            <ClientPASection clientId={client.id} />
           </>
         )}
       </div>
