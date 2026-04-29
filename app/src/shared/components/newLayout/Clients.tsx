@@ -1,339 +1,250 @@
-import { useMemo, useState } from "react";
-import { Edit, Eye, Filter, MoreVertical, Plus, Search, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useDeferredValue, useMemo, useState } from "react";
+import { Building2, ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 
-import { ClientCreateModal } from "@modules/clients";
-import type { ClientItem } from "@modules/clients";
+import { mapClientStatusFromApi, useClients } from "@modules/clients";
 
-type ClientRow = {
-  id: string;
-  name: string;
-  cnpj: string;
-  status: string;
-  department: string;
-  revenue: string;
-  contact: string;
+const CLIENTS_GRADIENT_ICON_CLASSNAME =
+  "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
+
+const CLIENTS_GRADIENT_BUTTON_CLASSNAME =
+  "bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]";
+
+const CLIENTS_PANEL_CLASSNAME =
+  "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
+
+const CLIENTS_SUBPANEL_CLASSNAME =
+  "rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-950/40";
+
+const CLIENTS_INPUT_CLASSNAME =
+  "w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500";
+
+const statusClassNameByValue: Record<string, string> = {
+  Ativo: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+  Prospect: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+  Inativo: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  Fechado: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
 };
 
-const seedRows: ClientRow[] = [
-  {
-    id: "1",
-    name: "Tech Solutions Ltda",
-    cnpj: "12.345.678/0001-90",
-    status: "Ativo",
-    department: "Tecnologia",
-    revenue: "R$ 25.000/mês",
-    contact: "João Silva",
-  },
-  {
-    id: "2",
-    name: "Comércio ABC",
-    cnpj: "98.765.432/0001-11",
-    status: "Ativo",
-    department: "Comercial",
-    revenue: "R$ 15.000/mês",
-    contact: "Maria Santos",
-  },
-  {
-    id: "3",
-    name: "Indústria Delta S/A",
-    cnpj: "45.678.912/0001-33",
-    status: "Prospect",
-    department: "Fiscal",
-    revenue: "R$ 40.000/mês",
-    contact: "Carlos Oliveira",
-  },
-  {
-    id: "4",
-    name: "Serviços Omega",
-    cnpj: "78.912.345/0001-55",
-    status: "Ativo",
-    department: "Contábil",
-    revenue: "R$ 18.000/mês",
-    contact: "Ana Costa",
-  },
-  {
-    id: "5",
-    name: "Consultoria Gamma",
-    cnpj: "32.165.498/0001-77",
-    status: "Inativo",
-    department: "RH",
-    revenue: "R$ 0",
-    contact: "Pedro Ferreira",
-  },
-];
+function formatCpfCnpj(value: string): string {
+  const digits = value.replace(/\D/g, "");
 
-function formatCpfCnpjDisplay(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 14) {
-    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
-  }
   if (digits.length === 11) {
     return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
   }
-  return raw;
-}
 
-function clientItemToRow(item: ClientItem): ClientRow {
-  return {
-    id: String(item.id ?? crypto.randomUUID()),
-    name: item.name,
-    cnpj: formatCpfCnpjDisplay(item.cpf_cnpj ?? ""),
-    status: item.status ?? "Ativo",
-    department: "—",
-    revenue: "—",
-    contact: item.name,
-  };
-}
+  if (digits.length === 14) {
+    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+  }
 
-const statusColors: Record<string, string> = {
-  Ativo: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
-  Prospect: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400",
-  Inativo: "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400",
-};
+  return value;
+}
 
 export function Clients() {
-  const [clients, setClients] = useState<ClientRow[]>(seedRows);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("todos");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [page, setPage] = useState(1);
+  const deferredSearch = useDeferredValue(search);
+  const limit = 10;
 
-  const filteredClients = useMemo(() => {
-    return clients.filter((client) => {
-      const matchesSearch =
-        client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.cnpj.includes(searchTerm);
-      const matchesStatus = statusFilter === "todos" || client.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [clients, searchTerm, statusFilter]);
+  const filters = useMemo(
+    () => ({
+      search: deferredSearch.trim() || undefined,
+      status: status || undefined,
+      page,
+      limit,
+    }),
+    [deferredSearch, page, status],
+  );
 
-  const handleCreated = (item: ClientItem) => {
-    setClients((prev) => [clientItemToRow(item), ...prev]);
-  };
+  const clientsQuery = useClients(filters);
+  const clientsPage = clientsQuery.data;
+  const clients = clientsPage?.items ?? [];
+  const total = clientsPage?.total ?? 0;
+  const currentPage = clientsPage?.page ?? page;
+  const pageSize = clientsPage?.pageSize ?? limit;
+  const pageCount = total > 0 ? Math.ceil(total / pageSize) : 1;
 
   return (
     <div className="space-y-6">
-      <ClientCreateModal
-        isOpen={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={handleCreated}
-      />
-
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Clientes</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Gerencie todos os clientes e prospects
+          <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-slate-900 dark:text-white">
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-xl ${CLIENTS_GRADIENT_ICON_CLASSNAME}`}
+            >
+              <Building2 className="h-6 w-6 text-white" />
+            </div>
+            Clientes
+          </h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Listagem server-driven de clientes e prospects.
           </p>
         </div>
+
         <button
           type="button"
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-          onClick={() => setCreateOpen(true)}
+          disabled
+          className={`self-end lg:self-auto w-fit flex items-center gap-2 rounded-xl px-4 py-2.5 text-white opacity-60 ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
         >
-          <Plus className="w-4 h-4" />
-          Novo Cliente
+          <Plus className="h-5 w-5" />
+          Novo cliente
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total de Clientes</div>
-          <div className="text-2xl font-semibold text-gray-900 dark:text-white">248</div>
-          <div className="text-xs text-green-600 dark:text-green-400 mt-1">+12 este mês</div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_180px]">
+        <div className={`${CLIENTS_SUBPANEL_CLASSNAME} p-4`}>
+          <label className="space-y-2">
+            <span className="block text-sm font-medium text-slate-700 dark:text-white">
+              Busca
+            </span>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Buscar por nome ou CPF/CNPJ"
+                className={CLIENTS_INPUT_CLASSNAME}
+              />
+            </div>
+          </label>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Clientes Ativos</div>
-          <div className="text-2xl font-semibold text-gray-900 dark:text-white">186</div>
-          <div className="text-xs text-green-600 dark:text-green-400 mt-1">75% do total</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Prospects</div>
-          <div className="text-2xl font-semibold text-gray-900 dark:text-white">42</div>
-          <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">18 em negociação</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Receita Mensal</div>
-          <div className="text-2xl font-semibold text-gray-900 dark:text-white">R$ 1.2M</div>
-          <div className="text-xs text-green-600 dark:text-green-400 mt-1">+8% vs mês anterior</div>
-        </div>
-      </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-            <input
-              type="text"
-              placeholder="Buscar por nome ou CNPJ..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex gap-2">
+        <div className={`${CLIENTS_SUBPANEL_CLASSNAME} p-4`}>
+          <label className="space-y-2">
+            <span className="block text-sm font-medium text-slate-700 dark:text-white">
+              Status
+            </span>
             <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={status}
+              onChange={(event) => {
+                setStatus(event.target.value);
+                setPage(1);
+              }}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             >
-              <option value="todos">Todos os status</option>
+              <option value="">Todos</option>
               <option value="Ativo">Ativo</option>
               <option value="Prospect">Prospect</option>
               <option value="Inativo">Inativo</option>
+              <option value="Fechado">Fechado</option>
             </select>
-            <button
-              type="button"
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-            >
-              <Filter className="w-4 h-4" />
-              Mais Filtros
-            </button>
-          </div>
+          </label>
+        </div>
+
+        <div className={`${CLIENTS_SUBPANEL_CLASSNAME} flex flex-col justify-center p-4`}>
+          <span className="text-sm text-slate-500 dark:text-slate-400">Total encontrado</span>
+          <strong className="text-2xl font-semibold text-slate-900 dark:text-white">{total}</strong>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <section className={`${CLIENTS_PANEL_CLASSNAME} overflow-hidden`}>
         <div className="overflow-x-auto">
-          <table className="w-full border-separate border-spacing-y-2 px-2">
-            <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  CNPJ
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Departamento
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Receita
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Contato
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Ações
-                </th>
+          <table className="min-w-full">
+            <thead className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-950/40">
+              <tr className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <th className="px-6 py-4 font-medium">Cliente</th>
+                <th className="px-6 py-4 font-medium">Documento</th>
+                <th className="px-6 py-4 font-medium">Status</th>
+                <th className="px-6 py-4 font-medium">Organização</th>
+                <th className="px-6 py-4 font-medium text-right">Ação</th>
               </tr>
             </thead>
             <tbody>
-              {filteredClients.map((client) => (
-                <tr
-                  key={client.id}
-                  className="[&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl [&>td]:bg-white dark:[&>td]:bg-gray-800 [&>td]:border-y [&>td]:border-gray-200 dark:[&>td]:border-gray-700 [&>td:first-child]:border-l [&>td:last-child]:border-r hover:[&>td]:bg-gray-50 dark:hover:[&>td]:bg-gray-700/50 transition-colors"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-semibold mr-3">
-                        {client.name.charAt(0)}
-                      </div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {client.name}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                    {client.cnpj}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        statusColors[client.status] ?? statusColors.Inativo
-                      }`}
-                    >
-                      {client.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                    {client.department}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {client.revenue}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                    {client.contact}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                        title="Visualizar"
-                        type="button"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                        title="Editar"
-                        type="button"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                        title="Excluir"
-                        type="button"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                        type="button"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-                    </div>
+              {clientsQuery.isLoading ? (
+                <tr>
+                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={5}>
+                    Carregando clientes...
                   </td>
                 </tr>
-              ))}
+              ) : clientsQuery.isError ? (
+                <tr>
+                  <td className="px-6 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={5}>
+                    Não foi possível carregar a listagem no momento.
+                  </td>
+                </tr>
+              ) : clients.length === 0 ? (
+                <tr>
+                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={5}>
+                    Nenhum cliente encontrado para os filtros atuais.
+                  </td>
+                </tr>
+              ) : (
+                clients.map((client) => {
+                  const uiStatus = mapClientStatusFromApi(client.status);
+
+                  return (
+                    <tr key={client.id} className="border-b border-slate-200/80 last:border-b-0 dark:border-slate-800">
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="font-medium text-slate-900 dark:text-white">{client.name}</p>
+                          {client.company_name ? (
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{client.company_name}</p>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
+                        {formatCpfCnpj(client.cpf_cnpj)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            statusClassNameByValue[uiStatus] ?? statusClassNameByValue.Inativo
+                          }`}
+                        >
+                          {uiStatus}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
+                        {client.organization?.name ?? "Organização atual"}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Link
+                          href={`/clients/${client.id}`}
+                          className="inline-flex rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                          Abrir detalhe
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Mostrando <span className="font-medium">{filteredClients.length}</span> de{" "}
-            <span className="font-medium">{clients.length}</span> clientes
-          </div>
-          <div className="flex gap-2">
+        <div className="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            Página {currentPage} de {pageCount}
+          </p>
+
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={currentPage <= 1 || clientsQuery.isFetching}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
             >
+              <ChevronLeft className="h-4 w-4" />
               Anterior
             </button>
             <button
               type="button"
-              className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              onClick={() => setPage((current) => current + 1)}
+              disabled={!clientsPage?.hasMore || clientsQuery.isFetching}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
             >
-              1
-            </button>
-            <button
-              type="button"
-              className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm"
-            >
-              2
-            </button>
-            <button
-              type="button"
-              className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm"
-            >
-              3
-            </button>
-            <button
-              type="button"
-              className="px-3 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm"
-            >
-              Próximo
+              Próxima
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
