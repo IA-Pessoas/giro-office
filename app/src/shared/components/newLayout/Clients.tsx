@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
 import { Building2, ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 
-import { mapClientStatusFromApi, useClients } from "@modules/clients";
+import { ClientCreateModal, mapClientStatusFromApi, useClients } from "@modules/clients";
 
 const CLIENTS_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
@@ -41,6 +41,7 @@ function formatCpfCnpj(value: string): string {
 }
 
 export function Clients() {
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -67,6 +68,11 @@ export function Clients() {
 
   return (
     <div className="space-y-6">
+      <ClientCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-slate-900 dark:text-white">
@@ -84,8 +90,8 @@ export function Clients() {
 
         <button
           type="button"
-          disabled
-          className={`self-end lg:self-auto w-fit flex items-center gap-2 rounded-xl px-4 py-2.5 text-white opacity-60 ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
+          onClick={() => setIsCreateModalOpen(true)}
+          className={`self-end lg:self-auto w-fit flex items-center gap-2 rounded-xl px-4 py-2.5 text-white ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
         >
           <Plus className="h-5 w-5" />
           Novo cliente

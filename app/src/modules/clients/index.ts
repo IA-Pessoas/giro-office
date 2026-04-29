@@ -2,6 +2,7 @@ export { ClientList } from './components/ClientList';
 export { ClientProfile } from './components/ClientProfile';
 export { ClientDetailsView } from './components/ClientDetails';
 export { ClientFilters } from './components/ClientFilters';
+export { ClientForm } from './components/ClientForm';
 export { ClientCreateModal } from './components/ClientCreateModal';
 
 export { useActivateClientMutation, useClient, useClients, useCreateClientMutation, useDeactivateClientMutation, useUpdateClientMutation } from './hooks/useClients';
@@ -16,6 +17,7 @@ export { mapClientStatusFromApi, mapClientStatusToApi } from './utils/statusMapp
 export type {
   Client,
   ClientItem,
+  ClientFormValues,
   ClientListFilters,
   ClientListPage,
   ClientOrganizationSummary,

@@ -106,6 +106,15 @@ export interface ClientListFilters {
   limit?: number;
 }
 
+export interface ClientFormValues {
+  name: string;
+  company_name: string;
+  fantasy_name: string;
+  cpf_cnpj: string;
+  status: string;
+  service_unique: boolean;
+}
+
 export interface Perms {
   id: string;
   user_id: string;
