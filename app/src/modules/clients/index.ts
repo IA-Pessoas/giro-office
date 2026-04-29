@@ -3,9 +3,20 @@ export { ClientProfile } from './components/ClientProfile';
 export { ClientDetailsView } from './components/ClientDetails';
 export { ClientFilters } from './components/ClientFilters';
 export { ClientForm } from './components/ClientForm';
+export { ClientPASection } from './components/ClientPASection';
 export { ClientCreateModal } from './components/ClientCreateModal';
 
-export { useActivateClientMutation, useClient, useClients, useCreateClientMutation, useDeactivateClientMutation, useUpdateClientMutation } from './hooks/useClients';
+export {
+  useActivateClientMutation,
+  useClient,
+  useClientPa,
+  useClients,
+  useCreateClientMutation,
+  useCreateClientPaMutation,
+  useDeactivateClientMutation,
+  useUpdateClientMutation,
+  useUpdateClientPaMutation,
+} from './hooks/useClients';
 export { useClientList } from './hooks/useClientList';
 export { useClientFormComercial } from './hooks/useFormComercial';
 export { useClientFormIntegracao } from './hooks/useFormIntegracao';
@@ -23,6 +34,9 @@ export type {
   Client,
   ClientItem,
   ClientFormValues,
+  ClientPa,
+  ClientPaRelatedClient,
+  ClientPaResponse,
   ClientListFilters,
   ClientListPage,
   ClientOrganizationSummary,
@@ -31,6 +45,7 @@ export type {
   CreateClientData,
   CreateClientPayload,
   Perms,
+  UpdateClientPaPayload,
   UpdateClientData,
   UpdateClientPayload,
 } from './types';

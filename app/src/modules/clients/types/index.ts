@@ -115,6 +115,86 @@ export interface ClientFormValues {
   service_unique: boolean;
 }
 
+export interface ClientPaRelatedClient {
+  company_name: string | null;
+  cpf_cnpj: string | null;
+  responsible: string | null;
+  opening_date: string | null;
+  number: string | null;
+  register_date_prospecting: string | null;
+  participants_meet: string | null;
+  email: string | null;
+  meet_type: string | null;
+  indication: string | null;
+  instagram: string | null;
+  regime: string | null;
+  cnae: string | null;
+  cnae_secondary: string | null;
+  contabil: boolean | null;
+  fiscal: boolean | null;
+  pessoal: boolean | null;
+  infoproduto: boolean | null;
+  consultoria: boolean | null;
+  castelo_med: boolean | null;
+}
+
+export interface ClientPa {
+  client_id: string;
+  activities: string | null;
+  tax_billing: string | null;
+  management_billing: string | null;
+  works_bidding: boolean | null;
+  dissatisfaction: string | null;
+  registered_collabortors: number | null;
+  unregistered_collabortors: number | null;
+  esocial: boolean | null;
+  how_many_banks: boolean | null;
+  whitch_banks: string | null;
+  responsible_departments: string | null;
+  works_system: boolean | null;
+  system_name: string | null;
+  system_usage_time: string | null;
+  system_value: string | null;
+  system_contact: string | null;
+  system_operations: string | null;
+  cloud_storage: boolean | null;
+  which_cloud_storage: string | null;
+  rental_agreement: boolean | null;
+  assessment_regime: string | null;
+  permit: string | null;
+  services: string | null;
+}
+
+export interface ClientPaResponse extends ClientPa {
+  client: ClientPaRelatedClient;
+}
+
+export interface UpdateClientPaPayload {
+  activities?: string | null;
+  tax_billing?: string | null;
+  management_billing?: string | null;
+  works_bidding?: boolean | null;
+  dissatisfaction?: string | null;
+  registered_collabortors?: number | null;
+  unregistered_collabortors?: number | null;
+  esocial?: boolean | null;
+  how_many_banks?: boolean | null;
+  whitch_banks?: string | null;
+  responsible_departments?: string | null;
+  works_system?: boolean | null;
+  system_name?: string | null;
+  system_usage_time?: string | null;
+  system_value?: string | null;
+  system_contact?: string | null;
+  system_operations?: string | null;
+  cloud_storage?: boolean | null;
+  which_cloud_storage?: string | null;
+  rental_agreement?: boolean | null;
+  assessment_regime?: string | null;
+  permit?: string | null;
+  services?: string | null;
+}
+
 export interface Perms {
   id: string;
   user_id: string;
