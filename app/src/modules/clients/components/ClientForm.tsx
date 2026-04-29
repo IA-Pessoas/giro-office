@@ -4,6 +4,12 @@ import type { ClientFormValues } from "../types";
 
 const fieldClassName =
   "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500";
+const selectClassName =
+  "w-full appearance-none rounded-xl border border-slate-200 bg-white bg-[length:14px] bg-[position:right_1.25rem_center] bg-no-repeat px-3 py-2.5 pr-14 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white";
+const selectArrowStyle = {
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+} as const;
 
 interface ClientFormProps {
   values: ClientFormValues;
@@ -71,7 +77,8 @@ export function ClientForm({
             value={values.status}
             onChange={onChange}
             disabled={disabled}
-            className={fieldClassName}
+            className={selectClassName}
+            style={selectArrowStyle}
           >
             <option value="Ativo">Ativo</option>
             <option value="Prospect">Prospect</option>

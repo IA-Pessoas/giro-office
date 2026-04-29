@@ -4,6 +4,12 @@ import type { ClientCreateFormState, IbgeCity, IbgeState } from "./clientCreateF
 
 const inputClass =
   "w-full px-4 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900";
+const selectClass =
+  "w-full appearance-none rounded-xl border-2 border-gray-200 bg-white bg-[length:14px] bg-[position:right_1.25rem_center] bg-no-repeat px-4 py-2.5 pr-14 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:ring-blue-900";
+const selectArrowStyle = {
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+} as const;
 
 const labelClass = "block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5";
 
@@ -28,7 +34,7 @@ export function ClientCreateFormFields({
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       <label className="flex flex-col gap-1.5">
         <span className={labelClass}>Tipo de Pessoa</span>
-        <select className={inputClass} name="type" value={formData.type} onChange={onChange}>
+        <select className={selectClass} style={selectArrowStyle} name="type" value={formData.type} onChange={onChange}>
           <option value="PJ">Pessoa Jurídica (PJ)</option>
           <option value="PF">Pessoa Física (PF)</option>
         </select>
@@ -37,7 +43,8 @@ export function ClientCreateFormFields({
       <label className="flex flex-col gap-1.5">
         <span className={labelClass}>Tipo de Registro</span>
         <select
-          className={inputClass}
+          className={selectClass}
+          style={selectArrowStyle}
           name="type_registration"
           value={formData.type_registration}
           onChange={onChange}
@@ -129,7 +136,7 @@ export function ClientCreateFormFields({
       </label>
       <label className="flex flex-col gap-1.5">
         <span className={labelClass}>Estado</span>
-        <select className={inputClass} name="state" value={formData.state} onChange={onChange}>
+        <select className={selectClass} style={selectArrowStyle} name="state" value={formData.state} onChange={onChange}>
           <option value="">Selecione o estado</option>
           {states.map((s) => (
             <option key={s.id} value={s.sigla}>
@@ -141,7 +148,8 @@ export function ClientCreateFormFields({
       <label className="flex flex-col gap-1.5">
         <span className={labelClass}>Cidade</span>
         <select
-          className={inputClass}
+          className={selectClass}
+          style={selectArrowStyle}
           name="city"
           value={formData.city}
           onChange={onChange}
