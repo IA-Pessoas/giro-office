@@ -2,7 +2,9 @@ import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
 import { Building2, ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 
-import { ClientCreateModal, mapClientStatusFromApi, useClients } from "@modules/clients";
+import { ClientCreateModal } from "@modules/clients/components/ClientCreateModal";
+import { useClients } from "@modules/clients/hooks/useClients";
+import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
 
 const CLIENTS_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";

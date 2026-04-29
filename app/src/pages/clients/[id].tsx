@@ -6,16 +6,15 @@ import { ArrowLeft, Power, RotateCcw } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { canSSRAuth } from "@modules/auth";
+import { ClientForm } from "@modules/clients/components/ClientForm";
 import {
-  ClientForm,
-  mapClientStatusFromApi,
-  mapClientStatusToApi,
   useActivateClientMutation,
   useClient,
   useDeactivateClientMutation,
   useUpdateClientMutation,
-} from "@modules/clients";
-import type { ClientFormValues } from "@modules/clients";
+} from "@modules/clients/hooks/useClients";
+import type { ClientFormValues } from "@modules/clients/types";
+import { mapClientStatusFromApi, mapClientStatusToApi } from "@modules/clients/utils/statusMapper";
 import { useAuth } from "@/context/AuthContext";
 
 const PANEL_CLASSNAME = "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
