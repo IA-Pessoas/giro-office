@@ -57,14 +57,53 @@ export interface Client {
   cpf_cnpj: string;
 }
 
+export type ClientStatus = "Ativo" | "Inativo" | "Prospect" | "Prospecção" | "Fechado" | string;
+
 export interface ClientItem {
   id: string;
-  dominio_code: string;
+  dominio_code?: string;
   name: string;
   company_name: string;
   fantasy_name: string;
   cpf_cnpj: string;
   status: string;
+}
+
+export interface ClientOrganizationSummary {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url: string | null;
+  status: string;
+  subscription_plan: string;
+}
+
+export interface ClientRecord {
+  id: string;
+  name: string;
+  organization_id: string;
+  status: ClientStatus;
+  cpf_cnpj: string;
+  company_name: string | null;
+  fantasy_name: string | null;
+  service_unique: boolean;
+  deletion_date: string | null;
+  organization?: ClientOrganizationSummary;
+}
+
+export interface ClientListPage {
+  items: ClientRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export interface ClientListFilters {
+  search?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface Perms {
@@ -96,6 +135,25 @@ export interface CreateClientData {
   [key: string]: any;
 }
 
+export interface CreateClientPayload {
+  organization_id?: string;
+  name: string;
+  status?: string;
+  cpf_cnpj: string;
+  company_name?: string | null;
+  fantasy_name?: string | null;
+  service_unique?: boolean;
+}
+
 export interface UpdateClientData {
   [key: string]: any;
+}
+
+export interface UpdateClientPayload {
+  name?: string;
+  status?: string;
+  cpf_cnpj?: string;
+  company_name?: string | null;
+  fantasy_name?: string | null;
+  service_unique?: boolean;
 }

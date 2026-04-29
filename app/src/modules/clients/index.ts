@@ -4,11 +4,26 @@ export { ClientDetailsView } from './components/ClientDetails';
 export { ClientFilters } from './components/ClientFilters';
 export { ClientCreateModal } from './components/ClientCreateModal';
 
+export { useActivateClientMutation, useClient, useClients, useCreateClientMutation, useDeactivateClientMutation, useUpdateClientMutation } from './hooks/useClients';
 export { useClientList } from './hooks/useClientList';
 export { useClientFormComercial } from './hooks/useFormComercial';
 export { useClientFormIntegracao } from './hooks/useFormIntegracao';
 export { useClientFormRegularize } from './hooks/useFormRegularize';
 
 export { clientService } from './services/clientService';
+export { mapClientStatusFromApi, mapClientStatusToApi } from './utils/statusMapper';
 
-export type { Client, ClientItem, Perms, CreateClientData, UpdateClientData } from './types';
+export type {
+  Client,
+  ClientItem,
+  ClientListFilters,
+  ClientListPage,
+  ClientOrganizationSummary,
+  ClientRecord,
+  ClientStatus,
+  CreateClientData,
+  CreateClientPayload,
+  Perms,
+  UpdateClientData,
+  UpdateClientPayload,
+} from './types';

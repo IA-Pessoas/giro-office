@@ -22,12 +22,14 @@ export const useClientList = (initialFilters: Filters) => {
 
         try {
             const response = await clientService.list({
-                ...filters,
+                status: filters.status || undefined,
+                search: filters.search || undefined,
                 page: currentPage,
                 limit: 10
             });
 
-            const { data, hasMore: newHasMore } = response;
+            const data = response.items;
+            const newHasMore = response.hasMore;
             
             setClients(prev => shouldReset ? data : [...prev, ...data]);
             setHasMore(newHasMore);
