@@ -82,8 +82,8 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
 
 ## CI/CD (GitHub Actions → VPS)
 
-- Push em **`develop`**: workflow **Develop CI** (`.github/workflows/develop-cicd.yml`) — `build-and-push` + `vps-deploy` no slot `/opt/workspace-develop` (`workspace-develop`).
-- Push em **`staging`**: workflow **Staging CI/CD** (`.github/workflows/staging-cicd.yml`) — o mesmo padrão no slot `/opt/workspace-staging` (`workspace-staging`).
+- Push em **`develop`**: workflow **Develop CI** (`.github/workflows/develop-cicd.yml`) — `build-and-push` + `vps-deploy` no slot `/data/workspace-develop` (`workspace-develop`).
+- Push em **`staging`**: workflow **Staging CI/CD** (`.github/workflows/staging-cicd.yml`) — o mesmo padrão no slot `/data/workspace-staging` (`workspace-staging`).
 
 Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em falha.
 
@@ -102,10 +102,10 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 1. Instalar Docker e Compose plugin.
 2. Clonar o repositório nos paths usados pelo CI (ajuste conforme o seu fork):
 
-   - **develop:** `/opt/workspace-develop` (branch `develop`)
-   - **staging:** `/opt/workspace-staging` (branch `staging`)
+   - **develop:** `/data/workspace-develop` (branch `develop`)
+   - **staging:** `/data/workspace-staging` (branch `staging`)
 
-3. O segundo slot usa portas diferentes (`docker-compose.vps.slot-staging.yml`: proxy `8086`, gateway `3011`) para conviver com o primeiro na mesma máquina.
+3. Com **develop** e **staging** na mesma VPS: **staging** usa só `docker-compose.vps.yml` (proxy **8085**, gateway **3010**). **develop** usa `docker-compose.vps.yml` + `docker-compose.vps.slot-develop.yml` (proxy **8086**, gateway **3011**). O `vps-remote-deploy.sh` aplica o override quando `DEPLOY_SLOT=develop`.
 
 ### Smoke / logs
 

@@ -29,12 +29,15 @@ if [[ -z "${DOCKER_REGISTRY_URL:-}" || -z "${DOCKER_REGISTRY_USERNAME:-}" || -z 
 fi
 
 COMPOSE_ARGS=( -f docker-compose.vps.yml )
-if [[ "$DEPLOY_SLOT" == "staging" ]]; then
-  if [[ ! -f docker-compose.vps.slot-staging.yml ]]; then
-    echo "::error::docker-compose.vps.slot-staging.yml não encontrado (necessário para slot staging)" >&2
+# Staging: só o compose base → proxy 8085, gateway 3010 (docker-compose.vps.yml).
+# Develop na mesma VPS: merge com override 8086 / 3011 (docker-compose.vps.slot-develop.yml).
+if [[ "$DEPLOY_SLOT" == "develop" ]]; then
+  SLOT_OVERRIDE="docker-compose.vps.slot-develop.yml"
+  if [[ ! -f "$SLOT_OVERRIDE" ]]; then
+    echo "::error::$SLOT_OVERRIDE não encontrado (override de portas do slot develop)" >&2
     exit 1
   fi
-  COMPOSE_ARGS+=( -f docker-compose.vps.slot-staging.yml )
+  COMPOSE_ARGS+=( -f "$SLOT_OVERRIDE" )
 fi
 
 compose() {
