@@ -97,7 +97,7 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
       title="Cadastrar novo cliente"
       description="Preencha os dados principais para cadastrar um cliente."
       contentClassName="w-[min(92vw,760px)]"
-      bodyClassName="pb-0"
+      bodyClassName="pb-4"
     >
       <ClientForm
         values={formValues}

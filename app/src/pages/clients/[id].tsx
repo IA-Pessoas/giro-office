@@ -184,11 +184,9 @@ export default function ClientDetailPage() {
             </Link>
             <div>
               <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-                {client?.name ?? "Detalhe do cliente"}
+                {client?.name ?? "Detalhes do cliente"}
               </h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Visualização e edição inline do cliente.
-              </p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Detalhes do cliente.</p>
             </div>
           </div>
 
@@ -234,9 +232,9 @@ export default function ClientDetailPage() {
               </div>
 
               <div className={`${PANEL_CLASSNAME} p-6`}>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Lifecycle</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Ciclo de vida</h2>
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                  Ativação e desativação disponíveis apenas para administradores.
+                  Ações disponíveis apenas para administradores.
                 </p>
 
                 <div className="mt-5 space-y-3">
@@ -267,7 +265,7 @@ export default function ClientDetailPage() {
               <div className="mb-5">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Editar cliente</h2>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                  Alterações sincronizadas via React Query após cada mutation.
+                  Atualize os dados principais do cliente.
                 </p>
               </div>
 

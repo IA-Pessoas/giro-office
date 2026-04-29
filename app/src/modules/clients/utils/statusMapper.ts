@@ -3,6 +3,14 @@ export function mapClientStatusFromApi(status: string | null | undefined): strin
     return "Prospect";
   }
 
+  if (status === "active") {
+    return "Ativo";
+  }
+
+  if (status === "inactive") {
+    return "Inativo";
+  }
+
   return status ?? "";
 }
 
