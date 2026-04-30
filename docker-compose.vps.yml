@@ -1,3 +1,5 @@
+# Tag local das imagens `workspace-*` (isolamento por stack na mesma VPS). Definir
+# `WORKSPACE_VPS_IMAGE_TAG` no ambiente ou em `.env` na raiz; omissão = `vps`.
 x-service-defaults: &service_defaults
   dns:
     - 1.1.1.1
@@ -13,7 +15,7 @@ services:
       [
         "/bin/sh",
         "-c",
-        "/opt/generate-nginx-config.sh && exec nginx -g 'daemon off;'",
+        "sh /opt/generate-nginx-config.sh && exec nginx -g 'daemon off;'",
       ]
     depends_on:
       gateway:
@@ -32,7 +34,7 @@ services:
 
   gateway:
     <<: *service_defaults
-    image: workspace-gateway:vps
+    image: workspace-gateway:${WORKSPACE_VPS_IMAGE_TAG:-vps}
     restart: unless-stopped
     command: ["node", "dist/services/gateway/src/server.js"]
     build:
@@ -76,7 +78,7 @@ services:
 
   organization-service:
     <<: *service_defaults
-    image: workspace-organization-service:vps
+    image: workspace-organization-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
     restart: unless-stopped
     build:
       context: .
@@ -106,7 +108,7 @@ services:
 
   user-service:
     <<: *service_defaults
-    image: workspace-user-service:vps
+    image: workspace-user-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
     restart: unless-stopped
     build:
       context: .
@@ -136,7 +138,7 @@ services:
 
   task-service:
     <<: *service_defaults
-    image: workspace-task-service:vps
+    image: workspace-task-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
     restart: unless-stopped
     build:
       context: .
@@ -166,7 +168,7 @@ services:
 
   project-service:
     <<: *service_defaults
-    image: workspace-project-service:vps
+    image: workspace-project-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
     restart: unless-stopped
     build:
       context: .
@@ -196,7 +198,7 @@ services:
 
   client-service:
     <<: *service_defaults
-    image: workspace-client-service:vps
+    image: workspace-client-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
     restart: unless-stopped
     build:
       context: .
@@ -226,7 +228,7 @@ services:
 
   rh-service:
     <<: *service_defaults
-    image: workspace-rh-service:vps
+    image: workspace-rh-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
     restart: unless-stopped
     build:
       context: .
@@ -256,7 +258,7 @@ services:
 
   audit-service:
     <<: *service_defaults
-    image: workspace-audit-service:vps
+    image: workspace-audit-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
     restart: unless-stopped
     profiles:
       - audit

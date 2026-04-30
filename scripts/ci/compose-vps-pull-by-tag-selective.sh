@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Puxa {REG}/{service}:{TAG} e reetiqueta para workspace-*:vps apenas para serviços listados.
+# Puxa {REG}/{service}:{TAG} e reetiqueta para workspace-*:<WORKSPACE_VPS_IMAGE_TAG> apenas para serviços listados.
 # VPS_PULL_SERVICES: lista separada por espaço (ex.: gateway user-service) ou ALL/vazio = todos.
 # Obrigatório: DOCKER_REGISTRY_URL, DOCKER_IMAGE_TAG
 set -eo pipefail
@@ -41,7 +41,7 @@ fi
 
 for local_img in "${local_imgs[@]}"; do
   name="${local_img#workspace-}"
-  name="${name%:vps}"
+  name="${name%:${WORKSPACE_VPS_IMAGE_TAG:-vps}}"
   if ! should_pull "$name"; then
     echo "skip pull (não selecionado): $local_img"
     continue

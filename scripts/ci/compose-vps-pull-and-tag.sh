@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Puxa imagens do registry no formato {REG}/{service}:{SOURCE_TAG} e reetiqueta para o nome
-# esperado por docker-compose.vps.yml (ex.: workspace-gateway:vps).
+# esperado por docker-compose.vps.yml (ex.: workspace-gateway:<WORKSPACE_VPS_IMAGE_TAG>).
 #
 # Obrigatório: DOCKER_REGISTRY_URL, DOCKER_STAGING_RESOLVED_TAG
 set -eo pipefail
@@ -32,9 +32,9 @@ fi
 mapfile -t local_imgs < <(list_images)
 
 for local_img in "${local_imgs[@]}"; do
-  # workspace-foo-service:vps -> foo-service
+  # workspace-foo-service:<tag> -> foo-service
   name="${local_img#workspace-}"
-  name="${name%:vps}"
+  name="${name%:${WORKSPACE_VPS_IMAGE_TAG:-vps}}"
   remote="$(bash "$REF_HELPER" "$DOCKER_REGISTRY_URL" "$name" "${DOCKER_STAGING_RESOLVED_TAG}")"
   echo "::group::pull+tag: $local_img <- $remote"
   docker pull "$remote"

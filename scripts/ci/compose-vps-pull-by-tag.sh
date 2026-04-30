@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Puxa {REG}/{service}:{TAG} e reetiqueta para workspace-*:vps.
+# Puxa {REG}/{service}:{TAG} e reetiqueta para workspace-*:<WORKSPACE_VPS_IMAGE_TAG>.
 # Obrigatório: DOCKER_REGISTRY_URL, DOCKER_IMAGE_TAG
 set -eo pipefail
 
@@ -17,7 +17,7 @@ mapfile -t local_imgs < <(bash scripts/ci/list-workspace-vps-images.sh)
 
 for local_img in "${local_imgs[@]}"; do
   name="${local_img#workspace-}"
-  name="${name%:vps}"
+  name="${name%:${WORKSPACE_VPS_IMAGE_TAG:-vps}}"
   remote="$(bash "$REF_HELPER" "$DOCKER_REGISTRY_URL" "$name" "${DOCKER_IMAGE_TAG}")"
   echo "::group::pull+tag: $local_img <- $remote"
   docker pull "$remote"

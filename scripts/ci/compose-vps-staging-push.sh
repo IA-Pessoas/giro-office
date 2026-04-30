@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publica imagens workspace-*:vps no registry com uma tag (ex.: sha do commit do CI = $STAGING_DOCKER_TAG).
+# Publica imagens workspace-*:<WORKSPACE_VPS_IMAGE_TAG> no registry com uma tag (ex.: sha do commit do CI = $STAGING_DOCKER_TAG).
 # Referências são normalizadas em minúsculas (evita "name invalid" em GHCR / Docker Hub com owner em maiúsculas).
 # O `main` pode fazer `pull` dessa tag. Obrigatório: DOCKER_REGISTRY_URL, STAGING_DOCKER_TAG
 set -eo pipefail
@@ -38,7 +38,7 @@ should_push() {
 
 for local_img in "${local_imgs[@]}"; do
   name="${local_img#workspace-}"
-  name="${name%:vps}"
+  name="${name%:${WORKSPACE_VPS_IMAGE_TAG:-vps}}"
   if ! should_push "$name"; then
     echo "skip push (não selecionado): $local_img"
     continue

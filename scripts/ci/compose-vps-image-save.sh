@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Gera /tmp/workspace-vps-images.tar com todas as imagens `workspace-*:vps` atuais
+# Gera /tmp/workspace-vps-images.tar com todas as imagens `workspace-*:<WORKSPACE_VPS_IMAGE_TAG>` atuais
 # (para outro job do GHA fazer `docker load`).
 set -eo pipefail
 

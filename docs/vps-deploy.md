@@ -117,7 +117,22 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 
 ### Smoke / logs
 
-O deploy remoto corre na VPS; se falhar, o script tenta reverter as imagens `workspace-*:vps` anteriores e imprime `docker compose ps` e `docker compose logs` no log do GitHub Actions.
+O deploy remoto corre na VPS; se falhar, o script tenta reverter as imagens `workspace-*:<WORKSPACE_VPS_IMAGE_TAG>` anteriores e imprime `docker compose ps` e `docker compose logs` no log do GitHub Actions.
+
+### Tag local das imagens (`WORKSPACE_VPS_IMAGE_TAG`)
+
+No mesmo host Docker, **vários clones** (develop, staging, testes) não devem partilhar a mesma tag local `workspace-*:vps`, senão um `docker pull` + `docker tag` de um slot sobrescreve a imagem que outro slot usa.
+
+O `docker-compose.vps.yml` usa `image: workspace-<serviço>:${WORKSPACE_VPS_IMAGE_TAG:-vps}`. O CI define a variável no job `vps-deploy` e o `vps-remote-deploy.sh` grava-a em `.env` no diretório do clone na VPS para `docker compose` manual alinhar com o CI.
+
+| Diretório na VPS (exemplo) | Workflow | Valor usado no CI |
+|----------------------------|----------|-------------------|
+| `/data/workspace-staging` | `staging-cicd.yml` | `vps-staging` |
+| `/data/workspace-develop` | `develop-cicd.yml` | `vps-develop` |
+| `/data/workspace-teste-develop` | `test-deploy-develop-cicd.yml` | `vps-test-develop` |
+| `/data/workspace-teste-staging` | `test-deploy-staging-cicd.yml` | `vps-test-staging` |
+
+O **registry** continua a usar tags por commit (ex.: `{registry}/gateway:<GITHUB_SHA>`); só a etiqueta **local** na VPS muda por stack.
 
 ## Current scope
 

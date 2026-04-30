@@ -168,6 +168,7 @@ jobs:
       GITHUB_SHA: ${{ github.sha }}
       DOCKER_IMAGE_TAG: ${{ github.sha }}
       VPS_PULL_SERVICES: ${{ needs.build-and-push.outputs.pull_services }}
+      WORKSPACE_VPS_IMAGE_TAG: vps-develop
       DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
       DOCKER_REGISTRY_USERNAME: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
       DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}

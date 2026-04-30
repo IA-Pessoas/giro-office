@@ -2,6 +2,7 @@
 # Executar na VPS (diretório do repositório = DEPLOY_PATH), após git checkout no commit e .env.vps.* atualizados.
 # Variáveis: DEPLOY_SLOT (develop|staging|test-develop|test-staging), COMPOSE_PROJECT, DOCKER_IMAGE_TAG, DOCKER_REGISTRY_* ,
 # VPS_PULL_SERVICES (ALL ou lista de nomes curtos gateway, user-service, …).
+# WORKSPACE_VPS_IMAGE_TAG: sufixo local das imagens workspace-* na mesma VPS (omissão: vps). O deploy grava em `.env`.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -66,6 +67,22 @@ case "${DEPLOY_SLOT:-}" in
     ;;
 esac
 
+export WORKSPACE_VPS_IMAGE_TAG="${WORKSPACE_VPS_IMAGE_TAG:-vps}"
+
+persist_workspace_vps_image_tag() {
+  local f=".env"
+  local line="WORKSPACE_VPS_IMAGE_TAG=${WORKSPACE_VPS_IMAGE_TAG}"
+  local tmp
+  tmp="$(mktemp "${TMPDIR:-/tmp}/workspace-vps-image-tag.XXXXXX")"
+  if [[ -f "$f" ]]; then
+    grep -v '^WORKSPACE_VPS_IMAGE_TAG=' "$f" >"$tmp" || true
+  fi
+  printf "%s\n" "$line" >>"$tmp"
+  mv "$tmp" "$f"
+}
+
+persist_workspace_vps_image_tag
+
 compose() {
   docker compose -p "$COMPOSE_PROJECT" "${COMPOSE_ARGS[@]}" "$@"
 }
@@ -119,12 +136,12 @@ if [[ "$login_rc" -ne 0 ]]; then
 fi
 
 export VPS_PULL_SERVICES="${VPS_PULL_SERVICES:-ALL}"
-if [[ "$VPS_PULL_SERVICES" == "NONE" ]] && ! docker image inspect workspace-gateway:vps >/dev/null 2>&1; then
+if [[ "$VPS_PULL_SERVICES" == "NONE" ]] && ! docker image inspect "workspace-gateway:${WORKSPACE_VPS_IMAGE_TAG}" >/dev/null 2>&1; then
   log "sem imagem workspace local; forçando pull completo (ALL)"
   VPS_PULL_SERVICES=ALL
   export VPS_PULL_SERVICES
 fi
-log "pull registry → workspace-*:vps (VPS_PULL_SERVICES=$VPS_PULL_SERVICES)"
+log "pull registry → workspace-*:${WORKSPACE_VPS_IMAGE_TAG} (VPS_PULL_SERVICES=$VPS_PULL_SERVICES)"
 set +e
 bash scripts/ci/compose-vps-pull-by-tag-selective.sh
 pull_rc=$?
