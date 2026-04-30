@@ -1,5 +1,26 @@
 import type { ClientTerminationFormValues, TerminateClientPayload } from "../types";
-import { normalizeMonthInputValue, normalizeRequiredTextValue } from "./verticalForm";
+
+function normalizeRequiredTextValue(value: string | null | undefined): string {
+  return (value ?? "").trim();
+}
+
+function normalizeMonthInputValue(value: string | null | undefined): string {
+  const trimmed = (value ?? "").trim();
+
+  if (trimmed.length === 0) {
+    return "";
+  }
+
+  if (/^\d{4}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    return trimmed.slice(0, 7);
+  }
+
+  return trimmed;
+}
 
 export function createTerminationInitialValues(): ClientTerminationFormValues {
   return {
