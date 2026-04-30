@@ -3,7 +3,9 @@ import type { ClientListFilters } from "../types";
 export const CLIENT_ENDPOINTS = {
   list: "/client/list",
   create: "/client",
+  createIntegration: "/client/integration",
   detail: (id: string) => `/client/${id}`,
+  updateIntegration: (id: string) => `/client/${id}/integration`,
   activate: (id: string) => `/client/${id}/activate`,
   detailPa: (id: string) => `/client/${id}/pa`,
   createPa: (id: string) => `/client/${id}/pa`,

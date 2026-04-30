@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState, type ChangeEvent } from "react";
-import { ArrowLeft, FileText, Power, RotateCcw } from "lucide-react";
+import { ArrowLeft, FileText, Power, RotateCcw, Workflow } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { canSSRAuth } from "@modules/auth";
@@ -14,10 +14,12 @@ import {
   useUpdateClientMutation,
 } from "@modules/clients/hooks/useClients";
 import type { ClientFormValues } from "@modules/clients/types";
+import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
 import { mapClientStatusFromApi, mapClientStatusToApi } from "@modules/clients/utils/statusMapper";
 import { useAuth } from "@/context/AuthContext";
 
-const PANEL_CLASSNAME = "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
+const PANEL_CLASSNAME =
+  "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
 
 const statusClassNames: Record<string, string> = {
   Ativo: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
@@ -65,7 +67,8 @@ export default function ClientDetailPage() {
   const client = clientQuery.data;
   const uiStatus = mapClientStatusFromApi(client?.status);
   const organizationName =
-    (client as { organization?: { name?: string } } | null)?.organization?.name ?? "Organização atual";
+    (client as { organization?: { name?: string } } | null)?.organization?.name ??
+    "Organização atual";
 
   useEffect(() => {
     if (!client) {
@@ -97,6 +100,18 @@ export default function ClientDetailPage() {
       return;
     }
 
+    if (!formValues.name.trim()) {
+      toast.error("Preencha o nome do cliente para continuar.");
+      return;
+    }
+
+    const documentError = validateCpfCnpjDocument(formValues.cpf_cnpj);
+
+    if (documentError) {
+      toast.error(documentError);
+      return;
+    }
+
     try {
       await updateClientMutation.mutateAsync({
         name: formValues.name.trim(),
@@ -114,7 +129,8 @@ export default function ClientDetailPage() {
         typeof error === "object" &&
         error !== null &&
         "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === "string"
+        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
+          "string"
           ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
           : "Não foi possível atualizar o cliente.";
 
@@ -136,7 +152,8 @@ export default function ClientDetailPage() {
         typeof error === "object" &&
         error !== null &&
         "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === "string"
+        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
+          "string"
           ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
           : "Não foi possível reativar o cliente.";
 
@@ -158,7 +175,8 @@ export default function ClientDetailPage() {
         typeof error === "object" &&
         error !== null &&
         "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === "string"
+        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
+          "string"
           ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
           : "Não foi possível desativar o cliente.";
 
@@ -226,7 +244,11 @@ export default function ClientDetailPage() {
                   <SummaryItem label="Organização" value={organizationName} />
                   <SummaryItem
                     label="Desativado em"
-                    value={client.deletion_date ? new Date(client.deletion_date).toLocaleString("pt-BR") : "Ativo"}
+                    value={
+                      client.deletion_date
+                        ? new Date(client.deletion_date).toLocaleString("pt-BR")
+                        : "Ativo"
+                    }
                   />
                 </div>
               </div>
@@ -287,22 +309,46 @@ export default function ClientDetailPage() {
                 disabled={updateClientMutation.isPending}
               />
             </section>
+
             <section className={`${PANEL_CLASSNAME} p-6`}>
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-1">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">PA</h2>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Gerencie os dados de PA do cliente em uma página dedicada.
-                  </p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-1">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">PA</h2>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Gerencie os dados de PA do cliente em uma página dedicada.
+                      </p>
+                    </div>
+
+                    <Link
+                      href={`/clients/${client.id}/pa`}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Abrir PA
+                    </Link>
+                  </div>
                 </div>
 
-                <Link
-                  href={`/clients/${client.id}/pa`}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
-                >
-                  <FileText className="h-4 w-4" />
-                  Abrir PA
-                </Link>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-1">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Integração</h2>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Gerencie os dados de integração do cliente em uma página dedicada.
+                      </p>
+                    </div>
+
+                    <Link
+                      href={`/clients/${client.id}/integration`}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
+                    >
+                      <Workflow className="h-4 w-4" />
+                      Abrir integração
+                    </Link>
+                  </div>
+                </div>
               </div>
             </section>
           </>

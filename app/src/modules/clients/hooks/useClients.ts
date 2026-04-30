@@ -15,7 +15,9 @@ import type {
   ClientListFilters,
   ClientListPage,
   CreateClientPayload,
+  CreateClientIntegrationPayload,
   UpdateClientPaPayload,
+  UpdateClientIntegrationPayload,
   UpdateClientPayload,
 } from "../types";
 
@@ -83,6 +85,34 @@ export function useUpdateClientMutation(
 
   return useMutation({
     mutationFn: (payload) => clientService.update(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
+    },
+  });
+}
+
+export function useCreateClientIntegrationMutation(): UseMutationResult<
+  Client,
+  Error,
+  CreateClientIntegrationPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => clientService.createIntegration(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
+    },
+  });
+}
+
+export function useUpdateClientIntegrationMutation(
+  id: string,
+): UseMutationResult<Client, Error, UpdateClientIntegrationPayload> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => clientService.updateIntegration(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
     },
