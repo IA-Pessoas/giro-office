@@ -97,12 +97,27 @@ jobs:
         env:
           DOCKER_BUILDKIT: 1
           COMPOSE_DOCKER_CLI_BUILD: 1
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+      - name: "Liberar espaço no runner (Docker)"
         run: |
-          set -eo pipefail
+          set -euxo pipefail
           docker system df || true
           docker builder prune -af || true
           docker system prune -af || true
           docker system df || true
+      - name: Build imagens Compose (docker compose build)
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+        run: |
+          set -eo pipefail
           set -a
           # shellcheck disable=SC1091
           . ./.env.vps.web
