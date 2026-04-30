@@ -240,6 +240,7 @@ jobs:
           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+          ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
         run: bash scripts/ci/materialize-vps-env.sh
 
       - id: scope
@@ -252,6 +253,9 @@ jobs:
           if [[ "$DET" == "ALL" ]]; then
             echo "pull_services=ALL" >> "$GITHUB_OUTPUT"
             echo "push_services=ALL" >> "$GITHUB_OUTPUT"
+          elif [[ "$DET" == "NONE" ]]; then
+            echo "pull_services=NONE" >> "$GITHUB_OUTPUT"
+            echo "push_services=NONE" >> "$GITHUB_OUTPUT"
           else
             ws="$(echo "$DET" | tr ' ' '\n' | grep -v '^reverse-proxy$' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
             if [[ -z "$ws" ]]; then
@@ -273,6 +277,10 @@ jobs:
       - name: Build imagens Docker (seletivo ou completo)
         run: |
           set -eo pipefail
+          set -a
+          # shellcheck disable=SC1091
+          . ./.env.vps.web
+          set +a
           PULL="${{ steps.scope.outputs.pull_services }}"
           if [[ "$PULL" == "ALL" ]]; then
             docker compose -f docker-compose.vps.yml build
@@ -323,6 +331,7 @@ jobs:
           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+          ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
         run: bash scripts/ci/materialize-vps-env.sh
 
       - name: Instalar sshpass (opcional, deploy por senha SSH)

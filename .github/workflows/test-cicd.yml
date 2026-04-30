@@ -88,6 +88,7 @@ jobs:
           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+          ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
         run: bash scripts/ci/materialize-vps-env.sh
 
       # BuildKit acelera builds; `docker compose build` nos runners do GHA não aceita
@@ -98,6 +99,10 @@ jobs:
           COMPOSE_DOCKER_CLI_BUILD: 1
         run: |
           set -eo pipefail
+          set -a
+          # shellcheck disable=SC1091
+          . ./.env.vps.web
+          set +a
           echo "::group::docker compose build"
           docker compose -f docker-compose.vps.yml build
           echo "::endgroup::"
@@ -149,6 +154,7 @@ jobs:
           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+          ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
         run: bash scripts/ci/materialize-vps-env.sh
 
       - name: "[Build] Imagens Docker (docker-compose.vps.yml)"
@@ -157,6 +163,10 @@ jobs:
           COMPOSE_DOCKER_CLI_BUILD: 1
         run: |
           set -eo pipefail
+          set -a
+          # shellcheck disable=SC1091
+          . ./.env.vps.web
+          set +a
           docker compose -f docker-compose.vps.yml build
 
       # Docker Hub oficial: aquasec/trivy (aquasecurity/trivy não existe como repo no Hub).

@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 # Compara dois SHAs e lista nomes de serviços Compose em docker-compose.vps.yml afetados.
-# Saída (stdout): uma linha — "ALL" (rebuild/pull completo) ou nomes separados por espaço.
+# Saída (stdout): uma linha — "ALL", "NONE" (sem impacto em imagens VPS) ou nomes separados por espaço.
+# "NONE": só alterações em paths de tooling/docs (.agent, .cursor, .husky, vscode, .vscode, docs).
 # Uso: detect-changed-vps-services.sh <before_sha> <after_sha>
 # GitHub: antes pode ser 0000... no primeiro push — nesse caso emite ALL.
 set -euo pipefail
 
 BEFORE="${1:-}"
 AFTER="${2:-HEAD}"
+
+# Caminhos que não devem forçar build/pull/deploy de imagens workspace na VPS.
+vps_irrelevant_path() {
+  case "$1" in
+    .agent | .agent/* | .cursor | .cursor/* | .husky | .husky/* | \
+      vscode | vscode/* | .vscode | .vscode/* | docs | docs/* )
+      return 0
+      ;;
+  esac
+  return 1
+}
 
 if [[ -z "$BEFORE" || "$BEFORE" == "0000000000000000000000000000000000000000" ]]; then
   printf "%s\n" "ALL"
@@ -30,6 +42,18 @@ if [[ "${#files[@]}" -eq 0 ]]; then
   exit 0
 fi
 
+declare -a relevant=()
+for f in "${files[@]}"; do
+  if ! vps_irrelevant_path "$f"; then
+    relevant+=("$f")
+  fi
+done
+if [[ "${#relevant[@]}" -eq 0 ]]; then
+  printf "%s\n" "NONE"
+  exit 0
+fi
+files=("${relevant[@]}")
+
 declare -A services=()
 
 mark_all() {
@@ -47,7 +71,7 @@ for f in "${files[@]}"; do
   fi
   case "$f" in
     package.json | pnpm-lock.yaml | pnpm-workspace.yaml | turbo.json | \
-    docker/service.Dockerfile | docker-compose.vps.yml | tsconfig.json | biome.json )
+    docker/service.Dockerfile | docker/app.Dockerfile | docker-compose.vps.yml | tsconfig.json | biome.json )
       mark_all
       ;;
     .github/workflows/* )
@@ -78,6 +102,12 @@ for f in "${files[@]}"; do
       ;;
     services/audit-service/* )
       services[audit-service]=1
+      ;;
+    app/* )
+      services[web]=1
+      ;;
+    packages/api/* )
+      services[web]=1
       ;;
   esac
 done

@@ -32,6 +32,39 @@ services:
       - edge
       - backend
 
+  web:
+    <<: *service_defaults
+    image: workspace-web:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3010}
+        API_INTERNAL_URL: ${API_INTERNAL_URL:-http://gateway:3010}
+    env_file:
+      - .env.vps.web
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - edge
+      - backend
+
   gateway:
     <<: *service_defaults
     image: workspace-gateway:${WORKSPACE_VPS_IMAGE_TAG:-vps}

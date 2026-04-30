@@ -1,6 +1,6 @@
 # Sobreposição de portas para o slot **develop** na mesma VPS que staging.
-# Staging (`workspace-staging`): só `docker-compose.vps.yml` → proxy **8085**, gateway **3010**.
-# Develop (`workspace-develop`): base + este ficheiro → proxy **8086**, gateway **3011**.
+# Staging (`workspace-staging`): só `docker-compose.vps.yml` → proxy **8085**, gateway **3010**, web **3000**.
+# Develop (`workspace-develop`): base + este ficheiro → proxy **8086**, gateway **3011**, web **3001**.
 #
 # Uso na VPS (deploy CI):
 #   docker compose -f docker-compose.vps.yml -f docker-compose.vps.slot-develop.yml -p workspace-develop ...
@@ -12,3 +12,6 @@ services:
   gateway:
     ports: !override
       - "3011:3010"
+  web:
+    ports: !override
+      - "3001:3000"

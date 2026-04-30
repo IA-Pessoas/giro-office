@@ -76,6 +76,7 @@ jobs:
           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+          ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
         run: bash scripts/ci/materialize-vps-env.sh
 
       - name: Calcular tag de origem (staging) no registry
@@ -132,6 +133,10 @@ jobs:
           COMPOSE_DOCKER_CLI_BUILD: 1
         run: |
           set -eo pipefail
+          set -a
+          # shellcheck disable=SC1091
+          . ./.env.vps.web
+          set +a
           docker compose -f docker-compose.vps.yml build
 
       - name: "Salvar TAR (sem registry) para jobs seguintes"
@@ -228,6 +233,7 @@ jobs:
           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+          ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
         run: bash scripts/ci/materialize-vps-env.sh
 
       - name: Login no registry
@@ -332,6 +338,7 @@ jobs:
           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+          ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
         run: bash scripts/ci/dast-local-stack.sh
 
       - name: Logs (falha na stack DAST)

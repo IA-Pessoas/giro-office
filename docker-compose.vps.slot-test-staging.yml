@@ -8,3 +8,6 @@ services:
   gateway:
     ports: !override
       - "3012:3010"
+  web:
+    ports: !override
+      - "3003:3000"

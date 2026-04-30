@@ -30,10 +30,10 @@ if [[ -z "${DOCKER_REGISTRY_URL:-}" || -z "${DOCKER_REGISTRY_USERNAME:-}" || -z 
 fi
 
 COMPOSE_ARGS=( -f docker-compose.vps.yml )
-# staging: só base → 8085 / 3010
-# develop: + slot-develop → 8086 / 3011
-# test-develop: + slot-test-develop → 8087 / 3013
-# test-staging: + slot-test-staging → 8086 / 3012
+# staging: só base → 8085 / 3010 / 3000 (web)
+# develop: + slot-develop → 8086 / 3011 / 3001 (web)
+# test-develop: + slot-test-develop → 8087 / 3013 / 3002 (web)
+# test-staging: + slot-test-staging → 8086 / 3012 / 3003 (web)
 case "${DEPLOY_SLOT:-}" in
   develop)
     SLOT_OVERRIDE="docker-compose.vps.slot-develop.yml"
