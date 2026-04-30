@@ -1,26 +1,24 @@
 ---
-description: Padroes de UI, estilo e selects no frontend React
+description: Padrões gerais de UI compartilhada no frontend
 globs: app/**/*.{tsx,jsx}
 alwaysApply: false
 ---
 
-# UI e estilos em componentes
+# Padrões de UI no Frontend
 
-## Padrões recorrentes
+## Padrões visuais compartilhados
 
-- Para padrões visuais que se repetem entre telas ou fluxos (por exemplo `select` nativo customizado), usar **componente base** ou **módulo compartilhado do domínio** (ex.: `modules/<dominio>/form/`), em vez de copiar as mesmas classes em cada tela.
-- No módulo **clients**, inputs e textarea alinhados à marca usam `app/src/modules/clients/form/clientFormControls.ts` (`clientTextFieldClassName`, `clientTextareaClassName`).
-- Select nativo estilizado do módulo clients: `app/src/modules/clients/form/ClientNativeSelect.tsx` — classes, seta (`background-image`) e `style` ficam **só** nesse componente.
+- Evitar estilos visuais inline em componentes de tela ou feature, incluindo `style={...}` e constantes locais criadas apenas para controlar apresentação.
+- Padrões visuais recorrentes devem ser extraídos para componentes compartilhados, wrappers ou módulos de UI no nível do domínio, em vez de serem redefinidos em várias telas.
+- Elementos nativos com apresentação customizada (`select`, `input`, `textarea`, etc.), quando o mesmo padrão visual aparecer em mais de um lugar, devem usar uma implementação compartilhada do domínio: um componente base (ex.: `ClientNativeSelect`) ou classes/tokens exportados de um único módulo de formulário do domínio (ex.: `clientFormControls.ts`), desde que a tela não duplique strings de classe nem `style` apenas para reproduzir o mesmo controle.
+- Quando um detalhe visual realmente exigir `style`, ele deve ficar encapsulado apenas no componente base compartilhado responsável por aquele padrão, nunca espalhado nas telas da feature.
 
-## Telas e fluxos (o que evitar)
+## Uso nas features
 
-- Evitar `style={...}` e blocos grandes de strings Tailwind **no arquivo da feature** só para montar um `select` customizado (seta, `appearance-none`, foco). Usar `ClientNativeSelect` (ou equivalente do domínio).
-- Evitar constantes locais criadas **só** para o mesmo padrão visual que já existe na base do domínio — importar o componente ou as classes compartilhadas.
+- Telas e componentes de feature devem consumir componentes de UI compartilhados ou o módulo de formulário do domínio, em vez de recriar localmente o mesmo padrão visual.
+- Quando um domínio já possuir controles compartilhados de formulário, deve-se preferir estender essa camada compartilhada em vez de introduzir novo styling local.
 
-## Base compartilhada (permitido)
+## Exemplo (domínio `clients`)
 
-- No **componente ou módulo de formulário do domínio** pode concentrar detalhes de aparência, **incluindo** `style` quando necessário (ex.: seta do `select` nativo), desde que as telas usem o wrapper e não repitam isso.
-
-## Select nativo
-
-- Customizações visuais de `select` (seta, espaçamento à direita, estados de foco) não devem ser espalhadas nos componentes de fluxo; usar `ClientNativeSelect` no módulo clients.
+- Controles de formulário alinhados à marca: `app/src/modules/clients/form/clientFormControls.ts` (`clientTextFieldClassName`, `clientTextareaClassName`).
+- `select` nativo estilizado (seta, foco, etc.): `app/src/modules/clients/form/ClientNativeSelect.tsx` — qualquer `style` necessário fica só nesse wrapper; as features importam o componente.

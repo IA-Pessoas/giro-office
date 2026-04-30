@@ -76,12 +76,6 @@ export function ClientIntegrationForm({
             <option value="Novo">Novo</option>
             <option value="Constituição de Empresa">Constituição de Empresa</option>
           </ClientNativeSelect>
-          {isCreate ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              O status final do cliente será definido pelas regras do backend para esse tipo de
-              cadastro.
-            </p>
-          ) : null}
         </label>
 
         <label className="space-y-1.5">
