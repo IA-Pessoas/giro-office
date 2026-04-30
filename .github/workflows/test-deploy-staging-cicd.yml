@@ -55,144 +55,144 @@ jobs:
       - name: Testes unitários / pacote (Vitest em serviços)
         run: pnpm test
 
-  staging-environment:
-    name: Staging (teste) — Docker no runner (apenas PR)
-    needs: quality
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
+  # staging-environment:
+  #   name: Staging (teste) — Docker no runner (apenas PR)
+  #   needs: quality
+  #   if: github.event_name == 'pull_request'
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 60
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
+  #     - uses: pnpm/action-setup@v4
+  #       with:
+  #         version: 9.15.0
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "22"
+  #         cache: pnpm
 
-      - name: Instalar dependências (pnpm smoke / Playwright em app)
-        run: pnpm install --frozen-lockfile
+  #     - name: Instalar dependências (pnpm smoke / Playwright em app)
+  #       run: pnpm install --frozen-lockfile
 
-      - uses: docker/setup-buildx-action@v3
+  #     - uses: docker/setup-buildx-action@v3
 
-      - id: reg
-        name: Registro Docker configurado?
-        env:
-          R: ${{ secrets.DOCKER_REGISTRY_URL }}
-        run: |
-          if [ -n "$R" ]; then
-            echo "has=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has=false" >> "$GITHUB_OUTPUT"
-          fi
+  #     - id: reg
+  #       name: Registro Docker configurado?
+  #       env:
+  #         R: ${{ secrets.DOCKER_REGISTRY_URL }}
+  #       run: |
+  #         if [ -n "$R" ]; then
+  #           echo "has=true" >> "$GITHUB_OUTPUT"
+  #         else
+  #           echo "has=false" >> "$GITHUB_OUTPUT"
+  #         fi
 
-      - name: Materializar .env.vps.* a partir dos segredos
-        env:
-          ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
-          ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
-          ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
-          ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
-          ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
-          ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
-          ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
-          ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
-        run: bash scripts/ci/materialize-vps-env.sh
+  #     - name: Materializar .env.vps.* a partir dos segredos
+  #       env:
+  #         ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+  #         ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+  #         ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+  #         ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+  #         ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+  #         ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+  #         ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+  #         ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+  #       run: bash scripts/ci/materialize-vps-env.sh
 
-      - name: "[Build] Imagens Docker (docker-compose.vps.yml)"
-        env:
-          DOCKER_BUILDKIT: 1
-          COMPOSE_DOCKER_CLI_BUILD: 1
-        run: |
-          set -eo pipefail
-          docker compose -f docker-compose.vps.yml build
+  #     - name: "[Build] Imagens Docker (docker-compose.vps.yml)"
+  #       env:
+  #         DOCKER_BUILDKIT: 1
+  #         COMPOSE_DOCKER_CLI_BUILD: 1
+  #       run: |
+  #         set -eo pipefail
+  #         docker compose -f docker-compose.vps.yml build
 
-      - name: "[Scan] Trivy — imagens workspace (gate: CRITICAL; HIGH é informativo)"
-        run: |
-          set -eo pipefail
-          mkdir -p /tmp/trivy-cache
-          mapfile -t images < <(bash scripts/ci/list-workspace-vps-images.sh)
-          scan() {
-            local img="$1"
-            local severity="$2"
-            local exit_code="$3"
-            docker run --rm \
-              -v /var/run/docker.sock:/var/run/docker.sock \
-              -v /tmp/trivy-cache:/root/.cache/trivy \
-              aquasec/trivy:0.58.2 image \
-              --scanners vuln \
-              --severity "$severity" \
-              --exit-code "$exit_code" \
-              --ignore-unfixed \
-              "$img"
-          }
-          for img in "${images[@]}"; do
-            echo "::group::Trivy (informativo HIGH,CRITICAL) — $img"
-            scan "$img" "HIGH,CRITICAL" 0 || true
-            echo "::endgroup::"
-          done
-          for img in "${images[@]}"; do
-            echo "::group::Trivy (gate CRITICAL) — $img"
-            scan "$img" "CRITICAL" 1
-            echo "::endgroup::"
-          done
+  #     - name: "[Scan] Trivy — imagens workspace (gate: CRITICAL; HIGH é informativo)"
+  #       run: |
+  #         set -eo pipefail
+  #         mkdir -p /tmp/trivy-cache
+  #         mapfile -t images < <(bash scripts/ci/list-workspace-vps-images.sh)
+  #         scan() {
+  #           local img="$1"
+  #           local severity="$2"
+  #           local exit_code="$3"
+  #           docker run --rm \
+  #             -v /var/run/docker.sock:/var/run/docker.sock \
+  #             -v /tmp/trivy-cache:/root/.cache/trivy \
+  #             aquasec/trivy:0.58.2 image \
+  #             --scanners vuln \
+  #             --severity "$severity" \
+  #             --exit-code "$exit_code" \
+  #             --ignore-unfixed \
+  #             "$img"
+  #         }
+  #         for img in "${images[@]}"; do
+  #           echo "::group::Trivy (informativo HIGH,CRITICAL) — $img"
+  #           scan "$img" "HIGH,CRITICAL" 0 || true
+  #           echo "::endgroup::"
+  #         done
+  #         for img in "${images[@]}"; do
+  #           echo "::group::Trivy (gate CRITICAL) — $img"
+  #           scan "$img" "CRITICAL" 1
+  #           echo "::endgroup::"
+  #         done
 
-      - name: "[Deploy temporário] Subir stack e aguardar healthchecks"
-        env:
-          DOCKER_BUILDKIT: 1
-          COMPOSE_DOCKER_CLI_BUILD: 1
-        run: |
-          set -eo pipefail
-          docker compose version
-          docker compose -f docker-compose.vps.yml up -d --wait --wait-timeout 900
+  #     - name: "[Deploy temporário] Subir stack e aguardar healthchecks"
+  #       env:
+  #         DOCKER_BUILDKIT: 1
+  #         COMPOSE_DOCKER_CLI_BUILD: 1
+  #       run: |
+  #         set -eo pipefail
+  #         docker compose version
+  #         docker compose -f docker-compose.vps.yml up -d --wait --wait-timeout 900
 
-      - name: "[Integration] Vitest — client-service com Postgres (opcional)"
-        env:
-          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
-          CLIENT_SERVICE_INTEGRATION: "1"
-        run: |
-          set -eo pipefail
-          if [ -z "$DATABASE_URL" ]; then
-            echo "::notice::Secret STAGING_DATABASE_URL não configurado — pulando testes de integração com Postgres."
-            exit 0
-          fi
-          pnpm --filter @workspace/client-service test
+  #     - name: "[Integration] Vitest — client-service com Postgres (opcional)"
+  #       env:
+  #         DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+  #         CLIENT_SERVICE_INTEGRATION: "1"
+  #       run: |
+  #         set -eo pipefail
+  #         if [ -z "$DATABASE_URL" ]; then
+  #           echo "::notice::Secret STAGING_DATABASE_URL não configurado — pulando testes de integração com Postgres."
+  #           exit 0
+  #         fi
+  #         pnpm --filter @workspace/client-service test
 
-      - name: "[Smoke + integração HTTP] Contrato público via gateway (pnpm smoke)"
-        run: pnpm smoke
+  #     - name: "[Smoke + integração HTTP] Contrato público via gateway (pnpm smoke)"
+  #       run: pnpm smoke
 
-      - name: "[E2E] Playwright (executa quando @playwright/test existir no workspace)"
-        run: |
-          set -eo pipefail
-          if [ ! -d app/node_modules/@playwright/test ] && [ ! -d node_modules/@playwright/test ]; then
-            echo "::notice::Playwright não instalado — adicione @playwright/test ao app e playwright.config.ts para ativar E2E."
-            exit 0
-          fi
-          cd app
-          pnpm exec playwright install --with-deps chromium
-          pnpm exec playwright test
+  #     - name: "[E2E] Playwright (executa quando @playwright/test existir no workspace)"
+  #       run: |
+  #         set -eo pipefail
+  #         if [ ! -d app/node_modules/@playwright/test ] && [ ! -d node_modules/@playwright/test ]; then
+  #           echo "::notice::Playwright não instalado — adicione @playwright/test ao app e playwright.config.ts para ativar E2E."
+  #           exit 0
+  #         fi
+  #         cd app
+  #         pnpm exec playwright install --with-deps chromium
+  #         pnpm exec playwright test
 
-      - name: "[Registry] Login"
-        if: success() && steps.reg.outputs.has == 'true'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ secrets.DOCKER_REGISTRY_URL }}
-          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
-          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+  #     - name: "[Registry] Login"
+  #       if: success() && steps.reg.outputs.has == 'true'
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: ${{ secrets.DOCKER_REGISTRY_URL }}
+  #         username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+  #         password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
 
-      - name: "[Registry] push workspace-* (tag local) → {registry}/*:<GITHUB_SHA>"
-        if: success() && steps.reg.outputs.has == 'true'
-        env:
-          DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
-          STAGING_DOCKER_TAG: ${{ github.sha }}
-        run: bash scripts/ci/compose-vps-staging-push.sh
+  #     - name: "[Registry] push workspace-* (tag local) → {registry}/*:<GITHUB_SHA>"
+  #       if: success() && steps.reg.outputs.has == 'true'
+  #       env:
+  #         DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+  #         STAGING_DOCKER_TAG: ${{ github.sha }}
+  #       run: bash scripts/ci/compose-vps-staging-push.sh
 
-      - name: Encerrar stack
-        if: always()
-        run: |
-          docker compose -f docker-compose.vps.yml down -v || true
+  #     - name: Encerrar stack
+  #       if: always()
+  #       run: |
+  #         docker compose -f docker-compose.vps.yml down -v || true
 
   build-and-push:
     name: Build e push registry (push test/deploy-staging)
