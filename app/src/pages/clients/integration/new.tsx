@@ -40,7 +40,7 @@ export default function NewClientIntegrationPage() {
     const organizationId = meQuery.data?.organization_id;
 
     if (!organizationId) {
-      toast.error("NÃ£o foi possÃ­vel identificar a organizaÃ§Ã£o do usuÃ¡rio.");
+      toast.error("Não foi possível identificar a organização do usuário.");
       return;
     }
 
@@ -54,7 +54,7 @@ export default function NewClientIntegrationPage() {
         buildCreateClientIntegrationPayload(formValues, organizationId),
       );
 
-      toast.success("Cliente de integraÃ§Ã£o cadastrado com sucesso.");
+      toast.success("Cliente de integração cadastrado com sucesso.");
       await router.push(`/clients/${createdClient.id}`);
     } catch (error) {
       const message =
@@ -64,7 +64,7 @@ export default function NewClientIntegrationPage() {
         typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
           "string"
           ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "Erro ao cadastrar cliente de integraÃ§Ã£o.";
+          : "Erro ao cadastrar cliente de integração.";
 
       toast.error(message);
     }
@@ -73,7 +73,7 @@ export default function NewClientIntegrationPage() {
   return (
     <>
       <Head>
-        <title>Novo cliente de integraÃ§Ã£o</title>
+        <title>Novo cliente de integração</title>
       </Head>
 
       <div className="space-y-6">
@@ -88,10 +88,10 @@ export default function NewClientIntegrationPage() {
 
           <div>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-              Novo cliente por integraÃ§Ã£o
+              Novo cliente por integração
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              Crie um cliente usando o fluxo dedicado de integraÃ§Ã£o.
+              Crie um cliente usando o fluxo dedicado de integração.
             </p>
           </div>
         </div>

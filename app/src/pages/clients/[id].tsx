@@ -67,7 +67,7 @@ export default function ClientDetailPage() {
   const uiStatus = mapClientStatusFromApi(client?.status);
   const organizationName =
     (client as { organization?: { name?: string } } | null)?.organization?.name ??
-    "OrganizaÃ§Ã£o atual";
+    "Organização atual";
 
   useEffect(() => {
     if (!client) {
@@ -119,7 +119,7 @@ export default function ClientDetailPage() {
         typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
           "string"
           ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "NÃ£o foi possÃ­vel atualizar o cliente.";
+          : "Não foi possível atualizar o cliente.";
 
       toast.error(message);
     }
@@ -142,7 +142,7 @@ export default function ClientDetailPage() {
         typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
           "string"
           ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "NÃ£o foi possÃ­vel reativar o cliente.";
+          : "Não foi possível reativar o cliente.";
 
       toast.error(message);
     }
@@ -165,7 +165,7 @@ export default function ClientDetailPage() {
         typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
           "string"
           ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "NÃ£o foi possÃ­vel desativar o cliente.";
+          : "Não foi possível desativar o cliente.";
 
       toast.error(message);
     }
@@ -212,11 +212,11 @@ export default function ClientDetailPage() {
           </section>
         ) : clientQuery.isError ? (
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-rose-600 dark:text-rose-300`}>
-            NÃ£o foi possÃ­vel carregar o detalhe deste cliente.
+            Não foi possível carregar o detalhe deste cliente.
           </section>
         ) : !client ? (
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
-            Cliente nÃ£o encontrado.
+            Cliente não encontrado.
           </section>
         ) : (
           <>
@@ -226,9 +226,9 @@ export default function ClientDetailPage() {
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <SummaryItem label="Nome" value={client.name} />
                   <SummaryItem label="CPF/CNPJ" value={formatCpfCnpj(client.cpf_cnpj)} />
-                  <SummaryItem label="RazÃ£o social" value={client.company_name || "NÃ£o informado"} />
-                  <SummaryItem label="Nome fantasia" value={client.fantasy_name || "NÃ£o informado"} />
-                  <SummaryItem label="OrganizaÃ§Ã£o" value={organizationName} />
+                  <SummaryItem label="Razão social" value={client.company_name || "Não informado"} />
+                  <SummaryItem label="Nome fantasia" value={client.fantasy_name || "Não informado"} />
+                  <SummaryItem label="Organização" value={organizationName} />
                   <SummaryItem
                     label="Desativado em"
                     value={
@@ -243,7 +243,7 @@ export default function ClientDetailPage() {
               <div className={`${PANEL_CLASSNAME} p-6`}>
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Ciclo de vida</h2>
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                  AÃ§Ãµes disponÃ­veis apenas para administradores.
+                  Ações disponíveis apenas para administradores.
                 </p>
 
                 <div className="mt-5 space-y-3">
@@ -292,7 +292,7 @@ export default function ClientDetailPage() {
                     service_unique: client.service_unique ?? false,
                   })
                 }
-                submitLabel={updateClientMutation.isPending ? "Salvando..." : "Salvar alteraÃ§Ãµes"}
+                submitLabel={updateClientMutation.isPending ? "Salvando..." : "Salvar alterações"}
                 disabled={updateClientMutation.isPending}
               />
             </section>
@@ -304,7 +304,7 @@ export default function ClientDetailPage() {
                     <div className="space-y-1">
                       <h2 className="text-lg font-semibold text-slate-900 dark:text-white">PA</h2>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Gerencie os dados de PA do cliente em uma pÃ¡gina dedicada.
+                        Gerencie os dados de PA do cliente em uma página dedicada.
                       </p>
                     </div>
 
@@ -321,9 +321,9 @@ export default function ClientDetailPage() {
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="space-y-1">
-                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Integracao</h2>
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Integração</h2>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Gerencie os dados de integracao do cliente em uma pÃ¡gina dedicada.
+                        Gerencie os dados de integração do cliente em uma página dedicada.
                       </p>
                     </div>
 
@@ -332,7 +332,7 @@ export default function ClientDetailPage() {
                       className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
                     >
                       <Workflow className="h-4 w-4" />
-                      Abrir integracao
+                      Abrir integração
                     </Link>
                   </div>
                 </div>

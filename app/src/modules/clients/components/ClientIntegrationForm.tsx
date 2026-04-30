@@ -59,8 +59,8 @@ export function ClientIntegrationForm({
             onChange={onChange}
             disabled={disabled}
           >
-            <option value="PJ">Pessoa Juridica (PJ)</option>
-            <option value="PF">Pessoa Fisica (PF)</option>
+            <option value="PJ">Pessoa Jurídica (PJ)</option>
+            <option value="PF">Pessoa Física (PF)</option>
           </ClientNativeSelect>
         </label>
 
@@ -74,11 +74,11 @@ export function ClientIntegrationForm({
           >
             <option value="Existente">Existente</option>
             <option value="Novo">Novo</option>
-            <option value="Constituicao de Empresa">Constituicao de Empresa</option>
+            <option value="Constituição de Empresa">Constituição de Empresa</option>
           </ClientNativeSelect>
           {isCreate ? (
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              O status final do cliente sera definido pelas regras do backend para esse tipo de
+              O status final do cliente será definido pelas regras do backend para esse tipo de
               cadastro.
             </p>
           ) : null}
@@ -91,7 +91,7 @@ export function ClientIntegrationForm({
             value={values.cpf_cnpj}
             onChange={onChange}
             disabled={disabled}
-            placeholder="Somente numeros"
+            placeholder="Somente números"
             className={clientTextFieldClassName}
           />
         </label>
@@ -108,7 +108,7 @@ export function ClientIntegrationForm({
         </label>
 
         <label className="space-y-1.5">
-          <span className={labelClassName}>Razao Social</span>
+          <span className={labelClassName}>Razão Social</span>
           <input
             name="company_name"
             value={values.company_name}
@@ -167,7 +167,7 @@ export function ClientIntegrationForm({
         </label>
 
         <label className="space-y-1.5">
-          <span className={labelClassName}>Responsavel Legal</span>
+          <span className={labelClassName}>Responsável Legal</span>
           <input
             name="responsible"
             value={values.responsible}
@@ -178,13 +178,13 @@ export function ClientIntegrationForm({
         </label>
 
         <label className="space-y-1.5">
-          <span className={labelClassName}>CPF Responsavel</span>
+          <span className={labelClassName}>CPF Responsável</span>
           <input
             name="cpf_responsible"
             value={values.cpf_responsible}
             onChange={onChange}
             disabled={disabled}
-            placeholder="Somente numeros"
+            placeholder="Somente números"
             className={clientTextFieldClassName}
           />
         </label>
@@ -207,7 +207,7 @@ export function ClientIntegrationForm({
             value={values.cpf_agent}
             onChange={onChange}
             disabled={disabled}
-            placeholder="Somente numeros"
+            placeholder="Somente números"
             className={clientTextFieldClassName}
           />
         </label>
@@ -224,7 +224,7 @@ export function ClientIntegrationForm({
         </label>
 
         <label className="space-y-1.5">
-          <span className={labelClassName}>Indicacao</span>
+          <span className={labelClassName}>Indicação</span>
           <input
             name="indication"
             value={values.indication}
@@ -237,7 +237,7 @@ export function ClientIntegrationForm({
         {createValues ? (
           <>
             <label className="space-y-1.5">
-              <span className={labelClassName}>Participantes da Reuniao</span>
+              <span className={labelClassName}>Participantes da Reunião</span>
               <input
                 name="participants_meet"
                 value={createValues.participants_meet}
@@ -248,7 +248,7 @@ export function ClientIntegrationForm({
             </label>
 
             <label className="space-y-1.5">
-              <span className={labelClassName}>Tipo de Reuniao</span>
+              <span className={labelClassName}>Tipo de Reunião</span>
               <input
                 name="meet_type"
                 value={createValues.meet_type}
@@ -263,7 +263,7 @@ export function ClientIntegrationForm({
         {editValues ? (
           <>
             <label className="space-y-1.5 md:col-span-2 xl:col-span-2">
-              <span className={labelClassName}>Endereco</span>
+              <span className={labelClassName}>Endereço</span>
               <input
                 name="address"
                 value={editValues.address}
@@ -328,7 +328,7 @@ export function ClientIntegrationForm({
             disabled={disabled}
             className="h-4 w-4 rounded border-slate-300 text-[var(--colors-brand-gradient-end)] focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-600 dark:bg-slate-900"
           />
-          <span className="text-sm font-medium text-slate-700 dark:text-white">Servico unico</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-white">Serviço único</span>
         </label>
       </div>
 

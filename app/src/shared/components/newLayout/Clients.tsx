@@ -99,7 +99,7 @@ export function Clients() {
             className={`inline-flex w-fit items-center gap-2 rounded-xl px-4 py-2.5 text-white ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
           >
             <Plus className="h-5 w-5" />
-            Nova integracao
+            Nova integração
           </Link>
 
           <button

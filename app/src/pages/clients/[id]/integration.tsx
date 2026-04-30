@@ -70,7 +70,7 @@ export default function ClientIntegrationPage() {
 
     try {
       await updateIntegrationMutation.mutateAsync(updatePayload);
-      toast.success("Cliente de integraÃ§Ã£o atualizado com sucesso.");
+      toast.success("Cliente de integração atualizado com sucesso.");
       await router.push(`/clients/${clientId}`);
     } catch (error) {
       const message =
@@ -80,7 +80,7 @@ export default function ClientIntegrationPage() {
         typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
           "string"
           ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "NÃ£o foi possÃ­vel atualizar o cliente de integraÃ§Ã£o.";
+          : "Não foi possível atualizar o cliente de integração.";
 
       toast.error(message);
     }
@@ -89,7 +89,7 @@ export default function ClientIntegrationPage() {
   return (
     <>
       <Head>
-        <title>IntegraÃ§Ã£o do cliente</title>
+        <title>Integração do cliente</title>
       </Head>
 
       <div className="space-y-6">
@@ -104,10 +104,10 @@ export default function ClientIntegrationPage() {
 
           <div>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-              {client?.name ? `IntegraÃ§Ã£o de ${client.name}` : "IntegraÃ§Ã£o do cliente"}
+              {client?.name ? `Integração de ${client.name}` : "Integração do cliente"}
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              PÃ¡gina dedicada para atualizaÃ§Ã£o dos dados de integraÃ§Ã£o.
+              Página dedicada para atualização dos dados de integração.
             </p>
           </div>
         </div>
@@ -118,19 +118,19 @@ export default function ClientIntegrationPage() {
           </section>
         ) : clientQuery.isError ? (
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-rose-600 dark:text-rose-300`}>
-            NÃ£o foi possÃ­vel carregar o cliente para o fluxo de integraÃ§Ã£o.
+            Não foi possível carregar o cliente para o fluxo de integração.
           </section>
         ) : !clientId ? (
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
-            Cliente invÃ¡lido.
+            Cliente inválido.
           </section>
         ) : !client ? (
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
-            Cliente nÃ£o encontrado.
+            Cliente não encontrado.
           </section>
         ) : !hasUsableIntegrationData(client) ? (
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
-            Este cliente ainda nÃ£o possui dados mÃ­nimos de integraÃ§Ã£o para ediÃ§Ã£o.
+            Este cliente ainda não possui dados mínimos de integração para edição.
           </section>
         ) : formValues ? (
           <section className={`${PANEL_CLASSNAME} p-6`}>
@@ -140,7 +140,7 @@ export default function ClientIntegrationPage() {
               onChange={handleInputChange}
               onSubmit={() => void handleSubmit()}
               onCancel={() => setFormValues(createUpdateClientIntegrationInitialValues(client))}
-              submitLabel={updateIntegrationMutation.isPending ? "Salvando..." : "Salvar alteraÃ§Ãµes"}
+              submitLabel={updateIntegrationMutation.isPending ? "Salvando..." : "Salvar alterações"}
               disabled={updateIntegrationMutation.isPending}
               submitDisabled={!hasChanges}
             />
