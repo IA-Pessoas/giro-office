@@ -1,9 +1,8 @@
 import type { ChangeEvent } from "react";
 
+import { ClientNativeSelect } from "../form/ClientNativeSelect";
+import { clientTextFieldClassName } from "../form/clientFormControls";
 import type { ClientFormValues } from "../types";
-
-const fieldClassName =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500";
 
 interface ClientFormProps {
   values: ClientFormValues;
@@ -27,7 +26,7 @@ export function ClientForm({
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-1.5">
           <span className="block text-sm font-medium text-slate-700 dark:text-white">Nome</span>
-          <input name="name" value={values.name} onChange={onChange} disabled={disabled} className={fieldClassName} />
+          <input name="name" value={values.name} onChange={onChange} disabled={disabled} className={clientTextFieldClassName} />
         </label>
 
         <label className="space-y-1.5">
@@ -38,7 +37,7 @@ export function ClientForm({
             onChange={onChange}
             disabled={disabled}
             placeholder="Somente números"
-            className={fieldClassName}
+            className={clientTextFieldClassName}
           />
         </label>
 
@@ -49,7 +48,7 @@ export function ClientForm({
             value={values.company_name}
             onChange={onChange}
             disabled={disabled}
-            className={fieldClassName}
+            className={clientTextFieldClassName}
           />
         </label>
 
@@ -60,24 +59,18 @@ export function ClientForm({
             value={values.fantasy_name}
             onChange={onChange}
             disabled={disabled}
-            className={fieldClassName}
+            className={clientTextFieldClassName}
           />
         </label>
 
         <label className="space-y-1.5">
           <span className="block text-sm font-medium text-slate-700 dark:text-white">Status</span>
-          <select
-            name="status"
-            value={values.status}
-            onChange={onChange}
-            disabled={disabled}
-            className={fieldClassName}
-          >
+          <ClientNativeSelect name="status" value={values.status} onChange={onChange} disabled={disabled}>
             <option value="Ativo">Ativo</option>
             <option value="Prospect">Prospect</option>
             <option value="Inativo">Inativo</option>
             <option value="Fechado">Fechado</option>
-          </select>
+          </ClientNativeSelect>
         </label>
 
         <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 dark:border-slate-700 dark:bg-slate-950/40">

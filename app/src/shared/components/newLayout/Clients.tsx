@@ -136,7 +136,7 @@ export function Clients() {
                 setStatus(event.target.value);
                 setPage(1);
               }}
-              className="w-full appearance-none rounded-xl border border-slate-200 bg-white bg-[length:14px] bg-[position:right_1rem_center] bg-no-repeat px-3 py-2.5 pr-12 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              className="w-full appearance-none rounded-xl border border-slate-200 bg-white bg-[length:14px] bg-[position:right_1.25rem_center] bg-no-repeat px-3 py-2.5 pr-14 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               style={CLIENTS_SELECT_ARROW_STYLE}
             >
               <option value="">Todos</option>

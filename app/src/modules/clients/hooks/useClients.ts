@@ -10,9 +10,12 @@ import { useFetch } from "@shared/hooks";
 import { clientService } from "../services/clientService";
 import type {
   Client,
+  ClientPa,
+  ClientPaResponse,
   ClientListFilters,
   ClientListPage,
   CreateClientPayload,
+  UpdateClientPaPayload,
   UpdateClientPayload,
 } from "../types";
 
@@ -33,6 +36,10 @@ export function clientDetailQueryKey(id: string) {
   return [...CLIENTS_QUERY_KEY, "detail", id] as const;
 }
 
+export function clientPaDetailQueryKey(id: string) {
+  return [...CLIENTS_QUERY_KEY, "detail", id, "pa"] as const;
+}
+
 export function useClients(filters: ClientListFilters): UseQueryResult<ClientListPage, Error> {
   return useFetch(clientListQueryKey(filters), () => clientService.list(filters), {
     placeholderData: (previousData) => previousData,
@@ -42,6 +49,13 @@ export function useClients(filters: ClientListFilters): UseQueryResult<ClientLis
 
 export function useClient(id: string | undefined): UseQueryResult<Client | null, Error> {
   return useFetch(clientDetailQueryKey(id ?? "missing"), () => clientService.getById(id ?? ""), {
+    enabled: Boolean(id),
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useClientPa(id: string | undefined): UseQueryResult<ClientPaResponse | null, Error> {
+  return useFetch(clientPaDetailQueryKey(id ?? "missing"), () => clientService.getPaByClientId(id ?? ""), {
     enabled: Boolean(id),
     refetchOnWindowFocus: false,
   });
@@ -91,6 +105,30 @@ export function useActivateClientMutation(id: string): UseMutationResult<Client,
 
   return useMutation({
     mutationFn: () => clientService.activate(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
+    },
+  });
+}
+
+export function useCreateClientPaMutation(id: string): UseMutationResult<ClientPa, Error, void> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => clientService.createPa(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
+    },
+  });
+}
+
+export function useUpdateClientPaMutation(
+  id: string,
+): UseMutationResult<ClientPa, Error, UpdateClientPaPayload> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => clientService.updatePa(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
     },

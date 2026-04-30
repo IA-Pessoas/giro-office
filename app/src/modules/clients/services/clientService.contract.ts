@@ -5,6 +5,9 @@ export const CLIENT_ENDPOINTS = {
   create: "/client",
   detail: (id: string) => `/client/${id}`,
   activate: (id: string) => `/client/${id}/activate`,
+  detailPa: (id: string) => `/client/${id}/pa`,
+  createPa: (id: string) => `/client/${id}/pa`,
+  updatePa: (id: string) => `/client/${id}/pa`,
 } as const;
 
 export function buildClientListParams(filters: ClientListFilters) {
@@ -22,4 +25,14 @@ export function unwrapClientEnvelope<T>(body: unknown): T {
   }
 
   return body as T;
+}
+
+export function unwrapClientPaDetail(body: unknown) {
+  const data = unwrapClientEnvelope<{ detail?: unknown } | unknown>(body);
+
+  if (data !== null && typeof data === "object" && "detail" in data) {
+    return (data as { detail: unknown }).detail;
+  }
+
+  return data;
 }

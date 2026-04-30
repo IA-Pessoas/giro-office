@@ -4,6 +4,7 @@ import {
   buildClientListParams,
   CLIENT_ENDPOINTS,
   unwrapClientEnvelope,
+  unwrapClientPaDetail,
 } from "./services/clientService.contract.ts";
 import {
   mapClientStatusFromApi,
@@ -38,6 +39,9 @@ runTest("client endpoints use only /client contract", () => {
   assert.equal(CLIENT_ENDPOINTS.create, "/client");
   assert.equal(CLIENT_ENDPOINTS.detail("123"), "/client/123");
   assert.equal(CLIENT_ENDPOINTS.activate("123"), "/client/123/activate");
+  assert.equal(CLIENT_ENDPOINTS.detailPa("123"), "/client/123/pa");
+  assert.equal(CLIENT_ENDPOINTS.createPa("123"), "/client/123/pa");
+  assert.equal(CLIENT_ENDPOINTS.updatePa("123"), "/client/123/pa");
 });
 
 runTest("buildClientListParams forwards search, status, page and limit", () => {
@@ -56,4 +60,17 @@ runTest("unwrapClientEnvelope normalizes response.data.data", () => {
 
   assert.deepEqual(unwrapClientEnvelope({ success: true, data: payload }), payload);
   assert.deepEqual(unwrapClientEnvelope(payload), payload);
+});
+
+runTest("unwrapClientPaDetail returns nested detail payload", () => {
+  const detail = {
+    client_id: "123",
+    activities: "Retail",
+    client: {
+      email: "client@example.com",
+    },
+  };
+
+  assert.deepEqual(unwrapClientPaDetail({ success: true, data: { detail } }), detail);
+  assert.deepEqual(unwrapClientPaDetail({ detail }), detail);
 });

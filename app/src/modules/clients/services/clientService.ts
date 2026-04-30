@@ -2,14 +2,22 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   Client,
+  ClientPa,
+  ClientPaResponse,
   ClientListFilters,
   ClientListPage,
   CreateClientPayload,
   CreateClientData,
+  UpdateClientPaPayload,
   UpdateClientPayload,
   UpdateClientData,
 } from "../types";
-import { buildClientListParams, CLIENT_ENDPOINTS, unwrapClientEnvelope } from "./clientService.contract";
+import {
+  buildClientListParams,
+  CLIENT_ENDPOINTS,
+  unwrapClientEnvelope,
+  unwrapClientPaDetail,
+} from "./clientService.contract";
 
 export const clientService = {
   async list(filters: ClientListFilters = {}): Promise<ClientListPage> {
@@ -54,5 +62,26 @@ export const clientService = {
     const response = await api.post(CLIENT_ENDPOINTS.activate(id));
 
     return unwrapClientEnvelope<Client>(response.data);
+  },
+
+  async getPaByClientId(id: string): Promise<ClientPaResponse | null> {
+    const api = setupAPIClient();
+    const response = await api.get(CLIENT_ENDPOINTS.detailPa(id));
+
+    return unwrapClientPaDetail(response.data) as ClientPaResponse | null;
+  },
+
+  async createPa(id: string): Promise<ClientPa> {
+    const api = setupAPIClient();
+    const response = await api.post(CLIENT_ENDPOINTS.createPa(id), {});
+
+    return unwrapClientEnvelope<ClientPa>(response.data);
+  },
+
+  async updatePa(id: string, payload: UpdateClientPaPayload): Promise<ClientPa> {
+    const api = setupAPIClient();
+    const response = await api.patch(CLIENT_ENDPOINTS.updatePa(id), payload);
+
+    return unwrapClientEnvelope<ClientPa>(response.data);
   },
 };
