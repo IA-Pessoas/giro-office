@@ -1,0 +1,26 @@
+---
+description: Padroes de UI, estilo e selects no frontend React
+globs: app/**/*.{tsx,jsx}
+alwaysApply: false
+---
+
+# UI e estilos em componentes
+
+## Padrões recorrentes
+
+- Para padrões visuais que se repetem entre telas ou fluxos (por exemplo `select` nativo customizado), usar **componente base** ou **módulo compartilhado do domínio** (ex.: `modules/<dominio>/form/`), em vez de copiar as mesmas classes em cada tela.
+- No módulo **clients**, inputs e textarea alinhados à marca usam `app/src/modules/clients/form/clientFormControls.ts` (`clientTextFieldClassName`, `clientTextareaClassName`).
+- Select nativo estilizado do módulo clients: `app/src/modules/clients/form/ClientNativeSelect.tsx` — classes, seta (`background-image`) e `style` ficam **só** nesse componente.
+
+## Telas e fluxos (o que evitar)
+
+- Evitar `style={...}` e blocos grandes de strings Tailwind **no arquivo da feature** só para montar um `select` customizado (seta, `appearance-none`, foco). Usar `ClientNativeSelect` (ou equivalente do domínio).
+- Evitar constantes locais criadas **só** para o mesmo padrão visual que já existe na base do domínio — importar o componente ou as classes compartilhadas.
+
+## Base compartilhada (permitido)
+
+- No **componente ou módulo de formulário do domínio** pode concentrar detalhes de aparência, **incluindo** `style` quando necessário (ex.: seta do `select` nativo), desde que as telas usem o wrapper e não repitam isso.
+
+## Select nativo
+
+- Customizações visuais de `select` (seta, espaçamento à direita, estados de foco) não devem ser espalhadas nos componentes de fluxo; usar `ClientNativeSelect` no módulo clients.

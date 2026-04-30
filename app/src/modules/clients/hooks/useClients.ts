@@ -117,11 +117,7 @@ export function useCreateClientPaMutation(id: string): UseMutationResult<ClientP
   return useMutation({
     mutationFn: () => clientService.createPa(id),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: clientDetailQueryKey(id) }),
-        queryClient.invalidateQueries({ queryKey: clientPaDetailQueryKey(id) }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
     },
   });
 }
@@ -134,11 +130,7 @@ export function useUpdateClientPaMutation(
   return useMutation({
     mutationFn: (payload) => clientService.updatePa(id, payload),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: clientDetailQueryKey(id) }),
-        queryClient.invalidateQueries({ queryKey: clientPaDetailQueryKey(id) }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
     },
   });
 }
