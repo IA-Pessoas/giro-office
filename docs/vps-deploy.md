@@ -148,3 +148,5 @@ This VPS stack is meant for the stable microservices only:
 - `/audit` when the audit profile is enabled
 
 Legacy routes are intentionally out of scope for this deployment.
+
+<!-- esse comentario é apenas um teste -->
