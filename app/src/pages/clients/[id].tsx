@@ -2,7 +2,17 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState, type ChangeEvent } from "react";
-import { ArrowLeft, FileText, Power, RotateCcw, Workflow } from "lucide-react";
+import {
+  ArrowLeft,
+  BriefcaseBusiness,
+  CircleDollarSign,
+  FileText,
+  Power,
+  RotateCcw,
+  ShieldCheck,
+  Workflow,
+  XCircle,
+} from "lucide-react";
 import { toast } from "react-toastify";
 
 import { canSSRAuth } from "@modules/auth";
@@ -311,44 +321,54 @@ export default function ClientDetailPage() {
             </section>
 
             <section className={`${PANEL_CLASSNAME} p-6`}>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div className="space-y-1">
-                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">PA</h2>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Gerencie os dados de PA do cliente em uma página dedicada.
-                      </p>
-                    </div>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <ClientAccessCard
+                  title="PA"
+                  description="Gerencie os dados de PA do cliente em uma página dedicada."
+                  href={`/clients/${client.id}/pa`}
+                  actionLabel="Abrir PA"
+                  icon={FileText}
+                />
 
-                    <Link
-                      href={`/clients/${client.id}/pa`}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
-                    >
-                      <FileText className="h-4 w-4" />
-                      Abrir PA
-                    </Link>
-                  </div>
-                </div>
+                <ClientAccessCard
+                  title="Integração"
+                  description="Gerencie os dados de integração do cliente em uma página dedicada."
+                  href={`/clients/${client.id}/integration`}
+                  actionLabel="Abrir integração"
+                  icon={Workflow}
+                />
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div className="space-y-1">
-                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Integração</h2>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Gerencie os dados de integração do cliente em uma página dedicada.
-                      </p>
-                    </div>
+                <ClientAccessCard
+                  title="Commercial"
+                  description="Atualize o status de prospecção e os dados comerciais do cliente."
+                  href={`/clients/${client.id}/commercial`}
+                  actionLabel="Abrir commercial"
+                  icon={BriefcaseBusiness}
+                />
 
-                    <Link
-                      href={`/clients/${client.id}/integration`}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
-                    >
-                      <Workflow className="h-4 w-4" />
-                      Abrir integração
-                    </Link>
-                  </div>
-                </div>
+                <ClientAccessCard
+                  title="Finance"
+                  description="Gerencie a informação de contrato em uma página dedicada."
+                  href={`/clients/${client.id}/finance`}
+                  actionLabel="Abrir finance"
+                  icon={CircleDollarSign}
+                />
+
+                <ClientAccessCard
+                  title="Regularize"
+                  description="Atualize os dados cadastrais, fiscais e operacionais do cliente."
+                  href={`/clients/${client.id}/regularize`}
+                  actionLabel="Abrir regularize"
+                  icon={ShieldCheck}
+                />
+
+                <ClientAccessCard
+                  title="Termination"
+                  description="Inicie o processo de inativação do cliente em uma página dedicada."
+                  href={`/clients/${client.id}/termination`}
+                  actionLabel="Abrir termination"
+                  icon={XCircle}
+                />
               </div>
             </section>
           </>
@@ -365,6 +385,39 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
         {label}
       </p>
       <p className="mt-2 text-sm text-slate-900 dark:text-white">{value}</p>
+    </div>
+  );
+}
+
+function ClientAccessCard({
+  title,
+  description,
+  href,
+  actionLabel,
+  icon: Icon,
+}: {
+  title: string;
+  description: string;
+  href: string;
+  actionLabel: string;
+  icon: typeof FileText;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{description}</p>
+        </div>
+
+        <Link
+          href={href}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
+        >
+          <Icon className="h-4 w-4" />
+          {actionLabel}
+        </Link>
+      </div>
     </div>
   );
 }
