@@ -12,9 +12,11 @@ export {
   useClientPa,
   useClients,
   useCreateClientMutation,
+  useCreateClientIntegrationMutation,
   useCreateClientPaMutation,
   useDeactivateClientMutation,
   useUpdateClientMutation,
+  useUpdateClientIntegrationMutation,
   useUpdateClientPaMutation,
 } from './hooks/useClients';
 export { useClientList } from './hooks/useClientList';
@@ -23,6 +25,7 @@ export { useClientFormIntegracao } from './hooks/useFormIntegracao';
 export { useClientFormRegularize } from './hooks/useFormRegularize';
 
 export { clientService } from './services/clientService';
+export { ClientIntegrationForm } from './components/ClientIntegrationForm';
 export {
   mapClientStatusFromApi,
   mapClientStatusToApi,
@@ -34,9 +37,12 @@ export type {
   Client,
   ClientItem,
   ClientFormValues,
+  ClientIntegrationFormValuesBase,
   ClientPa,
   ClientPaRelatedClient,
   ClientPaResponse,
+  CreateClientIntegrationFormValues,
+  CreateClientIntegrationPayload,
   ClientListFilters,
   ClientListPage,
   ClientOrganizationSummary,
@@ -47,5 +53,7 @@ export type {
   Perms,
   UpdateClientPaPayload,
   UpdateClientData,
+  UpdateClientIntegrationFormValues,
+  UpdateClientIntegrationPayload,
   UpdateClientPayload,
 } from './types';

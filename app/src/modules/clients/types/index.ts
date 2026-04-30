@@ -115,6 +115,38 @@ export interface ClientFormValues {
   service_unique: boolean;
 }
 
+export interface ClientIntegrationFormValuesBase {
+  type: "PJ" | "PF";
+  name: string;
+  cpf_cnpj: string;
+  company_name: string;
+  fantasy_name: string;
+  responsible: string;
+  cpf_responsible: string;
+  number: string;
+  email: string;
+  agent: string;
+  cpf_agent: string;
+  instagram: string;
+  indication: string;
+  type_registration: string;
+  service_unique: boolean;
+}
+
+export interface CreateClientIntegrationFormValues extends ClientIntegrationFormValuesBase {
+  opening_date: string;
+  participants_meet: string;
+  meet_type: string;
+}
+
+export interface UpdateClientIntegrationFormValues extends ClientIntegrationFormValuesBase {
+  address: string;
+  cep: string;
+  neighborhood: string;
+  state: string;
+  city: string;
+}
+
 export interface ClientPaRelatedClient {
   company_name: string | null;
   cpf_cnpj: string | null;
@@ -234,6 +266,28 @@ export interface CreateClientPayload {
   service_unique?: boolean;
 }
 
+export interface CreateClientIntegrationPayload {
+  organization_id: string;
+  type: "PJ" | "PF";
+  name: string;
+  cpf_cnpj: string;
+  company_name?: string | null;
+  fantasy_name?: string | null;
+  opening_date?: string | null;
+  responsible?: string | null;
+  cpf_responsible?: string | null;
+  number?: string | null;
+  email?: string | null;
+  agent?: string | null;
+  cpf_agent?: string | null;
+  instagram?: string | null;
+  indication?: string | null;
+  participants_meet?: string | null;
+  meet_type?: string | null;
+  type_registration?: string | null;
+  service_unique?: boolean;
+}
+
 export interface UpdateClientData {
   [key: string]: any;
 }
@@ -245,4 +299,27 @@ export interface UpdateClientPayload {
   company_name?: string | null;
   fantasy_name?: string | null;
   service_unique?: boolean;
+}
+
+export interface UpdateClientIntegrationPayload {
+  type?: "PJ" | "PF";
+  name?: string | null;
+  cpf_cnpj?: string | null;
+  company_name?: string | null;
+  fantasy_name?: string | null;
+  responsible?: string | null;
+  cpf_responsible?: string | null;
+  number?: string | null;
+  email?: string | null;
+  agent?: string | null;
+  cpf_agent?: string | null;
+  instagram?: string | null;
+  indication?: string | null;
+  type_registration?: string | null;
+  service_unique?: boolean;
+  address?: string | null;
+  cep?: string | null;
+  neighborhood?: string | null;
+  state?: string | null;
+  city?: string | null;
 }

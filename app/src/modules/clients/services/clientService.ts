@@ -8,8 +8,10 @@ import type {
   ClientListPage,
   CreateClientPayload,
   CreateClientData,
+  CreateClientIntegrationPayload,
   UpdateClientPaPayload,
   UpdateClientPayload,
+  UpdateClientIntegrationPayload,
   UpdateClientData,
 } from "../types";
 import {
@@ -46,6 +48,20 @@ export const clientService = {
   async update(id: string, payload: UpdateClientPayload | UpdateClientData): Promise<Client> {
     const api = setupAPIClient();
     const response = await api.patch(CLIENT_ENDPOINTS.detail(id), payload);
+
+    return unwrapClientEnvelope<Client>(response.data);
+  },
+
+  async createIntegration(payload: CreateClientIntegrationPayload): Promise<Client> {
+    const api = setupAPIClient();
+    const response = await api.post(CLIENT_ENDPOINTS.createIntegration, payload);
+
+    return unwrapClientEnvelope<Client>(response.data);
+  },
+
+  async updateIntegration(id: string, payload: UpdateClientIntegrationPayload): Promise<Client> {
+    const api = setupAPIClient();
+    const response = await api.patch(CLIENT_ENDPOINTS.updateIntegration(id), payload);
 
     return unwrapClientEnvelope<Client>(response.data);
   },
