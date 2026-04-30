@@ -2,6 +2,8 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   Client,
+  ClientCommercialRecord,
+  ClientFinanceRecord,
   ClientPa,
   ClientPaResponse,
   ClientListFilters,
@@ -9,9 +11,14 @@ import type {
   CreateClientPayload,
   CreateClientData,
   CreateClientIntegrationPayload,
+  ClientTerminationRecord,
+  TerminateClientPayload,
+  UpdateClientCommercialPayload,
+  UpdateClientFinancePayload,
   UpdateClientPaPayload,
   UpdateClientPayload,
   UpdateClientIntegrationPayload,
+  UpdateClientRegularizePayload,
   UpdateClientData,
 } from "../types";
 import {
@@ -64,6 +71,40 @@ export const clientService = {
     const response = await api.patch(CLIENT_ENDPOINTS.updateIntegration(id), payload);
 
     return unwrapClientEnvelope<Client>(response.data);
+  },
+
+  async updateCommercial(
+    id: string,
+    payload: UpdateClientCommercialPayload,
+  ): Promise<ClientCommercialRecord> {
+    const api = setupAPIClient();
+    const response = await api.patch(CLIENT_ENDPOINTS.updateCommercial(id), payload);
+
+    return unwrapClientEnvelope<ClientCommercialRecord>(response.data);
+  },
+
+  async updateFinance(
+    id: string,
+    payload: UpdateClientFinancePayload,
+  ): Promise<ClientFinanceRecord> {
+    const api = setupAPIClient();
+    const response = await api.patch(CLIENT_ENDPOINTS.updateFinance(id), payload);
+
+    return unwrapClientEnvelope<ClientFinanceRecord>(response.data);
+  },
+
+  async updateRegularize(id: string, payload: UpdateClientRegularizePayload): Promise<Client> {
+    const api = setupAPIClient();
+    const response = await api.patch(CLIENT_ENDPOINTS.updateRegularize(id), payload);
+
+    return unwrapClientEnvelope<Client>(response.data);
+  },
+
+  async terminate(id: string, payload: TerminateClientPayload): Promise<ClientTerminationRecord> {
+    const api = setupAPIClient();
+    const response = await api.patch(CLIENT_ENDPOINTS.terminate(id), payload);
+
+    return unwrapClientEnvelope<ClientTerminationRecord>(response.data);
   },
 
   async deactivate(id: string): Promise<Client> {

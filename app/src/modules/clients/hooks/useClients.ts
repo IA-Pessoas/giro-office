@@ -10,14 +10,21 @@ import { useFetch } from "@shared/hooks";
 import { clientService } from "../services/clientService";
 import type {
   Client,
+  ClientCommercialRecord,
+  ClientFinanceRecord,
   ClientPa,
   ClientPaResponse,
+  ClientTerminationRecord,
   ClientListFilters,
   ClientListPage,
   CreateClientPayload,
   CreateClientIntegrationPayload,
+  TerminateClientPayload,
+  UpdateClientCommercialPayload,
+  UpdateClientFinancePayload,
   UpdateClientPaPayload,
   UpdateClientIntegrationPayload,
+  UpdateClientRegularizePayload,
   UpdateClientPayload,
 } from "../types";
 
@@ -113,6 +120,58 @@ export function useUpdateClientIntegrationMutation(
 
   return useMutation({
     mutationFn: (payload) => clientService.updateIntegration(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
+    },
+  });
+}
+
+export function useUpdateClientCommercialMutation(
+  id: string,
+): UseMutationResult<ClientCommercialRecord, Error, UpdateClientCommercialPayload> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => clientService.updateCommercial(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
+    },
+  });
+}
+
+export function useUpdateClientFinanceMutation(
+  id: string,
+): UseMutationResult<ClientFinanceRecord, Error, UpdateClientFinancePayload> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => clientService.updateFinance(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
+    },
+  });
+}
+
+export function useUpdateClientRegularizeMutation(
+  id: string,
+): UseMutationResult<Client, Error, UpdateClientRegularizePayload> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => clientService.updateRegularize(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
+    },
+  });
+}
+
+export function useTerminateClientMutation(
+  id: string,
+): UseMutationResult<ClientTerminationRecord, Error, TerminateClientPayload> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => clientService.terminate(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
     },
