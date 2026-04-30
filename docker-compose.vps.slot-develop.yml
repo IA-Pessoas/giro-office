@@ -6,8 +6,9 @@
 #   docker compose -f docker-compose.vps.yml -f docker-compose.vps.slot-develop.yml -p workspace-develop ...
 services:
   reverse-proxy:
-    ports:
+    # Evitar concatenação com docker-compose.vps.yml (Compose junta listas `ports`).
+    ports: !override
       - "8086:80"
   gateway:
-    ports:
+    ports: !override
       - "3011:3010"
