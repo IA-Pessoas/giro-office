@@ -13,13 +13,18 @@ if [[ -z "${VPS_HOST:-}" || -z "${VPS_USER:-}" || -z "${DEPLOY_PATH:-}" ]]; then
   exit 1
 fi
 
+if [[ "$DEPLOY_PATH" != /* ]]; then
+  echo "::error::run-vps-deploy-from-github: DEPLOY_PATH deve ser caminho absoluto (começar com /); recebido não-vazio mas inválido para mkdir/scp" >&2
+  exit 1
+fi
+
 if [[ -z "${VPS_SSH_PRIVATE_KEY:-}" && -z "${VPS_SSH_PASSWORD:-}" ]]; then
   echo "::error::Defina VPS_SSH_PRIVATE_KEY ou VPS_SSH_PASSWORD" >&2
   exit 1
 fi
 
 KNOWN_HOSTS_FILE="${ROOT}/.ci-known_hosts"
-mkdir -p "$(dirname "$KNOWN_HOSTS_FILE")"
+mkdir -p "$ROOT"
 touch "$KNOWN_HOSTS_FILE"
 ssh-keyscan -H "$VPS_HOST" >>"$KNOWN_HOSTS_FILE" 2>/dev/null || true
 
@@ -85,21 +90,22 @@ if [[ "${#scp_files[@]}" -eq 0 ]]; then
   exit 1
 fi
 
-run_ssh bash -c "mkdir -p $(printf "%q" "$DEPLOY_PATH")"
+GITHUB_SHA="${GITHUB_SHA:?}"
+
+run_ssh bash -s -- "$DEPLOY_PATH" <<'REMOTE_MKDIR'
+mkdir -p "$1"
+REMOTE_MKDIR
 
 run_scp "${scp_files[@]}" "$REMOTE_ENV"
 
-GITHUB_SHA="${GITHUB_SHA:?}"
-
-# shellcheck disable=SC2029
-run_ssh bash -s <<EOF
+run_ssh bash -s -- "$DEPLOY_PATH" "$GITHUB_SHA" <<'REMOTE_DEPLOY'
 set -euxo pipefail
-cd $(printf "%q" "$DEPLOY_PATH")
-git config --global --add safe.directory $(printf "%q" "$DEPLOY_PATH") || true
+cd "$1"
+git config --global --add safe.directory "$1" || true
 git fetch origin
-git fetch origin "${GITHUB_SHA}" 2>/dev/null || true
-git checkout -f "${GITHUB_SHA}"
+git fetch origin "$2" 2>/dev/null || true
+git checkout -f "$2"
 source ./.ci-remote-env
 rm -f ./.ci-remote-env
 bash scripts/ci/vps-remote-deploy.sh
-EOF
+REMOTE_DEPLOY
