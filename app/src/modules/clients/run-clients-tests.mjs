@@ -12,6 +12,10 @@ import {
   hasUsableIntegrationData,
 } from "./utils/integrationForm.ts";
 import {
+  validateCpfCnpjDocument,
+  validateOptionalCpfDocument,
+} from "./utils/documentValidation.ts";
+import {
   mapClientStatusFromApi,
   mapClientStatusToApi,
 } from "./utils/statusMapper.ts";
@@ -176,4 +180,26 @@ runTest("integration edit guard blocks when normalized cpf_cnpj is missing", () 
   assert.equal(hasUsableIntegrationData({ cpf_cnpj: "   " }), false);
   assert.equal(hasUsableIntegrationData({ cpf_cnpj: "..../-" }), false);
   assert.equal(hasUsableIntegrationData(null), false);
+});
+
+runTest("document validation enforces base client cpf_cnpj length", () => {
+  assert.equal(validateCpfCnpjDocument("123.456.789-10"), null);
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-90"), null);
+  assert.equal(validateCpfCnpjDocument("123"), "CPF/CNPJ deve ter 11 ou 14 dígitos.");
+});
+
+runTest("document validation enforces integration person type length", () => {
+  assert.equal(validateCpfCnpjDocument("123.456.789-10", "PF"), null);
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-90", "PJ"), null);
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-90", "PF"), "CPF deve ter 11 dígitos.");
+  assert.equal(validateCpfCnpjDocument("123.456.789-10", "PJ"), "CNPJ deve ter 14 dígitos.");
+});
+
+runTest("optional cpf validation accepts empty values and rejects invalid lengths", () => {
+  assert.equal(validateOptionalCpfDocument("CPF do responsável", ""), null);
+  assert.equal(validateOptionalCpfDocument("CPF do responsável", "123.456.789-10"), null);
+  assert.equal(
+    validateOptionalCpfDocument("CPF do responsável", "123"),
+    "CPF do responsável deve ter 11 dígitos.",
+  );
 });

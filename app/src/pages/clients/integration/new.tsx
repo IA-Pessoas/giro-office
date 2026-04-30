@@ -11,9 +11,12 @@ import { useCreateClientIntegrationMutation } from "@modules/clients/hooks/useCl
 import {
   buildCreateClientIntegrationPayload,
   createClientIntegrationInitialValues,
-  normalizeDocumentValue,
 } from "@modules/clients/utils/integrationForm";
 import { useMe } from "@shared/hooks/useMe";
+import {
+  validateCpfCnpjDocument,
+  validateOptionalCpfDocument,
+} from "@modules/clients/utils/documentValidation";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -44,8 +47,32 @@ export default function NewClientIntegrationPage() {
       return;
     }
 
-    if (!formValues.name.trim() || normalizeDocumentValue(formValues.cpf_cnpj).length === 0) {
+    if (!formValues.name.trim() || !formValues.cpf_cnpj.trim()) {
       toast.error("Preencha nome e CPF/CNPJ para continuar.");
+      return;
+    }
+
+    const cpfCnpjError = validateCpfCnpjDocument(formValues.cpf_cnpj, formValues.type);
+
+    if (cpfCnpjError) {
+      toast.error(cpfCnpjError);
+      return;
+    }
+
+    const responsibleCpfError = validateOptionalCpfDocument(
+      "CPF do responsável",
+      formValues.cpf_responsible,
+    );
+
+    if (responsibleCpfError) {
+      toast.error(responsibleCpfError);
+      return;
+    }
+
+    const agentCpfError = validateOptionalCpfDocument("CPF do preposto", formValues.cpf_agent);
+
+    if (agentCpfError) {
+      toast.error(agentCpfError);
       return;
     }
 

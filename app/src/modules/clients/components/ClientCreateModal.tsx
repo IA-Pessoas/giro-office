@@ -6,6 +6,7 @@ import { useMe } from "@shared/hooks/useMe";
 
 import { useCreateClientMutation } from "../hooks/useClients";
 import { mapClientStatusToApi } from "../utils/statusMapper";
+import { validateCpfCnpjDocument } from "../utils/documentValidation";
 import type { Client, ClientFormValues } from "../types";
 import { ClientForm } from "./ClientForm";
 
@@ -56,6 +57,13 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
 
     if (!formValues.name.trim() || !formValues.cpf_cnpj.trim()) {
       toast.error("Preencha nome e CPF/CNPJ para continuar.");
+      return;
+    }
+
+    const documentError = validateCpfCnpjDocument(formValues.cpf_cnpj);
+
+    if (documentError) {
+      toast.error(documentError);
       return;
     }
 

@@ -14,6 +14,7 @@ import {
   useUpdateClientMutation,
 } from "@modules/clients/hooks/useClients";
 import type { ClientFormValues } from "@modules/clients/types";
+import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
 import { mapClientStatusFromApi, mapClientStatusToApi } from "@modules/clients/utils/statusMapper";
 import { useAuth } from "@/context/AuthContext";
 
@@ -96,6 +97,18 @@ export default function ClientDetailPage() {
 
   const handleUpdate = async () => {
     if (!clientId) {
+      return;
+    }
+
+    if (!formValues.name.trim()) {
+      toast.error("Preencha o nome do cliente para continuar.");
+      return;
+    }
+
+    const documentError = validateCpfCnpjDocument(formValues.cpf_cnpj);
+
+    if (documentError) {
+      toast.error(documentError);
       return;
     }
 

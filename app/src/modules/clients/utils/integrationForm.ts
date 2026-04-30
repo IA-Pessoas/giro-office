@@ -5,9 +5,7 @@ import type {
   UpdateClientIntegrationFormValues,
   UpdateClientIntegrationPayload,
 } from "../types";
-
 const nullableTextFieldNames = [
-  "name",
   "company_name",
   "fantasy_name",
   "responsible",
@@ -25,19 +23,18 @@ const nullableTextFieldNames = [
 ] as const satisfies ReadonlyArray<keyof UpdateClientIntegrationFormValues>;
 
 const documentFieldNames = [
-  "cpf_cnpj",
   "cpf_responsible",
   "cpf_agent",
 ] as const satisfies ReadonlyArray<keyof UpdateClientIntegrationFormValues>;
-
-export function normalizeDocumentValue(value: string | null | undefined): string {
-  return (value ?? "").replace(/\D/g, "");
-}
 
 export function normalizeNullableTextValue(value: string | null | undefined): string | null {
   const trimmed = (value ?? "").trim();
 
   return trimmed.length > 0 ? trimmed : null;
+}
+
+export function normalizeDocumentValue(value: string | null | undefined): string {
+  return (value ?? "").replace(/\D/g, "");
 }
 
 export function hasUsableIntegrationData(client: Client | null | undefined): boolean {
@@ -130,6 +127,20 @@ export function buildUpdateClientIntegrationPayload(
 
   if (values.type !== currentValues.type) {
     payload.type = values.type;
+  }
+
+  const nextName = values.name.trim();
+  const currentName = currentValues.name.trim();
+
+  if (nextName.length > 0 && nextName !== currentName) {
+    payload.name = nextName;
+  }
+
+  const nextCpfCnpj = normalizeDocumentValue(values.cpf_cnpj);
+  const currentCpfCnpj = normalizeDocumentValue(currentValues.cpf_cnpj);
+
+  if (nextCpfCnpj.length > 0 && nextCpfCnpj !== currentCpfCnpj) {
+    payload.cpf_cnpj = nextCpfCnpj;
   }
 
   if (values.service_unique !== currentValues.service_unique) {

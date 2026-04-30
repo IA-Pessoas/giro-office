@@ -17,6 +17,10 @@ import {
   createUpdateClientIntegrationInitialValues,
   hasUsableIntegrationData,
 } from "@modules/clients/utils/integrationForm";
+import {
+  validateCpfCnpjDocument,
+  validateOptionalCpfDocument,
+} from "@modules/clients/utils/documentValidation";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -65,6 +69,39 @@ export default function ClientIntegrationPage() {
 
   const handleSubmit = async () => {
     if (!clientId || !client || !hasChanges) {
+      return;
+    }
+
+    if (!formValues) {
+      return;
+    }
+
+    if (!formValues.name.trim()) {
+      toast.error("Preencha o nome do cliente para continuar.");
+      return;
+    }
+
+    const cpfCnpjError = validateCpfCnpjDocument(formValues.cpf_cnpj, formValues.type);
+
+    if (cpfCnpjError) {
+      toast.error(cpfCnpjError);
+      return;
+    }
+
+    const responsibleCpfError = validateOptionalCpfDocument(
+      "CPF do responsável",
+      formValues.cpf_responsible,
+    );
+
+    if (responsibleCpfError) {
+      toast.error(responsibleCpfError);
+      return;
+    }
+
+    const agentCpfError = validateOptionalCpfDocument("CPF do preposto", formValues.cpf_agent);
+
+    if (agentCpfError) {
+      toast.error(agentCpfError);
       return;
     }
 
