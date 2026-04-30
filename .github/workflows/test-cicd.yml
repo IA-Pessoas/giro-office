@@ -99,6 +99,10 @@ jobs:
           COMPOSE_DOCKER_CLI_BUILD: 1
         run: |
           set -eo pipefail
+          docker system df || true
+          docker builder prune -af || true
+          docker system prune -af || true
+          docker system df || true
           set -a
           # shellcheck disable=SC1091
           . ./.env.vps.web

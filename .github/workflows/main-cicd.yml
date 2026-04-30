@@ -118,6 +118,14 @@ jobs:
           username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
           password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
 
+      - name: "Liberar espaço no runner (Docker)"
+        run: |
+          set -euxo pipefail
+          docker system df || true
+          docker builder prune -af || true
+          docker system prune -af || true
+          docker system df || true
+
       # Puxa o exato set testado no staging (mesma tag) — sem recompilar.
       - name: "Pull+retag: imagens a partir de staging (registry)"
         if: steps.check.outputs.has == 'true'
