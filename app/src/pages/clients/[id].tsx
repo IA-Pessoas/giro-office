@@ -1,125 +1,374 @@
-import React from 'react';
-import 'react-toastify/dist/ReactToastify.css';
+import Head from "next/head";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import { useEffect, useState, type ChangeEvent } from "react";
+import { ArrowLeft, FileText, Power, RotateCcw, Workflow } from "lucide-react";
+import { toast } from "react-toastify";
 
-import { ClientTabs } from '../../components/Tabs/ClientTabs';
+import { canSSRAuth } from "@modules/auth";
+import { ClientForm } from "@modules/clients/components/ClientForm";
+import {
+  useActivateClientMutation,
+  useClient,
+  useDeactivateClientMutation,
+  useUpdateClientMutation,
+} from "@modules/clients/hooks/useClients";
+import type { ClientFormValues } from "@modules/clients/types";
+import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
+import { mapClientStatusFromApi, mapClientStatusToApi } from "@modules/clients/utils/statusMapper";
+import { useAuth } from "@/context/AuthContext";
 
-import { canSSRAuth } from '@modules/auth';
-import { setupAPIClient } from '@shared/services/api';
+const PANEL_CLASSNAME =
+  "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
 
-interface ClientItem {
-    id: string
-    dominio_code: string
-    name: string
-    company_name: string
-    fantasy_name: string
-    cnpj: string
-    cnae: string
-    cnae_secondary: string
-    responsible: string
-    cpf_responsible: string
-    agent: string
-    cpf_agent: string
-    number: string
-    email: string
-    address: string
-    cep: string
-    neighborhood: string
-    state: string
-    city: string
-    customer_since: Date | null
-    municipal_registration: string
-    state_registration: string
-    commercial_board_registration: string
-    status: string
-    competence_entry: string | null
-    competence_output: string | null
-    opening_date: Date | null
-    instagram: string
-    indication: string
-    regime: string
-    size: string
-    segment: string
-    contabil: string
-    fiscal: string
-    pessoal: string
-    infoproduto: string
-    consultoria: string
-    castelo_med: string
-    start_strike: Date | null
-    end_strike: Date | null
-    deletion_date: Date | null
-    contract: string
-    service: string
-    solucao: string
-    prospecting_status: string
-    date_status: Date | null
-    closing_date: Date | null
-    description_prospecting: string
-    month_prospecting: Date | null
-    register_date_prospecting: Date | null
-    participants_meet: string
-    meet_type: string
-    service_unique: boolean
-}
-interface PermItem {
-    id: string
-    user_id: string
-    atendimento: number | null
-    certificado: number | null
-    comercial: number | null
-    contabil: number | null
-    financeiro: number | null
-    fiscal: number | null
-    integracao: number | null
-    marketing: number | null
-    parcelamento: number | null
-    pec: number | null
-    pessoal: number | null
-    regularize: number | null
-    rh: number | null
-    triagem: number | null
-    wiki: number | null
-}
-interface Props {
-    client: ClientItem
-    perms: PermItem
+const statusClassNames: Record<string, string> = {
+  Ativo: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+  Prospect: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+  Inativo: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  Fechado: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
+};
+
+function formatCpfCnpj(value: string): string {
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.length === 11) {
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  }
+
+  if (digits.length === 14) {
+    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+  }
+
+  return value;
 }
 
-export default function Client({ client, perms }: Props) {
-    return (
-        <>
-            <div className="p-4">
-                <ClientTabs client={client} perms={perms} />
-            </div>
-        </>
-    );
+function createInitialFormValues(): ClientFormValues {
+  return {
+    name: "",
+    company_name: "",
+    fantasy_name: "",
+    cpf_cnpj: "",
+    status: "Ativo",
+    service_unique: false,
+  };
 }
 
-export const getServerSideProps = canSSRAuth(async (ctx) => {
-    const { id } = ctx.params;
+export default function ClientDetailPage() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const clientId = typeof router.query.id === "string" ? router.query.id : undefined;
+  const clientQuery = useClient(clientId);
+  const updateClientMutation = useUpdateClientMutation(clientId ?? "");
+  const activateClientMutation = useActivateClientMutation(clientId ?? "");
+  const deactivateClientMutation = useDeactivateClientMutation(clientId ?? "");
+  const [formValues, setFormValues] = useState<ClientFormValues>(createInitialFormValues());
+
+  const isAdmin = user?.permission === 2;
+  const client = clientQuery.data;
+  const uiStatus = mapClientStatusFromApi(client?.status);
+  const organizationName =
+    (client as { organization?: { name?: string } } | null)?.organization?.name ??
+    "Organização atual";
+
+  useEffect(() => {
+    if (!client) {
+      return;
+    }
+
+    setFormValues({
+      name: client.name ?? "",
+      company_name: client.company_name ?? "",
+      fantasy_name: client.fantasy_name ?? "",
+      cpf_cnpj: client.cpf_cnpj ?? "",
+      status: mapClientStatusFromApi(client.status),
+      service_unique: client.service_unique ?? false,
+    });
+  }, [client]);
+
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = event.target;
+    const nextValue = type === "checkbox" ? (event.target as HTMLInputElement).checked : value;
+
+    setFormValues((current) => ({
+      ...current,
+      [name]: nextValue,
+    }));
+  };
+
+  const handleUpdate = async () => {
+    if (!clientId) {
+      return;
+    }
+
+    if (!formValues.name.trim()) {
+      toast.error("Preencha o nome do cliente para continuar.");
+      return;
+    }
+
+    const documentError = validateCpfCnpjDocument(formValues.cpf_cnpj);
+
+    if (documentError) {
+      toast.error(documentError);
+      return;
+    }
 
     try {
-        const apiClient = setupAPIClient(ctx);
+      await updateClientMutation.mutateAsync({
+        name: formValues.name.trim(),
+        company_name: formValues.company_name.trim() || null,
+        fantasy_name: formValues.fantasy_name.trim() || null,
+        cpf_cnpj: formValues.cpf_cnpj.replace(/\D/g, ""),
+        status: mapClientStatusToApi(formValues.status),
+        service_unique: formValues.service_unique,
+      });
 
-        const [meResponse, permResponse, clientResponse] = await Promise.all([
-            apiClient.get('/user/me'),
-            apiClient.get('/permission'),
-            apiClient.get('/client', { params: { client_id: id } })
-        ])
-
-        return {
-            props: {
-                perms: permResponse.data.permission,
-                client: clientResponse.data.client,
-            },
-        };
+      toast.success("Cliente atualizado com sucesso.");
+      await clientQuery.refetch();
     } catch (error) {
-        console.log(error);
-        return {
-            redirect: {
-                destination: '/dashboard',
-                permanent: false,
-            },
-        };
+      const message =
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
+          "string"
+          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+          : "Não foi possível atualizar o cliente.";
+
+      toast.error(message);
     }
+  };
+
+  const handleActivate = async () => {
+    if (!clientId) {
+      return;
+    }
+
+    try {
+      await activateClientMutation.mutateAsync();
+      toast.success("Cliente reativado com sucesso.");
+      await clientQuery.refetch();
+    } catch (error) {
+      const message =
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
+          "string"
+          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+          : "Não foi possível reativar o cliente.";
+
+      toast.error(message);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!clientId) {
+      return;
+    }
+
+    try {
+      await deactivateClientMutation.mutateAsync();
+      toast.success("Cliente desativado com sucesso.");
+      await clientQuery.refetch();
+    } catch (error) {
+      const message =
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
+          "string"
+          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+          : "Não foi possível desativar o cliente.";
+
+      toast.error(message);
+    }
+  };
+
+  return (
+    <>
+      <Head>
+        <title>Cliente</title>
+      </Head>
+
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-2">
+            <Link
+              href="/clients"
+              className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para clientes
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+                {client?.name ?? "Detalhes do cliente"}
+              </h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Detalhes do cliente.</p>
+            </div>
+          </div>
+
+          {client ? (
+            <span
+              className={`inline-flex rounded-full px-3 py-1.5 text-sm font-semibold ${
+                statusClassNames[uiStatus] ?? statusClassNames.Inativo
+              }`}
+            >
+              {uiStatus}
+            </span>
+          ) : null}
+        </div>
+
+        {clientQuery.isLoading ? (
+          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
+            Carregando cliente...
+          </section>
+        ) : clientQuery.isError ? (
+          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-rose-600 dark:text-rose-300`}>
+            Não foi possível carregar o detalhe deste cliente.
+          </section>
+        ) : !client ? (
+          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
+            Cliente não encontrado.
+          </section>
+        ) : (
+          <>
+            <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className={`${PANEL_CLASSNAME} p-6`}>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Resumo</h2>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <SummaryItem label="Nome" value={client.name} />
+                  <SummaryItem label="CPF/CNPJ" value={formatCpfCnpj(client.cpf_cnpj)} />
+                  <SummaryItem label="Razão social" value={client.company_name || "Não informado"} />
+                  <SummaryItem label="Nome fantasia" value={client.fantasy_name || "Não informado"} />
+                  <SummaryItem label="Organização" value={organizationName} />
+                  <SummaryItem
+                    label="Desativado em"
+                    value={
+                      client.deletion_date
+                        ? new Date(client.deletion_date).toLocaleString("pt-BR")
+                        : "Ativo"
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className={`${PANEL_CLASSNAME} p-6`}>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Ciclo de vida</h2>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Ações disponíveis apenas para administradores.
+                </p>
+
+                <div className="mt-5 space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleActivate()}
+                    disabled={!isAdmin || activateClientMutation.isPending || uiStatus === "Ativo"}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    {activateClientMutation.isPending ? "Reativando..." : "Reativar cliente"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleDeactivate()}
+                    disabled={!isAdmin || deactivateClientMutation.isPending || uiStatus === "Inativo"}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                  >
+                    <Power className="h-4 w-4" />
+                    {deactivateClientMutation.isPending ? "Desativando..." : "Desativar cliente"}
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section className={`${PANEL_CLASSNAME} p-6`}>
+              <div className="mb-5">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Editar cliente</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  Atualize os dados principais do cliente.
+                </p>
+              </div>
+
+              <ClientForm
+                values={formValues}
+                onChange={handleInputChange}
+                onSubmit={() => void handleUpdate()}
+                onCancel={() =>
+                  setFormValues({
+                    name: client.name ?? "",
+                    company_name: client.company_name ?? "",
+                    fantasy_name: client.fantasy_name ?? "",
+                    cpf_cnpj: client.cpf_cnpj ?? "",
+                    status: mapClientStatusFromApi(client.status),
+                    service_unique: client.service_unique ?? false,
+                  })
+                }
+                submitLabel={updateClientMutation.isPending ? "Salvando..." : "Salvar alterações"}
+                disabled={updateClientMutation.isPending}
+              />
+            </section>
+
+            <section className={`${PANEL_CLASSNAME} p-6`}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-1">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">PA</h2>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Gerencie os dados de PA do cliente em uma página dedicada.
+                      </p>
+                    </div>
+
+                    <Link
+                      href={`/clients/${client.id}/pa`}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Abrir PA
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-1">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Integração</h2>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Gerencie os dados de integração do cliente em uma página dedicada.
+                      </p>
+                    </div>
+
+                    <Link
+                      href={`/clients/${client.id}/integration`}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
+                    >
+                      <Workflow className="h-4 w-4" />
+                      Abrir integração
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </p>
+      <p className="mt-2 text-sm text-slate-900 dark:text-white">{value}</p>
+    </div>
+  );
+}
+
+export const getServerSideProps = canSSRAuth(async () => {
+  return { props: {} };
 });

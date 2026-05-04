@@ -27,6 +27,9 @@ const outputDirs = [
   join(rootDir, "services", "organization-service", "src", "generated", "prisma"),
   join(rootDir, "services", "audit-service", "generated", "prisma"),
   join(rootDir, "services", "rh-service", "src", "generated", "prisma"),
+  join(rootDir, "services", "department-service", "src", "generated", "prisma"),
+  join(rootDir, "services", "fiscal-service", "src", "generated", "prisma"),
+  join(rootDir, "services", "contabil-service", "src", "generated", "prisma"),
 ];
 
 function sleep(ms) {

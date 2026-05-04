@@ -95,6 +95,8 @@ const SERVICE_URL_ENV_KEYS = {
   "audit-service": "AUDIT_SERVICE_URL",
   "client-service": "CLIENT_SERVICE_URL",
   "department-service": "DEPARTMENT_SERVICE_URL",
+  "fiscal-service": "FISCAL_SERVICE_URL",
+  "contabil-service": "CONTABIL_SERVICE_URL",
   "organization-service": "ORGANIZATION_SERVICE_URL",
   "project-service": "PROJECT_SERVICE_URL",
   "rh-service": "RH_SERVICE_URL",
@@ -106,6 +108,8 @@ const SERVICE_URL_DEFAULTS = {
   "audit-service": "http://localhost:3020",
   "client-service": "http://localhost:3035",
   "department-service": "http://localhost:3036",
+  "fiscal-service": "http://localhost:3037",
+  "contabil-service": "http://localhost:3038",
   "organization-service": "http://localhost:3031",
   "project-service": "http://localhost:3033",
   "rh-service": "http://localhost:3034",
@@ -139,6 +143,16 @@ for (const [service, envKey] of Object.entries(SERVICE_URL_ENV_KEYS)) {
   env[service] = env[envKey];
 }
 
+if (!env["fiscal-service"]) {
+  env.FISCAL_SERVICE_URL = "http://localhost:3037";
+  env["fiscal-service"] = env.FISCAL_SERVICE_URL;
+}
+
+if (!env["contabil-service"]) {
+  env.CONTABIL_SERVICE_URL = "http://localhost:3038";
+  env["contabil-service"] = env.CONTABIL_SERVICE_URL;
+}
+
 for (const envKey of Object.values(INTERNAL_SERVICE_TOKENS)) {
   env[envKey] = process.env[envKey]?.trim() || "";
 }
@@ -155,6 +169,12 @@ const state = {
   secondaryClientId: "",
   clientHistoryPendingId: "",
   clientHistoryId: "",
+  fiscalIcmsId: "",
+  fiscalIcmsCode: "",
+  fiscalIpiId: "",
+  fiscalIpiNcm: "",
+  fiscalNcmId: "",
+  fiscalNcmCode: "",
   projectId: "",
   taskModelPrimaryId: "",
   taskModelSecondaryId: "",
@@ -177,6 +197,10 @@ const state = {
   rhTargetUserToken: "",
   rhPointDayAlreadyComplete: false,
   auditRequestId: "",
+  contabilControlId: "",
+  contabilControlCompetence: "",
+  contabilResponsibleId: "",
+  contabilRelationshipId: "",
 };
 
 const cleanupTasks = [];
@@ -994,6 +1018,13 @@ const handlers = {
     });
   },
 
+  async userPhotoGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/user/${requireState("tempUserId")}/photo`,
+    });
+  },
+
   async userPhotoDelete(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -1431,6 +1462,367 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [403],
       json: { project_id: requireState("projectId") },
+    });
+  },
+
+  async fiscalNcmCreate(op) {
+    const ncmCode = uniqueDigits(8);
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        tax_regime: "Simples Nacional",
+        ncm_code: ncmCode,
+        federal_taxation_type: "Monofásica",
+        description: uniqueText("Smoke Fiscal NCM"),
+        validity_start_date: new Date().toISOString(),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.fiscalNcmId =
+      pickFirst(response.body, "data.create.id") ??
+      pickFirst(response.body, "data.id") ??
+      findFirstId(response.body?.data);
+    state.fiscalNcmCode = ncmCode;
+  },
+
+  async fiscalNcmCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        ncm_code: uniqueDigits(8),
+      },
+    });
+  },
+
+  async fiscalNcmGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ncm_id: requireState("fiscalNcmId") },
+    });
+  },
+
+  async fiscalNcmList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ncmCodes: requireState("fiscalNcmCode") },
+    });
+  },
+
+  async fiscalNcmPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        ncm_id: requireState("fiscalNcmId"),
+        tax_regime: "Simples Nacional",
+        ncm_code: requireState("fiscalNcmCode"),
+        federal_taxation_type: "Monofásica",
+        description: uniqueText("Smoke Fiscal NCM Updated"),
+        validity_start_date: new Date().toISOString(),
+      },
+    });
+  },
+
+  async fiscalNcmSearch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ncmCode: requireState("fiscalNcmCode") },
+    });
+  },
+
+  async fiscalNcmSearchInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      query: { ncmCode: "" },
+    });
+  },
+
+  async fiscalIcmsCreate(op) {
+    const icmsCode = uniqueText("Smoke Fiscal ICMS");
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        state: "SP",
+        item_number: uniqueDigits(4),
+        cest_code: `${uniqueDigits(2)}.${uniqueDigits(3)}.${uniqueDigits(2)}`,
+        description: icmsCode,
+        interstate_agreement: "Convênio ICMS",
+        applied_original_mva: "10.00",
+        adjusted_mva: "12.00",
+        original_mva: "8.00",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.fiscalIcmsId =
+      pickFirst(response.body, "data.create.id") ??
+      pickFirst(response.body, "data.id") ??
+      findFirstId(response.body?.data);
+    state.fiscalIcmsCode = icmsCode;
+  },
+
+  async fiscalIcmsCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        description: uniqueText("Smoke Invalid ICMS"),
+      },
+    });
+  },
+
+  async fiscalIcmsGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { icms_id: requireState("fiscalIcmsId") },
+    });
+  },
+
+  async fiscalIcmsList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { icmsCodes: requireState("fiscalIcmsCode") },
+    });
+  },
+
+  async fiscalIcmsPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        icms_id: requireState("fiscalIcmsId"),
+        state: "SP",
+        item_number: uniqueDigits(4),
+        cest_code: `${uniqueDigits(2)}.${uniqueDigits(3)}.${uniqueDigits(2)}`,
+        description: requireState("fiscalIcmsCode"),
+        interstate_agreement: "Convênio ICMS atualizado",
+        applied_original_mva: "11.00",
+        adjusted_mva: "13.00",
+        original_mva: "9.00",
+      },
+    });
+  },
+
+  async fiscalIpiCreate(op) {
+    const ncm = uniqueDigits(8);
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        ncm,
+        ex: uniqueDigits(3),
+        description: uniqueText("Smoke Fiscal IPI"),
+        aliquot: "10.00",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.fiscalIpiId =
+      pickFirst(response.body, "data.create.id") ??
+      pickFirst(response.body, "data.id") ??
+      findFirstId(response.body?.data);
+    state.fiscalIpiNcm = ncm;
+  },
+
+  async fiscalIpiCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        description: uniqueText("Smoke Invalid IPI"),
+      },
+    });
+  },
+
+  async fiscalIpiGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ipi_id: requireState("fiscalIpiId") },
+    });
+  },
+
+  async fiscalIpiList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ipiCodes: requireState("fiscalIpiNcm") },
+    });
+  },
+
+  async fiscalIpiPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        ipi_id: requireState("fiscalIpiId"),
+        ncm: requireState("fiscalIpiNcm"),
+        ex: uniqueDigits(3),
+        description: uniqueText("Smoke Fiscal IPI Updated"),
+        aliquot: "12.00",
+      },
+    });
+  },
+
+  async contabilControlCreate(op) {
+    const competence =
+      `${env.namespace}`.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40) || `comp-${uniqueDigits(8)}`;
+    state.contabilControlCompetence = competence;
+    const response = await httpRequest(op, {
+      expectedStatus: [200, 201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    const id =
+      pickFirst(response.body, "data.control.id", "data.id") ?? findFirstId(response.body?.data);
+    if (id) {
+      state.contabilControlId = id;
+    }
+  },
+
+  async contabilControlCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { client_id: "not-a-uuid", competence: "" },
+    });
+  },
+
+  async contabilControlDetail(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("contabilControlCompetence"),
+      },
+    });
+  },
+
+  async contabilControlPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/controls/${requireState("contabilControlId")}`,
+      json: { field: "monthly_closing", value: true },
+    });
+  },
+
+  async contabilControlPatchNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/contabil/controls/00000000-0000-0000-0000-000000000000",
+      json: { field: "monthly_closing", value: false },
+    });
+  },
+
+  async contabilResponsibleCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("secondaryClientId"),
+        customer_with_movement: true,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) {
+      state.contabilResponsibleId = id;
+    }
+  },
+
+  async contabilResponsibleCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {},
+    });
+  },
+
+  async contabilResponsibleGetByClient(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/responsibles/client/${requireState("secondaryClientId")}`,
+    });
+  },
+
+  async contabilResponsibleUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/responsibles/${requireState("contabilResponsibleId")}`,
+      json: { customer_with_movement: false },
+    });
+  },
+
+  async contabilResponsibleUpdateNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/contabil/responsibles/00000000-0000-0000-0000-000000000000",
+      json: { customer_with_movement: true },
+    });
+  },
+
+  async contabilResponsibleDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/responsibles/${requireState("contabilResponsibleId")}`,
+    });
+  },
+
+  async contabilRelationshipCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        bidding: false,
+        chart_accounts: uniqueText("Smoke chart"),
+        tool: "Ferramenta smoke",
+        system: "Sistema smoke",
+        note: uniqueText("Smoke relationship note"),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) {
+      state.contabilRelationshipId = id;
+    }
+  },
+
+  async contabilRelationshipCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async contabilRelationshipGetByClient(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/relationships/client/${requireState("primaryClientId")}`,
+    });
+  },
+
+  async contabilRelationshipUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/relationships/${requireState("contabilRelationshipId")}`,
+      json: { note: uniqueText("Smoke relationship updated") },
+    });
+  },
+
+  async contabilRelationshipUpdateNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/contabil/relationships/00000000-0000-0000-0000-000000000000",
+      json: { note: "not found smoke" },
+    });
+  },
+
+  async contabilRelationshipDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/relationships/${requireState("contabilRelationshipId")}`,
     });
   },
 
@@ -2520,6 +2912,15 @@ const handlers = {
       auth: "public",
       headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
       query: { page: 1, pageSize: 1 },
+    });
+  },
+
+  async userPhotoUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      path: `/user/${requireState("tempUserId")}/photo`,
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
     });
   },
 

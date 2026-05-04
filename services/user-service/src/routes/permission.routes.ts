@@ -1,7 +1,13 @@
-import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
+import {
+  createSuccessResponse,
+  error as logError,
+  parseWithZod,
+  requireAuthenticatedRequestContext,
+} from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
+import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   permissionQuerySchema,
   permissionUserIdParamsSchema,
@@ -12,35 +18,52 @@ import { PermissionService } from "../services/permissionService.js";
 const router: ReturnType<typeof Router> = Router();
 const permissionService = new PermissionService();
 
-router.get("/:userId", async (request: Request, response: Response, next: NextFunction) => {
-  try {
-    const { userId } = parseWithZod(permissionUserIdParamsSchema, request.params);
-    const { modulo } = parseWithZod(permissionQuerySchema, request.query);
+function requirePermissionAuth(request: Request) {
+  return requireAuthenticatedRequestContext(request, {
+    userIdMessage: "Não autenticado.",
+    organizationIdMessage: "Não autenticado.",
+  });
+}
 
-    const permission = await permissionService.getByUserId(userId, modulo);
+router.get(
+  "/:userId",
+  isAuthenticated,
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      requirePermissionAuth(request);
+      const { userId } = parseWithZod(permissionUserIdParamsSchema, request.params);
+      const { modulo } = parseWithZod(permissionQuerySchema, request.query);
 
-    response.json(createSuccessResponse(permission));
-  } catch (err) {
-    logError("Erro ao buscar permissao", { err });
-    next(err);
-  }
-});
+      const permission = await permissionService.getByUserId(userId, modulo);
 
-router.put("/:userId", async (request: Request, response: Response, next: NextFunction) => {
-  try {
-    const { userId } = parseWithZod(permissionUserIdParamsSchema, request.params);
-    const modules = parseWithZod(updatePermissionBodySchema, request.body) as Record<
-      string,
-      number | null
-    >;
+      response.json(createSuccessResponse(permission));
+    } catch (err) {
+      logError("Erro ao buscar permissao", { err });
+      next(err);
+    }
+  },
+);
 
-    const permission = await permissionService.update(userId, modules);
+router.put(
+  "/:userId",
+  isAuthenticated,
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      requirePermissionAuth(request);
+      const { userId } = parseWithZod(permissionUserIdParamsSchema, request.params);
+      const modules = parseWithZod(updatePermissionBodySchema, request.body) as Record<
+        string,
+        number | null
+      >;
 
-    response.json(createSuccessResponse(permission));
-  } catch (err) {
-    logError("Erro ao atualizar permissao", { err });
-    next(err);
-  }
-});
+      const permission = await permissionService.update(userId, modules);
+
+      response.json(createSuccessResponse(permission));
+    } catch (err) {
+      logError("Erro ao atualizar permissao", { err });
+      next(err);
+    }
+  },
+);
 
 export { router as permissionRoutes };

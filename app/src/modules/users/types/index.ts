@@ -7,6 +7,9 @@ export interface UserItem {
   status: string;
   photo?: string | null;
   photo_url?: string | null;
+  type?: UserType | null;
+  first_owner_flag?: boolean;
+  permission_id?: string | null;
   department?: {
     name: string;
     color: string;
@@ -15,6 +18,33 @@ export interface UserItem {
 
 export type UserType = "user" | "admin" | "owner";
 export type UserPermission = 0 | 1 | 2;
+
+export type KnownPermissionModuleKey =
+  | "atendimento"
+  | "certificado"
+  | "comercial"
+  | "contabil"
+  | "financeiro"
+  | "fiscal"
+  | "integracao"
+  | "marketing"
+  | "parcelamento"
+  | "pec"
+  | "pessoal"
+  | "regularize"
+  | "rh"
+  | "triagem"
+  | "wiki";
+
+export type KnownPermissionRecord = Record<KnownPermissionModuleKey, number | null>;
+export type PermissionDraft = Record<string, number | null>;
+
+export interface PermissionNormalizationResult {
+  known: KnownPermissionRecord;
+  extras: PermissionDraft;
+  missingKnownKeys: KnownPermissionModuleKey[];
+  invalidExtraKeys: string[];
+}
 
 export interface CreateUserData {
   name: string;

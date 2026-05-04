@@ -70,6 +70,7 @@ function ThemeBridge() {
     root.setAttribute("data-theme", initialTheme);
 
     localStorage.setItem("workspace-theme", initialTheme);
+    localStorage.setItem("chakra-ui-color-mode", initialTheme);
   }, []);
 
   return null;

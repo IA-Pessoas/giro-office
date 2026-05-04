@@ -1,62 +1,103 @@
 import { setupAPIClient } from "@shared/services/api";
-import type { Client, ClientItem, CreateClientData, UpdateClientData } from "../types";
 
-function unwrapClient(body: unknown): ClientItem | undefined {
-  if (body === null || typeof body !== "object") {
-    return undefined;
-  }
-  const o = body as Record<string, unknown>;
-  if ("client" in o && o.client !== null && typeof o.client === "object") {
-    return o.client as ClientItem;
-  }
-  if ("data" in o && o.data !== null && typeof o.data === "object") {
-    const d = o.data as Record<string, unknown>;
-    if ("client" in d && d.client !== null && typeof d.client === "object") {
-      return d.client as ClientItem;
-    }
-    return o.data as ClientItem;
-  }
-  return undefined;
-}
+import type {
+  Client,
+  ClientPa,
+  ClientPaResponse,
+  ClientListFilters,
+  ClientListPage,
+  CreateClientPayload,
+  CreateClientData,
+  CreateClientIntegrationPayload,
+  UpdateClientPaPayload,
+  UpdateClientPayload,
+  UpdateClientIntegrationPayload,
+  UpdateClientData,
+} from "../types";
+import {
+  buildClientListParams,
+  CLIENT_ENDPOINTS,
+  unwrapClientEnvelope,
+  unwrapClientPaDetail,
+} from "./clientService.contract";
 
 export const clientService = {
-  list: async (filters?: { status?: string; page?: number; limit?: number }): Promise<{ data: ClientItem[]; hasMore: boolean }> => {
+  async list(filters: ClientListFilters = {}): Promise<ClientListPage> {
     const api = setupAPIClient();
-    const response = await api.get('/clients', { params: filters });
-    return response.data;
+    const response = await api.get(CLIENT_ENDPOINTS.list, {
+      params: buildClientListParams(filters),
+    });
+
+    return unwrapClientEnvelope<ClientListPage>(response.data);
   },
 
-  getById: async (id: string): Promise<Client> => {
+  async getById(id: string): Promise<Client | null> {
     const api = setupAPIClient();
-    const response = await api.get('/client', { params: { client_id: id } });
-    return response.data.client;
+    const response = await api.get(CLIENT_ENDPOINTS.detail(id));
+
+    return unwrapClientEnvelope<Client | null>(response.data);
   },
 
-  create: async (data: CreateClientData): Promise<ClientItem> => {
+  async create(payload: CreateClientPayload | CreateClientData): Promise<Client> {
     const api = setupAPIClient();
-    const cleanDoc = data.cpf_cnpj.replace(/[^\d]/g, '');
-    const cleanCpfResp = (data.cpf_responsible || '').replace(/[^\d]/g, '');
-    const cleanCpfAgent = (data.cpf_agent || '').replace(/[^\d]/g, '');
-    
-    const payload = {
-      ...data,
-      cpf_cnpj: cleanDoc,
-      cpf_responsible: cleanCpfResp,
-      cpf_agent: cleanCpfAgent,
-      opening_date: data.opening_date ? new Date(data.opening_date) : null,
-    };
-    
-    const response = await api.post("/clients-integracao", payload);
-    const created = unwrapClient(response.data);
-    if (!created) {
-      throw new Error("Resposta inválida ao criar cliente.");
-    }
-    return created;
+    const response = await api.post(CLIENT_ENDPOINTS.create, payload);
+
+    return unwrapClientEnvelope<Client>(response.data);
   },
 
-  update: async (id: string, data: UpdateClientData): Promise<Client> => {
+  async update(id: string, payload: UpdateClientPayload | UpdateClientData): Promise<Client> {
     const api = setupAPIClient();
-    const response = await api.put('/clients', { client_id: id, ...data });
-    return response.data.client;
+    const response = await api.patch(CLIENT_ENDPOINTS.detail(id), payload);
+
+    return unwrapClientEnvelope<Client>(response.data);
+  },
+
+  async createIntegration(payload: CreateClientIntegrationPayload): Promise<Client> {
+    const api = setupAPIClient();
+    const response = await api.post(CLIENT_ENDPOINTS.createIntegration, payload);
+
+    return unwrapClientEnvelope<Client>(response.data);
+  },
+
+  async updateIntegration(id: string, payload: UpdateClientIntegrationPayload): Promise<Client> {
+    const api = setupAPIClient();
+    const response = await api.patch(CLIENT_ENDPOINTS.updateIntegration(id), payload);
+
+    return unwrapClientEnvelope<Client>(response.data);
+  },
+
+  async deactivate(id: string): Promise<Client> {
+    const api = setupAPIClient();
+    const response = await api.delete(CLIENT_ENDPOINTS.detail(id));
+
+    return unwrapClientEnvelope<Client>(response.data);
+  },
+
+  async activate(id: string): Promise<Client> {
+    const api = setupAPIClient();
+    const response = await api.post(CLIENT_ENDPOINTS.activate(id));
+
+    return unwrapClientEnvelope<Client>(response.data);
+  },
+
+  async getPaByClientId(id: string): Promise<ClientPaResponse | null> {
+    const api = setupAPIClient();
+    const response = await api.get(CLIENT_ENDPOINTS.detailPa(id));
+
+    return unwrapClientPaDetail(response.data) as ClientPaResponse | null;
+  },
+
+  async createPa(id: string): Promise<ClientPa> {
+    const api = setupAPIClient();
+    const response = await api.post(CLIENT_ENDPOINTS.createPa(id), {});
+
+    return unwrapClientEnvelope<ClientPa>(response.data);
+  },
+
+  async updatePa(id: string, payload: UpdateClientPaPayload): Promise<ClientPa> {
+    const api = setupAPIClient();
+    const response = await api.patch(CLIENT_ENDPOINTS.updatePa(id), payload);
+
+    return unwrapClientEnvelope<ClientPa>(response.data);
   },
 };

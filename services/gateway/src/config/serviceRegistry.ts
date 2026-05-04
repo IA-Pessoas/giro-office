@@ -14,6 +14,10 @@ const PROJECT_SERVICE_PREFIXES = ["/project"] as const;
 
 const CLIENT_SERVICE_PREFIXES = ["/client"] as const;
 
+const FISCAL_SERVICE_PREFIXES = ["/fiscal"] as const;
+
+const CONTABIL_SERVICE_PREFIXES = ["/contabil"] as const;
+
 function getNormalizedPath(path: string): string {
   try {
     return new URL(path, "http://localhost").pathname;
@@ -76,6 +80,18 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.clientServiceUrl,
       auditTarget: "client-service",
       routePrefixes: [...CLIENT_SERVICE_PREFIXES],
+    },
+    {
+      key: "fiscal-service",
+      targetUrl: env.fiscalServiceUrl,
+      auditTarget: "fiscal-service",
+      routePrefixes: [...FISCAL_SERVICE_PREFIXES],
+    },
+    {
+      key: "contabil-service",
+      targetUrl: env.contabilServiceUrl,
+      auditTarget: "contabil-service",
+      routePrefixes: [...CONTABIL_SERVICE_PREFIXES],
     },
   ];
 }
