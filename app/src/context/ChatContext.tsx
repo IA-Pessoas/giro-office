@@ -244,7 +244,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         if (isAuthenticated) {
-            const { '@cw.token': token } = parseCookies();
+            const { 'cw.token': token } = parseCookies();
             fetch(`${SOCKET_URL}/chat`, { headers: { 'Authorization': `Bearer ${token}` } })
                 .then(res => res.ok ? res.json() : [])
                 .then(data => setChats(data))
@@ -336,7 +336,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
 
         if (myParticipation && myParticipation.unreadCount > 0) {
-            const { '@cw.token': token } = parseCookies();
+            const { 'cw.token': token } = parseCookies();
             fetch(`${SOCKET_URL}/chat/${chat.id}/read`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -355,7 +355,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         try {
             const controller = new AbortController();
             fetchControllerRef.current = controller;
-            const { '@cw.token': token } = parseCookies();
+            const { 'cw.token': token } = parseCookies();
             let hasMoreInLoop = true;
             let currentPageInLoop = 1;
             let messageFound = false;
@@ -419,7 +419,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const nextPage = currentPage + 1;
 
         try {
-            const { '@cw.token': token } = parseCookies();
+            const { 'cw.token': token } = parseCookies();
             const response = await fetch(`${SOCKET_URL}/chat/${selectedChat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${nextPage}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -446,7 +446,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setIsSearching(true)
 
         try {
-            const { '@cw.token': token } = parseCookies()
+            const { 'cw.token': token } = parseCookies()
             const response = await fetch(`${SOCKET_URL}/messages/search?query=${encodeURIComponent(query)}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
@@ -596,7 +596,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setFirstUnreadId(null);
 
         // 2. Sincronização com o Backend em segundo plano
-        const { '@cw.token': token } = parseCookies();
+        const { 'cw.token': token } = parseCookies();
         fetch(`${SOCKET_URL}/api/chat/${chatId}/read`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -620,7 +620,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         formData.append('file', file);
 
         try {
-            const { '@cw.token': token } = parseCookies();
+            const { 'cw.token': token } = parseCookies();
             
             const response = await fetch(`${SOCKET_URL}/chat/media`, {
                 method: 'POST',

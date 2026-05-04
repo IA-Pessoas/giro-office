@@ -18,7 +18,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     
     useEffect(() => {
         if (isAuthenticated) {
-            const { '@cw.token': token } = parseCookies();
+            const { 'cw.token': token } = parseCookies();
             const newSocket = io(SOCKET_URL, { auth: { token } });
             setSocket(newSocket);
 

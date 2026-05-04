@@ -38,7 +38,7 @@ type AuthProviderProps = {
 export const AuthContext = createContext({} as AuthContextData)
 
 function clearAuthCookie() {
-    destroyCookie(null, '@cw.token', { path: '/' })
+    destroyCookie(null, 'cw.token', { path: '/' })
     delete api.defaults.headers.common['Authorization']
 }
 
@@ -77,7 +77,7 @@ export function AuthProvider({ children }: AuthProviderProps){
     const [loading, setLoading] = useState(true);
     
     useEffect(() => {
-        const { '@cw.token': token } = parseCookies();
+        const { 'cw.token': token } = parseCookies();
 
         if (token) {
             api.get('/user/me').then(response => {
@@ -118,7 +118,7 @@ export function AuthProvider({ children }: AuthProviderProps){
                 return
             }
         
-            setCookie(undefined, '@cw.token', sessionData.token, {
+            setCookie(undefined, 'cw.token', sessionData.token, {
                 maxAge: 60 * 60 * 24 * 7,
                 path: '/'
             })
