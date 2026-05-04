@@ -206,6 +206,7 @@ jobs:
     needs: quality
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
+    environment: staging
     timeout-minutes: 45
     outputs:
       pull_services: ${{ steps.scope.outputs.pull_services }}
@@ -304,7 +305,7 @@ jobs:
           set -eo pipefail
           set -a
           # shellcheck disable=SC1091
-          . ./.env.vps.web\\\
+          . ./.env.vps.web
           set +a
           PULL="${{ steps.scope.outputs.pull_services }}"
           if [[ "$PULL" == "ALL" ]]; then
@@ -327,6 +328,7 @@ jobs:
     needs: build-and-push
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
+    environment: staging
     timeout-minutes: 30
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}

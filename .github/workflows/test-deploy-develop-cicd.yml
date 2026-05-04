@@ -60,6 +60,7 @@ jobs:
     needs: quality
     if: github.event_name == 'push' && github.ref == 'refs/heads/test/deploy-develop'
     runs-on: ubuntu-latest
+    environment: test-develop
     timeout-minutes: 45
     outputs:
       pull_services: ${{ steps.scope.outputs.pull_services }}
@@ -181,6 +182,7 @@ jobs:
     needs: build-and-push
     if: github.event_name == 'push' && github.ref == 'refs/heads/test/deploy-develop'
     runs-on: ubuntu-latest
+    environment: test-develop
     timeout-minutes: 30
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}

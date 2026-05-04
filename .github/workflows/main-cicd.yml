@@ -43,6 +43,7 @@ jobs:
   promote-image:
     name: Promote — imutabilidade (pull+retag ou TAR, sem rebuild no deploy)
     runs-on: ubuntu-latest
+    environment: production
     timeout-minutes: 45
     outputs:
       promoted_tag: ${{ steps.version.outputs.tag }}
@@ -319,6 +320,7 @@ jobs:
     name: DAST — OWASP ZAP baseline
     needs: [main-candidate, promote-image]
     runs-on: ubuntu-latest
+    environment: production
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4

@@ -88,7 +88,7 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
 - Push em **`develop`**: workflow **Develop CI** (`.github/workflows/develop-cicd.yml`) — `build-and-push` + `vps-deploy` no slot `/data/workspace-develop` (`workspace-develop`).
 - Push em **`staging`**: workflow **Staging CI/CD** (`.github/workflows/staging-cicd.yml`) — o mesmo padrão no slot `/data/workspace-staging` (`workspace-staging`).
 
-- **Branches de teste de deploy** (mesmos segredos; paths e projetos Compose distintos na VPS):
+- **Branches de teste de deploy** (paths e projetos Compose distintos na VPS; `ENV_VPS_*` por **GitHub Environment**, ver abaixo):
   - `test/deploy-develop` → `test-deploy-develop-cicd.yml` — `/data/workspace-teste-develop`, `DEPLOY_SLOT=test-develop`, projeto `workspace-teste-develop` — portas **8087** (proxy) / **3013** (gateway) / **3002** (web UI), ficheiro `docker-compose.vps.slot-test-develop.yml`.
   - `test/deploy-staging` → `test-deploy-staging-cicd.yml` — `/data/workspace-teste-staging`, `DEPLOY_SLOT=test-staging`, projeto `workspace-teste-staging` — portas **8086** (proxy) / **3012** (gateway) / **3003** (web UI), ficheiro `docker-compose.vps.slot-test-staging.yml`.
 
@@ -106,6 +106,24 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 | `VPS_HOST`, `VPS_USER` | SSH |
 | `VPS_SSH_PRIVATE_KEY` | Preferencial (chave privada PEM) |
 | `VPS_SSH_PASSWORD` | Alternativa (requer `sshpass` no runner — instalado no job) |
+
+### GitHub Environments (`ENV_VPS_*` por slot)
+
+Os jobs de **build/push** e **deploy na VPS** usam `environment:` para que os mesmos nomes de segredo (ex.: `ENV_VPS_WEB`, `ENV_VPS_REVERSE_PROXY`) tenham **valores diferentes** por stack, sem renomear variáveis no workflow.
+
+Crie os environments em **Settings → Environments** e adicione os segredos listados em `scripts/ci/vps-secrets.manifest` (pelo menos os `ENV_VPS_*` que o deploy materializa). `DOCKER_REGISTRY_*`, `VPS_HOST`, `VPS_USER`, `VPS_SSH_*` podem continuar só ao nível do repositório; o job com `environment` continua a vê-los.
+
+| Environment | Onde é usado |
+|-------------|----------------|
+| `vps-develop` | `.github/workflows/develop-cicd.yml` — jobs `build-and-push` e `vps-deploy` |
+| `vps-staging` | `.github/workflows/staging-cicd.yml` — jobs `build-and-push` e `vps-deploy` |
+| `vps-test-develop` | `.github/workflows/test-deploy-develop-cicd.yml` — jobs `build-and-push` e `vps-deploy` |
+| `vps-test-staging` | `.github/workflows/test-deploy-staging-cicd.yml` — jobs `build-and-push` e `vps-deploy` |
+| `production` | `.github/workflows/main-cicd.yml` — jobs `promote-image`, `main-candidate`, `dast` (e `database-migrations`, já existente) |
+
+Em **teste staging**, o gateway público no host costuma ser a porta **3012** (não **3010** do staging “real”); o `ENV_VPS_WEB` desse environment deve refletir a URL que o browser usa para falar com o gateway desse slot.
+
+Workflows que **não** definem `environment` (ex.: `test-cicd.yml` em branch de teste) continuam a usar apenas segredos ao nível do repositório.
 
 ### Primeira vez na VPS
 
