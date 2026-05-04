@@ -7,14 +7,14 @@ import { FiscalSearchService } from "../services/fiscalSearchService.js";
 
 const ORG_ID = "a0000000-0000-4000-8000-000000000001";
 
-function createMockPrisma(overrides: Partial<Pick<FiscalSearchServicePrisma, "$transaction">> = {}): FiscalSearchServicePrisma {
+function createMockPrisma(
+  overrides: Partial<Pick<FiscalSearchServicePrisma, "$transaction">> = {},
+): FiscalSearchServicePrisma {
   return {
     ncm: { findFirst: vi.fn() },
     icms: { findMany: vi.fn() },
     ipi: { findMany: vi.fn() },
-    $transaction: vi.fn(
-      async () => [{ ncm: true }, [], []] as [unknown, unknown, unknown],
-    ),
+    $transaction: vi.fn(async () => [{ ncm: true }, [], []] as [unknown, unknown, unknown]),
     ...overrides,
   } as unknown as FiscalSearchServicePrisma;
 }
@@ -24,14 +24,18 @@ describe("FiscalSearchService", () => {
     const ncmRow = { id: "n1", ncm_code: "84719012" };
     const icmsRows = [{ id: "i1" }];
     const ipiRows = [{ id: "p1" }];
-    const $transaction = vi.fn(async () => [ncmRow, icmsRows, ipiRows] as [unknown, unknown, unknown]);
+    const $transaction = vi.fn(
+      async () => [ncmRow, icmsRows, ipiRows] as [unknown, unknown, unknown],
+    );
     const prisma = createMockPrisma({ $transaction });
     const service = new FiscalSearchService(prisma);
 
     const result = await service.searchByNcmCode("84719012", ORG_ID);
 
     expect($transaction).toHaveBeenCalledTimes(1);
-    const calls = $transaction.mock.calls[0]![0] as unknown[];
+    const firstCall = $transaction.mock.calls[0];
+    expect(firstCall).toBeDefined();
+    const calls = firstCall[0] as unknown[];
     expect(Array.isArray(calls)).toBe(true);
     expect(calls).toHaveLength(3);
     expect(result).toEqual({ ncm: ncmRow, icms: icmsRows, ipi: ipiRows });

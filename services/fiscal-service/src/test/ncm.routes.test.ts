@@ -1,10 +1,10 @@
 import "./envBootstrap.js";
 
 import {
+  createLogger,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
-  createLogger,
 } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";

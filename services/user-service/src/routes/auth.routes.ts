@@ -39,20 +39,24 @@ router.post("/start-config", async (_request: Request, response: Response, next:
   }
 });
 
-router.get("/me", isAuthenticated, async (request: Request, response: Response, next: NextFunction) => {
-  try {
-    const { user_id } = requireAuthenticatedRequestContext(request, {
-      userIdMessage: "Não autenticado.",
-      organizationIdMessage: "Não autenticado.",
-    });
+router.get(
+  "/me",
+  isAuthenticated,
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const { user_id } = requireAuthenticatedRequestContext(request, {
+        userIdMessage: "Não autenticado.",
+        organizationIdMessage: "Não autenticado.",
+      });
 
-    const user = await userService.getById(user_id);
+      const user = await userService.getById(user_id);
 
-    response.json(createSuccessResponse({ ...user, service: "user-service" }));
-  } catch (err) {
-    logError("Erro ao buscar usuário autenticado", { err });
-    next(err);
-  }
-});
+      response.json(createSuccessResponse({ ...user, service: "user-service" }));
+    } catch (err) {
+      logError("Erro ao buscar usuário autenticado", { err });
+      next(err);
+    }
+  },
+);
 
 export { router as authRoutes };

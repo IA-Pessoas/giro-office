@@ -41,7 +41,9 @@ describe("auth routes", () => {
     userServiceMock.getById.mockResolvedValue({ id: "user-1" });
     const app = createTestApp();
 
-    const res = await request(app).get("/user/me").set(gatewayAuthHeaders({ userId: "user-1" }));
+    const res = await request(app)
+      .get("/user/me")
+      .set(gatewayAuthHeaders({ userId: "user-1" }));
 
     expect(res.status).toBe(200);
     expect(userServiceMock.getById).toHaveBeenCalledWith("user-1");

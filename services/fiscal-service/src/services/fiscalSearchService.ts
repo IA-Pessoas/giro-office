@@ -70,7 +70,11 @@ export class FiscalSearchService {
       orderBy: { ncm: "asc" },
     });
 
-    const [ncm, icms, ipi] = await this.prisma.$transaction([ncmDataQuery, icmsDataQuery, ipiDataQuery]);
+    const [ncm, icms, ipi] = await this.prisma.$transaction([
+      ncmDataQuery,
+      icmsDataQuery,
+      ipiDataQuery,
+    ]);
 
     return { ncm, icms, ipi };
   }

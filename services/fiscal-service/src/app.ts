@@ -8,7 +8,10 @@ import "express-async-errors";
 import type { FiscalServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildFiscalServiceOpenApiSpec } from "./openapi/spec.js";
-import { createFiscalSearchRoutes, type FiscalSearchRouteDeps } from "./routes/fiscalSearch.routes.js";
+import {
+  createFiscalSearchRoutes,
+  type FiscalSearchRouteDeps,
+} from "./routes/fiscalSearch.routes.js";
 import { createIcmsRoutes, type IcmsRouteDeps } from "./routes/icms.routes.js";
 import { createIpiRoutes, type IpiRouteDeps } from "./routes/ipi.routes.js";
 import { createNcmRoutes, type NcmRouteDeps } from "./routes/ncm.routes.js";

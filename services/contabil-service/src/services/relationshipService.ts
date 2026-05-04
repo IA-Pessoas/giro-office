@@ -165,7 +165,10 @@ export class RelationshipService {
     }
   }
 
-  async getByClientId(clientId: string, organizationId: string): Promise<RelationshipContabilEntity> {
+  async getByClientId(
+    clientId: string,
+    organizationId: string,
+  ): Promise<RelationshipContabilEntity> {
     const relationship = await this.prisma.relationshipContabil.findFirst({
       where: {
         client_id: clientId,

@@ -21,7 +21,9 @@ export type RelationshipRouteDeps = Pick<
   "create" | "update" | "getByClientId" | "delete"
 >;
 
-export function createRelationshipRoutes(service: RelationshipRouteDeps): ReturnType<typeof Router> {
+export function createRelationshipRoutes(
+  service: RelationshipRouteDeps,
+): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
 
   router.post(

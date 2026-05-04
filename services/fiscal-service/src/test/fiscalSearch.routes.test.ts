@@ -1,10 +1,10 @@
 import "./envBootstrap.js";
 
 import {
+  createLogger,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
-  createLogger,
 } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -47,9 +47,7 @@ describe("fiscal search routes", () => {
     const deps = createMockFiscalSearchDeps();
     const app = createFiscalApp({ env, logger, fiscalSearchRouteDeps: deps });
 
-    const res = await request(app)
-      .get("/fiscal/ncm-search")
-      .set(gatewayHeaders());
+    const res = await request(app).get("/fiscal/ncm-search").set(gatewayHeaders());
 
     expect(res.status).toBe(400);
     expect(deps.searchByNcmCode).not.toHaveBeenCalled();

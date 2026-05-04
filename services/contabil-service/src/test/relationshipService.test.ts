@@ -48,7 +48,10 @@ describe("RelationshipService", () => {
   it("create lança 409 quando já existe para o cliente na organização", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.relationshipContabil.findFirst).mockResolvedValue(baseRow);
-    const service = new RelationshipService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new RelationshipService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
     await expect(
       service.create(createPayload, { userId: USER_ID, organizationId: ORG_ID }),
@@ -95,7 +98,10 @@ describe("RelationshipService", () => {
   it("update lança 404 quando não existe na organização", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.relationshipContabil.findFirst).mockResolvedValue(null);
-    const service = new RelationshipService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new RelationshipService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
     await expect(
       service.update(RELATIONSHIP_ID, { note: "x" }, { userId: USER_ID, organizationId: ORG_ID }),
@@ -134,15 +140,23 @@ describe("RelationshipService", () => {
   it("getByClientId lança 404 quando não encontra", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.relationshipContabil.findFirst).mockResolvedValue(null);
-    const service = new RelationshipService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new RelationshipService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
-    await expect(service.getByClientId(CLIENT_ID, ORG_ID)).rejects.toMatchObject({ statusCode: 404 });
+    await expect(service.getByClientId(CLIENT_ID, ORG_ID)).rejects.toMatchObject({
+      statusCode: 404,
+    });
   });
 
   it("getByClientId retorna registro", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.relationshipContabil.findFirst).mockResolvedValue(baseRow);
-    const service = new RelationshipService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new RelationshipService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
     const row = await service.getByClientId(CLIENT_ID, ORG_ID);
     expect(row).toEqual(baseRow);
@@ -154,9 +168,14 @@ describe("RelationshipService", () => {
   it("delete lança 404 quando não existe na organização", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.relationshipContabil.findFirst).mockResolvedValue(null);
-    const service = new RelationshipService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new RelationshipService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
-    await expect(service.delete(RELATIONSHIP_ID, ORG_ID)).rejects.toMatchObject({ statusCode: 404 });
+    await expect(service.delete(RELATIONSHIP_ID, ORG_ID)).rejects.toMatchObject({
+      statusCode: 404,
+    });
     expect(prisma.relationshipContabil.delete).not.toHaveBeenCalled();
   });
 
@@ -164,18 +183,28 @@ describe("RelationshipService", () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.relationshipContabil.findFirst).mockResolvedValue(baseRow);
     vi.mocked(prisma.relationshipContabil.delete).mockResolvedValue(baseRow);
-    const service = new RelationshipService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new RelationshipService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
     const result = await service.delete(RELATIONSHIP_ID, ORG_ID);
 
     expect(result.message).toContain("sucesso");
-    expect(prisma.relationshipContabil.delete).toHaveBeenCalledWith({ where: { id: RELATIONSHIP_ID } });
+    expect(prisma.relationshipContabil.delete).toHaveBeenCalledWith({
+      where: { id: RELATIONSHIP_ID },
+    });
   });
 
   it("create propaga ServiceError sem embrulhar em 500", async () => {
     const prisma = createMockPrisma();
-    vi.mocked(prisma.relationshipContabil.findFirst).mockRejectedValue(new ServiceError(400, "Falha."));
-    const service = new RelationshipService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    vi.mocked(prisma.relationshipContabil.findFirst).mockRejectedValue(
+      new ServiceError(400, "Falha."),
+    );
+    const service = new RelationshipService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
     await expect(
       service.create(createPayload, { userId: USER_ID, organizationId: ORG_ID }),

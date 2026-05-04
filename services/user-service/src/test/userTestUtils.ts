@@ -31,28 +31,30 @@ interface UserRouteMocks {
   };
 }
 
-const userRouteMocks: UserRouteMocks = vi.hoisted((): UserRouteMocks => ({
-  authServiceMock: {
-    login: vi.fn(),
-    firstCreate: vi.fn(),
-  },
-  userServiceMock: {
-    list: vi.fn(),
-    getById: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  permissionServiceMock: {
-    getByUserId: vi.fn(),
-    update: vi.fn(),
-  },
-  storageServiceMock: {
-    uploadUserPhoto: vi.fn(),
-    deleteUserPhoto: vi.fn(),
-    readUserPhoto: vi.fn(),
-  },
-}));
+const userRouteMocks: UserRouteMocks = vi.hoisted(
+  (): UserRouteMocks => ({
+    authServiceMock: {
+      login: vi.fn(),
+      firstCreate: vi.fn(),
+    },
+    userServiceMock: {
+      list: vi.fn(),
+      getById: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    permissionServiceMock: {
+      getByUserId: vi.fn(),
+      update: vi.fn(),
+    },
+    storageServiceMock: {
+      uploadUserPhoto: vi.fn(),
+      deleteUserPhoto: vi.fn(),
+      readUserPhoto: vi.fn(),
+    },
+  }),
+);
 
 vi.mock("../services/authService.js", () => ({
   AuthService: vi.fn(function AuthService() {
@@ -108,7 +110,8 @@ export function gatewayAuthHeaders(overrides?: {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
     [FORWARDED_AUTH_USER_ID_HEADER]: overrides?.userId ?? DEFAULT_TEST_USER_ID,
-    [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: overrides?.organizationId ?? DEFAULT_TEST_ORGANIZATION_ID,
+    [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]:
+      overrides?.organizationId ?? DEFAULT_TEST_ORGANIZATION_ID,
   };
 }
 

@@ -3,7 +3,10 @@ import { z } from "zod";
 export const createResponsibleBodySchema = z
   .object({
     client_id: z.string().uuid({ message: "client_id inválido." }),
-    person_responsible_id: z.string().uuid({ message: "person_responsible_id inválido." }).optional(),
+    person_responsible_id: z
+      .string()
+      .uuid({ message: "person_responsible_id inválido." })
+      .optional(),
     posted_by_id: z.string().uuid({ message: "posted_by_id inválido." }).optional(),
     customer_with_movement: z.boolean().optional(),
   })
@@ -17,11 +20,7 @@ export const updateResponsibleBodySchema = z
       .uuid({ message: "person_responsible_id inválido." })
       .optional()
       .nullable(),
-    posted_by_id: z
-      .string()
-      .uuid({ message: "posted_by_id inválido." })
-      .optional()
-      .nullable(),
+    posted_by_id: z.string().uuid({ message: "posted_by_id inválido." }).optional().nullable(),
     customer_with_movement: z.boolean().optional(),
   })
   .strict()
