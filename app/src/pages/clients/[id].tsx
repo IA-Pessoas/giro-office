@@ -249,17 +249,10 @@ export default function ClientDetailPage() {
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <SummaryItem label="Nome" value={client.name} />
                   <SummaryItem label="CPF/CNPJ" value={formatCpfCnpj(client.cpf_cnpj)} />
+                  <SummaryItem label="Regime" value={client.regime || "A definir"} />
+                  <SummaryItem label="Organização" value={organizationName} />
                   <SummaryItem label="Razão social" value={client.company_name || "Não informado"} />
                   <SummaryItem label="Nome fantasia" value={client.fantasy_name || "Não informado"} />
-                  <SummaryItem label="Organização" value={organizationName} />
-                  <SummaryItem
-                    label="Desativado em"
-                    value={
-                      client.deletion_date
-                        ? new Date(client.deletion_date).toLocaleString("pt-BR")
-                        : "Ativo"
-                    }
-                  />
                 </div>
               </div>
 
@@ -289,6 +282,14 @@ export default function ClientDetailPage() {
                     <Power className="h-4 w-4" />
                     {deactivateClientMutation.isPending ? "Desativando..." : "Desativar cliente"}
                   </button>
+                  <SummaryItem
+                      label="Desativado em"
+                      value={
+                        client.deletion_date
+                          ? new Date(client.deletion_date).toLocaleString("pt-BR")
+                          : "Ativo"
+                      }
+                    />
                 </div>
               </div>
             </section>
