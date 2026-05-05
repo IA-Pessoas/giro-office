@@ -36,9 +36,15 @@ function gatewayHeaders(): Record<string, string> {
 
 function createMockDeps(): ControlRouteDeps {
   return {
-    create: vi.fn(async () => ({ control: { id: CONTROL_ID }, created: true })) as unknown as ControlRouteDeps["create"],
+    create: vi.fn(async () => ({
+      control: { id: CONTROL_ID },
+      created: true,
+    })) as unknown as ControlRouteDeps["create"],
     detail: vi.fn(async () => ({ id: CONTROL_ID })) as unknown as ControlRouteDeps["detail"],
-    updateField: vi.fn(async () => ({ id: CONTROL_ID, depreciation: true })) as unknown as ControlRouteDeps["updateField"],
+    updateField: vi.fn(async () => ({
+      id: CONTROL_ID,
+      depreciation: true,
+    })) as unknown as ControlRouteDeps["updateField"],
   };
 }
 

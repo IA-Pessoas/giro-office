@@ -45,10 +45,20 @@ function gatewayHeaders(): Record<string, string> {
 
 function createMockDeps(): RelationshipRouteDeps {
   return {
-    create: vi.fn(async () => ({ id: RELATIONSHIP_ID, client_id: CLIENT_ID })) as unknown as RelationshipRouteDeps["create"],
-    update: vi.fn(async () => ({ id: RELATIONSHIP_ID, bidding: true })) as unknown as RelationshipRouteDeps["update"],
-    getByClientId: vi.fn(async () => ({ id: RELATIONSHIP_ID })) as unknown as RelationshipRouteDeps["getByClientId"],
-    delete: vi.fn(async () => ({ message: "Registro deletado com sucesso." })) as unknown as RelationshipRouteDeps["delete"],
+    create: vi.fn(async () => ({
+      id: RELATIONSHIP_ID,
+      client_id: CLIENT_ID,
+    })) as unknown as RelationshipRouteDeps["create"],
+    update: vi.fn(async () => ({
+      id: RELATIONSHIP_ID,
+      bidding: true,
+    })) as unknown as RelationshipRouteDeps["update"],
+    getByClientId: vi.fn(async () => ({
+      id: RELATIONSHIP_ID,
+    })) as unknown as RelationshipRouteDeps["getByClientId"],
+    delete: vi.fn(async () => ({
+      message: "Registro deletado com sucesso.",
+    })) as unknown as RelationshipRouteDeps["delete"],
   };
 }
 

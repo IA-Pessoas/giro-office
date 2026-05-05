@@ -78,7 +78,9 @@ function createMockAudit() {
 describe("IcmsService", () => {
   it("create lança 409 quando ICMS já existe", async () => {
     const prisma = createMockPrisma();
-    prisma.icms.findFirst = vi.fn(async () => ({ id: ICMS_ID })) as unknown as IcmsServicePrisma["icms"]["findFirst"];
+    prisma.icms.findFirst = vi.fn(async () => ({
+      id: ICMS_ID,
+    })) as unknown as IcmsServicePrisma["icms"]["findFirst"];
     const audit = createMockAudit();
     const service = new IcmsService(prisma, audit);
 
@@ -90,9 +92,13 @@ describe("IcmsService", () => {
 
   it("create persiste ICMS e registra auditoria", async () => {
     const prisma = createMockPrisma();
-    prisma.icms.findFirst = vi.fn(async () => null) as unknown as IcmsServicePrisma["icms"]["findFirst"];
+    prisma.icms.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as IcmsServicePrisma["icms"]["findFirst"];
     const created = { id: ICMS_ID, ...baseCreateInput };
-    prisma.icms.create = vi.fn(async () => created) as unknown as IcmsServicePrisma["icms"]["create"];
+    prisma.icms.create = vi.fn(
+      async () => created,
+    ) as unknown as IcmsServicePrisma["icms"]["create"];
     const audit = createMockAudit();
     const service = new IcmsService(prisma, audit);
 
@@ -110,7 +116,9 @@ describe("IcmsService", () => {
 
   it("detail lança 404 quando ICMS não existe", async () => {
     const prisma = createMockPrisma();
-    prisma.icms.findFirst = vi.fn(async () => null) as unknown as IcmsServicePrisma["icms"]["findFirst"];
+    prisma.icms.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as IcmsServicePrisma["icms"]["findFirst"];
     const service = new IcmsService(prisma, createMockAudit());
 
     await expect(service.detail(ICMS_ID, ORG_ID)).rejects.toMatchObject({ statusCode: 404 });
@@ -123,7 +131,9 @@ describe("IcmsService", () => {
   it("detail retorna registro quando existe", async () => {
     const row = { id: ICMS_ID, description: baseCreateInput.description };
     const prisma = createMockPrisma();
-    prisma.icms.findFirst = vi.fn(async () => row) as unknown as IcmsServicePrisma["icms"]["findFirst"];
+    prisma.icms.findFirst = vi.fn(
+      async () => row,
+    ) as unknown as IcmsServicePrisma["icms"]["findFirst"];
     const service = new IcmsService(prisma, createMockAudit());
 
     const result = await service.detail(ICMS_ID, ORG_ID);
@@ -136,7 +146,9 @@ describe("IcmsService", () => {
 
   it("update lança 404 quando ICMS não existe", async () => {
     const prisma = createMockPrisma();
-    prisma.icms.findFirst = vi.fn(async () => null) as unknown as IcmsServicePrisma["icms"]["findFirst"];
+    prisma.icms.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as IcmsServicePrisma["icms"]["findFirst"];
     const service = new IcmsService(prisma, createMockAudit());
 
     await expect(
@@ -154,9 +166,13 @@ describe("IcmsService", () => {
   it("update persiste e registra auditoria quando ICMS existe", async () => {
     const prisma = createMockPrisma();
     const existing = { id: ICMS_ID, description: baseCreateInput.description };
-    prisma.icms.findFirst = vi.fn(async () => existing) as unknown as IcmsServicePrisma["icms"]["findFirst"];
+    prisma.icms.findFirst = vi.fn(
+      async () => existing,
+    ) as unknown as IcmsServicePrisma["icms"]["findFirst"];
     const updated = { ...existing, description: "Atualizado" };
-    prisma.icms.update = vi.fn(async () => updated) as unknown as IcmsServicePrisma["icms"]["update"];
+    prisma.icms.update = vi.fn(
+      async () => updated,
+    ) as unknown as IcmsServicePrisma["icms"]["update"];
     const audit = createMockAudit();
     const service = new IcmsService(prisma, audit);
 

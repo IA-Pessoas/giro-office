@@ -40,7 +40,9 @@ function createMockAudit() {
 describe("NcmService", () => {
   it("create lança 409 quando NCM já existe", async () => {
     const prisma = createMockPrisma();
-    prisma.ncm.findFirst = vi.fn(async () => ({ id: NCM_ID })) as unknown as NcmServicePrisma["ncm"]["findFirst"];
+    prisma.ncm.findFirst = vi.fn(async () => ({
+      id: NCM_ID,
+    })) as unknown as NcmServicePrisma["ncm"]["findFirst"];
     const audit = createMockAudit();
     const service = new NcmService(prisma, audit);
 
@@ -50,7 +52,9 @@ describe("NcmService", () => {
 
   it("create persiste NCM e registra auditoria", async () => {
     const prisma = createMockPrisma();
-    prisma.ncm.findFirst = vi.fn(async () => null) as unknown as NcmServicePrisma["ncm"]["findFirst"];
+    prisma.ncm.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as NcmServicePrisma["ncm"]["findFirst"];
     const created = { id: NCM_ID, ...baseCreateInput };
     prisma.ncm.create = vi.fn(async () => created) as unknown as NcmServicePrisma["ncm"]["create"];
     const audit = createMockAudit();
@@ -64,7 +68,9 @@ describe("NcmService", () => {
 
   it("detail lança 404 quando NCM não existe", async () => {
     const prisma = createMockPrisma();
-    prisma.ncm.findFirst = vi.fn(async () => null) as unknown as NcmServicePrisma["ncm"]["findFirst"];
+    prisma.ncm.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as NcmServicePrisma["ncm"]["findFirst"];
     const service = new NcmService(prisma, createMockAudit());
 
     await expect(service.detail(NCM_ID, ORG_ID)).rejects.toMatchObject({ statusCode: 404 });
@@ -73,7 +79,9 @@ describe("NcmService", () => {
   it("detail retorna registro quando existe", async () => {
     const row = { id: NCM_ID, ncm_code: "84719012" };
     const prisma = createMockPrisma();
-    prisma.ncm.findFirst = vi.fn(async () => row) as unknown as NcmServicePrisma["ncm"]["findFirst"];
+    prisma.ncm.findFirst = vi.fn(
+      async () => row,
+    ) as unknown as NcmServicePrisma["ncm"]["findFirst"];
     const service = new NcmService(prisma, createMockAudit());
 
     const result = await service.detail(NCM_ID, ORG_ID);
@@ -82,7 +90,9 @@ describe("NcmService", () => {
 
   it("update lança 404 quando NCM não existe", async () => {
     const prisma = createMockPrisma();
-    prisma.ncm.findFirst = vi.fn(async () => null) as unknown as NcmServicePrisma["ncm"]["findFirst"];
+    prisma.ncm.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as NcmServicePrisma["ncm"]["findFirst"];
     const service = new NcmService(prisma, createMockAudit());
 
     await expect(
@@ -96,7 +106,9 @@ describe("NcmService", () => {
   it("update persiste e registra auditoria quando NCM existe", async () => {
     const prisma = createMockPrisma();
     const existing = { id: NCM_ID, ncm_code: "84719012" };
-    prisma.ncm.findFirst = vi.fn(async () => existing) as unknown as NcmServicePrisma["ncm"]["findFirst"];
+    prisma.ncm.findFirst = vi.fn(
+      async () => existing,
+    ) as unknown as NcmServicePrisma["ncm"]["findFirst"];
     const updated = { ...existing, description: "Atualizado" };
     prisma.ncm.update = vi.fn(async () => updated) as unknown as NcmServicePrisma["ncm"]["update"];
     const audit = createMockAudit();
