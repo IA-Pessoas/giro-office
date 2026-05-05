@@ -12,6 +12,7 @@ import type { ClientRegularizeFormValues } from "@modules/clients/types";
 import {
   buildRegularizePayload,
   createRegularizeInitialValues,
+  getRegularizeUnsupportedDateClearError,
   hasRegularizeChanges,
 } from "@modules/clients/utils/regularizeForm";
 import {
@@ -84,6 +85,13 @@ export default function ClientRegularizePage() {
 
     if (responsibleCpfError) {
       toast.error(responsibleCpfError);
+      return;
+    }
+
+    const unsupportedDateClearError = getRegularizeUnsupportedDateClearError(formValues, client);
+
+    if (unsupportedDateClearError) {
+      toast.error(unsupportedDateClearError);
       return;
     }
 

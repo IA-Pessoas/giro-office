@@ -8,6 +8,7 @@ import {
 } from "./services/clientService.contract.ts";
 import {
   buildCommercialPayload,
+  COMMERCIAL_STATUS_OPTIONS,
   createCommercialInitialValues,
   hasCommercialChanges,
 } from "./utils/commercialForm.ts";
@@ -28,6 +29,7 @@ import {
 import {
   buildRegularizePayload,
   createRegularizeInitialValues,
+  getRegularizeUnsupportedDateClearError,
   hasRegularizeChanges,
 } from "./utils/regularizeForm.ts";
 import {
@@ -50,11 +52,11 @@ function runTest(name, fn) {
   }
 }
 
-runTest("mapClientStatusFromApi converts ProspecÃ§Ã£o to Prospect", () => {
+runTest("mapClientStatusFromApi converts prospecting status to Prospect", () => {
   assert.equal(mapClientStatusFromApi("ProspecÃ§Ã£o"), "Prospect");
 });
 
-runTest("mapClientStatusToApi converts Prospect to ProspecÃ§Ã£o", () => {
+runTest("mapClientStatusToApi converts Prospect to API status", () => {
   assert.equal(mapClientStatusToApi("Prospect"), "ProspecÃ§Ã£o");
 });
 
@@ -228,6 +230,13 @@ runTest("optional cpf validation accepts empty values and rejects invalid length
   );
 });
 
+runTest("commercial options separate backend value from UI label", () => {
+  assert.deepEqual(COMMERCIAL_STATUS_OPTIONS[0], {
+    value: "Análise/Agendamento",
+    label: "Análise/Agendamento",
+  });
+});
+
 runTest("commercial initial values normalize dates to input format", () => {
   const client = {
     prospecting_status: "Análise/Agendamento",
@@ -325,6 +334,55 @@ runTest("regularize payload normalizes documents, nullable text, and dates", () 
     customer_since: "2026-04-02",
   });
   assert.equal(hasRegularizeChanges(values, client), true);
+});
+
+runTest("regularize blocks clearing non-nullable dates and ignores invalid clear as effective change", () => {
+  const client = {
+    dominio_code: "",
+    name: "Acme",
+    company_name: "",
+    fantasy_name: "",
+    cpf_cnpj: "12345678000190",
+    cnae: "",
+    cnae_secondary: "",
+    responsible: "",
+    cpf_responsible: "",
+    number: "",
+    email: "",
+    address: "",
+    cep: "",
+    neighborhood: "",
+    state: "",
+    city: "",
+    customer_since: "2026-04-01T00:00:00.000Z",
+    municipal_registration: "",
+    state_registration: "",
+    commercial_board_registration: "",
+    opening_date: null,
+    regime: "",
+    size: "",
+    segment: "",
+    contabil: false,
+    fiscal: false,
+    pessoal: false,
+    infoproduto: false,
+    consultoria: false,
+    start_strike: null,
+    end_strike: null,
+    deletion_date: null,
+  };
+
+  const values = {
+    ...createRegularizeInitialValues(client),
+    customer_since: "",
+  };
+
+  assert.deepEqual(buildRegularizePayload(values, client), {});
+  assert.equal(hasRegularizeChanges(values, client), false);
+  assert.equal(
+    getRegularizeUnsupportedDateClearError(values, client),
+    "Não é possível limpar cliente desde neste fluxo. Informe uma data válida.",
+  );
 });
 
 runTest("termination helpers validate competence_output and build payload", () => {

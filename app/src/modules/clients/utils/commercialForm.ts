@@ -43,14 +43,14 @@ function normalizeDateInputValue(value: Date | string | null | undefined): strin
 }
 
 export const COMMERCIAL_STATUS_OPTIONS = [
-  "Análise/Agendamento",
-  "Envio de Proposta",
-  "Análise Financeira",
-  "Fechado",
-  "Paralisado",
-  "Recusado pelo Cliente",
-  "Baixada",
-  "Inativo",
+  { value: "Análise/Agendamento", label: "Análise/Agendamento" },
+  { value: "Envio de Proposta", label: "Envio de Proposta" },
+  { value: "Análise Financeira", label: "Análise Financeira" },
+  { value: "Fechado", label: "Fechado" },
+  { value: "Paralisado", label: "Paralisado" },
+  { value: "Recusado pelo Cliente", label: "Recusado pelo Cliente" },
+  { value: "Baixada", label: "Baixada" },
+  { value: "Inativo", label: "Inativo" },
 ] as const;
 
 export function createCommercialInitialValues(client: Client): ClientCommercialFormValues {

@@ -68,13 +68,23 @@ const nullableTextFieldNames = [
   "segment",
 ] as const satisfies ReadonlyArray<keyof ClientRegularizeFormValues>;
 
-const dateFieldNames = [
+const optionalDateFieldNames = [
   "customer_since",
   "opening_date",
   "start_strike",
   "end_strike",
+] as const satisfies ReadonlyArray<keyof ClientRegularizeFormValues>;
+
+const nullableDateFieldNames = [
   "deletion_date",
 ] as const satisfies ReadonlyArray<keyof ClientRegularizeFormValues>;
+
+const optionalDateFieldLabels: Record<(typeof optionalDateFieldNames)[number], string> = {
+  customer_since: "Cliente desde",
+  opening_date: "Data de abertura",
+  start_strike: "Início da paralisação",
+  end_strike: "Fim da paralisação",
+};
 
 const booleanFieldNames = [
   "contabil",
@@ -176,7 +186,20 @@ export function buildRegularizePayload(
     }
   }
 
-  for (const fieldName of dateFieldNames) {
+  for (const fieldName of optionalDateFieldNames) {
+    const nextValue = normalizeDateInputValue(values[fieldName]);
+    const currentValue = normalizeDateInputValue(currentValues[fieldName]);
+
+    if (nextValue.length === 0) {
+      continue;
+    }
+
+    if (nextValue !== currentValue) {
+      payload[fieldName] = nextValue;
+    }
+  }
+
+  for (const fieldName of nullableDateFieldNames) {
     const nextValue = normalizeDateInputValue(values[fieldName]);
     const currentValue = normalizeDateInputValue(currentValues[fieldName]);
 
@@ -196,4 +219,22 @@ export function buildRegularizePayload(
 
 export function hasRegularizeChanges(values: ClientRegularizeFormValues, client: Client): boolean {
   return Object.keys(buildRegularizePayload(values, client)).length > 0;
+}
+
+export function getRegularizeUnsupportedDateClearError(
+  values: ClientRegularizeFormValues,
+  client: Client,
+): string | null {
+  const currentValues = createRegularizeInitialValues(client);
+
+  for (const fieldName of optionalDateFieldNames) {
+    const nextValue = normalizeDateInputValue(values[fieldName]);
+    const currentValue = normalizeDateInputValue(currentValues[fieldName]);
+
+    if (currentValue.length > 0 && nextValue.length === 0) {
+      return `Não é possível limpar ${optionalDateFieldLabels[fieldName].toLowerCase()} neste fluxo. Informe uma data válida.`;
+    }
+  }
+
+  return null;
 }
