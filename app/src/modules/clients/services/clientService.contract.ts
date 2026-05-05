@@ -14,6 +14,8 @@ export const CLIENT_ENDPOINTS = {
   detailPa: (id: string) => `/client/${id}/pa`,
   createPa: (id: string) => `/client/${id}/pa`,
   updatePa: (id: string) => `/client/${id}/pa`,
+  histories: (id: string) => `/client/${id}/histories`,
+  updateHistory: (id: string, historyId: string) => `/client/${id}/histories/${historyId}`,
 } as const;
 
 export function buildClientListParams(filters: ClientListFilters) {
