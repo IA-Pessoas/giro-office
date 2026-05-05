@@ -36,9 +36,9 @@ function gatewayHeaders(): Record<string, string> {
 
 function createMockDeps(): ControlRouteDeps {
   return {
-    create: vi.fn(async () => ({ control: { id: CONTROL_ID }, created: true })),
-    detail: vi.fn(async () => ({ id: CONTROL_ID })),
-    updateField: vi.fn(async () => ({ id: CONTROL_ID, depreciation: true })),
+    create: vi.fn(async () => ({ control: { id: CONTROL_ID }, created: true })) as unknown as ControlRouteDeps["create"],
+    detail: vi.fn(async () => ({ id: CONTROL_ID })) as unknown as ControlRouteDeps["detail"],
+    updateField: vi.fn(async () => ({ id: CONTROL_ID, depreciation: true })) as unknown as ControlRouteDeps["updateField"],
   };
 }
 
@@ -61,7 +61,7 @@ describe("control routes", () => {
     deps.create = vi.fn(async () => ({
       control: { id: CONTROL_ID, client_id: CLIENT_ID },
       created: true,
-    }));
+    })) as unknown as ControlRouteDeps["create"];
     const app = createContabilApp({ env, logger, controlRouteDeps: deps });
 
     const res = await request(app)
@@ -83,7 +83,7 @@ describe("control routes", () => {
     deps.create = vi.fn(async () => ({
       control: { id: CONTROL_ID },
       created: false,
-    }));
+    })) as unknown as ControlRouteDeps["create"];
     const app = createContabilApp({ env, logger, controlRouteDeps: deps });
 
     const res = await request(app)
@@ -125,7 +125,7 @@ describe("control routes", () => {
 
   it("GET /contabil/controls com query válida retorna 200", async () => {
     const deps = createMockDeps();
-    deps.detail = vi.fn(async () => ({ id: CONTROL_ID }));
+    deps.detail = vi.fn(async () => ({ id: CONTROL_ID })) as unknown as ControlRouteDeps["detail"];
     const app = createContabilApp({ env, logger, controlRouteDeps: deps });
 
     const res = await request(app)

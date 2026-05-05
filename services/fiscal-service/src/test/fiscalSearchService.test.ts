@@ -33,9 +33,15 @@ describe("FiscalSearchService", () => {
     const result = await service.searchByNcmCode("84719012", ORG_ID);
 
     expect($transaction).toHaveBeenCalledTimes(1);
-    const firstCall = $transaction.mock.calls[0];
-    expect(firstCall).toBeDefined();
-    const calls = firstCall[0] as unknown[];
+    const firstCall = ($transaction as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
+    if (!firstCall) {
+      throw new Error("Expected $transaction to be called at least once.");
+    }
+    const txnArg = firstCall[0];
+    if (!txnArg) {
+      throw new Error("Expected $transaction to be called with args.");
+    }
+    const calls = txnArg as unknown[];
     expect(Array.isArray(calls)).toBe(true);
     expect(calls).toHaveLength(3);
     expect(result).toEqual({ ncm: ncmRow, icms: icmsRows, ipi: ipiRows });

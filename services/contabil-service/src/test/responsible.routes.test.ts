@@ -36,10 +36,10 @@ function gatewayHeaders(): Record<string, string> {
 
 function createMockDeps(): ResponsibleRouteDeps {
   return {
-    create: vi.fn(async () => ({ id: RESPONSIBLE_ID, client_id: CLIENT_ID })),
-    update: vi.fn(async () => ({ id: RESPONSIBLE_ID, customer_with_movement: true })),
-    getByClientId: vi.fn(async () => ({ id: RESPONSIBLE_ID })),
-    delete: vi.fn(async () => ({ message: "Registro deletado com sucesso." })),
+    create: vi.fn(async () => ({ id: RESPONSIBLE_ID, client_id: CLIENT_ID })) as unknown as ResponsibleRouteDeps["create"],
+    update: vi.fn(async () => ({ id: RESPONSIBLE_ID, customer_with_movement: true })) as unknown as ResponsibleRouteDeps["update"],
+    getByClientId: vi.fn(async () => ({ id: RESPONSIBLE_ID })) as unknown as ResponsibleRouteDeps["getByClientId"],
+    delete: vi.fn(async () => ({ message: "Registro deletado com sucesso." })) as unknown as ResponsibleRouteDeps["delete"],
   };
 }
 
