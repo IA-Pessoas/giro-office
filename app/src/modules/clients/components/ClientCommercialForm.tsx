@@ -31,7 +31,8 @@ export function ClientCommercialForm({
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
-        Alterar o status de prospecção pode impactar o status geral do cliente conforme as regras do backend.
+        Alterar o status de prospecção pode impactar o status geral do cliente conforme as
+        regras do backend.
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -45,8 +46,8 @@ export function ClientCommercialForm({
           >
             <option value="">Selecione um status</option>
             {COMMERCIAL_STATUS_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </ClientNativeSelect>

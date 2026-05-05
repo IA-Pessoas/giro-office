@@ -324,7 +324,7 @@ export default function ClientDetailPage() {
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <ClientAccessCard
                   title="PA"
-                  description="Gerencie os dados de PA do cliente em uma página dedicada."
+                  description="Gerencie os dados de PA do cliente."
                   href={`/clients/${client.id}/pa`}
                   actionLabel="Abrir PA"
                   icon={FileText}
@@ -332,25 +332,25 @@ export default function ClientDetailPage() {
 
                 <ClientAccessCard
                   title="Integração"
-                  description="Gerencie os dados de integração do cliente em uma página dedicada."
+                  description="Gerencie os dados de integração do cliente."
                   href={`/clients/${client.id}/integration`}
                   actionLabel="Abrir integração"
                   icon={Workflow}
                 />
 
                 <ClientAccessCard
-                  title="Commercial"
+                  title="Comercial"
                   description="Atualize o status de prospecção e os dados comerciais do cliente."
                   href={`/clients/${client.id}/commercial`}
-                  actionLabel="Abrir commercial"
+                  actionLabel="Abrir comercial"
                   icon={BriefcaseBusiness}
                 />
 
                 <ClientAccessCard
-                  title="Finance"
-                  description="Gerencie a informação de contrato em uma página dedicada."
+                  title="Financeiro"
+                  description="Gerencie a informação de contrato do cliente."
                   href={`/clients/${client.id}/finance`}
-                  actionLabel="Abrir finance"
+                  actionLabel="Abrir financeiro"
                   icon={CircleDollarSign}
                 />
 
@@ -363,10 +363,10 @@ export default function ClientDetailPage() {
                 />
 
                 <ClientAccessCard
-                  title="Termination"
-                  description="Inicie o processo de inativação do cliente em uma página dedicada."
+                  title="Inativação"
+                  description="Inicie o processo de inativação do cliente."
                   href={`/clients/${client.id}/termination`}
-                  actionLabel="Abrir termination"
+                  actionLabel="Abrir inativação"
                   icon={XCircle}
                 />
               </div>
@@ -412,7 +412,7 @@ function ClientAccessCard({
 
         <Link
           href={href}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
+          className="inline-flex min-h-12 min-w-[176px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
         >
           <Icon className="h-4 w-4" />
           {actionLabel}

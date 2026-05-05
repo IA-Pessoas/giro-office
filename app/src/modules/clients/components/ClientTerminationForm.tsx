@@ -29,7 +29,8 @@ export function ClientTerminationForm({
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-200">
-        Esta ação inicia o processo de inativação do cliente e pode impactar tarefas abertas. Revise os dados antes de confirmar.
+        Esta ação inicia o processo de inativação do cliente e pode impactar tarefas abertas.
+        Revise os dados antes de confirmar.
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
