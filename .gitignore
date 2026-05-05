@@ -3,7 +3,8 @@
 .env.local
 .env.vps.*
 *generated/
-tsconfig*
+tsconfig.tsbuildinfo
+tsconfig.tests*
 
 # Turborepo
 .turbo/
