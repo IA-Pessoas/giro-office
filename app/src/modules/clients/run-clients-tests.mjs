@@ -53,11 +53,11 @@ function runTest(name, fn) {
 }
 
 runTest("mapClientStatusFromApi converts prospecting status to Prospect", () => {
-  assert.equal(mapClientStatusFromApi("ProspecÃ§Ã£o"), "Prospect");
+  assert.equal(mapClientStatusFromApi("Prospecção"), "Prospect");
 });
 
 runTest("mapClientStatusToApi converts Prospect to API status", () => {
-  assert.equal(mapClientStatusToApi("Prospect"), "ProspecÃ§Ã£o");
+  assert.equal(mapClientStatusToApi("Prospect"), "Prospecção");
 });
 
 runTest("status mapper keeps unrelated values unchanged", () => {
