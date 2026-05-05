@@ -40,7 +40,7 @@ export interface Client {
   start_strike: Date | null;
   end_strike: Date | null;
   deletion_date: Date | null;
-  contract: string;
+  contract: boolean;
   service: string;
   solucao: string;
   prospecting_status: string;
@@ -303,8 +303,8 @@ export interface UpdateClientPayload {
 
 export interface UpdateClientIntegrationPayload {
   type?: "PJ" | "PF";
-  name?: string | null;
-  cpf_cnpj?: string | null;
+  name?: string;
+  cpf_cnpj?: string;
   company_name?: string | null;
   fantasy_name?: string | null;
   responsible?: string | null;
@@ -322,4 +322,134 @@ export interface UpdateClientIntegrationPayload {
   neighborhood?: string | null;
   state?: string | null;
   city?: string | null;
+}
+
+export interface UpdateClientCommercialPayload {
+  prospecting_status?: string;
+  date_status?: string;
+  description_prospecting?: string | null;
+  register_date_prospecting?: string;
+}
+
+export interface UpdateClientFinancePayload {
+  contract?: boolean;
+}
+
+export interface UpdateClientRegularizePayload {
+  dominio_code?: string | null;
+  name?: string;
+  company_name?: string | null;
+  fantasy_name?: string | null;
+  cpf_cnpj?: string;
+  cnae?: string | null;
+  cnae_secondary?: string | null;
+  responsible?: string | null;
+  cpf_responsible?: string | null;
+  number?: string | null;
+  email?: string | null;
+  address?: string | null;
+  cep?: string | null;
+  neighborhood?: string | null;
+  state?: string | null;
+  city?: string | null;
+  customer_since?: string | null;
+  municipal_registration?: string | null;
+  state_registration?: string | null;
+  commercial_board_registration?: string | null;
+  opening_date?: string | null;
+  regime?: string | null;
+  size?: string | null;
+  segment?: string | null;
+  contabil?: boolean;
+  fiscal?: boolean;
+  pessoal?: boolean;
+  infoproduto?: boolean;
+  consultoria?: boolean;
+  start_strike?: string | null;
+  end_strike?: string | null;
+  deletion_date?: string | null;
+}
+
+export interface TerminateClientPayload {
+  reason: string;
+  description: string;
+  competence_output: string;
+}
+
+export interface ClientCommercialFormValues {
+  prospecting_status: string;
+  date_status: string;
+  description_prospecting: string;
+  register_date_prospecting: string;
+}
+
+export interface ClientFinanceFormValues {
+  contract: boolean;
+}
+
+export interface ClientRegularizeFormValues {
+  dominio_code: string;
+  name: string;
+  company_name: string;
+  fantasy_name: string;
+  cpf_cnpj: string;
+  cnae: string;
+  cnae_secondary: string;
+  responsible: string;
+  cpf_responsible: string;
+  number: string;
+  email: string;
+  address: string;
+  cep: string;
+  neighborhood: string;
+  state: string;
+  city: string;
+  customer_since: string;
+  municipal_registration: string;
+  state_registration: string;
+  commercial_board_registration: string;
+  opening_date: string;
+  regime: string;
+  size: string;
+  segment: string;
+  contabil: boolean;
+  fiscal: boolean;
+  pessoal: boolean;
+  infoproduto: boolean;
+  consultoria: boolean;
+  start_strike: string;
+  end_strike: string;
+  deletion_date: string;
+}
+
+export interface ClientTerminationFormValues {
+  reason: string;
+  description: string;
+  competence_output: string;
+}
+
+export interface ClientCommercialRecord {
+  id: string;
+  name: string;
+  company_name: string | null;
+  fantasy_name: string | null;
+  cpf_cnpj: string | null;
+  prospecting_status: string | null;
+  date_status: string | null;
+  description_prospecting: string | null;
+  register_date_prospecting: string | null;
+}
+
+export interface ClientFinanceRecord {
+  id: string;
+  contract: boolean | null;
+}
+
+export interface ClientTerminationRecord {
+  id: string;
+  client_id: string;
+  reason: string;
+  description: string;
+  competence: string;
+  user_id: string;
 }

@@ -22,9 +22,7 @@ export function validateCpfCnpjDocument(
     return digits.length === 14 ? null : "CNPJ deve ter 14 dígitos.";
   }
 
-  return digits.length === 11 || digits.length === 14
-    ? null
-    : "CPF/CNPJ deve ter 11 ou 14 dígitos.";
+  return digits.length === 11 || digits.length === 14 ? null : "CPF/CNPJ deve ter 11 ou 14 dígitos.";
 }
 
 export function validateOptionalCpfDocument(label: string, value: string): string | null {

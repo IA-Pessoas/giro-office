@@ -4,10 +4,14 @@ export type ClientStatusApi = "Prospecção" | "active" | "inactive";
 /** Normalized status values used in forms and detail UI. */
 export type ClientStatusForm = "Prospect" | "Ativo" | "Inativo";
 
+function isProspectingStatus(value: string | null | undefined): boolean {
+  return value === "Prospecção" || value === "ProspecÃ§Ã£o" || value === "ProspecÃƒÂ§ÃƒÂ£o";
+}
+
 export function mapClientStatusFromApi(
   status: ClientStatusApi | string | null | undefined,
 ): ClientStatusForm | string {
-  if (status === "Prospecção") {
+  if (isProspectingStatus(status)) {
     return "Prospect";
   }
 
