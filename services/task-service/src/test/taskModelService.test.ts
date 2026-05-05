@@ -50,7 +50,9 @@ describe("TaskModelService", () => {
     prismaMock.taskModel.findFirst.mockResolvedValue(null);
     const service = new TaskModelService();
 
-    await expect(service.detailModel("model-1", "org-1")).rejects.toMatchObject({ statusCode: 404 });
+    await expect(service.detailModel("model-1", "org-1")).rejects.toMatchObject({
+      statusCode: 404,
+    });
   });
 
   it("createModel lança 403 quando usuário não tem permissão", async () => {
@@ -72,7 +74,10 @@ describe("TaskModelService", () => {
   });
 
   it("updateModel lança 403 quando usuário não tem permissão", async () => {
-    prismaMock.taskModel.findFirst.mockResolvedValueOnce({ id: "model-1", organization_id: "org-1" });
+    prismaMock.taskModel.findFirst.mockResolvedValueOnce({
+      id: "model-1",
+      organization_id: "org-1",
+    });
     prismaMock.user.findFirst.mockResolvedValue({ id: "user-1", permission: 1 });
     const service = new TaskModelService();
 
@@ -91,7 +96,10 @@ describe("TaskModelService", () => {
   });
 
   it("deleteModel lança 403 quando usuário não tem permissão", async () => {
-    prismaMock.taskModel.findFirst.mockResolvedValueOnce({ id: "model-1", organization_id: "org-1" });
+    prismaMock.taskModel.findFirst.mockResolvedValueOnce({
+      id: "model-1",
+      organization_id: "org-1",
+    });
     prismaMock.user.findFirst.mockResolvedValue({ id: "user-1", permission: 1 });
     const service = new TaskModelService();
 

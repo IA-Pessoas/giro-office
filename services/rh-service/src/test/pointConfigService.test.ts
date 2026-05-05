@@ -19,14 +19,16 @@ describe("PointConfigService", () => {
 
   it("upsert lança 400 quando user_id não é informado", async () => {
     const service = new PointConfigService();
-    await expect(service.upsert({
-      user_id: "",
-      organization_id: "org-1",
-      start_time: "08:00",
-      lunch_break: "12:00",
-      lunch_return: "13:00",
-      end_time: "18:00",
-    })).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      service.upsert({
+        user_id: "",
+        organization_id: "org-1",
+        start_time: "08:00",
+        lunch_break: "12:00",
+        lunch_return: "13:00",
+        end_time: "18:00",
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("getByUserId lança 400 quando organization_id não é informado", async () => {

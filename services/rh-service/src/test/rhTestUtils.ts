@@ -181,11 +181,7 @@ vi.mock("../services/scoreNitroService.js", () => ({
 }));
 
 vi.mock("../middlewares/isAuthenticated.js", () => ({
-  isAuthenticated: (
-    req: Express.Request,
-    _res: Express.Response,
-    next: NextFunction,
-  ) => {
+  isAuthenticated: (req: Express.Request, _res: Express.Response, next: NextFunction) => {
     req.user_id = "00000000-0000-4000-8000-000000000001";
     req.organization_id = "00000000-0000-4000-8000-000000000002";
     next();
@@ -240,19 +236,29 @@ export function resetRhRouteMocks() {
   scoreQuestionServiceMock.delete.mockResolvedValue({ ok: true });
   scoreQuarterServiceMock.generateQuarterlyScore.mockResolvedValue({ ok: true });
   scoreQuarterServiceMock.updateNitro.mockResolvedValue({ ok: true });
-  scoreQuarterServiceMock.listForUser.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
-  scoreQuarterServiceMock.getDetail.mockResolvedValue({ id: "00000000-0000-4000-8000-000000000010" });
-  scoreEvaluationServiceMock.listPendingEvaluations.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
+  scoreQuarterServiceMock.listForUser.mockResolvedValue([
+    { id: "00000000-0000-4000-8000-000000000010" },
+  ]);
+  scoreQuarterServiceMock.getDetail.mockResolvedValue({
+    id: "00000000-0000-4000-8000-000000000010",
+  });
+  scoreEvaluationServiceMock.listPendingEvaluations.mockResolvedValue([
+    { id: "00000000-0000-4000-8000-000000000010" },
+  ]);
   scoreEvaluationServiceMock.submitEvaluation.mockResolvedValue({ ok: true });
   holidayServiceMock.create.mockResolvedValue({ ok: true });
   holidayServiceMock.update.mockResolvedValue({ ok: true });
   holidayServiceMock.list.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
   holidayServiceMock.delete.mockResolvedValue({ ok: true });
-  timeBankReleaseServiceMock.list.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
+  timeBankReleaseServiceMock.list.mockResolvedValue([
+    { id: "00000000-0000-4000-8000-000000000010" },
+  ]);
   timeBankReleaseServiceMock.create.mockResolvedValue({ ok: true });
   timeBankReleaseServiceMock.approve.mockResolvedValue({ ok: true });
   messageServiceMock.create.mockResolvedValue({ ok: true });
-  messageServiceMock.listByRequest.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
+  messageServiceMock.listByRequest.mockResolvedValue([
+    { id: "00000000-0000-4000-8000-000000000010" },
+  ]);
   timeSheetServiceMock.create.mockResolvedValue({ ok: true });
   timeSheetServiceMock.list.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
   timeSheetServiceMock.sign.mockResolvedValue({ ok: true });

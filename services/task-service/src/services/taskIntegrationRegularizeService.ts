@@ -34,7 +34,9 @@ export type TaskIntegrationRegularizeRow = TasksIntegrationRegularizeGetPayload<
 }>;
 
 export class TaskIntegrationRegularizeService {
-  async createLink(data: CreateLinkRequest): Promise<{ integration: TaskIntegrationRegularizeRow }> {
+  async createLink(
+    data: CreateLinkRequest,
+  ): Promise<{ integration: TaskIntegrationRegularizeRow }> {
     try {
       const taskModel = await prismaClient.taskModel.findFirst({
         where: { id: data.task_model_id, organization_id: data.organization_id },

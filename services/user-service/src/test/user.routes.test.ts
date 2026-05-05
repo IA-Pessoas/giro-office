@@ -24,7 +24,10 @@ describe("user routes", () => {
     userServiceMock.list.mockResolvedValue([{ id: "user-1" }]);
     const app = createTestApp();
 
-    const res = await request(app).get("/user").set(gatewayAuthHeaders()).query({ skip: 5, take: 10 });
+    const res = await request(app)
+      .get("/user")
+      .set(gatewayAuthHeaders())
+      .query({ skip: 5, take: 10 });
 
     expect(res.status).toBe(200);
     expect(userServiceMock.list).toHaveBeenCalledWith({ skip: 5, take: 10 });

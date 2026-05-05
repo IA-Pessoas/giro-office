@@ -4,8 +4,8 @@ import {
   parseWithZod,
   requireAuthenticatedRequestContext,
 } from "@workspace/shared";
-import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
+import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {

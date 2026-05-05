@@ -6,8 +6,8 @@ import {
   ServiceError,
 } from "@workspace/shared";
 import { createPhotoUploadMiddleware } from "@workspace/shared/upload";
-import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
+import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {

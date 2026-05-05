@@ -75,12 +75,7 @@ export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const body = parseWithZod(updateFinanceBodySchema, request.body);
         const organizationId = resolveOrganizationId(request, undefined);
-        const updated = await updateFinanceClient(
-          prisma,
-          params.id,
-          organizationId,
-          body,
-        );
+        const updated = await updateFinanceClient(prisma, params.id, organizationId, body);
         response.json(createSuccessResponse(updated));
       } catch (err) {
         logError("Erro ao atualizar cliente (financeiro)", { err });

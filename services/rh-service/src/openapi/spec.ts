@@ -484,9 +484,7 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           tags: ["Ponto"],
           summary: "Calcular horas diarias de um ponto",
           security: bearer,
-          parameters: [
-            { name: "pointId", in: "path", required: true, schema: { type: "string" } },
-          ],
+          parameters: [{ name: "pointId", in: "path", required: true, schema: { type: "string" } }],
           responses: {
             "200": { description: "Horas calculadas", ...successJson },
           },
@@ -816,7 +814,9 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           tags: ["Mensagens"],
           summary: "Listar mensagens de um chamado RH",
           security: bearer,
-          parameters: [{ name: "requestId", in: "query", required: true, schema: { type: "string" } }],
+          parameters: [
+            { name: "requestId", in: "query", required: true, schema: { type: "string" } },
+          ],
           responses: {
             "200": { description: "Lista", ...successJson },
           },

@@ -1,7 +1,4 @@
-import {
-  AUDIT_ADMIN_PERMISSION,
-  type ForwardedAuditAuthContext,
-} from "@workspace/shared/audit";
+import { AUDIT_ADMIN_PERMISSION, type ForwardedAuditAuthContext } from "@workspace/shared/audit";
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,

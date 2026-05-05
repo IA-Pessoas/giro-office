@@ -1,9 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import {
-  createAuditRecorder,
-  type CreateAuditRequestPayload,
-} from "@workspace/shared/audit";
+import { type CreateAuditRequestPayload, createAuditRecorder } from "@workspace/shared/audit";
 import { createLogger } from "@workspace/shared/logger";
 
 import { getTaskServiceEnv } from "../config/env.js";

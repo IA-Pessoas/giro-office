@@ -1,7 +1,7 @@
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
 import type { NextFunction } from "express";
-import { vi, type Mock } from "vitest";
+import { type Mock, vi } from "vitest";
 
 interface OrganizationRouteMocks {
   organizationServiceMock: {
@@ -14,16 +14,18 @@ interface OrganizationRouteMocks {
   };
 }
 
-const organizationRouteMocks: OrganizationRouteMocks = vi.hoisted((): OrganizationRouteMocks => ({
-  organizationServiceMock: {
-    list: vi.fn(),
-    create: vi.fn(),
-    findById: vi.fn(),
-    updateStatus: vi.fn(),
-    updateSubscriptionPlan: vi.fn(),
-    updateLogoUrl: vi.fn(),
-  },
-}));
+const organizationRouteMocks: OrganizationRouteMocks = vi.hoisted(
+  (): OrganizationRouteMocks => ({
+    organizationServiceMock: {
+      list: vi.fn(),
+      create: vi.fn(),
+      findById: vi.fn(),
+      updateStatus: vi.fn(),
+      updateSubscriptionPlan: vi.fn(),
+      updateLogoUrl: vi.fn(),
+    },
+  }),
+);
 
 vi.mock("../services/organizationService.js", () => ({
   OrganizationService: vi.fn(function OrganizationService() {
@@ -32,11 +34,7 @@ vi.mock("../services/organizationService.js", () => ({
 }));
 
 vi.mock("../middlewares/isAuthenticated.js", () => ({
-  isAuthenticated: (
-    req: Express.Request,
-    _res: Express.Response,
-    next: NextFunction,
-  ) => {
+  isAuthenticated: (req: Express.Request, _res: Express.Response, next: NextFunction) => {
     req.user_id = "user-1";
     req.organization_id = "00000000-0000-4000-8000-000000000001";
     next();

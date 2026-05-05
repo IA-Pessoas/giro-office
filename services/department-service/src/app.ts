@@ -8,10 +8,7 @@ import "express-async-errors";
 import type { DepartmentServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildDepartmentServiceOpenApiSpec } from "./openapi/spec.js";
-import {
-  createDepartmentRoutes,
-  type DepartmentRouteDeps,
-} from "./routes/department.routes.js";
+import { createDepartmentRoutes, type DepartmentRouteDeps } from "./routes/department.routes.js";
 import { DepartmentService } from "./services/departmentService.js";
 
 function departmentServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {

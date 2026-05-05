@@ -1,16 +1,10 @@
 import path from "node:path";
 
 import { fileURLToPath } from "node:url";
-
-
-
+import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 
-import { loggerLevelSchema } from "@workspace/shared/logger";
-
 import { z } from "zod";
-
-
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -18,24 +12,15 @@ const __dirname = path.dirname(__filename);
 
 const serviceEnvPath = path.resolve(__dirname, "../../.env");
 
-
-
 dotenv.config({ path: serviceEnvPath });
 
-
-
 function parseBoolean(value: string | undefined): boolean {
-
   return value === "true" || value === "1";
-
 }
-
-
 
 const rawEnvSchema = z
 
   .object({
-
     port: z
 
       .string()
@@ -45,11 +30,9 @@ const rawEnvSchema = z
       .default("3030")
 
       .transform((val: string) => {
-
         const parsed = Number.parseInt(val, 10);
 
         return Number.isNaN(parsed) ? 3030 : parsed;
-
       }),
 
     databaseUrl: z.string().url("DATABASE_URL não definida."),
@@ -81,63 +64,41 @@ const rawEnvSchema = z
     /** Token interno igual ao do gateway (`AUDIT_SERVICE_TOKEN`) para pedidos com headers x-auth-* */
 
     auditServiceToken: z.string().optional().default("audit-service-token"),
-
   })
 
   .superRefine((env, ctx) => {
-
     if (!z.string().url().safeParse(env.supabaseUrl).success) {
-
       ctx.addIssue({
-
         code: z.ZodIssueCode.custom,
 
         message: "SUPABASE_URL inválida.",
 
         path: ["supabaseUrl"],
-
       });
-
     }
-
   });
 
-
-
 const envSchema = rawEnvSchema.transform((env) => {
-
   const { enableApiDocsEnv, ...rest } = env;
 
   const enableApiDocs =
-
     enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
-
       ? parseBoolean(enableApiDocsEnv)
-
       : rest.nodeEnv !== "production";
 
   return {
-
     ...rest,
 
     logPretty: rest.nodeEnv !== "production" && rest.logPretty,
 
     enableApiDocs,
-
   };
-
 });
-
-
 
 export type UserServiceEnv = z.infer<typeof envSchema>;
 
-
-
 export function getUserServiceEnv(): UserServiceEnv {
-
   return envSchema.parse({
-
     port: process.env.PORT,
 
     databaseUrl: process.env.DATABASE_URL,
@@ -159,8 +120,5 @@ export function getUserServiceEnv(): UserServiceEnv {
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
 
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
-
   });
-
 }
-

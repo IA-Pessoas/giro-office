@@ -1,10 +1,14 @@
 import type { AxiosInstance } from "axios";
 
-import type { MeProfile, MeApiResponse, MeSessionUser, UpdateCurrentUserPayload } from "../types/me.js";
+import type {
+  MeApiResponse,
+  MeProfile,
+  MeSessionUser,
+  UpdateCurrentUserPayload,
+} from "../types/me.js";
 import type { UserDetailApiResponse, UserItem } from "../types/user.js";
 
-interface InternalMeRecord extends MeProfile {
-}
+interface InternalMeRecord extends MeProfile {}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -107,8 +111,7 @@ function extractUserItem(payload: unknown): UserItem {
   const department = isRecord(userPayload.department)
     ? {
         name: typeof userPayload.department.name === "string" ? userPayload.department.name : "",
-        color:
-          typeof userPayload.department.color === "string" ? userPayload.department.color : "",
+        color: typeof userPayload.department.color === "string" ? userPayload.department.color : "",
       }
     : undefined;
 

@@ -1,11 +1,7 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  createTestApp,
-  resetRhRouteMocks,
-  timeClockRequestServiceMock,
-} from "./rhTestUtils.js";
+import { createTestApp, resetRhRouteMocks, timeClockRequestServiceMock } from "./rhTestUtils.js";
 
 describe("timeClockRequest routes", () => {
   const requestId = "00000000-0000-4000-8000-000000000010";

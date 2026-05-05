@@ -28,7 +28,9 @@ describe("task integration regularize routes", () => {
   it("DELETE /task/integration remove vinculo", async () => {
     const app = createTestApp();
 
-    const res = await request(app).delete("/task/integration").send({ integration_id: "integration-1" });
+    const res = await request(app)
+      .delete("/task/integration")
+      .send({ integration_id: "integration-1" });
 
     expect(res.status).toBe(200);
     expect(taskIntegrationRegularizeServiceMock.removeLink).toHaveBeenCalledTimes(1);

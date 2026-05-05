@@ -21,7 +21,9 @@ describe("ScoreQuestionService", () => {
   it("update lança 404 quando pergunta não existe", async () => {
     prismaMock.scoreQuestion.findFirst.mockResolvedValue(null);
     const service = new ScoreQuestionService();
-    await expect(service.update({ id: "q-1", organization_id: "org-1", question: "Nova" })).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      service.update({ id: "q-1", organization_id: "org-1", question: "Nova" }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it("list aplica filtro por organização", async () => {

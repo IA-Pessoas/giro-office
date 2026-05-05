@@ -40,7 +40,14 @@ function createTestApp() {
   const logger = createTestLogger();
 
   app.use(express.json());
-  app.use("/task", createDepsTasksRoutes({ async listDepartmentsWithTaskModels() { return []; } }));
+  app.use(
+    "/task",
+    createDepsTasksRoutes({
+      async listDepartmentsWithTaskModels() {
+        return [];
+      },
+    }),
+  );
   app.use(
     createExpressErrorHandler({
       logger,

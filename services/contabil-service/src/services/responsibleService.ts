@@ -151,7 +151,10 @@ export class ResponsibleService {
     }
   }
 
-  async getByClientId(clientId: string, organizationId: string): Promise<ResponsibleContabilEntity> {
+  async getByClientId(
+    clientId: string,
+    organizationId: string,
+  ): Promise<ResponsibleContabilEntity> {
     const responsible = await this.prisma.responsibleContabil.findFirst({
       where: {
         client_id: clientId,

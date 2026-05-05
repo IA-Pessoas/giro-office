@@ -1,9 +1,9 @@
 import {
-  requireAuthenticatedRequestContext,
   createSuccessResponse,
   getSingleQueryValue,
   error as logError,
   parseWithZod,
+  requireAuthenticatedRequestContext,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
@@ -30,25 +30,21 @@ function requireDepartmentAuthContext(req: Request): { user_id: string; organiza
 export function createDepartmentRoutes(service: DepartmentRouteDeps): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
 
-  router.get(
-    "/list",
-    isAuthenticated,
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const { organization_id } = requireDepartmentAuthContext(req);
-        const parsedQuery = parseWithZod(listDepartmentsQuerySchema, {
-          status: getSingleQueryValue(req.query.status),
-        });
-        const status = parsedQuery.status;
-        const result = await service.list(status, organization_id);
+  router.get("/list", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { organization_id } = requireDepartmentAuthContext(req);
+      const parsedQuery = parseWithZod(listDepartmentsQuerySchema, {
+        status: getSingleQueryValue(req.query.status),
+      });
+      const status = parsedQuery.status;
+      const result = await service.list(status, organization_id);
 
-        res.json(createSuccessResponse(result));
-      } catch (err) {
-        logError("Erro ao listar departamentos", { err });
-        next(err);
-      }
-    },
-  );
+      res.json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao listar departamentos", { err });
+      next(err);
+    }
+  });
 
   router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
     try {

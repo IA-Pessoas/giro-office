@@ -23,19 +23,23 @@ describe("ScoreNitroService", () => {
   it("updateMetric lança 404 quando registro nitro não existe", async () => {
     prismaMock.scoreNitro.findUnique.mockResolvedValue(null);
     const service = new ScoreNitroService();
-    await expect(service.updateMetric("org-1", "user-1", {
-      score_id: "550e8400-e29b-41d4-a716-446655440099",
-      type: "projects",
-      value: 1,
-    })).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      service.updateMetric("org-1", "user-1", {
+        score_id: "550e8400-e29b-41d4-a716-446655440099",
+        type: "projects",
+        value: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it("updateMetric lança 400 quando organization_id é vazio", async () => {
     const service = new ScoreNitroService();
-    await expect(service.updateMetric("", "user-1", {
-      score_id: "550e8400-e29b-41d4-a716-446655440099",
-      type: "projects",
-      value: 1,
-    })).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      service.updateMetric("", "user-1", {
+        score_id: "550e8400-e29b-41d4-a716-446655440099",
+        type: "projects",
+        value: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 });

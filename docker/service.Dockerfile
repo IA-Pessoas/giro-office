@@ -31,6 +31,10 @@ ARG SERVICE_DIR
 
 RUN pnpm install --frozen-lockfile
 RUN pnpm turbo run build --filter="${WORKSPACE_PACKAGE}"
+# Runtime: só produção (reduz CVEs no Trivy). Sem `--filter`, o install --prod inclui app → Next.js (árbitros/vendors com picomatch antigo que o Trivy acusa).
+# `...` = este pacote + dependências do workspace (ex.: shared); não instala os outros microserviços nem o frontend.
+RUN rm -rf node_modules \
+  && npm_config_ignore_scripts=true pnpm install --frozen-lockfile --prod --filter "${WORKSPACE_PACKAGE}..."
 
 FROM base AS runtime
 

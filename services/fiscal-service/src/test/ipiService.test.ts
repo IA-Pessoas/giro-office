@@ -62,7 +62,9 @@ function createMockAudit() {
 describe("IpiService", () => {
   it("create lança 409 quando IPI já existe", async () => {
     const prisma = createMockPrisma();
-    prisma.ipi.findFirst = vi.fn(async () => ({ id: IPI_ID }));
+    prisma.ipi.findFirst = vi.fn(async () => ({
+      id: IPI_ID,
+    })) as unknown as IpiServicePrisma["ipi"]["findFirst"];
     const audit = createMockAudit();
     const service = new IpiService(prisma, audit);
 
@@ -74,9 +76,11 @@ describe("IpiService", () => {
 
   it("create persiste IPI e registra auditoria com referring fiscal.ipi", async () => {
     const prisma = createMockPrisma();
-    prisma.ipi.findFirst = vi.fn(async () => null);
+    prisma.ipi.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as IpiServicePrisma["ipi"]["findFirst"];
     const created = { id: IPI_ID, ...baseCreateInput };
-    prisma.ipi.create = vi.fn(async () => created);
+    prisma.ipi.create = vi.fn(async () => created) as unknown as IpiServicePrisma["ipi"]["create"];
     const audit = createMockAudit();
     const service = new IpiService(prisma, audit);
 
@@ -100,7 +104,9 @@ describe("IpiService", () => {
 
   it("detail lança 404 quando IPI não existe", async () => {
     const prisma = createMockPrisma();
-    prisma.ipi.findFirst = vi.fn(async () => null);
+    prisma.ipi.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as IpiServicePrisma["ipi"]["findFirst"];
     const service = new IpiService(prisma, createMockAudit());
 
     await expect(service.detail(IPI_ID, ORG_ID)).rejects.toMatchObject({ statusCode: 404 });
@@ -113,7 +119,9 @@ describe("IpiService", () => {
   it("detail retorna registro quando existe", async () => {
     const row = { id: IPI_ID, ncm: baseCreateInput.ncm };
     const prisma = createMockPrisma();
-    prisma.ipi.findFirst = vi.fn(async () => row);
+    prisma.ipi.findFirst = vi.fn(
+      async () => row,
+    ) as unknown as IpiServicePrisma["ipi"]["findFirst"];
     const service = new IpiService(prisma, createMockAudit());
 
     const result = await service.detail(IPI_ID, ORG_ID);
@@ -126,7 +134,9 @@ describe("IpiService", () => {
 
   it("update lança 404 quando IPI não existe", async () => {
     const prisma = createMockPrisma();
-    prisma.ipi.findFirst = vi.fn(async () => null);
+    prisma.ipi.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as IpiServicePrisma["ipi"]["findFirst"];
     const service = new IpiService(prisma, createMockAudit());
 
     await expect(
@@ -144,9 +154,11 @@ describe("IpiService", () => {
   it("update persiste e registra auditoria quando IPI existe", async () => {
     const prisma = createMockPrisma();
     const existing = { id: IPI_ID, ncm: baseCreateInput.ncm };
-    prisma.ipi.findFirst = vi.fn(async () => existing);
+    prisma.ipi.findFirst = vi.fn(
+      async () => existing,
+    ) as unknown as IpiServicePrisma["ipi"]["findFirst"];
     const updated = { ...existing, description: "Atualizado" };
-    prisma.ipi.update = vi.fn(async () => updated);
+    prisma.ipi.update = vi.fn(async () => updated) as unknown as IpiServicePrisma["ipi"]["update"];
     const audit = createMockAudit();
     const service = new IpiService(prisma, audit);
 
@@ -185,13 +197,15 @@ describe("IpiService", () => {
   it("list usa filtro ncm in com ipiCodes e organizationId", async () => {
     const findMany = vi.fn(async () => []);
     const prisma = createMockPrisma();
-    prisma.ipi.findMany = findMany;
+    prisma.ipi.findMany = findMany as unknown as IpiServicePrisma["ipi"]["findMany"];
     const service = new IpiService(prisma, createMockAudit());
 
     await service.list(["84719012", "84719013"], ORG_ID);
 
     expect(findMany).toHaveBeenCalledTimes(1);
-    const arg = findMany.mock.calls[0]?.[0] as {
+    const firstCall = (findMany as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
+    if (!firstCall) throw new Error("Expected findMany to be called.");
+    const arg = firstCall[0] as {
       where: { organization_id: string; ncm: { in: string[] } };
     };
     expect(arg.where).toEqual({

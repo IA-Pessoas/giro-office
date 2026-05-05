@@ -7,8 +7,8 @@ export {
   uploadCurrentUserPhoto,
 } from "./services/userService.js";
 export type {
-  MeProfile,
   MeApiResponse,
+  MeProfile,
   MeSessionUser,
   UpdateCurrentUserPayload,
 } from "./types/me.js";

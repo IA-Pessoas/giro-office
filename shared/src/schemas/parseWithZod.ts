@@ -1,4 +1,4 @@
-import { ZodError, type ZodTypeAny, z } from "zod";
+import { ZodError, type ZodTypeAny, type z } from "zod";
 
 import { ServiceError } from "../http/errors.js";
 

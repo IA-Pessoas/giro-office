@@ -16,7 +16,8 @@
       "!**/.turbo",
       "!services/src",
       "!app",
-      "!infra"
+      "!infra",
+      "!**/.vscode"
     ]
   },
   "formatter": {

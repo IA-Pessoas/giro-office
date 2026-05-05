@@ -17,7 +17,9 @@ function firstQueryValue(value: unknown): unknown {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export function createFiscalSearchRoutes(service: FiscalSearchRouteDeps): ReturnType<typeof Router> {
+export function createFiscalSearchRoutes(
+  service: FiscalSearchRouteDeps,
+): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
 
   router.get(

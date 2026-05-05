@@ -39,7 +39,10 @@ describe("ResponsibleService", () => {
   it("create lança 409 quando já existe para o cliente na organização", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.responsibleContabil.findFirst).mockResolvedValue(baseRow);
-    const service = new ResponsibleService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new ResponsibleService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
     await expect(
       service.create({ client_id: CLIENT_ID }, { userId: USER_ID, organizationId: ORG_ID }),
@@ -88,7 +91,10 @@ describe("ResponsibleService", () => {
   it("update lança 404 quando não existe na organização", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.responsibleContabil.findFirst).mockResolvedValue(null);
-    const service = new ResponsibleService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new ResponsibleService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
     await expect(
       service.update(
@@ -131,15 +137,23 @@ describe("ResponsibleService", () => {
   it("getByClientId lança 404 quando não encontra", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.responsibleContabil.findFirst).mockResolvedValue(null);
-    const service = new ResponsibleService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new ResponsibleService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
-    await expect(service.getByClientId(CLIENT_ID, ORG_ID)).rejects.toMatchObject({ statusCode: 404 });
+    await expect(service.getByClientId(CLIENT_ID, ORG_ID)).rejects.toMatchObject({
+      statusCode: 404,
+    });
   });
 
   it("getByClientId retorna registro", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.responsibleContabil.findFirst).mockResolvedValue(baseRow);
-    const service = new ResponsibleService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new ResponsibleService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
     const row = await service.getByClientId(CLIENT_ID, ORG_ID);
     expect(row).toEqual(baseRow);
@@ -151,7 +165,10 @@ describe("ResponsibleService", () => {
   it("delete lança 404 quando não existe na organização", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.responsibleContabil.findFirst).mockResolvedValue(null);
-    const service = new ResponsibleService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new ResponsibleService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
     await expect(service.delete(RESPONSIBLE_ID, ORG_ID)).rejects.toMatchObject({ statusCode: 404 });
     expect(prisma.responsibleContabil.delete).not.toHaveBeenCalled();
@@ -161,18 +178,28 @@ describe("ResponsibleService", () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.responsibleContabil.findFirst).mockResolvedValue(baseRow);
     vi.mocked(prisma.responsibleContabil.delete).mockResolvedValue(baseRow);
-    const service = new ResponsibleService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const service = new ResponsibleService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
     const result = await service.delete(RESPONSIBLE_ID, ORG_ID);
 
     expect(result.message).toContain("sucesso");
-    expect(prisma.responsibleContabil.delete).toHaveBeenCalledWith({ where: { id: RESPONSIBLE_ID } });
+    expect(prisma.responsibleContabil.delete).toHaveBeenCalledWith({
+      where: { id: RESPONSIBLE_ID },
+    });
   });
 
   it("create propaga ServiceError sem embrulhar em 500", async () => {
     const prisma = createMockPrisma();
-    vi.mocked(prisma.responsibleContabil.findFirst).mockRejectedValue(new ServiceError(400, "Falha."));
-    const service = new ResponsibleService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    vi.mocked(prisma.responsibleContabil.findFirst).mockRejectedValue(
+      new ServiceError(400, "Falha."),
+    );
+    const service = new ResponsibleService(prisma, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
 
     await expect(
       service.create({ client_id: CLIENT_ID }, { userId: USER_ID, organizationId: ORG_ID }),

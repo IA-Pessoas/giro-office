@@ -1,8 +1,8 @@
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = dirname(__dirname);
@@ -47,7 +47,10 @@ async function fileExists(path) {
 
 async function outputsReady() {
   const results = await Promise.all(
-    outputDirs.map(async (dir) => (await fileExists(join(dir, "client.ts"))) || (await fileExists(join(dir, "client.js")))),
+    outputDirs.map(
+      async (dir) =>
+        (await fileExists(join(dir, "client.ts"))) || (await fileExists(join(dir, "client.js"))),
+    ),
   );
   return results.every(Boolean);
 }
@@ -71,9 +74,7 @@ async function readCurrentStamp() {
 }
 
 async function cleanOutputs() {
-  await Promise.all(
-    outputDirs.map((dir) => rm(dir, { recursive: true, force: true })),
-  );
+  await Promise.all(outputDirs.map((dir) => rm(dir, { recursive: true, force: true })));
 }
 
 async function runPrismaGenerate() {

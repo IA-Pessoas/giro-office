@@ -85,10 +85,7 @@ const ROUTE_NEGATIVE_CASE_OVERRIDES = new Map([
   ["task-service|PUT|/task/conclusion", "unauthorized401"],
 ]);
 
-const GENERATED_BAD_CASES_BEFORE = new Set([
-  "taskModelCreate",
-  "taskProjectPlanCreate",
-]);
+const GENERATED_BAD_CASES_BEFORE = new Set(["taskModelCreate", "taskProjectPlanCreate"]);
 
 function inferNegativeCaseFromAction(action) {
   if (/Unauthorized/i.test(action)) return "unauthorized401";
@@ -242,7 +239,10 @@ function determineGeneratedNegativeCase(entry) {
 }
 
 function shouldInsertGeneratedBadBefore(entry, negativeCase) {
-  return entry.method === "DELETE" || (negativeCase === "lowPermission403" && GENERATED_BAD_CASES_BEFORE.has(entry.action));
+  return (
+    entry.method === "DELETE" ||
+    (negativeCase === "lowPermission403" && GENERATED_BAD_CASES_BEFORE.has(entry.action))
+  );
 }
 
 function buildGeneratedBadOp(entry) {

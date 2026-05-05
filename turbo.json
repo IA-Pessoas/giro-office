@@ -20,7 +20,8 @@
       "persistent": true
     },
     "typecheck": {
-      "dependsOn": ["^typecheck"],
+      "dependsOn": ["^build"],
+      "env": ["DATABASE_URL"],
       "outputs": []
     },
     "lint": {
