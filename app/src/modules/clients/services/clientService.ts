@@ -7,12 +7,14 @@ import type {
   ClientPa,
   ClientPaResponse,
   ClientHistoryItem,
+  ClientHistoryPendingItem,
   ClientListFilters,
   ClientListPage,
   CreateClientPayload,
   CreateClientData,
   CreateClientIntegrationPayload,
   CreateClientHistoryPayload,
+  CreateClientHistoryPendingPayload,
   ClientTerminationRecord,
   TerminateClientPayload,
   UpdateClientCommercialPayload,
@@ -187,5 +189,34 @@ export const clientService = {
     const response = await api.patch(CLIENT_ENDPOINTS.updateHistory(clientId, historyId), payload);
 
     return unwrapClientEnvelope<ClientHistoryItem>(response.data);
+  },
+
+  async createHistoryPending(
+    clientId: string,
+    payload: CreateClientHistoryPendingPayload,
+  ): Promise<ClientHistoryPendingItem> {
+    const api = setupAPIClient();
+    const response = await api.post(CLIENT_ENDPOINTS.createHistoryPending(clientId), payload);
+
+    return unwrapClientEnvelope<ClientHistoryPendingItem>(response.data);
+  },
+
+  async listHistoryPending(filter?: { user_id?: string }): Promise<ClientHistoryPendingItem[]> {
+    const api = setupAPIClient();
+    const response = await api.get(CLIENT_ENDPOINTS.listHistoryPending, { params: filter });
+
+    const data = unwrapClientEnvelope<{ list?: ClientHistoryPendingItem[] } | unknown>(response.data);
+    if (data !== null && typeof data === "object" && "list" in data) {
+      return ((data as { list?: ClientHistoryPendingItem[] }).list ?? []) as ClientHistoryPendingItem[];
+    }
+
+    return data as ClientHistoryPendingItem[];
+  },
+
+  async deleteHistoryPending(pendingId: string): Promise<{ ok: boolean }> {
+    const api = setupAPIClient();
+    const response = await api.delete(CLIENT_ENDPOINTS.deleteHistoryPending(pendingId));
+
+    return unwrapClientEnvelope<{ ok: boolean }>(response.data);
   },
 };

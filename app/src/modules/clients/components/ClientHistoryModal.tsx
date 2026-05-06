@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { toast } from "react-toastify";
 
 import { Dialog } from "@shared/components";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useCreateClientHistoryMutation, useUpdateClientHistoryMutation } from "../hooks/useClientHistories";
+import { historyPendingQueryKey } from "../hooks/useClientHistoryPending";
 import type { ClientHistoryItem } from "../types";
 
 type Mode = "create" | "edit";
@@ -14,6 +16,8 @@ interface ClientHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   history?: ClientHistoryItem | null;
+  pendingId?: string;
+  pendingUserId?: string;
 }
 
 interface HistoryFormState {
@@ -34,7 +38,16 @@ function toDatetimeLocalValue(value: string): string {
   )}`;
 }
 
-export function ClientHistoryModal({ clientId, mode, isOpen, onClose, history }: ClientHistoryModalProps) {
+export function ClientHistoryModal({
+  clientId,
+  mode,
+  isOpen,
+  onClose,
+  history,
+  pendingId,
+  pendingUserId,
+}: ClientHistoryModalProps) {
+  const queryClient = useQueryClient();
   const createMutation = useCreateClientHistoryMutation(clientId);
   const updateMutation = useUpdateClientHistoryMutation(clientId, history?.id ?? "missing");
 
@@ -87,7 +100,12 @@ export function ClientHistoryModal({ clientId, mode, isOpen, onClose, history }:
           date: form.date,
           history: form.history.trim(),
           file: form.file,
+          pending_id: pendingId,
         });
+        if (pendingId) {
+          await queryClient.invalidateQueries({ queryKey: ["clients", clientId, "histories"] });
+          await queryClient.invalidateQueries({ queryKey: historyPendingQueryKey(pendingUserId) });
+        }
         toast.success("Histórico criado com sucesso.");
         onClose();
         return;
