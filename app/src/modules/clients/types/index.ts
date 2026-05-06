@@ -484,3 +484,19 @@ export interface UpdateClientHistoryPayload {
   date: string | Date;
   history: string;
 }
+
+export interface ClientHistoryPendingClient {
+  company_name: string;
+  cpf_cnpj: string;
+}
+
+export interface ClientHistoryPendingItem {
+  id: string;
+  reason: string;
+  client_id: string;
+  client?: ClientHistoryPendingClient;
+}
+
+export interface CreateClientHistoryPendingPayload {
+  reason: string;
+}
