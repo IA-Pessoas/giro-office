@@ -15,6 +15,10 @@ body {
     padding: 0;
 }
 
+:root {
+    --app-card-border-light: #b8c6d8;
+}
+
 .login-input:-webkit-autofill,
 .login-input:-webkit-autofill:hover,
 .login-input:-webkit-autofill:focus {
@@ -22,6 +26,11 @@ body {
     box-shadow: 0 0 0 1000px #ffffff inset;
     caret-color: #111827;
     transition: background-color 9999s ease-out 0s;
+}
+
+html:not(.dark) .border-slate-200,
+html:not(.dark) .border-gray-200 {
+    border-color: var(--app-card-border-light);
 }
 
 /*
