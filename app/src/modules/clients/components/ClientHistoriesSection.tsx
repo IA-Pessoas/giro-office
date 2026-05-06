@@ -4,6 +4,8 @@ import { Plus, Pencil } from "lucide-react";
 import { useClientHistories } from "../hooks/useClientHistories";
 import type { ClientHistoryItem } from "../types";
 import { ClientHistoryModal } from "./ClientHistoryModal";
+import { ClientHistoryPendingSection } from "./ClientHistoryPendingSection";
+import { useAuth } from "@/context/AuthContext";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -18,8 +20,10 @@ function formatDate(value: string) {
 
 export function ClientHistoriesSection({ clientId }: { clientId: string }) {
   const historiesQuery = useClientHistories(clientId);
+  const { user } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ClientHistoryItem | null>(null);
+  const [pendingToCreate, setPendingToCreate] = useState<{ id: string } | null>(null);
 
   const ordered = useMemo(() => {
     const list = historiesQuery.data ?? [];
@@ -27,7 +31,8 @@ export function ClientHistoriesSection({ clientId }: { clientId: string }) {
   }, [historiesQuery.data]);
 
   return (
-    <section className={`${PANEL_CLASSNAME} p-6`}>
+    <div className="space-y-6">
+      <section className={`${PANEL_CLASSNAME} p-6`}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Históricos</h2>
@@ -119,7 +124,22 @@ export function ClientHistoriesSection({ clientId }: { clientId: string }) {
         history={editing}
         onClose={() => setEditing(null)}
       />
-    </section>
+
+      <ClientHistoryModal
+        clientId={clientId}
+        mode="create"
+        isOpen={Boolean(pendingToCreate)}
+        pendingId={pendingToCreate?.id}
+        pendingUserId={user?.id}
+        onClose={() => setPendingToCreate(null)}
+      />
+      </section>
+
+      <ClientHistoryPendingSection
+        clientId={clientId}
+        onCreateHistoryFromPending={(pending) => setPendingToCreate({ id: pending.id })}
+      />
+    </div>
   );
 }
 
