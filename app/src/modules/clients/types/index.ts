@@ -453,3 +453,34 @@ export interface ClientTerminationRecord {
   competence: string;
   user_id: string;
 }
+
+export interface ClientHistoryUserDepartment {
+  name: string;
+}
+
+export interface ClientHistoryUser {
+  name: string;
+  department?: ClientHistoryUserDepartment | null;
+}
+
+export interface ClientHistoryItem {
+  id: string;
+  client_id: string;
+  date: string;
+  history: string;
+  file: string | null;
+  user_id: string;
+  user?: ClientHistoryUser;
+}
+
+export interface CreateClientHistoryPayload {
+  date: string | Date;
+  history: string;
+  pending_id?: string;
+  file?: File | null;
+}
+
+export interface UpdateClientHistoryPayload {
+  date: string | Date;
+  history: string;
+}

@@ -7,6 +7,7 @@ import {
   BriefcaseBusiness,
   CircleDollarSign,
   FileText,
+  NotebookText,
   Power,
   RotateCcw,
   ShieldCheck,
@@ -322,6 +323,13 @@ export default function ClientDetailPage() {
             </section>
 
             <section className={`${PANEL_CLASSNAME} p-6`}>
+              <div className="mb-5">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Fluxos</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  Acesse os fluxos de atualização do cliente.
+                </p>
+              </div>
+
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <ClientAccessCard
                   title="PA"
@@ -369,6 +377,25 @@ export default function ClientDetailPage() {
                   href={`/clients/${client.id}/termination`}
                   actionLabel="Abrir inativação"
                   icon={XCircle}
+                />
+              </div>
+            </section>
+
+            <section className={`${PANEL_CLASSNAME} p-6`}>
+              <div className="mb-5">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Acompanhamento</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  Consulte registros e eventos relacionados ao cliente.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <ClientAccessCard
+                  title="Históricos"
+                  description="Crie e edite históricos do cliente."
+                  href={`/clients/${client.id}/histories`}
+                  actionLabel="Abrir históricos"
+                  icon={NotebookText}
                 />
               </div>
             </section>

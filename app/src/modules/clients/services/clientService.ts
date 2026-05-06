@@ -6,15 +6,18 @@ import type {
   ClientFinanceRecord,
   ClientPa,
   ClientPaResponse,
+  ClientHistoryItem,
   ClientListFilters,
   ClientListPage,
   CreateClientPayload,
   CreateClientData,
   CreateClientIntegrationPayload,
+  CreateClientHistoryPayload,
   ClientTerminationRecord,
   TerminateClientPayload,
   UpdateClientCommercialPayload,
   UpdateClientFinancePayload,
+  UpdateClientHistoryPayload,
   UpdateClientPaPayload,
   UpdateClientPayload,
   UpdateClientIntegrationPayload,
@@ -140,5 +143,49 @@ export const clientService = {
     const response = await api.patch(CLIENT_ENDPOINTS.updatePa(id), payload);
 
     return unwrapClientEnvelope<ClientPa>(response.data);
+  },
+
+  async listHistories(clientId: string): Promise<ClientHistoryItem[]> {
+    const api = setupAPIClient();
+    const response = await api.get(CLIENT_ENDPOINTS.histories(clientId));
+
+    const data = unwrapClientEnvelope<{ list?: ClientHistoryItem[] } | unknown>(response.data);
+    if (data !== null && typeof data === "object" && "list" in data) {
+      return ((data as { list?: ClientHistoryItem[] }).list ?? []) as ClientHistoryItem[];
+    }
+
+    return data as ClientHistoryItem[];
+  },
+
+  async createHistory(clientId: string, payload: CreateClientHistoryPayload): Promise<ClientHistoryItem> {
+    const api = setupAPIClient();
+    const formData = new FormData();
+    formData.append("date", new Date(payload.date).toISOString());
+    formData.append("history", payload.history);
+
+    if (payload.pending_id) {
+      formData.append("pending_id", payload.pending_id);
+    }
+
+    if (payload.file) {
+      formData.append("file", payload.file);
+    }
+
+    const response = await api.post(CLIENT_ENDPOINTS.histories(clientId), formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    return unwrapClientEnvelope<ClientHistoryItem>(response.data);
+  },
+
+  async updateHistory(
+    clientId: string,
+    historyId: string,
+    payload: UpdateClientHistoryPayload,
+  ): Promise<ClientHistoryItem> {
+    const api = setupAPIClient();
+    const response = await api.patch(CLIENT_ENDPOINTS.updateHistory(clientId, historyId), payload);
+
+    return unwrapClientEnvelope<ClientHistoryItem>(response.data);
   },
 };
