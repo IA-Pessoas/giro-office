@@ -138,6 +138,7 @@ export function ClientHistoriesSection({ clientId }: { clientId: string }) {
       <ClientHistoryPendingSection
         clientId={clientId}
         onCreateHistoryFromPending={(pending) => setPendingToCreate({ id: pending.id })}
+        activePendingId={pendingToCreate?.id ?? undefined}
       />
     </div>
   );

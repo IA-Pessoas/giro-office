@@ -13,9 +13,11 @@ const PANEL_CLASSNAME =
 export function ClientHistoryPendingSection({
   clientId,
   onCreateHistoryFromPending,
+  activePendingId,
 }: {
   clientId: string;
   onCreateHistoryFromPending: (pending: ClientHistoryPendingItem) => void;
+  activePendingId?: string;
 }) {
   const { user } = useAuth();
   const userId = user?.id;
@@ -143,11 +145,11 @@ export function ClientHistoryPendingSection({
                     <button
                       type="button"
                       onClick={() => onCreateHistoryFromPending(item)}
-                      disabled={createMutation.isPending}
+                      disabled={activePendingId === item.id}
                       className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
                       <NotebookPen className="h-4 w-4" />
-                      Criar histórico
+                      {activePendingId === item.id ? "Criando..." : "Criar histórico"}
                     </button>
 
                     {isAdmin ? (
