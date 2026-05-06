@@ -58,9 +58,15 @@ export function ClientHistoryPendingSection({
   };
 
   const handleDelete = async (pendingId: string) => {
-    if (!isAdmin || !user) {
+    if (!user) {
       return;
     }
+
+    if (!isAdmin) {
+      toast.warning("Você não tem permissão para remover esta pendência.");
+      return;
+    }
+
     try {
       setDeletingId(pendingId);
       await deleteMutation.mutateAsync({ pendingId, userId: user.id });
