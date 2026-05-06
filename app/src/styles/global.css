@@ -15,6 +15,15 @@ body {
     padding: 0;
 }
 
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #111827;
+    box-shadow: 0 0 0 1000px #ffffff inset;
+    caret-color: #111827;
+    transition: background-color 9999s ease-out 0s;
+}
+
 /*
   Stage 3 - Styling conventions baseline
   - HTML-first structure with semantic class names
