@@ -1,0 +1,285 @@
+import {
+  type AuthLogContext,
+  createAuditRecorder,
+  createExpressErrorHandler,
+  createSuccessResponse,
+  gatewayError,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+  type Logger,
+  type LogLevel,
+  ServiceError,
+} from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
+import cors from "cors";
+import express, { type NextFunction, type Request, type Response } from "express";
+
+import type { GatewayEnv } from "./config/env.js";
+import { getGatewayServiceDefinitions, resolveGatewayService } from "./config/serviceRegistry.js";
+import {
+  buildAuditErrorCaptureMiddleware,
+  buildAuditLifecycleMiddleware,
+} from "./middlewares/audit.js";
+import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
+import { authorizeRequest } from "./middlewares/authorize.js";
+import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
+import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
+import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
+
+function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
+  return {
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      if (env.allowedOrigins.includes("*") || env.allowedOrigins.includes(origin)) {
+        callback(null, origin);
+        return;
+      }
+
+      callback(new ServiceError(403, "Origin não permitida pelo gateway."));
+    },
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    allowedHeaders: ["Content-Type", "Authorization", "x-request-id"],
+    credentials: true,
+  };
+}
+
+function getRequestLogger(request: Request, logger: Logger): Logger {
+  return (
+    request.log ??
+    logger.child({
+      request: {
+        id: request.requestId,
+        method: request.method,
+        path: request.path,
+        ip: request.ip || undefined,
+      },
+    })
+  );
+}
+
+function getAuthLogContext(request: Request): AuthLogContext | undefined {
+  if (!request.auth) {
+    return undefined;
+  }
+
+  return {
+    userId: request.auth.userId,
+    organizationId: request.auth.organizationId,
+    permission:
+      typeof request.auth.claims.permission === "number"
+        ? request.auth.claims.permission
+        : undefined,
+  };
+}
+
+function getUpstreamContext(url: string, request: Request) {
+  try {
+    const upstreamUrl = new URL(request.originalUrl, url);
+
+    return {
+      host: upstreamUrl.host,
+      method: request.method,
+      path: upstreamUrl.pathname,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function getResponseSizeBytes(response: Response): number | undefined {
+  const header = response.getHeader("content-length");
+
+  if (typeof header === "number") {
+    return header;
+  }
+
+  if (typeof header === "string") {
+    const parsed = Number.parseInt(header, 10);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+
+  return undefined;
+}
+
+function getLevelForStatusCode(statusCode: number): LogLevel {
+  if (statusCode >= 500) {
+    return "error";
+  }
+
+  if (statusCode >= 400) {
+    return "warn";
+  }
+
+  return "info";
+}
+
+function getDurationMs(startedAt: bigint): number {
+  return Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+}
+
+function buildRequestLifecycleMiddleware(logger: Logger) {
+  return function requestLifecycle(request: Request, response: Response, next: NextFunction): void {
+    const startedAt = process.hrtime.bigint();
+    let logged = false;
+
+    const requestLogger = getRequestLogger(request, logger);
+
+    response.once("finish", () => {
+      if (logged) {
+        return;
+      }
+
+      logged = true;
+
+      requestLogger[getLevelForStatusCode(response.statusCode)]({
+        event: "http.request.completed",
+        message: "HTTP request completed",
+        auth: getAuthLogContext(request),
+        http: {
+          statusCode: response.statusCode,
+          durationMs: getDurationMs(startedAt),
+          responseSizeBytes: getResponseSizeBytes(response),
+        },
+      });
+    });
+
+    response.once("close", () => {
+      if (logged || response.writableEnded) {
+        return;
+      }
+
+      logged = true;
+
+      requestLogger.warn({
+        event: "http.request.aborted",
+        message: "HTTP request aborted by client",
+        auth: getAuthLogContext(request),
+        http: {
+          durationMs: getDurationMs(startedAt),
+        },
+      });
+    });
+
+    next();
+  };
+}
+
+export function createApp(env: GatewayEnv, logger: Logger): express.Express {
+  const app = express();
+  const gatewayOpenApiSpec = buildGatewayOpenApiSpec(env);
+  const recordAuditRequest = createAuditRecorder({
+    enabled: env.auditEnabled,
+    serviceUrl: env.auditServiceUrl,
+    serviceToken: env.auditServiceToken,
+    logger,
+  });
+
+  app.set("trust proxy", true);
+  app.use(buildRequestContextMiddleware(logger));
+  app.use(
+    buildAuditLifecycleMiddleware({
+      enabled: env.auditEnabled,
+      env,
+      logger,
+      recordAuditRequest,
+    }),
+  );
+  app.use(buildRequestLifecycleMiddleware(logger));
+  app.use(cors(createCorsOptions(env)));
+  app.options("*", cors(createCorsOptions(env)));
+  app.use(express.json());
+
+  app.get("/openapi.json", (request: Request, response: Response) => {
+    response.json({
+      ...gatewayOpenApiSpec,
+      servers: [{ url: `${request.protocol}://${request.get("host")}` }],
+    });
+  });
+  mountOpenApiDocs(app, {
+    spec: gatewayOpenApiSpec,
+    docsPath: "/docs",
+    jsonPath: "/__gateway-openapi-static.json",
+    specUrl: "/openapi.json",
+    siteTitle: "gateway - OpenAPI",
+  });
+
+  if (!env.auditEnabled) {
+    app.use("/audit", (_request, _response, next) => {
+      next(new ServiceError(404, "Recurso não encontrado."));
+    });
+  }
+
+  app.use(buildAuthenticateMiddleware(env.jwtSecret));
+  app.use(authorizeRequest);
+
+  app.get("/health", (_request, response) => {
+    response.status(200).json(
+      createSuccessResponse({
+        status: "ok",
+        service: "gateway",
+      }),
+    );
+  });
+
+  app.get("/ready", (_request, response) => {
+    response.status(200).json(
+      createSuccessResponse({
+        status: "ready",
+        service: "gateway",
+      }),
+    );
+  });
+
+  for (const service of getGatewayServiceDefinitions(env)) {
+    for (const routePrefix of service.routePrefixes) {
+      app.use(routePrefix, buildHttpProxyMiddleware(service.targetUrl));
+    }
+  }
+  if (env.auditEnabled) {
+    app.use(
+      "/audit",
+      (request, _response, next) => {
+        request.headers[INTERNAL_SERVICE_TOKEN_HEADER] = env.auditServiceToken;
+        next();
+      },
+      buildHttpProxyMiddleware(env.auditServiceUrl),
+    );
+  }
+
+  app.use((request, response, next) => {
+    const service = resolveGatewayService(env, request.originalUrl);
+    if (service === null) {
+      next(new ServiceError(404, "Rota não mapeada no gateway."));
+      return;
+    }
+    return buildHttpProxyMiddleware(service.targetUrl)(request, response, next);
+  });
+  app.use(buildAuditErrorCaptureMiddleware());
+  app.use(
+    createExpressErrorHandler({
+      logger,
+      event: "gateway.error",
+      fallbackMessage: "Erro interno no gateway.",
+      getContext: (request) => {
+        const service = resolveGatewayService(env, request.originalUrl);
+        return {
+          auth: getAuthLogContext(request),
+          upstream: service ? getUpstreamContext(service.targetUrl, request) : undefined,
+        };
+      },
+    }),
+  );
+  app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
+    gatewayError({
+      requestId: request.requestId ?? "",
+      message: error.message,
+    });
+
+    response.status(500).json({ error: "Erro interno no gateway." });
+  });
+
+  return app;
+}

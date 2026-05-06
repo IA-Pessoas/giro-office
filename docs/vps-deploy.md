@@ -1,0 +1,176 @@
+# VPS Stable Stack Deploy
+
+## Files
+
+- `docker-compose.vps.yml`
+- `docker/service.Dockerfile`
+- `docker/app.Dockerfile` (Next.js UI, serviço `web`)
+- `docker/nginx/generate-nginx-config.sh`
+- `.env.vps.reverse-proxy`
+- `.env.vps.gateway`
+- `.env.vps.organization-service`
+- `.env.vps.user-service`
+- `.env.vps.task-service`
+- `.env.vps.project-service`
+- `.env.vps.client-service`
+- `.env.vps.rh-service`
+- `.env.vps.web` (Next: `NEXT_PUBLIC_API_URL` + `API_INTERNAL_URL` — ver secção CI)
+- `.env.vps.audit-service`
+
+## First start
+
+1. Fill the `.env.vps.*` files with the real VPS values.
+2. If `NGINX_TLS_ENABLED=true`, place the certificate files in `docker/nginx/certs` on the VPS.
+3. Configure o secret **`ENV_VPS_WEB`** (corpo = ficheiro `.env.vps.web`): `NEXT_PUBLIC_API_URL=<URL pública do API para o browser>` (ex.: `https://api.seu-dominio` ou `http://IP:3010`) e `API_INTERNAL_URL=http://gateway:3010` para os rewrites `/api/*` do Next dentro da rede Docker.
+4. If you keep `NGINX_TLS_ENABLED=false`, use `http://api.seu-dominio` instead.
+5. Start the stable stack:
+
+```bash
+docker compose -f docker-compose.vps.yml up -d --build
+```
+
+6. Start the audit profile only when needed:
+
+```bash
+docker compose -f docker-compose.vps.yml --profile audit up -d --build audit-service gateway reverse-proxy
+```
+
+If you enable the audit profile, also switch `AUDIT_ENABLED=true` in `.env.vps.gateway`.
+
+## Nginx TLS
+
+Nginx in this stack does not provision certificates automatically.
+
+- `NGINX_TLS_ENABLED=true`: listens on `80` and `443`, redirects HTTP to HTTPS and requires mounted cert files.
+- `NGINX_TLS_ENABLED=false`: serves the API only over plain HTTP on port `80`.
+
+## Update one service without touching the others
+
+```bash
+docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
+docker compose -f docker-compose.vps.yml up -d --build --no-deps task-service
+docker compose -f docker-compose.vps.yml up -d --build --no-deps project-service
+```
+
+The `--no-deps` flag keeps the rest of the stack running.
+
+## Stop or remove one service
+
+Stop only one container:
+
+```bash
+docker compose -f docker-compose.vps.yml stop user-service
+```
+
+Remove only one container:
+
+```bash
+docker compose -f docker-compose.vps.yml rm -sf user-service
+```
+
+Recreate it later without touching the rest:
+
+```bash
+docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
+```
+
+## Health checks
+
+- Gateway: `GET /ready`
+- Task service: `GET /ready`
+- Client service: `GET /ready`
+- Audit service: `GET /ready`
+- Organization, user, project and RH services: `GET /health`
+- **Web (Next.js):** `GET /` (container escuta na porta **3000**; no host, ver portas por slot abaixo)
+
+## CI/CD (GitHub Actions → VPS)
+
+- Push em **`develop`**: workflow **Develop CI** (`.github/workflows/develop-cicd.yml`) — `build-and-push` + `vps-deploy` no slot `/data/workspace-develop` (`workspace-develop`).
+- Push em **`staging`**: workflow **Staging CI/CD** (`.github/workflows/staging-cicd.yml`) — o mesmo padrão no slot `/data/workspace-staging` (`workspace-staging`).
+
+- **Branches de teste de deploy** (paths e projetos Compose distintos na VPS; `ENV_VPS_*` por **GitHub Environment**, ver abaixo):
+  - `test/deploy-develop` → `test-deploy-develop-cicd.yml` — `/data/workspace-teste-develop`, `DEPLOY_SLOT=test-develop`, projeto `workspace-teste-develop` — portas **8087** (proxy) / **3013** (gateway) / **3002** (web UI), ficheiro `docker-compose.vps.slot-test-develop.yml`.
+  - `test/deploy-staging` → `test-deploy-staging-cicd.yml` — `/data/workspace-teste-staging`, `DEPLOY_SLOT=test-staging`, projeto `workspace-teste-staging` — portas **8086** (proxy) / **3012** (gateway) / **3003** (web UI), ficheiro `docker-compose.vps.slot-test-staging.yml`.
+
+  Slots **reais**: develop **8086**/**3011**/**3001** (web), staging **8085**/**3010**/**3000** (web no host 3000), ver `vps-remote-deploy.sh`. Os slots de teste usam portas acima para reduzir choque com produção; ainda assim **8086** no teste-staging coincide com o proxy do **develop** real — não corras os dois no mesmo host sem ajustar um deles.
+
+Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em falha.
+
+### Segredos no repositório (Actions)
+
+| Segredo | Uso |
+|---------|-----|
+| `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | URL **com namespace** (ex.: `ghcr.io/meu-org`, `docker.io/meuuser` — não use só `ghcr.io`). Push/pull normalizam em minúsculas. |
+| `ENV_VPS_*` | Igual ao manifest `scripts/ci/vps-secrets.manifest` — `.env.vps.*` copiados para a VPS em cada deploy |
+| `ENV_VPS_WEB` | Corpo do ficheiro **`.env.vps.web`**: pelo menos `NEXT_PUBLIC_API_URL=<URL pública do API para o browser>` e `API_INTERNAL_URL=http://gateway:3010` (rede Docker). O valor de `NEXT_PUBLIC_API_URL` é embutido no bundle no `docker compose build`. |
+| `VPS_HOST`, `VPS_USER` | SSH |
+| `VPS_SSH_PRIVATE_KEY` | Preferencial (chave privada PEM) |
+| `VPS_SSH_PASSWORD` | Alternativa (requer `sshpass` no runner — instalado no job) |
+
+### GitHub Environments (`ENV_VPS_*` por slot)
+
+Os jobs de **build/push** e **deploy na VPS** usam `environment:` para que os mesmos nomes de segredo (ex.: `ENV_VPS_WEB`, `ENV_VPS_REVERSE_PROXY`) tenham **valores diferentes** por stack, sem renomear variáveis no workflow.
+
+Crie os environments em **Settings → Environments** e adicione os segredos listados em `scripts/ci/vps-secrets.manifest` (pelo menos os `ENV_VPS_*` que o deploy materializa). `DOCKER_REGISTRY_*`, `VPS_HOST`, `VPS_USER`, `VPS_SSH_*` podem continuar só ao nível do repositório; o job com `environment` continua a vê-los.
+
+| Environment | Onde é usado |
+|-------------|----------------|
+| `vps-develop` | `.github/workflows/develop-cicd.yml` — jobs `build-and-push` e `vps-deploy` |
+| `vps-staging` | `.github/workflows/staging-cicd.yml` — jobs `build-and-push` e `vps-deploy` |
+| `vps-test-develop` | `.github/workflows/test-deploy-develop-cicd.yml` — jobs `build-and-push` e `vps-deploy` |
+| `vps-test-staging` | `.github/workflows/test-deploy-staging-cicd.yml` — jobs `build-and-push` e `vps-deploy` |
+| `production` | `.github/workflows/main-cicd.yml` — jobs `promote-image`, `main-candidate`, `dast` (e `database-migrations`, já existente) |
+
+Em **teste staging**, o gateway público no host costuma ser a porta **3012** (não **3010** do staging “real”); o `ENV_VPS_WEB` desse environment deve refletir a URL que o browser usa para falar com o gateway desse slot.
+
+Workflows que **não** definem `environment` (ex.: `test-cicd.yml` em branch de teste) continuam a usar apenas segredos ao nível do repositório.
+
+### Primeira vez na VPS
+
+1. Instalar Docker e Compose plugin.
+2. Clonar o repositório nos paths usados pelo CI (ajuste conforme o seu fork):
+
+   - **develop:** `/data/workspace-develop` (branch `develop`)
+   - **staging:** `/data/workspace-staging` (branch `staging`)
+   - **teste develop:** `/data/workspace-teste-develop` (branch `test/deploy-develop`)
+   - **teste staging:** `/data/workspace-teste-staging` (branch `test/deploy-staging`)
+
+3. Com **develop** e **staging** na mesma VPS: **staging** usa só `docker-compose.vps.yml` (proxy **8085**, gateway **3010**). **develop** usa `docker-compose.vps.yml` + `docker-compose.vps.slot-develop.yml` (proxy **8086**, gateway **3011**). O `vps-remote-deploy.sh` aplica o override quando `DEPLOY_SLOT=develop`.
+
+### Smoke / logs
+
+O deploy remoto corre na VPS; se falhar, o script tenta reverter as imagens `workspace-*:<WORKSPACE_VPS_IMAGE_TAG>` anteriores e imprime `docker compose ps` e `docker compose logs` no log do GitHub Actions.
+
+### Tag local das imagens (`WORKSPACE_VPS_IMAGE_TAG`)
+
+No mesmo host Docker, **vários clones** (develop, staging, testes) não devem partilhar a mesma tag local `workspace-*:vps`, senão um `docker pull` + `docker tag` de um slot sobrescreve a imagem que outro slot usa.
+
+O `docker-compose.vps.yml` usa `image: workspace-<serviço>:${WORKSPACE_VPS_IMAGE_TAG:-vps}`. O CI define a variável no job `vps-deploy` e o `vps-remote-deploy.sh` grava-a em `.env` no diretório do clone na VPS para `docker compose` manual alinhar com o CI.
+
+| Diretório na VPS (exemplo) | Workflow | Valor usado no CI |
+|----------------------------|----------|-------------------|
+| `/data/workspace-staging` | `staging-cicd.yml` | `vps-staging` |
+| `/data/workspace-develop` | `develop-cicd.yml` | `vps-develop` |
+| `/data/workspace-teste-develop` | `test-deploy-develop-cicd.yml` | `vps-test-develop` |
+| `/data/workspace-teste-staging` | `test-deploy-staging-cicd.yml` | `vps-test-staging` |
+
+O **registry** continua a usar tags por commit (ex.: `{registry}/gateway:<GITHUB_SHA>`); só a etiqueta **local** na VPS muda por stack.
+
+### Deploy incremental (paths ignorados)
+
+O script `scripts/ci/detect-changed-vps-services.sh` emite **`NONE`** quando o diff entre commits **só** inclui ficheiros sob `.agent/`, `.cursor/`, `.husky/`, `vscode/`, `.vscode/` ou `docs/` — nesse caso o job de build/push **não** reconstrói imagens workspace e o deploy **não** refaz pull completo (evita reiniciar serviços só por mudanças de tooling ou documentação). Se o mesmo commit tocar fora destes paths, aplica-se a lógica normal (lista de serviços ou `ALL`).
+
+## Current scope
+
+This VPS stack is meant for the stable microservices only:
+
+- `/user`
+- `/organizations`
+- `/task`
+- `/project`
+- `/client`
+- `/rh`
+- `/health`
+- `/audit` when the audit profile is enabled
+
+Legacy routes are intentionally out of scope for this deployment.

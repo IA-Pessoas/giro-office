@@ -1,0 +1,21 @@
+/** Defaults aligned with gateway `GatewayEnv` (organization, client, rh URLs). */
+const SERVICE_DEFAULTS = {
+  organizationServiceUrl: "http://localhost:3031",
+  rhServiceUrl: "http://localhost:3034",
+  clientServiceUrl: "http://localhost:3035",
+} as const;
+
+export interface ServiceUrls {
+  organizationServiceUrl: string;
+  rhServiceUrl: string;
+  clientServiceUrl: string;
+}
+
+export function getServiceUrls(): ServiceUrls {
+  return {
+    organizationServiceUrl:
+      process.env.ORGANIZATION_SERVICE_URL || SERVICE_DEFAULTS.organizationServiceUrl,
+    rhServiceUrl: process.env.RH_SERVICE_URL || SERVICE_DEFAULTS.rhServiceUrl,
+    clientServiceUrl: process.env.CLIENT_SERVICE_URL || SERVICE_DEFAULTS.clientServiceUrl,
+  };
+}
