@@ -15,8 +15,10 @@ interface RhRequestDetailModalProps {
   requestId: string | null;
   getCategoryLabel: (categoryId: string) => string;
   getAssignedUserLabel: (userId: string) => string;
+  isDeleting: boolean;
   onClose: () => void;
   onEdit: (requestId: string) => void;
+  onDelete: (requestId: string) => void;
 }
 
 export function RhRequestDetailModal({
@@ -24,8 +26,10 @@ export function RhRequestDetailModal({
   requestId,
   getCategoryLabel,
   getAssignedUserLabel,
+  isDeleting,
   onClose,
   onEdit,
+  onDelete,
 }: RhRequestDetailModalProps) {
   const requestQuery = useRhRequest(requestId ?? undefined);
   const request = requestQuery.data;
@@ -62,6 +66,18 @@ export function RhRequestDetailModal({
             className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Editar
+          </button>
+          <button
+            type="button"
+            disabled={!requestId || isDeleting}
+            onClick={() => {
+              if (requestId) {
+                onDelete(requestId);
+              }
+            }}
+            className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-900/20"
+          >
+            {isDeleting ? "Excluindo..." : "Excluir"}
           </button>
         </>
       }

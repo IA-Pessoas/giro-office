@@ -1,7 +1,12 @@
 import { useState } from "react";
+import { toast } from "react-toastify";
 
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
-import { useRhCategories, useRhRequests } from "../hooks/useRhRequests";
+import {
+  useDeleteRhRequestMutation,
+  useRhCategories,
+  useRhRequests,
+} from "../hooks/useRhRequests";
 import type { RhRequest, RhRequestStatus, RhRequestRow } from "../types";
 import {
   formatRhDateTime,
@@ -27,6 +32,7 @@ export function RhRequestsSection() {
 
   const categoriesQuery = useRhCategories();
   const assignableUsersQuery = useAssignableUsers();
+  const deleteRequestMutation = useDeleteRhRequestMutation();
   const requestsQuery = useRhRequests({
     status: statusFilter === "all" ? undefined : statusFilter,
     category_id: categoryFilter || undefined,
@@ -69,6 +75,7 @@ export function RhRequestsSection() {
     requestsQuery.isLoading;
   const error =
     categoriesQuery.error || assignableUsersQuery.error || requestsQuery.error;
+  const deletingRequestId = deleteRequestMutation.variables?.id ?? null;
 
   function getCategoryLabel(categoryId: string) {
     return categoryNameById.get(categoryId) ?? MISSING_CATEGORY_LABEL;
@@ -100,6 +107,33 @@ export function RhRequestsSection() {
   function handleEditFromDetail(requestId: string) {
     handleCloseDetail();
     handleOpenEdit(requestId);
+  }
+
+  async function handleDelete(requestId: string) {
+    const shouldDelete = window.confirm(
+      "Deseja realmente excluir esta solicitação de RH?",
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      await deleteRequestMutation.mutateAsync({ id: requestId });
+      if (selectedRequestId === requestId) {
+        handleCloseDetail();
+      }
+      if (editingRequest?.id === requestId) {
+        handleCloseForm();
+      }
+      toast.success("Solicitação excluída com sucesso.");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Não foi possível excluir a solicitação.";
+      toast.error(errorMessage);
+    }
   }
 
   function handleCloseForm() {
@@ -141,6 +175,8 @@ export function RhRequestsSection() {
           rows={rows}
           onOpenDetail={handleOpenDetail}
           onEdit={handleOpenEdit}
+          onDelete={handleDelete}
+          deletingRequestId={deletingRequestId}
         />
       ) : null}
 
@@ -157,8 +193,10 @@ export function RhRequestsSection() {
         requestId={selectedRequestId}
         getCategoryLabel={getCategoryLabel}
         getAssignedUserLabel={getAssignedUserLabel}
+        isDeleting={deleteRequestMutation.isPending}
         onClose={handleCloseDetail}
         onEdit={handleEditFromDetail}
+        onDelete={handleDelete}
       />
     </div>
   );
