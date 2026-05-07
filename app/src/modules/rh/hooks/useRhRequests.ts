@@ -161,11 +161,8 @@ export function useUpdateRhRequestMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => rhRequestsService.updateRequest(payload),
-    onSuccess: async (_data, variables) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
-      await queryClient.invalidateQueries({
-        queryKey: rhRequestDetailQueryKey(variables.id),
-      });
     },
   });
 }
@@ -194,10 +191,7 @@ export function useCreateRhMessageMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => rhRequestsService.createMessage(payload),
-    onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: rhMessagesQueryKey({ requestId: variables.request_id }),
-      });
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
     },
   });

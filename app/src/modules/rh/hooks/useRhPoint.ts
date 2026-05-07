@@ -47,11 +47,8 @@ export function useCreateOrUpdateRhPointConfigMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => rhPointService.upsertPointConfig(payload),
-    onSuccess: async (_data, variables) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
-      await queryClient.invalidateQueries({
-        queryKey: rhPointConfigQueryKey(variables.target_user_id),
-      });
     },
   });
 }
@@ -80,11 +77,8 @@ export function useCalculateRhPointMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (pointId) => rhPointService.calculatePoint(pointId),
-    onSuccess: async (_data, pointId) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
-      await queryClient.invalidateQueries({
-        queryKey: rhPointCalculationQueryKey(pointId),
-      });
     },
   });
 }
