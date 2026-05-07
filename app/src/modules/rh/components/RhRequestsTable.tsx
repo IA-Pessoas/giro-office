@@ -1,0 +1,95 @@
+import { Eye } from "lucide-react";
+
+import type { RhRequestRow } from "../types";
+
+interface RhRequestsTableProps {
+  rows: RhRequestRow[];
+}
+
+export function RhRequestsTable({ rows }: RhRequestsTableProps) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-700/50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Título
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Categoria
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Responsável
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Urgência
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Status
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Atualizado
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Ações
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            {rows.map((row) => (
+              <tr
+                key={row.id}
+                className="hover:bg-gray-50 dark:hover:bg-gray-700/30"
+              >
+                <td className="px-6 py-4 align-top">
+                  <div className="space-y-1">
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {row.title}
+                    </p>
+                    <p className="max-w-sm text-sm text-gray-600 dark:text-gray-400">
+                      {row.description}
+                    </p>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                  {row.categoryLabel}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                  {row.assignedToUserLabel}
+                </td>
+                <td className="px-6 py-4">
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${row.urgencyClassName}`}
+                  >
+                    {row.urgencyLabel}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${row.statusClassName}`}
+                  >
+                    {row.statusLabel}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                  {row.updatedAtLabel}
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-500 opacity-70 dark:border-gray-600 dark:text-gray-300"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Detalhes
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
