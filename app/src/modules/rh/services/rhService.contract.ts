@@ -18,6 +18,7 @@ export const RH_ENDPOINTS = {
   requestPointAdjustment: "/rh/point/adjustment/request",
   approvePointAdjustment: "/rh/point/adjustment/approve",
   holidays: "/rh/holidays",
+  timeBankReleaseList: "/rh/time-bank-releases/list",
   timeBankReleases: "/rh/time-bank-releases",
   timeBankReleaseApprove: "/rh/time-bank-releases/approve",
   timeSheets: "/rh/timesheets",
@@ -30,7 +31,7 @@ export const RH_ENDPOINTS = {
   pendingScoreEvaluations: "/rh/score/evaluations/pending",
   submitScoreEvaluation: "/rh/score/evaluations/submit",
   scoreNitroUpdate: "/rh/score/nitro/update",
-  // Future point endpoints from Swagger / roadmap:
+  // Future point endpoints pending backend support / roadmap:
   // "/rh/point"
   // "/rh/point/me/today"
   // "/rh/point/adjustment/requests"

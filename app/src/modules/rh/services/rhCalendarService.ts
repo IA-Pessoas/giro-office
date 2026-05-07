@@ -55,7 +55,7 @@ export const rhCalendarService = {
     filters: RhTimeBankReleaseListFilters = {},
   ): Promise<RhTimeBankRelease[]> {
     const api = setupAPIClient();
-    const response = await api.get(RH_ENDPOINTS.timeBankReleases, {
+    const response = await api.get(RH_ENDPOINTS.timeBankReleaseList, {
       params: buildRhTimeBankReleaseListParams(filters),
     });
 
