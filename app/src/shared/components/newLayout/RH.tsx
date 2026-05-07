@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { RhRequestsSection } from '@modules/rh';
 import { 
   Users,
   Plus,
@@ -717,8 +718,10 @@ export function RH() {
         </div>
       )}
 
+      {activeTab === 'requests' && <RhRequestsSection />}
+
       {/* Requests Tab */}
-      {activeTab === 'requests' && (
+      {false && activeTab === 'requests' && (
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
