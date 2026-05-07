@@ -245,7 +245,10 @@ class PointService {
         throw new ServiceError(400, "Registro incompleto para calculo (exige entrada e saida).");
       }
       if (!point.lunch_out || !point.lunch_in) {
-        throw new ServiceError(400, "Registro incompleto para calculo (intervalo de almoco ausente).");
+        throw new ServiceError(
+          400,
+          "Registro incompleto para calculo (intervalo de almoco ausente).",
+        );
       }
 
       const config = await prismaClient.pointsConfig.findUnique({
@@ -494,7 +497,10 @@ class PointService {
       }
 
       const expectedMinutesPerDay = expectedMinutesFromPointConfig(config);
-      const totalWorkedMinutes = points.reduce((sum, point) => sum + (point.workload_hours ?? 0), 0);
+      const totalWorkedMinutes = points.reduce(
+        (sum, point) => sum + (point.workload_hours ?? 0),
+        0,
+      );
       const expectedMinutes = expectedWorkDayCount * expectedMinutesPerDay;
       const balanceMinutes = totalWorkedMinutes - expectedMinutes;
 

@@ -521,7 +521,12 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           summary: "Gerar resumo mensal de ponto",
           security: bearer,
           parameters: [
-            { name: "month", in: "query", required: true, schema: { type: "string", example: "2026-05" } },
+            {
+              name: "month",
+              in: "query",
+              required: true,
+              schema: { type: "string", example: "2026-05" },
+            },
             { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
           ],
           responses: {
@@ -557,7 +562,11 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           summary: "Listar solicitacoes de ajuste de ponto",
           security: bearer,
           parameters: [
-            { name: "status", in: "query", schema: { type: "string", enum: ["Pendente", "Aprovado"] } },
+            {
+              name: "status",
+              in: "query",
+              schema: { type: "string", enum: ["Pendente", "Aprovado"] },
+            },
             { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
           ],
           responses: {

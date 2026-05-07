@@ -42,23 +42,27 @@ router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextF
   }
 });
 
-router.get("/me/today", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
-      statusCode: 400,
-    });
+router.get(
+  "/me/today",
+  isAuthenticated,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+        statusCode: 400,
+      });
 
-    const result = await pointService.getTodayPointForUser({
-      organization_id,
-      user_id,
-    });
+      const result = await pointService.getTodayPointForUser({
+        organization_id,
+        user_id,
+      });
 
-    res.status(200).json(createSuccessResponse(result));
-  } catch (err) {
-    logError("Erro ao buscar ponto do dia", { err });
-    next(err);
-  }
-});
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao buscar ponto do dia", { err });
+      next(err);
+    }
+  },
+);
 
 router.get("/summary", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
