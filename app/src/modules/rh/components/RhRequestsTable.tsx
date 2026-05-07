@@ -1,13 +1,18 @@
-import { Edit } from "lucide-react";
+import { Edit, Eye } from "lucide-react";
 
 import type { RhRequestRow } from "../types";
 
 interface RhRequestsTableProps {
   rows: RhRequestRow[];
+  onOpenDetail: (requestId: string) => void;
   onEdit: (requestId: string) => void;
 }
 
-export function RhRequestsTable({ rows, onEdit }: RhRequestsTableProps) {
+export function RhRequestsTable({
+  rows,
+  onOpenDetail,
+  onEdit,
+}: RhRequestsTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
       <div className="overflow-x-auto">
@@ -77,14 +82,24 @@ export function RhRequestsTable({ rows, onEdit }: RhRequestsTableProps) {
                   {row.updatedAtLabel}
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <button
-                    type="button"
-                    onClick={() => onEdit(row.id)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                  >
-                    <Edit className="h-4 w-4" />
-                    Editar
-                  </button>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onOpenDetail(row.id)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                      <Eye className="h-4 w-4" />
+                      Detalhes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onEdit(row.id)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Editar
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

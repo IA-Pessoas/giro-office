@@ -10,6 +10,7 @@ import {
   getRhRequestUrgencyClassName,
   getRhRequestUrgencyLabel,
 } from "../utils/rhRequestUi";
+import { RhRequestDetailModal } from "./RhRequestDetailModal";
 import { RhRequestFormModal } from "./RhRequestFormModal";
 import { RhRequestsFilters } from "./RhRequestsFilters";
 import { RhRequestsTable } from "./RhRequestsTable";
@@ -21,6 +22,7 @@ export function RhRequestsSection() {
   const [statusFilter, setStatusFilter] = useState<RhRequestStatus | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [editingRequest, setEditingRequest] = useState<RhRequest | null>(null);
 
   const categoriesQuery = useRhCategories();
@@ -68,15 +70,36 @@ export function RhRequestsSection() {
   const error =
     categoriesQuery.error || assignableUsersQuery.error || requestsQuery.error;
 
+  function getCategoryLabel(categoryId: string) {
+    return categoryNameById.get(categoryId) ?? MISSING_CATEGORY_LABEL;
+  }
+
+  function getAssignedUserLabel(userId: string) {
+    return userNameById.get(userId) ?? MISSING_ASSIGNEE_LABEL;
+  }
+
   function handleOpenCreate() {
     setEditingRequest(null);
     setIsFormOpen(true);
+  }
+
+  function handleOpenDetail(requestId: string) {
+    setSelectedRequestId(requestId);
+  }
+
+  function handleCloseDetail() {
+    setSelectedRequestId(null);
   }
 
   function handleOpenEdit(requestId: string) {
     const request = requests.find((candidate) => candidate.id === requestId) ?? null;
     setEditingRequest(request);
     setIsFormOpen(true);
+  }
+
+  function handleEditFromDetail(requestId: string) {
+    handleCloseDetail();
+    handleOpenEdit(requestId);
   }
 
   function handleCloseForm() {
@@ -114,7 +137,11 @@ export function RhRequestsSection() {
       ) : null}
 
       {!isLoading && !error && rows.length > 0 ? (
-        <RhRequestsTable rows={rows} onEdit={handleOpenEdit} />
+        <RhRequestsTable
+          rows={rows}
+          onOpenDetail={handleOpenDetail}
+          onEdit={handleOpenEdit}
+        />
       ) : null}
 
       <RhRequestFormModal
@@ -123,6 +150,15 @@ export function RhRequestsSection() {
         assignableUsers={assignableUsers}
         request={editingRequest}
         onClose={handleCloseForm}
+      />
+
+      <RhRequestDetailModal
+        open={Boolean(selectedRequestId)}
+        requestId={selectedRequestId}
+        getCategoryLabel={getCategoryLabel}
+        getAssignedUserLabel={getAssignedUserLabel}
+        onClose={handleCloseDetail}
+        onEdit={handleEditFromDetail}
       />
     </div>
   );
