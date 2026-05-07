@@ -47,7 +47,10 @@ router.get("/list", isAuthenticated, async (req: Request, res: Response, next: N
     const ref_id = String(req.query.ref_id ?? "");
     const search = String(req.query.search ?? "");
     const page = Math.max(1, Number.parseInt(String(req.query.page ?? "1"), 10) || 1);
-    const limit = Math.max(1, Math.min(100, Number.parseInt(String(req.query.limit ?? "20"), 10) || 20));
+    const limit = Math.max(
+      1,
+      Math.min(100, Number.parseInt(String(req.query.limit ?? "20"), 10) || 20),
+    );
 
     const result = await taskCrudService.listTasks({
       organization_id,

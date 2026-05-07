@@ -45,6 +45,24 @@ generator rh_service_client {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator department_service_client {
+  provider        = "prisma-client"
+  output          = "../../services/department-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+generator fiscalServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/fiscal-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+generator contabilServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/contabil-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }

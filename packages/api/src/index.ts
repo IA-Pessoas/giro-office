@@ -1,7 +1,14 @@
 export { type CreateApiClientOptions, createApiClient } from "./client.js";
-export { getMe, getUserById, updateCurrentUser } from "./services/userService.js";
+export {
+  deleteCurrentUserPhoto,
+  getMe,
+  getUserById,
+  updateCurrentUser,
+  uploadCurrentUserPhoto,
+} from "./services/userService.js";
 export type {
   MeApiResponse,
+  MeProfile,
   MeSessionUser,
   UpdateCurrentUserPayload,
 } from "./types/me.js";

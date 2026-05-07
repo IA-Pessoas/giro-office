@@ -1,28 +1,19 @@
 ﻿import { once } from "node:events";
 import { createServer, type IncomingMessage, request as nodeRequest, type Server } from "node:http";
-import { Writable } from "node:stream";
-import { expect, it } from "vitest";
 
+import type { CreateAuditRequestPayload } from "@workspace/shared";
 import {
+  createLogger,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
-  createLogger,
 } from "@workspace/shared";
-import type { CreateAuditRequestPayload } from "@workspace/shared";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
 import jwt from "jsonwebtoken";
+import { expect, it } from "vitest";
+
 import { createApp } from "./app.js";
 import type { GatewayEnv } from "./config/env.js";
-
-class MemoryLogStream extends Writable {
-  _write(
-    _chunk: string | Uint8Array,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
-    callback();
-  }
-}
 
 async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
@@ -130,6 +121,10 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     taskServiceUrl: "http://127.0.0.1:3032",
     projectServiceUrl: "http://127.0.0.1:3033",
     clientServiceUrl: "http://127.0.0.1:3035",
+    departmentServiceUrl: "http://127.0.0.1:3336",
+    fiscalServiceUrl: "http://127.0.0.1:3037",
+    contabilServiceUrl: "http://127.0.0.1:3038",
+
     jwtSecret: "test-secret",
     logLevel: "silent",
     logPretty: false,
@@ -375,6 +370,8 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/client/list"]).toBeTruthy();
     expect(body.paths["/organizations"]).toBeTruthy();
     expect(body.paths["/rh/point-config"]).toBeTruthy();
+    expect(body.paths["/fiscal/ncm"]).toBeTruthy();
+    expect(body.paths["/contabil/controls"]).toBeTruthy();
     expect(body.paths["/audit/requests"]).toBeTruthy();
   } finally {
     await stopServer(server);
@@ -397,6 +394,8 @@ it("does not duplicate gateway path prefixes in the aggregated OpenAPI JSON", as
     expect(body.paths["/rh/rh/point-config"]).toBe(undefined);
     expect(body.paths["/audit/audit/requests"]).toBe(undefined);
     expect(body.paths["/client/client/list"]).toBe(undefined);
+    expect(body.paths["/fiscal/fiscal/ncm"]).toBe(undefined);
+    expect(body.paths["/contabil/contabil/controls"]).toBe(undefined);
   } finally {
     await stopServer(server);
   }

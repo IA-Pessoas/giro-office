@@ -1,5 +1,3 @@
-import { Writable } from "node:stream";
-
 import { createExpressErrorHandler } from "@workspace/shared";
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -7,6 +5,7 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared/http";
 import { createLogger } from "@workspace/shared/logger";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
@@ -19,16 +18,6 @@ process.env.AUDIT_SERVICE_TOKEN ??= "audit-service-token";
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
-
-class MemoryLogStream extends Writable {
-  override _write(
-    _chunk: string | Uint8Array,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
-    callback();
-  }
-}
 
 function createTestLogger() {
   return createLogger({
@@ -51,7 +40,14 @@ function createTestApp() {
   const logger = createTestLogger();
 
   app.use(express.json());
-  app.use("/task", createDepsTasksRoutes({ async listDepartmentsWithTaskModels() { return []; } }));
+  app.use(
+    "/task",
+    createDepsTasksRoutes({
+      async listDepartmentsWithTaskModels() {
+        return [];
+      },
+    }),
+  );
   app.use(
     createExpressErrorHandler({
       logger,

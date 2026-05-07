@@ -13,12 +13,10 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-const app = createProjectApplication(
-  {
-    env,
-    logger,
-  },
-);
+const app = createProjectApplication({
+  env,
+  logger,
+});
 
 app.listen(env.port, () => {
   logger.info({ event: "server.start", data: { port: env.port } }, "project-service rodando");

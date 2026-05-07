@@ -1,3 +1,5 @@
+import { Readable } from "node:stream";
+
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
@@ -6,8 +8,6 @@ import {
   ServiceError,
 } from "@workspace/shared";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
-
-import { Readable } from "node:stream";
 
 function hasRequestBody(method: string): boolean {
   const upperMethod = method.toUpperCase();
@@ -97,7 +97,7 @@ function createHttpProxy(resolveTargetUrl: (request: Request) => string): Reques
       };
 
       if (body !== undefined && typeof body !== "string") {
-        (fetchOptions as any).duplex = "half";
+        (fetchOptions as RequestInit & { duplex: "half" }).duplex = "half";
       }
 
       const upstreamResponse = await fetch(upstreamUrl, fetchOptions);

@@ -30,12 +30,16 @@ describe("PointService", () => {
 
   it("registerPoint lança 400 quando user_id é obrigatório", async () => {
     const service = new PointService();
-    await expect(service.registerPoint({ user_id: "", organization_id: "org-1" })).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      service.registerPoint({ user_id: "", organization_id: "org-1" }),
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("calculateDailyHours lança 404 quando ponto não existe", async () => {
     prismaMock.point.findUnique.mockResolvedValue(null);
     const service = new PointService();
-    await expect(service.calculateDailyHours("point-1", "org-1")).rejects.toMatchObject({ statusCode: 404 });
+    await expect(service.calculateDailyHours("point-1", "org-1")).rejects.toMatchObject({
+      statusCode: 404,
+    });
   });
 });

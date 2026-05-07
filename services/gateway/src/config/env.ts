@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loggerLevelSchema, type LoggerLevel } from "@workspace/shared";
+import { type LoggerLevel, loggerLevelSchema } from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -36,9 +36,12 @@ const gatewayEnvSchema = z
     organizationServiceUrl: z.string().url().default("http://localhost:3031"),
     rhServiceUrl: z.string().url().default("http://localhost:3034"),
     userServiceUrl: z.string().url().default("http://localhost:3030"),
+    departmentServiceUrl: z.string().url().default("http://localhost:3036"),
     taskServiceUrl: z.string().url().default("http://localhost:3032"),
     projectServiceUrl: z.string().url().default("http://localhost:3033"),
     clientServiceUrl: z.string().url().default("http://localhost:3035"),
+    fiscalServiceUrl: z.string().url().default("http://localhost:3037"),
+    contabilServiceUrl: z.string().url().default("http://localhost:3038"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -81,9 +84,12 @@ export interface GatewayEnv {
   organizationServiceUrl: string;
   rhServiceUrl: string;
   userServiceUrl: string;
+  departmentServiceUrl: string;
   taskServiceUrl: string;
   projectServiceUrl: string;
   clientServiceUrl: string;
+  fiscalServiceUrl: string;
+  contabilServiceUrl: string;
   websocketUpstreamUrl?: string;
   jwtSecret: string;
   logLevel: LoggerLevel;
@@ -101,9 +107,12 @@ export function getGatewayEnv(): GatewayEnv {
     organizationServiceUrl: process.env.ORGANIZATION_SERVICE_URL,
     rhServiceUrl: process.env.RH_SERVICE_URL,
     userServiceUrl: process.env.USER_SERVICE_URL,
+    departmentServiceUrl: process.env.DEPARTMENT_SERVICE_URL,
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
     clientServiceUrl: process.env.CLIENT_SERVICE_URL,
+    fiscalServiceUrl: process.env.FISCAL_SERVICE_URL,
+    contabilServiceUrl: process.env.CONTABIL_SERVICE_URL,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,

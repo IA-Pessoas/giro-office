@@ -14,22 +14,26 @@ import { TaskFinanceiroService } from "../services/taskFinanceiroService.js";
 const router: ReturnType<typeof Router> = Router();
 const taskFinanceiroService = new TaskFinanceiroService();
 
-router.put("/financeiro", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
-    const parsed = parseWithZod(financeiroTaskUpdateBodySchema, req.body);
+router.put(
+  "/financeiro",
+  isAuthenticated,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
+      const parsed = parseWithZod(financeiroTaskUpdateBodySchema, req.body);
 
-    const result = await taskFinanceiroService.updateChargeFinanceiro({
-      user_id,
-      organization_id,
-      task_id: parsed.task_id,
-    });
+      const result = await taskFinanceiroService.updateChargeFinanceiro({
+        user_id,
+        organization_id,
+        task_id: parsed.task_id,
+      });
 
-    res.json(createSuccessResponse(result));
-  } catch (err) {
-    logError("Erro ao atualizar cobranÃ§a financeira", { err });
-    next(err);
-  }
-});
+      res.json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao atualizar cobranÃ§a financeira", { err });
+      next(err);
+    }
+  },
+);
 
 export { router as taskFinanceiroRoutes };

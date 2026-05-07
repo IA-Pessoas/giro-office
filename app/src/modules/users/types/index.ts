@@ -7,10 +7,43 @@ export interface UserItem {
   status: string;
   photo?: string | null;
   photo_url?: string | null;
+  type?: UserType | null;
+  first_owner_flag?: boolean;
+  permission_id?: string | null;
   department?: {
     name: string;
     color: string;
   };
+}
+
+export type UserType = "user" | "admin" | "owner";
+export type UserPermission = 0 | 1 | 2;
+
+export type KnownPermissionModuleKey =
+  | "atendimento"
+  | "certificado"
+  | "comercial"
+  | "contabil"
+  | "financeiro"
+  | "fiscal"
+  | "integracao"
+  | "marketing"
+  | "parcelamento"
+  | "pec"
+  | "pessoal"
+  | "regularize"
+  | "rh"
+  | "triagem"
+  | "wiki";
+
+export type KnownPermissionRecord = Record<KnownPermissionModuleKey, number | null>;
+export type PermissionDraft = Record<string, number | null>;
+
+export interface PermissionNormalizationResult {
+  known: KnownPermissionRecord;
+  extras: PermissionDraft;
+  missingKnownKeys: KnownPermissionModuleKey[];
+  invalidExtraKeys: string[];
 }
 
 export interface CreateUserData {
@@ -18,7 +51,19 @@ export interface CreateUserData {
   login: string;
   password: string;
   department_id: string;
-  permission: number;
+  permission: UserPermission;
+  organization_id?: string;
+  type?: UserType;
+  status?: string;
+  invited_by?: string;
+  first_owner_flag?: boolean;
+  modules?: Record<string, number | null>;
+}
+
+export interface AdminCreateUserData extends CreateUserData {
+  organization_id: string;
+  type: UserType;
+  status: string;
 }
 
 export interface UpdateUserData {

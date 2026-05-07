@@ -6,11 +6,17 @@ const RH_SERVICE_PREFIXES = ["/rh"] as const;
 
 const USER_SERVICE_PREFIXES = ["/user"] as const;
 
+const DEPARTMENT_SERVICE_PREFIXES = ["/department"] as const;
+
 const TASK_SERVICE_PREFIXES = ["/task"] as const;
 
 const PROJECT_SERVICE_PREFIXES = ["/project"] as const;
 
 const CLIENT_SERVICE_PREFIXES = ["/client"] as const;
+
+const FISCAL_SERVICE_PREFIXES = ["/fiscal"] as const;
+
+const CONTABIL_SERVICE_PREFIXES = ["/contabil"] as const;
 
 function getNormalizedPath(path: string): string {
   try {
@@ -52,6 +58,12 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       routePrefixes: [...USER_SERVICE_PREFIXES],
     },
     {
+      key: "department-service",
+      targetUrl: env.departmentServiceUrl,
+      auditTarget: "department-service",
+      routePrefixes: [...DEPARTMENT_SERVICE_PREFIXES],
+    },
+    {
       key: "task-service",
       targetUrl: env.taskServiceUrl,
       auditTarget: "task-service",
@@ -68,6 +80,18 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.clientServiceUrl,
       auditTarget: "client-service",
       routePrefixes: [...CLIENT_SERVICE_PREFIXES],
+    },
+    {
+      key: "fiscal-service",
+      targetUrl: env.fiscalServiceUrl,
+      auditTarget: "fiscal-service",
+      routePrefixes: [...FISCAL_SERVICE_PREFIXES],
+    },
+    {
+      key: "contabil-service",
+      targetUrl: env.contabilServiceUrl,
+      auditTarget: "contabil-service",
+      routePrefixes: [...CONTABIL_SERVICE_PREFIXES],
     },
   ];
 }

@@ -2,6 +2,9 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import { buildAuditServiceOpenApiSpec } from "../../../audit-service/src/openapi/spec.js";
 import { buildClientServiceOpenApiSpec } from "../../../client-service/src/openapi/spec.js";
+import { buildContabilServiceOpenApiSpec } from "../../../contabil-service/src/openapi/spec.js";
+import { buildDepartmentServiceOpenApiSpec } from "../../../department-service/src/openapi/spec.js";
+import { buildFiscalServiceOpenApiSpec } from "../../../fiscal-service/src/openapi/spec.js";
 import { buildOrganizationServiceOpenApiSpec } from "../../../organization-service/src/openapi/spec.js";
 import { buildProjectServiceOpenApiSpec } from "../../../project-service/src/openapi/spec.js";
 import { buildRhServiceOpenApiSpec } from "../../../rh-service/src/openapi/spec.js";
@@ -57,6 +60,15 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       includePath: (path) => path !== "/health",
     },
     {
+      key: "department-service",
+      label: "Department Service",
+      buildSpec: () =>
+        buildDepartmentServiceOpenApiSpec({
+          port: getPortFromUrl(env.departmentServiceUrl),
+        } as never),
+      includePath: (path) => path !== "/health",
+    },
+    {
       key: "task-service",
       label: "Task Service",
       buildSpec: () =>
@@ -91,6 +103,20 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "RH Service",
       buildSpec: () =>
         buildRhServiceOpenApiSpec({ port: getPortFromUrl(env.rhServiceUrl) } as never),
+      includePath: (path) => path !== "/health",
+    },
+    {
+      key: "fiscal-service",
+      label: "Fiscal Service",
+      buildSpec: () =>
+        buildFiscalServiceOpenApiSpec({ port: getPortFromUrl(env.fiscalServiceUrl) } as never),
+      includePath: (path) => path !== "/health",
+    },
+    {
+      key: "contabil-service",
+      label: "Contabil Service",
+      buildSpec: () =>
+        buildContabilServiceOpenApiSpec({ port: getPortFromUrl(env.contabilServiceUrl) } as never),
       includePath: (path) => path !== "/health",
     },
     {

@@ -34,21 +34,25 @@
     "./logger": {
       "types": "./dist/logger/index.d.ts",
       "import": "./dist/logger/index.js",
+      "development": "./src/logger/index.ts",
       "default": "./dist/logger/index.js"
     },
     "./routes/services": {
       "types": "./dist/routes/services.d.ts",
       "import": "./dist/routes/services.js",
+      "development": "./src/routes/services.ts",
       "default": "./dist/routes/services.js"
     },
     "./schemas": {
       "types": "./dist/schemas/index.d.ts",
       "import": "./dist/schemas/index.js",
+      "development": "./src/schemas/index.ts",
       "default": "./dist/schemas/index.js"
     },
     "./storage": {
       "types": "./dist/storage/index.d.ts",
       "import": "./dist/storage/index.js",
+      "development": "./src/storage/index.ts",
       "default": "./dist/storage/index.js"
     },
     "./upload": {
@@ -60,6 +64,12 @@
       "types": "./dist/validation/index.d.ts",
       "import": "./dist/validation/index.js",
       "default": "./dist/validation/index.js"
+    },
+    "./testUtils": {
+      "types": "./dist/testUtils/index.d.ts",
+      "import": "./dist/testUtils/index.js",
+      "development": "./src/testUtils/index.ts",
+      "default": "./dist/testUtils/index.js"
     },
     "./package.json": "./package.json"
   },

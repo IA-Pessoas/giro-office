@@ -1,7 +1,12 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createTestApp, permissionServiceMock, resetUserRouteMocks } from "./userTestUtils.js";
+import {
+  createTestApp,
+  gatewayAuthHeaders,
+  permissionServiceMock,
+  resetUserRouteMocks,
+} from "./userTestUtils.js";
 
 describe("permission routes", () => {
   beforeEach(() => {
@@ -12,7 +17,10 @@ describe("permission routes", () => {
     permissionServiceMock.getByUserId.mockResolvedValue({ users: 1 });
     const app = createTestApp();
 
-    const res = await request(app).get("/user/permission/user-3").query({ modulo: "users" });
+    const res = await request(app)
+      .get("/user/permission/user-3")
+      .set(gatewayAuthHeaders())
+      .query({ modulo: "users" });
 
     expect(res.status).toBe(200);
     expect(permissionServiceMock.getByUserId).toHaveBeenCalledWith("user-3", "users");
@@ -22,7 +30,7 @@ describe("permission routes", () => {
     permissionServiceMock.update.mockResolvedValue({ users: 2 });
     const app = createTestApp();
 
-    const res = await request(app).put("/user/permission/user-3").send({
+    const res = await request(app).put("/user/permission/user-3").set(gatewayAuthHeaders()).send({
       users: 2,
       finance: null,
     });

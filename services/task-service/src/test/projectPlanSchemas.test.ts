@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   projectPlanAddTaskBodySchema,
   projectPlanDeleteParamsSchema,
-  projectPlanDetailQuerySchema,
   projectPlanDeleteTaskBodySchema,
+  projectPlanDetailQuerySchema,
   projectPlanHireBodySchema,
   projectPlanListTasksQuerySchema,
   projectPlanReorderTaskBodySchema,
@@ -16,10 +16,14 @@ const UUID = "11111111-1111-1111-1111-111111111111";
 
 describe("project-plan schemas (UUID)", () => {
   it("aceita UUIDs validos", () => {
-    expect(() => parseWithZod(projectPlanUpdateBodySchema, { id: UUID, name: "x", color: "#000" })).not.toThrow();
+    expect(() =>
+      parseWithZod(projectPlanUpdateBodySchema, { id: UUID, name: "x", color: "#000" }),
+    ).not.toThrow();
     expect(() => parseWithZod(projectPlanDetailQuerySchema, { plan_id: UUID })).not.toThrow();
     expect(() => parseWithZod(projectPlanDeleteParamsSchema, { id: UUID })).not.toThrow();
-    expect(() => parseWithZod(projectPlanAddTaskBodySchema, { plan_id: UUID, task_id: UUID })).not.toThrow();
+    expect(() =>
+      parseWithZod(projectPlanAddTaskBodySchema, { plan_id: UUID, task_id: UUID }),
+    ).not.toThrow();
     expect(() => parseWithZod(projectPlanListTasksQuerySchema, { plan_id: UUID })).not.toThrow();
     expect(() =>
       parseWithZod(projectPlanReorderTaskBodySchema, {
@@ -28,8 +32,12 @@ describe("project-plan schemas (UUID)", () => {
         direction: "up",
       }),
     ).not.toThrow();
-    expect(() => parseWithZod(projectPlanDeleteTaskBodySchema, { plan_id: UUID, plan_task_id: UUID })).not.toThrow();
-    expect(() => parseWithZod(projectPlanHireBodySchema, { project_id: UUID, plan_id: UUID })).not.toThrow();
+    expect(() =>
+      parseWithZod(projectPlanDeleteTaskBodySchema, { plan_id: UUID, plan_task_id: UUID }),
+    ).not.toThrow();
+    expect(() =>
+      parseWithZod(projectPlanHireBodySchema, { project_id: UUID, plan_id: UUID }),
+    ).not.toThrow();
   });
 
   it("rejeita quando um UUID e invalido (400)", () => {
@@ -42,4 +50,3 @@ describe("project-plan schemas (UUID)", () => {
     }
   });
 });
-

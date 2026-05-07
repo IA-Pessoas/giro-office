@@ -1,8 +1,12 @@
-import { Writable } from "node:stream";
-
+import {
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+} from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
 import type { NextFunction } from "express";
-import { vi, type Mock } from "vitest";
+import { type Mock, vi } from "vitest";
 
 interface UserRouteMocks {
   authServiceMock: {
@@ -23,30 +27,34 @@ interface UserRouteMocks {
   storageServiceMock: {
     uploadUserPhoto: Mock;
     deleteUserPhoto: Mock;
+    readUserPhoto: Mock;
   };
 }
 
-const userRouteMocks: UserRouteMocks = vi.hoisted((): UserRouteMocks => ({
-  authServiceMock: {
-    login: vi.fn(),
-    firstCreate: vi.fn(),
-  },
-  userServiceMock: {
-    list: vi.fn(),
-    getById: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  permissionServiceMock: {
-    getByUserId: vi.fn(),
-    update: vi.fn(),
-  },
-  storageServiceMock: {
-    uploadUserPhoto: vi.fn(),
-    deleteUserPhoto: vi.fn(),
-  },
-}));
+const userRouteMocks: UserRouteMocks = vi.hoisted(
+  (): UserRouteMocks => ({
+    authServiceMock: {
+      login: vi.fn(),
+      firstCreate: vi.fn(),
+    },
+    userServiceMock: {
+      list: vi.fn(),
+      getById: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    permissionServiceMock: {
+      getByUserId: vi.fn(),
+      update: vi.fn(),
+    },
+    storageServiceMock: {
+      uploadUserPhoto: vi.fn(),
+      deleteUserPhoto: vi.fn(),
+      readUserPhoto: vi.fn(),
+    },
+  }),
+);
 
 vi.mock("../services/authService.js", () => ({
   AuthService: vi.fn(function AuthService() {
@@ -91,14 +99,20 @@ vi.mock("@workspace/shared/upload", () => ({
 import { createUserApp } from "../app.js";
 import { getUserServiceEnv } from "../config/env.js";
 
-class MemoryLogStream extends Writable {
-  _write(
-    _chunk: string | Uint8Array,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
-    callback();
-  }
+const DEFAULT_TEST_ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
+const DEFAULT_TEST_USER_ID = "c0000000-0000-4000-8000-000000000001";
+
+/** Headers como o gateway envia após JWT válido (alinhado ao department-service). */
+export function gatewayAuthHeaders(overrides?: {
+  userId?: string;
+  organizationId?: string;
+}): Record<string, string> {
+  return {
+    [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
+    [FORWARDED_AUTH_USER_ID_HEADER]: overrides?.userId ?? DEFAULT_TEST_USER_ID,
+    [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]:
+      overrides?.organizationId ?? DEFAULT_TEST_ORGANIZATION_ID,
+  };
 }
 
 export function createTestApp() {

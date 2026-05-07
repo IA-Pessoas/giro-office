@@ -1,34 +1,23 @@
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
-import { Writable } from "node:stream";
-import { expect, it } from "vitest";
-
-import {
-  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
-  FORWARDED_AUTH_PERMISSION_HEADER,
-  FORWARDED_AUTH_USER_ID_HEADER,
-  INTERNAL_SERVICE_TOKEN_HEADER,
-} from "@workspace/shared/http";
+import { createLogger } from "@workspace/shared";
 import type {
   AuditRequestRecord,
   AuditSearchFilters,
   AuditSearchResult,
   CreateAuditRequestPayload,
 } from "@workspace/shared/audit";
-import { createLogger } from "@workspace/shared";
+import {
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+} from "@workspace/shared/http";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
+import { expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import type { AuditServiceEnv } from "../src/config/env.js";
 import type { AuditRequestRepository } from "../src/integrations/prisma/auditRequestRepository.js";
-
-class MemoryLogStream extends Writable {
-  _write(
-    _chunk: string | Uint8Array,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
-    callback();
-  }
-}
 
 function createTestRepository(): AuditRequestRepository {
   const records = new Map<string, AuditRequestRecord>();

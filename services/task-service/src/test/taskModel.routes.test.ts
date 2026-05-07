@@ -1,5 +1,5 @@
-import request from "supertest";
 import { ServiceError } from "@workspace/shared";
+import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createTestApp, resetTaskRouteMocks, taskModelServiceMock } from "./taskTestUtils.js";
@@ -79,7 +79,9 @@ describe("task model routes", () => {
   it("GET /task/model/list lista modelos", async () => {
     const app = createTestApp();
 
-    const res = await request(app).get("/task/model/list").query({ type: "fiscal", billing: "Realizar" });
+    const res = await request(app)
+      .get("/task/model/list")
+      .query({ type: "fiscal", billing: "Realizar" });
 
     expect(res.status).toBe(200);
     expect(taskModelServiceMock.listModel).toHaveBeenCalledWith("fiscal", "Realizar", "org-1");

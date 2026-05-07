@@ -7,21 +7,21 @@ import express, { type Request, type Response } from "express";
 import "express-async-errors";
 
 import type { RhEnv } from "./config/env.js";
-import { buildRhServiceOpenApiSpec } from "./openapi/spec.js";
 import { requestContext } from "./middlewares/requestContext.js";
+import { buildRhServiceOpenApiSpec } from "./openapi/spec.js";
 import categoryRoutes from "./routes/category.routes.js";
 import holidayRoutes from "./routes/holiday.routes.js";
 import messageRoutes from "./routes/message.routes.js";
 import pointRoutes from "./routes/point.routes.js";
 import pointConfigRoutes from "./routes/pointConfig.routes.js";
 import requestRoutes from "./routes/request.routes.js";
+import scoreEvaluationRoutes from "./routes/scoreEvaluation.routes.js";
 import scoreNitroRoutes from "./routes/scoreNitro.routes.js";
+import scoreQuarterRoutes from "./routes/scoreQuarter.routes.js";
+import scoreQuestionRoutes from "./routes/scoreQuestion.routes.js";
 import timeBankReleaseRoutes from "./routes/timeBankRelease.routes.js";
 import timeClockRequestRoutes from "./routes/timeClockRequest.routes.js";
 import timeSheetRoutes from "./routes/timeSheet.routes.js";
-import scoreQuestionRoutes from "./routes/scoreQuestion.routes.js";
-import scoreQuarterRoutes from "./routes/scoreQuarter.routes.js";
-import scoreEvaluationRoutes from "./routes/scoreEvaluation.routes.js";
 
 function rhErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;

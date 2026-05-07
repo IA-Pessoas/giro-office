@@ -1,11 +1,7 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  createTestApp,
-  resetRhRouteMocks,
-  timeBankReleaseServiceMock,
-} from "./rhTestUtils.js";
+import { createTestApp, resetRhRouteMocks, timeBankReleaseServiceMock } from "./rhTestUtils.js";
 
 describe("timeBankRelease routes", () => {
   const itemId = "00000000-0000-4000-8000-000000000010";

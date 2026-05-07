@@ -27,7 +27,9 @@ describe("task crud routes", () => {
   it("GET /task/list lista tarefas", async () => {
     const app = createTestApp();
 
-    const res = await request(app).get("/task/list").query({ status: "Todos", page: "1", limit: "20" });
+    const res = await request(app)
+      .get("/task/list")
+      .query({ status: "Todos", page: "1", limit: "20" });
 
     expect(res.status).toBe(200);
     expect(taskCrudServiceMock.listTasks).toHaveBeenCalledTimes(1);

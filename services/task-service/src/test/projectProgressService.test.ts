@@ -34,9 +34,7 @@ describe("project-progress integration", () => {
       [FORWARDED_AUTH_USER_ID_HEADER]: "c0000000-0000-4000-8000-000000000001",
       [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "a0000000-0000-4000-8000-000000000001",
     });
-    expect(init?.body).toBe(
-      JSON.stringify({ project_id: "d0000000-0000-4000-8000-000000000001" }),
-    );
+    expect(init?.body).toBe(JSON.stringify({ project_id: "d0000000-0000-4000-8000-000000000001" }));
   });
 
   it("envolve resposta não-OK em ServiceError 502", async () => {
@@ -64,4 +62,3 @@ describe("project-progress integration", () => {
     ).rejects.toMatchObject({ statusCode: 502 });
   });
 });
-

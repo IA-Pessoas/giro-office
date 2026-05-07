@@ -6,7 +6,7 @@ export function canSSRAuth<P>(fn: GetServerSideProps<P>) {
   return async (ctx: GetServerSidePropsContext): Promise<GetServerSidePropsResult<P>> => {
     const cookies = parseCookies(ctx);
 
-    const token = cookies['@cw.token'];
+    const token = cookies['cw.token'];
 
     if(!token){
       return{
@@ -21,7 +21,7 @@ export function canSSRAuth<P>(fn: GetServerSideProps<P>) {
       return await fn(ctx);
     }catch(err){
       // Sempre destrói o cookie em caso de erro para evitar loops
-      destroyCookie(ctx, '@cw.token', { path: '/' });
+      destroyCookie(ctx, 'cw.token', { path: '/' });
       
       if(err instanceof AuthTokenError || (err instanceof Error && (err.message === 'Unauthorized' || err.message.includes('401')))){
         return{

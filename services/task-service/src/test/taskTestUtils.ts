@@ -1,8 +1,7 @@
-import { Writable } from "node:stream";
-
 import { createLogger } from "@workspace/shared/logger";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
 import type { NextFunction } from "express";
-import { vi, type Mock } from "vitest";
+import { type Mock, vi } from "vitest";
 
 interface TaskRouteMocks {
   taskCrudServiceMock: {
@@ -41,42 +40,44 @@ interface TaskRouteMocks {
   };
 }
 
-const taskRouteMocks: TaskRouteMocks = vi.hoisted((): TaskRouteMocks => ({
-  taskCrudServiceMock: {
-    createTask: vi.fn(),
-    listTasks: vi.fn(),
-    updateTask: vi.fn(),
-    detailTask: vi.fn(),
-    deleteTask: vi.fn(),
-  },
-  taskModelServiceMock: {
-    createModel: vi.fn(),
-    detailModel: vi.fn(),
-    updateModel: vi.fn(),
-    listModel: vi.fn(),
-    deleteModel: vi.fn(),
-  },
-  taskDependentServiceMock: {
-    addDependent: vi.fn(),
-    listDependents: vi.fn(),
-    deleteDependent: vi.fn(),
-  },
-  taskIntegrationRegularizeServiceMock: {
-    createLink: vi.fn(),
-    removeLink: vi.fn(),
-    list: vi.fn(),
-  },
-  taskLifecycleServiceMock: {
-    concludeTask: vi.fn(),
-    approveTaskCompletion: vi.fn(),
-  },
-  taskComercialServiceMock: {
-    updateChargeComercial: vi.fn(),
-  },
-  taskFinanceiroServiceMock: {
-    updateChargeFinanceiro: vi.fn(),
-  },
-}));
+const taskRouteMocks: TaskRouteMocks = vi.hoisted(
+  (): TaskRouteMocks => ({
+    taskCrudServiceMock: {
+      createTask: vi.fn(),
+      listTasks: vi.fn(),
+      updateTask: vi.fn(),
+      detailTask: vi.fn(),
+      deleteTask: vi.fn(),
+    },
+    taskModelServiceMock: {
+      createModel: vi.fn(),
+      detailModel: vi.fn(),
+      updateModel: vi.fn(),
+      listModel: vi.fn(),
+      deleteModel: vi.fn(),
+    },
+    taskDependentServiceMock: {
+      addDependent: vi.fn(),
+      listDependents: vi.fn(),
+      deleteDependent: vi.fn(),
+    },
+    taskIntegrationRegularizeServiceMock: {
+      createLink: vi.fn(),
+      removeLink: vi.fn(),
+      list: vi.fn(),
+    },
+    taskLifecycleServiceMock: {
+      concludeTask: vi.fn(),
+      approveTaskCompletion: vi.fn(),
+    },
+    taskComercialServiceMock: {
+      updateChargeComercial: vi.fn(),
+    },
+    taskFinanceiroServiceMock: {
+      updateChargeFinanceiro: vi.fn(),
+    },
+  }),
+);
 
 vi.mock("../services/taskCrudService.js", () => ({
   TaskCrudService: vi.fn(function TaskCrudService() {
@@ -121,11 +122,7 @@ vi.mock("../services/taskFinanceiroService.js", () => ({
 }));
 
 vi.mock("../middlewares/isAuthenticated.js", () => ({
-  isAuthenticated: (
-    req: Express.Request,
-    _res: Express.Response,
-    next: NextFunction,
-  ) => {
+  isAuthenticated: (req: Express.Request, _res: Express.Response, next: NextFunction) => {
     req.user_id = "user-1";
     req.organization_id = "org-1";
     next();
@@ -134,16 +131,6 @@ vi.mock("../middlewares/isAuthenticated.js", () => ({
 
 import { createTaskApp } from "../app.js";
 import type { TaskServiceEnv } from "../config/env.js";
-
-class MemoryLogStream extends Writable {
-  _write(
-    _chunk: string | Uint8Array,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
-    callback();
-  }
-}
 
 export function createTestApp() {
   const env = {
@@ -206,7 +193,8 @@ export function resetTaskRouteMocks() {
   taskFinanceiroServiceMock.updateChargeFinanceiro.mockResolvedValue({ id: "task-1" });
 }
 
-const taskCrudServiceMock: TaskRouteMocks["taskCrudServiceMock"] = taskRouteMocks.taskCrudServiceMock;
+const taskCrudServiceMock: TaskRouteMocks["taskCrudServiceMock"] =
+  taskRouteMocks.taskCrudServiceMock;
 const taskModelServiceMock: TaskRouteMocks["taskModelServiceMock"] =
   taskRouteMocks.taskModelServiceMock;
 const taskDependentServiceMock: TaskRouteMocks["taskDependentServiceMock"] =

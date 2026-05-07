@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   createTestApp,
+  gatewayAuthHeaders,
   resetUserRouteMocks,
   storageServiceMock,
   userServiceMock,
@@ -13,11 +14,20 @@ describe("user routes", () => {
     resetUserRouteMocks();
   });
 
+  it("GET /user retorna 401 sem autenticacao", async () => {
+    const app = createTestApp();
+    const res = await request(app).get("/user");
+    expect(res.status).toBe(401);
+  });
+
   it("GET /user lista usuarios", async () => {
     userServiceMock.list.mockResolvedValue([{ id: "user-1" }]);
     const app = createTestApp();
 
-    const res = await request(app).get("/user").query({ skip: 5, take: 10 });
+    const res = await request(app)
+      .get("/user")
+      .set(gatewayAuthHeaders())
+      .query({ skip: 5, take: 10 });
 
     expect(res.status).toBe(200);
     expect(userServiceMock.list).toHaveBeenCalledWith({ skip: 5, take: 10 });
@@ -27,7 +37,7 @@ describe("user routes", () => {
     userServiceMock.getById.mockResolvedValue({ id: "user-2" });
     const app = createTestApp();
 
-    const res = await request(app).get("/user/user-2");
+    const res = await request(app).get("/user/user-2").set(gatewayAuthHeaders());
 
     expect(res.status).toBe(200);
     expect(userServiceMock.getById).toHaveBeenCalledWith("user-2");
@@ -37,7 +47,7 @@ describe("user routes", () => {
     userServiceMock.create.mockResolvedValue({ id: "user-3" });
     const app = createTestApp();
 
-    const res = await request(app).post("/user").send({
+    const res = await request(app).post("/user").set(gatewayAuthHeaders()).send({
       name: "Novo Usuario",
       login: "novo.usuario",
       password: "secret",
@@ -60,7 +70,7 @@ describe("user routes", () => {
     userServiceMock.update.mockResolvedValue({ id: "user-3" });
     const app = createTestApp();
 
-    const res = await request(app).patch("/user/user-3").send({
+    const res = await request(app).patch("/user/user-3").set(gatewayAuthHeaders()).send({
       name: "Usuario Atualizado",
     });
 
@@ -70,12 +80,54 @@ describe("user routes", () => {
     });
   });
 
+  it("GET /user/:id/photo retorna JSON com url quando a foto e URL publica", async () => {
+    userServiceMock.getById.mockResolvedValue({
+      id: "user-3",
+      photo_url: "https://cdn/avatar.png",
+    });
+    storageServiceMock.readUserPhoto.mockReturnValue("https://cdn/avatar.png");
+    const app = createTestApp();
+
+    const res = await request(app).get("/user/user-3/photo").set(gatewayAuthHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      success: true,
+      data: { url: "https://cdn/avatar.png" },
+    });
+    expect(storageServiceMock.readUserPhoto).toHaveBeenCalledWith("https://cdn/avatar.png");
+  });
+
+  it("GET /user/:id/photo retorna 404 quando photo_url nao e URL publica", async () => {
+    userServiceMock.getById.mockResolvedValue({
+      id: "user-3",
+      photo_url: "users/user-3/photo.png",
+    });
+    storageServiceMock.readUserPhoto.mockReturnValue(null);
+    const app = createTestApp();
+
+    const res = await request(app).get("/user/user-3/photo").set(gatewayAuthHeaders());
+
+    expect(res.status).toBe(404);
+    expect(storageServiceMock.readUserPhoto).toHaveBeenCalledWith("users/user-3/photo.png");
+  });
+
+  it("GET /user/:id/photo retorna 404 quando nao ha foto", async () => {
+    userServiceMock.getById.mockResolvedValue({ id: "user-3", photo_url: null });
+    storageServiceMock.readUserPhoto.mockReturnValue(null);
+    const app = createTestApp();
+
+    const res = await request(app).get("/user/user-3/photo").set(gatewayAuthHeaders());
+
+    expect(res.status).toBe(404);
+  });
+
   it("POST /user/:id/photo faz upload e atualiza foto", async () => {
     storageServiceMock.uploadUserPhoto.mockResolvedValue("https://cdn/avatar.png");
     userServiceMock.update.mockResolvedValue({ id: "user-3", photo_url: "https://cdn/avatar.png" });
     const app = createTestApp();
 
-    const res = await request(app).post("/user/user-3/photo");
+    const res = await request(app).post("/user/user-3/photo").set(gatewayAuthHeaders());
 
     expect(res.status).toBe(200);
     expect(storageServiceMock.uploadUserPhoto).toHaveBeenCalledTimes(1);
@@ -89,7 +141,7 @@ describe("user routes", () => {
     userServiceMock.update.mockResolvedValue({ id: "user-3", photo_url: null });
     const app = createTestApp();
 
-    const res = await request(app).delete("/user/user-3/photo");
+    const res = await request(app).delete("/user/user-3/photo").set(gatewayAuthHeaders());
 
     expect(res.status).toBe(200);
     expect(storageServiceMock.deleteUserPhoto).toHaveBeenCalledWith("user-3");
@@ -100,7 +152,7 @@ describe("user routes", () => {
     userServiceMock.delete.mockResolvedValue(undefined);
     const app = createTestApp();
 
-    const res = await request(app).delete("/user/user-3");
+    const res = await request(app).delete("/user/user-3").set(gatewayAuthHeaders());
 
     expect(res.status).toBe(200);
     expect(userServiceMock.delete).toHaveBeenCalledWith("user-3");

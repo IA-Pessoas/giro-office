@@ -1,8 +1,8 @@
-import type { ProjectPlanAudit, ProjectPlanPrisma } from "../services/projectPlanService.js";
-import type { CreateTaskCrudRequest } from "../services/taskCrudService.js";
-import { ProjectPlanService } from "../services/projectPlanService.js";
-import { TaskCrudService } from "../services/taskCrudService.js";
 import { describe, expect, it } from "vitest";
+import type { ProjectPlanAudit, ProjectPlanPrisma } from "../services/projectPlanService.js";
+import { ProjectPlanService } from "../services/projectPlanService.js";
+import type { CreateTaskCrudRequest } from "../services/taskCrudService.js";
+import { TaskCrudService } from "../services/taskCrudService.js";
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -228,7 +228,9 @@ describe("ProjectPlanService", () => {
 
   it("reorderTask lança 403 quando usuário não tem permissão", async () => {
     const prisma = createBasePrisma();
-    prisma.projectPlanTasks.findFirst = async (args?: { where?: { id?: string; order?: number } }) => {
+    prisma.projectPlanTasks.findFirst = async (args?: {
+      where?: { id?: string; order?: number };
+    }) => {
       if (args?.where?.id === "plan-task-1") {
         return { id: "plan-task-1", order: 2 };
       }
@@ -253,21 +255,20 @@ describe("ProjectPlanService", () => {
 
   it("deleteTask lança 403 quando usuário não tem permissão", async () => {
     const prisma = createBasePrisma();
-    prisma.projectPlanTasks.findFirst = async () =>
-      ({
-        id: "plan-task-1",
-        plan_id: PLAN_ID,
-        task_id: "model-1",
-        order: 1,
-        tasks: {
-          id: "model-1",
-          name: "Modelo",
-          department_id: "dep-1",
-          billing: "Realizar",
-          prevision: 3,
-          type: "regularize",
-        },
-      });
+    prisma.projectPlanTasks.findFirst = async () => ({
+      id: "plan-task-1",
+      plan_id: PLAN_ID,
+      task_id: "model-1",
+      order: 1,
+      tasks: {
+        id: "model-1",
+        name: "Modelo",
+        department_id: "dep-1",
+        billing: "Realizar",
+        prevision: 3,
+        type: "regularize",
+      },
+    });
     prisma.user.findFirst = async () => ({ id: USER_ID, permission: 1 });
     const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
 
