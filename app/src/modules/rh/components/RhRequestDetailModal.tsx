@@ -94,6 +94,12 @@ export function RhRequestDetailModal({
         </div>
       ) : null}
 
+      {!requestQuery.isLoading && !requestQuery.error && !request ? (
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/20 dark:text-gray-300">
+          Solicitação não encontrada.
+        </div>
+      ) : null}
+
       {!requestQuery.isLoading && !requestQuery.error && request ? (
         <>
           <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900/20">

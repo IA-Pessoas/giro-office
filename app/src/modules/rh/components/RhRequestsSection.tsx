@@ -30,7 +30,7 @@ export function RhRequestsSection() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [editingRequest, setEditingRequest] = useState<RhRequest | null>(null);
 
-  const categoriesQuery = useRhCategories();
+  const categoriesQuery = useRhCategories({ activeOnly: true });
   const assignableUsersQuery = useAssignableUsers();
   const deleteRequestMutation = useDeleteRhRequestMutation();
   const requestsQuery = useRhRequests({

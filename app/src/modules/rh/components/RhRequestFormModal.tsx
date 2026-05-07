@@ -11,8 +11,10 @@ import type {
   AssignableUser,
   RhCategory,
   RhRequest,
+  RhRequestStatus,
   RhRequestUrgency,
 } from "../types";
+import { RH_REQUEST_STATUS_META } from "../utils/rhRequestUi";
 
 interface RhRequestFormModalProps {
   open: boolean;
@@ -28,6 +30,7 @@ interface RhRequestFormState {
   category_id: string;
   assigned_to_user_id: string;
   urgency: RhRequestUrgency;
+  status: RhRequestStatus;
 }
 
 const DEFAULT_FORM_STATE: RhRequestFormState = {
@@ -36,6 +39,7 @@ const DEFAULT_FORM_STATE: RhRequestFormState = {
   category_id: "",
   assigned_to_user_id: "",
   urgency: "Medium",
+  status: "New",
 };
 
 function buildFormState(request: RhRequest | null): RhRequestFormState {
@@ -49,6 +53,7 @@ function buildFormState(request: RhRequest | null): RhRequestFormState {
     category_id: request.category_id,
     assigned_to_user_id: request.assigned_to_user_id,
     urgency: request.urgency,
+    status: request.status,
   };
 }
 
@@ -107,6 +112,7 @@ export function RhRequestFormModal({
           category_id: formState.category_id,
           assigned_to_user_id: formState.assigned_to_user_id,
           urgency: formState.urgency,
+          status: formState.status,
         });
         toast.success("Solicitação atualizada com sucesso.");
       } else {
@@ -239,6 +245,25 @@ export function RhRequestFormModal({
             placeholder="Descreva o contexto da solicitação"
           />
         </label>
+
+        {isEditing ? (
+          <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300 md:col-span-2">
+            <span>Status</span>
+            <select
+              value={formState.status}
+              onChange={(event) =>
+                handleChange("status", event.target.value as RhRequestStatus)
+              }
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-rose-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              {Object.entries(RH_REQUEST_STATUS_META).map(([value, meta]) => (
+                <option key={value} value={value}>
+                  {meta.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </div>
     </Dialog>
   );
