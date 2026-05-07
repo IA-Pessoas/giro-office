@@ -23,6 +23,11 @@ export interface TimeClockRequestApproveInput {
   obs_approver?: string | null;
 }
 
+export interface TimeClockRequestListFilters {
+  status?: "Pendente" | "Aprovado";
+  user_id?: string;
+}
+
 const TIME_CLOCK_REQUEST_SELECT = {
   id: true,
   user_id: true,
@@ -55,16 +60,16 @@ class TimeClockRequestService {
       const justification = assertNonEmptyString(input.justification, "justification");
 
       if (Number.isNaN(input.clock_in.getTime())) {
-        throw new ServiceError(400, "clock_in inválido.");
+        throw new ServiceError(400, "clock_in invalido.");
       }
       if (Number.isNaN(input.lunch_out.getTime())) {
-        throw new ServiceError(400, "lunch_out inválido.");
+        throw new ServiceError(400, "lunch_out invalido.");
       }
       if (Number.isNaN(input.lunch_in.getTime())) {
-        throw new ServiceError(400, "lunch_in inválido.");
+        throw new ServiceError(400, "lunch_in invalido.");
       }
       if (Number.isNaN(input.clock_out.getTime())) {
-        throw new ServiceError(400, "clock_out inválido.");
+        throw new ServiceError(400, "clock_out invalido.");
       }
 
       const point = await prismaClient.point.findUnique({
@@ -77,16 +82,16 @@ class TimeClockRequestService {
       });
 
       if (!point) {
-        throw new ServiceError(404, "Registro de ponto não encontrado.");
+        throw new ServiceError(404, "Registro de ponto nao encontrado.");
       }
       if (point.user_id !== userId) {
-        throw new ServiceError(403, "Só é possível solicitar ajuste para o próprio ponto.");
+        throw new ServiceError(403, "So e possivel solicitar ajuste para o proprio ponto.");
       }
       if (point.organization_id !== organizationId) {
-        throw new ServiceError(403, "Registro de ponto pertence a outra organização.");
+        throw new ServiceError(403, "Registro de ponto pertence a outra organizacao.");
       }
 
-      const created = await prismaClient.timeClockRequest.create({
+      return await prismaClient.timeClockRequest.create({
         data: {
           user_id: userId,
           organization_id: organizationId,
@@ -101,13 +106,11 @@ class TimeClockRequestService {
         },
         select: TIME_CLOCK_REQUEST_SELECT,
       });
-
-      return created;
     } catch (err: unknown) {
-      logError("Erro ao criar solicitação de ajuste de ponto", { err });
+      logError("Erro ao criar solicitacao de ajuste de ponto", { err });
       if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao criar solicitação de ajuste. ${msg}`, err);
+      throw new ServiceError(500, `Erro interno ao criar solicitacao de ajuste. ${msg}`, err);
     }
   }
 
@@ -123,13 +126,13 @@ class TimeClockRequestService {
       });
 
       if (!request) {
-        throw new ServiceError(404, "Solicitação não encontrada.");
+        throw new ServiceError(404, "Solicitacao nao encontrada.");
       }
       if (request.organization_id !== organizationId) {
-        throw new ServiceError(403, "Solicitação pertence a outra organização.");
+        throw new ServiceError(403, "Solicitacao pertence a outra organizacao.");
       }
       if (request.status !== "Pendente") {
-        throw new ServiceError(409, "Solicitação não está pendente de aprovação.");
+        throw new ServiceError(409, "Solicitacao nao esta pendente de aprovacao.");
       }
 
       const point = await prismaClient.point.findUnique({
@@ -143,10 +146,10 @@ class TimeClockRequestService {
       });
 
       if (!point) {
-        throw new ServiceError(404, "Registro de ponto vinculado não encontrado.");
+        throw new ServiceError(404, "Registro de ponto vinculado nao encontrado.");
       }
       if (point.organization_id !== organizationId) {
-        throw new ServiceError(403, "Registro de ponto pertence a outra organização.");
+        throw new ServiceError(403, "Registro de ponto pertence a outra organizacao.");
       }
 
       if (point.time_bank_balance !== null && point.time_bank_balance !== undefined) {
@@ -170,7 +173,7 @@ class TimeClockRequestService {
 
       await this.pointService.calculateDailyHours(point.id, organizationId);
 
-      const updated = await prismaClient.timeClockRequest.update({
+      return await prismaClient.timeClockRequest.update({
         where: { id: requestId },
         data: {
           status: "Aprovado",
@@ -184,13 +187,41 @@ class TimeClockRequestService {
         },
         select: TIME_CLOCK_REQUEST_SELECT,
       });
-
-      return updated;
     } catch (err: unknown) {
-      logError("Erro ao aprovar solicitação de ajuste de ponto", { err });
+      logError("Erro ao aprovar solicitacao de ajuste de ponto", { err });
       if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao aprovar solicitação. ${msg}`, err);
+      throw new ServiceError(500, `Erro interno ao aprovar solicitacao. ${msg}`, err);
+    }
+  }
+
+  async list(
+    organizationId: string,
+    filters: TimeClockRequestListFilters,
+  ): Promise<TimeClockRequestSnapshot[]> {
+    try {
+      const orgId = assertNonEmptyString(organizationId, "organization_id");
+
+      const where: Prisma.TimeClockRequestWhereInput = {
+        organization_id: orgId,
+      };
+      if (filters.status !== undefined) {
+        where.status = filters.status;
+      }
+      if (filters.user_id !== undefined) {
+        where.user_id = filters.user_id;
+      }
+
+      return await prismaClient.timeClockRequest.findMany({
+        where,
+        select: TIME_CLOCK_REQUEST_SELECT,
+        orderBy: [{ date: "desc" }, { id: "desc" }],
+      });
+    } catch (err: unknown) {
+      logError("Erro ao listar solicitacoes de ajuste de ponto", { err });
+      if (err instanceof ServiceError) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao listar solicitacoes de ajuste. ${msg}`, err);
     }
   }
 }

@@ -1,42 +1,65 @@
 import {
   createSuccessResponse,
+  getSingleTrimmedQueryValue,
   error as logError,
   parseIsoDate,
   parseWithZod,
-  ServiceError,
+  requireAuthenticatedRequestContext,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
+
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   approveAdjustmentBodySchema,
   createAdjustmentRequestBodySchema,
+  listAdjustmentRequestsQuerySchema,
 } from "../schemas/timeClockRequest.schemas.js";
 import { TimeClockRequestService } from "../services/timeClockRequestService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const timeClockRequestService = new TimeClockRequestService();
 
+router.get(
+  "/adjustment/requests",
+  isAuthenticated,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
+      const queryInput = {
+        status: getSingleTrimmedQueryValue(req.query.status),
+        user_id: getSingleTrimmedQueryValue(req.query.user_id),
+      };
+      const query = parseWithZod(listAdjustmentRequestsQuerySchema, queryInput);
+
+      const result = await timeClockRequestService.list(organization_id, {
+        status: query.status,
+        user_id: query.user_id,
+      });
+
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao listar solicitacoes de ajuste de ponto", { err });
+      next(err);
+    }
+  },
+);
+
 router.post(
   "/adjustment/request",
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const organizationId = req.organization_id;
-      const userId = req.user_id;
-      if (!organizationId) {
-        throw new ServiceError(400, "organization_id é obrigatório.");
-      }
-      if (!userId) {
-        throw new ServiceError(400, "user_id é obrigatório.");
-      }
+      const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+        statusCode: 400,
+      });
 
       const parsed = parseWithZod(createAdjustmentRequestBodySchema, req.body);
       const lunch_in = parseIsoDate(parsed.lunch_in, "lunch_in");
 
       const result = await timeClockRequestService.create({
-        user_id: userId,
-        organization_id: organizationId,
+        user_id,
+        organization_id,
         point_id: parsed.point_id,
         clock_in: parsed.clock_in,
         lunch_out: parsed.lunch_out,
@@ -62,21 +85,16 @@ router.put(
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const organizationId = req.organization_id;
-      const userId = req.user_id;
-      if (!organizationId) {
-        throw new ServiceError(400, "organization_id é obrigatório.");
-      }
-      if (!userId) {
-        throw new ServiceError(400, "user_id é obrigatório.");
-      }
+      const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+        statusCode: 400,
+      });
 
       const body = parseWithZod(approveAdjustmentBodySchema, req.body);
 
       const result = await timeClockRequestService.approve({
         request_id: body.request_id,
-        approver_user_id: userId,
-        organization_id: organizationId,
+        approver_user_id: user_id,
+        organization_id,
         obs_approver:
           body.obs_approver === undefined
             ? undefined

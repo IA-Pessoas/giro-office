@@ -9,6 +9,7 @@ const { prismaMock, pointServiceMock } = vi.hoisted(() => ({
     timeClockRequest: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn(),
     },
     pointsConfig: {
@@ -32,7 +33,7 @@ import { TimeClockRequestService } from "../services/timeClockRequestService.js"
 describe("TimeClockRequestService", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("create lança 404 quando ponto não existe", async () => {
+  it("create lanca 404 quando ponto nao existe", async () => {
     prismaMock.point.findUnique.mockResolvedValue(null);
     const service = new TimeClockRequestService();
     await expect(
@@ -49,7 +50,7 @@ describe("TimeClockRequestService", () => {
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 
-  it("approve lança 404 quando solicitação não existe", async () => {
+  it("approve lanca 404 quando solicitacao nao existe", async () => {
     prismaMock.timeClockRequest.findUnique.mockResolvedValue(null);
     const service = new TimeClockRequestService();
     await expect(
@@ -59,5 +60,37 @@ describe("TimeClockRequestService", () => {
         organization_id: "org-1",
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("list filtra por status", async () => {
+    prismaMock.timeClockRequest.findMany.mockResolvedValue([]);
+    const service = new TimeClockRequestService();
+
+    await service.list("org-1", { status: "Pendente" });
+
+    expect(prismaMock.timeClockRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organization_id: "org-1",
+          status: "Pendente",
+        }),
+      }),
+    );
+  });
+
+  it("list filtra por user_id", async () => {
+    prismaMock.timeClockRequest.findMany.mockResolvedValue([]);
+    const service = new TimeClockRequestService();
+
+    await service.list("org-1", { user_id: "user-1" });
+
+    expect(prismaMock.timeClockRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organization_id: "org-1",
+          user_id: "user-1",
+        }),
+      }),
+    );
   });
 });

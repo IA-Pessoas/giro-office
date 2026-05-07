@@ -490,6 +490,45 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/point": {
+        get: {
+          tags: ["Ponto"],
+          summary: "Listar registros de ponto",
+          security: bearer,
+          parameters: [
+            { name: "date_from", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "date_to", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Lista de registros", ...successJson },
+          },
+        },
+      },
+      "/rh/point/me/today": {
+        get: {
+          tags: ["Ponto"],
+          summary: "Buscar ponto do dia do usuario autenticado",
+          security: bearer,
+          responses: {
+            "200": { description: "Ponto do dia", ...successJson },
+          },
+        },
+      },
+      "/rh/point/summary": {
+        get: {
+          tags: ["Ponto"],
+          summary: "Gerar resumo mensal de ponto",
+          security: bearer,
+          parameters: [
+            { name: "month", in: "query", required: true, schema: { type: "string", example: "2026-05" } },
+            { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Resumo mensal", ...successJson },
+          },
+        },
+      },
       "/rh/point/adjustment/request": {
         post: {
           tags: ["Ponto"],
@@ -509,6 +548,20 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           ...approveTimeClockAdjustmentRequestBody,
           responses: {
             "200": { description: "Ajuste aprovado", ...successJson },
+          },
+        },
+      },
+      "/rh/point/adjustment/requests": {
+        get: {
+          tags: ["Ponto"],
+          summary: "Listar solicitacoes de ajuste de ponto",
+          security: bearer,
+          parameters: [
+            { name: "status", in: "query", schema: { type: "string", enum: ["Pendente", "Aprovado"] } },
+            { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Lista de solicitacoes", ...successJson },
           },
         },
       },
