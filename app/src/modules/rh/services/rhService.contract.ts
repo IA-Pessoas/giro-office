@@ -1,0 +1,91 @@
+import type {
+  RhCategoryListFilters,
+  RhRequestListFilters,
+  RhScoreQuestionListFilters,
+  RhTimeBankReleaseListFilters,
+  RhTimeSheetListFilters,
+} from "../types";
+
+export const RH_ENDPOINTS = {
+  categories: "/rh/categories",
+  requests: "/rh/requests",
+  requestDetail: (id: string) => `/rh/requests/${id}`,
+  messages: "/rh/messages",
+  pointConfig: "/rh/point-config",
+  pointConfigByUser: (userId: string) => `/rh/point-config/${userId}`,
+  registerPoint: "/rh/point/register",
+  calculatePoint: (pointId: string) => `/rh/point/${pointId}/calculate`,
+  requestPointAdjustment: "/rh/point/adjustment/request",
+  approvePointAdjustment: "/rh/point/adjustment/approve",
+  holidays: "/rh/holidays",
+  timeBankReleaseList: "/rh/time-bank-releases/list",
+  timeBankReleases: "/rh/time-bank-releases",
+  timeBankReleaseApprove: "/rh/time-bank-releases/approve",
+  timeSheets: "/rh/timesheets",
+  signTimeSheet: "/rh/timesheets/sign",
+  scoreQuestions: "/rh/score/questions",
+  scoreQuartersGenerate: "/rh/score/quarters/generate",
+  scoreQuartersNitro: "/rh/score/quarters/nitro",
+  myScoreQuarters: "/rh/score/quarters/me",
+  scoreQuarterDetail: (id: string) => `/rh/score/quarters/${id}`,
+  pendingScoreEvaluations: "/rh/score/evaluations/pending",
+  submitScoreEvaluation: "/rh/score/evaluations/submit",
+  scoreNitroUpdate: "/rh/score/nitro/update",
+  // Future point endpoints pending backend support / roadmap:
+  // "/rh/point"
+  // "/rh/point/me/today"
+  // "/rh/point/adjustment/requests"
+  // "/rh/point/summary"
+} as const;
+
+export function buildRhCategoryListParams(filters: RhCategoryListFilters = {}) {
+  return {
+    activeOnly: filters.activeOnly ? "true" : undefined,
+  };
+}
+
+export function buildRhRequestListParams(filters: RhRequestListFilters = {}) {
+  return {
+    status: filters.status,
+    category_id: filters.category_id,
+    requester_user_id: filters.requester_user_id,
+    assigned_to_user_id: filters.assigned_to_user_id,
+  };
+}
+
+export function buildRhTimeBankReleaseListParams(
+  filters: RhTimeBankReleaseListFilters = {},
+) {
+  return {
+    user_id: filters.user_id,
+    is_approved:
+      typeof filters.is_approved === "boolean"
+        ? String(filters.is_approved)
+        : undefined,
+    date_from: filters.date_from,
+    date_to: filters.date_to,
+  };
+}
+
+export function buildRhTimeSheetListParams(filters: RhTimeSheetListFilters = {}) {
+  return {
+    target_user_id: filters.target_user_id,
+  };
+}
+
+export function buildRhScoreQuestionListParams(
+  filters: RhScoreQuestionListFilters = {},
+) {
+  return {
+    type: filters.type,
+    all: filters.all ? "true" : undefined,
+  };
+}
+
+export function unwrapRhEnvelope<T>(body: unknown): T {
+  if (body !== null && typeof body === "object" && "data" in body) {
+    return (body as { data: T }).data;
+  }
+
+  return body as T;
+}
