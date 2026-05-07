@@ -27,10 +27,14 @@ const rhMocks: {
   pointServiceMock: {
     registerPoint: vi.fn(),
     calculateDailyHours: vi.fn(),
+    listPoints: vi.fn(),
+    getTodayPointForUser: vi.fn(),
+    getMonthlySummary: vi.fn(),
   },
   timeClockRequestServiceMock: {
     create: vi.fn(),
     approve: vi.fn(),
+    list: vi.fn(),
   },
   categoryServiceMock: {
     create: vi.fn(),
@@ -219,8 +223,31 @@ export function resetRhRouteMocks() {
   pointConfigServiceMock.getByUserId.mockResolvedValue({ ok: true });
   pointServiceMock.registerPoint.mockResolvedValue({ ok: true });
   pointServiceMock.calculateDailyHours.mockResolvedValue({ ok: true });
+  pointServiceMock.listPoints.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
+  pointServiceMock.getTodayPointForUser.mockResolvedValue({
+    point: null,
+    next_action: "Entrada",
+    is_complete: false,
+    has_clock_in: false,
+    has_lunch_out: false,
+    has_lunch_in: false,
+    has_clock_out: false,
+  });
+  pointServiceMock.getMonthlySummary.mockResolvedValue({
+    month: "2026-05",
+    user_id: "00000000-0000-4000-8000-000000000001",
+    total_worked_minutes: 0,
+    expected_minutes: 0,
+    balance_minutes: 0,
+    overtime_minutes: 0,
+    absence_days: 0,
+    pending_adjustments: 0,
+  });
   timeClockRequestServiceMock.create.mockResolvedValue({ ok: true });
   timeClockRequestServiceMock.approve.mockResolvedValue({ ok: true });
+  timeClockRequestServiceMock.list.mockResolvedValue([
+    { id: "00000000-0000-4000-8000-000000000010", status: "Pendente" },
+  ]);
   categoryServiceMock.create.mockResolvedValue({ ok: true });
   categoryServiceMock.update.mockResolvedValue({ ok: true });
   categoryServiceMock.list.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);

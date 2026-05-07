@@ -2233,6 +2233,63 @@ const handlers = {
     });
   },
 
+  async rhPointList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/point",
+      query: {
+        user_id: requireState("session").id,
+      },
+    });
+  },
+
+  async rhPointListInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      path: "/rh/point",
+      query: {
+        user_id: "invalid-user-id",
+      },
+    });
+  },
+
+  async rhPointToday(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/point/me/today",
+    });
+  },
+
+  async rhPointTodayUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      path: "/rh/point/me/today",
+      auth: "public",
+    });
+  },
+
+  async rhPointSummary(op) {
+    const now = new Date();
+    const month = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/point/summary",
+      query: {
+        month,
+      },
+    });
+  },
+
+  async rhPointSummaryInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      path: "/rh/point/summary",
+      query: {
+        month: "2026-13",
+      },
+    });
+  },
+
   async rhPointRegister(op) {
     // Use rhTargetUser (fresh each run) so we always get a clean point day
     const targetToken = await ensureRhTargetUserToken();
@@ -2297,6 +2354,26 @@ const handlers = {
       return;
     }
     state.rhAdjustmentId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async rhPointAdjustmentList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/point/adjustment/requests",
+      query: {
+        status: "Pendente",
+      },
+    });
+  },
+
+  async rhPointAdjustmentListInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      path: "/rh/point/adjustment/requests",
+      query: {
+        status: "Invalid",
+      },
+    });
   },
 
   async rhPointAdjustmentApprove(op) {

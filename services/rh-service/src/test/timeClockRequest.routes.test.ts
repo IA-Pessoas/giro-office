@@ -5,9 +5,29 @@ import { createTestApp, resetRhRouteMocks, timeClockRequestServiceMock } from ".
 
 describe("timeClockRequest routes", () => {
   const requestId = "00000000-0000-4000-8000-000000000010";
+  const organizationId = "00000000-0000-4000-8000-000000000002";
 
   beforeEach(() => {
     resetRhRouteMocks();
+  });
+
+  it("GET /rh/point/adjustment/requests lista solicitacoes", async () => {
+    const app = createTestApp();
+    const res = await request(app).get("/rh/point/adjustment/requests?status=Pendente");
+
+    expect(res.status).toBe(200);
+    expect(timeClockRequestServiceMock.list).toHaveBeenCalledWith(organizationId, {
+      status: "Pendente",
+      user_id: undefined,
+    });
+  });
+
+  it("GET /rh/point/adjustment/requests retorna 400 para status invalido", async () => {
+    const app = createTestApp();
+    const res = await request(app).get("/rh/point/adjustment/requests?status=Invalido");
+
+    expect(res.status).toBe(400);
+    expect(timeClockRequestServiceMock.list).not.toHaveBeenCalled();
   });
 
   it("POST /rh/point/adjustment/request cria solicitacao", async () => {

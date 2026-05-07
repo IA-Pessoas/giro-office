@@ -38,3 +38,14 @@ export const approveAdjustmentBodySchema = z
       }),
   })
   .strict();
+
+export const listAdjustmentRequestsQuerySchema = z
+  .object({
+    status: z
+      .enum(["Pendente", "Aprovado"], {
+        message: "status deve ser Pendente ou Aprovado.",
+      })
+      .optional(),
+    user_id: z.string().uuid({ message: "user_id inválido." }).optional(),
+  })
+  .strict();
