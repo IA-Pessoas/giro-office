@@ -7,6 +7,7 @@ interface RhRequestsFiltersProps {
   selectedCategoryId: string;
   onStatusChange: (value: RhRequestStatus | "all") => void;
   onCategoryChange: (value: string) => void;
+  onOpenCreate: () => void;
 }
 
 export function RhRequestsFilters({
@@ -15,6 +16,7 @@ export function RhRequestsFilters({
   selectedCategoryId,
   onStatusChange,
   onCategoryChange,
+  onOpenCreate,
 }: RhRequestsFiltersProps) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
@@ -27,7 +29,7 @@ export function RhRequestsFilters({
         </p>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
           <span>Status</span>
           <select
@@ -61,6 +63,14 @@ export function RhRequestsFilters({
             ))}
           </select>
         </label>
+
+        <button
+          type="button"
+          onClick={onOpenCreate}
+          className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-700"
+        >
+          Nova solicitação
+        </button>
       </div>
     </div>
   );

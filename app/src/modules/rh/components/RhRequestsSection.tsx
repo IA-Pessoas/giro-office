@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import { useRhCategories, useRhRequests } from "../hooks/useRhRequests";
-import type { RhRequestStatus, RhRequestRow } from "../types";
+import type { RhRequest, RhRequestStatus, RhRequestRow } from "../types";
 import {
   formatRhDateTime,
   getRhRequestStatusClassName,
@@ -10,6 +10,7 @@ import {
   getRhRequestUrgencyClassName,
   getRhRequestUrgencyLabel,
 } from "../utils/rhRequestUi";
+import { RhRequestFormModal } from "./RhRequestFormModal";
 import { RhRequestsFilters } from "./RhRequestsFilters";
 import { RhRequestsTable } from "./RhRequestsTable";
 
@@ -19,6 +20,8 @@ const MISSING_ASSIGNEE_LABEL = "Não atribuído";
 export function RhRequestsSection() {
   const [statusFilter, setStatusFilter] = useState<RhRequestStatus | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingRequest, setEditingRequest] = useState<RhRequest | null>(null);
 
   const categoriesQuery = useRhCategories();
   const assignableUsersQuery = useAssignableUsers();
@@ -65,6 +68,22 @@ export function RhRequestsSection() {
   const error =
     categoriesQuery.error || assignableUsersQuery.error || requestsQuery.error;
 
+  function handleOpenCreate() {
+    setEditingRequest(null);
+    setIsFormOpen(true);
+  }
+
+  function handleOpenEdit(requestId: string) {
+    const request = requests.find((candidate) => candidate.id === requestId) ?? null;
+    setEditingRequest(request);
+    setIsFormOpen(true);
+  }
+
+  function handleCloseForm() {
+    setIsFormOpen(false);
+    setEditingRequest(null);
+  }
+
   return (
     <div className="space-y-6">
       <RhRequestsFilters
@@ -73,6 +92,7 @@ export function RhRequestsSection() {
         selectedCategoryId={categoryFilter}
         onStatusChange={setStatusFilter}
         onCategoryChange={setCategoryFilter}
+        onOpenCreate={handleOpenCreate}
       />
 
       {isLoading ? (
@@ -94,8 +114,16 @@ export function RhRequestsSection() {
       ) : null}
 
       {!isLoading && !error && rows.length > 0 ? (
-        <RhRequestsTable rows={rows} />
+        <RhRequestsTable rows={rows} onEdit={handleOpenEdit} />
       ) : null}
+
+      <RhRequestFormModal
+        open={isFormOpen}
+        categories={categories}
+        assignableUsers={assignableUsers}
+        request={editingRequest}
+        onClose={handleCloseForm}
+      />
     </div>
   );
 }
