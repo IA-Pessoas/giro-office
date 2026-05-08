@@ -314,7 +314,7 @@ export function RH() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
               <Users className="w-6 h-6 text-white" />
             </div>
             Recursos Humanos
@@ -323,7 +323,7 @@ export function RH() {
             Gestão completa de colaboradores, solicitações e avaliações
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-lg hover:from-rose-700 hover:to-rose-800 transition-all shadow-md hover:shadow-lg">
+        <button className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg">
           <Plus className="w-5 h-5" />
           <span className="font-medium">Novo Colaborador</span>
         </button>
@@ -336,7 +336,7 @@ export function RH() {
             onClick={() => setActiveTab('dashboard')}
             className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
               activeTab === 'dashboard'
-                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
@@ -347,7 +347,7 @@ export function RH() {
             onClick={() => setActiveTab('employees')}
             className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
               activeTab === 'employees'
-                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
@@ -358,14 +358,14 @@ export function RH() {
             onClick={() => setActiveTab('requests')}
             className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
               activeTab === 'requests'
-                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
             <FileText className="w-4 h-4 inline-block mr-2" />
             Solicitações
             {pendingRequests > 0 && (
-              <span className="ml-2 px-2 py-0.5 bg-red-500 text-white rounded-full text-xs">
+              <span className="ml-2 rounded-full bg-blue-600 px-2 py-0.5 text-xs text-white">
                 {pendingRequests}
               </span>
             )}
@@ -374,7 +374,7 @@ export function RH() {
             onClick={() => setActiveTab('evaluations')}
             className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
               activeTab === 'evaluations'
-                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
@@ -385,7 +385,7 @@ export function RH() {
             onClick={() => setActiveTab('timetracking')}
             className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
               activeTab === 'timetracking'
-                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >

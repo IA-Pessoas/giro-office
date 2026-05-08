@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { toast } from "react-toastify";
 
 import {
@@ -68,7 +69,9 @@ export function RhRequestMessagesTimeline({
           </div>
         ) : null}
 
-        {!messagesQuery.isLoading && !messagesQuery.error && messages.length === 0 ? (
+        {!messagesQuery.isLoading &&
+        !messagesQuery.error &&
+        messages.length === 0 ? (
           <div className="rounded-lg border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/20 dark:text-gray-300">
             Ainda não há mensagens nesta solicitação.
           </div>
@@ -82,7 +85,7 @@ export function RhRequestMessagesTimeline({
                 className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/20"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                  <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
                     {getRhMessageTypeLabel(item.type)}
                   </span>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -106,18 +109,21 @@ export function RhRequestMessagesTimeline({
         <div className="grid gap-3 md:grid-cols-[180px,1fr]">
           <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
             <span>Tipo</span>
-            <select
-              value={messageType}
-              onChange={(event) =>
-                setMessageType(event.target.value as RhMessageType)
-              }
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-rose-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="Message">Mensagem</option>
-              <option value="Solution">Solução</option>
-              <option value="Rejection">Rejeição</option>
-              <option value="Acceptance">Aceite</option>
-            </select>
+            <div className="relative">
+              <select
+                value={messageType}
+                onChange={(event) =>
+                  setMessageType(event.target.value as RhMessageType)
+                }
+                className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="Message">Mensagem</option>
+                <option value="Solution">Solução</option>
+                <option value="Rejection">Rejeição</option>
+                <option value="Acceptance">Aceite</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            </div>
           </label>
 
           <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -126,7 +132,7 @@ export function RhRequestMessagesTimeline({
               rows={4}
               value={message}
               onChange={(event) => setMessage(event.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-rose-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="Descreva a atualização do chamado"
             />
           </label>
@@ -137,7 +143,7 @@ export function RhRequestMessagesTimeline({
             type="button"
             onClick={handleSubmit}
             disabled={createMessageMutation.isPending}
-            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {createMessageMutation.isPending ? "Enviando..." : "Enviar mensagem"}
           </button>
