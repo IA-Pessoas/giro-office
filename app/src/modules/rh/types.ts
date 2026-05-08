@@ -48,6 +48,34 @@ export interface RhRequest {
   organization_id: string;
 }
 
+export interface AssignableUser {
+  id: string;
+  name: string;
+  status: string | null;
+  departmentName: string | null;
+  photoUrl: string | null;
+}
+
+export interface RhRequestRow {
+  id: string;
+  title: string;
+  description: string;
+  categoryId: string;
+  categoryLabel: string;
+  assignedToUserId: string;
+  assignedToUserLabel: string;
+  urgency: RhRequestUrgency;
+  urgencyLabel: string;
+  urgencyClassName: string;
+  status: RhRequestStatus;
+  statusLabel: string;
+  statusClassName: string;
+  createdAt: string;
+  createdAtLabel: string;
+  updatedAt: string;
+  updatedAtLabel: string;
+}
+
 export interface RhRequestListFilters {
   status?: RhRequestStatus;
   category_id?: string;
