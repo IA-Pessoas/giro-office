@@ -89,37 +89,3 @@ export function formatRhCategoryLabel(value: string | null | undefined) {
     .map((part) => part.charAt(0).toLocaleUpperCase("pt-BR") + part.slice(1))
     .join(" ");
 }
-
-export function formatRhDate(value: string | null | undefined) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return date.toLocaleDateString("pt-BR");
-}
-
-export function formatRhDateTime(value: string | null | undefined) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}

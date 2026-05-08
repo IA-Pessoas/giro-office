@@ -2,12 +2,12 @@ import { Dialog } from "@shared/components";
 
 import { useRhRequest } from "../hooks/useRhRequests";
 import {
-  formatRhDateTime,
   getRhRequestStatusClassName,
   getRhRequestStatusLabel,
   getRhRequestUrgencyClassName,
   getRhRequestUrgencyLabel,
 } from "../utils/rhRequestUi";
+import { formatRhDateTime } from "../utils/rhDate";
 import { RhRequestMessagesTimeline } from "./RhRequestMessagesTimeline";
 
 interface RhRequestDetailModalProps {

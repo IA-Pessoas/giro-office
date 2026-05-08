@@ -2,10 +2,9 @@ export { RhRequestsSection } from "./components/RhRequestsSection";
 export { RhHolidaysSection } from "./components/RhHolidaysSection";
 export { useAssignableUsers } from "./hooks/useAssignableUsers";
 export { useRhRequests } from "./hooks/useRhRequests";
+export { formatRhDate, formatRhDateTime } from "./utils/rhDate";
 
 export {
-  formatRhDate,
-  formatRhDateTime,
   getRhMessageTypeLabel,
   getRhRequestStatusClassName,
   getRhRequestStatusLabel,

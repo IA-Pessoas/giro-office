@@ -1,6 +1,7 @@
 import { Edit, Trash2 } from "lucide-react";
 
 import type { RhHoliday } from "../types";
+import { formatRhDate } from "../utils/rhDate";
 
 interface RhHolidaysTableProps {
   holidays: RhHoliday[];
@@ -11,10 +12,6 @@ interface RhHolidaysTableProps {
 
 const ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 min-w-[84px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
-
-function formatDatePreview(value: string) {
-  return value;
-}
 
 export function RhHolidaysTable({
   holidays,
@@ -48,7 +45,7 @@ export function RhHolidaysTable({
                   {holiday.name.trim()}
                 </td>
                 <td className="px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {formatDatePreview(holiday.date)}
+                  {formatRhDate(holiday.date)}
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex items-center justify-end gap-2">

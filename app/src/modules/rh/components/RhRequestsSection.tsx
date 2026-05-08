@@ -12,12 +12,12 @@ import {
 import type { RhRequest, RhRequestRow, RhRequestStatus } from "../types";
 import {
   formatRhCategoryLabel,
-  formatRhDateTime,
   getRhRequestStatusClassName,
   getRhRequestStatusLabel,
   getRhRequestUrgencyClassName,
   getRhRequestUrgencyLabel,
 } from "../utils/rhRequestUi";
+import { formatRhDateTime } from "../utils/rhDate";
 import { RhRequestDetailModal } from "./RhRequestDetailModal";
 import { RhRequestFormModal } from "./RhRequestFormModal";
 import { RhRequestsFilters } from "./RhRequestsFilters";
