@@ -11,6 +11,7 @@ import {
 } from "../hooks/useRhRequests";
 import type { RhRequest, RhRequestRow, RhRequestStatus } from "../types";
 import {
+  formatRhCategoryLabel,
   formatRhDateTime,
   getRhRequestStatusClassName,
   getRhRequestStatusLabel,
@@ -48,7 +49,7 @@ export function RhRequestsSection() {
   const requests = requestsQuery.data ?? [];
 
   const categoryNameById = new Map(
-    categories.map((category) => [category.id, category.name]),
+    categories.map((category) => [category.id, formatRhCategoryLabel(category.name)]),
   );
   const userNameById = new Map(assignableUsers.map((user) => [user.id, user.name]));
 

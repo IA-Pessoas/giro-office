@@ -77,6 +77,19 @@ export function getRhMessageTypeLabel(type: RhMessageType) {
   return RH_MESSAGE_TYPE_LABELS[type];
 }
 
+export function formatRhCategoryLabel(value: string | null | undefined) {
+  if (!value) {
+    return "-";
+  }
+
+  return value
+    .trim()
+    .toLocaleLowerCase("pt-BR")
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toLocaleUpperCase("pt-BR") + part.slice(1))
+    .join(" ");
+}
+
 export function formatRhDate(value: string | null | undefined) {
   if (!value) {
     return "-";

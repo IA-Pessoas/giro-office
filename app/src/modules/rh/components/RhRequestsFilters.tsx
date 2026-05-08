@@ -1,7 +1,10 @@
 import { ChevronDown } from "lucide-react";
 
 import type { RhCategory, RhRequestStatus } from "../types";
-import { RH_REQUEST_STATUS_META } from "../utils/rhRequestUi";
+import {
+  formatRhCategoryLabel,
+  RH_REQUEST_STATUS_META,
+} from "../utils/rhRequestUi";
 
 interface RhRequestsFiltersProps {
   categories: RhCategory[];
@@ -64,7 +67,7 @@ export function RhRequestsFilters({
               <option value="">Todas</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
-                  {category.name}
+                  {formatRhCategoryLabel(category.name)}
                 </option>
               ))}
             </select>

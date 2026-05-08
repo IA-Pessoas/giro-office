@@ -15,7 +15,10 @@ import type {
   RhRequestStatus,
   RhRequestUrgency,
 } from "../types";
-import { RH_REQUEST_STATUS_META } from "../utils/rhRequestUi";
+import {
+  formatRhCategoryLabel,
+  RH_REQUEST_STATUS_META,
+} from "../utils/rhRequestUi";
 
 interface RhRequestFormModalProps {
   open: boolean;
@@ -196,7 +199,7 @@ export function RhRequestFormModal({
               <option value="">Selecione</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
-                  {category.name}
+                  {formatRhCategoryLabel(category.name)}
                 </option>
               ))}
             </select>
