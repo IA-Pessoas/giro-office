@@ -33,6 +33,7 @@ export function RhRequestDetailModal({
 }: RhRequestDetailModalProps) {
   const requestQuery = useRhRequest(requestId ?? undefined);
   const request = requestQuery.data;
+  const canManageRequest = Boolean(request);
 
   return (
     <Dialog
@@ -57,10 +58,10 @@ export function RhRequestDetailModal({
           </button>
           <button
             type="button"
-            disabled={!requestId}
+            disabled={!canManageRequest}
             onClick={() => {
-              if (requestId) {
-                onEdit(requestId);
+              if (request) {
+                onEdit(request.id);
               }
             }}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -69,10 +70,10 @@ export function RhRequestDetailModal({
           </button>
           <button
             type="button"
-            disabled={!requestId || isDeleting}
+            disabled={!canManageRequest || isDeleting}
             onClick={() => {
-              if (requestId) {
-                onDelete(requestId);
+              if (request) {
+                onDelete(request.id);
               }
             }}
             className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-900/20"
