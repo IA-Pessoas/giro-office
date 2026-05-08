@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  RhHolidaysSection,
   RhRequestsSection,
   formatRhDateTime,
   getRhRequestStatusClassName,
@@ -8,6 +9,7 @@ import {
   getRhRequestUrgencyLabel,
   useRhRequests,
 } from '@modules/rh';
+import { Dialog } from '@shared/components';
 import { 
   Users,
   Plus,
@@ -64,6 +66,7 @@ interface Employee {
 }
 export function RH() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'requests' | 'evaluations' | 'timetracking'>('dashboard');
+  const [isHolidaysManagerOpen, setIsHolidaysManagerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -252,7 +255,7 @@ export function RH() {
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
@@ -264,10 +267,20 @@ export function RH() {
             Gestão completa de colaboradores, solicitações e avaliações
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg">
-          <Plus className="w-5 h-5" />
-          <span className="font-medium">Novo Colaborador</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsHolidaysManagerOpen(true)}
+            className="flex items-center gap-2 rounded-lg border border-blue-200 px-4 py-2.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20"
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Gerenciar feriados</span>
+          </button>
+          <button className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg">
+            <Plus className="w-5 h-5" />
+            <span className="font-medium">Novo Colaborador</span>
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -868,7 +881,17 @@ export function RH() {
           </div>
         </div>
       )}
+
+      <Dialog
+        open={isHolidaysManagerOpen}
+        onOpenChange={setIsHolidaysManagerOpen}
+        title="Gerenciar feriados"
+        description="Gerenciamento administrativo de feriados do RH"
+        contentClassName="w-[min(92vw,960px)]"
+        bodyClassName="max-h-[78vh] overflow-y-auto"
+      >
+        <RhHolidaysSection />
+      </Dialog>
     </div>
   );
 }
-

@@ -1,4 +1,5 @@
 export { RhRequestsSection } from "./components/RhRequestsSection";
+export { RhHolidaysSection } from "./components/RhHolidaysSection";
 export { useAssignableUsers } from "./hooks/useAssignableUsers";
 export { useRhRequests } from "./hooks/useRhRequests";
 
