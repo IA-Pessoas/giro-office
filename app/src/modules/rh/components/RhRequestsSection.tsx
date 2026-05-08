@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
 
+import { Dialog } from "@shared/components";
+
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import {
   useDeleteRhRequestMutation,
   useRhCategories,
   useRhRequests,
 } from "../hooks/useRhRequests";
-import type { RhRequest, RhRequestStatus, RhRequestRow } from "../types";
+import type { RhRequest, RhRequestRow, RhRequestStatus } from "../types";
 import {
   formatRhDateTime,
   getRhRequestStatusClassName,
@@ -29,6 +31,9 @@ export function RhRequestsSection() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [editingRequest, setEditingRequest] = useState<RhRequest | null>(null);
+  const [requestIdPendingDelete, setRequestIdPendingDelete] = useState<string | null>(
+    null,
+  );
 
   const categoriesQuery = useRhCategories({ activeOnly: true });
   const assignableUsersQuery = useAssignableUsers();
@@ -109,23 +114,32 @@ export function RhRequestsSection() {
     handleOpenEdit(requestId);
   }
 
-  async function handleDelete(requestId: string) {
-    const shouldDelete = window.confirm(
-      "Deseja realmente excluir esta solicitação de RH?",
-    );
+  function handleRequestDelete(requestId: string) {
+    setRequestIdPendingDelete(requestId);
+  }
 
-    if (!shouldDelete) {
+  function handleCloseDeleteDialog() {
+    if (deleteRequestMutation.isPending) {
+      return;
+    }
+
+    setRequestIdPendingDelete(null);
+  }
+
+  async function handleConfirmDelete() {
+    if (!requestIdPendingDelete) {
       return;
     }
 
     try {
-      await deleteRequestMutation.mutateAsync({ id: requestId });
-      if (selectedRequestId === requestId) {
+      await deleteRequestMutation.mutateAsync({ id: requestIdPendingDelete });
+      if (selectedRequestId === requestIdPendingDelete) {
         handleCloseDetail();
       }
-      if (editingRequest?.id === requestId) {
+      if (editingRequest?.id === requestIdPendingDelete) {
         handleCloseForm();
       }
+      setRequestIdPendingDelete(null);
       toast.success("Solicitação excluída com sucesso.");
     } catch (error) {
       const errorMessage =
@@ -175,7 +189,7 @@ export function RhRequestsSection() {
           rows={rows}
           onOpenDetail={handleOpenDetail}
           onEdit={handleOpenEdit}
-          onDelete={handleDelete}
+          onDelete={handleRequestDelete}
           deletingRequestId={deletingRequestId}
         />
       ) : null}
@@ -196,8 +210,44 @@ export function RhRequestsSection() {
         isDeleting={deleteRequestMutation.isPending}
         onClose={handleCloseDetail}
         onEdit={handleEditFromDetail}
-        onDelete={handleDelete}
+        onDelete={handleRequestDelete}
       />
+
+      <Dialog
+        open={Boolean(requestIdPendingDelete)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            handleCloseDeleteDialog();
+          }
+        }}
+        title="Excluir solicitação"
+        description="Confirmação de exclusão de solicitação de RH"
+        contentClassName="w-[min(92vw,460px)]"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={handleCloseDeleteDialog}
+              disabled={deleteRequestMutation.isPending}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={deleteRequestMutation.isPending}
+              className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-900/20"
+            >
+              {deleteRequestMutation.isPending ? "Excluindo..." : "Excluir"}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          Deseja realmente excluir esta solicitação de RH?
+        </p>
+      </Dialog>
     </div>
   );
 }

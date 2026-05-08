@@ -1,5 +1,6 @@
 export { RhRequestsSection } from "./components/RhRequestsSection";
 export { useAssignableUsers } from "./hooks/useAssignableUsers";
+export { useRhRequests } from "./hooks/useRhRequests";
 
 export {
   formatRhDate,

@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { RhRequestsSection } from '@modules/rh';
+import {
+  RhRequestsSection,
+  formatRhDateTime,
+  getRhRequestStatusClassName,
+  getRhRequestStatusLabel,
+  getRhRequestUrgencyClassName,
+  getRhRequestUrgencyLabel,
+  useRhRequests,
+} from '@modules/rh';
 import { 
   Users,
   Plus,
@@ -11,8 +19,6 @@ import {
   FileText,
   Award,
   AlertCircle,
-  CheckCircle,
-  XCircle,
   MoreVertical,
   Mail,
   Phone,
@@ -56,23 +62,12 @@ interface Employee {
   salary?: number;
   performance?: number;
 }
-
-interface Request {
-  id: string;
-  employee: string;
-  type: 'vacation' | 'leave' | 'medical' | 'reimbursement';
-  status: 'pending' | 'approved' | 'rejected';
-  date: string;
-  startDate?: string;
-  endDate?: string;
-  description: string;
-}
-
 export function RH() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'requests' | 'evaluations' | 'timetracking'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const requestsSummaryQuery = useRhRequests();
 
   const employees: Employee[] = [
     {
@@ -167,75 +162,11 @@ export function RH() {
     },
   ];
 
-  const requests: Request[] = [
-    {
-      id: '1',
-      employee: 'João Silva',
-      type: 'vacation',
-      status: 'pending',
-      date: '2026-03-15',
-      startDate: '2026-04-01',
-      endDate: '2026-04-15',
-      description: 'Férias programadas'
-    },
-    {
-      id: '2',
-      employee: 'Ana Costa',
-      type: 'leave',
-      status: 'approved',
-      date: '2026-03-10',
-      startDate: '2026-03-20',
-      endDate: '2026-03-20',
-      description: 'Assuntos pessoais'
-    },
-    {
-      id: '3',
-      employee: 'Carlos Oliveira',
-      type: 'medical',
-      status: 'approved',
-      date: '2026-03-12',
-      startDate: '2026-03-13',
-      endDate: '2026-03-14',
-      description: 'Atestado médico - Consulta'
-    },
-    {
-      id: '4',
-      employee: 'Maria Santos',
-      type: 'reimbursement',
-      status: 'pending',
-      date: '2026-03-16',
-      description: 'Reembolso de transporte - R$ 250,00'
-    },
-    {
-      id: '5',
-      employee: 'Pedro Alves',
-      type: 'vacation',
-      status: 'rejected',
-      date: '2026-03-08',
-      startDate: '2026-03-25',
-      endDate: '2026-04-05',
-      description: 'Período indisponível'
-    },
-  ];
-
   const statusConfig = {
     active: { label: 'Ativo', color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300', icon: UserCheck },
     vacation: { label: 'Férias', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', icon: Calendar },
     leave: { label: 'Afastado', color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300', icon: Clock },
     inactive: { label: 'Inativo', color: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300', icon: UserX },
-  };
-
-  const requestTypeConfig = {
-    vacation: { label: 'Férias', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', icon: Calendar },
-    leave: { label: 'Folga', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300', icon: Clock },
-    medical: { label: 'Atestado', color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300', icon: FileText },
-    reimbursement: { label: 'Reembolso', color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300', icon: TrendingUp },
-  };
-
-  const requestStatusConfig = {
-    pending: { label: 'Pendente', color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300', icon: Clock },
-    approved: { label: 'Aprovada', color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300', icon: CheckCircle },
-    rejected: { label: 'Rejeitada', color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300', icon: XCircle },
   };
 
   const filteredEmployees = employees.filter(emp => {
@@ -253,7 +184,17 @@ export function RH() {
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter(e => e.status === 'active').length;
   const onVacation = employees.filter(e => e.status === 'vacation').length;
-  const pendingRequests = requests.filter(r => r.status === 'pending').length;
+  const rhRequests = requestsSummaryQuery.data ?? [];
+  const pendingRequests = rhRequests.filter(
+    (request) => request.status === 'New' || request.status === 'In_Progress',
+  ).length;
+  const requestsTabCount = rhRequests.length;
+  const recentRequests = [...rhRequests]
+    .sort(
+      (left, right) =>
+        new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime(),
+    )
+    .slice(0, 5);
 
   // Upcoming birthdays (next 30 days)
   const today = new Date();
@@ -364,9 +305,9 @@ export function RH() {
           >
             <FileText className="w-4 h-4 inline-block mr-2" />
             Solicitações
-            {pendingRequests > 0 && (
+            {requestsTabCount > 0 && (
               <span className="ml-2 rounded-full bg-blue-600 px-2 py-0.5 text-xs text-white">
-                {pendingRequests}
+                {requestsTabCount}
               </span>
             )}
           </button>
@@ -566,37 +507,41 @@ export function RH() {
                 </h3>
                 <button 
                   onClick={() => setActiveTab('requests')}
-                  className="text-sm text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium"
+                  className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   Ver todas
                 </button>
               </div>
               <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                {requests.slice(0, 5).map((req) => {
-                  const TypeIcon = requestTypeConfig[req.type].icon;
-                  const StatusIcon = requestStatusConfig[req.status].icon;
-                  
-                  return (
-                    <div key={req.id} className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors border border-gray-100 dark:border-gray-700">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900 dark:text-white">{req.employee}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">{req.description}</p>
+                {recentRequests.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-400">
+                    Nenhuma solicitação recente encontrada.
+                  </div>
+                ) : (
+                  recentRequests.map((request) => (
+                    <div key={request.id} className="rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50">
+                      <div className="mb-2 flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-gray-900 dark:text-white">{request.title}</p>
+                          <p className="mt-1 line-clamp-2 text-sm text-gray-600 dark:text-gray-400">
+                            {request.description}
+                          </p>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${requestTypeConfig[req.type].color} flex items-center gap-1`}>
-                          <TypeIcon className="w-3 h-3" />
-                          {requestTypeConfig[req.type].label}
+                        <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                          {formatRhDateTime(request.updated_at)}
                         </span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${requestStatusConfig[req.status].color} flex items-center gap-1`}>
-                          <StatusIcon className="w-3 h-3" />
-                          {requestStatusConfig[req.status].label}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getRhRequestUrgencyClassName(request.urgency)}`}>
+                          {getRhRequestUrgencyLabel(request.urgency)}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getRhRequestStatusClassName(request.status)}`}>
+                          {getRhRequestStatusLabel(request.status)}
                         </span>
                       </div>
                     </div>
-                  );
-                })}
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -926,3 +871,4 @@ export function RH() {
     </div>
   );
 }
+
