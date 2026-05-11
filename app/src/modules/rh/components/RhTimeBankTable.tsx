@@ -1,6 +1,7 @@
 import { CheckCircle2 } from "lucide-react";
 
 import type { RhTimeBankRelease } from "../types";
+import { formatRhDate } from "../utils/rhDate";
 
 interface RhTimeBankTableProps {
   releases: RhTimeBankRelease[];
@@ -12,14 +13,6 @@ interface RhTimeBankTableProps {
 
 const ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 min-w-[96px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
-
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(date));
-}
 
 function formatMinutes(minutes: number) {
   const sign = minutes > 0 ? "+" : minutes < 0 ? "-" : "";
@@ -80,7 +73,7 @@ export function RhTimeBankTable({
                 className="align-top hover:bg-gray-50 dark:hover:bg-gray-700/30"
               >
                 <td className="px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                  {formatDate(release.date)}
+                  {formatRhDate(release.date)}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                   {getUserLabel(release.user_id)}
