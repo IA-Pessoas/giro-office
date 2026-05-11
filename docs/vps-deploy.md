@@ -14,6 +14,9 @@
 - `.env.vps.project-service`
 - `.env.vps.client-service`
 - `.env.vps.rh-service`
+- `.env.vps.department-service`
+- `.env.vps.fiscal-service`
+- `.env.vps.contabil-service`
 - `.env.vps.web` (Next: `NEXT_PUBLIC_API_URL` + `API_INTERNAL_URL` — ver secção CI)
 - `.env.vps.audit-service`
 
@@ -50,6 +53,9 @@ Nginx in this stack does not provision certificates automatically.
 docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps task-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps project-service
+docker compose -f docker-compose.vps.yml up -d --build --no-deps department-service
+docker compose -f docker-compose.vps.yml up -d --build --no-deps fiscal-service
+docker compose -f docker-compose.vps.yml up -d --build --no-deps contabil-service
 ```
 
 The `--no-deps` flag keeps the rest of the stack running.
@@ -81,6 +87,9 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
 - Client service: `GET /ready`
 - Audit service: `GET /ready`
 - Organization, user, project and RH services: `GET /health`
+- Department service: `GET /health`
+- Fiscal service: `GET /health`
+- Contabil service: `GET /health`
 - **Web (Next.js):** `GET /` (container escuta na porta **3000**; no host, ver portas por slot abaixo)
 
 ## CI/CD (GitHub Actions → VPS)
@@ -106,6 +115,8 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 | `VPS_HOST`, `VPS_USER` | SSH |
 | `VPS_SSH_PRIVATE_KEY` | Preferencial (chave privada PEM) |
 | `VPS_SSH_PASSWORD` | Alternativa (requer `sshpass` no runner — instalado no job) |
+
+Os serviços estáveis promovidos também exigem segredos de GitHub Environment para materializar os respetivos ficheiros ignorados na VPS: `ENV_VPS_DEPARTMENT_SERVICE`, `ENV_VPS_FISCAL_SERVICE` e `ENV_VPS_CONTABIL_SERVICE`. Não faça stage nem commit dos ficheiros reais `.env.vps.*`.
 
 ### GitHub Environments (`ENV_VPS_*` por slot)
 
@@ -170,6 +181,9 @@ This VPS stack is meant for the stable microservices only:
 - `/project`
 - `/client`
 - `/rh`
+- `/department`
+- `/fiscal`
+- `/contabil`
 - `/health`
 - `/audit` when the audit profile is enabled
 
