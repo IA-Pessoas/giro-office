@@ -8,6 +8,10 @@ import type { AssignableUser } from "../types";
 
 const ASSIGNABLE_USERS_PAGE_SIZE = 100;
 
+interface UseAssignableUsersOptions {
+  enabled?: boolean;
+}
+
 function normalizeAssignableUserStatus(status: string | null | undefined) {
   if (status === "active" || status === "Ativo") {
     return "active";
@@ -24,7 +28,9 @@ export function assignableUsersQueryKey() {
   return [...RH_QUERY_KEY, "assignable-users", ASSIGNABLE_USERS_PAGE_SIZE] as const;
 }
 
-export function useAssignableUsers(): UseQueryResult<AssignableUser[], Error> {
+export function useAssignableUsers(
+  options?: UseAssignableUsersOptions,
+): UseQueryResult<AssignableUser[], Error> {
   return useFetch(
     assignableUsersQueryKey(),
     async () => {
@@ -44,6 +50,7 @@ export function useAssignableUsers(): UseQueryResult<AssignableUser[], Error> {
         }));
     },
     {
+      enabled: options?.enabled ?? true,
       refetchOnWindowFocus: false,
     },
   );

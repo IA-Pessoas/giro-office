@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   RhHolidaysSection,
   RhRequestsSection,
+  RhTimeBankSection,
   formatRhDateTime,
   getRhRequestStatusClassName,
   getRhRequestStatusLabel,
@@ -344,7 +345,7 @@ export function RH() {
             }`}
           >
             <Clock className="w-4 h-4 inline-block mr-2" />
-            Controle de Ponto
+            Banco de Horas
           </button>
         </div>
       </div>
@@ -749,137 +750,7 @@ export function RH() {
 
       {/* Time Tracking Tab */}
       {activeTab === 'timetracking' && (
-        <div className="space-y-6">
-          {/* P onto Banner */}
-          <div className="bg-gradient-to-r from-rose-500 to-rose-600 rounded-xl p-6 text-white">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <Clock className="w-8 h-8" />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold mb-1">Controle de Ponto</h2>
-                <p className="text-rose-100">Gestão completa de jornada de trabalho e registro de ponto dos colaboradores</p>
-              </div>
-              <button className="px-6 py-3 bg-white text-rose-600 rounded-lg font-semibold hover:bg-rose-50 transition-colors shadow-lg">
-                <Plus className="w-5 h-5 inline-block mr-2" />
-                Registrar Ponto
-              </button>
-            </div>
-          </div>
-
-          {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Presentes Hoje</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">124</p>
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">+8 vs ontem</p>
-                </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                  <UserCheck className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Horas Extras Mês</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">342h</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">15 colaboradores</p>
-                </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                  <Clock className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Ajustes Pendentes</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">8</p>
-                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">Aguardando aprovação</p>
-                </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                  <AlertCircle className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Faltas do Mês</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">12</p>
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">-3 vs mês anterior</p>
-                </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                  <UserX className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Time Records */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <Clock className="w-5 h-5 text-rose-600 dark:text-rose-400" />
-                Registros de Hoje
-              </h3>
-              <input
-                type="date"
-                defaultValue={new Date().toISOString().split('T')[0]}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
-              />
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Colaborador</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Entrada</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Pausa</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Retorno</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Saída</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Horas</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {employees.slice(0, 5).map((emp) => (
-                    <tr key={emp.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full ${emp.color} flex items-center justify-center text-white text-sm font-semibold`}>
-                            {emp.avatar}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900 dark:text-white">{emp.name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{emp.department}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">08:00</td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">12:00</td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">13:00</td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">18:00</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">9h</td>
-                      <td className="px-6 py-4">
-                        <span className="px-2.5 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-medium">
-                          Completo
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <RhTimeBankSection />
       )}
 
       <Dialog
