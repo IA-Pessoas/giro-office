@@ -7,10 +7,8 @@ import {
   useRhMessages,
 } from "../hooks/useRhRequests";
 import type { RhMessageType } from "../types";
-import {
-  formatRhDateTime,
-  getRhMessageTypeLabel,
-} from "../utils/rhRequestUi";
+import { getRhMessageTypeLabel } from "../utils/rhRequestUi";
+import { formatRhDateTime } from "../utils/rhDate";
 
 interface RhRequestMessagesTimelineProps {
   requestId: string;
