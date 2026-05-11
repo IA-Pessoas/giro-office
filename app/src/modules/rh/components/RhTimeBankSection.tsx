@@ -164,8 +164,9 @@ export function RhTimeBankSection() {
         onOpenCreate={handleOpenCreate}
       />
 
-      {isCreateOpen && canManageTimeBank ? (
+      {canManageTimeBank ? (
         <RhTimeBankFormPanel
+          open={isCreateOpen}
           assignableUsers={assignableUsers}
           defaultUserId={selectedUserId}
           onClose={() => setIsCreateOpen(false)}

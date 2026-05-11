@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { toast } from "react-toastify";
 
+import { Dialog } from "@shared/components";
 import { useCreateRhTimeBankReleaseMutation } from "../hooks/useRhCalendar";
 import type { AssignableUser } from "../types";
 
 interface RhTimeBankFormPanelProps {
+  open: boolean;
   assignableUsers: AssignableUser[];
   defaultUserId: string;
   onClose: () => void;
 }
 
-type RhTimeBankReleaseDirection = "credit" | "debit";
 type RhTimeBankReasonPreset =
   | ""
   | "Hora extra"
@@ -21,9 +23,7 @@ type RhTimeBankReasonPreset =
 interface RhTimeBankFormState {
   userId: string;
   date: string;
-  direction: RhTimeBankReleaseDirection;
-  hours: string;
-  minutes: string;
+  duration: string;
   reasonPreset: RhTimeBankReasonPreset;
   reason: string;
 }
@@ -31,9 +31,7 @@ interface RhTimeBankFormState {
 const DEFAULT_FORM_STATE: RhTimeBankFormState = {
   userId: "",
   date: "",
-  direction: "credit",
-  hours: "",
-  minutes: "",
+  duration: "",
   reasonPreset: "",
   reason: "",
 };
@@ -45,7 +43,18 @@ function buildInitialFormState(defaultUserId: string): RhTimeBankFormState {
   };
 }
 
+function formatDurationInput(rawValue: string) {
+  const digitsOnly = rawValue.replace(/\D/g, "").slice(0, 4);
+
+  if (digitsOnly.length <= 2) {
+    return digitsOnly;
+  }
+
+  return `${digitsOnly.slice(0, 2)}:${digitsOnly.slice(2)}`;
+}
+
 export function RhTimeBankFormPanel({
+  open,
   assignableUsers,
   defaultUserId,
   onClose,
@@ -55,9 +64,11 @@ export function RhTimeBankFormPanel({
     buildInitialFormState(defaultUserId),
   );
 
+  const isSubmitting = createMutation.isPending;
+
   useEffect(() => {
     setFormState(buildInitialFormState(defaultUserId));
-  }, [defaultUserId]);
+  }, [defaultUserId, open]);
 
   function handleChange<K extends keyof RhTimeBankFormState>(
     key: K,
@@ -77,6 +88,10 @@ export function RhTimeBankFormPanel({
     }));
   }
 
+  function handleDurationChange(value: string) {
+    handleChange("duration", formatDurationInput(value));
+  }
+
   function handleCancel() {
     setFormState(buildInitialFormState(defaultUserId));
     onClose();
@@ -84,8 +99,7 @@ export function RhTimeBankFormPanel({
 
   async function handleSubmit() {
     const trimmedReason = formState.reason.trim();
-    const parsedHours = Number(formState.hours || "0");
-    const parsedMinutes = Number(formState.minutes || "0");
+    const trimmedDuration = formState.duration.trim();
 
     if (!formState.userId) {
       toast.warn("Selecione o colaborador.");
@@ -97,14 +111,17 @@ export function RhTimeBankFormPanel({
       return;
     }
 
-    if (
-      !Number.isInteger(parsedHours) ||
-      parsedHours < 0 ||
-      !Number.isInteger(parsedMinutes) ||
-      parsedMinutes < 0 ||
-      parsedMinutes > 59
-    ) {
-      toast.warn("Preencha horas e minutos com valores inteiros válidos.");
+    const durationMatch = trimmedDuration.match(/^(\d{1,2}):(\d{2})$/);
+    if (!durationMatch) {
+      toast.warn("Informe a duração no formato HH:MM.");
+      return;
+    }
+
+    const parsedHours = Number(durationMatch[1]);
+    const parsedMinutes = Number(durationMatch[2]);
+
+    if (parsedMinutes > 59) {
+      toast.warn("Os minutos da duração devem estar entre 00 e 59.");
       return;
     }
 
@@ -123,7 +140,7 @@ export function RhTimeBankFormPanel({
       await createMutation.mutateAsync({
         user_id: formState.userId,
         date: formState.date,
-        minutes: formState.direction === "debit" ? totalMinutes * -1 : totalMinutes,
+        minutes: totalMinutes,
         reason: trimmedReason,
       });
 
@@ -140,136 +157,117 @@ export function RhTimeBankFormPanel({
   }
 
   return (
-    <section className="rounded-xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900/30 dark:bg-blue-900/10">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-            Novo lançamento
-          </h3>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Informe colaborador, data, duração e motivo do ajuste manual.
-          </p>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          handleCancel();
+        }
+      }}
+      title="Novo lançamento"
+      description="Formulário de lançamento de banco de horas"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? "Salvando..." : "Criar lançamento"}
+          </button>
+        </>
+      }
+      contentClassName="w-[min(92vw,720px)]"
+      bodyClassName="space-y-4"
+    >
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        Informe colaborador, data, duração e motivo do ajuste manual.
+      </p>
+
+      <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <span>Colaborador</span>
+            <div className="relative">
+              <select
+                value={formState.userId}
+                onChange={(event) => handleChange("userId", event.target.value)}
+                className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Selecione</option>
+                {assignableUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            </div>
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <span>Sugestão de motivo</span>
+            <div className="relative">
+              <select
+                value={formState.reasonPreset}
+                onChange={(event) =>
+                  handleReasonPresetChange(event.target.value as RhTimeBankReasonPreset)
+                }
+                className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Selecionar</option>
+                <option value="Hora extra">Hora extra</option>
+                <option value="Compensação de horas">Compensação de horas</option>
+                <option value="Libera mais cedo">Libera mais cedo</option>
+                <option value="Ajuste manual">Ajuste manual</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            </div>
+          </label>
         </div>
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-        >
-          Cancelar
-        </button>
-      </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(220px,1fr),180px,180px,120px,120px]">
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Colaborador</span>
-          <select
-            value={formState.userId}
-            onChange={(event) => handleChange("userId", event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          >
-            <option value="">Selecione</option>
-            {assignableUsers.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <span>Data</span>
+            <input
+              type="date"
+              value={formState.date}
+              onChange={(event) => handleChange("date", event.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+          </label>
 
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Data</span>
-          <input
-            type="date"
-            value={formState.date}
-            onChange={(event) => handleChange("date", event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Tipo</span>
-          <select
-            value={formState.direction}
-            onChange={(event) =>
-              handleChange(
-                "direction",
-                event.target.value as RhTimeBankReleaseDirection,
-              )
-            }
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          >
-            <option value="credit">Crédito</option>
-            <option value="debit">Débito</option>
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Horas</span>
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={formState.hours}
-            onChange={(event) => handleChange("hours", event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            placeholder="Ex.: 1"
-          />
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Minutos</span>
-          <input
-            type="number"
-            min={0}
-            max={59}
-            step={1}
-            value={formState.minutes}
-            onChange={(event) => handleChange("minutes", event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            placeholder="Ex.: 30"
-          />
-        </label>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-[240px,minmax(0,1fr)]">
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Sugestão de motivo</span>
-          <select
-            value={formState.reasonPreset}
-            onChange={(event) =>
-              handleReasonPresetChange(event.target.value as RhTimeBankReasonPreset)
-            }
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          >
-            <option value="">Selecionar</option>
-            <option value="Hora extra">Hora extra</option>
-            <option value="Compensação de horas">Compensação de horas</option>
-            <option value="Libera mais cedo">Libera mais cedo</option>
-            <option value="Ajuste manual">Ajuste manual</option>
-          </select>
-        </label>
+          <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <span>Duração</span>
+            <input
+              inputMode="numeric"
+              value={formState.duration}
+              onChange={(event) => handleDurationChange(event.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              placeholder="00:00"
+            />
+          </label>
+        </div>
 
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
           <span>Motivo</span>
           <textarea
             value={formState.reason}
             onChange={(event) => handleChange("reason", event.target.value)}
-            className="min-h-[96px] rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            placeholder="Descreva o motivo do lançamento."
+            rows={5}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            placeholder="Descreva o contexto do ajuste manual"
           />
         </label>
       </div>
-
-      <div className="mt-4 flex justify-end">
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={createMutation.isPending}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {createMutation.isPending ? "Salvando..." : "Criar lançamento"}
-        </button>
-      </div>
-    </section>
+    </Dialog>
   );
 }
