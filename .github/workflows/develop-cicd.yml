@@ -102,6 +102,9 @@ jobs:
           ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+          ENV_VPS_DEPARTMENT_SERVICE: ${{ secrets.ENV_VPS_DEPARTMENT_SERVICE }}
+          ENV_VPS_FISCAL_SERVICE: ${{ secrets.ENV_VPS_FISCAL_SERVICE }}
+          ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
         run: bash scripts/ci/materialize-vps-env.sh
@@ -212,6 +215,9 @@ jobs:
           ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+          ENV_VPS_DEPARTMENT_SERVICE: ${{ secrets.ENV_VPS_DEPARTMENT_SERVICE }}
+          ENV_VPS_FISCAL_SERVICE: ${{ secrets.ENV_VPS_FISCAL_SERVICE }}
+          ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
         run: bash scripts/ci/materialize-vps-env.sh
