@@ -128,6 +128,10 @@ export function RhTimesheetsSection() {
       (assignableUser) => assignableUser.departmentName === selectedDepartment,
     );
   }, [assignableUsers, selectedDepartment]);
+  const shouldDisableGenerate =
+    !canManageTimesheets ||
+    assignableUsersQuery.isLoading ||
+    filteredAssignableUsers.length === 0;
 
   const effectiveUserId = canManageTimesheets
     ? selectedUserId || (user?.id ?? "")
@@ -191,6 +195,7 @@ export function RhTimesheetsSection() {
         departments={departments}
         canManageTimesheets={canManageTimesheets}
         currentUserLabel={currentUserName}
+        disableGenerate={shouldDisableGenerate}
         selectedDepartment={selectedDepartment}
         selectedUserId={selectedUserId}
         dateFrom={dateFrom}

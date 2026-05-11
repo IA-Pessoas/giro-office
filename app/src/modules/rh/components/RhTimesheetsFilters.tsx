@@ -7,6 +7,7 @@ interface RhTimesheetsFiltersProps {
   departments: string[];
   canManageTimesheets: boolean;
   currentUserLabel: string;
+  disableGenerate: boolean;
   selectedDepartment: string;
   selectedUserId: string;
   dateFrom: string;
@@ -23,6 +24,7 @@ export function RhTimesheetsFilters({
   departments,
   canManageTimesheets,
   currentUserLabel,
+  disableGenerate,
   selectedDepartment,
   selectedUserId,
   dateFrom,
@@ -44,7 +46,8 @@ export function RhTimesheetsFilters({
           <button
             type="button"
             onClick={onOpenGenerate}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            disabled={disableGenerate}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Plus className="h-4 w-4" />
             Gerar folha
