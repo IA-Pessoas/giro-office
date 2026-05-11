@@ -4,10 +4,14 @@ import type { AssignableUser } from "../types";
 
 interface RhTimesheetsFiltersProps {
   assignableUsers: AssignableUser[];
+  departments: string[];
   canManageTimesheets: boolean;
+  currentUserLabel: string;
+  selectedDepartment: string;
   selectedUserId: string;
   dateFrom: string;
   dateTo: string;
+  onDepartmentChange: (value: string) => void;
   onUserChange: (value: string) => void;
   onDateFromChange: (value: string) => void;
   onDateToChange: (value: string) => void;
@@ -16,26 +20,25 @@ interface RhTimesheetsFiltersProps {
 
 export function RhTimesheetsFilters({
   assignableUsers,
+  departments,
   canManageTimesheets,
+  currentUserLabel,
+  selectedDepartment,
   selectedUserId,
   dateFrom,
   dateTo,
+  onDepartmentChange,
   onUserChange,
   onDateFromChange,
   onDateToChange,
   onOpenGenerate,
 }: RhTimesheetsFiltersProps) {
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Folhas de Ponto
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Consulte, gere e acompanhe as folhas de ponto.
-          </p>
-        </div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Folhas de Ponto
+        </h2>
 
         {canManageTimesheets ? (
           <button
@@ -49,29 +52,50 @@ export function RhTimesheetsFilters({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end">
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,220px)_minmax(0,300px)_200px_200px]">
         {canManageTimesheets ? (
-          <label className="flex w-full flex-col gap-1 text-sm text-gray-600 dark:text-gray-300 md:max-w-[320px] xl:flex-1 xl:basis-[280px] xl:max-w-[360px]">
-            <span>Colaborador</span>
-            <div className="relative">
-              <select
-                value={selectedUserId}
-                onChange={(event) => onUserChange(event.target.value)}
-                className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              >
-                <option value="">Meu usuário</option>
-                {assignableUsers.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            </div>
-          </label>
+          <>
+            <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
+              <span>Departamento</span>
+              <div className="relative">
+                <select
+                  value={selectedDepartment}
+                  onChange={(event) => onDepartmentChange(event.target.value)}
+                  className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">Todos</option>
+                  {departments.map((department) => (
+                    <option key={department} value={department}>
+                      {department}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              </div>
+            </label>
+
+            <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
+              <span>Colaborador</span>
+              <div className="relative">
+                <select
+                  value={selectedUserId}
+                  onChange={(event) => onUserChange(event.target.value)}
+                  className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">{currentUserLabel}</option>
+                  {assignableUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              </div>
+            </label>
+          </>
         ) : null}
 
-        <label className="flex w-full flex-col gap-1 text-sm text-gray-600 dark:text-gray-300 md:max-w-[220px] xl:w-[200px]">
+        <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
           <span>Período inicial</span>
           <input
             type="date"
@@ -81,7 +105,7 @@ export function RhTimesheetsFilters({
           />
         </label>
 
-        <label className="flex w-full flex-col gap-1 text-sm text-gray-600 dark:text-gray-300 md:max-w-[220px] xl:w-[200px]">
+        <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
           <span>Período final</span>
           <input
             type="date"

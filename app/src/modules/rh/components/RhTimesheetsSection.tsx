@@ -71,6 +71,7 @@ function intersectsSelectedPeriod(
 
 export function RhTimesheetsSection() {
   const { user } = useAuth();
+  const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [dateFrom, setDateFrom] = useState(getMonthStartInputValue);
   const [dateTo, setDateTo] = useState(getTodayInputValue);
@@ -107,6 +108,27 @@ export function RhTimesheetsSection() {
     enabled: canManageTimesheets,
   });
 
+  const currentUserName = user?.name?.trim() || "Você";
+  const assignableUsers = assignableUsersQuery.data ?? [];
+  const departments = useMemo(() => {
+    return [
+      ...new Set(
+        assignableUsers
+          .map((assignableUser) => assignableUser.departmentName)
+          .filter(Boolean),
+      ),
+    ];
+  }, [assignableUsers]);
+  const filteredAssignableUsers = useMemo(() => {
+    if (!selectedDepartment) {
+      return assignableUsers;
+    }
+
+    return assignableUsers.filter(
+      (assignableUser) => assignableUser.departmentName === selectedDepartment,
+    );
+  }, [assignableUsers, selectedDepartment]);
+
   const effectiveUserId = canManageTimesheets
     ? selectedUserId || (user?.id ?? "")
     : (user?.id ?? "");
@@ -115,7 +137,6 @@ export function RhTimesheetsSection() {
   };
 
   const timeSheetsQuery = useRhTimeSheets(filters);
-  const assignableUsers = assignableUsersQuery.data ?? [];
   const timeSheets = timeSheetsQuery.data ?? [];
 
   const filteredTimeSheets = useMemo(() => {
@@ -135,10 +156,15 @@ export function RhTimesheetsSection() {
 
   function getUserLabel(userId: string) {
     if (user?.id === userId) {
-      return user?.name?.trim() || "Você";
+      return currentUserName;
     }
 
     return userNameById.get(userId) ?? "Colaborador não encontrado";
+  }
+
+  function handleDepartmentChange(nextDepartment: string) {
+    setSelectedDepartment(nextDepartment);
+    setSelectedUserId("");
   }
 
   function handleOpenGenerate() {
@@ -155,16 +181,21 @@ export function RhTimesheetsSection() {
       assignableUsersQuery.isLoading &&
       !assignableUsersQuery.data);
   const error =
-    timeSheetsQuery.error || (canManageTimesheets ? assignableUsersQuery.error : null);
+    timeSheetsQuery.error ||
+    (canManageTimesheets ? assignableUsersQuery.error : null);
 
   return (
     <div className="space-y-6">
       <RhTimesheetsFilters
-        assignableUsers={assignableUsers}
+        assignableUsers={filteredAssignableUsers}
+        departments={departments}
         canManageTimesheets={canManageTimesheets}
+        currentUserLabel={currentUserName}
+        selectedDepartment={selectedDepartment}
         selectedUserId={selectedUserId}
         dateFrom={dateFrom}
         dateTo={dateTo}
+        onDepartmentChange={handleDepartmentChange}
         onUserChange={setSelectedUserId}
         onDateFromChange={setDateFrom}
         onDateToChange={setDateTo}
@@ -174,7 +205,7 @@ export function RhTimesheetsSection() {
       {canManageTimesheets ? (
         <RhTimesheetGenerateModal
           open={isGenerateOpen}
-          assignableUsers={assignableUsers}
+          assignableUsers={filteredAssignableUsers}
           defaultUserId={selectedUserId}
           onClose={() => setIsGenerateOpen(false)}
         />
