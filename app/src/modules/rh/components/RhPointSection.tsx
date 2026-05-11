@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { toast } from "react-toastify";
 
 import { useAuth } from "@/context/AuthContext";
 import { permissionService } from "@modules/users/services/permissionService";
@@ -6,6 +7,10 @@ import { normalizePermissionResponse } from "@modules/users/utils/permissionUtil
 import { useFetch } from "@shared/hooks";
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import type { RhPointAdjustmentStatus } from "../types";
+import {
+  useRegisterRhPointMutation,
+  useRhTodayPoint,
+} from "../hooks/useRhPoint";
 import { RhPointAdjustmentPanel } from "./RhPointAdjustmentPanel";
 import { RhPointAdjustmentRequestModal } from "./RhPointAdjustmentRequestModal";
 import { RhPointFilters } from "./RhPointFilters";
@@ -75,6 +80,19 @@ export function RhPointSection() {
 
   const assignableUsers = assignableUsersQuery.data ?? [];
   const currentUserName = user?.name?.trim() || "Você";
+  const todayPointQuery = useRhTodayPoint();
+  const registerMutation = useRegisterRhPointMutation();
+
+  async function handleRegisterPoint() {
+    try {
+      await registerMutation.mutateAsync();
+      toast.success("Ponto registrado com sucesso.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Não foi possível registrar o ponto.";
+      toast.error(message);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -94,7 +112,14 @@ export function RhPointSection() {
         onAdjustmentStatusChange={setSelectedAdjustmentStatus}
       />
 
-      <RhPointTodayCard currentUserName={currentUserName} />
+      <RhPointTodayCard
+        currentUserName={currentUserName}
+        todayPoint={todayPointQuery.data ?? null}
+        isLoading={todayPointQuery.isLoading}
+        hasError={Boolean(todayPointQuery.error)}
+        isRegistering={registerMutation.isPending}
+        onRegister={handleRegisterPoint}
+      />
       <RhPointSummaryCards />
       <RhPointTable />
       <RhPointAdjustmentPanel />
