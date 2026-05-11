@@ -5,6 +5,8 @@ interface RhPointTableProps {
   points: RhPointListItem[];
   isLoading: boolean;
   hasError: boolean;
+  currentUserId: string;
+  onRequestAdjustment: (point: RhPointListItem) => void;
 }
 
 function formatWorkloadLabel(totalMinutes: number | null) {
@@ -30,7 +32,13 @@ function formatBalanceLabel(balanceMinutes: number | null) {
   return `${signal}${hours}h${String(minutes).padStart(2, "0")}`;
 }
 
-export function RhPointTable({ points, isLoading, hasError }: RhPointTableProps) {
+export function RhPointTable({
+  points,
+  isLoading,
+  hasError,
+  currentUserId,
+  onRequestAdjustment,
+}: RhPointTableProps) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
       <div className="mb-4">
@@ -77,8 +85,11 @@ export function RhPointTable({ points, isLoading, hasError }: RhPointTableProps)
                 <th className="w-[12%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-gray-300">
                   Saldo
                 </th>
-                <th className="w-[12%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-gray-300">
+                <th className="w-[10%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-gray-300">
                   Status
+                </th>
+                <th className="w-[12%] px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-gray-300">
+                  Ações
                 </th>
               </tr>
             </thead>
@@ -108,6 +119,19 @@ export function RhPointTable({ points, isLoading, hasError }: RhPointTableProps)
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                     {point.status}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {point.user_id === currentUserId ? (
+                      <button
+                        type="button"
+                        onClick={() => onRequestAdjustment(point)}
+                        className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20"
+                      >
+                        Solicitar ajuste
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Sem ação</span>
+                    )}
                   </td>
                 </tr>
               ))}

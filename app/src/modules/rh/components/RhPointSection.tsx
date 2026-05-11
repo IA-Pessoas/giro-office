@@ -6,8 +6,9 @@ import { permissionService } from "@modules/users/services/permissionService";
 import { normalizePermissionResponse } from "@modules/users/utils/permissionUtils";
 import { useFetch } from "@shared/hooks";
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
-import type { RhPointAdjustmentStatus } from "../types";
+import type { RhPointAdjustmentStatus, RhPointListItem } from "../types";
 import {
+  useRhPointAdjustmentRequests,
   useRhPoints,
   useRhPointSummary,
   useRegisterRhPointMutation,
@@ -69,7 +70,8 @@ export function RhPointSection() {
   const [selectedAdjustmentStatus, setSelectedAdjustmentStatus] = useState<
     "" | RhPointAdjustmentStatus
   >("");
-  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
+  const [selectedPointForAdjustment, setSelectedPointForAdjustment] =
+    useState<RhPointListItem | null>(null);
 
   const permissionQuery = useFetch(
     ["rh", "point", "permissions", user?.id ?? ""],
@@ -113,6 +115,10 @@ export function RhPointSection() {
     month,
     user_id: effectiveUserId || undefined,
   });
+  const adjustmentsQuery = useRhPointAdjustmentRequests({
+    user_id: effectiveUserId || undefined,
+    status: selectedAdjustmentStatus || undefined,
+  });
   const registerMutation = useRegisterRhPointMutation();
 
   useEffect(() => {
@@ -130,6 +136,15 @@ export function RhPointSection() {
         error instanceof Error ? error.message : "Não foi possível registrar o ponto.";
       toast.error(message);
     }
+  }
+
+  function getUserLabel(userId: string) {
+    if (user?.id === userId) {
+      return currentUserName;
+    }
+
+    const matchedUser = assignableUsers.find((assignableUser) => assignableUser.id === userId);
+    return matchedUser?.name ?? "Colaborador não encontrado";
   }
 
   return (
@@ -167,12 +182,22 @@ export function RhPointSection() {
         points={pointsQuery.data ?? []}
         isLoading={pointsQuery.isLoading}
         hasError={Boolean(pointsQuery.error)}
+        currentUserId={user?.id ?? ""}
+        onRequestAdjustment={setSelectedPointForAdjustment}
       />
-      <RhPointAdjustmentPanel />
+      <RhPointAdjustmentPanel
+        adjustments={adjustmentsQuery.data ?? []}
+        isLoading={adjustmentsQuery.isLoading}
+        hasError={Boolean(adjustmentsQuery.error)}
+        canManagePoint={canManagePoint}
+        currentUserId={user?.id ?? ""}
+        getUserLabel={getUserLabel}
+      />
 
       <RhPointAdjustmentRequestModal
-        open={isAdjustmentModalOpen}
-        onClose={() => setIsAdjustmentModalOpen(false)}
+        open={Boolean(selectedPointForAdjustment)}
+        point={selectedPointForAdjustment}
+        onClose={() => setSelectedPointForAdjustment(null)}
       />
     </div>
   );
