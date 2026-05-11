@@ -20,6 +20,8 @@ import { RhPointFilters } from "./RhPointFilters";
 import { RhPointSummaryCards } from "./RhPointSummaryCards";
 import { RhPointTable } from "./RhPointTable";
 import { RhPointTodayCard } from "./RhPointTodayCard";
+import { RhTimeBankSection } from "./RhTimeBankSection";
+import { RhTimesheetsSection } from "./RhTimesheetsSection";
 
 function formatInputDate(date: Date) {
   const offset = date.getTimezoneOffset();
@@ -63,6 +65,9 @@ function getMonthDateRange(month: string) {
 
 export function RhPointSection() {
   const { user } = useAuth();
+  const [activePointTab, setActivePointTab] = useState<"point" | "timebank" | "timesheets">(
+    "point",
+  );
   const [selectedUserId, setSelectedUserId] = useState("");
   const [month, setMonth] = useState(getCurrentMonthValue);
   const [dateFrom, setDateFrom] = useState(getMonthStartInputValue);
@@ -149,56 +154,101 @@ export function RhPointSection() {
 
   return (
     <div className="space-y-6">
-      <RhPointFilters
-        assignableUsers={assignableUsers}
-        canManagePoint={canManagePoint}
-        currentUserLabel={currentUserName}
-        selectedUserId={selectedUserId}
-        month={month}
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        selectedAdjustmentStatus={selectedAdjustmentStatus}
-        onUserChange={setSelectedUserId}
-        onMonthChange={setMonth}
-        onDateFromChange={setDateFrom}
-        onDateToChange={setDateTo}
-        onAdjustmentStatusChange={setSelectedAdjustmentStatus}
-      />
+      <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex flex-wrap items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setActivePointTab("point")}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              activePointTab === "point"
+                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            }`}
+          >
+            Ponto
+          </button>
+          <button
+            type="button"
+            onClick={() => setActivePointTab("timebank")}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              activePointTab === "timebank"
+                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            }`}
+          >
+            Banco de Horas
+          </button>
+          <button
+            type="button"
+            onClick={() => setActivePointTab("timesheets")}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              activePointTab === "timesheets"
+                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            }`}
+          >
+            Folhas de Ponto
+          </button>
+        </div>
+      </div>
 
-      <RhPointTodayCard
-        currentUserName={currentUserName}
-        todayPoint={todayPointQuery.data ?? null}
-        isLoading={todayPointQuery.isLoading}
-        hasError={Boolean(todayPointQuery.error)}
-        isRegistering={registerMutation.isPending}
-        onRegister={handleRegisterPoint}
-      />
-      <RhPointSummaryCards
-        summary={summaryQuery.data ?? null}
-        isLoading={summaryQuery.isLoading}
-        hasError={Boolean(summaryQuery.error)}
-      />
-      <RhPointTable
-        points={pointsQuery.data ?? []}
-        isLoading={pointsQuery.isLoading}
-        hasError={Boolean(pointsQuery.error)}
-        currentUserId={user?.id ?? ""}
-        onRequestAdjustment={setSelectedPointForAdjustment}
-      />
-      <RhPointAdjustmentPanel
-        adjustments={adjustmentsQuery.data ?? []}
-        isLoading={adjustmentsQuery.isLoading}
-        hasError={Boolean(adjustmentsQuery.error)}
-        canManagePoint={canManagePoint}
-        currentUserId={user?.id ?? ""}
-        getUserLabel={getUserLabel}
-      />
+      {activePointTab === "point" ? (
+        <>
+          <RhPointFilters
+            assignableUsers={assignableUsers}
+            canManagePoint={canManagePoint}
+            currentUserLabel={currentUserName}
+            selectedUserId={selectedUserId}
+            month={month}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            selectedAdjustmentStatus={selectedAdjustmentStatus}
+            onUserChange={setSelectedUserId}
+            onMonthChange={setMonth}
+            onDateFromChange={setDateFrom}
+            onDateToChange={setDateTo}
+            onAdjustmentStatusChange={setSelectedAdjustmentStatus}
+          />
 
-      <RhPointAdjustmentRequestModal
-        open={Boolean(selectedPointForAdjustment)}
-        point={selectedPointForAdjustment}
-        onClose={() => setSelectedPointForAdjustment(null)}
-      />
+          <RhPointTodayCard
+            currentUserName={currentUserName}
+            todayPoint={todayPointQuery.data ?? null}
+            isLoading={todayPointQuery.isLoading}
+            hasError={Boolean(todayPointQuery.error)}
+            isRegistering={registerMutation.isPending}
+            onRegister={handleRegisterPoint}
+          />
+          <RhPointSummaryCards
+            summary={summaryQuery.data ?? null}
+            isLoading={summaryQuery.isLoading}
+            hasError={Boolean(summaryQuery.error)}
+          />
+          <RhPointTable
+            points={pointsQuery.data ?? []}
+            isLoading={pointsQuery.isLoading}
+            hasError={Boolean(pointsQuery.error)}
+            currentUserId={user?.id ?? ""}
+            onRequestAdjustment={setSelectedPointForAdjustment}
+          />
+          <RhPointAdjustmentPanel
+            adjustments={adjustmentsQuery.data ?? []}
+            isLoading={adjustmentsQuery.isLoading}
+            hasError={Boolean(adjustmentsQuery.error)}
+            canManagePoint={canManagePoint}
+            currentUserId={user?.id ?? ""}
+            getUserLabel={getUserLabel}
+          />
+
+          <RhPointAdjustmentRequestModal
+            open={Boolean(selectedPointForAdjustment)}
+            point={selectedPointForAdjustment}
+            onClose={() => setSelectedPointForAdjustment(null)}
+          />
+        </>
+      ) : null}
+
+      {activePointTab === "timebank" ? <RhTimeBankSection /> : null}
+      {activePointTab === "timesheets" ? <RhTimesheetsSection /> : null}
     </div>
   );
 }
