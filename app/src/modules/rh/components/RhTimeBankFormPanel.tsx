@@ -72,7 +72,7 @@ export function RhTimeBankFormPanel({
     }
 
     if (!formState.date) {
-      toast.warn("Informe a data do lancamento.");
+      toast.warn("Informe a data do lançamento.");
       return;
     }
 
@@ -82,7 +82,7 @@ export function RhTimeBankFormPanel({
     }
 
     if (!trimmedReason) {
-      toast.warn("Informe o motivo do lancamento.");
+      toast.warn("Informe o motivo do lançamento.");
       return;
     }
 
@@ -94,14 +94,14 @@ export function RhTimeBankFormPanel({
         reason: trimmedReason,
       });
 
-      toast.success("Lancamento criado com sucesso.");
+      toast.success("Lançamento criado com sucesso.");
       setFormState(buildInitialFormState(defaultUserId));
       onClose();
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : "Nao foi possivel criar o lancamento.";
+          : "Não foi possível criar o lançamento.";
       toast.error(message);
     }
   }
@@ -111,7 +111,7 @@ export function RhTimeBankFormPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-            Novo lancamento
+            Novo lançamento
           </h3>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             Informe colaborador, data, minutos e motivo do ajuste manual.
@@ -172,7 +172,7 @@ export function RhTimeBankFormPanel({
           value={formState.reason}
           onChange={(event) => handleChange("reason", event.target.value)}
           className="min-h-[96px] rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          placeholder="Descreva o motivo do lancamento."
+          placeholder="Descreva o motivo do lançamento."
         />
       </label>
 
@@ -183,7 +183,7 @@ export function RhTimeBankFormPanel({
           disabled={createMutation.isPending}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {createMutation.isPending ? "Salvando..." : "Criar lancamento"}
+          {createMutation.isPending ? "Salvando..." : "Criar lançamento"}
         </button>
       </div>
     </section>

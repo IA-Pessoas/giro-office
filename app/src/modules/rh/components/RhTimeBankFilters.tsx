@@ -38,7 +38,7 @@ export function RhTimeBankFilters({
           Banco de horas
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Consulte e gerencie os lancamentos de banco de horas.
+          Consulte e gerencie os lançamentos de banco de horas.
         </p>
       </div>
 
@@ -65,7 +65,7 @@ export function RhTimeBankFilters({
         ) : null}
 
         <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
-          <span>Periodo inicial</span>
+          <span>Período inicial</span>
           <input
             type="date"
             value={dateFrom}
@@ -75,7 +75,7 @@ export function RhTimeBankFilters({
         </label>
 
         <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
-          <span>Periodo final</span>
+          <span>Período final</span>
           <input
             type="date"
             value={dateTo}
@@ -109,7 +109,7 @@ export function RhTimeBankFilters({
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
           >
             <Plus className="h-4 w-4" />
-            Novo lancamento
+            Novo lançamento
           </button>
         ) : null}
       </div>

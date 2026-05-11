@@ -97,14 +97,14 @@ export function RhTimeBankSection() {
     return new Map(assignableUsers.map((assignableUser) => [assignableUser.id, assignableUser.name]));
   }, [assignableUsers]);
 
-  const currentUserName = user?.name?.trim() || "Voce";
+  const currentUserName = user?.name?.trim() || "Você";
 
   function getUserLabel(userId: string) {
     if (user?.id === userId) {
       return currentUserName;
     }
 
-    return userNameById.get(userId) ?? "Colaborador nao encontrado";
+    return userNameById.get(userId) ?? "Colaborador não encontrado";
   }
 
   function handleOpenCreate() {
@@ -130,13 +130,13 @@ export function RhTimeBankSection() {
 
     try {
       await approveMutation.mutateAsync({ id: releasePendingApproval.id });
-      toast.success("Lancamento aprovado com sucesso.");
+      toast.success("Lançamento aprovado com sucesso.");
       setReleasePendingApproval(null);
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : "Nao foi possivel aprovar o lancamento.";
+          : "Não foi possível aprovar o lançamento.";
       toast.error(message);
     }
   }
@@ -174,19 +174,19 @@ export function RhTimeBankSection() {
 
       {isLoading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-          Carregando lancamentos de banco de horas...
+          Carregando lançamentos de banco de horas...
         </div>
       ) : null}
 
       {!isLoading && error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">
-          Nao foi possivel carregar os lancamentos de banco de horas.
+          Não foi possível carregar os lançamentos de banco de horas.
         </div>
       ) : null}
 
       {!isLoading && !error && releases.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-          Nenhum lancamento encontrado para os filtros selecionados.
+          Nenhum lançamento encontrado para os filtros selecionados.
         </div>
       ) : null}
 
@@ -212,10 +212,10 @@ export function RhTimeBankSection() {
           <DialogPrimitive.Overlay className="fixed inset-0 z-[1800] bg-black/60 backdrop-blur-sm" />
           <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-[1900] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-lg focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
             <DialogPrimitive.Title className="sr-only">
-              Aprovar lancamento
+              Aprovar lançamento
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">
-              Confirmacao de aprovacao de lancamento de banco de horas
+              Confirmação de aprovação de lançamento de banco de horas
             </DialogPrimitive.Description>
 
             <div className="flex flex-col gap-5">
@@ -225,10 +225,10 @@ export function RhTimeBankSection() {
                 </div>
                 <div className="space-y-1.5">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Aprovar lancamento
+                    Aprovar lançamento
                   </h3>
                   <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
-                    Deseja aprovar este lancamento de banco de horas? Essa acao atualiza o
+                    Deseja aprovar este lançamento de banco de horas? Essa ação atualiza o
                     status do registro.
                   </p>
                 </div>

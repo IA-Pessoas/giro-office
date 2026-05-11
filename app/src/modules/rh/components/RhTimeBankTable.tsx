@@ -59,7 +59,7 @@ export function RhTimeBankTable({
               Status
             </th>
             <th className="w-[12%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-gray-300">
-              Acoes
+              Ações
             </th>
           </tr>
         </thead>
@@ -116,7 +116,7 @@ export function RhTimeBankTable({
                     </button>
                   ) : (
                     <span className="text-xs font-medium text-gray-400 dark:text-gray-500">
-                      {release.is_approved ? "Concluido" : "Sem permissao"}
+                      {release.is_approved ? "Concluído" : "Sem permissão"}
                     </span>
                   )}
                 </td>
