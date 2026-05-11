@@ -1,7 +1,13 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { type LoggerLevel, loggerLevelSchema } from "@workspace/shared";
+import {
+  type LoggerLevel,
+  loggerLevelSchema,
+  parseAllowedOrigins,
+  validateProductionCorsOrigins,
+  validateProductionInternalServiceToken,
+} from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -13,6 +19,11 @@ dotenv.config({ path: serviceEnvPath });
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 const gatewayEnvSchema = z
@@ -63,17 +74,43 @@ const gatewayEnvSchema = z
       .string()
       .optional()
       .default("*")
-      .transform((val: string) =>
-        val
-          .split(",")
-          .map((origin: string) => origin.trim())
-          .filter(Boolean),
-      ),
+      .transform((val: string) => parseAllowedOrigins(val)),
+    rateLimitMax: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 300)),
+    rateLimitWindowMs: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 60_000)),
+    authRateLimitMax: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 10)),
+    authRateLimitWindowMs: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 60_000)),
   })
-  .transform((env) => ({
-    ...env,
-    logPretty: env.nodeEnv !== "production" && env.logPretty,
-  }));
+  .transform((env) => {
+    validateProductionInternalServiceToken({
+      nodeEnv: env.nodeEnv,
+      serviceName: "gateway",
+      envName: "AUDIT_SERVICE_TOKEN",
+      token: env.auditServiceToken,
+    });
+    validateProductionCorsOrigins({
+      nodeEnv: env.nodeEnv,
+      serviceName: "gateway",
+      envName: "GATEWAY_ALLOWED_ORIGINS",
+      allowedOrigins: env.allowedOrigins,
+    });
+
+    return {
+      ...env,
+      logPretty: env.nodeEnv !== "production" && env.logPretty,
+    };
+  });
 
 export interface GatewayEnv {
   nodeEnv: string;
@@ -95,6 +132,10 @@ export interface GatewayEnv {
   logLevel: LoggerLevel;
   logPretty: boolean;
   allowedOrigins: string[];
+  rateLimitMax: number;
+  rateLimitWindowMs: number;
+  authRateLimitMax: number;
+  authRateLimitWindowMs: number;
 }
 
 export function getGatewayEnv(): GatewayEnv {
@@ -118,5 +159,9 @@ export function getGatewayEnv(): GatewayEnv {
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
     allowedOrigins: process.env.GATEWAY_ALLOWED_ORIGINS,
+    rateLimitMax: process.env.GATEWAY_RATE_LIMIT_MAX,
+    rateLimitWindowMs: process.env.GATEWAY_RATE_LIMIT_WINDOW_MS,
+    authRateLimitMax: process.env.GATEWAY_AUTH_RATE_LIMIT_MAX,
+    authRateLimitWindowMs: process.env.GATEWAY_AUTH_RATE_LIMIT_WINDOW_MS,
   }) as GatewayEnv;
 }

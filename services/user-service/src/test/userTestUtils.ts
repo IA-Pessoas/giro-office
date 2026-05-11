@@ -1,5 +1,6 @@
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
@@ -94,9 +95,11 @@ vi.mock("@workspace/shared/upload", () => ({
       next();
     },
   }),
+  validateUploadFileSignature: vi.fn(),
 }));
 
 import { createUserApp } from "../app.js";
+import type { UserServiceEnv } from "../config/env.js";
 import { getUserServiceEnv } from "../config/env.js";
 
 const DEFAULT_TEST_ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
@@ -106,17 +109,19 @@ const DEFAULT_TEST_USER_ID = "c0000000-0000-4000-8000-000000000001";
 export function gatewayAuthHeaders(overrides?: {
   userId?: string;
   organizationId?: string;
+  permission?: number;
 }): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
     [FORWARDED_AUTH_USER_ID_HEADER]: overrides?.userId ?? DEFAULT_TEST_USER_ID,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]:
       overrides?.organizationId ?? DEFAULT_TEST_ORGANIZATION_ID,
+    [FORWARDED_AUTH_PERMISSION_HEADER]: String(overrides?.permission ?? 2),
   };
 }
 
-export function createTestApp() {
-  const env = getUserServiceEnv();
+export function createTestApp(overrides: Partial<UserServiceEnv> = {}) {
+  const env = { ...getUserServiceEnv(), ...overrides };
   const logger = createLogger({
     service: "user-service-test",
     env: "test",

@@ -204,6 +204,7 @@ export function createTestApp() {
     logLevel: "silent",
     logPretty: false,
     pointMinIntervalMinutes: 30,
+    allowedOrigins: ["*"],
     enableApiDocs: false,
   } satisfies RhEnv;
   const logger = createLogger({

@@ -8,6 +8,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
@@ -28,6 +29,7 @@
     },
     "./http": {
       "types": "./dist/http/index.d.ts",
+      "development": "./src/http/index.ts",
       "import": "./dist/http/index.js",
       "default": "./dist/http/index.js"
     },
@@ -57,6 +59,7 @@
     },
     "./upload": {
       "types": "./dist/upload/index.d.ts",
+      "development": "./src/upload/index.ts",
       "import": "./dist/upload/index.js",
       "default": "./dist/upload/index.js"
     },

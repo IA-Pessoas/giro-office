@@ -1,4 +1,9 @@
-import { createExpressErrorHandler, createSuccessResponse } from "@workspace/shared";
+import {
+  createExpressErrorHandler,
+  createSecurityHeadersMiddleware,
+  createServiceCorsOptions,
+  createSuccessResponse,
+} from "@workspace/shared";
 import { mountOpenApiDocs } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import cors from "cors";
@@ -38,7 +43,8 @@ export function createDepartmentApp(options: CreateDepartmentAppOptions): Expres
   const departmentService = options.departmentService ?? new DepartmentService();
   const app = express();
 
-  app.use(cors());
+  app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
+  app.use(cors(createServiceCorsOptions(env.allowedOrigins, "department-service")));
   app.use(express.json());
   app.use(requestContext);
 

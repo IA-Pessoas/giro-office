@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const createIntegrationBodySchema = z
   .object({
-    organization_id: z.string().uuid({ message: "organization_id inválido." }),
+    organization_id: z.string().uuid({ message: "organization_id inválido." }).optional(),
     type: z.string().min(1),
     name: z.string().min(1),
     company_name: z.string().nullable().optional(),

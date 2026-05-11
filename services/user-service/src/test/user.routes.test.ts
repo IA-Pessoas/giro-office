@@ -20,6 +20,28 @@ describe("user routes", () => {
     expect(res.status).toBe(401);
   });
 
+  it("bloqueia rotas de administracao de usuarios para nao-admin", async () => {
+    const app = createTestApp();
+    const headers = gatewayAuthHeaders({ permission: 1 });
+    const cases = [
+      { method: "get", path: "/user" },
+      { method: "get", path: "/user/user-3" },
+      { method: "get", path: "/user/user-3/photo" },
+      { method: "patch", path: "/user/user-3" },
+      { method: "post", path: "/user/user-3/photo" },
+      { method: "delete", path: "/user/user-3/photo" },
+      { method: "delete", path: "/user/user-3" },
+    ] as const;
+
+    for (const item of cases) {
+      const res = await request(app)[item.method](item.path).set(headers).send({
+        name: "Bloqueado",
+      });
+
+      expect(res.status).toBe(403);
+    }
+  });
+
   it("GET /user lista usuarios", async () => {
     userServiceMock.list.mockResolvedValue([{ id: "user-1" }]);
     const app = createTestApp();
@@ -30,7 +52,11 @@ describe("user routes", () => {
       .query({ skip: 5, take: 10 });
 
     expect(res.status).toBe(200);
-    expect(userServiceMock.list).toHaveBeenCalledWith({ skip: 5, take: 10 });
+    expect(userServiceMock.list).toHaveBeenCalledWith({
+      skip: 5,
+      take: 10,
+      organizationId: "a0000000-0000-4000-8000-000000000001",
+    });
   });
 
   it("GET /user/:id retorna detalhe", async () => {
@@ -40,7 +66,10 @@ describe("user routes", () => {
     const res = await request(app).get("/user/user-2").set(gatewayAuthHeaders());
 
     expect(res.status).toBe(200);
-    expect(userServiceMock.getById).toHaveBeenCalledWith("user-2");
+    expect(userServiceMock.getById).toHaveBeenCalledWith(
+      "user-2",
+      "a0000000-0000-4000-8000-000000000001",
+    );
   });
 
   it("POST /user cria usuario", async () => {
@@ -62,8 +91,25 @@ describe("user routes", () => {
       password: "secret",
       department_id: "dep-1",
       permission: 1,
+      organization_id: "a0000000-0000-4000-8000-000000000001",
       first_owner_flag: false,
     });
+  });
+
+  it("POST /user rejeita organization_id diferente da organizacao autenticada", async () => {
+    const app = createTestApp();
+
+    const res = await request(app).post("/user").set(gatewayAuthHeaders()).send({
+      name: "Novo Usuario",
+      login: "novo.usuario",
+      password: "secret",
+      department_id: "dep-1",
+      permission: 1,
+      organization_id: "a0000000-0000-4000-8000-000000000099",
+    });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.create).not.toHaveBeenCalled();
   });
 
   it("PATCH /user/:id atualiza usuario", async () => {
@@ -75,9 +121,13 @@ describe("user routes", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(userServiceMock.update).toHaveBeenCalledWith("user-3", {
-      name: "Usuario Atualizado",
-    });
+    expect(userServiceMock.update).toHaveBeenCalledWith(
+      "user-3",
+      {
+        name: "Usuario Atualizado",
+      },
+      "a0000000-0000-4000-8000-000000000001",
+    );
   });
 
   it("GET /user/:id/photo retorna JSON com url quando a foto e URL publica", async () => {
@@ -95,6 +145,10 @@ describe("user routes", () => {
       success: true,
       data: { url: "https://cdn/avatar.png" },
     });
+    expect(userServiceMock.getById).toHaveBeenCalledWith(
+      "user-3",
+      "a0000000-0000-4000-8000-000000000001",
+    );
     expect(storageServiceMock.readUserPhoto).toHaveBeenCalledWith("https://cdn/avatar.png");
   });
 
@@ -131,9 +185,38 @@ describe("user routes", () => {
 
     expect(res.status).toBe(200);
     expect(storageServiceMock.uploadUserPhoto).toHaveBeenCalledTimes(1);
-    expect(userServiceMock.update).toHaveBeenCalledWith("user-3", {
-      photo_url: "https://cdn/avatar.png",
+    expect(userServiceMock.update).toHaveBeenCalledWith(
+      "user-3",
+      {
+        photo_url: "https://cdn/avatar.png",
+      },
+      "a0000000-0000-4000-8000-000000000001",
+    );
+  });
+
+  it("POST /user/:id/photo limita upload por usuario autenticado", async () => {
+    storageServiceMock.uploadUserPhoto.mockResolvedValue("https://cdn/avatar.png");
+    userServiceMock.update.mockResolvedValue({ id: "user-3", photo_url: "https://cdn/avatar.png" });
+    const app = createTestApp({
+      uploadRateLimitMax: 1,
+      uploadRateLimitWindowMs: 60_000,
     });
+
+    const firstUserHeaders = gatewayAuthHeaders({
+      userId: "c0000000-0000-4000-8000-000000000101",
+    });
+    const secondUserHeaders = gatewayAuthHeaders({
+      userId: "c0000000-0000-4000-8000-000000000102",
+    });
+
+    const firstUpload = await request(app).post("/user/user-3/photo").set(firstUserHeaders);
+    const repeatedFirstUpload = await request(app).post("/user/user-3/photo").set(firstUserHeaders);
+    const secondUserUpload = await request(app).post("/user/user-3/photo").set(secondUserHeaders);
+
+    expect(firstUpload.status).toBe(200);
+    expect(repeatedFirstUpload.status).toBe(429);
+    expect(secondUserUpload.status).toBe(200);
+    expect(storageServiceMock.uploadUserPhoto).toHaveBeenCalledTimes(2);
   });
 
   it("DELETE /user/:id/photo remove foto", async () => {
@@ -145,7 +228,11 @@ describe("user routes", () => {
 
     expect(res.status).toBe(200);
     expect(storageServiceMock.deleteUserPhoto).toHaveBeenCalledWith("user-3");
-    expect(userServiceMock.update).toHaveBeenCalledWith("user-3", { photo_url: null });
+    expect(userServiceMock.update).toHaveBeenCalledWith(
+      "user-3",
+      { photo_url: null },
+      "a0000000-0000-4000-8000-000000000001",
+    );
   });
 
   it("DELETE /user/:id desativa usuario", async () => {
@@ -155,6 +242,9 @@ describe("user routes", () => {
     const res = await request(app).delete("/user/user-3").set(gatewayAuthHeaders());
 
     expect(res.status).toBe(200);
-    expect(userServiceMock.delete).toHaveBeenCalledWith("user-3");
+    expect(userServiceMock.delete).toHaveBeenCalledWith(
+      "user-3",
+      "a0000000-0000-4000-8000-000000000001",
+    );
   });
 });

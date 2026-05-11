@@ -40,6 +40,8 @@ loadEnvFile(path.join(rootDir, ".env"));
 const { manifest } = await import(
   pathToFileURL(path.join(__dirname, "all-services-smoke.manifest.mjs")).href
 );
+const { getInternalServiceTokenEnvKeys, getServiceUrlDefaults, getServiceUrlEnvKeys } =
+  await import(pathToFileURL(path.join(__dirname, "service-registry.mjs")).href);
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -86,39 +88,12 @@ const levelColors = {
   DONE: color.bold + color.green,
 };
 
-const INTERNAL_SERVICE_TOKENS = {
-  "audit-service": "AUDIT_SERVICE_TOKEN",
-  "client-service": "CLIENT_SERVICE_INTERNAL_TOKEN",
-};
-
-const SERVICE_URL_ENV_KEYS = {
-  "audit-service": "AUDIT_SERVICE_URL",
-  "client-service": "CLIENT_SERVICE_URL",
-  "department-service": "DEPARTMENT_SERVICE_URL",
-  "fiscal-service": "FISCAL_SERVICE_URL",
-  "contabil-service": "CONTABIL_SERVICE_URL",
-  "organization-service": "ORGANIZATION_SERVICE_URL",
-  "project-service": "PROJECT_SERVICE_URL",
-  "rh-service": "RH_SERVICE_URL",
-  "task-service": "TASK_SERVICE_URL",
-  "user-service": "USER_SERVICE_URL",
-};
-
-const SERVICE_URL_DEFAULTS = {
-  "audit-service": "http://localhost:3020",
-  "client-service": "http://localhost:3035",
-  "department-service": "http://localhost:3036",
-  "fiscal-service": "http://localhost:3037",
-  "contabil-service": "http://localhost:3038",
-  "organization-service": "http://localhost:3031",
-  "project-service": "http://localhost:3033",
-  "rh-service": "http://localhost:3034",
-  "task-service": "http://localhost:3032",
-  "user-service": "http://localhost:3030",
-};
+const INTERNAL_SERVICE_TOKENS = getInternalServiceTokenEnvKeys();
+const SERVICE_URL_ENV_KEYS = getServiceUrlEnvKeys();
+const SERVICE_URL_DEFAULTS = getServiceUrlDefaults();
 
 const env = {
-  gatewayUrl: process.env.GATEWAY_URL,
+  gatewayUrl: process.env.GATEWAY_URL?.trim() || "",
   gatewayPort: process.env.GATEWAY_PORT ?? "3010",
   login: process.env.LOGIN ?? "Admin",
   password: process.env.PASSWORD ?? process.env.ADMIN_PASSWORD ?? "senha123",
@@ -134,12 +109,17 @@ const env = {
     path.join(rootDir, "scripts", "fixtures", "smoke-upload.png"),
 };
 
-if (!env.gatewayUrl) {
-  env.gatewayUrl = `http://localhost:${env.gatewayPort}`;
-}
+env.gatewayUrl =
+  env.gatewayUrl ||
+  (process.env.GATEWAY_PORT ? `http://localhost:${env.gatewayPort}` : SERVICE_URL_DEFAULTS.gateway);
+env.GATEWAY_URL = env.gatewayUrl;
+env.gateway = env.gatewayUrl;
 
 for (const [service, envKey] of Object.entries(SERVICE_URL_ENV_KEYS)) {
-  env[envKey] = process.env[envKey]?.trim() || SERVICE_URL_DEFAULTS[service] || "";
+  env[envKey] =
+    (service === "gateway" ? env.gatewayUrl : process.env[envKey]?.trim()) ||
+    SERVICE_URL_DEFAULTS[service] ||
+    "";
   env[service] = env[envKey];
 }
 

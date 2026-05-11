@@ -9,32 +9,26 @@ const rootDir = path.resolve(__dirname, "..");
 const manifestModule = await import(
   pathToFileURL(path.join(__dirname, "all-services-smoke.manifest.mjs")).href
 );
+const registryModule = await import(
+  pathToFileURL(path.join(__dirname, "service-registry.mjs")).href
+);
+const harnessModule = await import(
+  pathToFileURL(path.join(__dirname, "service-harness-lib.mjs")).href
+);
 
 const { manifest, specFiles } = manifestModule;
+const { serviceRegistry } = registryModule;
+const { extractOpenApiOperationsFromSource } = harnessModule;
+
+function extractWorkspaceServicePackagePaths() {
+  const workspacePath = path.join(rootDir, "pnpm-workspace.yaml");
+  const source = fs.readFileSync(workspacePath, "utf8");
+  return [...source.matchAll(/^\s*-\s+"?(services\/[^"*?]+)"?\s*$/gm)].map((match) => match[1]);
+}
 
 function extractSpecOperations(specPath, service) {
   const source = fs.readFileSync(specPath, "utf8");
-  const operations = [];
-  let currentPath = null;
-
-  for (const line of source.split(/\r?\n/)) {
-    const pathMatch = line.match(/^\s*"([^"]+)":\s*{$/);
-    if (pathMatch?.[1].startsWith("/")) {
-      currentPath = pathMatch[1];
-      continue;
-    }
-
-    const methodMatch = line.match(/^\s*(get|post|put|patch|delete):\s*{$/i);
-    if (methodMatch && currentPath) {
-      operations.push({
-        service,
-        method: methodMatch[1].toUpperCase(),
-        path: currentPath,
-      });
-    }
-  }
-
-  return operations;
+  return extractOpenApiOperationsFromSource(source).map((operation) => ({ service, ...operation }));
 }
 
 function asKey(entry) {
@@ -103,6 +97,16 @@ const manifestKeys = new Set(manifestOperations.map(asKey));
 
 const missing = [...specKeys].filter((key) => !manifestKeys.has(key));
 const extra = [...manifestKeys].filter((key) => !specKeys.has(key));
+const workspaceServicePaths = extractWorkspaceServicePackagePaths();
+const registryPackagePaths = new Set(serviceRegistry.map((service) => service.packagePath));
+const registryServices = new Set(serviceRegistry.map((service) => service.name));
+const servicesMissingFromRegistry = workspaceServicePaths.filter(
+  (servicePath) => !registryPackagePaths.has(servicePath),
+);
+const specServicesMissingCoverage = Object.keys(specFiles).filter(
+  (service) =>
+    registryServices.has(service) && !manifestOperations.some((entry) => entry.service === service),
+);
 
 if (
   missing.length > 0 ||
@@ -110,8 +114,24 @@ if (
   malformedEntries.length > 0 ||
   malformedGroups.length > 0 ||
   missingGood.length > 0 ||
-  missingBad.length > 0
+  missingBad.length > 0 ||
+  servicesMissingFromRegistry.length > 0 ||
+  specServicesMissingCoverage.length > 0
 ) {
+  if (servicesMissingFromRegistry.length > 0) {
+    console.error("Workspace services missing from scripts/service-registry.mjs:");
+    for (const servicePath of servicesMissingFromRegistry) {
+      console.error(`  - ${servicePath}`);
+    }
+  }
+
+  if (specServicesMissingCoverage.length > 0) {
+    console.error("Registry services with OpenAPI specs but no smoke manifest coverage:");
+    for (const service of specServicesMissingCoverage) {
+      console.error(`  - ${service}`);
+    }
+  }
+
   if (missing.length > 0) {
     console.error("Missing manifest operations:");
     for (const key of missing) {

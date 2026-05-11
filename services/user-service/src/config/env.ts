@@ -1,6 +1,11 @@
 import path from "node:path";
 
 import { fileURLToPath } from "node:url";
+import {
+  parseAllowedOrigins,
+  validateProductionCorsOrigins,
+  validateProductionInternalServiceToken,
+} from "@workspace/shared";
 import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 
@@ -16,6 +21,11 @@ dotenv.config({ path: serviceEnvPath });
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 const rawEnvSchema = z
@@ -64,6 +74,22 @@ const rawEnvSchema = z
     /** Token interno igual ao do gateway (`AUDIT_SERVICE_TOKEN`) para pedidos com headers x-auth-* */
 
     auditServiceToken: z.string().optional().default("audit-service-token"),
+
+    allowedOrigins: z
+      .string()
+      .optional()
+      .default("*")
+      .transform((value) => parseAllowedOrigins(value)),
+
+    uploadRateLimitMax: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 30)),
+
+    uploadRateLimitWindowMs: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 600_000)),
   })
 
   .superRefine((env, ctx) => {
@@ -85,6 +111,19 @@ const envSchema = rawEnvSchema.transform((env) => {
     enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
       ? parseBoolean(enableApiDocsEnv)
       : rest.nodeEnv !== "production";
+
+  validateProductionInternalServiceToken({
+    nodeEnv: rest.nodeEnv,
+    serviceName: "user-service",
+    envName: "AUDIT_SERVICE_TOKEN",
+    token: rest.auditServiceToken,
+  });
+  validateProductionCorsOrigins({
+    nodeEnv: rest.nodeEnv,
+    serviceName: "user-service",
+    envName: "SERVICE_ALLOWED_ORIGINS",
+    allowedOrigins: rest.allowedOrigins,
+  });
 
   return {
     ...rest,
@@ -120,5 +159,8 @@ export function getUserServiceEnv(): UserServiceEnv {
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
 
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
+    allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
+    uploadRateLimitMax: process.env.UPLOAD_RATE_LIMIT_MAX,
+    uploadRateLimitWindowMs: process.env.UPLOAD_RATE_LIMIT_WINDOW_MS,
   });
 }

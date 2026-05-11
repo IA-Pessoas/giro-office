@@ -58,6 +58,15 @@ jobs:
       - name: Auditoria de dependências
         run: pnpm audit:ci
 
+      - name: Harness de serviços
+        run: pnpm harness:test
+
+      - name: Cobertura smoke/OpenAPI
+        run: pnpm smoke:coverage
+
+      - name: Segurança Docker Compose
+        run: pnpm security:compose
+
       - name: Biome check
         run: pnpm check
 

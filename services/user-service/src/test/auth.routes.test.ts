@@ -46,6 +46,9 @@ describe("auth routes", () => {
       .set(gatewayAuthHeaders({ userId: "user-1" }));
 
     expect(res.status).toBe(200);
-    expect(userServiceMock.getById).toHaveBeenCalledWith("user-1");
+    expect(userServiceMock.getById).toHaveBeenCalledWith(
+      "user-1",
+      "a0000000-0000-4000-8000-000000000001",
+    );
   });
 });

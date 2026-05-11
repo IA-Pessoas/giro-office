@@ -76,7 +76,7 @@ interface UpdatePermissionInput {
 class PermissionService {
   async create(userId: string, organizationId: string): Promise<PermissionPublicRow> {
     const exists = await prismaClient.permission.findFirst({
-      where: { user_id: userId },
+      where: { user_id: userId, organization_id: organizationId },
     });
 
     if (exists) {
@@ -99,9 +99,16 @@ class PermissionService {
     }
   }
 
-  async getByUserId(userId: string, modulo?: string): Promise<PermissionPublicRow> {
+  async getByUserId(
+    userId: string,
+    modulo?: string,
+    organizationId?: string,
+  ): Promise<PermissionPublicRow> {
     const permission = await prismaClient.permission.findFirst({
-      where: { user_id: userId },
+      where: {
+        user_id: userId,
+        ...(organizationId ? { organization_id: organizationId } : {}),
+      },
       select: PERMISSION_PUBLIC_SELECT,
     });
 
@@ -122,8 +129,12 @@ class PermissionService {
     return permission;
   }
 
-  async update(userId: string, data: UpdatePermissionInput): Promise<PermissionPublicRow> {
-    await this.getByUserId(userId);
+  async update(
+    userId: string,
+    data: UpdatePermissionInput,
+    organizationId?: string,
+  ): Promise<PermissionPublicRow> {
+    await this.getByUserId(userId, undefined, organizationId);
 
     const updateData: Record<string, unknown> = {};
 
@@ -135,7 +146,10 @@ class PermissionService {
 
     try {
       const permission = await prismaClient.permission.updateMany({
-        where: { user_id: userId },
+        where: {
+          user_id: userId,
+          ...(organizationId ? { organization_id: organizationId } : {}),
+        },
         data: updateData,
       });
 
@@ -143,7 +157,7 @@ class PermissionService {
         throw new ServiceError(404, "Permissão não encontrada.");
       }
 
-      return this.getByUserId(userId);
+      return this.getByUserId(userId, undefined, organizationId);
     } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
       logError("Erro ao atualizar permissão", { err });

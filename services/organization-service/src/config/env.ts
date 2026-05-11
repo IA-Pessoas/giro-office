@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseAllowedOrigins, validateProductionCorsOrigins } from "@workspace/shared";
 import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -34,6 +35,11 @@ const organizationEnvSchema = z
       .default("false")
       .transform((value) => parseBoolean(value)),
     enableApiDocsEnv: z.string().optional(),
+    allowedOrigins: z
+      .string()
+      .optional()
+      .default("*")
+      .transform((value) => parseAllowedOrigins(value)),
   })
   .transform((env) => {
     const { enableApiDocsEnv, ...rest } = env;
@@ -41,6 +47,13 @@ const organizationEnvSchema = z
       enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
         ? parseBoolean(enableApiDocsEnv)
         : rest.nodeEnv !== "production";
+
+    validateProductionCorsOrigins({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "organization-service",
+      envName: "SERVICE_ALLOWED_ORIGINS",
+      allowedOrigins: rest.allowedOrigins,
+    });
 
     return {
       ...rest,
@@ -60,5 +73,6 @@ export function getOrganizationEnv(): OrganizationEnv {
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
+    allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
   });
 }

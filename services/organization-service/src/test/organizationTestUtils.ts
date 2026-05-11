@@ -52,6 +52,7 @@ export function createTestApp() {
     nodeEnv: "test",
     logLevel: "silent",
     logPretty: false,
+    allowedOrigins: ["*"],
     enableApiDocs: false,
   } satisfies OrganizationEnv;
   const logger = createLogger({
