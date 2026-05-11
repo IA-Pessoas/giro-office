@@ -142,7 +142,7 @@ const state = {
   bearerToken: "",
   adminBearerToken: "",
   baselineDepartmentId: env.smokeDepartmentId,
-  departmentId: "",
+  departmentId: env.smokeDepartmentId,
   tempUserId: "",
   tempOrganizationId: "",
   primaryClientId: "",
@@ -700,7 +700,7 @@ async function ensureDepartmentId() {
     service: "department-service",
     auth: "bearer",
     json: {
-      name: uniqueText("Smoke Department"),
+      name: uniqueText("Smoke Helper Department"),
       color: "#0F766E",
       solution: true,
     },
@@ -708,6 +708,7 @@ async function ensureDepartmentId() {
   });
 
   state.departmentId = pickFirst(response.body, "data.dep.id") ?? findFirstId(response.body?.data);
+  state.baselineDepartmentId = state.departmentId;
   return state.departmentId;
 }
 
@@ -724,7 +725,7 @@ async function ensureSecondaryTaskModel() {
     auth: "admin-bearer",
     json: {
       name: uniqueText("Smoke Secondary Task Model"),
-      department_id: requireState("baselineDepartmentId"),
+      department_id: await ensureDepartmentId(),
       responsible_id: requireState("session").id,
       billing: "Realizar",
       prevision: 2,
@@ -796,7 +797,7 @@ async function ensureRhTargetUser() {
       name: uniqueText("Smoke RH Target"),
       login: uniqueEmail("smoke-rh-target"),
       password: env.password,
-      department_id: requireState("baselineDepartmentId"),
+      department_id: await ensureDepartmentId(),
       permission: 1,
       organization_id: requireState("session").organization_id,
       type: "user",
@@ -946,16 +947,13 @@ const handlers = {
   },
 
   async userCreate(op) {
-    if (!state.baselineDepartmentId) {
-      throw new Error("Unable to derive department_id for user creation.");
-    }
     const response = await httpRequest(op, {
       expectedStatus: [201],
       json: {
         name: uniqueText("Smoke User"),
         login: uniqueEmail("smoke-user"),
         password: env.password,
-        department_id: state.baselineDepartmentId,
+        department_id: await ensureDepartmentId(),
         permission: 1,
         organization_id: requireState("session").organization_id,
         type: "user",
@@ -1815,7 +1813,7 @@ const handlers = {
       expectedStatus: [201],
       json: {
         name: uniqueText("Smoke Task Model"),
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         responsible_id: requireState("session").id,
         billing: "Realizar",
         prevision: 2,
@@ -1843,7 +1841,7 @@ const handlers = {
       json: {
         task_id: requireState("taskModelPrimaryId"),
         name: uniqueText("Smoke Task Model Updated"),
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         responsible_id: requireState("session").id,
         billing: "Realizar",
         prevision: 3,
@@ -2192,7 +2190,7 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       json: {
-        target_user_id: requireState("session").id,
+        target_user_id: await ensureRhTargetUser(),
         start_time: "08:00",
         lunch_break: "12:00",
         lunch_return: "13:00",
@@ -2209,7 +2207,7 @@ const handlers = {
   async rhPointConfigGetByUser(op) {
     await httpRequest(op, {
       expectedStatus: [200],
-      path: `/rh/point-config/${requireState("session").id}`,
+      path: `/rh/point-config/${await ensureRhTargetUser()}`,
     });
   },
 
@@ -2218,7 +2216,7 @@ const handlers = {
       expectedStatus: [200],
       path: "/rh/point",
       query: {
-        user_id: requireState("session").id,
+        user_id: await ensureRhTargetUser(),
       },
     });
   },
@@ -2846,7 +2844,7 @@ const handlers = {
       json: {
         task_id: "00000000-0000-0000-0000-000000000000",
         name: "Smoke Not Found",
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         responsible_id: requireState("session").id,
         billing: "Realizar",
         prevision: 1,
@@ -2997,7 +2995,7 @@ const handlers = {
         name: uniqueText("Smoke Forbidden User"),
         login: uniqueEmail("smoke-forbidden"),
         password: env.password,
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         permission: 1,
         organization_id: requireState("session").organization_id,
         type: "user",
@@ -3053,7 +3051,7 @@ const handlers = {
       expectedStatus: [409],
       json: {
         name: uniqueText("Smoke Task Model"),
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         responsible_id: requireState("session").id,
         billing: "Realizar",
         prevision: 2,
@@ -3148,7 +3146,7 @@ const handlers = {
       json: {
         name: uniqueText("Smoke Invalid User"),
         password: env.password,
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         permission: 1,
         organization_id: requireState("session").organization_id,
         type: "user",

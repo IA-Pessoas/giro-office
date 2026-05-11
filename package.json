@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm run dev:reset && turbo run dev --parallel",
+    "dev": "pnpm run dev:reset && turbo run dev --parallel --concurrency=20",
     "dev:reset": "node scripts/dev-reset.mjs",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",

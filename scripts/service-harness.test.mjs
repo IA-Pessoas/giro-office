@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 
 import {
@@ -136,4 +137,14 @@ test("formatGeneratedSmokeModule emits deterministic ESM for generated probes", 
   assert.match(output, /export const operations = \[/);
   assert.match(output, /export const routePlaceholders = \[/);
   assert.match(output, /billingServicePostBillingInvoices/);
+});
+
+test("all-services smoke builds user and task payloads from a verified department", () => {
+  const source = fs.readFileSync(new URL("./all-services-smoke.mjs", import.meta.url), "utf8");
+
+  assert.doesNotMatch(source, /department_id: requireState\("baselineDepartmentId"\)/);
+  assert.doesNotMatch(source, /department_id: state\.baselineDepartmentId/);
+  assert.doesNotMatch(source, /user_id: requireState\("session"\)\.id/);
+  assert.match(source, /name: uniqueText\("Smoke Helper Department"\)/);
+  assert.match(source, /department_id: await ensureDepartmentId\(\)/);
 });

@@ -513,6 +513,45 @@ it("does not apply the general rate limit to gateway infrastructure routes", asy
   }
 });
 
+it("does not let unauthenticated attempts exhaust authenticated route rate limits", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const taskServiceUrl = await startServer(upstream);
+  const app = createApp(
+    createEnv({
+      taskServiceUrl,
+      rateLimitMax: 1,
+      rateLimitWindowMs: 60_000,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const invalid = await fetch(`${gatewayUrl}/task/list`, {
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+    });
+    const valid = await fetch(`${gatewayUrl}/task/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(invalid.status).toBe(401);
+    expect(valid.status).toBe(200);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("serves the aggregated OpenAPI JSON from the gateway", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);

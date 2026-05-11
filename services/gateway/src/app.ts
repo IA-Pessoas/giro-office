@@ -207,13 +207,11 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     );
   });
 
-  app.use(
-    createRateLimitMiddleware({
-      key: "gateway:general",
-      max: env.rateLimitMax,
-      windowMs: env.rateLimitWindowMs,
-    }),
-  );
+  const generalRateLimit = createRateLimitMiddleware({
+    key: "gateway:general",
+    max: env.rateLimitMax,
+    windowMs: env.rateLimitWindowMs,
+  });
   const authRateLimit = createRateLimitMiddleware({
     key: "gateway:auth",
     max: env.authRateLimitMax,
@@ -230,6 +228,7 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   }
 
   app.use(buildAuthenticateMiddleware(env.jwtSecret));
+  app.use(generalRateLimit);
   app.use(authorizeRequest);
 
   for (const service of getGatewayServiceDefinitions(env)) {

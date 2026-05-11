@@ -88,6 +88,26 @@ interface ListUsersParams {
 type UserPublicRow = Prisma.UserGetPayload<{ select: typeof USER_PUBLIC_SELECT }>;
 type UserCreateRow = Prisma.UserGetPayload<{ select: typeof USER_CREATE_SELECT }>;
 
+function userOrganizationWhere(id: string, organizationId: string): Prisma.UserWhereInput {
+  return {
+    id,
+    OR: [
+      { organization_id: organizationId },
+      { organization_id: null, department: { organization_id: organizationId } },
+    ],
+  };
+}
+
+function normalizeUserOrganization<T extends { organization_id: string | null }>(
+  user: T,
+  organizationId: string,
+): Omit<T, "organization_id"> & { organization_id: string } {
+  return {
+    ...user,
+    organization_id: user.organization_id ?? organizationId,
+  };
+}
+
 class UserService {
   async list({ skip = 0, take = 20, organizationId }: ListUsersParams): Promise<{
     users: UserPublicRow[];
@@ -112,7 +132,7 @@ class UserService {
 
   async getById(id: string, organizationId: string): Promise<UserPublicRow> {
     const user = await prismaClient.user.findFirst({
-      where: { id, organization_id: organizationId },
+      where: userOrganizationWhere(id, organizationId),
       select: USER_PUBLIC_SELECT,
     });
 
@@ -120,7 +140,7 @@ class UserService {
       throw new ServiceError(404, "Usuário não encontrado.");
     }
 
-    return user;
+    return normalizeUserOrganization(user, organizationId);
   }
 
   async create(data: CreateUserInput): Promise<UserPublicRow | UserCreateRow> {
@@ -195,7 +215,7 @@ class UserService {
 
   async update(id: string, data: UpdateUserInput, organizationId: string): Promise<UserPublicRow> {
     const existingUser = await prismaClient.user.findFirst({
-      where: { id, organization_id: organizationId },
+      where: userOrganizationWhere(id, organizationId),
       select: { ...USER_PUBLIC_SELECT, permission_id: true },
     });
 
@@ -248,7 +268,7 @@ class UserService {
         await permissionService.update(id, MAX_MODULES, organizationId);
       }
 
-      return user;
+      return normalizeUserOrganization(user, organizationId);
     } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
       const isUniqueViolation =
