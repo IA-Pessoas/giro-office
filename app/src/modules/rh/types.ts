@@ -163,6 +163,16 @@ export interface RhPoint {
   signature: string | null;
 }
 
+export interface RhPointListFilters {
+  date_from?: string;
+  date_to?: string;
+  user_id?: string;
+}
+
+export interface RhPointListItem extends RhPoint {
+  status: string;
+}
+
 export type RhRegisterPointAction = "Entrada" | "Saída almoço" | "Volta almoço" | "Saída";
 
 export interface RhRegisterPointResult {
@@ -170,11 +180,37 @@ export interface RhRegisterPointResult {
   point: RhPoint;
 }
 
+export interface RhTodayPoint {
+  point: RhPoint | null;
+  next_action: RhRegisterPointAction | null;
+  is_complete: boolean;
+  has_clock_in: boolean;
+  has_lunch_out: boolean;
+  has_lunch_in: boolean;
+  has_clock_out: boolean;
+}
+
 export interface RhPointCalculationResult {
   point_id: string;
   total_worked_minutes: number;
   expected_minutes: number;
   day_balance_minutes: number;
+}
+
+export interface RhPointSummaryFilters {
+  month: string;
+  user_id?: string;
+}
+
+export interface RhPointMonthlySummary {
+  month: string;
+  user_id: string;
+  total_worked_minutes: number;
+  expected_minutes: number;
+  balance_minutes: number;
+  overtime_minutes: number;
+  absence_days: number;
+  pending_adjustments: number;
 }
 
 export interface CreateRhPointAdjustmentPayload {
@@ -192,6 +228,13 @@ export interface ApproveRhPointAdjustmentPayload {
   obs_approver?: string | null;
 }
 
+export type RhPointAdjustmentStatus = "Pendente" | "Aprovado";
+
+export interface RhPointAdjustmentListFilters {
+  status?: RhPointAdjustmentStatus;
+  user_id?: string;
+}
+
 export interface RhPointAdjustmentRequest {
   id: string;
   user_id: string;
@@ -203,7 +246,7 @@ export interface RhPointAdjustmentRequest {
   justification: string;
   attachment: string | null;
   date: string;
-  status: string;
+  status: RhPointAdjustmentStatus;
   approver_user_id: string | null;
   obs_approver: string | null;
   organization_id: string;
