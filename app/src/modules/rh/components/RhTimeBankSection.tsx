@@ -46,7 +46,6 @@ export function RhTimeBankSection() {
   const [releasePendingApproval, setReleasePendingApproval] =
     useState<RhTimeBankRelease | null>(null);
 
-  const assignableUsersQuery = useAssignableUsers();
   const approveMutation = useApproveRhTimeBankReleaseMutation();
   const permissionQuery = useFetch(
     ["rh", "time-bank", "permissions", user?.id ?? ""],
@@ -72,6 +71,10 @@ export function RhTimeBankSection() {
         normalizedPermissions?.rh !== undefined &&
         normalizedPermissions.rh >= 1),
   );
+
+  const assignableUsersQuery = useAssignableUsers({
+    enabled: canManageTimeBank,
+  });
 
   const effectiveUserId = canManageTimeBank ? selectedUserId : user?.id ?? "";
   const filters: RhTimeBankReleaseListFilters = {
@@ -143,8 +146,7 @@ export function RhTimeBankSection() {
     (canManageTimeBank && assignableUsersQuery.isLoading && !assignableUsersQuery.data);
   const error =
     releasesQuery.error ||
-    (canManageTimeBank ? assignableUsersQuery.error : null) ||
-    permissionQuery.error;
+    (canManageTimeBank ? assignableUsersQuery.error : null);
 
   return (
     <div className="space-y-6">
