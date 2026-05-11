@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
 import { useAuth } from "@/context/AuthContext";
@@ -8,6 +8,8 @@ import { useFetch } from "@shared/hooks";
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import type { RhPointAdjustmentStatus } from "../types";
 import {
+  useRhPoints,
+  useRhPointSummary,
   useRegisterRhPointMutation,
   useRhTodayPoint,
 } from "../hooks/useRhPoint";
@@ -36,6 +38,26 @@ function getTodayInputValue() {
 function getCurrentMonthValue() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getMonthDateRange(month: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) {
+    return {
+      dateFrom: getMonthStartInputValue(),
+      dateTo: getTodayInputValue(),
+    };
+  }
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 0);
+
+  return {
+    dateFrom: formatInputDate(monthStart),
+    dateTo: formatInputDate(monthEnd),
+  };
 }
 
 export function RhPointSection() {
@@ -80,8 +102,24 @@ export function RhPointSection() {
 
   const assignableUsers = assignableUsersQuery.data ?? [];
   const currentUserName = user?.name?.trim() || "Você";
+  const effectiveUserId = canManagePoint ? selectedUserId || (user?.id ?? "") : (user?.id ?? "");
   const todayPointQuery = useRhTodayPoint();
+  const pointsQuery = useRhPoints({
+    user_id: effectiveUserId || undefined,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
+  });
+  const summaryQuery = useRhPointSummary({
+    month,
+    user_id: effectiveUserId || undefined,
+  });
   const registerMutation = useRegisterRhPointMutation();
+
+  useEffect(() => {
+    const { dateFrom: nextDateFrom, dateTo: nextDateTo } = getMonthDateRange(month);
+    setDateFrom(nextDateFrom);
+    setDateTo(nextDateTo);
+  }, [month]);
 
   async function handleRegisterPoint() {
     try {
@@ -120,8 +158,16 @@ export function RhPointSection() {
         isRegistering={registerMutation.isPending}
         onRegister={handleRegisterPoint}
       />
-      <RhPointSummaryCards />
-      <RhPointTable />
+      <RhPointSummaryCards
+        summary={summaryQuery.data ?? null}
+        isLoading={summaryQuery.isLoading}
+        hasError={Boolean(summaryQuery.error)}
+      />
+      <RhPointTable
+        points={pointsQuery.data ?? []}
+        isLoading={pointsQuery.isLoading}
+        hasError={Boolean(pointsQuery.error)}
+      />
       <RhPointAdjustmentPanel />
 
       <RhPointAdjustmentRequestModal
