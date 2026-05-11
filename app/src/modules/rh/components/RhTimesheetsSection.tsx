@@ -8,6 +8,7 @@ import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import { useRhTimeSheets } from "../hooks/useRhCalendar";
 import type { RhTimeSheet, RhTimeSheetListFilters } from "../types";
 import { RhTimesheetGenerateModal } from "./RhTimesheetGenerateModal";
+import { RhTimesheetSignDialog } from "./RhTimesheetSignDialog";
 import { RhTimesheetsFilters } from "./RhTimesheetsFilters";
 import { RhTimesheetsTable } from "./RhTimesheetsTable";
 
@@ -74,6 +75,8 @@ export function RhTimesheetsSection() {
   const [dateFrom, setDateFrom] = useState(getMonthStartInputValue);
   const [dateTo, setDateTo] = useState(getTodayInputValue);
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
+  const [sheetPendingSignature, setSheetPendingSignature] =
+    useState<RhTimeSheet | null>(null);
 
   const permissionQuery = useFetch(
     ["rh", "timesheets", "permissions", user?.id ?? ""],
@@ -177,6 +180,12 @@ export function RhTimesheetsSection() {
         />
       ) : null}
 
+      <RhTimesheetSignDialog
+        open={Boolean(sheetPendingSignature)}
+        sheet={sheetPendingSignature}
+        onClose={() => setSheetPendingSignature(null)}
+      />
+
       {isLoading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
           Carregando folhas de ponto...
@@ -198,7 +207,10 @@ export function RhTimesheetsSection() {
       {!isLoading && !error && filteredTimeSheets.length > 0 ? (
         <RhTimesheetsTable
           timeSheets={filteredTimeSheets}
+          currentUserId={user?.id ?? ""}
+          signingSheetId={sheetPendingSignature?.id ?? null}
           getUserLabel={getUserLabel}
+          onSign={setSheetPendingSignature}
         />
       ) : null}
     </div>
