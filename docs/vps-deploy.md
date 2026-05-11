@@ -50,9 +50,12 @@ Nginx in this stack does not provision certificates automatically.
 ## Update one service without touching the others
 
 ```bash
+docker compose -f docker-compose.vps.yml up -d --build --no-deps organization-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps task-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps project-service
+docker compose -f docker-compose.vps.yml up -d --build --no-deps client-service
+docker compose -f docker-compose.vps.yml up -d --build --no-deps rh-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps department-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps fiscal-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps contabil-service
@@ -86,7 +89,10 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
 - Task service: `GET /ready`
 - Client service: `GET /ready`
 - Audit service: `GET /ready`
-- Organization, user, project and RH services: `GET /health`
+- Organization service: `GET /health`
+- User service: `GET /health`
+- Project service: `GET /health`
+- RH service: `GET /health`
 - Department service: `GET /health`
 - Fiscal service: `GET /health`
 - Contabil service: `GET /health`
