@@ -7,6 +7,7 @@ import { useFetch } from "@shared/hooks";
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import { useRhTimeSheets } from "../hooks/useRhCalendar";
 import type { RhTimeSheet, RhTimeSheetListFilters } from "../types";
+import { RhTimesheetGenerateModal } from "./RhTimesheetGenerateModal";
 import { RhTimesheetsFilters } from "./RhTimesheetsFilters";
 import { RhTimesheetsTable } from "./RhTimesheetsTable";
 
@@ -72,6 +73,7 @@ export function RhTimesheetsSection() {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [dateFrom, setDateFrom] = useState(getMonthStartInputValue);
   const [dateTo, setDateTo] = useState(getTodayInputValue);
+  const [isGenerateOpen, setIsGenerateOpen] = useState(false);
 
   const permissionQuery = useFetch(
     ["rh", "timesheets", "permissions", user?.id ?? ""],
@@ -136,6 +138,14 @@ export function RhTimesheetsSection() {
     return userNameById.get(userId) ?? "Colaborador não encontrado";
   }
 
+  function handleOpenGenerate() {
+    if (!canManageTimesheets) {
+      return;
+    }
+
+    setIsGenerateOpen(true);
+  }
+
   const isLoading =
     timeSheetsQuery.isLoading ||
     (canManageTimesheets &&
@@ -155,7 +165,17 @@ export function RhTimesheetsSection() {
         onUserChange={setSelectedUserId}
         onDateFromChange={setDateFrom}
         onDateToChange={setDateTo}
+        onOpenGenerate={handleOpenGenerate}
       />
+
+      {canManageTimesheets ? (
+        <RhTimesheetGenerateModal
+          open={isGenerateOpen}
+          assignableUsers={assignableUsers}
+          defaultUserId={selectedUserId}
+          onClose={() => setIsGenerateOpen(false)}
+        />
+      ) : null}
 
       {isLoading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">

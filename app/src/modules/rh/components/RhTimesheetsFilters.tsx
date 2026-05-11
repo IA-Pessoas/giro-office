@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 
 import type { AssignableUser } from "../types";
 
@@ -11,6 +11,7 @@ interface RhTimesheetsFiltersProps {
   onUserChange: (value: string) => void;
   onDateFromChange: (value: string) => void;
   onDateToChange: (value: string) => void;
+  onOpenGenerate: () => void;
 }
 
 export function RhTimesheetsFilters({
@@ -22,16 +23,30 @@ export function RhTimesheetsFilters({
   onUserChange,
   onDateFromChange,
   onDateToChange,
+  onOpenGenerate,
 }: RhTimesheetsFiltersProps) {
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Folhas de Ponto
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Consulte e acompanhe as folhas de ponto.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Folhas de Ponto
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Consulte, gere e acompanhe as folhas de ponto.
+          </p>
+        </div>
+
+        {canManageTimesheets ? (
+          <button
+            type="button"
+            onClick={onOpenGenerate}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            Gerar folha
+          </button>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end">
