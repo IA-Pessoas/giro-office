@@ -85,11 +85,17 @@ services:
         condition: service_healthy
       user-service:
         condition: service_healthy
+      department-service:
+        condition: service_healthy
       task-service:
         condition: service_healthy
       project-service:
         condition: service_healthy
       client-service:
+        condition: service_healthy
+      fiscal-service:
+        condition: service_healthy
+      contabil-service:
         condition: service_healthy
       rh-service:
         condition: service_healthy
@@ -160,6 +166,36 @@ services:
           "node",
           "-e",
           "fetch('http://127.0.0.1:3030/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  department-service:
+    <<: *service_defaults
+    image: workspace-department-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/department-service"
+        SERVICE_DIR: services/department-service
+    env_file:
+      - .env.vps.department-service
+    expose:
+      - "3036"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3036/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 30s
       timeout: 5s
@@ -250,6 +286,66 @@ services:
           "node",
           "-e",
           "fetch('http://127.0.0.1:3035/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  fiscal-service:
+    <<: *service_defaults
+    image: workspace-fiscal-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/fiscal-service"
+        SERVICE_DIR: services/fiscal-service
+    env_file:
+      - .env.vps.fiscal-service
+    expose:
+      - "3037"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3037/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  contabil-service:
+    <<: *service_defaults
+    image: workspace-contabil-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/contabil-service"
+        SERVICE_DIR: services/contabil-service
+    env_file:
+      - .env.vps.contabil-service
+    expose:
+      - "3038"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3038/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 30s
       timeout: 5s
