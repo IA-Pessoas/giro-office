@@ -1,3 +1,12 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { getSmokeSpecFiles } from "./service-registry.mjs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const EXEMPT_ROUTE_KEYS = new Set([
   "GET|/health",
   "GET|/ready",
@@ -320,18 +329,30 @@ function buildManifest(entries) {
   });
 }
 
-export const specFiles = {
-  "audit-service": "services/audit-service/src/openapi/spec.ts",
-  "client-service": "services/client-service/src/openapi/spec.ts",
-  "department-service": "services/department-service/src/openapi/spec.ts",
-  "organization-service": "services/organization-service/src/openapi/spec.ts",
-  "project-service": "services/project-service/src/openapi/spec.ts",
-  "rh-service": "services/rh-service/src/openapi/spec.ts",
-  "task-service": "services/task-service/src/openapi/spec.ts",
-  "user-service": "services/user-service/src/openapi/spec.ts",
-  "fiscal-service": "services/fiscal-service/src/openapi/spec.ts",
-  "contabil-service": "services/contabil-service/src/openapi/spec.ts",
-};
+export const specFiles = getSmokeSpecFiles();
+
+async function loadGeneratedSmokeDefinitions() {
+  const generatedDir = path.join(__dirname, "generated");
+  if (!fs.existsSync(generatedDir)) {
+    return [];
+  }
+
+  const files = fs
+    .readdirSync(generatedDir)
+    .filter((file) => file.endsWith(".smoke.mjs"))
+    .sort();
+  const definitions = [];
+
+  for (const file of files) {
+    const moduleUrl = pathToFileURL(path.join(generatedDir, file)).href;
+    const module = await import(moduleUrl);
+    if (Array.isArray(module.operations)) {
+      definitions.push(...module.operations);
+    }
+  }
+
+  return definitions;
+}
 
 const baseManifest = [
   op({
@@ -2234,4 +2255,6 @@ const baseManifest = [
   }),
 ];
 
-export const manifest = buildManifest(baseManifest);
+const generatedManifest = (await loadGeneratedSmokeDefinitions()).map((entry) => op(entry));
+
+export const manifest = buildManifest([...baseManifest, ...generatedManifest]);

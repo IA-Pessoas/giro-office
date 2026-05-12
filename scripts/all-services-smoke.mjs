@@ -40,6 +40,8 @@ loadEnvFile(path.join(rootDir, ".env"));
 const { manifest } = await import(
   pathToFileURL(path.join(__dirname, "all-services-smoke.manifest.mjs")).href
 );
+const { getInternalServiceTokenEnvKeys, getServiceUrlDefaults, getServiceUrlEnvKeys } =
+  await import(pathToFileURL(path.join(__dirname, "service-registry.mjs")).href);
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -86,39 +88,12 @@ const levelColors = {
   DONE: color.bold + color.green,
 };
 
-const INTERNAL_SERVICE_TOKENS = {
-  "audit-service": "AUDIT_SERVICE_TOKEN",
-  "client-service": "CLIENT_SERVICE_INTERNAL_TOKEN",
-};
-
-const SERVICE_URL_ENV_KEYS = {
-  "audit-service": "AUDIT_SERVICE_URL",
-  "client-service": "CLIENT_SERVICE_URL",
-  "department-service": "DEPARTMENT_SERVICE_URL",
-  "fiscal-service": "FISCAL_SERVICE_URL",
-  "contabil-service": "CONTABIL_SERVICE_URL",
-  "organization-service": "ORGANIZATION_SERVICE_URL",
-  "project-service": "PROJECT_SERVICE_URL",
-  "rh-service": "RH_SERVICE_URL",
-  "task-service": "TASK_SERVICE_URL",
-  "user-service": "USER_SERVICE_URL",
-};
-
-const SERVICE_URL_DEFAULTS = {
-  "audit-service": "http://localhost:3020",
-  "client-service": "http://localhost:3035",
-  "department-service": "http://localhost:3036",
-  "fiscal-service": "http://localhost:3037",
-  "contabil-service": "http://localhost:3038",
-  "organization-service": "http://localhost:3031",
-  "project-service": "http://localhost:3033",
-  "rh-service": "http://localhost:3034",
-  "task-service": "http://localhost:3032",
-  "user-service": "http://localhost:3030",
-};
+const INTERNAL_SERVICE_TOKENS = getInternalServiceTokenEnvKeys();
+const SERVICE_URL_ENV_KEYS = getServiceUrlEnvKeys();
+const SERVICE_URL_DEFAULTS = getServiceUrlDefaults();
 
 const env = {
-  gatewayUrl: process.env.GATEWAY_URL,
+  gatewayUrl: process.env.GATEWAY_URL?.trim() || "",
   gatewayPort: process.env.GATEWAY_PORT ?? "3010",
   login: process.env.LOGIN ?? "Admin",
   password: process.env.PASSWORD ?? process.env.ADMIN_PASSWORD ?? "senha123",
@@ -134,12 +109,17 @@ const env = {
     path.join(rootDir, "scripts", "fixtures", "smoke-upload.png"),
 };
 
-if (!env.gatewayUrl) {
-  env.gatewayUrl = `http://localhost:${env.gatewayPort}`;
-}
+env.gatewayUrl =
+  env.gatewayUrl ||
+  (process.env.GATEWAY_PORT ? `http://localhost:${env.gatewayPort}` : SERVICE_URL_DEFAULTS.gateway);
+env.GATEWAY_URL = env.gatewayUrl;
+env.gateway = env.gatewayUrl;
 
 for (const [service, envKey] of Object.entries(SERVICE_URL_ENV_KEYS)) {
-  env[envKey] = process.env[envKey]?.trim() || SERVICE_URL_DEFAULTS[service] || "";
+  env[envKey] =
+    (service === "gateway" ? env.gatewayUrl : process.env[envKey]?.trim()) ||
+    SERVICE_URL_DEFAULTS[service] ||
+    "";
   env[service] = env[envKey];
 }
 
@@ -162,7 +142,7 @@ const state = {
   bearerToken: "",
   adminBearerToken: "",
   baselineDepartmentId: env.smokeDepartmentId,
-  departmentId: "",
+  departmentId: env.smokeDepartmentId,
   tempUserId: "",
   tempOrganizationId: "",
   primaryClientId: "",
@@ -720,7 +700,7 @@ async function ensureDepartmentId() {
     service: "department-service",
     auth: "bearer",
     json: {
-      name: uniqueText("Smoke Department"),
+      name: uniqueText("Smoke Helper Department"),
       color: "#0F766E",
       solution: true,
     },
@@ -728,6 +708,7 @@ async function ensureDepartmentId() {
   });
 
   state.departmentId = pickFirst(response.body, "data.dep.id") ?? findFirstId(response.body?.data);
+  state.baselineDepartmentId = state.departmentId;
   return state.departmentId;
 }
 
@@ -744,7 +725,7 @@ async function ensureSecondaryTaskModel() {
     auth: "admin-bearer",
     json: {
       name: uniqueText("Smoke Secondary Task Model"),
-      department_id: requireState("baselineDepartmentId"),
+      department_id: await ensureDepartmentId(),
       responsible_id: requireState("session").id,
       billing: "Realizar",
       prevision: 2,
@@ -816,7 +797,7 @@ async function ensureRhTargetUser() {
       name: uniqueText("Smoke RH Target"),
       login: uniqueEmail("smoke-rh-target"),
       password: env.password,
-      department_id: requireState("baselineDepartmentId"),
+      department_id: await ensureDepartmentId(),
       permission: 1,
       organization_id: requireState("session").organization_id,
       type: "user",
@@ -966,16 +947,13 @@ const handlers = {
   },
 
   async userCreate(op) {
-    if (!state.baselineDepartmentId) {
-      throw new Error("Unable to derive department_id for user creation.");
-    }
     const response = await httpRequest(op, {
       expectedStatus: [201],
       json: {
         name: uniqueText("Smoke User"),
         login: uniqueEmail("smoke-user"),
         password: env.password,
-        department_id: state.baselineDepartmentId,
+        department_id: await ensureDepartmentId(),
         permission: 1,
         organization_id: requireState("session").organization_id,
         type: "user",
@@ -1835,7 +1813,7 @@ const handlers = {
       expectedStatus: [201],
       json: {
         name: uniqueText("Smoke Task Model"),
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         responsible_id: requireState("session").id,
         billing: "Realizar",
         prevision: 2,
@@ -1863,7 +1841,7 @@ const handlers = {
       json: {
         task_id: requireState("taskModelPrimaryId"),
         name: uniqueText("Smoke Task Model Updated"),
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         responsible_id: requireState("session").id,
         billing: "Realizar",
         prevision: 3,
@@ -2212,7 +2190,7 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       json: {
-        target_user_id: requireState("session").id,
+        target_user_id: await ensureRhTargetUser(),
         start_time: "08:00",
         lunch_break: "12:00",
         lunch_return: "13:00",
@@ -2229,7 +2207,7 @@ const handlers = {
   async rhPointConfigGetByUser(op) {
     await httpRequest(op, {
       expectedStatus: [200],
-      path: `/rh/point-config/${requireState("session").id}`,
+      path: `/rh/point-config/${await ensureRhTargetUser()}`,
     });
   },
 
@@ -2238,7 +2216,7 @@ const handlers = {
       expectedStatus: [200],
       path: "/rh/point",
       query: {
-        user_id: requireState("session").id,
+        user_id: await ensureRhTargetUser(),
       },
     });
   },
@@ -2866,7 +2844,7 @@ const handlers = {
       json: {
         task_id: "00000000-0000-0000-0000-000000000000",
         name: "Smoke Not Found",
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         responsible_id: requireState("session").id,
         billing: "Realizar",
         prevision: 1,
@@ -3017,7 +2995,7 @@ const handlers = {
         name: uniqueText("Smoke Forbidden User"),
         login: uniqueEmail("smoke-forbidden"),
         password: env.password,
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         permission: 1,
         organization_id: requireState("session").organization_id,
         type: "user",
@@ -3073,7 +3051,7 @@ const handlers = {
       expectedStatus: [409],
       json: {
         name: uniqueText("Smoke Task Model"),
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         responsible_id: requireState("session").id,
         billing: "Realizar",
         prevision: 2,
@@ -3168,7 +3146,7 @@ const handlers = {
       json: {
         name: uniqueText("Smoke Invalid User"),
         password: env.password,
-        department_id: requireState("baselineDepartmentId"),
+        department_id: await ensureDepartmentId(),
         permission: 1,
         organization_id: requireState("session").organization_id,
         type: "user",

@@ -5,6 +5,7 @@ import type { CreateAuditRequestPayload } from "@workspace/shared";
 import {
   createLogger,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
@@ -129,6 +130,10 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     logLevel: "silent",
     logPretty: false,
     allowedOrigins: ["*"],
+    rateLimitMax: 300,
+    rateLimitWindowMs: 60_000,
+    authRateLimitMax: 10,
+    authRateLimitWindowMs: 60_000,
     ...overrides,
   };
 }
@@ -188,6 +193,47 @@ it("returns shared forbidden response when permission is insufficient", async ()
   }
 });
 
+it("requires admin permission for user-management routes", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+  });
+  const routes = [
+    { method: "GET", path: "/user" },
+    { method: "GET", path: "/user/user-3" },
+    { method: "GET", path: "/user/user-3/photo" },
+    { method: "PATCH", path: "/user/user-3" },
+    { method: "POST", path: "/user/user-3/photo" },
+    { method: "DELETE", path: "/user/user-3/photo" },
+    { method: "DELETE", path: "/user/user-3" },
+    { method: "GET", path: "/user/permission/user-3" },
+  ];
+
+  try {
+    for (const route of routes) {
+      const response = await fetch(`${baseUrl}${route.path}`, {
+        method: route.method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: route.method === "GET" ? undefined : JSON.stringify({ name: "Blocked" }),
+      });
+      const body = (await response.json()) as Record<string, unknown>;
+
+      expect(response.status).toBe(403);
+      expect(body.success).toBe(false);
+      expect(body.code).toBe("FORBIDDEN");
+    }
+  } finally {
+    await stopServer(server);
+  }
+});
+
 it("returns shared forbidden response when permission update is attempted without admin permission", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
@@ -218,6 +264,58 @@ it("returns shared forbidden response when permission update is attempted withou
     expect(body.requestId).toBeTruthy();
   } finally {
     await stopServer(server);
+  }
+});
+
+it("strips client-supplied internal auth headers before proxying", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  let seenHeaders: {
+    internalToken?: string;
+    userId?: string;
+    organizationId?: string;
+    permission?: string;
+  } = {};
+
+  const upstream = createServer((request, response) => {
+    seenHeaders = {
+      internalToken: request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined,
+      userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
+      organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined,
+      permission: request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined,
+    };
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const taskServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ taskServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/task/list`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        [INTERNAL_SERVICE_TOKEN_HEADER]: "client-supplied-token",
+        [FORWARDED_AUTH_USER_ID_HEADER]: "attacker-user",
+        [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "attacker-org",
+        [FORWARDED_AUTH_PERMISSION_HEADER]: "999",
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenHeaders.internalToken).toBeUndefined();
+    expect(seenHeaders.userId).toBe("user-1");
+    expect(seenHeaders.organizationId).toBe("org-1");
+    expect(seenHeaders.permission).toBe("2");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
   }
 });
 
@@ -326,6 +424,50 @@ it("passes upstream error responses through unchanged", async () => {
   }
 });
 
+it("rate limits repeated public login attempts", async () => {
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { token: "ok" } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    for (let index = 0; index < 10; index += 1) {
+      const response = await fetch(`${gatewayUrl}/user/session`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ login: "user", password: "secret" }),
+      });
+      expect(response.status).toBe(200);
+    }
+
+    const limited = await fetch(`${gatewayUrl}/user/session`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ login: "user", password: "secret" }),
+    });
+    const body = (await limited.json()) as Record<string, unknown>;
+
+    expect(limited.status).toBe(429);
+    expect(body.code).toBe("TOO_MANY_REQUESTS");
+    expect(upstreamHits).toBe(10);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("returns the shared success envelope for gateway health", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
@@ -345,6 +487,68 @@ it("returns the shared success envelope for gateway health", async () => {
     });
   } finally {
     await stopServer(server);
+  }
+});
+
+it("does not apply the general rate limit to gateway infrastructure routes", async () => {
+  const app = createApp(
+    createEnv({
+      rateLimitMax: 1,
+      authRateLimitMax: 1,
+    }),
+    createTestLogger(),
+  );
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const routes = ["/health", "/health", "/ready", "/openapi.json", "/docs/swagger-ui-init.js"];
+
+    for (const route of routes) {
+      const response = await fetch(`${baseUrl}${route}`);
+      expect(response.status, route).not.toBe(429);
+    }
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("does not let unauthenticated attempts exhaust authenticated route rate limits", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const taskServiceUrl = await startServer(upstream);
+  const app = createApp(
+    createEnv({
+      taskServiceUrl,
+      rateLimitMax: 1,
+      rateLimitWindowMs: 60_000,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const invalid = await fetch(`${gatewayUrl}/task/list`, {
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+    });
+    const valid = await fetch(`${gatewayUrl}/task/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(invalid.status).toBe(401);
+    expect(valid.status).toBe(200);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
   }
 });
 

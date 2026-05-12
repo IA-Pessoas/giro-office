@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseAllowedOrigins, validateProductionCorsOrigins } from "@workspace/shared";
 import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -45,6 +46,11 @@ const rhEnvSchema = z
         return parsed;
       }),
     enableApiDocsEnv: z.string().optional(),
+    allowedOrigins: z
+      .string()
+      .optional()
+      .default("*")
+      .transform((value) => parseAllowedOrigins(value)),
   })
   .transform((env) => {
     const { enableApiDocsEnv, ...rest } = env;
@@ -52,6 +58,12 @@ const rhEnvSchema = z
       enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
         ? parseBoolean(enableApiDocsEnv)
         : rest.nodeEnv !== "production";
+    validateProductionCorsOrigins({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "rh-service",
+      envName: "SERVICE_ALLOWED_ORIGINS",
+      allowedOrigins: rest.allowedOrigins,
+    });
     return {
       ...rest,
       logPretty: rest.nodeEnv !== "production" && rest.logPretty,
@@ -71,5 +83,6 @@ export function getRhEnv(): RhEnv {
     logPretty: process.env.LOG_PRETTY,
     pointMinIntervalMinutes: process.env.POINT_MIN_INTERVAL_MINUTES,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
+    allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
   });
 }

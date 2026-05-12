@@ -44,12 +44,12 @@ router.get(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const { user_id } = requireAuthenticatedRequestContext(request, {
+      const { organization_id, user_id } = requireAuthenticatedRequestContext(request, {
         userIdMessage: "Não autenticado.",
         organizationIdMessage: "Não autenticado.",
       });
 
-      const user = await userService.getById(user_id);
+      const user = await userService.getById(user_id, organization_id);
 
       response.json(createSuccessResponse({ ...user, service: "user-service" }));
     } catch (err) {

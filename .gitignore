@@ -3,6 +3,8 @@
 .env.local
 .env.vps.*
 *generated/
+!scripts/generated/
+!scripts/generated/*.smoke.mjs
 tsconfig.tsbuildinfo
 tsconfig.tests*
 
@@ -30,6 +32,8 @@ Thumbs.db
 # docs
 docs/*
 !docs/vps-deploy.md
+!docs/security/
+!docs/security/*.md
 # Figma reference project (local only)
 novo layout/
 .cursor/plans/

@@ -55,7 +55,15 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+            if (!origin) return callback(null, true);
+
+            if (allowedOrigins.indexOf(origin) === -1) {
+                return callback(new Error('A política de CORS para este site não permite acesso da sua Origem.'), false);
+            }
+
+            return callback(null, true);
+        },
         methods: ["GET", "POST"]
     }
 });

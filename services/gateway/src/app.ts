@@ -2,9 +2,11 @@ import {
   type AuthLogContext,
   createAuditRecorder,
   createExpressErrorHandler,
+  createRateLimitMiddleware,
+  createSecurityHeadersMiddleware,
+  createServiceCorsOptions,
   createSuccessResponse,
   gatewayError,
-  INTERNAL_SERVICE_TOKEN_HEADER,
   type Logger,
   type LogLevel,
   ServiceError,
@@ -24,27 +26,6 @@ import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
-
-function createCorsOptions(env: GatewayEnv): cors.CorsOptions {
-  return {
-    origin(origin, callback) {
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-
-      if (env.allowedOrigins.includes("*") || env.allowedOrigins.includes(origin)) {
-        callback(null, origin);
-        return;
-      }
-
-      callback(new ServiceError(403, "Origin não permitida pelo gateway."));
-    },
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-    allowedHeaders: ["Content-Type", "Authorization", "x-request-id"],
-    credentials: true,
-  };
-}
 
 function getRequestLogger(request: Request, logger: Logger): Logger {
   return (
@@ -178,6 +159,7 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   });
 
   app.set("trust proxy", true);
+  app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(buildRequestContextMiddleware(logger));
   app.use(
     buildAuditLifecycleMiddleware({
@@ -188,8 +170,9 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     }),
   );
   app.use(buildRequestLifecycleMiddleware(logger));
-  app.use(cors(createCorsOptions(env)));
-  app.options("*", cors(createCorsOptions(env)));
+  const corsOptions = createServiceCorsOptions(env.allowedOrigins, "gateway");
+  app.use(cors(corsOptions));
+  app.options("*", cors(corsOptions));
   app.use(express.json());
 
   app.get("/openapi.json", (request: Request, response: Response) => {
@@ -205,15 +188,6 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     specUrl: "/openapi.json",
     siteTitle: "gateway - OpenAPI",
   });
-
-  if (!env.auditEnabled) {
-    app.use("/audit", (_request, _response, next) => {
-      next(new ServiceError(404, "Recurso não encontrado."));
-    });
-  }
-
-  app.use(buildAuthenticateMiddleware(env.jwtSecret));
-  app.use(authorizeRequest);
 
   app.get("/health", (_request, response) => {
     response.status(200).json(
@@ -233,6 +207,30 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     );
   });
 
+  const generalRateLimit = createRateLimitMiddleware({
+    key: "gateway:general",
+    max: env.rateLimitMax,
+    windowMs: env.rateLimitWindowMs,
+  });
+  const authRateLimit = createRateLimitMiddleware({
+    key: "gateway:auth",
+    max: env.authRateLimitMax,
+    windowMs: env.authRateLimitWindowMs,
+    methods: ["POST"],
+  });
+  app.use("/user/session", authRateLimit);
+  app.use("/user/start-config", authRateLimit);
+
+  if (!env.auditEnabled) {
+    app.use("/audit", (_request, _response, next) => {
+      next(new ServiceError(404, "Recurso não encontrado."));
+    });
+  }
+
+  app.use(buildAuthenticateMiddleware(env.jwtSecret));
+  app.use(generalRateLimit);
+  app.use(authorizeRequest);
+
   for (const service of getGatewayServiceDefinitions(env)) {
     for (const routePrefix of service.routePrefixes) {
       app.use(routePrefix, buildHttpProxyMiddleware(service.targetUrl));
@@ -241,11 +239,9 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   if (env.auditEnabled) {
     app.use(
       "/audit",
-      (request, _response, next) => {
-        request.headers[INTERNAL_SERVICE_TOKEN_HEADER] = env.auditServiceToken;
-        next();
-      },
-      buildHttpProxyMiddleware(env.auditServiceUrl),
+      buildHttpProxyMiddleware(env.auditServiceUrl, {
+        internalServiceToken: env.auditServiceToken,
+      }),
     );
   }
 

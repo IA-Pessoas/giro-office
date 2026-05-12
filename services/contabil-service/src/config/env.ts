@@ -1,5 +1,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  parseAllowedOrigins,
+  validateProductionCorsOrigins,
+  validateProductionInternalServiceToken,
+} from "@workspace/shared";
 import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -45,6 +50,11 @@ const envSchema = z
     /** Quando vazio, reutiliza `auditServiceToken` (compatível com deploys que só definem AUDIT_SERVICE_TOKEN). */
     internalServiceTokenEnv: z.string().optional(),
     enableApiDocsEnv: z.string().optional(),
+    allowedOrigins: z
+      .string()
+      .optional()
+      .default("*")
+      .transform((value) => parseAllowedOrigins(value)),
   })
   .transform((env) => {
     const { enableApiDocsEnv, internalServiceTokenEnv, ...rest } = env;
@@ -56,6 +66,24 @@ const envSchema = z
       internalServiceTokenEnv !== undefined && internalServiceTokenEnv !== ""
         ? internalServiceTokenEnv
         : rest.auditServiceToken;
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "contabil-service",
+      envName: "AUDIT_SERVICE_TOKEN",
+      token: rest.auditServiceToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "contabil-service",
+      envName: "INTERNAL_SERVICE_TOKEN",
+      token: internalServiceToken,
+    });
+    validateProductionCorsOrigins({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "contabil-service",
+      envName: "SERVICE_ALLOWED_ORIGINS",
+      allowedOrigins: rest.allowedOrigins,
+    });
     return {
       ...rest,
       internalServiceToken,
@@ -79,5 +107,6 @@ export function getContabilServiceEnv(): ContabilServiceEnv {
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     internalServiceTokenEnv: process.env.INTERNAL_SERVICE_TOKEN,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
+    allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
   });
 }

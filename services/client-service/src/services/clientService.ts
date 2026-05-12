@@ -165,7 +165,7 @@ function buildListStatusWhere(filters: ListClientsFilters): Prisma.ClientWhereIn
 export interface IClientService {
   listByOrganization(organizationId: string, filters: ListClientsFilters): Promise<ClientListPage>;
   getById(id: string, organizationId: string): Promise<ClientPublic | null>;
-  create(input: CreateClientBody): Promise<ClientPublic>;
+  create(input: CreateClientBody & { organization_id: string }): Promise<ClientPublic>;
   update(id: string, organizationId: string, input: UpdateClientBody): Promise<ClientPublic>;
   deactivate(id: string, organizationId: string): Promise<ClientPublic>;
   activate(id: string, organizationId: string): Promise<ClientPublic>;
@@ -239,7 +239,7 @@ export class ClientService implements IClientService {
     return toPublic(row, organization);
   }
 
-  async create(input: CreateClientBody): Promise<ClientPublic> {
+  async create(input: CreateClientBody & { organization_id: string }): Promise<ClientPublic> {
     const org = await this.prisma.organization.findUnique({
       where: { id: input.organization_id },
       select: { id: true },

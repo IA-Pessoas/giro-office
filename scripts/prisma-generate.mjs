@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getPrismaOutputPaths } from "./service-registry.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = dirname(__dirname);
@@ -20,16 +21,7 @@ const schemaInputs = [
 
 const outputDirs = [
   join(rootDir, "infra", "generated", "prisma"),
-  join(rootDir, "services", "user-service", "src", "generated", "prisma"),
-  join(rootDir, "services", "task-service", "src", "generated", "prisma"),
-  join(rootDir, "services", "project-service", "src", "generated", "prisma"),
-  join(rootDir, "services", "client-service", "src", "generated", "prisma"),
-  join(rootDir, "services", "organization-service", "src", "generated", "prisma"),
-  join(rootDir, "services", "audit-service", "generated", "prisma"),
-  join(rootDir, "services", "rh-service", "src", "generated", "prisma"),
-  join(rootDir, "services", "department-service", "src", "generated", "prisma"),
-  join(rootDir, "services", "fiscal-service", "src", "generated", "prisma"),
-  join(rootDir, "services", "contabil-service", "src", "generated", "prisma"),
+  ...getPrismaOutputPaths().map((outputPath) => join(rootDir, outputPath)),
 ];
 
 function sleep(ms) {

@@ -1,7 +1,13 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { type LoggerLevel, loggerLevelSchema } from "@workspace/shared";
+import {
+  type LoggerLevel,
+  loggerLevelSchema,
+  parseAllowedOrigins,
+  validateProductionCorsOrigins,
+  validateProductionInternalServiceToken,
+} from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -13,6 +19,11 @@ dotenv.config({ path: serviceEnvPath });
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 const historyStorageModeSchema = z.enum(["supabase", "local"]);
@@ -43,6 +54,19 @@ const rawClientServiceEnvSchema = z
     historyStorageDir: z.string().optional().default(".data/client-history-uploads"),
     internalServiceToken: z.string().optional(),
     enableApiDocsEnv: z.string().optional(),
+    allowedOrigins: z
+      .string()
+      .optional()
+      .default("*")
+      .transform((value) => parseAllowedOrigins(value)),
+    uploadRateLimitMax: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 30)),
+    uploadRateLimitWindowMs: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 600_000)),
   })
   .superRefine((env, ctx) => {
     if (env.historyStorageMode === "supabase") {
@@ -77,6 +101,19 @@ const clientServiceEnvSchema = rawClientServiceEnvSchema.transform((env) => {
       ? parseBoolean(enableApiDocsEnv)
       : rest.nodeEnv !== "production";
 
+  validateProductionInternalServiceToken({
+    nodeEnv: rest.nodeEnv,
+    serviceName: "client-service",
+    envName: "CLIENT_SERVICE_INTERNAL_TOKEN",
+    token: rest.internalServiceToken,
+  });
+  validateProductionCorsOrigins({
+    nodeEnv: rest.nodeEnv,
+    serviceName: "client-service",
+    envName: "SERVICE_ALLOWED_ORIGINS",
+    allowedOrigins: rest.allowedOrigins,
+  });
+
   return {
     ...rest,
     supabaseUrl: rest.supabaseUrl ?? "",
@@ -106,5 +143,8 @@ export function getClientServiceEnv(): ClientServiceEnv {
     historyStorageDir: process.env.CLIENT_HISTORY_STORAGE_DIR,
     internalServiceToken: process.env.CLIENT_SERVICE_INTERNAL_TOKEN,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
+    allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
+    uploadRateLimitMax: process.env.UPLOAD_RATE_LIMIT_MAX,
+    uploadRateLimitWindowMs: process.env.UPLOAD_RATE_LIMIT_WINDOW_MS,
   });
 }

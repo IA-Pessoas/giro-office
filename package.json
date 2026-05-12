@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm run dev:reset && turbo run dev --parallel",
+    "dev": "pnpm run dev:reset && turbo run dev --parallel --concurrency=20",
     "dev:reset": "node scripts/dev-reset.mjs",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
@@ -23,7 +23,10 @@
     "fix": "biome check --write .",
     "fix:unsafe": "biome check --write --unsafe .",
     "smoke": "node scripts/all-services-smoke.mjs",
-    "smoke:coverage": "node scripts/check-smoke-spec-coverage.mjs"
+    "smoke:coverage": "node scripts/check-smoke-spec-coverage.mjs",
+    "smoke:scaffold": "node scripts/generate-service-harness.mjs",
+    "harness:test": "node --test scripts/service-harness.test.mjs scripts/check-compose-security.test.mjs",
+    "security:compose": "node scripts/check-compose-security.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.5",

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loggerLevelSchema } from "@workspace/shared";
+import { loggerLevelSchema, validateProductionInternalServiceToken } from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -47,6 +47,12 @@ const auditServiceEnvSchema = z
       enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
         ? parseBoolean(enableApiDocsEnv)
         : rest.nodeEnv !== "production";
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "audit-service",
+      envName: "AUDIT_SERVICE_TOKEN",
+      token: rest.auditServiceToken,
+    });
     return {
       ...rest,
       logPretty: rest.nodeEnv !== "production" && rest.logPretty,

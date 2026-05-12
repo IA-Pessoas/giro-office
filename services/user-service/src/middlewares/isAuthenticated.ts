@@ -1,6 +1,7 @@
 import {
   extractBearerToken,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
@@ -14,6 +15,7 @@ import { getUserServiceEnv } from "../config/env.js";
 export function isAuthenticated(request: Request, _response: Response, next: NextFunction): void {
   const forwardedUserId = request.get(FORWARDED_AUTH_USER_ID_HEADER);
   const forwardedOrgId = request.get(FORWARDED_AUTH_ORGANIZATION_ID_HEADER);
+  const forwardedPermission = request.get(FORWARDED_AUTH_PERMISSION_HEADER);
   const internalToken = request.get(INTERNAL_SERVICE_TOKEN_HEADER);
   const { auditServiceToken } = getUserServiceEnv();
 
@@ -23,6 +25,9 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
   if (isFromGateway) {
     request.user_id = forwardedUserId;
     request.organization_id = forwardedOrgId;
+    const parsedPermission =
+      forwardedPermission !== undefined ? Number.parseInt(forwardedPermission, 10) : Number.NaN;
+    request.permission = Number.isNaN(parsedPermission) ? undefined : parsedPermission;
     next();
     return;
   }
@@ -40,6 +45,7 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
 
     request.user_id = claims.user_id;
     request.organization_id = claims.organization_id ?? "";
+    request.permission = claims.permission;
     next();
   } catch (err) {
     logError("Erro ao validar autenticação", { err });

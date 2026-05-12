@@ -5,7 +5,7 @@ import {
   requireAuthenticatedRequestContext,
   ServiceError,
 } from "@workspace/shared";
-import { createPhotoUploadMiddleware } from "@workspace/shared/upload";
+import { createPhotoUploadMiddleware, validateUploadFileSignature } from "@workspace/shared/upload";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
@@ -23,6 +23,7 @@ const router: ReturnType<typeof Router> = Router();
 const upload = createPhotoUploadMiddleware();
 const userService = new UserService();
 const storageService = new StorageService();
+const ADMIN_PERMISSION = 2;
 
 function requireUserAuth(request: Request) {
   return requireAuthenticatedRequestContext(request, {
@@ -31,14 +32,35 @@ function requireUserAuth(request: Request) {
   });
 }
 
+function requireAdminUserAuth(request: Request) {
+  const auth = requireUserAuth(request);
+  if (typeof auth.permission !== "number" || auth.permission < ADMIN_PERMISSION) {
+    throw new ServiceError(403, "Usuário não tem permissão.");
+  }
+  return auth;
+}
+
+function requireAdminUserAuthMiddleware(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  try {
+    requireAdminUserAuth(request);
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
 router.get(
   "/",
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      requireUserAuth(request);
+      const auth = requireAdminUserAuth(request);
       const { skip, take } = parseWithZod(listUsersQuerySchema, request.query);
-      const result = await userService.list({ skip, take });
+      const result = await userService.list({ skip, take, organizationId: auth.organization_id });
 
       response.json(createSuccessResponse(result));
     } catch (err) {
@@ -53,9 +75,9 @@ router.get(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      requireUserAuth(request);
+      const auth = requireAdminUserAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
-      const user = await userService.getById(id);
+      const user = await userService.getById(id, auth.organization_id);
       const publicPhotoUrl = storageService.readUserPhoto(user.photo_url);
 
       if (!publicPhotoUrl) {
@@ -75,9 +97,9 @@ router.get(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      requireUserAuth(request);
+      const auth = requireAdminUserAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
-      const user = await userService.getById(id);
+      const user = await userService.getById(id, auth.organization_id);
 
       response.json(createSuccessResponse(user));
     } catch (err) {
@@ -92,11 +114,15 @@ router.post(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      requireUserAuth(request);
+      const auth = requireAdminUserAuth(request);
       const body = parseWithZod(createUserBodySchema, request.body);
+      if (body.organization_id !== undefined && body.organization_id !== auth.organization_id) {
+        throw new ServiceError(403, "Organização da requisição não confere.");
+      }
 
       const user = await userService.create({
         ...body,
+        organization_id: auth.organization_id,
         first_owner_flag: body.first_owner_flag ?? false,
       });
 
@@ -113,11 +139,11 @@ router.patch(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      requireUserAuth(request);
+      const auth = requireAdminUserAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
       const body = parseWithZod(updateUserBodySchema, request.body);
 
-      const user = await userService.update(id, body);
+      const user = await userService.update(id, body, auth.organization_id);
 
       response.json(createSuccessResponse(user));
     } catch (err) {
@@ -130,18 +156,20 @@ router.patch(
 router.post(
   "/:id/photo",
   isAuthenticated,
+  requireAdminUserAuthMiddleware,
   upload.single("file"),
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      requireUserAuth(request);
+      const auth = requireAdminUserAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
 
       if (!request.file) {
         throw new ServiceError(400, "Arquivo de imagem e obrigatorio.");
       }
 
+      validateUploadFileSignature(request.file);
       const photoUrl = await storageService.uploadUserPhoto(request.file, id);
-      const user = await userService.update(id, { photo_url: photoUrl });
+      const user = await userService.update(id, { photo_url: photoUrl }, auth.organization_id);
 
       response.json(createSuccessResponse(user));
     } catch (err) {
@@ -156,11 +184,11 @@ router.delete(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      requireUserAuth(request);
+      const auth = requireAdminUserAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
 
       await storageService.deleteUserPhoto(id);
-      const user = await userService.update(id, { photo_url: null });
+      const user = await userService.update(id, { photo_url: null }, auth.organization_id);
 
       response.json(createSuccessResponse(user));
     } catch (err) {
@@ -175,10 +203,10 @@ router.delete(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      requireUserAuth(request);
+      const auth = requireAdminUserAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
 
-      await userService.delete(id);
+      await userService.delete(id, auth.organization_id);
 
       response.json(createSuccessResponse({ message: "Usuario desativado com sucesso." }));
     } catch (err) {
