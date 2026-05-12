@@ -8,6 +8,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# shellcheck source=scripts/ci/vps-deploy-scope.sh
+. "$ROOT/scripts/ci/vps-deploy-scope.sh"
+
 log() {
   printf "\n>>> %s\n" "$*" >&2
 }
@@ -87,6 +90,18 @@ compose() {
   docker compose -p "$COMPOSE_PROJECT" "${COMPOSE_ARGS[@]}" "$@"
 }
 
+export VPS_PULL_SERVICES="${VPS_PULL_SERVICES:-ALL}"
+DEPLOY_MODE="$(vps_deploy_mode "$VPS_PULL_SERVICES")"
+
+if [[ "$DEPLOY_MODE" == "skip" ]]; then
+  log "VPS_PULL_SERVICES=NONE; pulando docker login, pull de imagens e compose up"
+  mkdir -p "$ROOT/.deploy"
+  printf "%s\n" "$DOCKER_IMAGE_TAG" >"$ROOT/.deploy/last-skip-tag"
+  exit 0
+fi
+
+mapfile -t COMPOSE_SERVICE_ARGS < <(vps_compose_service_args "$VPS_PULL_SERVICES")
+
 REG_LOGIN="${DOCKER_REGISTRY_URL#https://}"
 REG_LOGIN="${REG_LOGIN#http://}"
 REG_LOGIN="${REG_LOGIN%%/*}"
@@ -135,13 +150,12 @@ if [[ "$login_rc" -ne 0 ]]; then
   exit 1
 fi
 
-export VPS_PULL_SERVICES="${VPS_PULL_SERVICES:-ALL}"
-if [[ "$VPS_PULL_SERVICES" == "NONE" ]] && ! docker image inspect "workspace-gateway:${WORKSPACE_VPS_IMAGE_TAG}" >/dev/null 2>&1; then
-  log "sem imagem workspace local; forçando pull completo (ALL)"
-  VPS_PULL_SERVICES=ALL
-  export VPS_PULL_SERVICES
-fi
 log "pull registry → workspace-*:${WORKSPACE_VPS_IMAGE_TAG} (VPS_PULL_SERVICES=$VPS_PULL_SERVICES)"
+if [[ "$DEPLOY_MODE" == "full" ]]; then
+  export VPS_PULL_MISSING_UNSELECTED=1
+else
+  export VPS_PULL_MISSING_UNSELECTED=0
+fi
 set +e
 bash scripts/ci/compose-vps-pull-by-tag-selective.sh
 pull_rc=$?
@@ -154,7 +168,13 @@ fi
 
 log "compose up -d --wait (projeto=$COMPOSE_PROJECT)"
 set +e
-compose up -d --wait --wait-timeout 900 --no-build
+if [[ "${#COMPOSE_SERVICE_ARGS[@]}" -gt 0 ]]; then
+  log "compose up seletivo: ${COMPOSE_SERVICE_ARGS[*]}"
+  compose up -d --wait --wait-timeout 900 --no-build "${COMPOSE_SERVICE_ARGS[@]}"
+else
+  log "compose up completo"
+  compose up -d --wait --wait-timeout 900 --no-build
+fi
 up_rc=$?
 set -e
 
@@ -162,7 +182,11 @@ if [[ "$up_rc" -ne 0 ]]; then
   log "compose up falhou (rc=$up_rc); rollback e diagnóstico"
   rollback_images "$IDS_FILE"
   set +e
-  compose up -d --wait --wait-timeout 300 --no-build || true
+  if [[ "${#COMPOSE_SERVICE_ARGS[@]}" -gt 0 ]]; then
+    compose up -d --wait --wait-timeout 300 --no-build "${COMPOSE_SERVICE_ARGS[@]}" || true
+  else
+    compose up -d --wait --wait-timeout 300 --no-build || true
+  fi
   set -e
   dump_compose_logs
   echo "::error::deploy falhou na VPS; rollback tentado" >&2

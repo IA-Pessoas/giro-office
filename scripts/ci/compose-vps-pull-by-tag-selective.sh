@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Pulls {REG}/{service}:{TAG} and retags it as workspace-*:<WORKSPACE_VPS_IMAGE_TAG>.
 # VPS_PULL_SERVICES: space-separated list (for example: gateway user-service), ALL/empty = all, NONE = no pull.
-# Services that are not selected but whose local image is missing are pulled too, because compose up starts
-# the whole required stack with --no-build and would fail if a mandatory image does not exist locally yet.
+# Services that are not selected but whose local image is missing can be pulled too when
+# VPS_PULL_MISSING_UNSELECTED=1, because full compose up starts the whole required stack with --no-build.
 # Required: DOCKER_REGISTRY_URL, DOCKER_IMAGE_TAG
 set -eo pipefail
 
@@ -56,7 +56,12 @@ for local_img in "${local_imgs[@]}"; do
       continue
     fi
 
-    echo "pull missing (not selected but required by compose): $local_img"
+    if [[ "${VPS_PULL_MISSING_UNSELECTED:-0}" == "1" ]]; then
+      echo "pull missing (not selected but required by full compose): $local_img"
+    else
+      echo "skip pull (not selected and not required for selective compose up): $local_img"
+      continue
+    fi
   fi
 
   remote="$(bash "$REF_HELPER" "$DOCKER_REGISTRY_URL" "$name" "${DOCKER_IMAGE_TAG}")"
