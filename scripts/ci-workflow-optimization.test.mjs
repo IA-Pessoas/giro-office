@@ -74,3 +74,54 @@ test("detect-changed-vps-services keeps shared changes conservative", async () =
 test("detect-changed-vps-services emits ALL for lockfile changes", async () => {
   assert.equal(await detectChangedServices("pnpm-lock.yaml"), "ALL");
 });
+
+const buildxPushScript = path.join(repoRoot, "scripts", "ci", "compose-vps-buildx-push.sh");
+
+async function dryRunBuildxPush(scope) {
+  const { stdout } = await run(bashCommand, [buildxPushScript], {
+    env: {
+      DOCKER_REGISTRY_URL: "ghcr.io/example-org/workspace",
+      STAGING_DOCKER_TAG: "abc1234",
+      VPS_PUSH_SERVICES: scope,
+      NEXT_PUBLIC_API_URL: "https://api.example.test",
+      API_INTERNAL_URL: "http://gateway:3010",
+      CI_DRY_RUN: "1",
+    },
+  });
+  return stdout;
+}
+
+test("compose-vps-buildx-push skips all Docker work for NONE scope", async () => {
+  const output = await dryRunBuildxPush("NONE");
+  assert.match(output, /VPS_PUSH_SERVICES=NONE/);
+  assert.doesNotMatch(output, /docker buildx build/);
+});
+
+test("compose-vps-buildx-push plans cached service build for a backend service", async () => {
+  const output = await dryRunBuildxPush("client-service");
+  assert.match(output, /docker buildx build/);
+  assert.match(output, /--file docker\/service\.Dockerfile/);
+  assert.match(output, /--build-arg WORKSPACE_PACKAGE=@workspace\/client-service/);
+  assert.match(output, /--build-arg SERVICE_DIR=services\/client-service/);
+  assert.match(
+    output,
+    /--cache-from type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-client-service:buildcache/,
+  );
+  assert.match(
+    output,
+    /--cache-to type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-client-service:buildcache,mode=max/,
+  );
+  assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/client-service:abc1234/);
+});
+
+test("compose-vps-buildx-push plans cached web build with Next.js build args", async () => {
+  const output = await dryRunBuildxPush("web");
+  assert.match(output, /--file docker\/app\.Dockerfile/);
+  assert.match(output, /--build-arg NEXT_PUBLIC_API_URL=https:\/\/api\.example\.test/);
+  assert.match(output, /--build-arg API_INTERNAL_URL=http:\/\/gateway:3010/);
+  assert.match(
+    output,
+    /--cache-from type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-web:buildcache/,
+  );
+  assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/web:abc1234/);
+});
