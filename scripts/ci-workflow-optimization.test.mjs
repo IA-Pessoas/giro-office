@@ -125,3 +125,33 @@ test("compose-vps-buildx-push plans cached web build with Next.js build args", a
   );
   assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/web:abc1234/);
 });
+
+const deployScopeScript = path.join(repoRoot, "scripts", "ci", "vps-deploy-scope.sh");
+
+async function runDeployScopeFunction(functionName, scope) {
+  const { stdout } = await run(
+    bashCommand,
+    ["-c", `. "${deployScopeScript.replaceAll("\\", "/")}"; ${functionName} "$1"`, "_", scope],
+  );
+  return stdout.trim();
+}
+
+test("vps-deploy-scope resolves NONE as skip", async () => {
+  assert.equal(await runDeployScopeFunction("vps_deploy_mode", "NONE"), "skip");
+});
+
+test("vps-deploy-scope resolves ALL as full", async () => {
+  assert.equal(await runDeployScopeFunction("vps_deploy_mode", "ALL"), "full");
+});
+
+test("vps-deploy-scope resolves service list as selective", async () => {
+  assert.equal(await runDeployScopeFunction("vps_deploy_mode", "gateway client-service"), "selective");
+});
+
+test("vps-deploy-scope emits compose args only for selective scope", async () => {
+  assert.equal(await runDeployScopeFunction("vps_compose_service_args", "ALL"), "");
+  assert.equal(
+    await runDeployScopeFunction("vps_compose_service_args", "gateway client-service"),
+    "gateway\nclient-service",
+  );
+});
