@@ -3,15 +3,14 @@ import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const detectorScript = path.join(repoRoot, "scripts", "ci", "detect-changed-vps-services.sh");
-const bashCommand =
-  process.platform === "win32" ? "C:\\Program Files\\Git\\bin\\bash.exe" : "bash";
+const bashCommand = process.platform === "win32" ? "C:\\Program Files\\Git\\bin\\bash.exe" : "bash";
 
 async function run(command, args, options = {}) {
   return execFileAsync(command, args, {
@@ -129,10 +128,12 @@ test("compose-vps-buildx-push plans cached web build with Next.js build args", a
 const deployScopeScript = path.join(repoRoot, "scripts", "ci", "vps-deploy-scope.sh");
 
 async function runDeployScopeFunction(functionName, scope) {
-  const { stdout } = await run(
-    bashCommand,
-    ["-c", `. "${deployScopeScript.replaceAll("\\", "/")}"; ${functionName} "$1"`, "_", scope],
-  );
+  const { stdout } = await run(bashCommand, [
+    "-c",
+    `. "${deployScopeScript.replaceAll("\\", "/")}"; ${functionName} "$1"`,
+    "_",
+    scope,
+  ]);
   return stdout.trim();
 }
 
@@ -145,7 +146,10 @@ test("vps-deploy-scope resolves ALL as full", async () => {
 });
 
 test("vps-deploy-scope resolves service list as selective", async () => {
-  assert.equal(await runDeployScopeFunction("vps_deploy_mode", "gateway client-service"), "selective");
+  assert.equal(
+    await runDeployScopeFunction("vps_deploy_mode", "gateway client-service"),
+    "selective",
+  );
 });
 
 test("vps-deploy-scope emits compose args only for selective scope", async () => {
