@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 
 import { useAuth } from "@/context/AuthContext";
@@ -9,6 +10,7 @@ import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import type { RhPointAdjustmentStatus, RhPointListItem } from "../types";
 import {
   useRhPointAdjustmentRequests,
+  useRhPointConfig,
   useRhPoints,
   useRhPointSummary,
   useRegisterRhPointMutation,
@@ -16,6 +18,7 @@ import {
 } from "../hooks/useRhPoint";
 import { RhPointAdjustmentPanel } from "./RhPointAdjustmentPanel";
 import { RhPointAdjustmentRequestModal } from "./RhPointAdjustmentRequestModal";
+import { RhPointConfigCard } from "./RhPointConfigCard";
 import { RhPointFilters } from "./RhPointFilters";
 import { RhPointSummaryCards } from "./RhPointSummaryCards";
 import { RhPointTable } from "./RhPointTable";
@@ -109,21 +112,49 @@ export function RhPointSection() {
 
   const assignableUsers = assignableUsersQuery.data ?? [];
   const currentUserName = user?.name?.trim() || "Você";
-  const effectiveUserId = canManagePoint ? selectedUserId || (user?.id ?? "") : (user?.id ?? "");
-  const todayPointQuery = useRhTodayPoint();
-  const pointsQuery = useRhPoints({
-    user_id: effectiveUserId || undefined,
-    date_from: dateFrom || undefined,
-    date_to: dateTo || undefined,
+  const effectiveUserId = canManagePoint ? selectedUserId || (user?.id ?? "") : user?.id ?? "";
+  const hasAuthenticatedUser = Boolean(user?.id);
+
+  const pointConfigQuery = useRhPointConfig(
+    canManagePoint ? selectedUserId || undefined : undefined,
+    {
+      enabled: hasAuthenticatedUser,
+    },
+  );
+  const myPointConfigQuery = useRhPointConfig(undefined, {
+    enabled: hasAuthenticatedUser,
   });
-  const summaryQuery = useRhPointSummary({
-    month,
-    user_id: effectiveUserId || undefined,
+  const todayPointQuery = useRhTodayPoint({
+    enabled: hasAuthenticatedUser,
   });
-  const adjustmentsQuery = useRhPointAdjustmentRequests({
-    user_id: effectiveUserId || undefined,
-    status: selectedAdjustmentStatus || undefined,
-  });
+  const pointsQuery = useRhPoints(
+    {
+      user_id: effectiveUserId || undefined,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
+    },
+    {
+      enabled: hasAuthenticatedUser,
+    },
+  );
+  const summaryQuery = useRhPointSummary(
+    {
+      month,
+      user_id: effectiveUserId || undefined,
+    },
+    {
+      enabled: hasAuthenticatedUser,
+    },
+  );
+  const adjustmentsQuery = useRhPointAdjustmentRequests(
+    {
+      user_id: effectiveUserId || undefined,
+      status: selectedAdjustmentStatus || undefined,
+    },
+    {
+      enabled: hasAuthenticatedUser,
+    },
+  );
   const registerMutation = useRegisterRhPointMutation();
 
   useEffect(() => {
@@ -137,8 +168,13 @@ export function RhPointSection() {
       await registerMutation.mutateAsync();
       toast.success("Ponto registrado com sucesso.");
     } catch (error) {
+      const responseMessage = isAxiosError(error) ? error.response?.data?.error : undefined;
       const message =
-        error instanceof Error ? error.message : "Não foi possível registrar o ponto.";
+        typeof responseMessage === "string"
+          ? responseMessage
+          : error instanceof Error
+            ? error.message
+            : "Não foi possível registrar o ponto.";
       toast.error(message);
     }
   }
@@ -152,43 +188,48 @@ export function RhPointSection() {
     return matchedUser?.name ?? "Colaborador não encontrado";
   }
 
+  const pointConfigTargetLabel =
+    canManagePoint && selectedUserId ? getUserLabel(selectedUserId) : currentUserName;
+
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
-        <div className="flex flex-wrap items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setActivePointTab("point")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              activePointTab === "point"
-                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-            }`}
-          >
-            Ponto
-          </button>
-          <button
-            type="button"
-            onClick={() => setActivePointTab("timebank")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              activePointTab === "timebank"
-                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-            }`}
-          >
-            Banco de Horas
-          </button>
-          <button
-            type="button"
-            onClick={() => setActivePointTab("timesheets")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              activePointTab === "timesheets"
-                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-            }`}
-          >
-            Folhas de Ponto
-          </button>
+    <div className="min-w-0 space-y-6">
+      <div className="flex justify-center">
+        <div className="max-w-full overflow-x-auto">
+          <div className="inline-flex min-w-max items-center gap-1 rounded-full border border-gray-200 bg-gray-100/90 p-1 dark:border-gray-700 dark:bg-gray-800/80">
+            <button
+              type="button"
+              onClick={() => setActivePointTab("point")}
+              className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                activePointTab === "point"
+                  ? "bg-white text-blue-700 shadow-sm dark:bg-gray-700 dark:text-blue-300"
+                  : "text-gray-600 hover:bg-white/70 dark:text-gray-400 dark:hover:bg-gray-700/80"
+              }`}
+            >
+              Ponto
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivePointTab("timebank")}
+              className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                activePointTab === "timebank"
+                  ? "bg-white text-blue-700 shadow-sm dark:bg-gray-700 dark:text-blue-300"
+                  : "text-gray-600 hover:bg-white/70 dark:text-gray-400 dark:hover:bg-gray-700/80"
+              }`}
+            >
+              Banco de Horas
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivePointTab("timesheets")}
+              className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                activePointTab === "timesheets"
+                  ? "bg-white text-blue-700 shadow-sm dark:bg-gray-700 dark:text-blue-300"
+                  : "text-gray-600 hover:bg-white/70 dark:text-gray-400 dark:hover:bg-gray-700/80"
+              }`}
+            >
+              Folhas de Ponto
+            </button>
+          </div>
         </div>
       </div>
 
@@ -210,11 +251,25 @@ export function RhPointSection() {
             onAdjustmentStatusChange={setSelectedAdjustmentStatus}
           />
 
+          <RhPointConfigCard
+            config={pointConfigQuery.data ?? null}
+            isLoading={pointConfigQuery.isLoading}
+            hasError={Boolean(pointConfigQuery.error)}
+            canManagePoint={canManagePoint}
+            selectedUserId={selectedUserId}
+            targetUserLabel={pointConfigTargetLabel}
+          />
+
           <RhPointTodayCard
             currentUserName={currentUserName}
             todayPoint={todayPointQuery.data ?? null}
             isLoading={todayPointQuery.isLoading}
             hasError={Boolean(todayPointQuery.error)}
+            isConfigMissing={
+              !myPointConfigQuery.isLoading &&
+              !myPointConfigQuery.error &&
+              !myPointConfigQuery.data
+            }
             isRegistering={registerMutation.isPending}
             onRegister={handleRegisterPoint}
           />
@@ -222,6 +277,7 @@ export function RhPointSection() {
             summary={summaryQuery.data ?? null}
             isLoading={summaryQuery.isLoading}
             hasError={Boolean(summaryQuery.error)}
+            error={summaryQuery.error ?? null}
           />
           <RhPointTable
             points={pointsQuery.data ?? []}

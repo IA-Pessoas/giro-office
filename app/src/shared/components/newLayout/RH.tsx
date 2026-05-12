@@ -283,7 +283,7 @@ export function RH() {
       {/* Tabs */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1">
         <div className="overflow-x-auto">
-        <div className="flex min-w-max items-center gap-1">
+        <div className="flex min-w-max items-center justify-center gap-1">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-5 py-2.5 font-medium transition-all ${

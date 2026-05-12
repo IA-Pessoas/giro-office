@@ -24,6 +24,10 @@ import type {
 } from "../types";
 import { RH_QUERY_KEY } from "./useRhRequests";
 
+interface RhPointReadQueryOptions {
+  enabled?: boolean;
+}
+
 export function rhPointConfigQueryKey(userId?: string) {
   return [...RH_QUERY_KEY, "point", "config", userId ?? "me"] as const;
 }
@@ -69,12 +73,16 @@ export function rhPointAdjustmentRequestsQueryKey(
   ] as const;
 }
 
-export function useRhPointConfig(userId?: string): UseQueryResult<RhPointConfig | null, Error> {
+export function useRhPointConfig(
+  userId?: string,
+  options?: RhPointReadQueryOptions,
+): UseQueryResult<RhPointConfig | null, Error> {
   return useFetch(
     rhPointConfigQueryKey(userId),
     () =>
       userId ? rhPointService.getPointConfigByUserId(userId) : rhPointService.getMyPointConfig(),
     {
+      enabled: options?.enabled,
       refetchOnWindowFocus: false,
     },
   );
@@ -82,14 +90,19 @@ export function useRhPointConfig(userId?: string): UseQueryResult<RhPointConfig 
 
 export function useRhPoints(
   filters: RhPointListFilters = {},
+  options?: RhPointReadQueryOptions,
 ): UseQueryResult<RhPointListItem[], Error> {
   return useFetch(rhPointListQueryKey(filters), () => rhPointService.listPoints(filters), {
+    enabled: options?.enabled,
     refetchOnWindowFocus: false,
   });
 }
 
-export function useRhTodayPoint(): UseQueryResult<RhTodayPoint, Error> {
+export function useRhTodayPoint(
+  options?: RhPointReadQueryOptions,
+): UseQueryResult<RhTodayPoint, Error> {
   return useFetch(rhTodayPointQueryKey(), () => rhPointService.getTodayPoint(), {
+    enabled: options?.enabled,
     refetchOnWindowFocus: false,
   });
 }
@@ -97,24 +110,26 @@ export function useRhTodayPoint(): UseQueryResult<RhTodayPoint, Error> {
 export function useRhPointSummary(filters: {
   month: string;
   user_id?: string;
-}): UseQueryResult<RhPointMonthlySummary, Error> {
+}, options?: RhPointReadQueryOptions): UseQueryResult<RhPointMonthlySummary, Error> {
   return useFetch(
     rhPointSummaryQueryKey(filters),
     () => rhPointService.getMonthlySummary(filters),
     {
       refetchOnWindowFocus: false,
-      enabled: Boolean(filters.month),
+      enabled: (options?.enabled ?? true) && Boolean(filters.month),
     },
   );
 }
 
 export function useRhPointAdjustmentRequests(
   filters: RhPointAdjustmentListFilters = {},
+  options?: RhPointReadQueryOptions,
 ): UseQueryResult<RhPointAdjustmentRequest[], Error> {
   return useFetch(
     rhPointAdjustmentRequestsQueryKey(filters),
     () => rhPointService.listAdjustmentRequests(filters),
     {
+      enabled: options?.enabled,
       refetchOnWindowFocus: false,
     },
   );

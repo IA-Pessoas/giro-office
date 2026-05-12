@@ -1,9 +1,12 @@
+import { isAxiosError } from "axios";
+
 import type { RhPointMonthlySummary } from "../types";
 
 interface RhPointSummaryCardsProps {
   summary: RhPointMonthlySummary | null;
   isLoading: boolean;
   hasError: boolean;
+  error: Error | null;
 }
 
 function formatMinutesLabel(totalMinutes: number) {
@@ -23,7 +26,8 @@ const CARD_CONFIG = [
   },
   {
     title: "Saldo do mês",
-    getValue: (summary: RhPointMonthlySummary) => formatMinutesLabel(summary.balance_minutes),
+    getValue: (summary: RhPointMonthlySummary) =>
+      formatMinutesLabel(summary.balance_minutes),
   },
   {
     title: "Horas extras",
@@ -36,10 +40,27 @@ const CARD_CONFIG = [
   },
 ];
 
+function getSummaryErrorMessage(error: Error | null) {
+  if (isAxiosError(error)) {
+    const responseMessage = error.response?.data?.error;
+
+    if (
+      error.response?.status === 404 &&
+      typeof responseMessage === "string" &&
+      responseMessage.includes("Configuracao de ponto nao encontrada")
+    ) {
+      return "Cadastre a configuração de ponto para visualizar o resumo.";
+    }
+  }
+
+  return "Resumo indisponível no momento.";
+}
+
 export function RhPointSummaryCards({
   summary,
   isLoading,
   hasError,
+  error,
 }: RhPointSummaryCardsProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -53,7 +74,7 @@ export function RhPointSummaryCards({
             {isLoading
               ? "Carregando resumo..."
               : hasError
-                ? "Falha ao carregar resumo."
+                ? getSummaryErrorMessage(error)
                 : summary
                   ? card.getValue(summary)
                   : "Sem resumo disponível."}

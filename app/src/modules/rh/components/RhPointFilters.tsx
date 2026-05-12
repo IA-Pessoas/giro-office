@@ -34,12 +34,8 @@ export function RhPointFilters({
   onAdjustmentStatusChange,
 }: RhPointFiltersProps) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Ponto</h2>
-      </div>
-
-      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,300px)_180px_180px_180px_180px]">
+    <div className="w-full min-w-0 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
         {canManagePoint ? (
           <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
             <span>Colaborador</span>

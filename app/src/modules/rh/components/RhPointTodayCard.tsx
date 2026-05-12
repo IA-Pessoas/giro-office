@@ -6,6 +6,7 @@ interface RhPointTodayCardProps {
   todayPoint: RhTodayPoint | null;
   isLoading: boolean;
   hasError: boolean;
+  isConfigMissing: boolean;
   isRegistering: boolean;
   onRegister: () => void;
 }
@@ -19,6 +20,7 @@ export function RhPointTodayCard({
   todayPoint,
   isLoading,
   hasError,
+  isConfigMissing,
   isRegistering,
   onRegister,
 }: RhPointTodayCardProps) {
@@ -47,6 +49,13 @@ export function RhPointTodayCard({
           <span>Não foi possível carregar seu ponto de hoje.</span>
         ) : (
           <div className="space-y-4">
+            {isConfigMissing ? (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-200">
+                Configure sua jornada para o sistema calcular saldo e fechamento do
+                dia corretamente.
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Próxima ação</p>
