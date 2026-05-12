@@ -194,3 +194,17 @@ This VPS stack is meant for the stable microservices only:
 - `/audit` when the audit profile is enabled
 
 Legacy routes are intentionally out of scope for this deployment.
+
+## Otimizacao de build e deploy
+
+Os workflows `develop`, `staging`, `test/deploy-develop` e `test/deploy-staging` usam o escopo produzido por `scripts/ci/detect-changed-vps-services.sh` para reduzir trabalho depois da etapa de qualidade.
+
+Escopos:
+
+- `NONE`: nao ha imagem VPS afetada. O workflow pula Buildx, login no registry, limpeza de disco, push e deploy SSH.
+- Lista de servicos: o workflow constroi e publica apenas as imagens selecionadas usando `scripts/ci/compose-vps-buildx-push.sh` com cache Buildx por servico.
+- `ALL`: o workflow constroi todas as imagens workspace e mantem limpeza agressiva de disco antes do build.
+
+O deploy remoto preserva rollback. Antes de puxar novas imagens, `scripts/ci/vps-remote-deploy.sh` grava os IDs locais em `.deploy/image-ids-before-<tag>.txt`. Se `compose up` falhar, o script reetiqueta as imagens anteriores e tenta subir novamente o mesmo escopo.
+
+Rollback nao e fallback. Falha em deploy seletivo nao vira deploy `ALL` automaticamente. Deploy completo acontece quando o detector retorna `ALL` ou quando o workflow e ajustado explicitamente para isso.
