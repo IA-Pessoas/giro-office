@@ -228,43 +228,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - id: reg
-        name: Registro Docker configurado?
-        env:
-          R: ${{ secrets.DOCKER_REGISTRY_URL }}
-        run: |
-          if [ -n "$R" ]; then
-            echo "has=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Exige registry para deploy na VPS
-        if: steps.reg.outputs.has != 'true'
-        run: |
-          echo "::error::Configure DOCKER_REGISTRY_URL (e credenciais) para build/push e deploy na VPS."
-          exit 1
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Materializar .env.vps.* a partir dos segredos
-        env:
-          ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
-          ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
-          ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
-          ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
-          ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
-          ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
-          ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
-          ENV_VPS_DEPARTMENT_SERVICE: ${{ secrets.ENV_VPS_DEPARTMENT_SERVICE }}
-          ENV_VPS_FISCAL_SERVICE: ${{ secrets.ENV_VPS_FISCAL_SERVICE }}
-          ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
-          ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
-          ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
-        run: bash scripts/ci/materialize-vps-env.sh
-
       - id: scope
-        name: Detetar serviços alterados (incremental)
+        name: Detect changed services (incremental)
         run: |
           set -eo pipefail
           DET="$(bash scripts/ci/detect-changed-vps-services.sh "${{ github.event.before }}" "${{ github.sha }}")"
@@ -287,7 +252,45 @@ jobs:
             fi
           fi
 
+      - id: reg
+        name: Registro Docker configurado?
+        env:
+          R: ${{ secrets.DOCKER_REGISTRY_URL }}
+        run: |
+          if [ -n "$R" ]; then
+            echo "has=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Exige registry para deploy na VPS
+        if: steps.reg.outputs.has != 'true' && steps.scope.outputs.push_services != 'NONE'
+        run: |
+          echo "::error::Configure DOCKER_REGISTRY_URL (e credenciais) para build/push e deploy na VPS."
+          exit 1
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.scope.outputs.push_services != 'NONE'
+
+      - name: Materializar .env.vps.* a partir dos segredos
+        if: steps.scope.outputs.push_services != 'NONE'
+        env:
+          ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+          ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+          ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+          ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+          ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+          ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+          ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+          ENV_VPS_DEPARTMENT_SERVICE: ${{ secrets.ENV_VPS_DEPARTMENT_SERVICE }}
+          ENV_VPS_FISCAL_SERVICE: ${{ secrets.ENV_VPS_FISCAL_SERVICE }}
+          ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
+          ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+          ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
+        run: bash scripts/ci/materialize-vps-env.sh
+
       - name: Login no registry
+        if: steps.scope.outputs.push_services != 'NONE'
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.DOCKER_REGISTRY_URL }}
@@ -295,6 +298,7 @@ jobs:
           password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
 
       - name: "Liberar espaço no runner (SO)"
+        if: steps.scope.outputs.push_services == 'ALL'
         uses: jlumbroso/free-disk-space@v1.3.1
         with:
           tool-cache: true
@@ -305,6 +309,7 @@ jobs:
           swap-storage: true
 
       - name: "Liberar espaço no runner (Docker)"
+        if: steps.scope.outputs.push_services == 'ALL'
         run: |
           set -euxo pipefail
           docker system df || true
@@ -312,33 +317,24 @@ jobs:
           docker system prune -af || true
           docker system df || true
 
-      - name: Build imagens Docker (seletivo ou completo)
+      - name: Build e push imagens Docker com cache Buildx
+        if: steps.scope.outputs.push_services != 'NONE'
+        env:
+          DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+          STAGING_DOCKER_TAG: ${{ github.sha }}
+          VPS_PUSH_SERVICES: ${{ steps.scope.outputs.push_services }}
         run: |
           set -eo pipefail
           set -a
           # shellcheck disable=SC1091
           . ./.env.vps.web
           set +a
-          PULL="${{ steps.scope.outputs.pull_services }}"
-          if [[ "$PULL" == "ALL" ]]; then
-            docker compose -f docker-compose.vps.yml build
-          elif [[ "$PULL" == "NONE" ]]; then
-            echo "::notice::Sem alterações em imagens workspace — sem build."
-          else
-            docker compose -f docker-compose.vps.yml build $PULL
-          fi
-
-      - name: Push imagens para o registry
-        env:
-          DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
-          STAGING_DOCKER_TAG: ${{ github.sha }}
-          VPS_PUSH_SERVICES: ${{ steps.scope.outputs.push_services }}
-        run: bash scripts/ci/compose-vps-staging-push.sh
+          bash scripts/ci/compose-vps-buildx-push.sh
 
   vps-deploy:
     name: Deploy na VPS — slot staging (SSH)
     needs: build-and-push
-    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging' && needs.build-and-push.outputs.pull_services != 'NONE'
     runs-on: ubuntu-latest
     environment: staging
     timeout-minutes: 30
@@ -377,6 +373,7 @@ jobs:
         run: bash scripts/ci/materialize-vps-env.sh
 
       - name: Instalar sshpass (opcional, deploy por senha SSH)
+        if: env.VPS_SSH_PRIVATE_KEY == '' && env.VPS_SSH_PASSWORD != ''
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
       - name: Deploy remoto (logs da VPS no output do step)
