@@ -1,5 +1,10 @@
 import "dotenv/config";
 
+import {
+  parseAllowedOrigins,
+  validateProductionCorsOrigins,
+  validateProductionInternalServiceToken,
+} from "@workspace/shared";
 import { loggerLevelSchema } from "@workspace/shared/logger";
 import { z } from "zod";
 
@@ -34,6 +39,11 @@ const envSchema = z
     auditServiceUrl: z.string().url().default("http://localhost:3336"),
     auditServiceToken: z.string().default("audit-service-token"),
     enableApiDocsEnv: z.string().optional(),
+    allowedOrigins: z
+      .string()
+      .optional()
+      .default("*")
+      .transform((value) => parseAllowedOrigins(value)),
   })
   .transform((env) => {
     const { enableApiDocsEnv, ...rest } = env;
@@ -41,6 +51,19 @@ const envSchema = z
       enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
         ? parseBoolean(enableApiDocsEnv)
         : rest.nodeEnv !== "production";
+
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "department-service",
+      envName: "AUDIT_SERVICE_TOKEN",
+      token: rest.auditServiceToken,
+    });
+    validateProductionCorsOrigins({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "department-service",
+      envName: "SERVICE_ALLOWED_ORIGINS",
+      allowedOrigins: rest.allowedOrigins,
+    });
 
     return {
       ...rest,
@@ -63,5 +86,6 @@ export function getDepartmentServiceEnv(): DepartmentServiceEnv {
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
+    allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
   });
 }

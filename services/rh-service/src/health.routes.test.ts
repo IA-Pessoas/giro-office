@@ -22,6 +22,7 @@ describe("rh-service", () => {
       logPretty: false,
       pointMinIntervalMinutes: 30,
       enableApiDocs: false,
+      allowedOrigins: ["*"],
     } satisfies RhEnv;
     const app = createApp(logger, env);
     const res = await request(app).get("/health");

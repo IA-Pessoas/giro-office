@@ -34,11 +34,14 @@ export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
           createIntegrationBodySchema,
           request.body,
         ) as CreateIntegrationBody;
-        const tokenOrg = request.organization_id?.trim() ? request.organization_id : undefined;
-        if (tokenOrg && tokenOrg !== body.organization_id) {
+        const organizationId = resolveOrganizationId(request, undefined);
+        if (body.organization_id && body.organization_id !== organizationId) {
           throw new ServiceError(403, "Integração não permitida para outra organização.");
         }
-        const created = await createIntegrationClient(prisma, body);
+        const created = await createIntegrationClient(prisma, {
+          ...body,
+          organization_id: organizationId,
+        });
         response.status(201).json(createSuccessResponse(created));
       } catch (err) {
         logError("Erro ao criar cliente (integração)", { err });

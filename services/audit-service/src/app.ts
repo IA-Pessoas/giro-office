@@ -1,5 +1,6 @@
 import {
   createExpressErrorHandler,
+  createSecurityHeadersMiddleware,
   createSuccessResponse,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
@@ -38,6 +39,7 @@ export function createApp({ env, logger, repository }: CreateAppOptions): expres
   const app = express();
 
   app.set("trust proxy", true);
+  app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(express.json());
   app.use(requestContext);
 

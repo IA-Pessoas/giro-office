@@ -111,9 +111,14 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                 schema: {
                   type: "object",
                   additionalProperties: true,
-                  required: ["organization_id", "name", "status"],
+                  required: ["name", "status"],
                   properties: {
-                    organization_id: { type: "string", format: "uuid" },
+                    organization_id: {
+                      type: "string",
+                      format: "uuid",
+                      description:
+                        "Opcional. Quando informado, deve corresponder a organizacao autenticada.",
+                    },
                     name: { type: "string" },
                     status: { type: "string" },
                     cpf_cnpj: { type: "string" },
@@ -233,9 +238,14 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                 schema: {
                   type: "object",
                   additionalProperties: true,
-                  required: ["organization_id", "type", "name", "cpf_cnpj"],
+                  required: ["type", "name", "cpf_cnpj"],
                   properties: {
-                    organization_id: { type: "string", format: "uuid" },
+                    organization_id: {
+                      type: "string",
+                      format: "uuid",
+                      description:
+                        "Opcional. Quando informado, deve corresponder a organizacao autenticada.",
+                    },
                     type: { type: "string" },
                     name: { type: "string" },
                     cpf_cnpj: { type: "string" },

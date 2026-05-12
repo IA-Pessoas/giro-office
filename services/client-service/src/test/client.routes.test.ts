@@ -75,9 +75,13 @@ beforeAll(() => {
 
 function buildTestApp(
   mock: IClientService,
-  overrides?: { prisma?: PrismaClient; historyStorage?: HistoryFileStorage },
+  overrides?: {
+    prisma?: PrismaClient;
+    historyStorage?: HistoryFileStorage;
+    env?: Partial<ReturnType<typeof getClientServiceEnv>>;
+  },
 ) {
-  const env = getClientServiceEnv();
+  const env = { ...getClientServiceEnv(), ...overrides?.env };
   const logger = createLogger({
     service: "client-service-test",
     env: "test",
@@ -157,6 +161,23 @@ describe("client-service", () => {
     expect(res.body.paths?.["/client/list"]).toBeDefined();
     expect(res.body.paths?.["/client/{id}/pa"]).toBeDefined();
     expect(res.body.paths?.["/internal/competence-output-update"]).toBeDefined();
+  });
+
+  it("GET /openapi.json marks client create organization_id as token-derived", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+    const res = await request(app).get("/openapi.json");
+
+    const clientCreateRequired =
+      res.body.paths?.["/client"]?.post?.requestBody?.content?.["application/json"]?.schema
+        ?.required;
+    const integrationCreateRequired =
+      res.body.paths?.["/client/integration"]?.post?.requestBody?.content?.["application/json"]
+        ?.schema?.required;
+
+    expect(res.status).toBe(200);
+    expect(clientCreateRequired).toEqual(["name", "status"]);
+    expect(integrationCreateRequired).toEqual(["type", "name", "cpf_cnpj"]);
   });
 
   it("GET /docs serves Swagger UI assets", async () => {
@@ -426,6 +447,175 @@ describe("client-service", () => {
 
     expect(res.status).toBe(400);
     expect(mock.create).toHaveBeenCalled();
+  });
+
+  it("POST /client rejects organization_id that does not match authenticated organization", async () => {
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      create: vi.fn(),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app).post("/client").set("Authorization", `Bearer ${token}`).send({
+      organization_id: "550e8400-e29b-41d4-a716-446655440099",
+      name: "Cliente",
+      status: "Ativo",
+    });
+
+    expect(res.status).toBe(403);
+    expect(mock.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /client uses authenticated organization when body omits organization_id", async () => {
+    const created = baseClient();
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      create: vi.fn().mockResolvedValue(created),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app).post("/client").set("Authorization", `Bearer ${token}`).send({
+      name: "Cliente",
+      status: "Ativo",
+    });
+
+    expect(res.status).toBe(201);
+    expect(mock.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organization_id: TEST_ORG_ID }),
+    );
+  });
+
+  it("POST /client/:id/histories rejects unsupported file MIME types", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .post(`/client/${TEST_CLIENT_ID}/histories`)
+      .set("Authorization", `Bearer ${token}`)
+      .field("date", "2026-01-01")
+      .field("history", "Histórico")
+      .attach("file", Buffer.from("<script>alert(1)</script>"), {
+        filename: "payload.html",
+        contentType: "text/html",
+      });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /client/:id/histories rejects files with spoofed allowed MIME types", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const historyStorage = {
+      saveObjectPath: vi.fn(),
+    } as unknown as HistoryFileStorage;
+    const app = buildTestApp(mock, { historyStorage });
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .post(`/client/${TEST_CLIENT_ID}/histories`)
+      .set("Authorization", `Bearer ${token}`)
+      .field("date", "2026-01-01")
+      .field("history", "Histórico")
+      .attach("file", Buffer.from("<script>alert(1)</script>"), {
+        filename: "payload.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(res.status).toBe(400);
+    expect(historyStorage.saveObjectPath).not.toHaveBeenCalled();
+  });
+
+  it("POST /client/:id/histories rate limits repeated uploads", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock, {
+      env: {
+        uploadRateLimitMax: 1,
+        uploadRateLimitWindowMs: 60_000,
+      },
+    });
+    const token = bearerToken(TEST_ORG_ID);
+
+    await request(app)
+      .post(`/client/${TEST_CLIENT_ID}/histories`)
+      .set("Authorization", `Bearer ${token}`)
+      .field("date", "2026-01-01")
+      .field("history", "Histórico")
+      .attach("file", Buffer.from("<script>alert(1)</script>"), {
+        filename: "payload.html",
+        contentType: "text/html",
+      });
+
+    const second = await request(app)
+      .post(`/client/${TEST_CLIENT_ID}/histories`)
+      .set("Authorization", `Bearer ${token}`)
+      .field("date", "2026-01-01")
+      .field("history", "Histórico")
+      .attach("file", Buffer.from("<script>alert(1)</script>"), {
+        filename: "payload.html",
+        contentType: "text/html",
+      });
+
+    expect(second.status).toBe(429);
+  });
+
+  it("POST /client/:id/histories rejects files above 10 MB", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .post(`/client/${TEST_CLIENT_ID}/histories`)
+      .set("Authorization", `Bearer ${token}`)
+      .field("date", "2026-01-01")
+      .field("history", "Histórico")
+      .attach("file", Buffer.alloc(10 * 1024 * 1024 + 1), {
+        filename: "large.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /client/:id/histories accepts allowed file types", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const prisma = {
+      client: {
+        findFirst: vi.fn().mockResolvedValue({ id: TEST_CLIENT_ID }),
+      },
+      clientHistory: {
+        create: vi.fn().mockResolvedValue({
+          id: "770e8400-e29b-41d4-a716-446655440003",
+          client_id: TEST_CLIENT_ID,
+          file: "client-history/doc.pdf",
+        }),
+      },
+    } as unknown as PrismaClient;
+    const historyStorage = {
+      saveObjectPath: vi.fn().mockResolvedValue("client-history/doc.pdf"),
+    } as unknown as HistoryFileStorage;
+    const app = buildTestApp(mock, { prisma, historyStorage });
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .post(`/client/${TEST_CLIENT_ID}/histories`)
+      .set("Authorization", `Bearer ${token}`)
+      .field("date", "2026-01-01")
+      .field("history", "Histórico")
+      .attach("file", Buffer.from("%PDF-1.7"), {
+        filename: "doc.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(res.status).toBe(201);
+    expect(historyStorage.saveObjectPath).toHaveBeenCalledWith(
+      TEST_CLIENT_ID,
+      expect.objectContaining({
+        mimetype: "application/pdf",
+        originalName: "doc.pdf",
+      }),
+    );
   });
 
   it("supports create, detail and update for client PA", async () => {

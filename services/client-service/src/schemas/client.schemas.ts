@@ -162,7 +162,7 @@ const extendedClientFields = {
 
 const baseClientFields = {
   name: z.string().min(1, "Nome é obrigatório."),
-  organization_id: z.string().uuid({ message: "organization_id inválido." }),
+  organization_id: z.string().uuid({ message: "organization_id inválido." }).optional(),
   status: z.string().min(1, "Status é obrigatório."),
   /** Alinhado ao legado; string vazia permitida quando ainda não informado. */
   cpf_cnpj: z.string().default(""),

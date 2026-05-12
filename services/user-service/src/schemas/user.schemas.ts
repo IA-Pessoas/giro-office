@@ -32,13 +32,6 @@ export const createUserBodySchema = z
   })
   .strict()
   .superRefine((body, ctx) => {
-    if ((body.type !== undefined || body.modules !== undefined) && !body.organization_id) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "organization_id e obrigatorio quando type ou modules forem enviados.",
-      });
-    }
-
     if (body.first_owner_flag === true && body.type !== "owner") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

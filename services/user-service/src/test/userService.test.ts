@@ -6,8 +6,12 @@ const { prismaMock, bcryptMock, permissionServiceMock } = vi.hoisted(() => ({
       findMany: vi.fn(),
       count: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+    },
+    department: {
+      findFirst: vi.fn(),
     },
   },
   bcryptMock: {
@@ -40,19 +44,63 @@ describe("UserService", () => {
     vi.clearAllMocks();
   });
 
-  it("getById lança 404 quando usuário não existe", async () => {
-    prismaMock.user.findUnique.mockResolvedValue(null);
+  it("getById aceita usuário legado vinculado pela organização do departamento", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-legacy",
+      name: "Legacy",
+      login: "legacy",
+      permission: 2,
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: null,
+      type: "admin",
+      first_owner_flag: false,
+      permission_id: "permission-1",
+    });
     const service = new UserService();
 
-    await expect(service.getById("user-1")).rejects.toMatchObject({ statusCode: 404 });
+    const result = await service.getById("user-legacy", "org-1");
+
+    expect(result).toMatchObject({ id: "user-legacy", organization_id: "org-1" });
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "user-legacy",
+          OR: [
+            { organization_id: "org-1" },
+            { organization_id: null, department: { organization_id: "org-1" } },
+          ],
+        },
+      }),
+    );
   });
 
-  it("list retorna usuários com paginação", async () => {
+  it("getById lança 404 quando usuário não existe na organização", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    const service = new UserService();
+
+    await expect(service.getById("user-1", "org-1")).rejects.toMatchObject({ statusCode: 404 });
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "user-1",
+          OR: [
+            { organization_id: "org-1" },
+            { organization_id: null, department: { organization_id: "org-1" } },
+          ],
+        },
+      }),
+    );
+  });
+
+  it("list retorna usuários da organização com paginação", async () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: "user-1" }]);
     prismaMock.user.count.mockResolvedValue(1);
     const service = new UserService();
 
-    const result = await service.list({ skip: 0, take: 10 });
+    const result = await service.list({ skip: 0, take: 10, organizationId: "org-1" });
 
     expect(result).toEqual({
       users: [{ id: "user-1" }],
@@ -60,10 +108,19 @@ describe("UserService", () => {
       skip: 0,
       take: 10,
     });
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: "org-1" },
+      }),
+    );
+    expect(prismaMock.user.count).toHaveBeenCalledWith({
+      where: { organization_id: "org-1" },
+    });
   });
 
   it("create com organization_id cria permissão do usuário", async () => {
     bcryptMock.hash.mockResolvedValue("hashed");
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1" });
     prismaMock.user.create.mockResolvedValue({
       id: "user-1",
       name: "Novo",
@@ -93,8 +150,54 @@ describe("UserService", () => {
       modules: { fiscal: 1 },
     });
 
+    expect(prismaMock.department.findFirst).toHaveBeenCalledWith({
+      where: { id: "dep-1", organization_id: "org-1" },
+      select: { id: true },
+    });
     expect(permissionServiceMock.create).toHaveBeenCalledWith("user-1", "org-1");
-    expect(permissionServiceMock.update).toHaveBeenCalledWith("user-1", { fiscal: 1 });
+    expect(permissionServiceMock.update).toHaveBeenCalledWith("user-1", { fiscal: 1 }, "org-1");
     expect(result).toMatchObject({ id: "user-1", permission_id: "permission-1" });
+  });
+
+  it("create rejeita departamento fora da organização", async () => {
+    prismaMock.department.findFirst.mockResolvedValue(null);
+    const service = new UserService();
+
+    await expect(
+      service.create({
+        name: "Novo",
+        login: "novo",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 1,
+        organization_id: "org-1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
+  });
+
+  it("update só altera usuário da organização informada", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      permission_id: "permission-1",
+    });
+    prismaMock.user.update.mockResolvedValue({ id: "user-1", name: "Atualizado" });
+    const service = new UserService();
+
+    await service.update("user-1", { name: "Atualizado" }, "org-1");
+
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "user-1",
+          OR: [
+            { organization_id: "org-1" },
+            { organization_id: null, department: { organization_id: "org-1" } },
+          ],
+        },
+      }),
+    );
+    expect(prismaMock.user.update).toHaveBeenCalled();
   });
 });

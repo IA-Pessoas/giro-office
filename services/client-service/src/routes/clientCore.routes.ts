@@ -103,11 +103,11 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(createClientBodySchema, request.body) as CreateClientBody;
-        const tokenOrg = request.organization_id?.trim() ? request.organization_id : undefined;
-        if (tokenOrg && tokenOrg !== body.organization_id) {
+        const organizationId = resolveOrganizationId(request, undefined);
+        if (body.organization_id && body.organization_id !== organizationId) {
           throw new ServiceError(403, "Não é permitido criar cliente em outra organização.");
         }
-        const client = await clientService.create(body);
+        const client = await clientService.create({ ...body, organization_id: organizationId });
         response.status(201).json(createSuccessResponse(client));
       } catch (err) {
         logError("Erro ao criar cliente", { err });

@@ -15,6 +15,7 @@ describe("organization-service", () => {
       logLevel: "silent",
       logPretty: false,
       enableApiDocs: false,
+      allowedOrigins: ["*"],
     } satisfies OrganizationEnv;
     const logger = createLogger({
       service: "organization-service-test",

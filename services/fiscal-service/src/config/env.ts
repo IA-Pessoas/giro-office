@@ -1,5 +1,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  parseAllowedOrigins,
+  validateProductionCorsOrigins,
+  validateProductionInternalServiceToken,
+} from "@workspace/shared";
 import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -43,6 +48,11 @@ const envSchema = z
     auditServiceUrl: z.string().url().default("http://localhost:3020"),
     auditServiceToken: z.string().default("audit-service-token"),
     enableApiDocsEnv: z.string().optional(),
+    allowedOrigins: z
+      .string()
+      .optional()
+      .default("*")
+      .transform((value) => parseAllowedOrigins(value)),
   })
   .transform((env) => {
     const { enableApiDocsEnv, ...rest } = env;
@@ -50,6 +60,18 @@ const envSchema = z
       enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
         ? parseBoolean(enableApiDocsEnv)
         : rest.nodeEnv !== "production";
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "fiscal-service",
+      envName: "AUDIT_SERVICE_TOKEN",
+      token: rest.auditServiceToken,
+    });
+    validateProductionCorsOrigins({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "fiscal-service",
+      envName: "SERVICE_ALLOWED_ORIGINS",
+      allowedOrigins: rest.allowedOrigins,
+    });
     return {
       ...rest,
       logPretty: rest.nodeEnv !== "production" && rest.logPretty,
@@ -71,5 +93,6 @@ export function getFiscalServiceEnv(): FiscalServiceEnv {
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
+    allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
   });
 }
