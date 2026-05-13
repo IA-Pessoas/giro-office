@@ -34,6 +34,36 @@ should_pull() {
   return 1
 }
 
+docker_pull_with_retry() {
+  local remote="$1"
+  local max_attempts="${DOCKER_PULL_RETRIES:-5}"
+  local delay_seconds="${DOCKER_PULL_RETRY_DELAY_SECONDS:-10}"
+  local attempt=1
+  local rc=0
+
+  while true; do
+    if docker pull "$remote"; then
+      return 0
+    fi
+    rc=$?
+
+    if [[ "$attempt" -ge "$max_attempts" ]]; then
+      echo "::error::docker pull failed after $attempt attempt(s): $remote" >&2
+      return "$rc"
+    fi
+
+    echo "::warning::docker pull failed for $remote (attempt $attempt/$max_attempts); retrying in ${delay_seconds}s" >&2
+    sleep "$delay_seconds"
+    attempt=$((attempt + 1))
+    if [[ "$delay_seconds" =~ ^[0-9]+$ && "$delay_seconds" -gt 0 && "$delay_seconds" -lt 60 ]]; then
+      delay_seconds=$((delay_seconds * 2))
+      if [[ "$delay_seconds" -gt 60 ]]; then
+        delay_seconds=60
+      fi
+    fi
+  done
+}
+
 mapfile -t local_imgs < <(bash scripts/ci/list-workspace-vps-images.sh)
 
 if [[ "${VPS_PULL_SERVICES:-}" == "NONE" ]]; then
@@ -66,7 +96,7 @@ for local_img in "${local_imgs[@]}"; do
 
   remote="$(bash "$REF_HELPER" "$DOCKER_REGISTRY_URL" "$name" "${DOCKER_IMAGE_TAG}")"
   echo "::group::pull+tag: $local_img <- $remote"
-  docker pull "$remote"
+  docker_pull_with_retry "$remote"
   docker tag "$remote" "$local_img"
   echo "::endgroup::"
 done

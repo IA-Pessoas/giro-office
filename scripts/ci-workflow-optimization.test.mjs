@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -158,4 +158,150 @@ test("vps-deploy-scope emits compose args only for selective scope", async () =>
     await runDeployScopeFunction("vps_compose_service_args", "gateway client-service"),
     "gateway\nclient-service",
   );
+});
+
+const pullByTagScript = path.join(
+  repoRoot,
+  "scripts",
+  "ci",
+  "compose-vps-pull-by-tag-selective.sh",
+);
+const remoteDeployScript = path.join(repoRoot, "scripts", "ci", "vps-remote-deploy.sh");
+const composeVpsFile = path.join(repoRoot, "docker-compose.vps.yml");
+const vpsSecretsManifest = path.join(repoRoot, "scripts", "ci", "vps-secrets.manifest");
+
+async function writeExecutable(filePath, contents) {
+  await writeFile(filePath, contents, "utf8");
+  await chmod(filePath, 0o755);
+}
+
+async function createFakeDockerBin(scriptContents) {
+  const dir = await mkdtemp(path.join(tmpdir(), "fake-docker-"));
+  await writeExecutable(path.join(dir, "docker"), scriptContents);
+  return dir;
+}
+
+function withPrependedPath(binDir, extraEnv = {}) {
+  return {
+    ...extraEnv,
+    PATH: `${toBashPath(binDir)}:${process.env.PATH}`,
+  };
+}
+
+function toBashPath(filePath) {
+  const normalized = filePath.replaceAll("\\", "/");
+  if (process.platform !== "win32") {
+    return normalized;
+  }
+  return `/${normalized[0].toLowerCase()}${normalized.slice(2)}`;
+}
+
+test("compose-vps-pull-by-tag-selective retries transient docker pull failures", async () => {
+  const stateDir = await mkdtemp(path.join(tmpdir(), "pull-retry-state-"));
+  const fakeDockerBin = await createFakeDockerBin(`#!/usr/bin/env bash
+set -euo pipefail
+echo "$*" >> "$DOCKER_CALL_LOG"
+if [[ "$1 $2" == "image inspect" ]]; then
+  exit 1
+fi
+if [[ "$1" == "compose" ]]; then
+  if [[ "$*" == *"config --images"* ]]; then
+    printf 'workspace-gateway:vps\\n'
+  fi
+  exit 0
+fi
+if [[ "$1" == "pull" ]]; then
+  count_file="$DOCKER_STATE_DIR/pull-count"
+  count=0
+  [[ -f "$count_file" ]] && count="$(cat "$count_file")"
+  count=$((count + 1))
+  echo "$count" > "$count_file"
+  if [[ "$count" -lt 3 ]]; then
+    echo "simulated GHCR timeout" >&2
+    exit 1
+  fi
+  exit 0
+fi
+if [[ "$1" == "tag" ]]; then
+  exit 0
+fi
+exit 0
+`);
+
+  const callLog = path.join(stateDir, "docker.log");
+  await run(bashCommand, [toBashPath(pullByTagScript)], {
+    env: withPrependedPath(fakeDockerBin, {
+      DOCKER_CALL_LOG: toBashPath(callLog),
+      DOCKER_STATE_DIR: toBashPath(stateDir),
+      DOCKER_REGISTRY_URL: "ghcr.io/example-org/workspace",
+      DOCKER_IMAGE_TAG: "abc1234",
+      VPS_PULL_SERVICES: "gateway",
+      DOCKER_PULL_RETRIES: "3",
+      DOCKER_PULL_RETRY_DELAY_SECONDS: "0",
+      WORKSPACE_VPS_IMAGE_TAG: "vps",
+    }),
+  });
+
+  const pullCount = Number(await readFile(path.join(stateDir, "pull-count"), "utf8"));
+  const calls = await readFile(callLog, "utf8");
+  assert.equal(pullCount, 3);
+  assert.match(calls, /pull ghcr\.io\/example-org\/workspace\/gateway:abc1234/);
+  assert.match(
+    calls,
+    /tag ghcr\.io\/example-org\/workspace\/gateway:abc1234 workspace-gateway:vps/,
+  );
+});
+
+test("vps-remote-deploy rolls image tags back when registry pull fails", async () => {
+  const script = await readFile(remoteDeployScript, "utf8");
+  assert.match(
+    script,
+    /if \[\[ "\$pull_rc" -ne 0 \]\]; then\s+.*rollback_images "\$IDS_FILE"\s+dump_compose_logs/s,
+  );
+});
+
+function extractComposeServiceBlock(composeContents, serviceName) {
+  const serviceMatch = new RegExp(`^  ${serviceName}:\\r?\\n`, "m").exec(composeContents);
+  assert.ok(serviceMatch, `service ${serviceName} should exist in docker-compose.vps.yml`);
+  const start = serviceMatch.index;
+  const nextServiceMatch = /^ {2}[A-Za-z0-9_.-]+:\r?\n/gm;
+  nextServiceMatch.lastIndex = start + serviceMatch[0].length;
+  const next = nextServiceMatch.exec(composeContents);
+  return composeContents.slice(start, next?.index ?? composeContents.length);
+}
+
+test("audit-service is part of the default VPS compose stack", async () => {
+  const composeContents = await readFile(composeVpsFile, "utf8");
+  const auditBlock = extractComposeServiceBlock(composeContents, "audit-service");
+  const gatewayBlock = extractComposeServiceBlock(composeContents, "gateway");
+
+  assert.doesNotMatch(auditBlock, /^\s+profiles:/m);
+  assert.match(gatewayBlock, /depends_on:[\s\S]*audit-service:[\s\S]*condition: service_healthy/);
+});
+
+test("VPS env materialization includes audit-service in active workflows", async () => {
+  const manifest = await readFile(vpsSecretsManifest, "utf8");
+  assert.match(manifest, /^ENV_VPS_AUDIT_SERVICE\|\.env\.vps\.audit-service$/m);
+
+  const workflowsDir = path.join(repoRoot, ".github", "workflows");
+  const workflowFiles = (await readdir(workflowsDir))
+    .filter((file) => file.endsWith(".yml"))
+    .map((file) => path.join(workflowsDir, file));
+
+  for (const workflowFile of workflowFiles) {
+    const contents = await readFile(workflowFile, "utf8");
+    const lines = contents.split(/\r?\n/);
+    for (const [index, line] of lines.entries()) {
+      if (!/^\s*run:\s+bash scripts\/ci\/materialize-vps-env\.sh\s*$/.test(line)) {
+        continue;
+      }
+
+      const envWindow = lines.slice(Math.max(0, index - 30), index).join("\n");
+      assert.match(
+        envWindow,
+        /^\s+ENV_VPS_AUDIT_SERVICE:\s+\$\{\{ secrets\.ENV_VPS_AUDIT_SERVICE \}\}/m,
+        `${path.relative(repoRoot, workflowFile)} materialize step at line ${index + 1} should map ENV_VPS_AUDIT_SERVICE`,
+      );
+    }
+  }
 });

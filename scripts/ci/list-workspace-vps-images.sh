@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Lista imagens do stack VPS no padrão workspace-*:<WORKSPACE_VPS_IMAGE_TAG>, derivadas de
 # `docker compose config --images` (variável omissa = tag `vps`).
-# Exclui terceiros (ex.: nginx). Serviços só em `profiles` inativos não entram no config padrão;
-# use COMPOSE_PROFILES=audit no job se quiser incluir audit-service no scan.
+# Exclui terceiros (ex.: nginx).
 set -eo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

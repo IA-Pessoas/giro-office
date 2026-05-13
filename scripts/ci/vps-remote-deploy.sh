@@ -161,6 +161,8 @@ bash scripts/ci/compose-vps-pull-by-tag-selective.sh
 pull_rc=$?
 set -e
 if [[ "$pull_rc" -ne 0 ]]; then
+  log "pull de imagens falhou (rc=$pull_rc); rollback de tags locais"
+  rollback_images "$IDS_FILE"
   dump_compose_logs
   echo "::error::pull de imagens falhou" >&2
   exit 1

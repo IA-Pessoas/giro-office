@@ -99,6 +99,8 @@ services:
         condition: service_healthy
       rh-service:
         condition: service_healthy
+      audit-service:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -389,8 +391,6 @@ services:
     <<: *service_defaults
     image: workspace-audit-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
     restart: unless-stopped
-    profiles:
-      - audit
     build:
       context: .
       dockerfile: docker/service.Dockerfile

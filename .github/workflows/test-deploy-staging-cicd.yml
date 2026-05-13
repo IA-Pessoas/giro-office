@@ -280,6 +280,7 @@ jobs:
           ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
+          ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
         run: bash scripts/ci/materialize-vps-env.sh
 
       - name: Login no registry
@@ -363,6 +364,7 @@ jobs:
           ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
+          ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
         run: bash scripts/ci/materialize-vps-env.sh
 
       - name: Instalar sshpass (opcional, deploy por senha SSH)
