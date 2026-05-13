@@ -32,13 +32,7 @@
 docker compose -f docker-compose.vps.yml up -d --build
 ```
 
-6. Start the audit profile only when needed:
-
-```bash
-docker compose -f docker-compose.vps.yml --profile audit up -d --build audit-service gateway reverse-proxy
-```
-
-If you enable the audit profile, also switch `AUDIT_ENABLED=true` in `.env.vps.gateway`.
+6. `audit-service` is part of the default stack. Control whether actions are audited with `AUDIT_ENABLED` in the gateway and service `.env.vps.*` files.
 
 ## Nginx TLS
 
@@ -191,7 +185,7 @@ This VPS stack is meant for the stable microservices only:
 - `/fiscal`
 - `/contabil`
 - `/health`
-- `/audit` when the audit profile is enabled
+- `/audit` when `AUDIT_ENABLED=true`
 
 Legacy routes are intentionally out of scope for this deployment.
 

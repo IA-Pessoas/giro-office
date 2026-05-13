@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -167,6 +167,8 @@ const pullByTagScript = path.join(
   "compose-vps-pull-by-tag-selective.sh",
 );
 const remoteDeployScript = path.join(repoRoot, "scripts", "ci", "vps-remote-deploy.sh");
+const composeVpsFile = path.join(repoRoot, "docker-compose.vps.yml");
+const vpsSecretsManifest = path.join(repoRoot, "scripts", "ci", "vps-secrets.manifest");
 
 async function writeExecutable(filePath, contents) {
   await writeFile(filePath, contents, "utf8");
@@ -256,4 +258,50 @@ test("vps-remote-deploy rolls image tags back when registry pull fails", async (
     script,
     /if \[\[ "\$pull_rc" -ne 0 \]\]; then\s+.*rollback_images "\$IDS_FILE"\s+dump_compose_logs/s,
   );
+});
+
+function extractComposeServiceBlock(composeContents, serviceName) {
+  const serviceMatch = new RegExp(`^  ${serviceName}:\\r?\\n`, "m").exec(composeContents);
+  assert.ok(serviceMatch, `service ${serviceName} should exist in docker-compose.vps.yml`);
+  const start = serviceMatch.index;
+  const nextServiceMatch = /^ {2}[A-Za-z0-9_.-]+:\r?\n/gm;
+  nextServiceMatch.lastIndex = start + serviceMatch[0].length;
+  const next = nextServiceMatch.exec(composeContents);
+  return composeContents.slice(start, next?.index ?? composeContents.length);
+}
+
+test("audit-service is part of the default VPS compose stack", async () => {
+  const composeContents = await readFile(composeVpsFile, "utf8");
+  const auditBlock = extractComposeServiceBlock(composeContents, "audit-service");
+  const gatewayBlock = extractComposeServiceBlock(composeContents, "gateway");
+
+  assert.doesNotMatch(auditBlock, /^\s+profiles:/m);
+  assert.match(gatewayBlock, /depends_on:[\s\S]*audit-service:[\s\S]*condition: service_healthy/);
+});
+
+test("VPS env materialization includes audit-service in active workflows", async () => {
+  const manifest = await readFile(vpsSecretsManifest, "utf8");
+  assert.match(manifest, /^ENV_VPS_AUDIT_SERVICE\|\.env\.vps\.audit-service$/m);
+
+  const workflowsDir = path.join(repoRoot, ".github", "workflows");
+  const workflowFiles = (await readdir(workflowsDir))
+    .filter((file) => file.endsWith(".yml"))
+    .map((file) => path.join(workflowsDir, file));
+
+  for (const workflowFile of workflowFiles) {
+    const contents = await readFile(workflowFile, "utf8");
+    const lines = contents.split(/\r?\n/);
+    for (const [index, line] of lines.entries()) {
+      if (!/^\s*run:\s+bash scripts\/ci\/materialize-vps-env\.sh\s*$/.test(line)) {
+        continue;
+      }
+
+      const envWindow = lines.slice(Math.max(0, index - 30), index).join("\n");
+      assert.match(
+        envWindow,
+        /^\s+ENV_VPS_AUDIT_SERVICE:\s+\$\{\{ secrets\.ENV_VPS_AUDIT_SERVICE \}\}/m,
+        `${path.relative(repoRoot, workflowFile)} materialize step at line ${index + 1} should map ENV_VPS_AUDIT_SERVICE`,
+      );
+    }
+  }
 });

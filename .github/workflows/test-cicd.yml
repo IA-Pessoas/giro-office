@@ -6,7 +6,7 @@
 #
 # Segredos do repositório → arquivos na raiz (gitignored). Pares: scripts/ci/vps-secrets.manifest.
 #
-# Opcional (somente se usar --profile audit no compose): ENV_VPS_AUDIT_SERVICE → .env.vps.audit-service
+# ENV_VPS_AUDIT_SERVICE → .env.vps.audit-service
 #
 # Pós-merge: cadastrar todos os segredos em Settings → Secrets and variables → Actions,
 # garantir DATABASE_URL/SUPABASE acessíveis a partir dos runners do GitHub e validar na aba Actions.
@@ -101,6 +101,7 @@ jobs:
           ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
+          ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
         run: bash scripts/ci/materialize-vps-env.sh
 
       # BuildKit acelera builds; `docker compose build` nos runners do GHA não aceita
@@ -189,6 +190,7 @@ jobs:
           ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
+          ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
         run: bash scripts/ci/materialize-vps-env.sh
 
       - name: "[Build] Imagens Docker (docker-compose.vps.yml)"
