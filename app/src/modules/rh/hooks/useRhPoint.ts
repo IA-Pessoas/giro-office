@@ -11,13 +11,22 @@ import { rhPointService } from "../services/rhPointService";
 import type {
   ApproveRhPointAdjustmentPayload,
   CreateRhPointAdjustmentPayload,
+  RhPointAdjustmentListFilters,
   RhPointAdjustmentRequest,
   RhPointCalculationResult,
   RhPointConfig,
+  RhPointListFilters,
+  RhPointListItem,
+  RhPointMonthlySummary,
   RhRegisterPointResult,
+  RhTodayPoint,
   UpsertRhPointConfigPayload,
 } from "../types";
 import { RH_QUERY_KEY } from "./useRhRequests";
+
+interface RhPointReadQueryOptions {
+  enabled?: boolean;
+}
 
 export function rhPointConfigQueryKey(userId?: string) {
   return [...RH_QUERY_KEY, "point", "config", userId ?? "me"] as const;
@@ -27,12 +36,100 @@ export function rhPointCalculationQueryKey(pointId: string) {
   return [...RH_QUERY_KEY, "point", "calculation", pointId] as const;
 }
 
-export function useRhPointConfig(userId?: string): UseQueryResult<RhPointConfig | null, Error> {
+export function rhPointListQueryKey(filters: RhPointListFilters = {}) {
+  return [
+    ...RH_QUERY_KEY,
+    "point",
+    "list",
+    filters.user_id ?? "me",
+    filters.date_from ?? "",
+    filters.date_to ?? "",
+  ] as const;
+}
+
+export function rhTodayPointQueryKey() {
+  return [...RH_QUERY_KEY, "point", "today", "me"] as const;
+}
+
+export function rhPointSummaryQueryKey(filters: { month: string; user_id?: string }) {
+  return [
+    ...RH_QUERY_KEY,
+    "point",
+    "summary",
+    filters.user_id ?? "me",
+    filters.month,
+  ] as const;
+}
+
+export function rhPointAdjustmentRequestsQueryKey(
+  filters: RhPointAdjustmentListFilters = {},
+) {
+  return [
+    ...RH_QUERY_KEY,
+    "point",
+    "adjustments",
+    filters.user_id ?? "me",
+    filters.status ?? "all",
+  ] as const;
+}
+
+export function useRhPointConfig(
+  userId?: string,
+  options?: RhPointReadQueryOptions,
+): UseQueryResult<RhPointConfig | null, Error> {
   return useFetch(
     rhPointConfigQueryKey(userId),
     () =>
       userId ? rhPointService.getPointConfigByUserId(userId) : rhPointService.getMyPointConfig(),
     {
+      enabled: options?.enabled,
+      refetchOnWindowFocus: false,
+    },
+  );
+}
+
+export function useRhPoints(
+  filters: RhPointListFilters = {},
+  options?: RhPointReadQueryOptions,
+): UseQueryResult<RhPointListItem[], Error> {
+  return useFetch(rhPointListQueryKey(filters), () => rhPointService.listPoints(filters), {
+    enabled: options?.enabled,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useRhTodayPoint(
+  options?: RhPointReadQueryOptions,
+): UseQueryResult<RhTodayPoint, Error> {
+  return useFetch(rhTodayPointQueryKey(), () => rhPointService.getTodayPoint(), {
+    enabled: options?.enabled,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useRhPointSummary(filters: {
+  month: string;
+  user_id?: string;
+}, options?: RhPointReadQueryOptions): UseQueryResult<RhPointMonthlySummary, Error> {
+  return useFetch(
+    rhPointSummaryQueryKey(filters),
+    () => rhPointService.getMonthlySummary(filters),
+    {
+      refetchOnWindowFocus: false,
+      enabled: (options?.enabled ?? true) && Boolean(filters.month),
+    },
+  );
+}
+
+export function useRhPointAdjustmentRequests(
+  filters: RhPointAdjustmentListFilters = {},
+  options?: RhPointReadQueryOptions,
+): UseQueryResult<RhPointAdjustmentRequest[], Error> {
+  return useFetch(
+    rhPointAdjustmentRequestsQueryKey(filters),
+    () => rhPointService.listAdjustmentRequests(filters),
+    {
+      enabled: options?.enabled,
       refetchOnWindowFocus: false,
     },
   );

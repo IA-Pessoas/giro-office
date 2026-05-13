@@ -2,14 +2,25 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   ApproveRhPointAdjustmentPayload,
+  RhPointAdjustmentListFilters,
   CreateRhPointAdjustmentPayload,
   RhPointAdjustmentRequest,
   RhPointCalculationResult,
   RhPointConfig,
+  RhPointListFilters,
+  RhPointListItem,
+  RhPointMonthlySummary,
   RhRegisterPointResult,
+  RhTodayPoint,
   UpsertRhPointConfigPayload,
 } from "../types";
-import { RH_ENDPOINTS, unwrapRhEnvelope } from "./rhService.contract";
+import {
+  buildRhPointAdjustmentListParams,
+  buildRhPointListParams,
+  buildRhPointSummaryParams,
+  RH_ENDPOINTS,
+  unwrapRhEnvelope,
+} from "./rhService.contract";
 
 export const rhPointService = {
   async getMyPointConfig(): Promise<RhPointConfig | null> {
@@ -31,6 +42,44 @@ export const rhPointService = {
     const response = await api.put(RH_ENDPOINTS.pointConfig, payload);
 
     return unwrapRhEnvelope<RhPointConfig>(response.data);
+  },
+
+  async listPoints(filters: RhPointListFilters = {}): Promise<RhPointListItem[]> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.points, {
+      params: buildRhPointListParams(filters),
+    });
+
+    return unwrapRhEnvelope<RhPointListItem[]>(response.data);
+  },
+
+  async getTodayPoint(): Promise<RhTodayPoint> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.myTodayPoint);
+
+    return unwrapRhEnvelope<RhTodayPoint>(response.data);
+  },
+
+  async getMonthlySummary(
+    filters: { month: string; user_id?: string },
+  ): Promise<RhPointMonthlySummary> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.pointSummary, {
+      params: buildRhPointSummaryParams(filters),
+    });
+
+    return unwrapRhEnvelope<RhPointMonthlySummary>(response.data);
+  },
+
+  async listAdjustmentRequests(
+    filters: RhPointAdjustmentListFilters = {},
+  ): Promise<RhPointAdjustmentRequest[]> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.pointAdjustmentRequests, {
+      params: buildRhPointAdjustmentListParams(filters),
+    });
+
+    return unwrapRhEnvelope<RhPointAdjustmentRequest[]>(response.data);
   },
 
   async registerPoint(): Promise<RhRegisterPointResult> {

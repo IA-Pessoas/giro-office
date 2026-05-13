@@ -1,5 +1,8 @@
 import type {
   RhCategoryListFilters,
+  RhPointAdjustmentListFilters,
+  RhPointListFilters,
+  RhPointSummaryFilters,
   RhRequestListFilters,
   RhScoreQuestionListFilters,
   RhTimeBankReleaseListFilters,
@@ -13,6 +16,10 @@ export const RH_ENDPOINTS = {
   messages: "/rh/messages",
   pointConfig: "/rh/point-config",
   pointConfigByUser: (userId: string) => `/rh/point-config/${userId}`,
+  points: "/rh/point",
+  myTodayPoint: "/rh/point/me/today",
+  pointAdjustmentRequests: "/rh/point/adjustment/requests",
+  pointSummary: "/rh/point/summary",
   registerPoint: "/rh/point/register",
   calculatePoint: (pointId: string) => `/rh/point/${pointId}/calculate`,
   requestPointAdjustment: "/rh/point/adjustment/request",
@@ -31,11 +38,6 @@ export const RH_ENDPOINTS = {
   pendingScoreEvaluations: "/rh/score/evaluations/pending",
   submitScoreEvaluation: "/rh/score/evaluations/submit",
   scoreNitroUpdate: "/rh/score/nitro/update",
-  // Future point endpoints pending backend support / roadmap:
-  // "/rh/point"
-  // "/rh/point/me/today"
-  // "/rh/point/adjustment/requests"
-  // "/rh/point/summary"
 } as const;
 
 export function buildRhCategoryListParams(filters: RhCategoryListFilters = {}) {
@@ -50,6 +52,30 @@ export function buildRhRequestListParams(filters: RhRequestListFilters = {}) {
     category_id: filters.category_id,
     requester_user_id: filters.requester_user_id,
     assigned_to_user_id: filters.assigned_to_user_id,
+  };
+}
+
+export function buildRhPointListParams(filters: RhPointListFilters = {}) {
+  return {
+    date_from: filters.date_from,
+    date_to: filters.date_to,
+    user_id: filters.user_id,
+  };
+}
+
+export function buildRhPointSummaryParams(filters: RhPointSummaryFilters) {
+  return {
+    month: filters.month,
+    user_id: filters.user_id,
+  };
+}
+
+export function buildRhPointAdjustmentListParams(
+  filters: RhPointAdjustmentListFilters = {},
+) {
+  return {
+    status: filters.status,
+    user_id: filters.user_id,
   };
 }
 

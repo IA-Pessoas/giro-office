@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import {
   RhHolidaysSection,
+  RhPointSection,
   RhRequestsSection,
-  RhTimeBankSection,
-  RhTimesheetsSection,
   formatRhDateTime,
   getRhRequestStatusClassName,
   getRhRequestStatusLabel,
@@ -67,7 +66,7 @@ interface Employee {
   performance?: number;
 }
 export function RH() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'requests' | 'evaluations' | 'timetracking' | 'timesheets'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'requests' | 'evaluations' | 'point'>('dashboard');
   const [isHolidaysManagerOpen, setIsHolidaysManagerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
@@ -284,7 +283,7 @@ export function RH() {
       {/* Tabs */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1">
         <div className="overflow-x-auto">
-        <div className="flex min-w-max items-center gap-1">
+        <div className="flex min-w-max items-center justify-center gap-1">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-5 py-2.5 font-medium transition-all ${
@@ -335,26 +334,15 @@ export function RH() {
             Avaliações
           </button>
           <button
-            onClick={() => setActiveTab('timetracking')}
+            onClick={() => setActiveTab('point')}
             className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-5 py-2.5 font-medium transition-all ${
-              activeTab === 'timetracking'
+              activeTab === 'point'
                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
             <Clock className="w-4 h-4 inline-block mr-2" />
-            Banco de Horas
-          </button>
-          <button
-            onClick={() => setActiveTab('timesheets')}
-            className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-5 py-2.5 font-medium transition-all ${
-              activeTab === 'timesheets'
-                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-          >
-            <FileText className="w-4 h-4 inline-block mr-2" />
-            Folhas de Ponto
+            Ponto
           </button>
         </div>
         </div>
@@ -758,13 +746,8 @@ export function RH() {
         </div>
       )}
 
-      {/* Time Tracking Tab */}
-      {activeTab === 'timetracking' && (
-        <RhTimeBankSection />
-      )}
-
-      {activeTab === 'timesheets' && (
-        <RhTimesheetsSection />
+      {activeTab === 'point' && (
+        <RhPointSection />
       )}
 
       <Dialog
