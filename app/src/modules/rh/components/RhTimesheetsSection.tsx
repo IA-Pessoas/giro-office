@@ -97,12 +97,13 @@ export function RhTimesheetsSection() {
     return normalizePermissionResponse(permissionQuery.data).known;
   }, [permissionQuery.data]);
 
-  const canManageTimesheets = Boolean(
-    user?.permission === 2 ||
-      (normalizedPermissions?.rh !== null &&
-        normalizedPermissions?.rh !== undefined &&
-        normalizedPermissions.rh >= 1),
+  const isRhResponsible = Boolean(
+    normalizedPermissions?.rh !== null &&
+      normalizedPermissions?.rh !== undefined &&
+      normalizedPermissions.rh >= 1,
   );
+  const isGlobalAdmin = user?.permission === 2;
+  const canManageTimesheets = isRhResponsible || isGlobalAdmin;
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManageTimesheets,

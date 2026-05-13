@@ -65,12 +65,13 @@ export function RhTimeBankSection() {
     return normalizePermissionResponse(permissionQuery.data).known;
   }, [permissionQuery.data]);
 
-  const canManageTimeBank = Boolean(
-    user?.permission === 2 ||
-      (normalizedPermissions?.rh !== null &&
-        normalizedPermissions?.rh !== undefined &&
-        normalizedPermissions.rh >= 1),
+  const isRhResponsible = Boolean(
+    normalizedPermissions?.rh !== null &&
+      normalizedPermissions?.rh !== undefined &&
+      normalizedPermissions.rh >= 1,
   );
+  const isGlobalAdmin = user?.permission === 2;
+  const canManageTimeBank = isRhResponsible || isGlobalAdmin;
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManageTimeBank,

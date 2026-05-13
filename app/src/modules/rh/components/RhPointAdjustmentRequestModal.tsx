@@ -129,9 +129,7 @@ export function RhPointAdjustmentRequestModal({
       handleClose();
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Não foi possível solicitar o ajuste.";
+        error instanceof Error ? error.message : "Não foi possível solicitar o ajuste.";
       toast.error(message);
     }
   }

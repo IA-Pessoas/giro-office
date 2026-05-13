@@ -26,13 +26,11 @@ const CARD_CONFIG = [
   },
   {
     title: "Saldo do mês",
-    getValue: (summary: RhPointMonthlySummary) =>
-      formatMinutesLabel(summary.balance_minutes),
+    getValue: (summary: RhPointMonthlySummary) => formatMinutesLabel(summary.balance_minutes),
   },
   {
     title: "Horas extras",
-    getValue: (summary: RhPointMonthlySummary) =>
-      formatMinutesLabel(summary.overtime_minutes),
+    getValue: (summary: RhPointMonthlySummary) => formatMinutesLabel(summary.overtime_minutes),
   },
   {
     title: "Ajustes pendentes",
@@ -69,8 +67,8 @@ export function RhPointSummaryCards({
           key={card.title}
           className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800"
         >
-          <p className="text-sm text-gray-600 dark:text-gray-400">{card.title}</p>
-          <div className="mt-3 rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+          <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{card.title}</p>
+          <div className="mt-3 rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200">
             {isLoading
               ? "Carregando resumo..."
               : hasError

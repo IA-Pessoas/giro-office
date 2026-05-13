@@ -99,12 +99,13 @@ export function RhPointSection() {
     return normalizePermissionResponse(permissionQuery.data).known;
   }, [permissionQuery.data]);
 
-  const canManagePoint = Boolean(
-    user?.permission === 2 ||
-      (normalizedPermissions?.rh !== null &&
-        normalizedPermissions?.rh !== undefined &&
-        normalizedPermissions.rh >= 1),
+  const isRhResponsible = Boolean(
+    normalizedPermissions?.rh !== null &&
+      normalizedPermissions?.rh !== undefined &&
+      normalizedPermissions.rh >= 1,
   );
+  const isGlobalAdmin = user?.permission === 2;
+  const canManagePoint = isRhResponsible || isGlobalAdmin;
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManagePoint,
@@ -114,6 +115,7 @@ export function RhPointSection() {
   const currentUserName = user?.name?.trim() || "Você";
   const effectiveUserId = canManagePoint ? selectedUserId || (user?.id ?? "") : user?.id ?? "";
   const hasAuthenticatedUser = Boolean(user?.id);
+  const shouldShowTodayCard = !canManagePoint || !selectedUserId || selectedUserId === user?.id;
 
   const pointConfigQuery = useRhPointConfig(
     canManagePoint ? selectedUserId || undefined : undefined,
@@ -260,25 +262,29 @@ export function RhPointSection() {
             targetUserLabel={pointConfigTargetLabel}
           />
 
-          <RhPointTodayCard
-            currentUserName={currentUserName}
-            todayPoint={todayPointQuery.data ?? null}
-            isLoading={todayPointQuery.isLoading}
-            hasError={Boolean(todayPointQuery.error)}
-            isConfigMissing={
-              !myPointConfigQuery.isLoading &&
-              !myPointConfigQuery.error &&
-              !myPointConfigQuery.data
-            }
-            isRegistering={registerMutation.isPending}
-            onRegister={handleRegisterPoint}
-          />
+          {shouldShowTodayCard ? (
+            <RhPointTodayCard
+              currentUserName={currentUserName}
+              todayPoint={todayPointQuery.data ?? null}
+              isLoading={todayPointQuery.isLoading}
+              hasError={Boolean(todayPointQuery.error)}
+              isConfigMissing={
+                !myPointConfigQuery.isLoading &&
+                !myPointConfigQuery.error &&
+                !myPointConfigQuery.data
+              }
+              isRegistering={registerMutation.isPending}
+              onRegister={handleRegisterPoint}
+            />
+          ) : null}
+
           <RhPointSummaryCards
             summary={summaryQuery.data ?? null}
             isLoading={summaryQuery.isLoading}
             hasError={Boolean(summaryQuery.error)}
             error={summaryQuery.error ?? null}
           />
+
           <RhPointTable
             points={pointsQuery.data ?? []}
             isLoading={pointsQuery.isLoading}
@@ -286,6 +292,7 @@ export function RhPointSection() {
             currentUserId={user?.id ?? ""}
             onRequestAdjustment={setSelectedPointForAdjustment}
           />
+
           <RhPointAdjustmentPanel
             adjustments={adjustmentsQuery.data ?? []}
             isLoading={adjustmentsQuery.isLoading}
