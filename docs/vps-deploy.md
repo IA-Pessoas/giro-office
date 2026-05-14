@@ -17,6 +17,7 @@
 - `.env.vps.department-service`
 - `.env.vps.fiscal-service`
 - `.env.vps.contabil-service`
+- `.env.vps.regularize-service`
 - `.env.vps.web` (Next: `NEXT_PUBLIC_API_URL` + `API_INTERNAL_URL` — ver secção CI)
 - `.env.vps.audit-service`
 
@@ -53,6 +54,7 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps rh-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps department-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps fiscal-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps contabil-service
+docker compose -f docker-compose.vps.yml up -d --build --no-deps regularize-service
 ```
 
 The `--no-deps` flag keeps the rest of the stack running.
@@ -90,6 +92,7 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
 - Department service: `GET /health`
 - Fiscal service: `GET /health`
 - Contabil service: `GET /health`
+- Regularize service: `GET /health`
 - **Web (Next.js):** `GET /` (container escuta na porta **3000**; no host, ver portas por slot abaixo)
 
 ## CI/CD (GitHub Actions → VPS)
@@ -109,6 +112,7 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 
 | Segredo | Uso |
 |---------|-----|
+| `ENV_VPS_GATEWAY` | Inclua `REGULARIZE_SERVICE_URL=http://regularize-service:3411` para a rota `/regularize` dentro da rede Docker. |
 | `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | URL **com namespace** (ex.: `ghcr.io/meu-org`, `docker.io/meuuser` — não use só `ghcr.io`). Push/pull normalizam em minúsculas. |
 | `ENV_VPS_*` | Igual ao manifest `scripts/ci/vps-secrets.manifest` — `.env.vps.*` copiados para a VPS em cada deploy |
 | `ENV_VPS_WEB` | Corpo do ficheiro **`.env.vps.web`**: pelo menos `NEXT_PUBLIC_API_URL=<URL pública do API para o browser>` e `API_INTERNAL_URL=http://gateway:3010` (rede Docker). O valor de `NEXT_PUBLIC_API_URL` é embutido no bundle no `docker compose build`. |
@@ -116,7 +120,7 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 | `VPS_SSH_PRIVATE_KEY` | Preferencial (chave privada PEM) |
 | `VPS_SSH_PASSWORD` | Alternativa (requer `sshpass` no runner — instalado no job) |
 
-Os serviços estáveis promovidos também exigem segredos de GitHub Environment para materializar os respetivos ficheiros ignorados na VPS: `ENV_VPS_DEPARTMENT_SERVICE`, `ENV_VPS_FISCAL_SERVICE` e `ENV_VPS_CONTABIL_SERVICE`. Não faça stage nem commit dos ficheiros reais `.env.vps.*`.
+Os serviços estáveis promovidos também exigem segredos de GitHub Environment para materializar os respetivos ficheiros ignorados na VPS: `ENV_VPS_DEPARTMENT_SERVICE`, `ENV_VPS_FISCAL_SERVICE`, `ENV_VPS_CONTABIL_SERVICE` e `ENV_VPS_REGULARIZE_SERVICE`. Não faça stage nem commit dos ficheiros reais `.env.vps.*`.
 
 ### GitHub Environments (`ENV_VPS_*` por slot)
 
@@ -184,6 +188,7 @@ This VPS stack is meant for the stable microservices only:
 - `/department`
 - `/fiscal`
 - `/contabil`
+- `/regularize`
 - `/health`
 - `/audit` when `AUDIT_ENABLED=true`
 
