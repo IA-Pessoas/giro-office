@@ -3,6 +3,7 @@ import {
   RhHolidaysSection,
   RhPointSection,
   RhRequestsSection,
+  RhScoreSection,
   formatRhDateTime,
   getRhRequestStatusClassName,
   getRhRequestStatusLabel,
@@ -678,74 +679,7 @@ export function RH() {
       {activeTab === 'requests' && <RhRequestsSection />}
 
 
-      {/* Evaluations Tab */}
-      {activeTab === 'evaluations' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredEmployees.map((emp) => (
-              <div 
-                key={emp.id}
-                className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`w-12 h-12 rounded-full ${emp.color} flex items-center justify-center text-white text-lg font-semibold`}>
-                    {emp.avatar}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{emp.name}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{emp.role}</p>
-                  </div>
-                </div>
-
-                {emp.performance && (
-                  <>
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-gray-600 dark:text-gray-400">Performance Geral</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{emp.performance}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all ${
-                            emp.performance >= 90 ? 'bg-green-500' :
-                            emp.performance >= 70 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${emp.performance}%` }}
-                        ></div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-4">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star 
-                          key={star}
-                          className={`w-5 h-5 ${
-                            star <= Math.round(emp.performance / 20) 
-                              ? 'text-yellow-500 fill-yellow-500' 
-                              : 'text-gray-300 dark:text-gray-600'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                <div className="space-y-2 pt-4 border-t border-gray-100 dark:border-gray-700">
-                  <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors">
-                    <MessageSquare className="w-4 h-4" />
-                    <span className="text-sm font-medium">Nova Avaliação</span>
-                  </button>
-                  <button className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <Eye className="w-4 h-4" />
-                    <span className="text-sm font-medium">Ver Histórico</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
+      {activeTab === 'evaluations' && <RhScoreSection />}
       {activeTab === 'point' && (
         <RhPointSection />
       )}
