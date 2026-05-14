@@ -65,6 +65,12 @@ const regularizeServiceEnvSchema = z
       envName: "AUDIT_SERVICE_TOKEN",
       token: rest.auditServiceToken,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "regularize-service",
+      envName: "REGULARIZE_SERVICE_INTERNAL_TOKEN",
+      token: rest.internalServiceToken,
+    });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
       serviceName: "regularize-service",
