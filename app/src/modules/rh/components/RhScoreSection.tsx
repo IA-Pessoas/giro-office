@@ -1307,7 +1307,7 @@ export function RhScoreSection() {
 
       {activeTab === "questions" && canManageScore ? <RhScoreQuestionsTab /> : null}
       {activeTab === "pending" ? <RhPendingEvaluationsTab /> : null}
-      {activeTab === "history" ? <RhScoreHistoryTab canManageScore={false} /> : null}
+      {activeTab === "history" ? <RhScoreHistoryTab canManageScore={canManageScore} /> : null}
 
       {!canManageScore && activeTab === "questions" ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
