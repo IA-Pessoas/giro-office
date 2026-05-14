@@ -23,6 +23,27 @@ describe("regularize internal routes", () => {
 
     const response = await request(app).post("/internal/reconciliation/run").send({});
 
+    expect(response.status).toBe(401);
+    expect(response.body.success).toBe(false);
+  });
+
+  it("POST /internal/reconciliation/run rejects a wrong internal token", async () => {
+    const app = createApp({
+      env: regularizeTestEnv,
+      logger: createLoggerMock(),
+      prisma: {} as PrismaClient,
+      reconciliationService: {} as never,
+      runReconciliation: vi.fn(async () => ({ processed: 1 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
+    });
+
+    const response = await request(app)
+      .post("/internal/reconciliation/run")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "wrong-token")
+      .send({});
+
     expect(response.status).toBe(403);
     expect(response.body.success).toBe(false);
   });

@@ -15,7 +15,12 @@ export function requireInternalToken(env: RegularizeServiceEnv) {
     }
 
     const header = request.headers[INTERNAL_SERVICE_TOKEN_HEADER];
-    const token = typeof header === "string" ? header : undefined;
+    if (typeof header !== "string") {
+      next(new ServiceError(401, "Token interno nao informado."));
+      return;
+    }
+
+    const token = header;
     if (token !== env.internalServiceToken) {
       next(new ServiceError(403, "Acesso negado."));
       return;
