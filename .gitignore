@@ -1,8 +1,12 @@
 **/node_modules
 *.env
 .env.local
+.env.vps.*
 *generated/
-tsconfig*
+!scripts/generated/
+!scripts/generated/*.smoke.mjs
+tsconfig.tsbuildinfo
+tsconfig.tests*
 
 # Turborepo
 .turbo/
@@ -26,7 +30,19 @@ Thumbs.db
 
 
 # docs
-docs/
+docs/*
+!docs/vps-deploy.md
+!docs/security/
+!docs/security/*.md
 # Figma reference project (local only)
 novo layout/
 .cursor/plans/
+
+# CI local (runner / desenvolvimento)
+.ci-remote-env
+.ci-known_hosts
+.ci-vps-ssh-key
+
+# Smoke test artifacts
+smoke-*/
+services_env_summary.md

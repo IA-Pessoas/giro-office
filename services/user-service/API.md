@@ -1,6 +1,6 @@
 # User Service - API Documentation
 
-Base URL: `http://localhost:3335` (ou via gateway)
+Base URL direta ao serviço: `http://localhost:3030` (valor padrão de `PORT`; ou via gateway).
 
 Todas as respostas de sucesso seguem o formato:
 ```json
@@ -35,7 +35,7 @@ Verifica se o serviço está em execução.
 
 ## Auth
 
-### POST /session
+### POST /user/session
 
 Realiza login e retorna token JWT.
 
@@ -75,7 +75,7 @@ Realiza login e retorna token JWT.
 
 ---
 
-### POST /start-config
+### POST /user/start-config
 
 Cria o primeiro usuário admin do sistema (quando o banco está vazio).
 
@@ -104,7 +104,7 @@ Cria o primeiro usuário admin do sistema (quando o banco está vazio).
 
 ---
 
-### GET /me
+### GET /user/me
 
 Retorna os dados do usuário autenticado.
 
@@ -138,7 +138,7 @@ Retorna os dados do usuário autenticado.
 
 ## Users
 
-### GET /users
+### GET /user
 
 Lista usuários com paginação.
 
@@ -150,7 +150,7 @@ Lista usuários com paginação.
 | skip      | number | Não          | 0       | Registros a pular |
 | take      | number | Não          | 20      | Registros por página |
 
-**Exemplo:** `GET /users?skip=0&take=10`
+**Exemplo:** `GET /user?skip=0&take=10`
 
 **Resposta:** `200 OK`
 ```json
@@ -167,7 +167,7 @@ Lista usuários com paginação.
 
 ---
 
-### GET /users/:id
+### GET /user/:id
 
 Busca usuário por ID.
 
@@ -203,7 +203,7 @@ Busca usuário por ID.
 
 ---
 
-### POST /users
+### POST /user
 
 Cria um novo usuário.
 
@@ -281,7 +281,7 @@ Cria um novo usuário.
 
 ---
 
-### PATCH /users/:id
+### PATCH /user/:id
 
 Atualiza um usuário existente.
 
@@ -313,7 +313,32 @@ Atualiza um usuário existente.
 
 ---
 
-### POST /users/:id/photo
+### GET /user/:id/photo
+
+Devolve a URL pública da foto no envelope de sucesso (`data.url`), alinhada ao campo `photo_url` quando é URL `http(s)` válida (ex.: Supabase Storage).
+
+**Autenticação:** Obrigatória
+
+**Path params:**
+| Parametro | Tipo   | Descrição |
+|-----------|--------|-----------|
+| id        | string | UUID do usuário |
+
+**Resposta:** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://..."
+  }
+}
+```
+
+**Erros:** `404` - Foto não encontrada ou `photo_url` não é uma URL pública válida
+
+---
+
+### POST /user/:id/photo
 
 Faz upload da foto do usuário.
 
@@ -331,7 +356,7 @@ Faz upload da foto do usuário.
 
 **Exemplo (curl):**
 ```bash
-curl -X POST "http://localhost:3335/users/SEU_USER_ID/photo" \
+curl -X POST "http://localhost:3030/user/SEU_USER_ID/photo" \
   -F "file=@/caminho/para/foto.jpg"
 ```
 
@@ -339,11 +364,11 @@ curl -X POST "http://localhost:3335/users/SEU_USER_ID/photo" \
 
 **Erros:** `400` - Arquivo não enviado ou tipo inválido; `404` - Usuário não encontrado; `500` - Erro no Supabase
 
-**Nota:** O gateway não encaminha multipart corretamente. Use chamada direta ao user-service (porta 3335) para upload.
+**Nota:** Se o multipart via gateway falhar em algum cenário, use chamada direta ao user-service com a porta configurada em `PORT` (padrão `3030`).
 
 ---
 
-### DELETE /users/:id/photo
+### DELETE /user/:id/photo
 
 Remove a foto do usuário (Supabase Storage + banco).
 
@@ -362,7 +387,7 @@ Remove a foto do usuário (Supabase Storage + banco).
 
 ---
 
-### DELETE /users/:id
+### DELETE /user/:id
 
 Desativa um usuário (soft delete).
 
@@ -391,7 +416,7 @@ Desativa um usuário (soft delete).
 
 ## Permissions
 
-### GET /permission/:userId
+### GET /user/permission/:userId
 
 Busca as permissões de um usuário.
 
@@ -407,7 +432,7 @@ Busca as permissões de um usuário.
 |-----------|--------|-------------|-----------|
 | modulo    | string | Não         | Filtra apenas um módulo (ex: `atendimento`) |
 
-**Exemplo:** `GET /permission/uuid-do-usuario?modulo=atendimento`
+**Exemplo:** `GET /user/permission/uuid-do-usuario?modulo=atendimento`
 
 **Resposta:** `200 OK`
 ```json
@@ -429,11 +454,11 @@ Busca as permissões de um usuário.
 
 ---
 
-### PUT /permission/:userId
+### PUT /user/permission/:userId
 
 Atualiza as permissões de um usuário.
 
-**Autenticação:** Obrigatória
+**Autenticação:** Obrigatória (minPermission: 2 no gateway)
 
 **Path params:**
 | Parametro | Tipo   | Descrição |

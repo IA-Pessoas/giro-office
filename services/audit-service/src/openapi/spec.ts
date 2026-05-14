@@ -110,7 +110,14 @@ export function buildAuditServiceOpenApiSpec(env: AuditServiceEnv): OpenApiDocum
                     },
                     department: { type: ["string", "null"] },
                   },
-                  required: ["requestId", "method", "path", "outcome", "serviceSource", "createdAt"],
+                  required: [
+                    "requestId",
+                    "method",
+                    "path",
+                    "outcome",
+                    "serviceSource",
+                    "createdAt",
+                  ],
                   additionalProperties: true,
                   example: {
                     requestId: "request-uuid",

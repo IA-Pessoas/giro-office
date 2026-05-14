@@ -4,3 +4,4 @@ process.env.ADMIN_PASSWORD = "test-admin-password";
 process.env.SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-supabase-service-role-key";
 process.env.NODE_ENV = "test";
+process.env.AUDIT_SERVICE_TOKEN = "audit-service-token";

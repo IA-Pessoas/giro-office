@@ -3,12 +3,12 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import type {
   CreateIntegrationBody,
   UpdateIntegrationBody,
-} from "../schemas/clientVerticals.schema.js";
+} from "../schemas/clientVerticals.schemas.js";
 import { cleanDocument } from "../utils/documents.js";
 
 export async function createIntegrationClient(
   prisma: PrismaClient,
-  input: CreateIntegrationBody,
+  input: CreateIntegrationBody & { organization_id: string },
 ): Promise<{ id: string; name: string; cpf_cnpj: string }> {
   const cleanedCpf = cleanDocument(input.cpf_cnpj);
   const exists = await prisma.client.findFirst({

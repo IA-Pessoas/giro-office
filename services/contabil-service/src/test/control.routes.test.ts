@@ -1,0 +1,180 @@
+import "./envBootstrap.js";
+
+import {
+  createLogger,
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+} from "@workspace/shared";
+import request from "supertest";
+import { describe, expect, it, vi } from "vitest";
+
+import { createContabilApp } from "../app.js";
+import { getContabilServiceEnv } from "../config/env.js";
+import type { ControlRouteDeps } from "../routes/control.routes.js";
+
+const ORG_ID = "a0000000-0000-4000-8000-000000000001";
+const USER_ID = "c0000000-0000-4000-8000-000000000001";
+const CLIENT_ID = "b0000000-0000-4000-8000-000000000001";
+const CONTROL_ID = "d0000000-0000-4000-8000-000000000001";
+const INTERNAL_TOKEN = "audit-service-token";
+const env = getContabilServiceEnv();
+const logger = createLogger({
+  service: "contabil-service",
+  env: env.nodeEnv,
+  level: env.logLevel,
+  pretty: env.logPretty,
+});
+
+function gatewayHeaders(): Record<string, string> {
+  return {
+    [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
+    [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
+    [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORG_ID,
+  };
+}
+
+function createMockDeps(): ControlRouteDeps {
+  return {
+    create: vi.fn(async () => ({
+      control: { id: CONTROL_ID },
+      created: true,
+    })) as unknown as ControlRouteDeps["create"],
+    detail: vi.fn(async () => ({ id: CONTROL_ID })) as unknown as ControlRouteDeps["detail"],
+    updateField: vi.fn(async () => ({
+      id: CONTROL_ID,
+      depreciation: true,
+    })) as unknown as ControlRouteDeps["updateField"],
+  };
+}
+
+describe("control routes", () => {
+  it("POST /contabil/controls sem auth retorna 401", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/contabil/controls")
+      .set("Content-Type", "application/json")
+      .send({ client_id: CLIENT_ID, competence: "2024-01" });
+
+    expect(res.status).toBe(401);
+    expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /contabil/controls com gateway e body válido retorna 201 quando criado", async () => {
+    const deps = createMockDeps();
+    deps.create = vi.fn(async () => ({
+      control: { id: CONTROL_ID, client_id: CLIENT_ID },
+      created: true,
+    })) as unknown as ControlRouteDeps["create"];
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/contabil/controls")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, competence: "2024-01" });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({
+      success: true,
+      data: { id: CONTROL_ID, client_id: CLIENT_ID },
+    });
+    expect(deps.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /contabil/controls retorna 200 quando já existia", async () => {
+    const deps = createMockDeps();
+    deps.create = vi.fn(async () => ({
+      control: { id: CONTROL_ID },
+      created: false,
+    })) as unknown as ControlRouteDeps["create"];
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/contabil/controls")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, competence: "2024-01" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it("POST /contabil/controls com body inválido retorna 400", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/contabil/controls")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ competence: "2024-01" });
+
+    expect(res.status).toBe(400);
+    expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("GET /contabil/controls sem query válida retorna 400", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/contabil/controls")
+      .query({ client_id: "invalid", competence: "2024-01" })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(400);
+    expect(deps.detail).not.toHaveBeenCalled();
+  });
+
+  it("GET /contabil/controls com query válida retorna 200", async () => {
+    const deps = createMockDeps();
+    deps.detail = vi.fn(async () => ({ id: CONTROL_ID })) as unknown as ControlRouteDeps["detail"];
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/contabil/controls")
+      .query({ client_id: CLIENT_ID, competence: "2024-01" })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(deps.detail).toHaveBeenCalledWith(CLIENT_ID, "2024-01", ORG_ID);
+  });
+
+  it("PATCH /contabil/controls/:id com body inválido retorna 400", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/contabil/controls/${CONTROL_ID}`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ field: "depreciation" });
+
+    expect(res.status).toBe(400);
+    expect(deps.updateField).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /contabil/controls/:id com payload válido retorna 200", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/contabil/controls/${CONTROL_ID}`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ field: "depreciation", value: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(deps.updateField).toHaveBeenCalledWith(
+      CONTROL_ID,
+      "depreciation",
+      true,
+      expect.objectContaining({ userId: USER_ID, organizationId: ORG_ID }),
+    );
+  });
+});

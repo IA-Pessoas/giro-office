@@ -1,11 +1,13 @@
 import {
   createSuccessResponse,
+  getSingleTrimmedQueryValue,
   error as logError,
   parseWithZod,
-  ServiceError,
+  requireAuthenticatedRequestContext,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
+
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   createRequestBodySchema,
@@ -20,30 +22,16 @@ import { RequestService } from "../services/requestService.js";
 const router: ReturnType<typeof Router> = Router();
 const requestService = new RequestService();
 
-function singleQueryString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  return trimmed === "" ? undefined : trimmed;
-}
-
 router.post("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const organizationId = req.organization_id;
-    const userId = req.user_id;
-    if (!organizationId) {
-      throw new ServiceError(400, "organization_id é obrigatório.");
-    }
-    if (!userId) {
-      throw new ServiceError(400, "user_id é obrigatório.");
-    }
-
+    const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+      statusCode: 400,
+    });
     const body = parseWithZod(createRequestBodySchema, req.body);
 
     const result = await requestService.create({
-      organization_id: organizationId,
-      requester_user_id: userId,
+      organization_id,
+      requester_user_id: user_id,
       title: body.title,
       description: body.description,
       category_id: body.category_id,
@@ -53,27 +41,19 @@ router.post("/", isAuthenticated, async (req: Request, res: Response, next: Next
 
     res.status(200).json(createSuccessResponse(result));
   } catch (err) {
-    logError("Erro ao criar solicitação RH", { err });
+    logError("Erro ao criar solicitacao RH", { err });
     next(err);
   }
 });
 
 router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const organizationId = req.organization_id;
-    const userId = req.user_id;
-    if (!organizationId) {
-      throw new ServiceError(400, "organization_id é obrigatório.");
-    }
-    if (!userId) {
-      throw new ServiceError(400, "user_id é obrigatório.");
-    }
-
+    const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
     const queryInput = {
-      status: singleQueryString(req.query.status),
-      category_id: singleQueryString(req.query.category_id),
-      requester_user_id: singleQueryString(req.query.requester_user_id),
-      assigned_to_user_id: singleQueryString(req.query.assigned_to_user_id),
+      status: getSingleTrimmedQueryValue(req.query.status),
+      category_id: getSingleTrimmedQueryValue(req.query.category_id),
+      requester_user_id: getSingleTrimmedQueryValue(req.query.requester_user_id),
+      assigned_to_user_id: getSingleTrimmedQueryValue(req.query.assigned_to_user_id),
     };
     const parsed = parseWithZod(listRequestQuerySchema, queryInput);
 
@@ -91,52 +71,36 @@ router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextF
       listOptions.assigned_to_user_id = parsed.assigned_to_user_id;
     }
 
-    const result = await requestService.list(organizationId, listOptions);
+    const result = await requestService.list(organization_id, listOptions);
 
     res.status(200).json(createSuccessResponse(result));
   } catch (err) {
-    logError("Erro ao listar solicitações RH", { err });
+    logError("Erro ao listar solicitacoes RH", { err });
     next(err);
   }
 });
 
 router.get("/:id", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const organizationId = req.organization_id;
-    const userId = req.user_id;
-    if (!organizationId) {
-      throw new ServiceError(400, "organization_id é obrigatório.");
-    }
-    if (!userId) {
-      throw new ServiceError(400, "user_id é obrigatório.");
-    }
-
+    const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
     const params = parseWithZod(requestIdParamsSchema, req.params);
 
-    const result = await requestService.getById(params.id, organizationId);
+    const result = await requestService.getById(params.id, organization_id);
     res.status(200).json(createSuccessResponse(result));
   } catch (err) {
-    logError("Erro ao buscar solicitação RH", { err });
+    logError("Erro ao buscar solicitacao RH", { err });
     next(err);
   }
 });
 
 router.put("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const organizationId = req.organization_id;
-    const userId = req.user_id;
-    if (!organizationId) {
-      throw new ServiceError(400, "organization_id é obrigatório.");
-    }
-    if (!userId) {
-      throw new ServiceError(400, "user_id é obrigatório.");
-    }
-
+    const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
     const body = parseWithZod(updateRequestBodySchema, req.body);
 
     const updateInput: RequestUpdateInput = {
       id: body.id,
-      organization_id: organizationId,
+      organization_id,
     };
     if (body.title !== undefined) {
       updateInput.title = body.title;
@@ -161,32 +125,24 @@ router.put("/", isAuthenticated, async (req: Request, res: Response, next: NextF
 
     res.status(200).json(createSuccessResponse(result));
   } catch (err) {
-    logError("Erro ao atualizar solicitação RH", { err });
+    logError("Erro ao atualizar solicitacao RH", { err });
     next(err);
   }
 });
 
 router.delete("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const organizationId = req.organization_id;
-    const userId = req.user_id;
-    if (!organizationId) {
-      throw new ServiceError(400, "organization_id é obrigatório.");
-    }
-    if (!userId) {
-      throw new ServiceError(400, "user_id é obrigatório.");
-    }
-
+    const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
     const body = parseWithZod(deleteRequestBodySchema, req.body);
 
     const result = await requestService.delete({
       id: body.id,
-      organization_id: organizationId,
+      organization_id,
     });
 
     res.status(200).json(createSuccessResponse(result));
   } catch (err) {
-    logError("Erro ao excluir solicitação RH", { err });
+    logError("Erro ao excluir solicitacao RH", { err });
     next(err);
   }
 });

@@ -2,26 +2,27 @@ import { createSuccessResponse, error as logError, parseWithZod } from "@workspa
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
+import type { ClientRouterDeps } from "../clientRouterDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { clientIdParamsSchema } from "../schemas/client.schema.js";
+import { clientIdParamsSchema } from "../schemas/client.schemas.js";
 import {
   terminationBodySchema,
   updateCommercialBodySchema,
   updateFinanceBodySchema,
   updateRegularizeBodySchema,
-} from "../schemas/clientVerticals.schema.js";
+} from "../schemas/clientVerticals.schemas.js";
 import { updateCommercialClient } from "../services/clientCommercialService.js";
 import { updateFinanceClient } from "../services/clientFinanceService.js";
 import { updateRegularizeClient } from "../services/clientRegularizeService.js";
 import { terminateClient } from "../services/clientTerminationService.js";
-import { type ClientRouterDeps, resolveOrganizationId } from "./clientRouteHelpers.js";
+import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
   const { prisma } = deps;
   const router: ReturnType<typeof Router> = Router();
 
   router.patch(
-    "/clients/:id/commercial",
+    "/:id/commercial",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -44,7 +45,7 @@ export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
   );
 
   router.patch(
-    "/clients/:id/termination",
+    "/:id/termination",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -67,19 +68,14 @@ export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
   );
 
   router.patch(
-    "/clients/:id/finance",
+    "/:id/finance",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const body = parseWithZod(updateFinanceBodySchema, request.body);
         const organizationId = resolveOrganizationId(request, undefined);
-        const updated = await updateFinanceClient(
-          prisma,
-          params.id,
-          organizationId,
-          body,
-        );
+        const updated = await updateFinanceClient(prisma, params.id, organizationId, body);
         response.json(createSuccessResponse(updated));
       } catch (err) {
         logError("Erro ao atualizar cliente (financeiro)", { err });
@@ -89,7 +85,7 @@ export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
   );
 
   router.patch(
-    "/clients/:id/regularize",
+    "/:id/regularize",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {

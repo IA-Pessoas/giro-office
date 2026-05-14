@@ -16,20 +16,20 @@ export const useClientList = (initialFilters: Filters) => {
     const [hasMore, setHasMore] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const loaderRef = useRef<HTMLDivElement>(null);
-    const apiClient = setupAPIClient();
-
     const fetchClients = useCallback(async (currentPage: number, shouldReset: boolean = false) => {
         if (isLoading) return;
         setIsLoading(true);
 
         try {
             const response = await clientService.list({
-                ...filters,
+                status: filters.status || undefined,
+                search: filters.search || undefined,
                 page: currentPage,
                 limit: 10
             });
 
-            const { data, hasMore: newHasMore } = response;
+            const data = response.items;
+            const newHasMore = response.hasMore;
             
             setClients(prev => shouldReset ? data : [...prev, ...data]);
             setHasMore(newHasMore);

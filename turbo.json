@@ -1,17 +1,30 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    ".env",
+    ".env.*",
+    "biome.json",
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "tsconfig.base.json"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**"]
+      "env": ["NODE_ENV", "NEXT_PUBLIC_*", "DATABASE_URL"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "dev": {
-      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "env": ["DATABASE_URL"],
+      "outputs": []
+    },
     "lint": {
-      "dependsOn": ["^lint"],
       "outputs": []
     },
     "prisma:generate": {
@@ -21,15 +34,14 @@
       "cache": false
     },
     "format": {
-      "dependsOn": ["^format"],
+      "cache": false,
       "outputs": []
     },
     "check": {
-      "dependsOn": ["^check"],
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "build"],
       "outputs": []
     }
   }

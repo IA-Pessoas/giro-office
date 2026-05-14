@@ -1,183 +1,215 @@
 ---
-description: Testes unitários em serviços Node.js/Express com node:test + tsx
-globs: "**/*.test.ts"
+description: Padrao de testes em servicos Node.js/Express com Vitest
+globs:
+  - "**/*.test.ts"
 alwaysApply: false
 ---
 
-# Testes unitários
+# Testes
 
-## Decisão padrão do workspace
+## Decisao padrao do workspace
 
-* O padrão do monorepo para testes unitários em serviços **Node.js + Express + TypeScript** deve ser **`node:test`** como framework de testes.
-* Para executar arquivos `.ts` sem etapa prévia de build, usar **`tsx --test`**.
-* **Não introduzir Jest por padrão**. Jest só deve ser adotado se houver uma necessidade explícita que o stack atual não cubra bem (ex.: ecossistema legado já dependente de Jest, snapshots como prática central, ou forte dependência de APIs específicas do Jest).
+- O padrao atual do monorepo para testes em servicos Node.js + Express + TypeScript e **Vitest**.
+- Nao introduzir `node:test`, Jest ou outro runner como novo padrao sem necessidade explicita.
+- Se um pacote ja usar Vitest, manter Vitest.
 
-## Quando usar este padrão
+## Runner e scripts
 
-* Serviços backend em Node.js.
-* Regras de negócio, camadas de aplicação, utilitários e adaptadores.
-* Testes HTTP leves contra `createApp()` ou servidor efêmero, quando isso já fizer parte do padrão do pacote.
+- O script padrao dos pacotes deve usar `vitest run`.
+- Watch local pode usar `vitest`.
+- O pacote pode usar `pnpm exec vitest run` ou `vitest run`, conforme a forma ja adotada nele.
+- Type-check continua separado com `tsc --noEmit` ou script equivalente.
 
-## Runner e script (`package.json`)
+Exemplos validos:
 
-* Comando padrão nos microservices: **`tsx --test`**.
-* O script de teste deve refletir exatamente onde os arquivos do pacote vivem:
+```json
+{
+  "scripts": {
+    "test": "pnpm exec vitest run",
+    "test:watch": "pnpm exec vitest"
+  }
+}
+```
 
-  * testes em `src/`: **`"test": "tsx --test src/**/*.test.ts"`**
-  * testes em `tests/`: **`"test": "tsx --test tests/**/*.test.ts"`**
-* Não misturar `src/**/*.test.ts` e `tests/**/*.test.ts` no mesmo pacote sem motivo claro.
-* Cada pacote deve escolher **um padrão principal** e manter consistência.
-* Se houver watch local de desenvolvimento, preferir um script separado em vez de poluir `test`:
+ou
 
-  * **`"test:watch": "tsx --test --watch src/**/*.test.ts"`** ou equivalente para `tests/`
-* Como `tsx` **não faz type-check**, o pacote ou workspace deve ter checagem de tipos separada com `tsc --noEmit` ou script equivalente.
+```json
+{
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}
+```
 
 ## Imports e estilo
 
-* Usar:
+- Usar imports do `vitest` quando necessario:
 
 ```ts
-import test from "node:test";
-import assert from "node:assert/strict";
+import { describe, expect, it, vi } from "vitest";
 ```
 
-* Quando necessário, usar APIs nativas do runner (`before`, `after`, `beforeEach`, `afterEach`, `mock`) a partir de `node:test`.
-* Imports locais devem seguir o padrão ESM do workspace, incluindo extensão **`.js`** quando exigido pela configuração do projeto.
-* Formatação e lint seguem o padrão do workspace (**Biome**).
+- Imports locais devem seguir o padrao ESM do workspace, incluindo extensao `.js` quando aplicavel.
+- Formatação e lint seguem o padrao do workspace.
 
-## Organização dos testes
+## Organizacao dos testes
 
-* Nome do arquivo: **`*.test.ts`**.
-* A descrição do `test(...)` deve ler como comportamento observável, não como detalhe interno de implementação.
-* Pode ser em português ou inglês, mas o arquivo deve manter consistência.
-* Preferir co-localização perto do código (`src/`) quando isso melhorar manutenção.
-* Preferir `tests/` quando o pacote quiser separar claramente código de produção e testes. O importante é consistência por pacote.
+- O padrao oficial do workspace para servicos e `*.test.ts`.
+- Nao criar novos arquivos `*.spec.ts`.
+- A descricao dos casos deve refletir comportamento observavel.
+- Pode ser em portugues ou ingles, mas manter consistencia no arquivo e no pacote.
+- Em servicos, os testes devem ficar em `src/test/`.
+- O formato de referencia e o `project-service`.
+- Evitar misturar `src/test/`, `tests/` e outras pastas no mesmo pacote.
+
+## Estrutura por modulo
+
+- Para cada modulo principal com rota HTTP, criar dois arquivos separados:
+  - um teste de service
+  - um teste de route
+- O par padrao deve seguir o formato:
+  - `camelCaseService.test.ts`
+  - `camelCase.routes.test.ts`
+- Exemplo de referencia real:
+  - `projectCrudService.test.ts`
+  - `projectCrud.routes.test.ts`
+- Nao concentrar todos os testes de um servico em um unico arquivo monolitico.
+- Nao misturar testes de service e testes de rota no mesmo arquivo.
+- Helpers compartilhados de teste podem ficar em `src/test/`, por exemplo:
+  - `envBootstrap.ts`
+  - `camelCaseTestUtils.ts`
+
+## Escopo dos testes por tipo
+
+### `camelCaseService.test.ts`
+
+- Deve testar regra de negocio da classe ou modulo de service.
+- Deve mockar dependencias de borda, como Prisma, HTTP, storage, fila ou providers externos.
+- Nao deve subir app HTTP nem depender de `supertest` salvo necessidade muito especifica.
+
+### `camelCase.routes.test.ts`
+
+- Deve testar o contrato HTTP da rota.
+- Deve exercitar o `app.ts` ou o router montado no `app.ts`, preferindo `supertest`.
+- Deve validar status, body, headers relevantes, autenticacao, validacao e serializacao de erro.
+- Deve mockar services e middlewares externos quando isso isolar melhor o contrato da rota.
+
+## Bootstrap para testes
+
+- Quando o pacote precisar de variaveis minimas antes de importar modulos de producao, criar `src/test/envBootstrap.ts`.
+- Importar esse bootstrap no topo dos testes que dependem desse ambiente, como no `project-service`.
+- O objetivo e impedir acoplamento acidental a `.env` real ou infraestrutura externa.
 
 ## O que cobrir
 
 ### Services e application layer
 
-* Regras de negócio.
-* Casos de sucesso.
-* Ramos de erro.
-* Validações.
-* Mapeamentos e normalizações.
-* Comportamento com dependências mockadas/stubadas.
-* Falhas que devem lançar `ServiceError`, validando o que realmente importa:
+- Regras de negocio.
+- Casos de sucesso.
+- Ramos de erro.
+- Validacoes.
+- Mapeamentos e normalizacoes.
+- Comportamento com dependencias mockadas ou stubadas.
+- Lancamento de `ServiceError` quando isso fizer parte do contrato.
 
-  * tipo do erro;
-  * `statusCode`, quando relevante;
-  * mensagem, apenas quando a mensagem fizer parte do contrato.
+### Rotas e app HTTP
 
-### Rotas / app HTTP
+- Status HTTP.
+- Body.
+- Headers relevantes.
+- Comportamento para entrada invalida.
+- Fluxo via `createApp()` ou app factory equivalente, sem infraestrutura real desnecessaria.
+- Servidor em porta efemera apenas quando realmente necessario.
 
-* Cobrir contrato HTTP quando o pacote já adota esse estilo:
+## Smoke end-to-end do workspace
 
-  * status;
-  * body;
-  * headers relevantes;
-  * comportamento para entrada inválida.
-* Preferir testar a app criada por `createApp()` sem subir infraestrutura real desnecessária.
-* Subir servidor em porta efêmera só quando realmente necessário para validar o fluxo.
+- O smoke oficial do workspace vive em:
+  - `scripts/all-services-smoke.mjs`
+  - `scripts/all-services-smoke.manifest.mjs`
+  - `scripts/check-smoke-spec-coverage.mjs`
+- Toda rota nova descrita no `spec.ts` do servico deve ser adicionada ao manifesto do smoke.
+- Ao criar um servico novo exposto via HTTP, incluir tambem seu `spec.ts` em `specFiles` no manifesto para que `pnpm smoke:coverage` compare OpenAPI x smoke.
+- O padrao por rota (`service|method|path`) e:
+  - exatamente 1 expectativa `good`
+  - ao menos 1 expectativa `bad`
+  - so usar `pairCoverageExempt` nas excecoes ja existentes de infraestrutura/bootstrap
+- O caso `good` deve representar o caminho feliz real da rota:
+  - usar o status de sucesso correto do contrato (`200` por padrao, `201` em criacoes, ou excecao documentada)
+  - manter `expectEnvelope` ativo quando a rota segue o envelope padrao de sucesso
+  - validar o path publico real (`gateway`) ou interno (`direct`) conforme o contrato
+- O caso `bad` deve cobrir pelo menos uma falha real do contrato HTTP, priorizando:
+  - `400` para body/query/params invalidos
+  - `401` para ausencia de autenticacao ou token invalido
+  - `403` para permissao insuficiente
+  - `404` para recurso inexistente
+  - `409` para conflito de dominio
+- Respostas de sucesso do smoke devem seguir o envelope compartilhado do workspace:
+  - `{ success: true, data: ... }`
+- Respostas de erro do contrato continuam seguindo o envelope compartilhado do workspace:
+  - `{ success: false, error: string, code: string, requestId?: string }`
+- No smoke, todo caso `bad` deve ao menos deixar `expectedStatus` e `expectedLabel` coerentes com esse contrato; quando for necessario validar o corpo de erro em detalhe, complementar com teste de rota.
+- So usar `expectEnvelope: false` quando a rota realmente nao seguir o envelope compartilhado atual e isso fizer parte do contrato existente.
+- Preserve a geracao automatica de casos negativos ja existente para autenticacao/autorizacao quando ela representar corretamente o contrato; so criar handler `bad` explicito quando a falha for especifica da rota ou quando o caso automatico nao for suficiente.
+- Em entradas explicitas do manifesto, manter claro:
+  - `expectedStatus` com o(s) status aceito(s)
+  - `expectedLabel` descrevendo o resultado esperado
+  - `specOperation: false` para cenarios negativos ou excecoes fora do contrato OpenAPI principal
+- Depois de alterar o manifesto ou qualquer `spec.ts`, rodar `pnpm smoke:coverage`.
 
-## O que evitar em teste unitário
+## O que evitar
 
-* Banco real.
-* Rede real.
-* Fila real.
-* Serviços externos reais.
-* Arquivos globais compartilhados entre testes sem isolamento.
-* Dependência de hora do sistema sem controle explícito.
-* `console.log` como substituto de assert.
-* Assert em texto de log, salvo quando log for parte do comportamento contratado.
-* Teste acoplado a detalhes internos triviais de implementação.
+- Banco real.
+- Rede real.
+- Fila real.
+- Servicos externos reais.
+- Dependencia de tempo sem controle explicito.
+- `console.log` no lugar de assert.
+- Testes acoplados a detalhes internos triviais.
+- Mockar agressivamente o que poderia ser exercitado de forma simples e deterministica.
 
-## Tratamento de erros nos testes
+## Mocks e spies
 
-* Para falhas assíncronas, usar **`assert.rejects`**.
-* Para falhas síncronas, usar **`assert.throws`**.
-* Quando o contrato exigir `ServiceError`, validar primeiro o tipo e o status; validar mensagem apenas se ela for relevante para o contrato.
-
-Exemplo:
-
-```ts
-await assert.rejects(async () => execute(input), (err) => {
-  assert.ok(err instanceof ServiceError);
-  assert.equal(err.statusCode, 400);
-  return true;
-});
-```
+- Preferir `vi.fn()`, `vi.spyOn()` e injeção de dependencias nas bordas do sistema.
+- Mockar banco, HTTP, storage, filas e providers externos.
+- Nao transformar o teste em uma reimplementacao do sistema com mocks frageis.
 
 ## Isolamento e limpeza
 
-* Cada teste deve poder rodar isoladamente.
-* Liberar recursos ao final:
+- Cada teste deve rodar isoladamente.
+- Liberar servidores, timers, listeners e estado global alterado.
+- Evitar vazamento entre casos.
+- Preferir fixtures locais e explicitas.
 
-  * servidores HTTP;
-  * timers;
-  * listeners;
-  * mocks temporários;
-  * estado global alterado durante o teste.
-* Evitar vazamento de estado entre casos.
-* Preferir dados de teste explícitos e locais ao caso de teste.
+## Qualidade da suite
 
-## Mocks, stubs e dependências
+- Testes devem ser rapidos, deterministicos, legiveis e independentes.
+- Cobertura e sinal auxiliar; priorizar risco, contrato e comportamento critico.
+- Cada teste deve ter motivo claro para existir.
 
-* Preferir injeção de dependência sempre que possível.
-* Mockar nas bordas: banco, HTTP, filas, storage, providers externos.
-* Não mockar agressivamente o que poderia ser exercitado como unidade real e barata.
-* O objetivo do teste unitário é validar comportamento da unidade, não reimplementar o sistema inteiro com mocks frágeis.
+## Execucao no monorepo
 
-## Qualidade da suíte
-
-* Testes devem ser:
-
-  * rápidos;
-  * determinísticos;
-  * legíveis;
-  * independentes.
-* Cada teste deve ter um motivo claro para existir.
-* Evitar casos redundantes que testam a mesma regra com nomes diferentes.
-* Cobertura é sinal auxiliar, não objetivo principal. Priorizar risco e comportamento crítico.
-
-## Quando considerar Jest
-
-* Só considerar Jest se houver ganho concreto e explícito, por exemplo:
-
-  * base já fortemente acoplada a Jest;
-  * necessidade real de snapshots como prática recorrente;
-  * dependência de matchers/plugins específicos do ecossistema Jest;
-  * time já operando em massa com tooling Jest e custo de mudança maior que o benefício.
-* Na ausência desses fatores, manter **`node:test` + `tsx`**.
-
-## Exemplo mínimo
-
-```ts
-import assert from "node:assert/strict";
-import test from "node:test";
-
-test("soma 1 + 1 corretamente", () => {
-  assert.equal(1 + 1, 2);
-});
-```
-
-## Execução no monorepo
-
-* Rodar testes de um pacote:
+- Rodar testes de um pacote:
 
 ```bash
 pnpm --filter @workspace/<nome-do-pacote> test
 ```
 
-* Rodar checagem de tipos separadamente no pacote ou no workspace, já que `tsx` não faz type-check.
+- Rodar type-check separadamente no pacote ou no workspace.
 
-## Diretriz prática para geração de código
+## Diretriz pratica para geracao de codigo
 
 Ao criar ou alterar testes neste workspace:
 
-* use **`node:test`**;
-* use **`node:assert/strict`**;
-* respeite o padrão de localização de testes já adotado pelo pacote;
-* não introduza Jest/Vitest sem pedido explícito;
-* mantenha os testes pequenos, determinísticos e focados em comportamento observável;
-* para código HTTP, teste contrato; para services, teste regra de negócio e falhas.
+- use Vitest;
+- use `*.test.ts`;
+- coloque os testes em `src/test/`;
+- siga o modelo do `project-service`;
+- para cada modulo principal de rota, crie um par:
+  - `camelCaseService.test.ts`
+  - `camelCase.routes.test.ts`
+- prefira `describe`, `it`, `expect` e `vi` quando fizer sentido;
+- mantenha os testes focados em comportamento observavel;
+- para codigo HTTP, teste contrato;
+- para services, teste regra de negocio, falhas e integracoes mockadas nas bordas;
+- ao criar rota nova em servico HTTP, atualize tambem o smoke manifesto do workspace e preserve o pareamento `good`/`bad` por rota.

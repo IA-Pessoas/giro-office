@@ -20,7 +20,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
       title: "user-service",
       version: "1.0.0",
       description:
-        "Autenticação, usuários e permissões. Rotas autenticadas costumam receber JWT via gateway; /me usa o header x-auth-user-id encaminhado.",
+        "Autenticação, usuários e permissões. Rotas autenticadas aceitam Bearer JWT (mesmo segredo que o gateway) ou, em chamadas internas, o token de serviço (`x-internal-service-token` igual a AUDIT_SERVICE_TOKEN) com `x-auth-user-id` e `x-auth-organization-id`, como o gateway encaminha.",
     },
     servers: [{ url: baseUrl }],
     tags: [
@@ -35,11 +35,6 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
-        },
-        forwardedAuthUserId: {
-          type: "apiKey",
-          in: "header",
-          name: "x-auth-user-id",
         },
       },
       schemas: {
@@ -60,7 +55,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/session": {
+      "/user/session": {
         post: {
           tags: ["Auth"],
           summary: "Login (criar sessão)",
@@ -88,7 +83,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/start-config": {
+      "/user/start-config": {
         post: {
           tags: ["Auth"],
           summary: "Primeira configuração (bootstrap)",
@@ -97,17 +92,17 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/me": {
+      "/user/me": {
         get: {
           tags: ["Auth"],
-          summary: "Usuário autenticado (via header encaminhado)",
-          security: [{ forwardedAuthUserId: [] }],
+          summary: "Usuário autenticado (JWT ou contexto encaminhado pelo gateway)",
+          security: bearer,
           responses: {
             "200": { description: "Dados do usuário", ...successJson },
           },
         },
       },
-      "/users": {
+      "/user": {
         get: {
           tags: ["Users"],
           summary: "Listar usuários",
@@ -175,7 +170,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/users/{id}": {
+      "/user/{id}": {
         get: {
           tags: ["Users"],
           summary: "Buscar usuário por ID",
@@ -247,7 +242,22 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/users/{id}/photo": {
+      "/user/{id}/photo": {
+        get: {
+          tags: ["Users"],
+          summary: "Obter URL pública da foto do usuário",
+          description:
+            "Retorna no envelope de sucesso `data.url` com a URL pública armazenada em `photo_url` (ex.: Supabase Storage). Se não houver URL pública, responde 404.",
+          security: bearer,
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": {
+              description: "URL pública da foto",
+              ...successJson,
+            },
+            "404": { description: "Usuário ou foto não encontrados" },
+          },
+        },
         post: {
           tags: ["Users"],
           summary: "Upload de foto do usuário",
@@ -280,7 +290,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/permission/{userId}": {
+      "/user/permission/{userId}": {
         get: {
           tags: ["Permission"],
           summary: "Buscar permissões do usuário",

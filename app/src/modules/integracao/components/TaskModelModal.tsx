@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { IoAdd, IoTrash } from "react-icons/io5";
 import { toast } from 'react-toastify';
 import { setupAPIClient } from '@shared/services/api';
+import { extractUsersList } from '@modules/users/services/userService';
 import { integracaoService } from '../services/integracaoService';
-import type { TaskModel, TaskDependent } from '../types';
+import type { TaskModel } from '../types';
 
 // --- Chakra shims local (para remover dependência de @chakra-ui/react sem reescrever toda a UI) ---
 // Observação: estes shims aplicam apenas um subconjunto de estilo via inline; a lógica/estrutura permanece.
@@ -250,14 +251,14 @@ export function TaskModelModal({ isOpen, onClose, initialData, onSave }: ModalPr
 
                 // Busca usuários e departamentos
                 const [usersRes, depsRes, tasksRes] = await Promise.all([
-                    apiClient.get('/users', { params: { status: 'Ativo' } }),
+                    apiClient.get('/user/users', { params: { status: 'Ativo' } }),
                     apiClient.get('/departments', { params: { status: 'Ativo' } }),
                     // Busca tarefas para popular o select de dependentes
                     // Ajuste a rota se necessário, estou usando a listagem padrão
-                    apiClient.get('/integracao-tasksModel') 
+                    apiClient.get('/task/models') 
                 ]);
 
-                setUsers(usersRes.data);
+                setUsers(extractUsersList(usersRes.data));
                 setDepartments(depsRes.data);
                 setAllTasks(tasksRes.data); // Assume que retorna array com id e name
 

@@ -1,189 +1,219 @@
-import { createSuccessResponse, error as logError, ServiceError } from "@workspace/shared";
-import { createPhotoUploadMiddleware } from "@workspace/shared/upload";
-import { Router } from "express";
+import {
+  createSuccessResponse,
+  error as logError,
+  parseWithZod,
+  requireAuthenticatedRequestContext,
+  ServiceError,
+} from "@workspace/shared";
+import { createPhotoUploadMiddleware, validateUploadFileSignature } from "@workspace/shared/upload";
 import type { NextFunction, Request, Response } from "express";
-import { StorageService } from "../services/StorageService.js";
-import { UserService } from "../services/UserService.js";
+import { Router } from "express";
+
+import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import {
+  createUserBodySchema,
+  listUsersQuerySchema,
+  updateUserBodySchema,
+  userIdParamsSchema,
+} from "../schemas/user.schemas.js";
+import { StorageService } from "../services/storageService.js";
+import { UserService } from "../services/userService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const upload = createPhotoUploadMiddleware();
 const userService = new UserService();
 const storageService = new StorageService();
+const ADMIN_PERMISSION = 2;
 
-router.get("/", async (request: Request, response: Response, next: NextFunction) => {
+function requireUserAuth(request: Request) {
+  return requireAuthenticatedRequestContext(request, {
+    userIdMessage: "Não autenticado.",
+    organizationIdMessage: "Não autenticado.",
+  });
+}
+
+function requireAdminUserAuth(request: Request) {
+  const auth = requireUserAuth(request);
+  if (typeof auth.permission !== "number" || auth.permission < ADMIN_PERMISSION) {
+    throw new ServiceError(403, "Usuário não tem permissão.");
+  }
+  return auth;
+}
+
+function requireAdminUserAuthMiddleware(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
   try {
-    const skip = Number(request.query.skip) || 0;
-    const take = Number(request.query.take) || 20;
-
-    const result = await userService.list({ skip, take });
-
-    response.json(createSuccessResponse(result));
+    requireAdminUserAuth(request);
+    next();
   } catch (err) {
-    logError("Erro ao listar usuários", { err });
     next(err);
   }
-});
+}
 
-router.get("/:id", async (request: Request, response: Response, next: NextFunction) => {
-  try {
-    const user = await userService.getById(request.params.id);
+router.get(
+  "/",
+  isAuthenticated,
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const auth = requireAdminUserAuth(request);
+      const { skip, take } = parseWithZod(listUsersQuerySchema, request.query);
+      const result = await userService.list({ skip, take, organizationId: auth.organization_id });
 
-    response.json(createSuccessResponse(user));
-  } catch (err) {
-    logError("Erro ao buscar usuário por ID", { err });
-    next(err);
-  }
-});
-
-router.post("/", async (request: Request, response: Response, next: NextFunction) => {
-  try {
-    const {
-      name,
-      login,
-      password,
-      department_id,
-      permission,
-      status,
-      photo_url,
-      invited_by,
-      organization_id,
-      type,
-      first_owner_flag,
-      modules,
-    } = request.body;
-
-    if (!name || !login || !password || !department_id || permission === undefined) {
-      throw new ServiceError(400, "Campos obrigatórios: name, login, password, department_id, permission.");
+      response.json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao listar usuarios", { err });
+      next(err);
     }
+  },
+);
 
-    if ((type || modules) && !organization_id) {
-      throw new ServiceError(400, "organization_id é obrigatório quando type ou modules forem enviados.");
+router.get(
+  "/:id/photo",
+  isAuthenticated,
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const auth = requireAdminUserAuth(request);
+      const { id } = parseWithZod(userIdParamsSchema, request.params);
+      const user = await userService.getById(id, auth.organization_id);
+      const publicPhotoUrl = storageService.readUserPhoto(user.photo_url);
+
+      if (!publicPhotoUrl) {
+        throw new ServiceError(404, "Foto nao encontrada.");
+      }
+
+      response.json(createSuccessResponse({ url: publicPhotoUrl }));
+    } catch (err) {
+      logError("Erro ao obter foto do usuario", { err });
+      next(err);
     }
+  },
+);
 
-    const validTypes = ["admin", "owner", "user"] as const;
-    if (type && !validTypes.includes(type)) {
-      throw new ServiceError(400, "type deve ser admin, owner ou user.");
+router.get(
+  "/:id",
+  isAuthenticated,
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const auth = requireAdminUserAuth(request);
+      const { id } = parseWithZod(userIdParamsSchema, request.params);
+      const user = await userService.getById(id, auth.organization_id);
+
+      response.json(createSuccessResponse(user));
+    } catch (err) {
+      logError("Erro ao buscar usuario por ID", { err });
+      next(err);
     }
+  },
+);
 
-    if (first_owner_flag === true && type !== "owner") {
-      throw new ServiceError(
-        400,
-        "first_owner_flag só pode ser true quando type for owner.",
-      );
+router.post(
+  "/",
+  isAuthenticated,
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const auth = requireAdminUserAuth(request);
+      const body = parseWithZod(createUserBodySchema, request.body);
+      if (body.organization_id !== undefined && body.organization_id !== auth.organization_id) {
+        throw new ServiceError(403, "Organização da requisição não confere.");
+      }
+
+      const user = await userService.create({
+        ...body,
+        organization_id: auth.organization_id,
+        first_owner_flag: body.first_owner_flag ?? false,
+      });
+
+      response.status(201).json(createSuccessResponse(user));
+    } catch (err) {
+      logError("Erro ao criar usuario", { err });
+      next(err);
     }
+  },
+);
 
-    const user = await userService.create({
-      name,
-      login,
-      password,
-      department_id,
-      permission,
-      status,
-      photo_url,
-      invited_by,
-      organization_id,
-      type,
-      first_owner_flag: first_owner_flag ?? false,
-      modules,
-    });
+router.patch(
+  "/:id",
+  isAuthenticated,
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const auth = requireAdminUserAuth(request);
+      const { id } = parseWithZod(userIdParamsSchema, request.params);
+      const body = parseWithZod(updateUserBodySchema, request.body);
 
-    response.status(201).json(createSuccessResponse(user));
-  } catch (err) {
-    logError("Erro ao criar usuário", { err });
-    next(err);
-  }
-});
+      const user = await userService.update(id, body, auth.organization_id);
 
-router.patch("/:id", async (request: Request, response: Response, next: NextFunction) => {
-  try {
-    const {
-      name,
-      login,
-      password,
-      department_id,
-      permission,
-      status,
-      photo_url,
-      organization_id,
-      type,
-      first_owner_flag,
-      modules,
-    } = request.body;
-
-    const validTypes = ["admin", "owner", "user"] as const;
-    if (type !== undefined && type !== null && !validTypes.includes(type)) {
-      throw new ServiceError(400, "type deve ser admin, owner ou user.");
+      response.json(createSuccessResponse(user));
+    } catch (err) {
+      logError("Erro ao atualizar usuario", { err });
+      next(err);
     }
+  },
+);
 
-    if (first_owner_flag === true && type !== "owner") {
-      throw new ServiceError(
-        400,
-        "first_owner_flag só pode ser true quando type for owner.",
-      );
+router.post(
+  "/:id/photo",
+  isAuthenticated,
+  requireAdminUserAuthMiddleware,
+  upload.single("file"),
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const auth = requireAdminUserAuth(request);
+      const { id } = parseWithZod(userIdParamsSchema, request.params);
+
+      if (!request.file) {
+        throw new ServiceError(400, "Arquivo de imagem e obrigatorio.");
+      }
+
+      validateUploadFileSignature(request.file);
+      const photoUrl = await storageService.uploadUserPhoto(request.file, id);
+      const user = await userService.update(id, { photo_url: photoUrl }, auth.organization_id);
+
+      response.json(createSuccessResponse(user));
+    } catch (err) {
+      logError("Erro ao fazer upload de foto", { err });
+      next(err);
     }
+  },
+);
 
-    const user = await userService.update(request.params.id, {
-      name,
-      login,
-      password,
-      department_id,
-      permission,
-      status,
-      photo_url,
-      organization_id,
-      type,
-      first_owner_flag,
-      modules,
-    });
+router.delete(
+  "/:id/photo",
+  isAuthenticated,
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const auth = requireAdminUserAuth(request);
+      const { id } = parseWithZod(userIdParamsSchema, request.params);
 
-    response.json(createSuccessResponse(user));
-  } catch (err) {
-    logError("Erro ao atualizar usuário", { err });
-    next(err);
-  }
-});
+      await storageService.deleteUserPhoto(id);
+      const user = await userService.update(id, { photo_url: null }, auth.organization_id);
 
-router.post("/:id/photo", upload.single("file"), async (request: Request, response: Response, next: NextFunction) => {
-  try {
-    if (!request.file) {
-      throw new ServiceError(400, "Arquivo de imagem é obrigatório.");
+      response.json(createSuccessResponse(user));
+    } catch (err) {
+      logError("Erro ao excluir foto", { err });
+      next(err);
     }
+  },
+);
 
-    const photoUrl = await storageService.uploadUserPhoto(request.file, request.params.id);
-    const user = await userService.update(request.params.id, { photo_url: photoUrl });
+router.delete(
+  "/:id",
+  isAuthenticated,
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const auth = requireAdminUserAuth(request);
+      const { id } = parseWithZod(userIdParamsSchema, request.params);
 
-    response.json(createSuccessResponse(user));
-  } catch (err) {
-    logError("Erro ao fazer upload de foto", { err });
-    next(err);
-  }
-});
+      await userService.delete(id, auth.organization_id);
 
-router.delete("/:id/photo", async (request: Request, response: Response, next: NextFunction) => {
-  try {
-    const { id } = request.params;
-
-    await storageService.deleteUserPhoto(id);
-    const user = await userService.update(id, { photo_url: null });
-
-    response.json(createSuccessResponse(user));
-  } catch (err) {
-    logError("Erro ao excluir foto", { err });
-    next(err);
-  }
-});
-
-router.delete("/:id", async (request: Request, response: Response, next: NextFunction) => {
-  try {
-    await userService.delete(request.params.id);
-
-    response.json(
-      createSuccessResponse({ message: "Usuário desativado com sucesso." }),
-    );
-  } catch (err) {
-    logError("Erro ao desativar usuário", { err });
-    next(err);
-  }
-});
+      response.json(createSuccessResponse({ message: "Usuario desativado com sucesso." }));
+    } catch (err) {
+      logError("Erro ao desativar usuario", { err });
+      next(err);
+    }
+  },
+);
 
 export { router as userRoutes };

@@ -7,6 +7,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
+import type { ClientRouterDeps } from "../clientRouterDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   ADMIN_PERMISSION,
@@ -15,15 +16,15 @@ import {
   createClientBodySchema,
   listClientsQuerySchema,
   updateClientBodySchema,
-} from "../schemas/client.schema.js";
-import { type ClientRouterDeps, resolveOrganizationId } from "./clientRouteHelpers.js";
+} from "../schemas/client.schemas.js";
+import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 export function createClientCoreRouter(deps: ClientRouterDeps): Router {
   const { clientService } = deps;
   const router: ReturnType<typeof Router> = Router();
 
   router.get(
-    "/clients",
+    "/list",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -46,7 +47,7 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
   );
 
   router.post(
-    "/clients/:id/activate",
+    "/:id/activate",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -62,7 +63,7 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
   );
 
   router.delete(
-    "/clients/:id",
+    "/:id",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -81,7 +82,7 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
   );
 
   router.get(
-    "/clients/:id",
+    "/:id",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -97,16 +98,16 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
   );
 
   router.post(
-    "/clients",
+    "/",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(createClientBodySchema, request.body) as CreateClientBody;
-        const tokenOrg = request.organization_id?.trim() ? request.organization_id : undefined;
-        if (tokenOrg && tokenOrg !== body.organization_id) {
+        const organizationId = resolveOrganizationId(request, undefined);
+        if (body.organization_id && body.organization_id !== organizationId) {
           throw new ServiceError(403, "Não é permitido criar cliente em outra organização.");
         }
-        const client = await clientService.create(body);
+        const client = await clientService.create({ ...body, organization_id: organizationId });
         response.status(201).json(createSuccessResponse(client));
       } catch (err) {
         logError("Erro ao criar cliente", { err });
@@ -116,7 +117,7 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
   );
 
   router.patch(
-    "/clients/:id",
+    "/:id",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {

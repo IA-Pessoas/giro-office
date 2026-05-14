@@ -12,6 +12,17 @@ export function getSingleQueryValue(value: unknown): string | undefined {
   return undefined;
 }
 
+export function getSingleTrimmedQueryValue(value: unknown): string | undefined {
+  const rawValue = getSingleQueryValue(value);
+
+  if (typeof rawValue !== "string") {
+    return undefined;
+  }
+
+  const trimmed = rawValue.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
 export function parsePositiveInteger(
   value: unknown,
   fieldName: string,

@@ -1,4 +1,16 @@
 import { useState } from 'react';
+import {
+  RhHolidaysSection,
+  RhPointSection,
+  RhRequestsSection,
+  formatRhDateTime,
+  getRhRequestStatusClassName,
+  getRhRequestStatusLabel,
+  getRhRequestUrgencyClassName,
+  getRhRequestUrgencyLabel,
+  useRhRequests,
+} from '@modules/rh';
+import { Dialog } from '@shared/components';
 import { 
   Users,
   Plus,
@@ -10,8 +22,6 @@ import {
   FileText,
   Award,
   AlertCircle,
-  CheckCircle,
-  XCircle,
   MoreVertical,
   Mail,
   Phone,
@@ -55,23 +65,13 @@ interface Employee {
   salary?: number;
   performance?: number;
 }
-
-interface Request {
-  id: string;
-  employee: string;
-  type: 'vacation' | 'leave' | 'medical' | 'reimbursement';
-  status: 'pending' | 'approved' | 'rejected';
-  date: string;
-  startDate?: string;
-  endDate?: string;
-  description: string;
-}
-
 export function RH() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'requests' | 'evaluations' | 'timetracking'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'requests' | 'evaluations' | 'point'>('dashboard');
+  const [isHolidaysManagerOpen, setIsHolidaysManagerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const requestsSummaryQuery = useRhRequests();
 
   const employees: Employee[] = [
     {
@@ -166,75 +166,11 @@ export function RH() {
     },
   ];
 
-  const requests: Request[] = [
-    {
-      id: '1',
-      employee: 'João Silva',
-      type: 'vacation',
-      status: 'pending',
-      date: '2026-03-15',
-      startDate: '2026-04-01',
-      endDate: '2026-04-15',
-      description: 'Férias programadas'
-    },
-    {
-      id: '2',
-      employee: 'Ana Costa',
-      type: 'leave',
-      status: 'approved',
-      date: '2026-03-10',
-      startDate: '2026-03-20',
-      endDate: '2026-03-20',
-      description: 'Assuntos pessoais'
-    },
-    {
-      id: '3',
-      employee: 'Carlos Oliveira',
-      type: 'medical',
-      status: 'approved',
-      date: '2026-03-12',
-      startDate: '2026-03-13',
-      endDate: '2026-03-14',
-      description: 'Atestado médico - Consulta'
-    },
-    {
-      id: '4',
-      employee: 'Maria Santos',
-      type: 'reimbursement',
-      status: 'pending',
-      date: '2026-03-16',
-      description: 'Reembolso de transporte - R$ 250,00'
-    },
-    {
-      id: '5',
-      employee: 'Pedro Alves',
-      type: 'vacation',
-      status: 'rejected',
-      date: '2026-03-08',
-      startDate: '2026-03-25',
-      endDate: '2026-04-05',
-      description: 'Período indisponível'
-    },
-  ];
-
   const statusConfig = {
     active: { label: 'Ativo', color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300', icon: UserCheck },
     vacation: { label: 'Férias', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', icon: Calendar },
     leave: { label: 'Afastado', color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300', icon: Clock },
     inactive: { label: 'Inativo', color: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300', icon: UserX },
-  };
-
-  const requestTypeConfig = {
-    vacation: { label: 'Férias', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', icon: Calendar },
-    leave: { label: 'Folga', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300', icon: Clock },
-    medical: { label: 'Atestado', color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300', icon: FileText },
-    reimbursement: { label: 'Reembolso', color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300', icon: TrendingUp },
-  };
-
-  const requestStatusConfig = {
-    pending: { label: 'Pendente', color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300', icon: Clock },
-    approved: { label: 'Aprovada', color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300', icon: CheckCircle },
-    rejected: { label: 'Rejeitada', color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300', icon: XCircle },
   };
 
   const filteredEmployees = employees.filter(emp => {
@@ -252,7 +188,17 @@ export function RH() {
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter(e => e.status === 'active').length;
   const onVacation = employees.filter(e => e.status === 'vacation').length;
-  const pendingRequests = requests.filter(r => r.status === 'pending').length;
+  const rhRequests = requestsSummaryQuery.data ?? [];
+  const pendingRequests = rhRequests.filter(
+    (request) => request.status === 'New' || request.status === 'In_Progress',
+  ).length;
+  const requestsTabCount = rhRequests.length;
+  const recentRequests = [...rhRequests]
+    .sort(
+      (left, right) =>
+        new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime(),
+    )
+    .slice(0, 5);
 
   // Upcoming birthdays (next 30 days)
   const today = new Date();
@@ -310,10 +256,10 @@ export function RH() {
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
               <Users className="w-6 h-6 text-white" />
             </div>
             Recursos Humanos
@@ -322,20 +268,27 @@ export function RH() {
             Gestão completa de colaboradores, solicitações e avaliações
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-lg hover:from-rose-700 hover:to-rose-800 transition-all shadow-md hover:shadow-lg">
-          <Plus className="w-5 h-5" />
-          <span className="font-medium">Novo Colaborador</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsHolidaysManagerOpen(true)}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Gerenciar feriados</span>
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1">
-        <div className="flex items-center gap-1">
+        <div className="overflow-x-auto">
+        <div className="flex min-w-max items-center justify-center gap-1">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
+            className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-5 py-2.5 font-medium transition-all ${
               activeTab === 'dashboard'
-                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
@@ -344,9 +297,9 @@ export function RH() {
           </button>
           <button
             onClick={() => setActiveTab('employees')}
-            className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
+            className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-5 py-2.5 font-medium transition-all ${
               activeTab === 'employees'
-                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
@@ -355,25 +308,25 @@ export function RH() {
           </button>
           <button
             onClick={() => setActiveTab('requests')}
-            className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
+            className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-5 py-2.5 font-medium transition-all ${
               activeTab === 'requests'
-                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
             <FileText className="w-4 h-4 inline-block mr-2" />
             Solicitações
-            {pendingRequests > 0 && (
-              <span className="ml-2 px-2 py-0.5 bg-red-500 text-white rounded-full text-xs">
-                {pendingRequests}
+            {requestsTabCount > 0 && (
+              <span className="ml-2 rounded-full bg-blue-600 px-2 py-0.5 text-xs text-white">
+                {requestsTabCount}
               </span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('evaluations')}
-            className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
+            className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-5 py-2.5 font-medium transition-all ${
               activeTab === 'evaluations'
-                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
@@ -381,16 +334,17 @@ export function RH() {
             Avaliações
           </button>
           <button
-            onClick={() => setActiveTab('timetracking')}
-            className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
-              activeTab === 'timetracking'
-                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
+            onClick={() => setActiveTab('point')}
+            className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-5 py-2.5 font-medium transition-all ${
+              activeTab === 'point'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
             <Clock className="w-4 h-4 inline-block mr-2" />
-            Controle de Ponto
+            Ponto
           </button>
+        </div>
         </div>
       </div>
 
@@ -565,37 +519,41 @@ export function RH() {
                 </h3>
                 <button 
                   onClick={() => setActiveTab('requests')}
-                  className="text-sm text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium"
+                  className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   Ver todas
                 </button>
               </div>
               <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                {requests.slice(0, 5).map((req) => {
-                  const TypeIcon = requestTypeConfig[req.type].icon;
-                  const StatusIcon = requestStatusConfig[req.status].icon;
-                  
-                  return (
-                    <div key={req.id} className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors border border-gray-100 dark:border-gray-700">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900 dark:text-white">{req.employee}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">{req.description}</p>
+                {recentRequests.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-400">
+                    Nenhuma solicitação recente encontrada.
+                  </div>
+                ) : (
+                  recentRequests.map((request) => (
+                    <div key={request.id} className="rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50">
+                      <div className="mb-2 flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-gray-900 dark:text-white">{request.title}</p>
+                          <p className="mt-1 line-clamp-2 text-sm text-gray-600 dark:text-gray-400">
+                            {request.description}
+                          </p>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${requestTypeConfig[req.type].color} flex items-center gap-1`}>
-                          <TypeIcon className="w-3 h-3" />
-                          {requestTypeConfig[req.type].label}
+                        <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                          {formatRhDateTime(request.updated_at)}
                         </span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${requestStatusConfig[req.status].color} flex items-center gap-1`}>
-                          <StatusIcon className="w-3 h-3" />
-                          {requestStatusConfig[req.status].label}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getRhRequestUrgencyClassName(request.urgency)}`}>
+                          {getRhRequestUrgencyLabel(request.urgency)}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getRhRequestStatusClassName(request.status)}`}>
+                          {getRhRequestStatusLabel(request.status)}
                         </span>
                       </div>
                     </div>
-                  );
-                })}
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -717,86 +675,8 @@ export function RH() {
         </div>
       )}
 
-      {/* Requests Tab */}
-      {activeTab === 'requests' && (
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full border-separate border-spacing-y-2 px-2">
-                <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Colaborador</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Tipo</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Período</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Descrição</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((req) => {
-                    const TypeIcon = requestTypeConfig[req.type].icon;
-                    const StatusIcon = requestStatusConfig[req.status].icon;
-                    
-                    return (
-                      <tr
-                        key={req.id}
-                        className="[&>td:first-child]:rounded-l-xl [&>td:last-child]:rounded-r-xl [&>td]:bg-white dark:[&>td]:bg-gray-800 [&>td]:border-y [&>td]:border-gray-200 dark:[&>td]:border-gray-700 [&>td:first-child]:border-l [&>td:last-child]:border-r hover:[&>td]:bg-gray-50 dark:hover:[&>td]:bg-gray-700/50 transition-colors"
-                      >
-                        <td className="px-6 py-4">
-                          <p className="font-semibold text-gray-900 dark:text-white">{req.employee}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${requestTypeConfig[req.type].color} flex items-center gap-1 w-fit`}>
-                            <TypeIcon className="w-3 h-3" />
-                            {requestTypeConfig[req.type].label}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900 dark:text-white">
-                            {req.startDate && req.endDate ? (
-                              <>
-                                {formatDate(req.startDate)} - {formatDate(req.endDate)}
-                              </>
-                            ) : (
-                              <span className="text-gray-500">-</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">{req.description}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${requestStatusConfig[req.status].color} flex items-center gap-1 w-fit`}>
-                            <StatusIcon className="w-3 h-3" />
-                            {requestStatusConfig[req.status].label}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          {req.status === 'pending' ? (
-                            <div className="flex items-center gap-2">
-                              <button className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-md transition-colors">
-                                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                              </button>
-                              <button className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md transition-colors">
-                                <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                              </button>
-                            </div>
-                          ) : (
-                            <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-md transition-colors">
-                              <Eye className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+      {activeTab === 'requests' && <RhRequestsSection />}
+
 
       {/* Evaluations Tab */}
       {activeTab === 'evaluations' && (
@@ -866,140 +746,20 @@ export function RH() {
         </div>
       )}
 
-      {/* Time Tracking Tab */}
-      {activeTab === 'timetracking' && (
-        <div className="space-y-6">
-          {/* P onto Banner */}
-          <div className="bg-gradient-to-r from-rose-500 to-rose-600 rounded-xl p-6 text-white">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <Clock className="w-8 h-8" />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold mb-1">Controle de Ponto</h2>
-                <p className="text-rose-100">Gestão completa de jornada de trabalho e registro de ponto dos colaboradores</p>
-              </div>
-              <button className="px-6 py-3 bg-white text-rose-600 rounded-lg font-semibold hover:bg-rose-50 transition-colors shadow-lg">
-                <Plus className="w-5 h-5 inline-block mr-2" />
-                Registrar Ponto
-              </button>
-            </div>
-          </div>
-
-          {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Presentes Hoje</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">124</p>
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">+8 vs ontem</p>
-                </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                  <UserCheck className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Horas Extras Mês</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">342h</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">15 colaboradores</p>
-                </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                  <Clock className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Ajustes Pendentes</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">8</p>
-                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">Aguardando aprovação</p>
-                </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                  <AlertCircle className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Faltas do Mês</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">12</p>
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">-3 vs mês anterior</p>
-                </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                  <UserX className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Time Records */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <Clock className="w-5 h-5 text-rose-600 dark:text-rose-400" />
-                Registros de Hoje
-              </h3>
-              <input
-                type="date"
-                defaultValue={new Date().toISOString().split('T')[0]}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
-              />
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Colaborador</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Entrada</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Pausa</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Retorno</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Saída</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Horas</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {employees.slice(0, 5).map((emp) => (
-                    <tr key={emp.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full ${emp.color} flex items-center justify-center text-white text-sm font-semibold`}>
-                            {emp.avatar}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900 dark:text-white">{emp.name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{emp.department}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">08:00</td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">12:00</td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">13:00</td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">18:00</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">9h</td>
-                      <td className="px-6 py-4">
-                        <span className="px-2.5 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-medium">
-                          Completo
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+      {activeTab === 'point' && (
+        <RhPointSection />
       )}
+
+      <Dialog
+        open={isHolidaysManagerOpen}
+        onOpenChange={setIsHolidaysManagerOpen}
+        title="Gerenciar feriados"
+        description="Gerenciamento administrativo de feriados do RH"
+        contentClassName="w-[min(92vw,960px)]"
+        bodyClassName="max-h-[78vh] overflow-y-auto"
+      >
+        <RhHolidaysSection />
+      </Dialog>
     </div>
   );
 }

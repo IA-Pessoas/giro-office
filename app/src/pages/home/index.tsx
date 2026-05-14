@@ -94,7 +94,7 @@ export default function Dashboard({ perm }: Props) {
 export const getServerSideProps = canSSRAuth(async (ctx) => {
     try {
         const apiClient = setupAPIClient(ctx);
-        const response = await apiClient.get('/me')
+        const response = await apiClient.get('/user/me')
 
         const responsePerms = await apiClient.get('/permission', {
             params: {

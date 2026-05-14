@@ -6,8 +6,11 @@ import {
   type ListClientsFilters,
   mapSimpleListStatusToDb,
   type UpdateClientBody,
-} from "../schemas/client.schema.js";
-import { buildLegacyListStatusWhere, mergeClientListSearchWhere } from "./clientListQuery.js";
+} from "../schemas/client.schemas.js";
+import {
+  buildLegacyListStatusWhere,
+  mergeClientListSearchWhere,
+} from "./clientListQueryService.js";
 
 export type OrganizationPublic = {
   id: string;
@@ -48,7 +51,11 @@ const organizationSelect = {
   subscription_plan: true,
 } satisfies Prisma.OrganizationSelect;
 
-export const clientWithOrganizationSelect = {
+type OrganizationRow = Prisma.OrganizationGetPayload<{
+  select: typeof organizationSelect;
+}>;
+
+const clientSelect = {
   id: true,
   name: true,
   organization_id: true,
@@ -58,11 +65,10 @@ export const clientWithOrganizationSelect = {
   fantasy_name: true,
   service_unique: true,
   deletion_date: true,
-  organization: { select: organizationSelect },
 } satisfies Prisma.ClientSelect;
 
-type ClientRowWithOrganization = Prisma.ClientGetPayload<{
-  select: typeof clientWithOrganizationSelect;
+type ClientRow = Prisma.ClientGetPayload<{
+  select: typeof clientSelect;
 }>;
 
 const EXTENDED_CLIENT_KEYS = [
@@ -119,7 +125,18 @@ function takeExtendedFields(input: CreateClientBody | UpdateClientBody): Record<
   return out;
 }
 
-function toPublic(row: ClientRowWithOrganization): ClientPublic {
+function toOrganizationPublic(row: OrganizationRow): OrganizationPublic {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    logo_url: row.logo_url,
+    status: row.status,
+    subscription_plan: row.subscription_plan,
+  };
+}
+
+function toPublic(row: ClientRow, organization: OrganizationPublic): ClientPublic {
   return {
     id: row.id,
     name: row.name,
@@ -130,14 +147,7 @@ function toPublic(row: ClientRowWithOrganization): ClientPublic {
     fantasy_name: row.fantasy_name,
     service_unique: row.service_unique ?? false,
     deletion_date: row.deletion_date ? row.deletion_date.toISOString() : null,
-    organization: {
-      id: row.organization.id,
-      name: row.organization.name,
-      slug: row.organization.slug,
-      logo_url: row.organization.logo_url,
-      status: row.organization.status,
-      subscription_plan: row.organization.subscription_plan,
-    },
+    organization,
   };
 }
 
@@ -155,7 +165,7 @@ function buildListStatusWhere(filters: ListClientsFilters): Prisma.ClientWhereIn
 export interface IClientService {
   listByOrganization(organizationId: string, filters: ListClientsFilters): Promise<ClientListPage>;
   getById(id: string, organizationId: string): Promise<ClientPublic | null>;
-  create(input: CreateClientBody): Promise<ClientPublic>;
+  create(input: CreateClientBody & { organization_id: string }): Promise<ClientPublic>;
   update(id: string, organizationId: string, input: UpdateClientBody): Promise<ClientPublic>;
   deactivate(id: string, organizationId: string): Promise<ClientPublic>;
   activate(id: string, organizationId: string): Promise<ClientPublic>;
@@ -163,6 +173,22 @@ export interface IClientService {
 
 export class ClientService implements IClientService {
   constructor(private readonly prisma: PrismaClient) {}
+
+  private async getOrganizationPublic(
+    organizationId: string,
+    notFoundStatusCode = 404,
+  ): Promise<OrganizationPublic> {
+    const row = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: organizationSelect,
+    });
+
+    if (!row) {
+      throw new ServiceError(notFoundStatusCode, "Organização não encontrada.");
+    }
+
+    return toOrganizationPublic(row);
+  }
 
   async listByOrganization(
     organizationId: string,
@@ -176,13 +202,14 @@ export class ClientService implements IClientService {
     const skip = (filters.page - 1) * filters.pageSize;
     const take = filters.pageSize;
 
-    const [rows, total] = await Promise.all([
+    const [organization, rows, total] = await Promise.all([
+      this.getOrganizationPublic(organizationId),
       this.prisma.client.findMany({
         where,
         orderBy: { name: "asc" },
         skip,
         take,
-        select: clientWithOrganizationSelect,
+        select: clientSelect,
       }),
       this.prisma.client.count({ where }),
     ]);
@@ -190,7 +217,7 @@ export class ClientService implements IClientService {
     const hasMore = filters.page * filters.pageSize < total;
 
     return {
-      items: rows.map(toPublic),
+      items: rows.map((row) => toPublic(row, organization)),
       total,
       page: filters.page,
       pageSize: filters.pageSize,
@@ -201,12 +228,18 @@ export class ClientService implements IClientService {
   async getById(id: string, organizationId: string): Promise<ClientPublic | null> {
     const row = await this.prisma.client.findFirst({
       where: { id, organization_id: organizationId },
-      select: clientWithOrganizationSelect,
+      select: clientSelect,
     });
-    return row ? toPublic(row) : null;
+
+    if (!row) {
+      return null;
+    }
+
+    const organization = await this.getOrganizationPublic(organizationId);
+    return toPublic(row, organization);
   }
 
-  async create(input: CreateClientBody): Promise<ClientPublic> {
+  async create(input: CreateClientBody & { organization_id: string }): Promise<ClientPublic> {
     const org = await this.prisma.organization.findUnique({
       where: { id: input.organization_id },
       select: { id: true },
@@ -214,27 +247,29 @@ export class ClientService implements IClientService {
     if (!org) {
       throw new ServiceError(400, "Organização não encontrada.");
     }
-
     const extended = takeExtendedFields(input);
 
-    const row = await this.prisma.client.create({
-      data: {
-        name: input.name,
-        organization_id: input.organization_id,
-        status: input.status,
-        cpf_cnpj: input.cpf_cnpj,
-        company_name: input.company_name ?? null,
-        fantasy_name: input.fantasy_name ?? null,
-        prospecting_status: input.prospecting_status,
-        type: input.type,
-        type_registration: input.type_registration,
-        service_unique: input.service_unique,
-        ...extended,
-      } as Prisma.ClientUncheckedCreateInput,
-      select: clientWithOrganizationSelect,
-    });
+    const [organization, row] = await Promise.all([
+      this.getOrganizationPublic(input.organization_id),
+      this.prisma.client.create({
+        data: {
+          name: input.name,
+          organization_id: input.organization_id,
+          status: input.status,
+          cpf_cnpj: input.cpf_cnpj,
+          company_name: input.company_name ?? null,
+          fantasy_name: input.fantasy_name ?? null,
+          prospecting_status: input.prospecting_status,
+          type: input.type,
+          type_registration: input.type_registration,
+          service_unique: input.service_unique,
+          ...extended,
+        } as Prisma.ClientUncheckedCreateInput,
+        select: clientSelect,
+      }),
+    ]);
 
-    return toPublic(row);
+    return toPublic(row, organization);
   }
 
   async update(id: string, organizationId: string, input: UpdateClientBody): Promise<ClientPublic> {
@@ -247,7 +282,6 @@ export class ClientService implements IClientService {
     }
 
     const extended = takeExtendedFields(input);
-
     const data: Record<string, unknown> = {};
 
     if (input.name !== undefined) {
@@ -288,13 +322,16 @@ export class ClientService implements IClientService {
 
     Object.assign(data, extended);
 
-    const row = await this.prisma.client.update({
-      where: { id },
-      data: data as Prisma.ClientUncheckedUpdateInput,
-      select: clientWithOrganizationSelect,
-    });
+    const [organization, row] = await Promise.all([
+      this.getOrganizationPublic(organizationId),
+      this.prisma.client.update({
+        where: { id },
+        data: data as Prisma.ClientUncheckedUpdateInput,
+        select: clientSelect,
+      }),
+    ]);
 
-    return toPublic(row);
+    return toPublic(row, organization);
   }
 
   async deactivate(id: string, organizationId: string): Promise<ClientPublic> {
@@ -309,13 +346,16 @@ export class ClientService implements IClientService {
       throw new ServiceError(409, "Cliente já está inativo.");
     }
 
-    const row = await this.prisma.client.update({
-      where: { id },
-      data: { status: "Inativo", deletion_date: new Date() },
-      select: clientWithOrganizationSelect,
-    });
+    const [organization, row] = await Promise.all([
+      this.getOrganizationPublic(organizationId),
+      this.prisma.client.update({
+        where: { id },
+        data: { status: "Inativo", deletion_date: new Date() },
+        select: clientSelect,
+      }),
+    ]);
 
-    return toPublic(row);
+    return toPublic(row, organization);
   }
 
   async activate(id: string, organizationId: string): Promise<ClientPublic> {
@@ -330,12 +370,15 @@ export class ClientService implements IClientService {
       throw new ServiceError(409, "Cliente já está ativo.");
     }
 
-    const row = await this.prisma.client.update({
-      where: { id },
-      data: { status: "Ativo", deletion_date: null },
-      select: clientWithOrganizationSelect,
-    });
+    const [organization, row] = await Promise.all([
+      this.getOrganizationPublic(organizationId),
+      this.prisma.client.update({
+        where: { id },
+        data: { status: "Ativo", deletion_date: null },
+        select: clientSelect,
+      }),
+    ]);
 
-    return toPublic(row);
+    return toPublic(row, organization);
   }
 }

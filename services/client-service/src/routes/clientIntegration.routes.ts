@@ -7,25 +7,26 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
+import type { ClientRouterDeps } from "../clientRouterDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { clientIdParamsSchema } from "../schemas/client.schema.js";
+import { clientIdParamsSchema } from "../schemas/client.schemas.js";
 import {
   type CreateIntegrationBody,
   createIntegrationBodySchema,
   updateIntegrationBodySchema,
-} from "../schemas/clientVerticals.schema.js";
+} from "../schemas/clientVerticals.schemas.js";
 import {
   createIntegrationClient,
   updateIntegrationClient,
 } from "../services/clientIntegrationService.js";
-import { type ClientRouterDeps, resolveOrganizationId } from "./clientRouteHelpers.js";
+import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
   const { prisma } = deps;
   const router: ReturnType<typeof Router> = Router();
 
   router.post(
-    "/clients/integration",
+    "/integration",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -33,11 +34,14 @@ export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
           createIntegrationBodySchema,
           request.body,
         ) as CreateIntegrationBody;
-        const tokenOrg = request.organization_id?.trim() ? request.organization_id : undefined;
-        if (tokenOrg && tokenOrg !== body.organization_id) {
+        const organizationId = resolveOrganizationId(request, undefined);
+        if (body.organization_id && body.organization_id !== organizationId) {
           throw new ServiceError(403, "Integração não permitida para outra organização.");
         }
-        const created = await createIntegrationClient(prisma, body);
+        const created = await createIntegrationClient(prisma, {
+          ...body,
+          organization_id: organizationId,
+        });
         response.status(201).json(createSuccessResponse(created));
       } catch (err) {
         logError("Erro ao criar cliente (integração)", { err });
@@ -47,7 +51,7 @@ export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
   );
 
   router.patch(
-    "/clients/:id/integration",
+    "/:id/integration",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {

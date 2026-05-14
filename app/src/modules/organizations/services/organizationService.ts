@@ -22,9 +22,7 @@ export const organizationService = {
 
   getById: async (id: string): Promise<Organization> => {
     const api = setupAPIClient();
-    const response = await api.get("/organizations", {
-      params: { id },
-    });
+    const response = await api.get(`/organizations/${id}`);
     return unwrapApiData<Organization>(response.data);
   },
 
@@ -39,6 +37,22 @@ export const organizationService = {
     const response = await api.put("/organizations", {
       id,
       ...data,
+    });
+    return unwrapApiData<Organization>(response.data);
+  },
+
+  updateLogoUrl: async (id: string, logo_url: string | null): Promise<Organization> => {
+    const api = setupAPIClient();
+    const response = await api.patch(`/organizations/${id}/logo-url`, {
+      logo_url,
+    });
+    return unwrapApiData<Organization>(response.data);
+  },
+
+  updateSubscriptionPlan: async (id: string, subscription_plan: string): Promise<Organization> => {
+    const api = setupAPIClient();
+    const response = await api.patch(`/organizations/${id}/subscription-plan`, {
+      subscription_plan,
     });
     return unwrapApiData<Organization>(response.data);
   },

@@ -13,15 +13,16 @@
   },
   "scripts": {
     "build": "node -e \"import('node:fs').then((fs) => { fs.rmSync('dist', { recursive: true, force: true }); fs.rmSync('tsconfig.tsbuildinfo', { force: true }); })\" && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check ."
   },
   "dependencies": {
-    "axios": "^1.6.7"
+    "axios": "^1.15.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.5",
+    "@biomejs/biome": "2.4.5",
     "typescript": "^5.3.3"
   }
 }

@@ -1,6 +1,10 @@
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import { buildAuditServiceOpenApiSpec } from "../../../audit-service/src/openapi/spec.js";
+import { buildClientServiceOpenApiSpec } from "../../../client-service/src/openapi/spec.js";
+import { buildContabilServiceOpenApiSpec } from "../../../contabil-service/src/openapi/spec.js";
+import { buildDepartmentServiceOpenApiSpec } from "../../../department-service/src/openapi/spec.js";
+import { buildFiscalServiceOpenApiSpec } from "../../../fiscal-service/src/openapi/spec.js";
 import { buildOrganizationServiceOpenApiSpec } from "../../../organization-service/src/openapi/spec.js";
 import { buildProjectServiceOpenApiSpec } from "../../../project-service/src/openapi/spec.js";
 import { buildRegularizeServiceOpenApiSpec } from "../../../regularize-service/src/openapi/spec.js";
@@ -42,14 +46,6 @@ function getPortFromUrl(url: string): number {
   return parsed.protocol === "https:" ? 443 : 80;
 }
 
-function getServicePort(url: string, fallbackPort: number): number {
-  try {
-    return getPortFromUrl(url);
-  } catch {
-    return fallbackPort;
-  }
-}
-
 function getMutableComponents(spec: AggregatedOpenApiDocument): OpenApiComponents {
   spec.components ??= {};
   return spec.components as OpenApiComponents;
@@ -61,31 +57,55 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       key: "user-service",
       label: "User Service",
       buildSpec: () =>
-        buildUserServiceOpenApiSpec({ port: getServicePort(env.userServiceUrl, 3335) } as never),
+        buildUserServiceOpenApiSpec({ port: getPortFromUrl(env.userServiceUrl) } as never),
+      includePath: (path) => path !== "/health",
+    },
+    {
+      key: "department-service",
+      label: "Department Service",
+      buildSpec: () =>
+        buildDepartmentServiceOpenApiSpec({
+          port: getPortFromUrl(env.departmentServiceUrl),
+        } as never),
       includePath: (path) => path !== "/health",
     },
     {
       key: "task-service",
       label: "Task Service",
       buildSpec: () =>
-        buildTaskServiceOpenApiSpec({ port: getServicePort(env.taskServiceUrl, 3337) } as never),
+        buildTaskServiceOpenApiSpec({ port: getPortFromUrl(env.taskServiceUrl) } as never),
       includePath: (path) => path !== "/health",
     },
     {
       key: "project-service",
       label: "Project Service",
       buildSpec: () =>
-        buildProjectServiceOpenApiSpec({
-          port: getServicePort(env.projectServiceUrl, 3338),
-        } as never),
+        buildProjectServiceOpenApiSpec({ port: getPortFromUrl(env.projectServiceUrl) } as never),
       includePath: (path) => path !== "/health",
+    },
+    {
+      key: "client-service",
+      label: "Client Service",
+      buildSpec: () =>
+        buildClientServiceOpenApiSpec({ port: getPortFromUrl(env.clientServiceUrl) } as never),
+      includePath: (path) => path !== "/health" && path !== "/ready",
+    },
+    {
+      key: "regularize-service",
+      label: "Regularize Service",
+      buildSpec: () =>
+        buildRegularizeServiceOpenApiSpec({
+          port: getPortFromUrl(env.regularizeServiceUrl),
+        } as never),
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
+      isInternalPath: (path) => path.startsWith("/internal/"),
     },
     {
       key: "organization-service",
       label: "Organization Service",
       buildSpec: () =>
         buildOrganizationServiceOpenApiSpec({
-          port: getServicePort(env.organizationServiceUrl, 3400),
+          port: getPortFromUrl(env.organizationServiceUrl),
         } as never),
       includePath: (path) => path !== "/health",
     },
@@ -93,25 +113,29 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       key: "rh-service",
       label: "RH Service",
       buildSpec: () =>
-        buildRhServiceOpenApiSpec({ port: getServicePort(env.rhServiceUrl, 3339) } as never),
+        buildRhServiceOpenApiSpec({ port: getPortFromUrl(env.rhServiceUrl) } as never),
       includePath: (path) => path !== "/health",
     },
     {
-      key: "regularize-service",
-      label: "Regularize Service",
+      key: "fiscal-service",
+      label: "Fiscal Service",
       buildSpec: () =>
-        buildRegularizeServiceOpenApiSpec({
-          port: getServicePort(env.regularizeServiceUrl, 3411),
-        } as never),
-      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
-      isInternalPath: (path) => path.startsWith("/internal/"),
+        buildFiscalServiceOpenApiSpec({ port: getPortFromUrl(env.fiscalServiceUrl) } as never),
+      includePath: (path) => path !== "/health",
+    },
+    {
+      key: "contabil-service",
+      label: "Contabil Service",
+      buildSpec: () =>
+        buildContabilServiceOpenApiSpec({ port: getPortFromUrl(env.contabilServiceUrl) } as never),
+      includePath: (path) => path !== "/health",
     },
     {
       key: "audit-service",
       label: "Audit Service",
       buildSpec: () =>
         buildAuditServiceOpenApiSpec({
-          auditServicePort: getServicePort(env.auditServiceUrl, 3336),
+          auditServicePort: getPortFromUrl(env.auditServiceUrl),
         } as never),
       includePath: (path) => path !== "/health" && path !== "/ready",
       isInternalPath: (path) => path.startsWith("/internal/"),
@@ -181,7 +205,7 @@ function getGatewayOperationSecurity(
   definition: ServiceSpecDefinition,
   security: Array<Record<string, string[]>> | undefined,
 ): Array<Record<string, string[]>> | undefined {
-  if (path === "/me") {
+  if (path === "/user/me") {
     return [{ bearerAuth: [] }];
   }
 
@@ -433,7 +457,7 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
       title: "office-gateway",
       version: "1.0.0",
       description:
-        "Gateway OpenAPI document aggregating user-service, task-service, project-service, organization-service, rh-service, regularize-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
+        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
     },
     servers: [{ url: "http://localhost" }],
     tags: [

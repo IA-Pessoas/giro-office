@@ -14,8 +14,8 @@ import {
   updateScoreQuestionBodySchema,
 } from "../schemas/scoreQuestion.schemas.js";
 import {
-  ScoreQuestionService,
   type ScoreQuestionListOptions,
+  ScoreQuestionService,
   type ScoreQuestionSnapshot,
   type ScoreQuestionUpdateInput,
 } from "../services/scoreQuestionService.js";

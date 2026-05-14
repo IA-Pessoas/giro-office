@@ -1,5 +1,17 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { type LoggerLevel, loggerLevelSchema } from "@workspace/shared";
+import dotenv from "dotenv";
 import { z } from "zod";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const serviceEnvPath = path.resolve(__dirname, "../../.env");
+const rootEnvPath = path.resolve(__dirname, "../../../../.env");
+
+dotenv.config({ path: serviceEnvPath });
+dotenv.config({ path: rootEnvPath });
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";

@@ -1,30 +1,53 @@
+import { Readable } from "node:stream";
+
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
   ServiceError,
 } from "@workspace/shared";
-import type { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 function hasRequestBody(method: string): boolean {
   const upperMethod = method.toUpperCase();
   return upperMethod !== "GET" && upperMethod !== "HEAD";
 }
 
-function getRequestBody(request: Request): string | undefined {
-  if (!hasRequestBody(request.method) || request.body === undefined) {
+function getRequestBody(request: Request): string | ReadableStream | undefined {
+  if (!hasRequestBody(request.method)) {
     return undefined;
   }
-  return JSON.stringify(request.body);
+  if (request.headers["content-type"]?.includes("application/json")) {
+    return JSON.stringify(request.body ?? {});
+  }
+  if (request.headers["content-type"]?.includes("application/x-www-form-urlencoded")) {
+    // If it was parsed by express.urlencoded
+    if (request.body && Object.keys(request.body).length > 0) {
+      return new URLSearchParams(request.body).toString();
+    }
+  }
+  return Readable.toWeb(request) as unknown as ReadableStream;
 }
 
-function buildForwardHeaders(request: Request): Headers {
+interface HttpProxyOptions {
+  internalServiceToken?: string;
+}
+
+function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): Headers {
   const headers = new Headers();
+  const strippedClientHeaders = new Set([
+    INTERNAL_SERVICE_TOKEN_HEADER,
+    FORWARDED_AUTH_USER_ID_HEADER,
+    FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+    FORWARDED_AUTH_PERMISSION_HEADER,
+  ]);
 
   Object.entries(request.headers).forEach(([key, value]) => {
     if (!value) return;
     if (key === "host" || key === "content-length") return;
+    if (strippedClientHeaders.has(key.toLowerCase())) return;
 
     if (Array.isArray(value)) {
       headers.set(key, value.join(","));
@@ -51,6 +74,10 @@ function buildForwardHeaders(request: Request): Headers {
     }
   }
 
+  if (options.internalServiceToken) {
+    headers.set(INTERNAL_SERVICE_TOKEN_HEADER, options.internalServiceToken);
+  }
+
   return headers;
 }
 
@@ -65,7 +92,10 @@ function normalizePathForUpstream(originalUrl: string): string {
   return normalizedPath + queryPart;
 }
 
-function createHttpProxy(resolveTargetUrl: (request: Request) => string) {
+function createHttpProxy(
+  resolveTargetUrl: (request: Request) => string,
+  options: HttpProxyOptions = {},
+): RequestHandler {
   return async function httpProxy(
     request: Request,
     response: Response,
@@ -79,11 +109,17 @@ function createHttpProxy(resolveTargetUrl: (request: Request) => string) {
     const body = getRequestBody(request);
 
     try {
-      const upstreamResponse = await fetch(upstreamUrl, {
+      const fetchOptions: RequestInit = {
         method: request.method,
-        headers: buildForwardHeaders(request),
-        body,
-      });
+        headers: buildForwardHeaders(request, options),
+        body: body as RequestInit["body"],
+      };
+
+      if (body !== undefined && typeof body !== "string") {
+        (fetchOptions as RequestInit & { duplex: "half" }).duplex = "half";
+      }
+
+      const upstreamResponse = await fetch(upstreamUrl, fetchOptions);
 
       response.status(upstreamResponse.status);
 
@@ -105,9 +141,12 @@ function createHttpProxy(resolveTargetUrl: (request: Request) => string) {
   };
 }
 
-export function buildHttpProxyMiddleware(targetUrlOrResolver: string | UpstreamResolver) {
+export function buildHttpProxyMiddleware(
+  targetUrlOrResolver: string | UpstreamResolver,
+  options: HttpProxyOptions = {},
+): RequestHandler {
   if (typeof targetUrlOrResolver === "string") {
-    return createHttpProxy(() => targetUrlOrResolver);
+    return createHttpProxy(() => targetUrlOrResolver, options);
   }
-  return createHttpProxy((request) => targetUrlOrResolver(request.method, request.path));
+  return createHttpProxy((request) => targetUrlOrResolver(request.method, request.path), options);
 }

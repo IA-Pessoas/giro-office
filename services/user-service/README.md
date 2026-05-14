@@ -4,7 +4,7 @@ Microserviço de utilizadores, sessão e permissões. Integra com o **gateway** 
 
 ## Porta local
 
-Por defeito: **3335** (`PORT`).
+Por defeito: **3030** (`PORT`).
 
 ## Variáveis de ambiente
 
@@ -12,14 +12,13 @@ Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`, `ADM
 
 ## Gateway
 
-O gateway encaminha estes prefixos/caminhos para `USER_SERVICE_URL` (ver [`gateway/src/utils/routeUtils.ts`](../gateway/src/utils/routeUtils.ts) — `isUserServiceRoute`):
+O encaminhamento para `USER_SERVICE_URL` usa o prefixo público **`/user`** — ver [`gateway/src/config/serviceRegistry.ts`](../gateway/src/config/serviceRegistry.ts) (`USER_SERVICE_PREFIXES`).
 
-- `/session`, `/start-config` (públicos no gateway para `POST`, conforme políticas)
-- `/me`
-- `/users`, `/users/*`
-- `/permission/*`
+Exemplos de caminhos expostos pelo **user-service** (via gateway): `/user/session`, `/user/start-config`, `/user/me`, `/user`, `/user/:id`, `/user/:id/photo`, `/user/permission/:userId`.
 
-Configurar no `.env` da raiz ou do gateway: `USER_SERVICE_URL=http://localhost:3335`.
+- **`GET /user/:id/photo`:** `200` com envelope padrão e `data.url` (URL pública da foto no storage).
+
+Configurar no `.env` da raiz ou do gateway: `USER_SERVICE_URL=http://localhost:3030`.
 
 ## Desenvolvimento
 

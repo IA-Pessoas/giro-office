@@ -5,7 +5,7 @@ export function canSSRGuest<P>(fn: GetServerSideProps<P>) {
     return async (ctx: GetServerSidePropsContext): Promise<GetServerSidePropsResult<P>> => {
         const cookies = parseCookies(ctx);
 
-        if (cookies['@cw.token']) {
+        if (cookies['cw.token']) {
             return {
                 redirect: {
                     destination: '/dashboard',

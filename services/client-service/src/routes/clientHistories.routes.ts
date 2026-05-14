@@ -4,18 +4,21 @@ import {
   parseWithZod,
   ServiceError,
 } from "@workspace/shared";
+import { validateUploadFileSignature } from "@workspace/shared/upload";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import multer from "multer";
-
+import type { ClientRouterDeps } from "../clientRouterDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { ADMIN_PERMISSION, clientIdParamsSchema } from "../schemas/client.schema.js";
+import { ADMIN_PERMISSION, clientIdParamsSchema } from "../schemas/client.schemas.js";
 import {
   createHistoryBodySchema,
   createHistoryPendingBodySchema,
   historyIdParamsSchema,
+  pendingDeleteParamsSchema,
+  pendingListQuerySchema,
   updateHistoryBodySchema,
-} from "../schemas/clientVerticals.schema.js";
+} from "../schemas/clientVerticals.schemas.js";
 import {
   createClientHistory,
   createHistoryPending,
@@ -26,23 +29,71 @@ import {
   updateClientHistory,
   uploadHistoryFileAndPath,
 } from "../services/clientHistoryService.js";
-import {
-  type ClientRouterDeps,
-  pendingDeleteParamsSchema,
-  pendingListQuerySchema,
-  resolveOrganizationId,
-} from "./clientRouteHelpers.js";
+import { resolveOrganizationId } from "../utils/organizationContext.js";
 
-const upload = multer({ storage: multer.memoryStorage() });
+const MAX_HISTORY_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_HISTORY_FILE_MIME_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "text/plain",
+  "text/csv",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+];
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_HISTORY_FILE_SIZE_BYTES },
+  fileFilter(_request, file, callback) {
+    if (!ALLOWED_HISTORY_FILE_MIME_TYPES.includes(file.mimetype)) {
+      callback(new ServiceError(400, "Tipo de arquivo não permitido."));
+      return;
+    }
+
+    callback(null, true);
+  },
+});
+
+function uploadHistoryFile(request: Request, response: Response, next: NextFunction): void {
+  upload.single("file")(request, response, (err) => {
+    if (!err) {
+      if (request.file) {
+        try {
+          validateUploadFileSignature(request.file);
+        } catch (validationError) {
+          next(validationError);
+          return;
+        }
+      }
+      next();
+      return;
+    }
+
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+      next(new ServiceError(400, "Arquivo excede o limite de 10 MB."));
+      return;
+    }
+
+    next(err);
+  });
+}
 
 export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   const { prisma, historyStorage } = deps;
+  const historyUploadRateLimit =
+    deps.historyUploadRateLimit ??
+    ((_request: Request, _response: Response, next: NextFunction) => next());
   const router: ReturnType<typeof Router> = Router();
 
   router.post(
-    "/clients/:id/histories",
+    "/:id/histories",
     isAuthenticated,
-    upload.single("file"),
+    historyUploadRateLimit,
+    uploadHistoryFile,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const params = parseWithZod(clientIdParamsSchema, request.params);
@@ -78,7 +129,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.get(
-    "/clients/:id/histories",
+    "/:id/histories",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -94,7 +145,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.get(
-    "/clients/:id/histories/:historyId",
+    "/:id/histories/:historyId",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -113,7 +164,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.patch(
-    "/clients/:id/histories/:historyId",
+    "/:id/histories/:historyId",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -136,7 +187,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.post(
-    "/clients/:id/histories/pending",
+    "/:id/histories/pending",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -159,7 +210,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.get(
-    "/clients/histories/pending",
+    "/histories/pending",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -175,7 +226,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
   );
 
   router.delete(
-    "/clients/histories/pending/:pendingId",
+    "/histories/pending/:pendingId",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
