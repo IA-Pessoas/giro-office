@@ -1,7 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
-import type { CreateProcessBody, UpdateProcessBody } from "../schemas/process.schema.js";
+import type { CreateProcessBody, UpdateProcessBody } from "../schemas/process.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 
 const processSelect = {

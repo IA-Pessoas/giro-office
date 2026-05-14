@@ -6,7 +6,7 @@ import type {
   CreateSitePasswordBody,
   UpdatePasswordBody,
   UpdateSitePasswordBody,
-} from "../schemas/password.schema.js";
+} from "../schemas/password.schemas.js";
 import { EncryptionService } from "./encryptionService.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 

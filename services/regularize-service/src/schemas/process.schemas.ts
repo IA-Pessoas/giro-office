@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { idQuerySchema } from "./common.schema.js";
+import { idQuerySchema } from "./common.schemas.js";
 
 export const createProcessBodySchema = z
   .object({

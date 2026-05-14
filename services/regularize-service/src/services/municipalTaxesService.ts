@@ -4,7 +4,7 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import type {
   CreateMunicipalTaxesBody,
   UpdateMunicipalTaxesBody,
-} from "../schemas/municipalTaxes.schema.js";
+} from "../schemas/municipalTaxes.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 
 const municipalTaxesSelect = {

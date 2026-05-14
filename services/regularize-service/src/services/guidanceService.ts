@@ -7,7 +7,7 @@ import type {
   GuidanceEconomicActivity,
   GuidancePartner,
   UpdateGuidanceBody,
-} from "../schemas/guidance.schema.js";
+} from "../schemas/guidance.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 
 export class GuidanceService {

@@ -1,7 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
-import type { CreateClientPfBody, UpdateClientPfBody } from "../schemas/clientPf.schema.js";
+import type { CreateClientPfBody, UpdateClientPfBody } from "../schemas/clientPf.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 import type { RegularizeReconciliationService } from "./regularizeReconciliationService.js";
 

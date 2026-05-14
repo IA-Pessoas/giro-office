@@ -7,7 +7,7 @@ import {
   listPartnersQuerySchema,
   partnerDetailQuerySchema,
   updatePartnerBodySchema,
-} from "../schemas/partners.schema.js";
+} from "../schemas/partners.schemas.js";
 import { PartnersService } from "../services/partnersService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 

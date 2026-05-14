@@ -7,7 +7,7 @@ import {
   licenseDetailQuerySchema,
   listLicensesQuerySchema,
   updateLicenseBodySchema,
-} from "../schemas/license.schema.js";
+} from "../schemas/license.schemas.js";
 import { LicenseService } from "../services/licenseService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 

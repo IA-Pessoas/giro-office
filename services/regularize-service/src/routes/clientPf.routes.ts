@@ -7,7 +7,7 @@ import {
   createClientPfBodySchema,
   listClientPfQuerySchema,
   updateClientPfBodySchema,
-} from "../schemas/clientPf.schema.js";
+} from "../schemas/clientPf.schemas.js";
 import { ClientPfService } from "../services/clientPfService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 

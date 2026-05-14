@@ -7,7 +7,7 @@ import {
   listProcessesQuerySchema,
   processDetailQuerySchema,
   updateProcessBodySchema,
-} from "../schemas/process.schema.js";
+} from "../schemas/process.schemas.js";
 import { ProcessService } from "../services/processService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 

@@ -11,7 +11,7 @@ import {
   sitePasswordDetailQuerySchema,
   updatePasswordBodySchema,
   updateSitePasswordBodySchema,
-} from "../schemas/password.schema.js";
+} from "../schemas/password.schemas.js";
 import { PasswordService } from "../services/passwordService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 

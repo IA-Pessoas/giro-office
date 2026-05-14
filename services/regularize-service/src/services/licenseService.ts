@@ -1,7 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
-import type { CreateLicenseBody, UpdateLicenseBody } from "../schemas/license.schema.js";
+import type { CreateLicenseBody, UpdateLicenseBody } from "../schemas/license.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 import type { RegularizeReconciliationService } from "./regularizeReconciliationService.js";
 

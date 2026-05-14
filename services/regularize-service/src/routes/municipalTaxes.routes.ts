@@ -7,7 +7,7 @@ import {
   listMunicipalTaxesQuerySchema,
   municipalTaxesDetailQuerySchema,
   updateMunicipalTaxesBodySchema,
-} from "../schemas/municipalTaxes.schema.js";
+} from "../schemas/municipalTaxes.schemas.js";
 import { MunicipalTaxesService } from "../services/municipalTaxesService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 

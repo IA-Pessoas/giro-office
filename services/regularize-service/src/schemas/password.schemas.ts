@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { booleanQuerySchema, idQuerySchema } from "./common.schema.js";
+import { booleanQuerySchema, idQuerySchema } from "./common.schemas.js";
 
 export const createPasswordBodySchema = z
   .object({

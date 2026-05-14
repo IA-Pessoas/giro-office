@@ -11,7 +11,7 @@ import {
   removeGuidanceActivityBodySchema,
   removeGuidancePartnerBodySchema,
   updateGuidanceBodySchema,
-} from "../schemas/guidance.schema.js";
+} from "../schemas/guidance.schemas.js";
 import { GuidanceService } from "../services/guidanceService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 
