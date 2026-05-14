@@ -1,17 +1,19 @@
 // Generated smoke coverage for regularize-service OpenAPI operations.
-// Runtime handlers can be added once end-to-end regularize smoke probes are enabled.
+// Non-health probes are gated until fixture-backed runtime handlers are enabled.
 
 export const service = "regularize-service";
+const regularizeSmokeCondition = "regularizeSmokeEnabled";
 
-export const operations = [
-  {
-    service,
-    method: "GET",
-    path: "/health",
-    action: "serviceHealth",
-    target: "direct",
-    auth: "public",
-  },
+const healthOperation = {
+  service,
+  method: "GET",
+  path: "/health",
+  action: "serviceHealth",
+  target: "direct",
+  auth: "public",
+};
+
+const regularizeOpenApiOperations = [
   {
     service,
     method: "GET",
@@ -428,6 +430,14 @@ export const operations = [
     expectedStatus: [403],
     expectedLabel: "invalid internal token",
   },
+];
+
+export const operations = [
+  healthOperation,
+  ...regularizeOpenApiOperations.map((operation) => ({
+    condition: regularizeSmokeCondition,
+    ...operation,
+  })),
 ];
 
 export const routePlaceholders = [];
