@@ -100,8 +100,7 @@ const env = {
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
-    process.env.REGULARIZE_SMOKE_ENABLED === "true" ||
-    process.env.REGULARIZE_SMOKE_ENABLED === "1",
+    process.env.REGULARIZE_SMOKE_ENABLED === "true" || process.env.REGULARIZE_SMOKE_ENABLED === "1",
   namespace:
     process.env.SMOKE_NAMESPACE?.trim() ||
     `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

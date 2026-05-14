@@ -52,9 +52,9 @@ describe("regularize remaining routes", () => {
   ])("%s %s without auth returns 401", async (method, path) => {
     const app = createTestApp();
 
-    const response = await request(app)[method.toLowerCase() as "get" | "post" | "put"](path).send(
-      {},
-    );
+    const response = await request(app)
+      [method.toLowerCase() as "get" | "post" | "put"](path)
+      .send({});
 
     expect(response.status).toBe(401);
     expect(response.body.success).toBe(false);
