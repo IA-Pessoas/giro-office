@@ -13,9 +13,9 @@ import "express-async-errors";
 import type { RegularizeServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { requestContext } from "./middlewares/requestContext.js";
-import { requireInternalToken } from "./middlewares/requireInternalToken.js";
 import { buildRegularizeServiceOpenApiSpec } from "./openapi/spec.js";
 import { createRegularizeRoutes } from "./routes/index.js";
+import { createRegularizeInternalRoutes } from "./routes/regularizeInternal.routes.js";
 import type { RegularizeReconciliationService } from "./services/regularizeReconciliationService.js";
 
 function regularizeServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -82,56 +82,15 @@ export function createApp({
     });
   }
 
-  app.post(
-    "/internal/reconciliation/run",
-    requireInternalToken(env),
-    async (_request, response, next) => {
-      try {
-        const result = await runReconciliation();
-        response.json(createSuccessResponse(result));
-      } catch (error) {
-        next(error);
-      }
-    },
-  );
-
-  app.post(
-    "/internal/reconciliation/license-notifications/run",
-    requireInternalToken(env),
-    async (_request, response, next) => {
-      try {
-        const result = await runLicenseNotificationReconciliation();
-        response.json(createSuccessResponse(result));
-      } catch (error) {
-        next(error);
-      }
-    },
-  );
-
-  app.post(
-    "/internal/reconciliation/client-pf-status/run",
-    requireInternalToken(env),
-    async (_request, response, next) => {
-      try {
-        const result = await runClientPfStatusReconciliation();
-        response.json(createSuccessResponse(result));
-      } catch (error) {
-        next(error);
-      }
-    },
-  );
-
-  app.post(
-    "/internal/reconciliation/client-pf-documents/run",
-    requireInternalToken(env),
-    async (_request, response, next) => {
-      try {
-        const result = await runClientPfDocumentsReconciliation();
-        response.json(createSuccessResponse(result));
-      } catch (error) {
-        next(error);
-      }
-    },
+  app.use(
+    "/internal",
+    createRegularizeInternalRoutes({
+      env,
+      runReconciliation,
+      runLicenseNotificationReconciliation,
+      runClientPfStatusReconciliation,
+      runClientPfDocumentsReconciliation,
+    }),
   );
 
   app.use(createRegularizeRoutes({ prisma, env, reconciliationService }));
