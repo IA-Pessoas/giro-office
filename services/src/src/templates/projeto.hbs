@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Projeto</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            width: 30%;
+            height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+        .logoImg {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .info {
+            width: 50%;
+            font-size: 14px;
+        }
+
+        .chart-container {
+            width: 20%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .circular-chart {
+            width: 125px;
+            height: 125px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 10px; /* Fonte menor */
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            border-right: 0;
+            border-left: 0;
+            padding: 6px 8px;
+            text-align: left; /* Alinha dados à esquerda */
+        }
+
+        th {
+            background: #f0f0f0;
+            font-weight: bold;
+        }
+
+        .info p {
+            margin: 4px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="logo">
+            <img class="logoImg" src="{{logoUrl}}" />
+            <p style="font-size: 10px; margin-top: 15px;"><b>Data: </b>{{dataHoraAtual}}</p>
+        </div>
+
+        <div class="info">
+            <p><strong>Empresa:</strong> {{company}}</p>
+            <p><strong>CPF/CNPJ:</strong> {{cpf_cnpj}} | <strong>Abertura:</strong> {{openDate}}</p>
+            <p><strong>Sócio Administrador:</strong> {{partner}}</p>
+            <p><strong>Contato:</strong> {{contact}} | <strong>Email:</strong> {{email}}</p>
+            <p><strong>Instagram:</strong> {{instagram}} | <strong>Abertura:</strong> {{openDate}}</p>
+            <p><strong>Regime:</strong> {{regime}}</p>
+            <p style="margin-top: 15px;">
+                <strong>Objetivo:</strong> {{projectObjective}} <br>
+                Início: {{projectStartDate}} | Término: {{projectEndDate}}
+            </p>
+        </div>
+
+        <div class="chart-container">
+            <svg viewBox="0 0 120 120" class="circular-chart">
+                <!-- Círculo de fundo -->
+                <circle cx="60" cy="60" r="52" stroke="#eee" stroke-width="10" fill="none" />
+
+                <!-- Círculo de progresso -->
+                <circle
+                    cx="60"
+                    cy="60"
+                    r="52"
+                    stroke="#36a2eb"
+                    stroke-width="10"
+                    fill="none"
+                    stroke-dasharray="326.72"
+                    stroke-dashoffset="{{dashOffset}}"
+                    transform="rotate(-90 60 60)"
+                />
+
+                <!-- Texto central -->
+                <text
+                    x="60"
+                    y="66"
+                    font-size="20"
+                    fill="#333"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                >
+                    {{percent}}%
+                </text>
+            </svg>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nº</th>
+                <th>Geração</th>
+                <th>Nome</th>
+                <th>Status</th>
+                <th>Alteração</th>
+                <th>Departamento</th>
+                <th>Responsável</th>
+                <th>Observação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{{rows}}}
+        </tbody>
+    </table>
+</body>
+
+</html>

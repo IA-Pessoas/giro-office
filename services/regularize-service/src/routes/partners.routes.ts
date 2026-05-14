@@ -1,0 +1,91 @@
+import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
+import type { NextFunction, Request, Response } from "express";
+import { Router } from "express";
+import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import {
+  createPartnerBodySchema,
+  listPartnersQuerySchema,
+  partnerDetailQuerySchema,
+  updatePartnerBodySchema,
+} from "../schemas/partners.schema.js";
+import { PartnersService } from "../services/partnersService.js";
+import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
+
+export function createPartnersRoutes(deps: RegularizeRouteDeps): Router {
+  const router = Router();
+  const partnersService = new PartnersService(deps.prisma, deps.reconciliationService);
+
+  router.post(
+    "/regularize/partners",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(createPartnerBodySchema, request.body);
+        const created = await partnersService.create({
+          organizationId: request.organization_id,
+          userId: request.user_id,
+          body,
+        });
+        response.status(201).json(createSuccessResponse(created));
+      } catch (error) {
+        logError("Erro ao criar parceiro do regularize", { error });
+        next(error);
+      }
+    },
+  );
+
+  router.put(
+    "/regularize/partners",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(updatePartnerBodySchema, request.body);
+        const updated = await partnersService.update({
+          organizationId: request.organization_id,
+          userId: request.user_id,
+          body,
+        });
+        response.json(createSuccessResponse(updated));
+      } catch (error) {
+        logError("Erro ao atualizar parceiro do regularize", { error });
+        next(error);
+      }
+    },
+  );
+
+  router.get(
+    "/regularize/partner",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const query = parseWithZod(partnerDetailQuerySchema, request.query);
+        const detail = await partnersService.detail(request.organization_id, query.id);
+        response.json(createSuccessResponse(detail));
+      } catch (error) {
+        logError("Erro ao detalhar parceiro do regularize", { error });
+        next(error);
+      }
+    },
+  );
+
+  router.get(
+    "/regularize/partners",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const query = parseWithZod(listPartnersQuerySchema, request.query);
+        const list = await partnersService.list(
+          request.organization_id,
+          query.type,
+          query.client_id,
+        );
+        response.json(createSuccessResponse(list));
+      } catch (error) {
+        logError("Erro ao listar parceiros do regularize", { error });
+        next(error);
+      }
+    },
+  );
+
+  return router;
+}

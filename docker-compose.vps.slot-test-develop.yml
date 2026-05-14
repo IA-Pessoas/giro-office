@@ -1,0 +1,13 @@
+# Portas do slot de **teste** develop (`workspace-teste-develop`, branch `test/deploy-develop`).
+# Develop real usa `docker-compose.vps.slot-develop.yml` (8086 / 3011).
+# `!override`: sem isto, o Compose concatena com as portas do ficheiro base e volta a publicar 3010/8085.
+services:
+  reverse-proxy:
+    ports: !override
+      - "8087:80"
+  gateway:
+    ports: !override
+      - "3013:3010"
+  web:
+    ports: !override
+      - "3002:3000"
