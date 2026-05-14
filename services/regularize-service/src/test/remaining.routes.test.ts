@@ -12,6 +12,54 @@ describe("regularize remaining routes", () => {
     vi.restoreAllMocks();
   });
 
+  it.each([
+    ["GET", "/regularize/passwords"],
+    ["POST", "/regularize/passwords"],
+    ["PUT", "/regularize/passwords"],
+    ["GET", "/regularize/password"],
+    ["GET", "/regularize/sites-pass"],
+    ["POST", "/regularize/sites-pass"],
+    ["PUT", "/regularize/sites-pass"],
+    ["GET", "/regularize/sites-pass-detail"],
+    ["GET", "/regularize/pf"],
+    ["POST", "/regularize/pf"],
+    ["PUT", "/regularize/pf"],
+    ["GET", "/regularize/pfs"],
+    ["GET", "/regularize/partners"],
+    ["POST", "/regularize/partners"],
+    ["PUT", "/regularize/partners"],
+    ["GET", "/regularize/partner"],
+    ["GET", "/regularize/municipal-taxes"],
+    ["POST", "/regularize/municipal-taxes"],
+    ["PUT", "/regularize/municipal-taxes"],
+    ["GET", "/regularize/municipal-taxes-detail"],
+    ["GET", "/regularize/process"],
+    ["POST", "/regularize/process"],
+    ["PUT", "/regularize/process"],
+    ["GET", "/regularize/processes"],
+    ["POST", "/regularize/guidance"],
+    ["PUT", "/regularize/guidance"],
+    ["GET", "/regularize/guidance/detail"],
+    ["GET", "/regularize/guidance/list"],
+    ["POST", "/regularize/guidance/activity/add"],
+    ["POST", "/regularize/guidance/activity/remove"],
+    ["POST", "/regularize/guidance/partner/add"],
+    ["POST", "/regularize/guidance/partner/remove"],
+    ["GET", "/regularize/license"],
+    ["POST", "/regularize/license"],
+    ["PUT", "/regularize/license"],
+    ["GET", "/regularize/licenses"],
+  ])("%s %s without auth returns 401", async (method, path) => {
+    const app = createTestApp();
+
+    const response = await request(app)[method.toLowerCase() as "get" | "post" | "put"](path).send(
+      {},
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.body.success).toBe(false);
+  });
+
   it("POST /regularize/municipal-taxes creates a municipal taxes record", async () => {
     const prisma = {
       client: {
