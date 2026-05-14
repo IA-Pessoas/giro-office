@@ -70,4 +70,73 @@ describe("regularize internal routes", () => {
     expect(response.body).toEqual({ success: true, data: { processed: 1 } });
     expect(runReconciliation).toHaveBeenCalledTimes(1);
   });
+
+  it("POST /internal/reconciliation/license-notifications/run delegates to the injected use case", async () => {
+    const runLicenseNotificationReconciliation = vi.fn(async () => ({ created: 2 }));
+    const app = createApp({
+      env: regularizeTestEnv,
+      logger: createLoggerMock(),
+      prisma: {} as PrismaClient,
+      reconciliationService: {} as never,
+      runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation,
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
+    });
+
+    const response = await request(app)
+      .post("/internal/reconciliation/license-notifications/run")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "internal-token")
+      .send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: { created: 2 } });
+    expect(runLicenseNotificationReconciliation).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /internal/reconciliation/client-pf-status/run delegates to the injected use case", async () => {
+    const runClientPfStatusReconciliation = vi.fn(async () => ({ updated: 3 }));
+    const app = createApp({
+      env: regularizeTestEnv,
+      logger: createLoggerMock(),
+      prisma: {} as PrismaClient,
+      reconciliationService: {} as never,
+      runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation,
+      runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
+    });
+
+    const response = await request(app)
+      .post("/internal/reconciliation/client-pf-status/run")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "internal-token")
+      .send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: { updated: 3 } });
+    expect(runClientPfStatusReconciliation).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /internal/reconciliation/client-pf-documents/run delegates to the injected use case", async () => {
+    const runClientPfDocumentsReconciliation = vi.fn(async () => ({ created: 4 }));
+    const app = createApp({
+      env: regularizeTestEnv,
+      logger: createLoggerMock(),
+      prisma: {} as PrismaClient,
+      reconciliationService: {} as never,
+      runReconciliation: vi.fn(async () => ({ processed: 0 })),
+      runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
+      runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
+      runClientPfDocumentsReconciliation,
+    });
+
+    const response = await request(app)
+      .post("/internal/reconciliation/client-pf-documents/run")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "internal-token")
+      .send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: { created: 4 } });
+    expect(runClientPfDocumentsReconciliation).toHaveBeenCalledTimes(1);
+  });
 });
