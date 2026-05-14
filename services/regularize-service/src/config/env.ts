@@ -1,7 +1,13 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { type LoggerLevel, loggerLevelSchema } from "@workspace/shared";
+import {
+  type LoggerLevel,
+  loggerLevelSchema,
+  parseAllowedOrigins,
+  validateProductionCorsOrigins,
+  validateProductionInternalServiceToken,
+} from "@workspace/shared";
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -10,8 +16,8 @@ const __dirname = path.dirname(__filename);
 const serviceEnvPath = path.resolve(__dirname, "../../.env");
 const rootEnvPath = path.resolve(__dirname, "../../../../.env");
 
-dotenv.config({ path: serviceEnvPath });
 dotenv.config({ path: rootEnvPath });
+dotenv.config({ path: serviceEnvPath, override: true });
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
@@ -39,6 +45,11 @@ const regularizeServiceEnvSchema = z
       .optional()
       .default("false")
       .transform((value) => parseBoolean(value)),
+    allowedOrigins: z
+      .string()
+      .optional()
+      .default("*")
+      .transform((value) => parseAllowedOrigins(value)),
     enableApiDocsEnv: z.string().optional(),
   })
   .transform((env) => {
@@ -47,6 +58,19 @@ const regularizeServiceEnvSchema = z
       enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
         ? parseBoolean(enableApiDocsEnv)
         : rest.nodeEnv !== "production";
+
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "regularize-service",
+      envName: "AUDIT_SERVICE_TOKEN",
+      token: rest.auditServiceToken,
+    });
+    validateProductionCorsOrigins({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "regularize-service",
+      envName: "SERVICE_ALLOWED_ORIGINS",
+      allowedOrigins: rest.allowedOrigins,
+    });
 
     return {
       ...rest,
@@ -71,6 +95,7 @@ export function getRegularizeServiceEnv(): RegularizeServiceEnv {
     encryptionKey: process.env.MTK_ENCRYPTION_KEY,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
+    allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
   });
 }

@@ -1,0 +1,9 @@
+process.env.NODE_ENV = "test";
+process.env.PORT = "3411";
+process.env.DATABASE_URL = "postgresql://localhost/test";
+process.env.JWT_SECRET = "secret";
+process.env.AUDIT_SERVICE_TOKEN = "audit-service-token";
+process.env.REGULARIZE_SERVICE_INTERNAL_TOKEN = "internal-token";
+process.env.MTK_ENCRYPTION_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+process.env.SERVICE_ALLOWED_ORIGINS = "*";
+process.env.ENABLE_API_DOCS = "false";
