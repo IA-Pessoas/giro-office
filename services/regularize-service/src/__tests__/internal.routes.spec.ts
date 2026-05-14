@@ -62,7 +62,7 @@ describe("regularize internal routes", () => {
 
     const response = await request(app).post("/internal/reconciliation/run");
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401);
   });
 
   it("POST /internal/reconciliation/run executes reconciliation with internal token", async () => {
