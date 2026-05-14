@@ -12,7 +12,7 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
 
 export const regularizeTestEnv: RegularizeServiceEnv = {
-  port: 3411,
+  port: 3039,
   nodeEnv: "test",
   databaseUrl: "postgresql://localhost/test",
   jwtSecret: "secret",

@@ -53,7 +53,7 @@ const gatewayEnvSchema = z
     clientServiceUrl: z.string().url().default("http://localhost:3035"),
     fiscalServiceUrl: z.string().url().default("http://localhost:3037"),
     contabilServiceUrl: z.string().url().default("http://localhost:3038"),
-    regularizeServiceUrl: z.string().url().default("http://localhost:3411"),
+    regularizeServiceUrl: z.string().url().default("http://localhost:3039"),
     websocketUpstreamUrl: z
       .string()
       .optional()

@@ -28,10 +28,10 @@ const regularizeServiceEnvSchema = z
     port: z
       .string()
       .optional()
-      .default("3411")
+      .default("3039")
       .transform((val) => {
         const parsed = Number.parseInt(val, 10);
-        return Number.isNaN(parsed) ? 3411 : parsed;
+        return Number.isNaN(parsed) ? 3039 : parsed;
       }),
     nodeEnv: z.string().optional().default("development"),
     databaseUrl: z.string().min(1, "DATABASE_URL não definido para o regularize-service."),

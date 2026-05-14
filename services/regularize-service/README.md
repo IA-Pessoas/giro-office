@@ -4,7 +4,7 @@ Micro-servico de regularize. Centraliza rotas, validacao, OpenAPI e rotinas inte
 
 ## Porta local
 
-Por defeito: **3411** (`PORT`).
+Por defeito: **3039** (`PORT`).
 
 ## Variaveis de ambiente
 
@@ -12,7 +12,7 @@ Definicao e defaults em [`src/config/env.ts`](src/config/env.ts):
 
 - `DATABASE_URL` - PostgreSQL (Prisma)
 - `JWT_SECRET` - validacao do Bearer nas rotas autenticadas
-- `PORT` - porta HTTP (default `3411`)
+- `PORT` - porta HTTP (default `3039`)
 - `MTK_ENCRYPTION_KEY` - chave usada para criptografar credenciais do legado
 - `AUDIT_SERVICE_TOKEN` - token usado na integracao de auditoria
 - `REGULARIZE_SERVICE_INTERNAL_TOKEN` - token exigido nas rotas `POST /internal/reconciliation/*` pelo header `x-internal-service-token`
@@ -27,7 +27,7 @@ Definicao e defaults em [`src/config/env.ts`](src/config/env.ts):
 
 ## Gateway
 
-- URL upstream: `REGULARIZE_SERVICE_URL` (ex.: `http://localhost:3411`)
+- URL upstream: `REGULARIZE_SERVICE_URL` (ex.: `http://localhost:3039`)
 - Prefixo publico: `/regularize`
 - Endpoints internos `/internal/*` nao devem ser expostos via gateway
 

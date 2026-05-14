@@ -112,7 +112,7 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 
 | Segredo | Uso |
 |---------|-----|
-| `ENV_VPS_GATEWAY` | Inclua `REGULARIZE_SERVICE_URL=http://regularize-service:3411` para a rota `/regularize` dentro da rede Docker. |
+| `ENV_VPS_GATEWAY` | Inclua `REGULARIZE_SERVICE_URL=http://regularize-service:3039` para a rota `/regularize` dentro da rede Docker. |
 | `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | URL **com namespace** (ex.: `ghcr.io/meu-org`, `docker.io/meuuser` — não use só `ghcr.io`). Push/pull normalizam em minúsculas. |
 | `ENV_VPS_*` | Igual ao manifest `scripts/ci/vps-secrets.manifest` — `.env.vps.*` copiados para a VPS em cada deploy |
 | `ENV_VPS_WEB` | Corpo do ficheiro **`.env.vps.web`**: pelo menos `NEXT_PUBLIC_API_URL=<URL pública do API para o browser>` e `API_INTERNAL_URL=http://gateway:3010` (rede Docker). O valor de `NEXT_PUBLIC_API_URL` é embutido no bundle no `docker compose build`. |

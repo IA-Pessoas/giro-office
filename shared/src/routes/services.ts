@@ -3,7 +3,7 @@ const SERVICE_DEFAULTS = {
   organizationServiceUrl: "http://localhost:3031",
   rhServiceUrl: "http://localhost:3034",
   clientServiceUrl: "http://localhost:3035",
-  regularizeServiceUrl: "http://localhost:3411",
+  regularizeServiceUrl: "http://localhost:3039",
 } as const;
 
 export interface ServiceUrls {

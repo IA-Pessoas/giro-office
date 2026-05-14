@@ -1,5 +1,5 @@
 process.env.NODE_ENV = "test";
-process.env.PORT = "3411";
+process.env.PORT = "3039";
 process.env.DATABASE_URL = "postgresql://localhost/test";
 process.env.JWT_SECRET = "secret";
 process.env.AUDIT_SERVICE_TOKEN = "audit-service-token";

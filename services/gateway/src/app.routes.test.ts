@@ -125,7 +125,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     departmentServiceUrl: "http://127.0.0.1:3336",
     fiscalServiceUrl: "http://127.0.0.1:3037",
     contabilServiceUrl: "http://127.0.0.1:3038",
-    regularizeServiceUrl: "http://127.0.0.1:3411",
+    regularizeServiceUrl: "http://127.0.0.1:3039",
 
     jwtSecret: "test-secret",
     logLevel: "silent",

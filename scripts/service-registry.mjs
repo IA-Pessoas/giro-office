@@ -85,7 +85,7 @@ export const serviceRegistry = [
   {
     name: "regularize-service",
     packagePath: "services/regularize-service",
-    defaultUrl: "http://localhost:3411",
+    defaultUrl: "http://localhost:3039",
     urlEnvKey: "REGULARIZE_SERVICE_URL",
     openapiSpecPath: "services/regularize-service/src/openapi/spec.ts",
     authModes: ["public", "bearer", "internal-token"],

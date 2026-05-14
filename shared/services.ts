@@ -26,9 +26,9 @@ export const SERVICES = {
   },
   regularizeService: {
     name: "regularize-service",
-    defaultPort: 3411,
+    defaultPort: 3039,
     envVar: "REGULARIZE_SERVICE_URL",
-    defaultUrl: "http://localhost:3411",
+    defaultUrl: "http://localhost:3039",
   },
   userService: {
     name: "user-service",
