@@ -75,7 +75,12 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           summary: "Listar senhas por cliente",
           security: [{ bearerAuth: [] }],
           parameters: [
-            { name: "client_id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
           ],
           responses: { "200": { description: "Lista de senhas", ...successEnvelopeContent() } },
         },
@@ -145,7 +150,9 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           parameters: [
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
-          responses: { "200": { description: "Detalhe do cliente PF", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Detalhe do cliente PF", ...successEnvelopeContent() },
+          },
         },
         post: {
           tags: ["PF"],
@@ -157,7 +164,9 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           tags: ["PF"],
           summary: "Atualizar cliente PF",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Cliente PF atualizado", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Cliente PF atualizado", ...successEnvelopeContent() },
+          },
         },
       },
       "/regularize/pfs": {
@@ -166,7 +175,9 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           summary: "Listar clientes PF",
           security: [{ bearerAuth: [] }],
           parameters: [{ name: "status", in: "query", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Lista de clientes PF", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Lista de clientes PF", ...successEnvelopeContent() },
+          },
         },
       },
       "/regularize/partners": {
@@ -175,8 +186,18 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           summary: "Listar socios",
           security: [{ bearerAuth: [] }],
           parameters: [
-            { name: "type", in: "query", required: true, schema: { type: "string", enum: ["pf", "pj"] } },
-            { name: "client_id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "type",
+              in: "query",
+              required: true,
+              schema: { type: "string", enum: ["pf", "pj"] },
+            },
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
           ],
           responses: { "200": { description: "Lista de socios", ...successEnvelopeContent() } },
         },
@@ -198,7 +219,9 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           tags: ["Partners"],
           summary: "Detalhar socio",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } }],
+          parameters: [
+            { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+          ],
           responses: { "200": { description: "Detalhe do socio", ...successEnvelopeContent() } },
         },
       },
@@ -208,19 +231,25 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           summary: "Listar tributos municipais por ano",
           security: [{ bearerAuth: [] }],
           parameters: [{ name: "year", in: "query", required: true, schema: { type: "integer" } }],
-          responses: { "200": { description: "Lista de tributos municipais", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Lista de tributos municipais", ...successEnvelopeContent() },
+          },
         },
         post: {
           tags: ["MunicipalTaxes"],
           summary: "Criar tributo municipal",
           security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Tributo municipal criado", ...successEnvelopeContent() } },
+          responses: {
+            "201": { description: "Tributo municipal criado", ...successEnvelopeContent() },
+          },
         },
         put: {
           tags: ["MunicipalTaxes"],
           summary: "Atualizar tributo municipal",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Tributo municipal atualizado", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Tributo municipal atualizado", ...successEnvelopeContent() },
+          },
         },
       },
       "/regularize/municipal-taxes-detail": {
@@ -228,8 +257,12 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           tags: ["MunicipalTaxes"],
           summary: "Detalhar tributo municipal",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } }],
-          responses: { "200": { description: "Detalhe do tributo municipal", ...successEnvelopeContent() } },
+          parameters: [
+            { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Detalhe do tributo municipal", ...successEnvelopeContent() },
+          },
         },
       },
       "/regularize/process": {
@@ -237,7 +270,9 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           tags: ["Processes"],
           summary: "Detalhar processo",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } }],
+          parameters: [
+            { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+          ],
           responses: { "200": { description: "Detalhe do processo", ...successEnvelopeContent() } },
         },
         post: {
@@ -273,7 +308,9 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           tags: ["Guidance"],
           summary: "Atualizar orientacao procedural",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Orientacao atualizada", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Orientacao atualizada", ...successEnvelopeContent() },
+          },
         },
       },
       "/regularize/guidance/detail": {
@@ -281,8 +318,12 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           tags: ["Guidance"],
           summary: "Detalhar orientacao procedural",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } }],
-          responses: { "200": { description: "Detalhe da orientacao", ...successEnvelopeContent() } },
+          parameters: [
+            { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Detalhe da orientacao", ...successEnvelopeContent() },
+          },
         },
       },
       "/regularize/guidance/list": {
@@ -290,8 +331,17 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           tags: ["Guidance"],
           summary: "Listar orientacoes por processo",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "process_id", in: "query", required: true, schema: { type: "string", format: "uuid" } }],
-          responses: { "200": { description: "Lista de orientacoes", ...successEnvelopeContent() } },
+          parameters: [
+            {
+              name: "process_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": { description: "Lista de orientacoes", ...successEnvelopeContent() },
+          },
         },
       },
       "/regularize/guidance/activity/add": {
@@ -299,7 +349,9 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           tags: ["Guidance"],
           summary: "Adicionar atividade economica",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Atividade adicionada", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Atividade adicionada", ...successEnvelopeContent() },
+          },
         },
       },
       "/regularize/guidance/activity/remove": {
@@ -331,7 +383,9 @@ export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): Op
           tags: ["Licenses"],
           summary: "Detalhar licenca",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } }],
+          parameters: [
+            { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+          ],
           responses: { "200": { description: "Detalhe da licenca", ...successEnvelopeContent() } },
         },
         post: {

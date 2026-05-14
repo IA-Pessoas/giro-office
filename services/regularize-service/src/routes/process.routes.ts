@@ -1,8 +1,6 @@
 import { createSuccessResponse, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-
-import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   createProcessBodySchema,
@@ -11,6 +9,7 @@ import {
   updateProcessBodySchema,
 } from "../schemas/process.schema.js";
 import { ProcessService } from "../services/processService.js";
+import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 
 export function createProcessRoutes(deps: RegularizeRouteDeps): Router {
   const router = Router();

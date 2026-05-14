@@ -178,15 +178,12 @@ describe("regularize client PF and partners routes", () => {
       runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
-    const response = await request(app)
-      .post("/regularize/partners")
-      .set(gatewayHeaders())
-      .send({
-        pj_id: "d0000000-0000-4000-8000-000000000001",
-        pf_id: "e0000000-0000-4000-8000-000000000001",
-        part: 50,
-        entry: "2024-01-01",
-      });
+    const response = await request(app).post("/regularize/partners").set(gatewayHeaders()).send({
+      pj_id: "d0000000-0000-4000-8000-000000000001",
+      pf_id: "e0000000-0000-4000-8000-000000000001",
+      part: 50,
+      entry: "2024-01-01",
+    });
 
     expect(response.status).toBe(201);
     expect(reconciliationService.handlePartnersChanged).toHaveBeenCalledWith(

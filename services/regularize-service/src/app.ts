@@ -6,11 +6,11 @@ import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { RegularizeServiceEnv } from "./config/env.js";
+import type { PrismaClient } from "./generated/prisma/client.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { requireInternalToken } from "./middlewares/requireInternalToken.js";
 import { buildRegularizeServiceOpenApiSpec } from "./openapi/spec.js";
 import { createRegularizeRoutes } from "./routes/index.js";
-import type { PrismaClient } from "./generated/prisma/client.js";
 import type { RegularizeReconciliationService } from "./services/regularizeReconciliationService.js";
 
 function regularizeServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {

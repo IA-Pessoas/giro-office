@@ -1,8 +1,6 @@
 import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-
-import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   createLicenseBodySchema,
@@ -11,6 +9,7 @@ import {
   updateLicenseBodySchema,
 } from "../schemas/license.schema.js";
 import { LicenseService } from "../services/licenseService.js";
+import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 
 export function createLicenseRoutes(deps: RegularizeRouteDeps): Router {
   const router = Router();

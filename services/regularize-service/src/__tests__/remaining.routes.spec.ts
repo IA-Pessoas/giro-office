@@ -190,16 +190,13 @@ describe("regularize remaining routes", () => {
       runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
-    const response = await request(app)
-      .post("/regularize/process")
-      .set(gatewayHeaders())
-      .send({
-        client_pj_id: "d0000000-0000-4000-8000-000000000001",
-        cpf_cnpj: "12345678901",
-        process_type: "Abertura",
-        description: "Descricao",
-        status: "Aberto",
-      });
+    const response = await request(app).post("/regularize/process").set(gatewayHeaders()).send({
+      client_pj_id: "d0000000-0000-4000-8000-000000000001",
+      cpf_cnpj: "12345678901",
+      process_type: "Abertura",
+      description: "Descricao",
+      status: "Aberto",
+    });
 
     expect(response.status).toBe(201);
     expect(response.body.success).toBe(true);
@@ -233,13 +230,10 @@ describe("regularize remaining routes", () => {
       runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
-    const response = await request(app)
-      .post("/regularize/guidance")
-      .set(gatewayHeaders())
-      .send({
-        process_id: "d0000000-0000-4000-8000-000000000001",
-        status: "Em andamento",
-      });
+    const response = await request(app).post("/regularize/guidance").set(gatewayHeaders()).send({
+      process_id: "d0000000-0000-4000-8000-000000000001",
+      status: "Em andamento",
+    });
 
     expect(response.status).toBe(201);
     expect(response.body.success).toBe(true);
@@ -288,22 +282,19 @@ describe("regularize remaining routes", () => {
       runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
-    const response = await request(app)
-      .post("/regularize/license")
-      .set(gatewayHeaders())
-      .send({
-        client_id: "d0000000-0000-4000-8000-000000000001",
-        has: true,
-        type_license: "Alvara",
-        entry_date: "2025-01-01",
-        protocol: "PROTO-1",
-        status: "Ativo",
-        current_situation: "Regular",
-        contact: "Contato",
-        urgency: "Media",
-        type: "Anual",
-        due_date: "2025-02-01",
-      });
+    const response = await request(app).post("/regularize/license").set(gatewayHeaders()).send({
+      client_id: "d0000000-0000-4000-8000-000000000001",
+      has: true,
+      type_license: "Alvara",
+      entry_date: "2025-01-01",
+      protocol: "PROTO-1",
+      status: "Ativo",
+      current_situation: "Regular",
+      contact: "Contato",
+      urgency: "Media",
+      type: "Anual",
+      due_date: "2025-02-01",
+    });
 
     expect(response.status).toBe(201);
     expect(reconciliationService.handleLicenseChanged).toHaveBeenCalledWith(

@@ -116,16 +116,13 @@ describe("regularize password routes", () => {
       runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     });
 
-    const response = await request(app)
-      .post("/regularize/passwords")
-      .set(gatewayHeaders())
-      .send({
-        client_id: "d0000000-0000-4000-8000-000000000001",
-        site_id: "e0000000-0000-4000-8000-000000000001",
-        login: "login",
-        password: "password",
-        notes: "nota",
-      });
+    const response = await request(app).post("/regularize/passwords").set(gatewayHeaders()).send({
+      client_id: "d0000000-0000-4000-8000-000000000001",
+      site_id: "e0000000-0000-4000-8000-000000000001",
+      login: "login",
+      password: "password",
+      notes: "nota",
+    });
 
     expect(response.status).toBe(201);
     expect(response.body.success).toBe(true);

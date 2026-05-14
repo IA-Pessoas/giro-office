@@ -5,13 +5,15 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../app.js";
 import type { RegularizeServiceEnv } from "../config/env.js";
 
+const internalServiceToken = "internal-token";
+
 const env: RegularizeServiceEnv = {
   port: 3411,
   nodeEnv: "test",
   databaseUrl: "postgresql://localhost/test",
   jwtSecret: "secret",
   auditServiceToken: "audit-service-token",
-  internalServiceToken: "internal-token",
+  internalServiceToken,
   encryptionKey: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
   logLevel: "info",
   logPretty: false,
@@ -77,7 +79,7 @@ describe("regularize internal routes", () => {
 
     const response = await request(app)
       .post("/internal/reconciliation/run")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.internalServiceToken!);
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalServiceToken);
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
@@ -99,7 +101,7 @@ describe("regularize internal routes", () => {
 
     const response = await request(app)
       .post("/internal/reconciliation/license-notifications/run")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.internalServiceToken!);
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalServiceToken);
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
@@ -121,7 +123,7 @@ describe("regularize internal routes", () => {
 
     const response = await request(app)
       .post("/internal/reconciliation/client-pf-status/run")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.internalServiceToken!);
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalServiceToken);
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
@@ -143,7 +145,7 @@ describe("regularize internal routes", () => {
 
     const response = await request(app)
       .post("/internal/reconciliation/client-pf-documents/run")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.internalServiceToken!);
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalServiceToken);
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);

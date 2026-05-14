@@ -270,7 +270,7 @@ export class PasswordService {
         organization_id: organizationId,
         client_id: body.client_id,
         site_id: body.site_id,
-        ...( "id" in body ? { NOT: { id: body.id } } : {} ),
+        ...("id" in body ? { NOT: { id: body.id } } : {}),
       },
       select: passwordSelect,
     });

@@ -1,8 +1,6 @@
 import { createSuccessResponse, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-
-import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   addGuidanceActivityBodySchema,
@@ -15,6 +13,7 @@ import {
   updateGuidanceBodySchema,
 } from "../schemas/guidance.schema.js";
 import { GuidanceService } from "../services/guidanceService.js";
+import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 
 export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
   const router = Router();

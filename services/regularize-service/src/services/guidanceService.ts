@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { ServiceError } from "@workspace/shared";
-import { Prisma } from "../generated/prisma/client.js";
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type {
   CreateGuidanceBody,
   GuidanceEconomicActivity,
@@ -99,7 +98,10 @@ export class GuidanceService {
     return detail as unknown as Record<string, unknown>;
   }
 
-  async listByProcess(organizationId: string, processId: string): Promise<Record<string, unknown>[]> {
+  async listByProcess(
+    organizationId: string,
+    processId: string,
+  ): Promise<Record<string, unknown>[]> {
     const list = await this.prisma.proceduralGuidance.findMany({
       where: {
         organization_id: organizationId,

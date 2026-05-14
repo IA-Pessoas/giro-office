@@ -1,8 +1,6 @@
 import { createSuccessResponse, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-
-import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   createPartnerBodySchema,
@@ -11,6 +9,7 @@ import {
   updatePartnerBodySchema,
 } from "../schemas/partners.schema.js";
 import { PartnersService } from "../services/partnersService.js";
+import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 
 export function createPartnersRoutes(deps: RegularizeRouteDeps): Router {
   const router = Router();

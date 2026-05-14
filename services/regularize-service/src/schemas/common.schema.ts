@@ -19,16 +19,14 @@ export const idQuerySchema = z
   })
   .strict();
 
-export const booleanQuerySchema = z
-  .union([z.boolean(), z.string()])
-  .transform((value, ctx) => {
-    try {
-      return parseBoolean(value);
-    } catch {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Valor booleano invalido.",
-      });
-      return z.NEVER;
-    }
-  });
+export const booleanQuerySchema = z.union([z.boolean(), z.string()]).transform((value, ctx) => {
+  try {
+    return parseBoolean(value);
+  } catch {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Valor booleano invalido.",
+    });
+    return z.NEVER;
+  }
+});

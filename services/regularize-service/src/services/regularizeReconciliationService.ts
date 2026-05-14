@@ -37,10 +37,13 @@ export class RegularizeReconciliationService {
 
   async handleClientPfChanged(organizationId: string, clientPfId: string): Promise<void> {
     const managerCache = new Map<string, string[]>();
-    await this.reconcileClientPfDocumentNotifications({
-      organizationId,
-      clientPfId,
-    }, managerCache);
+    await this.reconcileClientPfDocumentNotifications(
+      {
+        organizationId,
+        clientPfId,
+      },
+      managerCache,
+    );
     await this.reconcileInactiveClientPfStatuses({
       organizationId,
       clientPfId,
@@ -56,16 +59,22 @@ export class RegularizeReconciliationService {
 
   async handleLicenseChanged(organizationId: string, licenseId: string): Promise<void> {
     const managerCache = new Map<string, string[]>();
-    await this.reconcileLicenseNotifications({
-      organizationId,
-      licenseId,
-    }, managerCache);
+    await this.reconcileLicenseNotifications(
+      {
+        organizationId,
+        licenseId,
+      },
+      managerCache,
+    );
   }
 
-  private async reconcileClientPfDocumentNotifications(params?: {
-    organizationId?: string;
-    clientPfId?: string;
-  }, managerCache?: Map<string, string[]>): Promise<{ created: number }> {
+  private async reconcileClientPfDocumentNotifications(
+    params?: {
+      organizationId?: string;
+      clientPfId?: string;
+    },
+    managerCache?: Map<string, string[]>,
+  ): Promise<{ created: number }> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -225,10 +234,13 @@ export class RegularizeReconciliationService {
     return true;
   }
 
-  private async reconcileLicenseNotifications(params?: {
-    organizationId?: string;
-    licenseId?: string;
-  }, managerCache?: Map<string, string[]>): Promise<{ created: number }> {
+  private async reconcileLicenseNotifications(
+    params?: {
+      organizationId?: string;
+      licenseId?: string;
+    },
+    managerCache?: Map<string, string[]>,
+  ): Promise<{ created: number }> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
