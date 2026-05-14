@@ -1218,13 +1218,13 @@ export function RhScoreSection() {
   const isGlobalAdmin = user?.permission === 2;
   const canManageScore = isRhResponsible || isGlobalAdmin;
   const [activeTab, setActiveTab] = useState<RhScoreTab>(
-    canManageScore ? "questions" : "history",
+    canManageScore ? "questions" : "pending",
   );
   const hasInitializedAdminDefaultTab = useRef(false);
 
   useEffect(() => {
     if (!canManageScore && activeTab === "questions") {
-      setActiveTab("history");
+      setActiveTab("pending");
     }
   }, [activeTab, canManageScore]);
 
@@ -1233,7 +1233,7 @@ export function RhScoreSection() {
       return;
     }
 
-    setActiveTab((current) => (current === "questions" ? "history" : current));
+    setActiveTab((current) => (current === "questions" ? "pending" : current));
   }, [canManageScore]);
 
   useEffect(() => {
@@ -1246,8 +1246,8 @@ export function RhScoreSection() {
   }, [canManageScore]);
 
   const availableTabs = canManageScore
-    ? (["questions", "history"] as RhScoreTab[])
-    : (["history"] as RhScoreTab[]);
+    ? (["questions", "pending", "history"] as RhScoreTab[])
+    : (["pending", "history"] as RhScoreTab[]);
 
   return (
     <div className="space-y-6">
@@ -1306,7 +1306,7 @@ export function RhScoreSection() {
       </section>
 
       {activeTab === "questions" && canManageScore ? <RhScoreQuestionsTab /> : null}
-      {activeTab === "pending" ? null : null}
+      {activeTab === "pending" ? <RhPendingEvaluationsTab /> : null}
       {activeTab === "history" ? <RhScoreHistoryTab canManageScore={false} /> : null}
 
       {!canManageScore && activeTab === "questions" ? (
