@@ -23,6 +23,7 @@ const env: RegularizeServiceEnv = {
   logLevel: "info",
   logPretty: false,
   enableApiDocs: false,
+  allowedOrigins: ["*"],
 };
 
 process.env.DATABASE_URL = env.databaseUrl;
