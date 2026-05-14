@@ -1,4 +1,4 @@
-import { createSuccessResponse, parseWithZod } from "@workspace/shared";
+import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
@@ -16,7 +16,7 @@ export function createPartnersRoutes(deps: RegularizeRouteDeps): Router {
   const partnersService = new PartnersService(deps.prisma, deps.reconciliationService);
 
   router.post(
-    "/regularize/partners",
+    "/partners",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -27,14 +27,15 @@ export function createPartnersRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.status(201).json(createSuccessResponse(created));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao criar socio do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.put(
-    "/regularize/partners",
+    "/partners",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -45,28 +46,30 @@ export function createPartnersRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.json(createSuccessResponse(updated));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao atualizar socio do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/partner",
+    "/partner",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(partnerDetailQuerySchema, request.query);
         const detail = await partnersService.detail(request.organization_id, query.id);
         response.json(createSuccessResponse(detail));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao detalhar socio do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/partners",
+    "/partners",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -77,8 +80,9 @@ export function createPartnersRoutes(deps: RegularizeRouteDeps): Router {
           query.client_id,
         );
         response.json(createSuccessResponse(list));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao listar socios do regularize", { err });
+        next(err);
       }
     },
   );

@@ -1,4 +1,4 @@
-import { createSuccessResponse, parseWithZod } from "@workspace/shared";
+import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
@@ -16,7 +16,7 @@ export function createProcessRoutes(deps: RegularizeRouteDeps): Router {
   const processService = new ProcessService(deps.prisma);
 
   router.post(
-    "/regularize/process",
+    "/process",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -27,14 +27,15 @@ export function createProcessRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.status(201).json(createSuccessResponse(created));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao criar processo do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.put(
-    "/regularize/process",
+    "/process",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -45,36 +46,39 @@ export function createProcessRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.json(createSuccessResponse(updated));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao atualizar processo do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/process",
+    "/process",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(processDetailQuerySchema, request.query);
         const detail = await processService.detail(request.organization_id, query.id);
         response.json(createSuccessResponse(detail));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao detalhar processo do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/processes",
+    "/processes",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(listProcessesQuerySchema, request.query);
         const list = await processService.list(request.organization_id, query.status);
         response.json(createSuccessResponse(list));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao listar processos do regularize", { err });
+        next(err);
       }
     },
   );

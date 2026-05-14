@@ -93,7 +93,7 @@ export function createApp({
     }),
   );
 
-  app.use(createRegularizeRoutes({ prisma, env, reconciliationService }));
+  app.use("/regularize", createRegularizeRoutes({ prisma, env, reconciliationService }));
 
   app.use(
     createExpressErrorHandler({

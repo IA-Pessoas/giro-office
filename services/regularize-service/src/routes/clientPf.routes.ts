@@ -1,4 +1,4 @@
-import { createSuccessResponse, parseWithZod } from "@workspace/shared";
+import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
@@ -16,7 +16,7 @@ export function createClientPfRoutes(deps: RegularizeRouteDeps): Router {
   const clientPfService = new ClientPfService(deps.prisma, deps.reconciliationService);
 
   router.post(
-    "/regularize/pf",
+    "/pf",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -27,14 +27,15 @@ export function createClientPfRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.status(201).json(createSuccessResponse(created));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao criar cliente PF do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.put(
-    "/regularize/pf",
+    "/pf",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -45,36 +46,39 @@ export function createClientPfRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.json(createSuccessResponse(updated));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao atualizar cliente PF do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/pf",
+    "/pf",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(clientPfDetailQuerySchema, request.query);
         const detail = await clientPfService.detail(request.organization_id, query.id);
         response.json(createSuccessResponse(detail));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao detalhar cliente PF do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/pfs",
+    "/pfs",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(listClientPfQuerySchema, request.query);
         const list = await clientPfService.list(request.organization_id, query.status);
         response.json(createSuccessResponse(list));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao listar clientes PF do regularize", { err });
+        next(err);
       }
     },
   );

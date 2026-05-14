@@ -16,7 +16,7 @@ export function createLicenseRoutes(deps: RegularizeRouteDeps): Router {
   const licenseService = new LicenseService(deps.prisma, deps.reconciliationService);
 
   router.post(
-    "/regularize/license",
+    "/license",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -27,15 +27,15 @@ export function createLicenseRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.status(201).json(createSuccessResponse(created));
-      } catch (error) {
-        logError("Erro ao criar licença do regularize", { error });
-        next(error);
+      } catch (err) {
+        logError("Erro ao criar licenca do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.put(
-    "/regularize/license",
+    "/license",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -46,39 +46,39 @@ export function createLicenseRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.json(createSuccessResponse(updated));
-      } catch (error) {
-        logError("Erro ao atualizar licença do regularize", { error });
-        next(error);
+      } catch (err) {
+        logError("Erro ao atualizar licenca do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/license",
+    "/license",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(licenseDetailQuerySchema, request.query);
         const detail = await licenseService.detail(request.organization_id, query.id);
         response.json(createSuccessResponse(detail));
-      } catch (error) {
-        logError("Erro ao detalhar licença do regularize", { error });
-        next(error);
+      } catch (err) {
+        logError("Erro ao detalhar licenca do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/licenses",
+    "/licenses",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(listLicensesQuerySchema, request.query);
         const list = await licenseService.list(request.organization_id, query.status);
         response.json(createSuccessResponse(list));
-      } catch (error) {
-        logError("Erro ao listar licenças do regularize", { error });
-        next(error);
+      } catch (err) {
+        logError("Erro ao listar licencas do regularize", { err });
+        next(err);
       }
     },
   );

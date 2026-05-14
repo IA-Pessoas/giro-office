@@ -1,4 +1,4 @@
-import { createSuccessResponse, parseWithZod } from "@workspace/shared";
+import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
@@ -20,7 +20,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
   const passwordService = new PasswordService(deps.prisma, deps.env.encryptionKey);
 
   router.post(
-    "/regularize/passwords",
+    "/passwords",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -31,14 +31,15 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.status(201).json(createSuccessResponse(created));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao criar senha do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.put(
-    "/regularize/passwords",
+    "/passwords",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -49,42 +50,45 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.json(createSuccessResponse(updated));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao atualizar senha do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/passwords",
+    "/passwords",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(listPasswordsQuerySchema, request.query);
         const list = await passwordService.list(request.organization_id, query.client_id);
         response.json(createSuccessResponse(list));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao listar senhas do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/password",
+    "/password",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(passwordDetailQuerySchema, request.query);
         const detail = await passwordService.detail(request.organization_id, query.id);
         response.json(createSuccessResponse(detail));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao detalhar senha do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.post(
-    "/regularize/sites-pass",
+    "/sites-pass",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -95,14 +99,15 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.status(201).json(createSuccessResponse(created));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao criar site de senha do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.put(
-    "/regularize/sites-pass",
+    "/sites-pass",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
@@ -113,36 +118,39 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
           body,
         });
         response.json(createSuccessResponse(updated));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao atualizar site de senha do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/sites-pass",
+    "/sites-pass",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(listSitePasswordsQuerySchema, request.query);
         const list = await passwordService.listSites(request.organization_id, query.status);
         response.json(createSuccessResponse(list));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao listar sites de senha do regularize", { err });
+        next(err);
       }
     },
   );
 
   router.get(
-    "/regularize/sites-pass-detail",
+    "/sites-pass-detail",
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(sitePasswordDetailQuerySchema, request.query);
         const detail = await passwordService.detailSite(request.organization_id, query.id);
         response.json(createSuccessResponse(detail));
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        logError("Erro ao detalhar site de senha do regularize", { err });
+        next(err);
       }
     },
   );
