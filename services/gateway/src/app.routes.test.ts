@@ -320,6 +320,76 @@ it("strips client-supplied internal auth headers before proxying", async () => {
   }
 });
 
+it("strips hop-by-hop request headers before proxying", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  let seenHeaders: {
+    keepAlive?: string;
+    customConnectionToken?: string;
+  } = {};
+
+  const upstream = createServer((request, response) => {
+    seenHeaders = {
+      keepAlive: request.headers["keep-alive"] as string | undefined,
+      customConnectionToken: request.headers["x-remove-me"] as string | undefined,
+    };
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const taskServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ taskServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const { hostname, port } = new URL(gatewayUrl);
+
+  try {
+    const response = await new Promise<{ statusCode: number; body: string }>((resolve, reject) => {
+      const request = nodeRequest(
+        {
+          hostname,
+          port,
+          path: "/task/list",
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Connection: "x-remove-me",
+            "Keep-Alive": "timeout=5",
+            "X-Remove-Me": "client-hop-by-hop",
+          },
+        },
+        (incomingResponse) => {
+          const chunks: Buffer[] = [];
+          incomingResponse.on("data", (chunk) => {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          });
+          incomingResponse.on("end", () => {
+            resolve({
+              statusCode: incomingResponse.statusCode ?? 0,
+              body: Buffer.concat(chunks).toString("utf8"),
+            });
+          });
+        },
+      );
+
+      request.on("error", reject);
+      request.end();
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+    expect(seenHeaders.keepAlive).toBeUndefined();
+    expect(seenHeaders.customConnectionToken).toBeUndefined();
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("proxies permission updates to the user service when permission is sufficient", async () => {
   const token = createToken({
     user_id: "user-1",

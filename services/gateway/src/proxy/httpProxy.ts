@@ -35,8 +35,45 @@ interface HttpProxyOptions {
   internalServiceToken?: string;
 }
 
+const HOP_BY_HOP_HEADERS = new Set([
+  "connection",
+  "content-length",
+  "expect",
+  "host",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+]);
+
+function getConnectionHeaderTokens(request: Request): Set<string> {
+  const rawConnectionHeader = request.headers.connection;
+  const tokens = new Set<string>();
+
+  if (!rawConnectionHeader) {
+    return tokens;
+  }
+
+  const connectionHeader = Array.isArray(rawConnectionHeader)
+    ? rawConnectionHeader.join(",")
+    : rawConnectionHeader;
+
+  for (const token of connectionHeader.split(",")) {
+    const normalizedToken = token.trim().toLowerCase();
+    if (normalizedToken) {
+      tokens.add(normalizedToken);
+    }
+  }
+
+  return tokens;
+}
+
 function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): Headers {
   const headers = new Headers();
+  const connectionHeaderTokens = getConnectionHeaderTokens(request);
   const strippedClientHeaders = new Set([
     INTERNAL_SERVICE_TOKEN_HEADER,
     FORWARDED_AUTH_USER_ID_HEADER,
@@ -45,9 +82,12 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
   ]);
 
   Object.entries(request.headers).forEach(([key, value]) => {
+    const normalizedKey = key.toLowerCase();
+
     if (!value) return;
-    if (key === "host" || key === "content-length") return;
-    if (strippedClientHeaders.has(key.toLowerCase())) return;
+    if (HOP_BY_HOP_HEADERS.has(normalizedKey)) return;
+    if (connectionHeaderTokens.has(normalizedKey)) return;
+    if (strippedClientHeaders.has(normalizedKey)) return;
 
     if (Array.isArray(value)) {
       headers.set(key, value.join(","));
