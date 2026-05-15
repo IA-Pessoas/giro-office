@@ -5,8 +5,8 @@ import type { UpdateCommercialBody } from "../schemas/clientVerticals.schemas.js
 const OPEN_TASK_STATUSES = ["A Realizar", "Em andamento", "Em Espera", "Pendente"] as const;
 
 /**
- * Fluxo comercial alinhado ao legado `updateComercial` (atualizaÃƒÂ§ÃƒÂ£o de cliente + tarefas).
- * Envio de e-mail ao fechar prospecÃƒÂ§ÃƒÂ£o nÃƒÂ£o estÃƒÂ¡ replicado aqui (dependia de `EmailService` no monÃƒÂ³lito).
+ * Fluxo comercial alinhado ao legado `updateComercial` (atualização de cliente + tarefas).
+ * Envio de e-mail ao fechar prospecção não está replicado aqui (dependia de `EmailService` no monólito).
  */
 export async function updateCommercialClient(
   prisma: PrismaClient,
