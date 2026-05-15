@@ -1,0 +1,52 @@
+﻿Fonte original: .cursor/rules/typescript-services.mdc
+
+Metadados originais do Cursor:
+System.Object[]
+
+# TypeScript e Services
+
+## Imports
+- Usar extensao `.js` em imports locais (ESM).
+- Importar de `@workspace/shared` quando disponivel.
+
+## Nomes de arquivos
+- Em `src/services/`, usar `camelCaseService.ts`.
+- Em `src/routes/`, usar `camelCase.routes.ts`.
+- Evitar PascalCase, kebab-case e nomes mistos para arquivos novos nesses diretorios.
+- Imports locais devem acompanhar exatamente essa convencao.
+
+## Entry points
+- Em servicos HTTP/Express, preferir `server.ts` como entrypoint executavel.
+- `app.ts` deve exportar a factory da aplicacao (`createApp`, `createUserApp`, etc.) sem subir o servidor.
+- Testes devem importar `app.ts` sempre que possivel, e nao o entrypoint de processo.
+- Evitar `index.ts` como ponto de entrada quando ele mistura bootstrap, `listen`, logger e leitura de env.
+
+## Services
+- Uma responsabilidade por service.
+- `StorageService`: apenas operacoes de storage.
+- `UserService`: logica de usuario e banco.
+- `OrganizationService`: logica de organizacao e banco.
+- Rotas coordenam chamadas entre services.
+
+## Validacao de entrada (Zod)
+- Onde validar: na rota, com `parseWithZod` (`@workspace/shared`) e schemas em `services/<servico>/src/schemas/*.schemas.ts`.
+- Quando validar na rota: body em `POST`/`PUT`/`PATCH`, query em listagens/filtros, params quando precisarem de tipo ou formato.
+- O que fica no service: regras de negocio e integridade com `ServiceError`, sem repetir schema HTTP salvo motivo forte.
+- Shared: helpers genericos e `parseWithZod` em `shared/src/schemas/`; detalhes em `.cursor/rules/schemas-zod.mdc`.
+
+## Erros em services
+- `logError` como primeira linha util do `catch`, antes de ramificar com `if (err instanceof ServiceError)`.
+
+```typescript
+} catch (err: unknown) {
+  logError("Contexto do erro", { err });
+  if (err instanceof ServiceError) throw err;
+  throw new ServiceError(500, "Mensagem amigavel.", err);
+}
+```
+
+## Middlewares (`**/middlewares/**/*.ts`)
+- No `catch`, registrar antes de ramificar: `logError("contexto", { err })`.
+- Encaminhar com `next(err)` ou `next(new ServiceError(...))` conforme o caso.
+- Nao misturar esse fluxo com `response.status(...).json(...)` para o mesmo erro.
+
