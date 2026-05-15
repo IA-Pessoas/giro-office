@@ -37,7 +37,7 @@ const regularizeServiceEnvSchema = z
     databaseUrl: z.string().min(1, "DATABASE_URL não definido para o regularize-service."),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o regularize-service."),
     auditServiceToken: z.string().optional().default("audit-service-token"),
-    internalServiceToken: z.string().optional(),
+    internalServiceTokenEnv: z.string().optional(),
     encryptionKey: z.string().min(1, "MTK_ENCRYPTION_KEY não definida."),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
@@ -53,11 +53,15 @@ const regularizeServiceEnvSchema = z
     enableApiDocsEnv: z.string().optional(),
   })
   .transform((env) => {
-    const { enableApiDocsEnv, ...rest } = env;
+    const { enableApiDocsEnv, internalServiceTokenEnv, ...rest } = env;
     const enableApiDocs =
       enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
         ? parseBoolean(enableApiDocsEnv)
         : rest.nodeEnv !== "production";
+    const internalServiceToken =
+      internalServiceTokenEnv !== undefined && internalServiceTokenEnv !== ""
+        ? internalServiceTokenEnv
+        : rest.auditServiceToken;
 
     validateProductionInternalServiceToken({
       nodeEnv: rest.nodeEnv,
@@ -68,8 +72,8 @@ const regularizeServiceEnvSchema = z
     validateProductionInternalServiceToken({
       nodeEnv: rest.nodeEnv,
       serviceName: "regularize-service",
-      envName: "REGULARIZE_SERVICE_INTERNAL_TOKEN",
-      token: rest.internalServiceToken,
+      envName: "INTERNAL_SERVICE_TOKEN",
+      token: internalServiceToken,
     });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
@@ -80,6 +84,7 @@ const regularizeServiceEnvSchema = z
 
     return {
       ...rest,
+      internalServiceToken,
       logPretty: rest.nodeEnv !== "production" && rest.logPretty,
       enableApiDocs,
     };
@@ -97,7 +102,7 @@ export function getRegularizeServiceEnv(): RegularizeServiceEnv {
     databaseUrl: process.env.DATABASE_URL,
     jwtSecret: process.env.JWT_SECRET,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
-    internalServiceToken: process.env.REGULARIZE_SERVICE_INTERNAL_TOKEN,
+    internalServiceTokenEnv: process.env.INTERNAL_SERVICE_TOKEN,
     encryptionKey: process.env.MTK_ENCRYPTION_KEY,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,

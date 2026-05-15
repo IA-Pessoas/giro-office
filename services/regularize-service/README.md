@@ -15,7 +15,7 @@ Definicao e defaults em [`src/config/env.ts`](src/config/env.ts):
 - `PORT` - porta HTTP (default `3039`)
 - `MTK_ENCRYPTION_KEY` - chave usada para criptografar credenciais do legado
 - `AUDIT_SERVICE_TOKEN` - token usado na integracao de auditoria
-- `REGULARIZE_SERVICE_INTERNAL_TOKEN` - token exigido nas rotas `POST /internal/reconciliation/*` pelo header `x-internal-service-token`
+- `INTERNAL_SERVICE_TOKEN` - token exigido nas rotas `POST /internal/reconciliation/*` pelo header `x-internal-service-token` (opcional; se vazio, usa o mesmo valor que `AUDIT_SERVICE_TOKEN`)
 - `SERVICE_ALLOWED_ORIGINS` - origens CORS aceitas; em producao nao pode ficar como `*`
 - `ENABLE_API_DOCS` - documentacao OpenAPI em `/docs` (default ligado fora de producao)
 - `LOG_LEVEL`, `LOG_PRETTY` - configuracao de logs
@@ -48,7 +48,7 @@ Infraestrutura direto no servico: `GET /health` e, quando habilitado, `GET /docs
 
 ## Rotas internas
 
-As rotas internas ficam montadas diretamente no servico sob `/internal` e exigem `REGULARIZE_SERVICE_INTERNAL_TOKEN`:
+As rotas internas ficam montadas diretamente no servico sob `/internal` e exigem `INTERNAL_SERVICE_TOKEN`:
 
 - `POST /internal/reconciliation/run`
 - `POST /internal/reconciliation/license-notifications/run`

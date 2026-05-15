@@ -1,6 +1,6 @@
 const edgeFunctionSecret = Deno.env.get("EDGE_FUNCTION_SECRET");
 const regularizeServiceBaseUrl = Deno.env.get("REGULARIZE_SERVICE_BASE_URL");
-const regularizeServiceInternalToken = Deno.env.get("REGULARIZE_SERVICE_INTERNAL_TOKEN");
+const regularizeServiceInternalToken = Deno.env.get("INTERNAL_SERVICE_TOKEN");
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
@@ -18,8 +18,7 @@ Deno.serve(async (request) => {
 
   if (!regularizeServiceBaseUrl || !regularizeServiceInternalToken) {
     return jsonResponse(500, {
-      error:
-        "Missing REGULARIZE_SERVICE_BASE_URL or REGULARIZE_SERVICE_INTERNAL_TOKEN environment variables",
+      error: "Missing REGULARIZE_SERVICE_BASE_URL or INTERNAL_SERVICE_TOKEN environment variables",
     });
   }
 
