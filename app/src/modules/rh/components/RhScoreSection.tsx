@@ -520,6 +520,13 @@ type RhScoreTab = "questions" | "pending" | "history";
 
 type RhScoreQuestionFilter = RhScoreQuestionType | "all";
 
+const RH_SCORE_EVALUATION_GROUP_ORDER: RhScoreQuestionType[] = [
+  "behavioral",
+  "technical",
+  "tech",
+  "leadership",
+];
+
 
 
 
@@ -888,6 +895,26 @@ const RH_NITRO_METRICS: Array<[RhNitroMetricType, string]> = [
 
 ];
 
+const RH_VISIBLE_NITRO_METRICS = RH_NITRO_METRICS.filter(([type]) => type !== "folders");
+const RH_NITRO_MIN = 0;
+const RH_NITRO_MAX = 5;
+
+function getNitroMetricLabel(metric: RhNitroMetricType, defaultLabel: string) {
+  if (metric === "errors") {
+    return "Erros (-)";
+  }
+
+  return defaultLabel;
+}
+
+function getNitroMetricHint(metric: RhNitroMetricType) {
+  if (metric === "errors") {
+    return "Reduz o score final";
+  }
+
+  return "Impacto positivo no score";
+}
+
 
 
 
@@ -1183,6 +1210,22 @@ function buildNitroDraft(score: RhScoreQuarter | undefined): NitroDraftState {
 
 
 }
+function normalizeNitroInput(rawValue: string) {
+  if (!rawValue.trim()) {
+    return "";
+  }
+
+  const sanitizedValue = rawValue.replace(",", ".");
+  const parsedValue = Number(sanitizedValue);
+
+  if (!Number.isFinite(parsedValue)) {
+    return rawValue;
+  }
+
+  const clampedValue = Math.min(RH_NITRO_MAX, Math.max(RH_NITRO_MIN, parsedValue));
+  return String(clampedValue);
+}
+
 
 
 
@@ -4300,7 +4343,7 @@ function RhPendingEvaluationsTab() {
 
 
 
-                    MÃ©dia atual
+                    Média atual
 
 
 
@@ -5717,6 +5760,8 @@ function RhScoreDetailDialog({
 
 
   const [nitroDraft, setNitroDraft] = useState<NitroDraftState>(EMPTY_NITRO_DRAFT);
+  const [activeEvaluationType, setActiveEvaluationType] =
+    useState<RhScoreQuestionType | null>(null);
 
 
 
@@ -5749,6 +5794,7 @@ function RhScoreDetailDialog({
 
 
   }, [detailQuery.data, scoreId]);
+
 
 
 
@@ -5820,7 +5866,7 @@ function RhScoreDetailDialog({
 
 
 
-      toast.warn("Informe um valor para a mÃ©trica Nitro.");
+      toast.warn("Informe um valor para a métrica Nitro.");
 
 
 
@@ -5861,44 +5907,14 @@ function RhScoreDetailDialog({
 
 
     if (!Number.isFinite(value)) {
-
-
-
-
-
-
-
-      toast.warn("Informe um valor numÃ©rico vÃ¡lido para a mÃ©trica Nitro.");
-
-
-
-
-
-
-
+      toast.warn("Informe um valor numérico válido para a métrica Nitro.");
       return;
-
-
-
-
-
-
-
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+    if (value < RH_NITRO_MIN || value > RH_NITRO_MAX) {
+      toast.warn(`Use um valor entre ${RH_NITRO_MIN} e ${RH_NITRO_MAX} para a métrica Nitro.`);
+      return;
+    }
 
     try {
 
@@ -5964,7 +5980,7 @@ function RhScoreDetailDialog({
 
 
 
-      toast.error(getErrorMessage(error, "NÃ£o foi possÃ­vel atualizar o Nitro."));
+      toast.error(getErrorMessage(error, "Não foi possível atualizar o Nitro."));
 
 
 
@@ -5997,6 +6013,39 @@ function RhScoreDetailDialog({
 
 
   const score = detailQuery.data;
+
+  const groupedEvaluations = RH_SCORE_EVALUATION_GROUP_ORDER.map((type) => ({
+    type,
+    evaluations:
+      score?.evaluations?.filter((evaluation) => evaluation.type === type) ?? [],
+  })).filter((group) => group.evaluations.length > 0);
+
+  const activeEvaluationGroup =
+    groupedEvaluations.find((group) => group.type === activeEvaluationType) ??
+    groupedEvaluations[0] ??
+    null;
+
+  useEffect(() => {
+    if (!groupedEvaluations.length) {
+      if (activeEvaluationType !== null) {
+        setActiveEvaluationType(null);
+      }
+      return;
+    }
+
+    if (!activeEvaluationType) {
+      setActiveEvaluationType(groupedEvaluations[0].type);
+      return;
+    }
+
+    const hasActiveType = groupedEvaluations.some(
+      (group) => group.type === activeEvaluationType,
+    );
+
+    if (!hasActiveType) {
+      setActiveEvaluationType(groupedEvaluations[0].type);
+    }
+  }, [activeEvaluationType, groupedEvaluations]);
 
 
 
@@ -6356,7 +6405,7 @@ function RhScoreDetailDialog({
 
 
 
-                    Visualize a composiÃ§Ã£o do trimestre, consulte as respostas enviadas e ajuste
+                    Visualize a composição do trimestre, consulte as respostas enviadas e ajuste
 
 
 
@@ -6364,7 +6413,7 @@ function RhScoreDetailDialog({
 
 
 
-                    as mÃ©tricas de Nitro sem sair do contexto.
+                    as métricas de Nitro sem sair do contexto.
 
 
 
@@ -6900,7 +6949,7 @@ function RhScoreDetailDialog({
 
 
 
-                    MÃ©tricas trimestrais associadas ao score.
+                    Métricas trimestrais associadas ao score.
 
 
 
@@ -6980,7 +7029,7 @@ function RhScoreDetailDialog({
 
 
 
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="mt-5 grid gap-4 lg:grid-cols-3">
 
 
 
@@ -6988,7 +7037,7 @@ function RhScoreDetailDialog({
 
 
 
-                {RH_NITRO_METRICS.map(([type, label]) => (
+                {RH_VISIBLE_NITRO_METRICS.map(([type, label]) => (
 
 
 
@@ -7012,7 +7061,7 @@ function RhScoreDetailDialog({
 
 
 
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-900/30"
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/30"
 
 
 
@@ -7052,7 +7101,7 @@ function RhScoreDetailDialog({
 
 
 
-                          {label}
+                          {getNitroMetricLabel(type, label)}
 
 
 
@@ -7140,7 +7189,7 @@ function RhScoreDetailDialog({
 
 
 
-                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <div className="mt-3 flex items-end gap-2">
 
 
 
@@ -7204,7 +7253,7 @@ function RhScoreDetailDialog({
 
 
 
-                            [type]: event.target.value,
+                            [type]: normalizeNitroInput(event.target.value),
 
 
 
@@ -7236,7 +7285,7 @@ function RhScoreDetailDialog({
 
 
 
-                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
 
 
 
@@ -7292,7 +7341,7 @@ function RhScoreDetailDialog({
 
 
 
-                          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
 
 
 
@@ -7444,7 +7493,7 @@ function RhScoreDetailDialog({
 
 
 
-                    Respostas que jÃ¡ compÃµem o trimestre.
+                    Respostas que já compõem o trimestre.
 
 
 
@@ -7492,7 +7541,7 @@ function RhScoreDetailDialog({
 
 
 
-                <div className="mt-5 space-y-4">
+                <div className="mt-5 space-y-6">
 
 
 
@@ -7500,7 +7549,45 @@ function RhScoreDetailDialog({
 
 
 
-                  {score.evaluations.map((evaluation) => (
+                  <div className="flex flex-wrap gap-2">
+                    {groupedEvaluations.map((group) => {
+                      const isActive = activeEvaluationGroup?.type === group.type;
+
+                      return (
+                        <button
+                          key={`${group.type}-tab`}
+                          type="button"
+                          onClick={() => setActiveEvaluationType(group.type)}
+                          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                            isActive
+                              ? "bg-blue-600 text-white"
+                              : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/70"
+                          }`}
+                        >
+                          {getRhScoreTypeLabel(group.type)}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {groupedEvaluations.map((group) =>
+                    activeEvaluationGroup?.type === group.type ? (
+
+                    <div key={group.type} className="space-y-4">
+
+                      <div>
+
+                        <h4 className="text-base font-semibold text-slate-900 dark:text-white">
+
+                          {getRhScoreTypeLabel(group.type)}
+
+                        </h4>
+
+                      </div>
+
+                      <div className="space-y-4">
+
+                        {group.evaluations.map((evaluation) => (
 
 
 
@@ -7524,7 +7611,7 @@ function RhScoreDetailDialog({
 
 
 
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-900/30"
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/30"
 
 
 
@@ -7564,7 +7651,9 @@ function RhScoreDetailDialog({
 
 
 
-                            {getRhScoreTypeLabel(evaluation.type)}
+                            {evaluation.evaluator?.name?.trim() ||
+
+                              getRhScoreEvaluatorRoleLabel(evaluation.evaluator_role)}
 
 
 
@@ -7588,7 +7677,7 @@ function RhScoreDetailDialog({
 
 
 
-                            {evaluation.evaluator?.name?.trim() ||
+                            {getRhScoreStatusLabel(evaluation.status)}
 
 
 
@@ -7596,7 +7685,6 @@ function RhScoreDetailDialog({
 
 
 
-                              getRhScoreEvaluatorRoleLabel(evaluation.evaluator_role)}{" "}
 
 
 
@@ -7604,7 +7692,8 @@ function RhScoreDetailDialog({
 
 
 
-                            {"\u2022 "}{getRhScoreStatusLabel(evaluation.status)}
+
+
 
 
 
@@ -7636,7 +7725,7 @@ function RhScoreDetailDialog({
 
 
 
-                          MÃ©dia {formatRhScoreValue(evaluation.average_score)}
+                          Média {formatRhScoreValue(evaluation.average_score)}
 
 
 
@@ -7780,7 +7869,6 @@ function RhScoreDetailDialog({
 
 
 
-                                {answer.obs?.trim() ? (
 
 
 
@@ -7788,7 +7876,6 @@ function RhScoreDetailDialog({
 
 
 
-                                  <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
 
 
 
@@ -7796,7 +7883,6 @@ function RhScoreDetailDialog({
 
 
 
-                                    {answer.obs}
 
 
 
@@ -7804,7 +7890,6 @@ function RhScoreDetailDialog({
 
 
 
-                                  </p>
 
 
 
@@ -7812,7 +7897,7 @@ function RhScoreDetailDialog({
 
 
 
-                                ) : null}
+
 
 
 
@@ -7860,6 +7945,12 @@ function RhScoreDetailDialog({
 
 
 
+                            {answer.obs?.trim() ? (
+                              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                                {answer.obs}
+                              </p>
+                            ) : null}
+
                           </div>
 
 
@@ -7886,13 +7977,21 @@ function RhScoreDetailDialog({
 
                     </article>
 
+                        ))}
+
+                      </div>
+
+                    </div>
+
+                    ) : null,
+                  )}
 
 
 
 
 
 
-                  ))}
+
 
 
 
@@ -8037,6 +8136,13 @@ function RhScoreHistoryTab({ canManageScore }: { canManageScore: boolean }) {
 
 
   const scoreHistory = historyQuery.data ?? [];
+  const scoreHistory2026 = useMemo(
+    () =>
+      [...scoreHistory]
+        .filter((score) => score.quarter?.startsWith("2026-Q"))
+        .sort((left, right) => left.quarter.localeCompare(right.quarter)),
+    [scoreHistory],
+  );
 
 
 
@@ -8164,7 +8270,7 @@ function RhScoreHistoryTab({ canManageScore }: { canManageScore: boolean }) {
 
 
 
-      ) : scoreHistory.length === 0 ? (
+      ) : scoreHistory2026.length === 0 ? (
 
 
 
@@ -8236,7 +8342,7 @@ function RhScoreHistoryTab({ canManageScore }: { canManageScore: boolean }) {
 
 
 
-            Seus trimestres aparecerÃ£o aqui assim que forem gerados.
+            Seus trimestres de 2026 aparecerão aqui assim que forem gerados.
 
 
 
@@ -8268,7 +8374,11 @@ function RhScoreHistoryTab({ canManageScore }: { canManageScore: boolean }) {
 
 
 
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <div
+          className={`grid gap-4 ${
+            scoreHistory2026.length >= 3 ? "lg:grid-cols-2 xl:grid-cols-3" : "lg:grid-cols-2"
+          }`}
+        >
 
 
 
@@ -8276,7 +8386,7 @@ function RhScoreHistoryTab({ canManageScore }: { canManageScore: boolean }) {
 
 
 
-          {scoreHistory.map((score) => (
+          {scoreHistory2026.map((score) => (
 
 
 
@@ -8580,7 +8690,7 @@ function RhScoreHistoryTab({ canManageScore }: { canManageScore: boolean }) {
 
 
 
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
 
 
 
@@ -9221,15 +9331,17 @@ export function RhScoreSection() {
 
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            {"Avaliações de score"}
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-400">
-            {"Perguntas, pendências e histórico trimestral."}
-          </p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+              {"Avaliações de score"}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
+              {"Perguntas, pendências e histórico trimestral."}
+            </p>
+          </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 lg:justify-end">
             {availableTabs.map((tab) => (
               <button
                 key={tab}
@@ -9370,6 +9482,9 @@ export function RhScoreSection() {
 
 
 }
+
+
+
 
 
 
