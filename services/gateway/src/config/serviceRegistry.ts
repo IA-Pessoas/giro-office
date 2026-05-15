@@ -14,6 +14,8 @@ const PROJECT_SERVICE_PREFIXES = ["/project"] as const;
 
 const CLIENT_SERVICE_PREFIXES = ["/client"] as const;
 
+const REGULARIZE_SERVICE_PREFIXES = ["/regularize"] as const;
+
 const FISCAL_SERVICE_PREFIXES = ["/fiscal"] as const;
 
 const CONTABIL_SERVICE_PREFIXES = ["/contabil"] as const;
@@ -80,6 +82,12 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.clientServiceUrl,
       auditTarget: "client-service",
       routePrefixes: [...CLIENT_SERVICE_PREFIXES],
+    },
+    {
+      key: "regularize-service",
+      targetUrl: env.regularizeServiceUrl,
+      auditTarget: "regularize-service",
+      routePrefixes: [...REGULARIZE_SERVICE_PREFIXES],
     },
     {
       key: "fiscal-service",

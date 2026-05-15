@@ -7,6 +7,7 @@ import { buildDepartmentServiceOpenApiSpec } from "../../../department-service/s
 import { buildFiscalServiceOpenApiSpec } from "../../../fiscal-service/src/openapi/spec.js";
 import { buildOrganizationServiceOpenApiSpec } from "../../../organization-service/src/openapi/spec.js";
 import { buildProjectServiceOpenApiSpec } from "../../../project-service/src/openapi/spec.js";
+import { buildRegularizeServiceOpenApiSpec } from "../../../regularize-service/src/openapi/spec.js";
 import { buildRhServiceOpenApiSpec } from "../../../rh-service/src/openapi/spec.js";
 import { buildTaskServiceOpenApiSpec } from "../../../task-service/src/openapi/spec.js";
 import { buildUserServiceOpenApiSpec } from "../../../user-service/src/openapi/spec.js";
@@ -88,6 +89,16 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       buildSpec: () =>
         buildClientServiceOpenApiSpec({ port: getPortFromUrl(env.clientServiceUrl) } as never),
       includePath: (path) => path !== "/health" && path !== "/ready",
+    },
+    {
+      key: "regularize-service",
+      label: "Regularize Service",
+      buildSpec: () =>
+        buildRegularizeServiceOpenApiSpec({
+          port: getPortFromUrl(env.regularizeServiceUrl),
+        } as never),
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
+      isInternalPath: (path) => path.startsWith("/internal/"),
     },
     {
       key: "organization-service",
@@ -446,7 +457,7 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
       title: "office-gateway",
       version: "1.0.0",
       description:
-        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, organization-service, rh-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
+        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
     },
     servers: [{ url: "http://localhost" }],
     tags: [

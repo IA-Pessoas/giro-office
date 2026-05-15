@@ -83,6 +83,16 @@ export const serviceRegistry = [
     prismaOutputPath: "services/project-service/src/generated/prisma",
   },
   {
+    name: "regularize-service",
+    packagePath: "services/regularize-service",
+    defaultUrl: "http://localhost:3039",
+    urlEnvKey: "REGULARIZE_SERVICE_URL",
+    openapiSpecPath: "services/regularize-service/src/openapi/spec.ts",
+    authModes: ["public", "bearer", "internal-token"],
+    internalTokenEnvKey: "INTERNAL_SERVICE_TOKEN",
+    prismaOutputPath: "services/regularize-service/src/generated/prisma",
+  },
+  {
     name: "rh-service",
     packagePath: "services/rh-service",
     defaultUrl: "http://localhost:3034",

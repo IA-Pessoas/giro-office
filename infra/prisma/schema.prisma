@@ -45,6 +45,12 @@ generator rh_service_client {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator regularize_service_client {
+  provider        = "prisma-client"
+  output          = "../../services/regularize-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 generator department_service_client {
   provider        = "prisma-client"
   output          = "../../services/department-service/src/generated/prisma"

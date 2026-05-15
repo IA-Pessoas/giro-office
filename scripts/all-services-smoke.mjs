@@ -99,6 +99,8 @@ const env = {
   password: process.env.PASSWORD ?? process.env.ADMIN_PASSWORD ?? "senha123",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
+  regularizeSmokeEnabled:
+    process.env.REGULARIZE_SMOKE_ENABLED === "true" || process.env.REGULARIZE_SMOKE_ENABLED === "1",
   namespace:
     process.env.SMOKE_NAMESPACE?.trim() ||
     `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -3197,6 +3199,18 @@ function matchesFilter(op) {
   );
 }
 
+function disabledConditionReason(condition) {
+  if (condition === "auditEnabled" && !env.auditEnabled) {
+    return "AUDIT_ENABLED is false";
+  }
+
+  if (condition === "regularizeSmokeEnabled" && !env.regularizeSmokeEnabled) {
+    return "REGULARIZE_SMOKE_ENABLED is false";
+  }
+
+  return "";
+}
+
 async function run() {
   if (!cli.dryRun && !fs.existsSync(env.fixturePath)) {
     throw new Error(`Smoke upload fixture not found at ${env.fixturePath}.`);
@@ -3232,9 +3246,10 @@ async function run() {
         continue;
       }
 
-      if (op.condition === "auditEnabled" && !env.auditEnabled) {
-        skipped.push({ id: op.id, reason: "AUDIT_ENABLED is false" });
-        log("SKIP", `${op.id} (AUDIT_ENABLED is false)`);
+      const disabledReason = disabledConditionReason(op.condition);
+      if (disabledReason) {
+        skipped.push({ id: op.id, reason: disabledReason });
+        log("SKIP", `${op.id} (${disabledReason})`);
         continue;
       }
 

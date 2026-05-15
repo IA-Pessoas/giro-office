@@ -231,6 +231,10 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   app.use(generalRateLimit);
   app.use(authorizeRequest);
 
+  app.use("/regularize/internal", (_request, _response, next) => {
+    next(new ServiceError(404, "Recurso nÃ£o encontrado."));
+  });
+
   for (const service of getGatewayServiceDefinitions(env)) {
     for (const routePrefix of service.routePrefixes) {
       app.use(routePrefix, buildHttpProxyMiddleware(service.targetUrl));

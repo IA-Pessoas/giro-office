@@ -11,6 +11,7 @@ packages:
   - "services/task-service"
   - "services/client-service"
   - "services/project-service"
+  - "services/regularize-service"
   - "services/department-service"
   - "services/fiscal-service"
   - "services/contabil-service"
