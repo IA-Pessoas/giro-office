@@ -26,6 +26,7 @@
     "smoke:coverage": "node scripts/check-smoke-spec-coverage.mjs",
     "smoke:scaffold": "node scripts/generate-service-harness.mjs",
     "harness:test": "node --test scripts/service-harness.test.mjs scripts/check-compose-security.test.mjs scripts/ci-workflow-optimization.test.mjs",
+    "hooks:test": "node --test scripts/git-hook-scope.test.mjs",
     "security:compose": "node scripts/check-compose-security.mjs"
   },
   "devDependencies": {
@@ -55,11 +56,5 @@
       "picomatch": "4.0.4",
       "postcss": "8.5.11"
     }
-  },
-  "lint-staged": {
-    "{shared,services/gateway}/**/*.{ts,tsx,js,json}": [
-      "biome format --write",
-      "biome lint"
-    ]
   }
 }
