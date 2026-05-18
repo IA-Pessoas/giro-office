@@ -403,6 +403,9 @@ export interface RhScoreQuarter {
   organization_id: string;
   nitro?: RhScoreNitro | null;
   evaluations?: RhScoreEvaluation[];
+  user?: {
+    name: string;
+  } | null;
 }
 
 export interface CreateRhScoreQuarterPayload {
