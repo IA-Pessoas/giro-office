@@ -16,9 +16,12 @@ import type {
   DeleteRhHolidayPayload,
   RhHoliday,
   RhMutationMessage,
+  RhTimeBankOverview,
   RhTimeBankRelease,
   RhTimeBankReleaseListFilters,
-  RhTimeSheet,
+  RhTimeBankSummary,
+  RhTimeSheetDetail,
+  RhTimeSheetListItem,
   RhTimeSheetListFilters,
   SignRhTimeSheetPayload,
   UpdateRhHolidayPayload,
@@ -41,8 +44,20 @@ export function rhTimeBankReleasesQueryKey(filters: RhTimeBankReleaseListFilters
   ] as const;
 }
 
+export function rhTimeBankSummaryQueryKey(userId?: string) {
+  return [...RH_QUERY_KEY, "calendar", "time-bank-summary", userId ?? "me"] as const;
+}
+
+export function rhTimeBankOverviewQueryKey() {
+  return [...RH_QUERY_KEY, "calendar", "time-bank-overview"] as const;
+}
+
 export function rhTimeSheetsQueryKey(filters: RhTimeSheetListFilters = {}) {
   return [...RH_QUERY_KEY, "calendar", "timesheets", filters.target_user_id ?? "me"] as const;
+}
+
+export function rhTimeSheetDetailQueryKey(id?: string | null) {
+  return [...RH_QUERY_KEY, "calendar", "timesheet-detail", id ?? ""] as const;
 }
 
 export function useRhHolidays(): UseQueryResult<RhHoliday[], Error> {
@@ -63,9 +78,33 @@ export function useRhTimeBankReleases(
   );
 }
 
+export function useRhTimeBankSummary(
+  userId?: string,
+  enabled = true,
+): UseQueryResult<RhTimeBankSummary, Error> {
+  return useFetch(
+    rhTimeBankSummaryQueryKey(userId),
+    () =>
+      userId
+        ? rhCalendarService.getTimeBankSummaryByUserId(userId)
+        : rhCalendarService.getMyTimeBankSummary(),
+    {
+      enabled,
+      refetchOnWindowFocus: false,
+    },
+  );
+}
+
+export function useRhTimeBankOverview(enabled = true): UseQueryResult<RhTimeBankOverview, Error> {
+  return useFetch(rhTimeBankOverviewQueryKey(), () => rhCalendarService.getTimeBankOverview(), {
+    enabled,
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function useRhTimeSheets(
   filters: RhTimeSheetListFilters = {},
-): UseQueryResult<RhTimeSheet[], Error> {
+): UseQueryResult<RhTimeSheetListItem[], Error> {
   return useFetch(
     rhTimeSheetsQueryKey(filters),
     () => rhCalendarService.listTimeSheets(filters),
@@ -73,6 +112,16 @@ export function useRhTimeSheets(
       refetchOnWindowFocus: false,
     },
   );
+}
+
+export function useRhTimeSheetDetail(
+  id?: string | null,
+  enabled = true,
+): UseQueryResult<RhTimeSheetDetail, Error> {
+  return useFetch(rhTimeSheetDetailQueryKey(id), () => rhCalendarService.getTimeSheetDetail(id ?? ""), {
+    enabled: enabled && Boolean(id),
+    refetchOnWindowFocus: false,
+  });
 }
 
 export function useCreateRhHolidayMutation(): UseMutationResult<
@@ -151,7 +200,7 @@ export function useApproveRhTimeBankReleaseMutation(): UseMutationResult<
 }
 
 export function useCreateRhTimeSheetMutation(): UseMutationResult<
-  RhTimeSheet,
+  RhTimeSheetDetail,
   Error,
   CreateRhTimeSheetPayload
 > {
@@ -166,7 +215,7 @@ export function useCreateRhTimeSheetMutation(): UseMutationResult<
 }
 
 export function useSignRhTimeSheetMutation(): UseMutationResult<
-  RhTimeSheet,
+  RhTimeSheetDetail,
   Error,
   SignRhTimeSheetPayload
 > {

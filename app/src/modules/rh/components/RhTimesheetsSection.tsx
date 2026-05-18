@@ -1,12 +1,10 @@
 import { useMemo, useState } from "react";
 
-import { useAuth } from "@/context/AuthContext";
-import { permissionService } from "@modules/users/services/permissionService";
-import { normalizePermissionResponse } from "@modules/users/utils/permissionUtils";
-import { useFetch } from "@shared/hooks";
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import { useRhTimeSheets } from "../hooks/useRhCalendar";
-import type { RhTimeSheet, RhTimeSheetListFilters } from "../types";
+import { useRhPermissions } from "../hooks/useRhPermissions";
+import type { RhTimeSheetListFilters, RhTimeSheetListItem } from "../types";
+import { RhTimesheetDetailDialog } from "./RhTimesheetDetailDialog";
 import { RhTimesheetGenerateModal } from "./RhTimesheetGenerateModal";
 import { RhTimesheetSignDialog } from "./RhTimesheetSignDialog";
 import { RhTimesheetsFilters } from "./RhTimesheetsFilters";
@@ -43,11 +41,7 @@ function parseDateEnd(value: string) {
   return new Date(`${value}T23:59:59.999`);
 }
 
-function intersectsSelectedPeriod(
-  sheet: RhTimeSheet,
-  dateFrom: string,
-  dateTo: string,
-) {
+function intersectsSelectedPeriod(sheet: RhTimeSheetListItem, dateFrom: string, dateTo: string) {
   const start = new Date(sheet.start_time);
   const end = new Date(sheet.end_time);
 
@@ -70,40 +64,15 @@ function intersectsSelectedPeriod(
 }
 
 export function RhTimesheetsSection() {
-  const { user } = useAuth();
+  const { user, canManageRh: canManageTimesheets } = useRhPermissions("timesheets");
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [dateFrom, setDateFrom] = useState(getMonthStartInputValue);
   const [dateTo, setDateTo] = useState(getTodayInputValue);
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [sheetPendingSignature, setSheetPendingSignature] =
-    useState<RhTimeSheet | null>(null);
-
-  const permissionQuery = useFetch(
-    ["rh", "timesheets", "permissions", user?.id ?? ""],
-    () => permissionService.getByUserId(user?.id ?? ""),
-    {
-      enabled: Boolean(user?.id),
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-
-  const normalizedPermissions = useMemo(() => {
-    if (!permissionQuery.data) {
-      return null;
-    }
-
-    return normalizePermissionResponse(permissionQuery.data).known;
-  }, [permissionQuery.data]);
-
-  const isRhResponsible = Boolean(
-    normalizedPermissions?.rh !== null &&
-      normalizedPermissions?.rh !== undefined &&
-      normalizedPermissions.rh >= 1,
-  );
-  const isGlobalAdmin = user?.permission === 2;
-  const canManageTimesheets = isRhResponsible || isGlobalAdmin;
+    useState<RhTimeSheetListItem | null>(null);
+  const [selectedDetailSheetId, setSelectedDetailSheetId] = useState<string | null>(null);
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManageTimesheets,
@@ -114,9 +83,7 @@ export function RhTimesheetsSection() {
   const departments = useMemo(() => {
     return [
       ...new Set(
-        assignableUsers
-          .map((assignableUser) => assignableUser.departmentName)
-          .filter(Boolean),
+        assignableUsers.map((assignableUser) => assignableUser.departmentName).filter(Boolean),
       ),
     ];
   }, [assignableUsers]);
@@ -130,13 +97,9 @@ export function RhTimesheetsSection() {
     );
   }, [assignableUsers, selectedDepartment]);
   const shouldDisableGenerate =
-    !canManageTimesheets ||
-    assignableUsersQuery.isLoading ||
-    filteredAssignableUsers.length === 0;
+    !canManageTimesheets || assignableUsersQuery.isLoading || filteredAssignableUsers.length === 0;
 
-  const effectiveUserId = canManageTimesheets
-    ? selectedUserId || (user?.id ?? "")
-    : (user?.id ?? "");
+  const effectiveUserId = canManageTimesheets ? selectedUserId || (user?.id ?? "") : user?.id ?? "";
   const filters: RhTimeSheetListFilters = {
     target_user_id: effectiveUserId || undefined,
   };
@@ -145,18 +108,11 @@ export function RhTimesheetsSection() {
   const timeSheets = timeSheetsQuery.data ?? [];
 
   const filteredTimeSheets = useMemo(() => {
-    return timeSheets.filter((sheet) =>
-      intersectsSelectedPeriod(sheet, dateFrom, dateTo),
-    );
+    return timeSheets.filter((sheet) => intersectsSelectedPeriod(sheet, dateFrom, dateTo));
   }, [dateFrom, dateTo, timeSheets]);
 
   const userNameById = useMemo(() => {
-    return new Map(
-      assignableUsers.map((assignableUser) => [
-        assignableUser.id,
-        assignableUser.name,
-      ]),
-    );
+    return new Map(assignableUsers.map((assignableUser) => [assignableUser.id, assignableUser.name]));
   }, [assignableUsers]);
 
   function getUserLabel(userId: string) {
@@ -182,12 +138,8 @@ export function RhTimesheetsSection() {
 
   const isLoading =
     timeSheetsQuery.isLoading ||
-    (canManageTimesheets &&
-      assignableUsersQuery.isLoading &&
-      !assignableUsersQuery.data);
-  const error =
-    timeSheetsQuery.error ||
-    (canManageTimesheets ? assignableUsersQuery.error : null);
+    (canManageTimesheets && assignableUsersQuery.isLoading && !assignableUsersQuery.data);
+  const error = timeSheetsQuery.error || (canManageTimesheets ? assignableUsersQuery.error : null);
 
   return (
     <div className="space-y-6">
@@ -223,6 +175,12 @@ export function RhTimesheetsSection() {
         onClose={() => setSheetPendingSignature(null)}
       />
 
+      <RhTimesheetDetailDialog
+        open={Boolean(selectedDetailSheetId)}
+        timesheetId={selectedDetailSheetId}
+        onClose={() => setSelectedDetailSheetId(null)}
+      />
+
       {isLoading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
           Carregando folhas de ponto...
@@ -248,6 +206,7 @@ export function RhTimesheetsSection() {
           signingSheetId={sheetPendingSignature?.id ?? null}
           getUserLabel={getUserLabel}
           onSign={setSheetPendingSignature}
+          onViewDetail={setSelectedDetailSheetId}
         />
       ) : null}
     </div>
