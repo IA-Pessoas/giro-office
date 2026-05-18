@@ -1618,6 +1618,9 @@ model TimeSheets {
   start_time      DateTime
   end_time        DateTime
   signature       String?
+  status          String       @default("Gerada")
+  days            Json?
+  totals          Json?
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
   user            User         @relation(fields: [user_id], references: [id])

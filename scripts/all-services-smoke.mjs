@@ -2669,6 +2669,27 @@ const handlers = {
     });
   },
 
+  async rhTimeBankSummary(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/time-bank/summary",
+    });
+  },
+
+  async rhTimeBankSummaryUser(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/rh/time-bank/summary/${await ensureRhTargetUser()}`,
+    });
+  },
+
+  async rhTimeBankOverview(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/time-bank/overview",
+    });
+  },
+
   async rhMessageCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [200],
@@ -2718,6 +2739,13 @@ const handlers = {
       expectedStatus: [200],
       path: "/rh/timesheets",
       query: {},
+    });
+  },
+
+  async rhTimeSheetGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/rh/timesheets/${requireState("rhTimeSheetId")}`,
     });
   },
 

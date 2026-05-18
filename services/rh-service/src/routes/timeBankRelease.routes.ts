@@ -13,6 +13,7 @@ import {
   approveTimeBankReleaseBodySchema,
   createTimeBankReleaseBodySchema,
   listTimeBankReleasesQuerySchema,
+  timeBankSummaryUserParamsSchema,
 } from "../schemas/timeBankRelease.schemas.js";
 import {
   type TimeBankReleaseListFilters,
@@ -21,6 +22,56 @@ import {
 
 const router: ReturnType<typeof Router> = Router();
 const timeBankReleaseService = new TimeBankReleaseService();
+
+router.get("/summary", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+      statusCode: 400,
+    });
+
+    const result = await timeBankReleaseService.getSummary(organization_id, user_id);
+
+    res.status(200).json(createSuccessResponse(result));
+  } catch (err) {
+    logError("Erro ao obter resumo de banco de horas", { err });
+    next(err);
+  }
+});
+
+router.get(
+  "/summary/:userId",
+  isAuthenticated,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
+      const { userId } = parseWithZod(timeBankSummaryUserParamsSchema, req.params);
+
+      const result = await timeBankReleaseService.getSummary(organization_id, userId);
+
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao obter resumo de banco de horas por colaborador", { err });
+      next(err);
+    }
+  },
+);
+
+router.get(
+  "/overview",
+  isAuthenticated,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
+
+      const result = await timeBankReleaseService.getOverview(organization_id);
+
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao obter visao agregada de banco de horas", { err });
+      next(err);
+    }
+  },
+);
 
 router.get("/list", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {

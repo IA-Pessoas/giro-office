@@ -345,6 +345,7 @@ class ScoreQuarterService {
       const score = await this.db.scoreQuarter.findUnique({
         where: { id: scoreId },
         include: {
+          user: { select: { id: true, name: true } },
           nitro: true,
           evaluations: {
             include: { evaluator: { select: { name: true } } },

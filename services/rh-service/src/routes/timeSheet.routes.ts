@@ -12,6 +12,7 @@ import {
   createTimeSheetBodySchema,
   listTimeSheetsQuerySchema,
   signTimeSheetBodySchema,
+  timeSheetIdParamsSchema,
 } from "../schemas/timeSheet.schemas.js";
 import { TimeSheetService } from "../services/timeSheetService.js";
 
@@ -23,10 +24,10 @@ router.post("/", isAuthenticated, async (req: Request, res: Response, next: Next
     const organizationId = req.organization_id;
     const userId = req.user_id;
     if (!organizationId) {
-      throw new ServiceError(400, "organization_id é obrigatório.");
+      throw new ServiceError(400, "organization_id e obrigatorio.");
     }
     if (!userId) {
-      throw new ServiceError(400, "user_id é obrigatório.");
+      throw new ServiceError(400, "user_id e obrigatorio.");
     }
 
     const body = parseWithZod(createTimeSheetBodySchema, req.body);
@@ -50,10 +51,10 @@ router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextF
     const organizationId = req.organization_id;
     const requesterId = req.user_id;
     if (!organizationId) {
-      throw new ServiceError(400, "organization_id é obrigatório.");
+      throw new ServiceError(400, "organization_id e obrigatorio.");
     }
     if (!requesterId) {
-      throw new ServiceError(400, "user_id é obrigatório.");
+      throw new ServiceError(400, "user_id e obrigatorio.");
     }
 
     const query = parseWithZod(listTimeSheetsQuerySchema, req.query);
@@ -71,15 +72,36 @@ router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextF
   }
 });
 
+router.get("/:id", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const organizationId = req.organization_id;
+    if (!organizationId) {
+      throw new ServiceError(400, "organization_id e obrigatorio.");
+    }
+
+    const { id } = parseWithZod(timeSheetIdParamsSchema, req.params);
+
+    const result = await timeSheetService.getById({
+      organization_id: organizationId,
+      timesheet_id: id,
+    });
+
+    res.status(200).json(createSuccessResponse(result));
+  } catch (err) {
+    logError("Erro ao obter detalhe da folha de ponto", { err });
+    next(err);
+  }
+});
+
 router.put("/sign", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const organizationId = req.organization_id;
     const signerUserId = req.user_id;
     if (!organizationId) {
-      throw new ServiceError(400, "organization_id é obrigatório.");
+      throw new ServiceError(400, "organization_id e obrigatorio.");
     }
     if (!signerUserId) {
-      throw new ServiceError(400, "user_id é obrigatório.");
+      throw new ServiceError(400, "user_id e obrigatorio.");
     }
 
     const body = parseWithZod(signTimeSheetBodySchema, req.body);

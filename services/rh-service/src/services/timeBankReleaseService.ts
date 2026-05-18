@@ -44,6 +44,20 @@ export interface TimeBankReleaseListFilters {
   date_to?: Date;
 }
 
+export interface TimeBankSummary {
+  user_id: string;
+  balance_minutes: number;
+  approved_releases_count: number;
+  pending_releases_count: number;
+}
+
+export interface TimeBankOverview {
+  total_pending_releases: number;
+  total_approved_releases: number;
+  users_with_positive_balance: number;
+  users_with_negative_balance: number;
+}
+
 class TimeBankReleaseService {
   async create(input: TimeBankReleaseCreateInput): Promise<TimeBankReleaseSnapshot> {
     try {
@@ -52,10 +66,10 @@ class TimeBankReleaseService {
       const addedByUserId = assertNonEmptyString(input.added_by_user_id, "added_by_user_id");
       const reason = assertNonEmptyString(input.reason, "reason");
       if (Number.isNaN(input.date.getTime())) {
-        throw new ServiceError(400, "date inválido.");
+        throw new ServiceError(400, "date invalido.");
       }
       if (!Number.isInteger(input.minutes)) {
-        throw new ServiceError(400, "minutes deve ser um número inteiro.");
+        throw new ServiceError(400, "minutes deve ser um numero inteiro.");
       }
 
       const targetUser = await prismaClient.user.findFirst({
@@ -64,10 +78,10 @@ class TimeBankReleaseService {
       });
 
       if (!targetUser) {
-        throw new ServiceError(404, "Colaborador não encontrado nesta organização.");
+        throw new ServiceError(404, "Colaborador nao encontrado nesta organizacao.");
       }
 
-      const created = await prismaClient.timeBankReleases.create({
+      return await prismaClient.timeBankReleases.create({
         data: {
           user_id: targetUserId,
           date: input.date,
@@ -79,12 +93,10 @@ class TimeBankReleaseService {
         },
         select: TIME_BANK_RELEASE_SELECT,
       });
-
-      return created;
     } catch (err: unknown) {
-      logError("Erro ao criar lançamento de banco de horas", { err });
+      logError("Erro ao criar lancamento de banco de horas", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao criar lançamento de banco de horas.", err);
+      throw new ServiceError(500, "Erro interno ao criar lancamento de banco de horas.", err);
     }
   }
 
@@ -99,11 +111,11 @@ class TimeBankReleaseService {
       });
 
       if (!release) {
-        throw new ServiceError(404, "Lançamento não encontrado.");
+        throw new ServiceError(404, "Lancamento nao encontrado.");
       }
 
       if (release.is_approved) {
-        throw new ServiceError(409, "Lançamento já foi aprovado.");
+        throw new ServiceError(409, "Lancamento ja foi aprovado.");
       }
 
       const pointsConfig = await prismaClient.pointsConfig.findUnique({
@@ -114,11 +126,9 @@ class TimeBankReleaseService {
       if (!pointsConfig) {
         throw new ServiceError(
           404,
-          "Configuração de ponto não encontrada para o colaborador; não é possível aprovar o lançamento.",
+          "Configuracao de ponto nao encontrada para o colaborador; nao e possivel aprovar o lancamento.",
         );
       }
-
-      const minutesDelta = release.minutes;
 
       const updated = await prismaClient.$transaction(async (tx) => {
         await tx.timeBankReleases.update({
@@ -128,7 +138,7 @@ class TimeBankReleaseService {
 
         await tx.pointsConfig.update({
           where: { user_id: release.user_id },
-          data: { bank_balance: { increment: minutesDelta } },
+          data: { bank_balance: { increment: release.minutes } },
         });
 
         return tx.timeBankReleases.findFirstOrThrow({
@@ -139,9 +149,9 @@ class TimeBankReleaseService {
 
       return updated;
     } catch (err: unknown) {
-      logError("Erro ao aprovar lançamento de banco de horas", { err });
+      logError("Erro ao aprovar lancamento de banco de horas", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao aprovar lançamento de banco de horas.", err);
+      throw new ServiceError(500, "Erro interno ao aprovar lancamento de banco de horas.", err);
     }
   }
 
@@ -155,13 +165,13 @@ class TimeBankReleaseService {
       const dateFilter: { gte?: Date; lte?: Date } = {};
       if (filters.date_from !== undefined) {
         if (Number.isNaN(filters.date_from.getTime())) {
-          throw new ServiceError(400, "date_from inválido.");
+          throw new ServiceError(400, "date_from invalido.");
         }
         dateFilter.gte = TimeUtils.getUtcDayBounds(filters.date_from).dayStart;
       }
       if (filters.date_to !== undefined) {
         if (Number.isNaN(filters.date_to.getTime())) {
-          throw new ServiceError(400, "date_to inválido.");
+          throw new ServiceError(400, "date_to invalido.");
         }
         dateFilter.lte = TimeUtils.getUtcDayBounds(filters.date_to).dayEnd;
       }
@@ -185,9 +195,78 @@ class TimeBankReleaseService {
         orderBy: [{ date: "desc" }, { id: "desc" }],
       });
     } catch (err: unknown) {
-      logError("Erro ao listar lançamentos de banco de horas", { err });
+      logError("Erro ao listar lancamentos de banco de horas", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao listar lançamentos de banco de horas.", err);
+      throw new ServiceError(500, "Erro interno ao listar lancamentos de banco de horas.", err);
+    }
+  }
+
+  async getSummary(organizationId: string, userId: string): Promise<TimeBankSummary> {
+    try {
+      const orgId = assertNonEmptyString(organizationId, "organization_id");
+      const uid = assertNonEmptyString(userId, "user_id");
+
+      const config = await prismaClient.pointsConfig.findUnique({
+        where: { user_id: uid },
+        select: { user_id: true, organization_id: true, bank_balance: true },
+      });
+
+      if (!config) {
+        throw new ServiceError(404, "Configuracao de ponto nao encontrada para o colaborador.");
+      }
+      if (config.organization_id !== orgId) {
+        throw new ServiceError(403, "Configuracao de ponto pertence a outra organizacao.");
+      }
+
+      const [approvedCount, pendingCount] = await Promise.all([
+        prismaClient.timeBankReleases.count({
+          where: { organization_id: orgId, user_id: uid, is_approved: true },
+        }),
+        prismaClient.timeBankReleases.count({
+          where: { organization_id: orgId, user_id: uid, is_approved: false },
+        }),
+      ]);
+
+      return {
+        user_id: uid,
+        balance_minutes: config.bank_balance,
+        approved_releases_count: approvedCount,
+        pending_releases_count: pendingCount,
+      };
+    } catch (err: unknown) {
+      logError("Erro ao obter resumo de banco de horas", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao obter resumo de banco de horas.", err);
+    }
+  }
+
+  async getOverview(organizationId: string): Promise<TimeBankOverview> {
+    try {
+      const orgId = assertNonEmptyString(organizationId, "organization_id");
+
+      const [pendingCount, approvedCount, configs] = await Promise.all([
+        prismaClient.timeBankReleases.count({
+          where: { organization_id: orgId, is_approved: false },
+        }),
+        prismaClient.timeBankReleases.count({
+          where: { organization_id: orgId, is_approved: true },
+        }),
+        prismaClient.pointsConfig.findMany({
+          where: { organization_id: orgId },
+          select: { user_id: true, bank_balance: true },
+        }),
+      ]);
+
+      return {
+        total_pending_releases: pendingCount,
+        total_approved_releases: approvedCount,
+        users_with_positive_balance: configs.filter((config) => config.bank_balance > 0).length,
+        users_with_negative_balance: configs.filter((config) => config.bank_balance < 0).length,
+      };
+    } catch (err: unknown) {
+      logError("Erro ao obter visao agregada de banco de horas", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao obter visao agregada de banco de horas.", err);
     }
   }
 }

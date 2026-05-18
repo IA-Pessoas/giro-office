@@ -63,6 +63,7 @@ export function createApp(logger: Logger, env: RhEnv): express.Express {
   app.use("/rh/score/quarters", scoreQuarterRoutes);
   app.use("/rh/score/evaluations", scoreEvaluationRoutes);
   app.use("/rh/holidays", holidayRoutes);
+  app.use("/rh/time-bank", timeBankReleaseRoutes);
   app.use("/rh/time-bank-releases", timeBankReleaseRoutes);
   app.use("/rh/messages", messageRoutes);
   app.use("/rh/timesheets", timeSheetRoutes);

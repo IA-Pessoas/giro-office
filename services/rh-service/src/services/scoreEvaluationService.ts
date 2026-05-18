@@ -254,7 +254,24 @@ export class ScoreEvaluationService {
       }
       const average = input.answers.length > 0 ? sum / input.answers.length : 0;
 
-      const answersJson = input.answers as unknown as Prisma.InputJsonValue;
+      const previousAnswers = Array.isArray(evaluation.answers) ? evaluation.answers : [];
+      const questionTextById = new Map<string, string>();
+      for (const previous of previousAnswers) {
+        if (!previous || typeof previous !== "object") {
+          continue;
+        }
+        const item = previous as { question_id?: unknown; question_text?: unknown };
+        if (typeof item.question_id === "string" && typeof item.question_text === "string") {
+          questionTextById.set(item.question_id, item.question_text);
+        }
+      }
+
+      const answersWithQuestionText = input.answers.map((answer) => {
+        const questionText = questionTextById.get(answer.question_id);
+        return questionText ? { ...answer, question_text: questionText } : answer;
+      });
+
+      const answersJson = answersWithQuestionText as unknown as Prisma.InputJsonValue;
 
       await this.prisma.scoreEvaluation.update({
         where: { id: evaluationId },
