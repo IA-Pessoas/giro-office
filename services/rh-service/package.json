@@ -15,7 +15,7 @@
     "start": "node dist/server.js",
     "lint": "biome lint src tests",
     "format": "biome format --write src tests",
-    "check": "biome check src tests",
+    "check": "biome check .",
     "test:watch": "vitest"
   },
   "dependencies": {

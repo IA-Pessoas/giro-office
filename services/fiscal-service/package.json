@@ -11,6 +11,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "typecheck": "pnpm prisma:generate && tsc --noEmit",
+    "check": "biome check .",
     "start": "node dist/server.js",
     "test": "pnpm exec vitest run",
     "test:watch": "pnpm exec vitest"
