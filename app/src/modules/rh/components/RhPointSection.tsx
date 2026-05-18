@@ -1,12 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 
-import { useAuth } from "@/context/AuthContext";
-import { permissionService } from "@modules/users/services/permissionService";
-import { normalizePermissionResponse } from "@modules/users/utils/permissionUtils";
-import { useFetch } from "@shared/hooks";
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
+import { useRhPermissions } from "../hooks/useRhPermissions";
 import type { RhPointAdjustmentStatus, RhPointListItem } from "../types";
 import {
   useRhPointAdjustmentRequests,
@@ -67,7 +64,7 @@ function getMonthDateRange(month: string) {
 }
 
 export function RhPointSection() {
-  const { user } = useAuth();
+  const { user, canManageRh } = useRhPermissions("point");
   const [activePointTab, setActivePointTab] = useState<"point" | "timebank" | "timesheets">(
     "point",
   );
@@ -80,32 +77,7 @@ export function RhPointSection() {
   >("");
   const [selectedPointForAdjustment, setSelectedPointForAdjustment] =
     useState<RhPointListItem | null>(null);
-
-  const permissionQuery = useFetch(
-    ["rh", "point", "permissions", user?.id ?? ""],
-    () => permissionService.getByUserId(user?.id ?? ""),
-    {
-      enabled: Boolean(user?.id),
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-
-  const normalizedPermissions = useMemo(() => {
-    if (!permissionQuery.data) {
-      return null;
-    }
-
-    return normalizePermissionResponse(permissionQuery.data).known;
-  }, [permissionQuery.data]);
-
-  const isRhResponsible = Boolean(
-    normalizedPermissions?.rh !== null &&
-      normalizedPermissions?.rh !== undefined &&
-      normalizedPermissions.rh >= 1,
-  );
-  const isGlobalAdmin = user?.permission === 2;
-  const canManagePoint = isRhResponsible || isGlobalAdmin;
+  const canManagePoint = canManageRh;
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManagePoint,
@@ -164,6 +136,17 @@ export function RhPointSection() {
     setDateFrom(nextDateFrom);
     setDateTo(nextDateTo);
   }, [month]);
+
+  useEffect(() => {
+    if (activePointTab === "point") {
+      return;
+    }
+
+    setSelectedUserId("");
+    setMonth(getCurrentMonthValue());
+    setSelectedAdjustmentStatus("");
+    setSelectedPointForAdjustment(null);
+  }, [activePointTab]);
 
   async function handleRegisterPoint() {
     try {
