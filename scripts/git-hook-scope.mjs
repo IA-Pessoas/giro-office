@@ -339,14 +339,39 @@ function formatCommand([command, args]) {
   return [command, ...args].map(shellQuote).join(" ");
 }
 
-function runCommands(commands) {
+function buildPnpmFallback(args, platform = process.platform) {
+  if (platform === "win32") {
+    return ["cmd.exe", ["/d", "/s", "/c", "corepack", "pnpm", ...args]];
+  }
+
+  return ["corepack", ["pnpm", ...args]];
+}
+
+function shouldFallbackToCorepack(command, result) {
+  return command === "pnpm" && result.error?.code === "ENOENT";
+}
+
+export function runCommands(
+  commands,
+  spawn = spawnSync,
+  env = process.env,
+  platform = process.platform,
+) {
   for (const [command, args] of commands) {
     console.log(`$ ${formatCommand([command, args])}`);
 
-    const result = spawnSync(command, args, {
+    let result = spawn(command, args, {
       stdio: "inherit",
-      env: process.env,
+      env,
     });
+
+    if (shouldFallbackToCorepack(command, result)) {
+      const [fallbackCommand, fallbackArgs] = buildPnpmFallback(args, platform);
+      result = spawn(fallbackCommand, fallbackArgs, {
+        stdio: "inherit",
+        env,
+      });
+    }
 
     if (result.status !== 0) {
       return result.status ?? 1;

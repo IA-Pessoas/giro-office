@@ -69,6 +69,12 @@ generator contabilServiceClient {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator tiServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/ti-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }

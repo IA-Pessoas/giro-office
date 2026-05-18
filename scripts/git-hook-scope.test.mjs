@@ -6,6 +6,7 @@ import {
   classifyChangedFiles,
   parsePrePushInput,
   resolvePrePushChangedFiles,
+  runCommands,
 } from "./git-hook-scope.mjs";
 
 describe("classifyChangedFiles", () => {
@@ -131,5 +132,29 @@ describe("resolvePrePushChangedFiles", () => {
       forceGlobal: true,
       reason: "new-branch-without-origin-develop",
     });
+  });
+});
+
+describe("runCommands", () => {
+  it("falls back to corepack when pnpm is not installed as a direct executable", () => {
+    const calls = [];
+    const fakeSpawn = (command, args) => {
+      calls.push([command, args]);
+
+      if (command === "pnpm") {
+        return {
+          status: null,
+          error: { code: "ENOENT" },
+        };
+      }
+
+      return { status: 0 };
+    };
+
+    assert.equal(runCommands([["pnpm", ["audit:ci"]]], fakeSpawn, {}, "win32"), 0);
+    assert.deepEqual(calls, [
+      ["pnpm", ["audit:ci"]],
+      ["cmd.exe", ["/d", "/s", "/c", "corepack", "pnpm", "audit:ci"]],
+    ]);
   });
 });
