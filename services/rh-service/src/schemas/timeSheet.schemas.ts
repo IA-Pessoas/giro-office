@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const createTimeSheetBodySchema = z
   .object({
-    user_id: z.string().uuid({ message: "user_id inválido." }),
+    user_id: z.string().uuid({ message: "user_id invalido." }),
     start_time: zIsoDate("start_time"),
     end_time: zIsoDate("end_time"),
   })
@@ -16,15 +16,21 @@ export const createTimeSheetBodySchema = z
 export const listTimeSheetsQuerySchema = z
   .object({
     target_user_id: z
-      .union([z.string().uuid({ message: "target_user_id inválido." }), z.literal("")])
+      .union([z.string().uuid({ message: "target_user_id invalido." }), z.literal("")])
       .optional()
       .transform((v) => (v === "" ? undefined : v)),
   })
   .strict();
 
+export const timeSheetIdParamsSchema = z
+  .object({
+    id: z.string().uuid({ message: "id invalido." }),
+  })
+  .strict();
+
 export const signTimeSheetBodySchema = z
   .object({
-    id: z.string().uuid({ message: "id inválido." }),
+    id: z.string().uuid({ message: "id invalido." }),
     signature: zNonEmptyText("signature"),
   })
   .strict();

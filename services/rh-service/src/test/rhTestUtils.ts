@@ -75,6 +75,8 @@ const rhMocks: {
     list: vi.fn(),
     create: vi.fn(),
     approve: vi.fn(),
+    getSummary: vi.fn(),
+    getOverview: vi.fn(),
   },
   messageServiceMock: {
     create: vi.fn(),
@@ -83,6 +85,7 @@ const rhMocks: {
   timeSheetServiceMock: {
     create: vi.fn(),
     list: vi.fn(),
+    getById: vi.fn(),
     sign: vi.fn(),
   },
   scoreNitroServiceMock: {
@@ -283,12 +286,30 @@ export function resetRhRouteMocks() {
   ]);
   timeBankReleaseServiceMock.create.mockResolvedValue({ ok: true });
   timeBankReleaseServiceMock.approve.mockResolvedValue({ ok: true });
+  timeBankReleaseServiceMock.getSummary.mockResolvedValue({
+    user_id: "00000000-0000-4000-8000-000000000001",
+    balance_minutes: 75,
+    approved_releases_count: 2,
+    pending_releases_count: 1,
+  });
+  timeBankReleaseServiceMock.getOverview.mockResolvedValue({
+    total_pending_releases: 1,
+    total_approved_releases: 2,
+    users_with_positive_balance: 3,
+    users_with_negative_balance: 4,
+  });
   messageServiceMock.create.mockResolvedValue({ ok: true });
   messageServiceMock.listByRequest.mockResolvedValue([
     { id: "00000000-0000-4000-8000-000000000010" },
   ]);
   timeSheetServiceMock.create.mockResolvedValue({ ok: true });
   timeSheetServiceMock.list.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
+  timeSheetServiceMock.getById.mockResolvedValue({
+    id: "00000000-0000-4000-8000-000000000010",
+    status: "Gerada",
+    days: [],
+    totals: { worked_minutes: 0, expected_minutes: 0, balance_minutes: 0, absence_count: 0 },
+  });
   timeSheetServiceMock.sign.mockResolvedValue({ ok: true });
   scoreNitroServiceMock.updateMetric.mockResolvedValue({ ok: true });
 }

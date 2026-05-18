@@ -824,6 +824,44 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/time-bank/summary": {
+        get: {
+          tags: ["BancoDeHoras"],
+          summary: "Obter resumo do banco de horas do usuario autenticado",
+          security: bearer,
+          responses: {
+            "200": { description: "Resumo", ...successJson },
+          },
+        },
+      },
+      "/rh/time-bank/summary/{userId}": {
+        get: {
+          tags: ["BancoDeHoras"],
+          summary: "Obter resumo do banco de horas por colaborador",
+          security: bearer,
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": { description: "Resumo", ...successJson },
+          },
+        },
+      },
+      "/rh/time-bank/overview": {
+        get: {
+          tags: ["BancoDeHoras"],
+          summary: "Obter visao agregada do banco de horas",
+          security: bearer,
+          responses: {
+            "200": { description: "Visao agregada", ...successJson },
+          },
+        },
+      },
       "/rh/time-bank-releases/list": {
         get: {
           tags: ["BancoDeHoras"],
@@ -903,6 +941,19 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           ],
           responses: {
             "200": { description: "Lista", ...successJson },
+          },
+        },
+      },
+      "/rh/timesheets/{id}": {
+        get: {
+          tags: ["TimeSheets"],
+          summary: "Obter detalhe completo de folha de ponto",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Detalhe", ...successJson },
           },
         },
       },

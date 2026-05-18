@@ -35,6 +35,23 @@ describe("timeSheet routes", () => {
     });
   });
 
+  it("GET /rh/timesheets/:id retorna detalhe completo da folha", async () => {
+    const app = createTestApp();
+    const res = await request(app).get(`/rh/timesheets/${itemId}`);
+
+    expect(res.status).toBe(200);
+    expect(timeSheetServiceMock.getById).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      timesheet_id: itemId,
+    });
+    expect(res.body.data).toMatchObject({
+      id: itemId,
+      status: "Gerada",
+      days: [],
+      totals: { absence_count: 0 },
+    });
+  });
+
   it("PUT /rh/timesheets/sign assina folha", async () => {
     const app = createTestApp();
     const res = await request(app).put("/rh/timesheets/sign").send({

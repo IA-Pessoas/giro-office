@@ -3,16 +3,16 @@ import { z } from "zod";
 
 export const createTimeBankReleaseBodySchema = z
   .object({
-    user_id: z.string().uuid({ message: "user_id inválido." }),
+    user_id: z.string().uuid({ message: "user_id invalido." }),
     date: zIsoDate("date"),
-    minutes: z.number().int({ message: "minutes deve ser um número inteiro." }),
+    minutes: z.number().int({ message: "minutes deve ser um numero inteiro." }),
     reason: zNonEmptyText("reason"),
   })
   .strict();
 
 export const approveTimeBankReleaseBodySchema = z
   .object({
-    id: z.string().uuid({ message: "id inválido." }),
+    id: z.string().uuid({ message: "id invalido." }),
   })
   .strict();
 
@@ -22,19 +22,25 @@ function optionalIsoDateQuery(field: string) {
     z
       .string()
       .trim()
-      .min(1, `${field} inválido.`)
-      .refine((s) => !Number.isNaN(Date.parse(s)), `${field} inválido.`)
+      .min(1, `${field} invalido.`)
+      .refine((s) => !Number.isNaN(Date.parse(s)), `${field} invalido.`)
       .transform((s: string) => new Date(s)),
   ]);
 }
 
 export const listTimeBankReleasesQuerySchema = z
   .object({
-    user_id: z.string().uuid({ message: "user_id inválido." }).optional(),
+    user_id: z.string().uuid({ message: "user_id invalido." }).optional(),
     is_approved: z
       .enum(["true", "false"], { message: "is_approved deve ser true ou false." })
       .optional(),
     date_from: optionalIsoDateQuery("date_from"),
     date_to: optionalIsoDateQuery("date_to"),
+  })
+  .strict();
+
+export const timeBankSummaryUserParamsSchema = z
+  .object({
+    userId: z.string().uuid({ message: "userId invalido." }),
   })
   .strict();
