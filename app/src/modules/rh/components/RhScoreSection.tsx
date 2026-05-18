@@ -1161,7 +1161,7 @@ function RhScoreDetailDialog({
                     </p>
 
                     <p className="mt-2 truncate text-sm font-semibold text-white">
-                      {getRhScoreUserSummary(score.user?.name, score.user_id)}
+                      {getRhScoreUserSummary(score.user?.name)}
                     </p>
                   </div>
 
