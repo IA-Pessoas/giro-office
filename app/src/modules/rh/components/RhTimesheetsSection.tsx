@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
+import { useRouter } from "next/router";
 
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import { useRhTimeSheets } from "../hooks/useRhCalendar";
 import { useRhPermissions } from "../hooks/useRhPermissions";
 import type { RhTimeSheetListFilters, RhTimeSheetListItem } from "../types";
-import { RhTimesheetDetailDialog } from "./RhTimesheetDetailDialog";
 import { RhTimesheetGenerateModal } from "./RhTimesheetGenerateModal";
 import { RhTimesheetSignDialog } from "./RhTimesheetSignDialog";
 import { RhTimesheetsFilters } from "./RhTimesheetsFilters";
@@ -64,6 +64,7 @@ function intersectsSelectedPeriod(sheet: RhTimeSheetListItem, dateFrom: string, 
 }
 
 export function RhTimesheetsSection() {
+  const router = useRouter();
   const { user, canManageRh: canManageTimesheets } = useRhPermissions("timesheets");
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -72,7 +73,6 @@ export function RhTimesheetsSection() {
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [sheetPendingSignature, setSheetPendingSignature] =
     useState<RhTimeSheetListItem | null>(null);
-  const [selectedDetailSheetId, setSelectedDetailSheetId] = useState<string | null>(null);
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManageTimesheets,
@@ -175,12 +175,6 @@ export function RhTimesheetsSection() {
         onClose={() => setSheetPendingSignature(null)}
       />
 
-      <RhTimesheetDetailDialog
-        open={Boolean(selectedDetailSheetId)}
-        timesheetId={selectedDetailSheetId}
-        onClose={() => setSelectedDetailSheetId(null)}
-      />
-
       {isLoading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
           Carregando folhas de ponto...
@@ -206,7 +200,7 @@ export function RhTimesheetsSection() {
           signingSheetId={sheetPendingSignature?.id ?? null}
           getUserLabel={getUserLabel}
           onSign={setSheetPendingSignature}
-          onViewDetail={setSelectedDetailSheetId}
+          onViewDetail={(timesheetId) => void router.push(`/rh/timesheets/${timesheetId}`)}
         />
       ) : null}
     </div>

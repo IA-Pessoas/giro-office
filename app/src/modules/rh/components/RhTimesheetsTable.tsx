@@ -110,7 +110,7 @@ export function RhTimesheetsTable({
                         className={`${ACTION_BUTTON_CLASSNAME} border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700/50`}
                       >
                         <Eye className="h-3.5 w-3.5" />
-                        Ver detalhe
+                        Abrir folha
                       </button>
                     ) : (
                       <span className="text-right text-xs font-medium text-gray-500 dark:text-gray-400">
