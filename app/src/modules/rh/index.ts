@@ -1,4 +1,5 @@
 export { RhRequestsSection } from "./components/RhRequestsSection";
+export { RhDashboardSection } from "./components/RhDashboardSection";
 export { RhHolidaysSection } from "./components/RhHolidaysSection";
 export { RhTimeBankSection } from "./components/RhTimeBankSection";
 export { RhTimesheetsSection } from "./components/RhTimesheetsSection";
