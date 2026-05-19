@@ -162,7 +162,9 @@ export function RhPointSection() {
           : error instanceof Error
             ? error.message
             : "Não foi possível registrar o ponto.";
-      toast.error(message);
+      toast.error(message, {
+        autoClose: typeof responseMessage === "string" ? 8000 : 5000,
+      });
     }
   }
 
