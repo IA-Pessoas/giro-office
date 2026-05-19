@@ -15,3 +15,4 @@ packages:
   - "services/department-service"
   - "services/fiscal-service"
   - "services/contabil-service"
+  - "services/ti-service"

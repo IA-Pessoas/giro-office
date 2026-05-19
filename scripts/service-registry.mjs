@@ -113,6 +113,16 @@ export const serviceRegistry = [
     prismaOutputPath: "services/task-service/src/generated/prisma",
   },
   {
+    name: "ti-service",
+    packagePath: "services/ti-service",
+    defaultUrl: "http://localhost:3040",
+    urlEnvKey: "TI_SERVICE_URL",
+    openapiSpecPath: null,
+    authModes: ["public", "bearer", "internal-token"],
+    internalTokenEnvKey: "TI_SERVICE_INTERNAL_TOKEN",
+    prismaOutputPath: "services/ti-service/src/generated/prisma",
+  },
+  {
     name: "user-service",
     packagePath: "services/user-service",
     defaultUrl: "http://localhost:3030",
