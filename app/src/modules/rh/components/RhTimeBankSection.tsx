@@ -6,7 +6,6 @@ import { toast } from "react-toastify";
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import {
   useApproveRhTimeBankReleaseMutation,
-  useRhTimeBankOverview,
   useRhTimeBankReleases,
   useRhTimeBankSummary,
 } from "../hooks/useRhCalendar";
@@ -43,7 +42,7 @@ export function RhTimeBankSection() {
     useState<RhTimeBankRelease | null>(null);
 
   const approveMutation = useApproveRhTimeBankReleaseMutation();
-  const isOverviewMode = canManageTimeBank && !selectedUserId;
+  const shouldShowSummary = !canManageTimeBank || Boolean(selectedUserId);
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManageTimeBank,
@@ -61,9 +60,8 @@ export function RhTimeBankSection() {
   const releasesQuery = useRhTimeBankReleases(filters);
   const timeBankSummaryQuery = useRhTimeBankSummary(
     canManageTimeBank ? selectedUserId || undefined : undefined,
-    !isOverviewMode,
+    shouldShowSummary,
   );
-  const timeBankOverviewQuery = useRhTimeBankOverview(isOverviewMode);
   const assignableUsers = assignableUsersQuery.data ?? [];
   const releases = releasesQuery.data ?? [];
 
@@ -137,15 +135,15 @@ export function RhTimeBankSection() {
         onOpenCreate={handleOpenCreate}
       />
 
-      <RhTimeBankSummaryCards
-        currentUserLabel={currentUserName}
-        selectedUserLabel={selectedUserLabel}
-        summary={timeBankSummaryQuery.data ?? null}
-        overview={timeBankOverviewQuery.data ?? null}
-        isOverviewMode={isOverviewMode}
-        isLoading={timeBankSummaryQuery.isLoading || timeBankOverviewQuery.isLoading}
-        hasError={Boolean(timeBankSummaryQuery.error || timeBankOverviewQuery.error)}
-      />
+      {shouldShowSummary ? (
+        <RhTimeBankSummaryCards
+          currentUserLabel={currentUserName}
+          selectedUserLabel={selectedUserLabel}
+          summary={timeBankSummaryQuery.data ?? null}
+          isLoading={timeBankSummaryQuery.isLoading}
+          hasError={Boolean(timeBankSummaryQuery.error)}
+        />
+      ) : null}
 
       {canManageTimeBank ? (
         <RhTimeBankFormPanel
@@ -210,8 +208,8 @@ export function RhTimeBankSection() {
                     Aprovar lançamento
                   </h3>
                   <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
-                    Deseja aprovar este lançamento de banco de horas? Essa ação atualiza o
-                    status do registro.
+                    Deseja aprovar este lançamento de banco de horas? Essa ação atualiza o status
+                    do registro.
                   </p>
                 </div>
               </div>

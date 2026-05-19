@@ -38,9 +38,7 @@ export function RhTimesheetsFilters({
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Folhas de Ponto
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Folhas de ponto</h2>
 
         {canManageTimesheets ? (
           <button

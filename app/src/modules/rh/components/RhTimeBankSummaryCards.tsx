@@ -1,4 +1,4 @@
-import type { RhTimeBankOverview, RhTimeBankSummary } from "../types";
+import type { RhTimeBankSummary } from "../types";
 
 function formatMinutesLabel(minutes: number) {
   const sign = minutes > 0 ? "+" : minutes < 0 ? "-" : "";
@@ -21,8 +21,6 @@ interface RhTimeBankSummaryCardsProps {
   currentUserLabel: string;
   selectedUserLabel?: string | null;
   summary: RhTimeBankSummary | null;
-  overview: RhTimeBankOverview | null;
-  isOverviewMode: boolean;
   isLoading: boolean;
   hasError: boolean;
 }
@@ -31,19 +29,13 @@ export function RhTimeBankSummaryCards({
   currentUserLabel,
   selectedUserLabel,
   summary,
-  overview,
-  isOverviewMode,
   isLoading,
   hasError,
 }: RhTimeBankSummaryCardsProps) {
-  const heading = isOverviewMode
-    ? "Visão agregada"
-    : selectedUserLabel
-      ? `Resumo de ${selectedUserLabel}`
-      : `Resumo de ${currentUserLabel}`;
-  const description = isOverviewMode
-    ? "Indicadores gerais de banco de horas para todos os colaboradores filtrados."
-    : "Saldo e volume de lançamentos aprovados e pendentes para o contexto selecionado.";
+  const heading = selectedUserLabel
+    ? `Resumo de ${selectedUserLabel}`
+    : `Resumo de ${currentUserLabel}`;
+  const description = "Saldo e volume de lançamentos aprovados e pendentes para o contexto selecionado.";
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
@@ -65,43 +57,8 @@ export function RhTimeBankSummaryCards({
       ) : null}
 
       {!isLoading && !hasError ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {isOverviewMode && overview ? (
-            <>
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/30">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-                  Pendentes
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
-                  {overview.total_pending_releases}
-                </p>
-              </div>
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/30">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-                  Aprovados
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
-                  {overview.total_approved_releases}
-                </p>
-              </div>
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/30">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-                  Saldo positivo
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
-                  {overview.users_with_positive_balance}
-                </p>
-              </div>
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/30">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-                  Saldo negativo
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
-                  {overview.users_with_negative_balance}
-                </p>
-              </div>
-            </>
-          ) : summary ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {summary ? (
             <>
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/30">
                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
@@ -129,7 +86,7 @@ export function RhTimeBankSummaryCards({
               </div>
             </>
           ) : (
-            <div className="rounded-lg border border-dashed border-gray-300 p-5 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300 md:col-span-2 xl:col-span-4">
+            <div className="rounded-lg border border-dashed border-gray-300 p-5 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300 md:col-span-2 xl:col-span-3">
               Nenhum resumo disponível para o contexto selecionado.
             </div>
           )}
