@@ -20,6 +20,7 @@ const PERMISSION_PUBLIC_SELECT = {
   pessoal: true,
   regularize: true,
   rh: true,
+  ti: true,
   triagem: true,
   wiki: true,
 } as const;
@@ -44,6 +45,7 @@ const MODULE_FIELDS = [
   "pessoal",
   "regularize",
   "rh",
+  "ti",
   "triagem",
   "wiki",
 ] as const;
@@ -69,6 +71,7 @@ interface UpdatePermissionInput {
   pessoal?: number | null;
   regularize?: number | null;
   rh?: number | null;
+  ti?: number | null;
   triagem?: number | null;
   wiki?: number | null;
 }

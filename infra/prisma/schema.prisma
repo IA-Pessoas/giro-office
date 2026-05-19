@@ -333,6 +333,7 @@ model Permission {
   pessoal         Int?
   regularize      Int?
   rh              Int?
+  ti              Int?
   triagem         Int?
   wiki            Int?
   organization_id String

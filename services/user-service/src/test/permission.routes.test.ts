@@ -31,20 +31,36 @@ describe("permission routes", () => {
   });
 
   it("PUT /user/permission/:userId atualiza permissao", async () => {
-    permissionServiceMock.update.mockResolvedValue({ users: 2 });
+    permissionServiceMock.update.mockResolvedValue({ ti: 3 });
     const app = createTestApp();
 
     const res = await request(app).put("/user/permission/user-3").set(gatewayAuthHeaders()).send({
-      users: 2,
-      finance: null,
+      ti: 3,
     });
 
     expect(res.status).toBe(200);
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
       "user-3",
       {
-        users: 2,
-        finance: null,
+        ti: 3,
+      },
+      "a0000000-0000-4000-8000-000000000001",
+    );
+  });
+
+  it("PUT /user/permission/:userId preserva null ao revogar permissao de TI", async () => {
+    permissionServiceMock.update.mockResolvedValue({ ti: null });
+    const app = createTestApp();
+
+    const res = await request(app).put("/user/permission/user-3").set(gatewayAuthHeaders()).send({
+      ti: null,
+    });
+
+    expect(res.status).toBe(200);
+    expect(permissionServiceMock.update).toHaveBeenCalledWith(
+      "user-3",
+      {
+        ti: null,
       },
       "a0000000-0000-4000-8000-000000000001",
     );

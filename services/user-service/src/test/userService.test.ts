@@ -159,6 +159,45 @@ describe("UserService", () => {
     expect(result).toMatchObject({ id: "user-1", permission_id: "permission-1" });
   });
 
+  it("create de owner concede permissao maxima para o modulo TI", async () => {
+    bcryptMock.hash.mockResolvedValue("hashed");
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1" });
+    prismaMock.user.create.mockResolvedValue({
+      id: "owner-1",
+      name: "Owner",
+      login: "owner",
+      permission: 2,
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: "org-1",
+      type: "owner",
+      first_owner_flag: true,
+      permission_id: null,
+    });
+    permissionServiceMock.create.mockResolvedValue({ id: "permission-1" });
+    prismaMock.user.update.mockResolvedValue({});
+    const service = new UserService();
+
+    await service.create({
+      name: "Owner",
+      login: "owner",
+      password: "secret",
+      department_id: "dep-1",
+      permission: 2,
+      organization_id: "org-1",
+      type: "owner",
+      first_owner_flag: true,
+    });
+
+    expect(permissionServiceMock.update).toHaveBeenCalledWith(
+      "owner-1",
+      expect.objectContaining({ ti: 2 }),
+      "org-1",
+    );
+  });
+
   it("create rejeita departamento fora da organização", async () => {
     prismaMock.department.findFirst.mockResolvedValue(null);
     const service = new UserService();

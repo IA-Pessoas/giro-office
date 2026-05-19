@@ -112,6 +112,25 @@ describe("user routes", () => {
     expect(userServiceMock.create).not.toHaveBeenCalled();
   });
 
+  it("POST /user rejeita permissao de modulo TI fora do intervalo permitido", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user")
+      .set(gatewayAuthHeaders())
+      .send({
+        name: "Novo Usuario",
+        login: "novo.usuario",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 1,
+        modules: { ti: 999 },
+      });
+
+    expect(res.status).toBe(400);
+    expect(userServiceMock.create).not.toHaveBeenCalled();
+  });
+
   it("PATCH /user/:id atualiza usuario", async () => {
     userServiceMock.update.mockResolvedValue({ id: "user-3" });
     const app = createTestApp();
@@ -128,6 +147,20 @@ describe("user routes", () => {
       },
       "a0000000-0000-4000-8000-000000000001",
     );
+  });
+
+  it("PATCH /user/:id rejeita permissao de modulo TI fora do intervalo permitido", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-3")
+      .set(gatewayAuthHeaders())
+      .send({
+        modules: { ti: 999 },
+      });
+
+    expect(res.status).toBe(400);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
   it("GET /user/:id/photo retorna JSON com url quando a foto e URL publica", async () => {
