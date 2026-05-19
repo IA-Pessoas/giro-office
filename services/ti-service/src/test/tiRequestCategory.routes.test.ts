@@ -31,7 +31,11 @@ describe("ti request category routes", () => {
       .send({ name: "Hardware" });
 
     expect(response.status).toBe(403);
-    expect(response.body.success).toBe(false);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para acessar o ti-service.",
+      code: "FORBIDDEN",
+    });
   });
 
   it("POST /ti/request-categories validates body", async () => {
@@ -43,6 +47,10 @@ describe("ti request category routes", () => {
       .send({ name: "" });
 
     expect(response.status).toBe(400);
-    expect(response.body.success).toBe(false);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "name é obrigatório.",
+      code: "BAD_REQUEST",
+    });
   });
 });
