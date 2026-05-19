@@ -10,9 +10,40 @@ export function createPrismaMock(): PrismaClient {
   return {
     tICategoryRequest: {
       findMany: vi.fn(async () => []),
-      findFirst: vi.fn(async () => null),
+      findFirst: vi.fn(async ({ where }) => {
+        if (!where.id) {
+          return null;
+        }
+
+        return {
+          id: where.id,
+          name: "Hardware",
+          active: where.active ?? true,
+          organization_id: where.organization_id,
+        };
+      }),
       create: vi.fn(async ({ data }) => ({ id: "cat-1", ...data })),
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+    },
+    user: {
+      findFirst: vi.fn(async ({ where }) => ({
+        id: where.id,
+        organization_id: where.organization_id,
+      })),
+    },
+    tIRequest: {
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async ({ where }) => ({
+        id: where.id,
+        status: "New",
+        organization_id: where.organization_id,
+      })),
+      create: vi.fn(async ({ data }) => ({ id: "req-1", ...data })),
+      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+    },
+    tIMessage: {
+      findMany: vi.fn(async () => []),
+      create: vi.fn(async ({ data }) => ({ id: "msg-1", ...data })),
     },
   } as unknown as PrismaClient;
 }
