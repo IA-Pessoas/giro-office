@@ -902,9 +902,6 @@ importers:
       express-async-errors:
         specifier: ^3.1.1
         version: 3.1.1(express@4.22.1)
-      pg:
-        specifier: ^8.13.0
-        version: 8.20.0
       prisma:
         specifier: 7.4.1
         version: 7.4.1(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.3.3)

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -347,6 +348,28 @@ function buildPnpmFallback(args, platform = process.platform) {
   return ["corepack", ["pnpm", ...args]];
 }
 
+function createPnpmShimEnv(env, platform = process.platform) {
+  const shimDir = mkdtempSync(path.join(tmpdir(), "git-hook-pnpm-"));
+
+  if (platform === "win32") {
+    writeFileSync(path.join(shimDir, "pnpm.cmd"), "@echo off\r\ncorepack pnpm %*\r\n");
+  } else {
+    const shimPath = path.join(shimDir, "pnpm");
+    writeFileSync(shimPath, '#!/bin/sh\nexec corepack pnpm "$@"\n');
+    chmodSync(shimPath, 0o755);
+  }
+
+  return {
+    env: {
+      ...env,
+      PATH: [shimDir, env.PATH ?? ""].filter(Boolean).join(path.delimiter),
+    },
+    cleanup() {
+      rmSync(shimDir, { recursive: true, force: true });
+    },
+  };
+}
+
 function shouldFallbackToCorepack(command, result) {
   return command === "pnpm" && result.error?.code === "ENOENT";
 }
@@ -367,10 +390,16 @@ export function runCommands(
 
     if (shouldFallbackToCorepack(command, result)) {
       const [fallbackCommand, fallbackArgs] = buildPnpmFallback(args, platform);
-      result = spawn(fallbackCommand, fallbackArgs, {
-        stdio: "inherit",
-        env,
-      });
+      const fallbackEnv = createPnpmShimEnv(env, platform);
+
+      try {
+        result = spawn(fallbackCommand, fallbackArgs, {
+          stdio: "inherit",
+          env: fallbackEnv.env,
+        });
+      } finally {
+        fallbackEnv.cleanup();
+      }
     }
 
     if (result.status !== 0) {

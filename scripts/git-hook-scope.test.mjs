@@ -138,7 +138,7 @@ describe("resolvePrePushChangedFiles", () => {
 describe("runCommands", () => {
   it("falls back to corepack when pnpm is not installed as a direct executable", () => {
     const calls = [];
-    const fakeSpawn = (command, args) => {
+    const fakeSpawn = (command, args, options = {}) => {
       calls.push([command, args]);
 
       if (command === "pnpm") {
@@ -148,6 +148,7 @@ describe("runCommands", () => {
         };
       }
 
+      assert.match(options.env.PATH, /git-hook-pnpm-/);
       return { status: 0 };
     };
 
