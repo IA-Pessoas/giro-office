@@ -1,10 +1,23 @@
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
+import { vi } from "vitest";
 
 import { createTiApplication } from "../app.js";
 import type { TiServiceEnv } from "../config/env.js";
+import type { PrismaClient } from "../generated/prisma/client.js";
 
-export function createTestApp() {
+export function createPrismaMock(): PrismaClient {
+  return {
+    tICategoryRequest: {
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async () => null),
+      create: vi.fn(async ({ data }) => ({ id: "cat-1", ...data })),
+      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+    },
+  } as unknown as PrismaClient;
+}
+
+export function createTestApp(prisma = createPrismaMock()) {
   const env = {
     nodeEnv: "test",
     port: 3040,
@@ -27,5 +40,6 @@ export function createTestApp() {
   return createTiApplication({
     env,
     logger,
+    prisma,
   });
 }

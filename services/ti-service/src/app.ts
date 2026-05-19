@@ -14,6 +14,7 @@ import type { TiServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildTiServiceOpenApiSpec } from "./openapi/spec.js";
+import { createTiRequestCategoryRoutes } from "./routes/tiRequestCategory.routes.js";
 
 function tiServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const out: Record<string, unknown> = {};
@@ -34,10 +35,14 @@ function tiServiceErrorLogContext(request: Request): Record<string, unknown> | u
 export interface CreateTiApplicationOptions {
   env: TiServiceEnv;
   logger: Logger;
-  prisma?: PrismaClient;
+  prisma: PrismaClient;
 }
 
-export function createTiApplication({ env, logger }: CreateTiApplicationOptions): express.Express {
+export function createTiApplication({
+  env,
+  logger,
+  prisma,
+}: CreateTiApplicationOptions): express.Express {
   const app = express();
 
   app.set("trust proxy", true);
@@ -64,6 +69,8 @@ export function createTiApplication({ env, logger }: CreateTiApplicationOptions)
       }),
     );
   });
+
+  app.use("/ti/request-categories", createTiRequestCategoryRoutes(prisma));
 
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {
