@@ -12,9 +12,61 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
+import { createTiApplication } from "../app.js";
+import type { TiServiceEnv } from "../config/env.js";
 import { requestContext } from "../middlewares/requestContext.js";
 import { requireTiPermission, TiPermissionLevel } from "../middlewares/requireTiPermission.js";
-import { createTestApp } from "./tiServiceTestUtils.js";
+import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
+
+const tiTestEnv = {
+  nodeEnv: "test",
+  port: 3040,
+  databaseUrl: "postgresql://localhost/ti_service_test",
+  auditServiceUrl: "http://localhost:3020",
+  auditServiceToken: "audit-service-token-test",
+  internalServiceToken: "ti-service-internal-token-test",
+  allowedOrigins: ["*"],
+  enableApiDocs: false,
+  logLevel: "info",
+  logPretty: false,
+} satisfies TiServiceEnv;
+
+const tiPublicOpenApiOperations = {
+  "/ti/request-categories/list": ["get"],
+  "/ti/request-categories": ["post"],
+  "/ti/request-categories/{id}": ["patch"],
+  "/ti/requests/list": ["get"],
+  "/ti/requests": ["post"],
+  "/ti/requests/{id}": ["get", "patch"],
+  "/ti/requests/{id}/assign": ["patch"],
+  "/ti/requests/{id}/status": ["patch"],
+  "/ti/requests/{id}/messages": ["get", "post"],
+  "/ti/inventory/list": ["get"],
+  "/ti/inventory": ["post"],
+  "/ti/inventory/{id}": ["get", "patch"],
+  "/ti/inventory/{id}/assign-user": ["patch"],
+  "/ti/inventory/{id}/return": ["patch"],
+  "/ti/inventory-categories/list": ["get"],
+  "/ti/inventory-categories": ["post"],
+  "/ti/inventory-categories/{id}": ["patch"],
+  "/ti/inventory-locations/list": ["get"],
+  "/ti/inventory-locations": ["post"],
+  "/ti/inventory-locations/{id}": ["patch"],
+  "/ti/passwords/list": ["get"],
+  "/ti/passwords": ["post"],
+  "/ti/passwords/{id}": ["get", "patch"],
+  "/ti/extensions/list": ["get"],
+  "/ti/extensions": ["post"],
+  "/ti/extensions/{id}": ["get", "patch"],
+  "/ti/terms/list": ["get"],
+  "/ti/terms": ["post"],
+  "/ti/terms/{id}": ["get", "patch"],
+  "/ti/terms/{id}/sign": ["patch"],
+} as const;
+
+const tiPublicOpenApiPaths = Object.keys(tiPublicOpenApiOperations);
+
+const openApiHttpMethods = ["get", "post", "patch", "put", "delete"] as const;
 
 function createPermissionTestApp() {
   const app = express();
@@ -38,6 +90,15 @@ function createPermissionTestApp() {
   );
 
   return app;
+}
+
+function createLoggerMock() {
+  return createLogger({
+    service: "ti-service-test",
+    env: "test",
+    level: "silent",
+    destination: new MemoryLogStream(),
+  });
 }
 
 describe("ti-service app", () => {
@@ -76,6 +137,42 @@ describe("ti-service app", () => {
     const response = await request(app).get("/health").set("x-request-id", "req-ti-1").expect(200);
 
     expect(response.headers["x-request-id"]).toBe("req-ti-1");
+  });
+
+  it("serve a especificacao OpenAPI publica quando habilitada", async () => {
+    const app = createTiApplication({
+      logger: createLoggerMock(),
+      env: { ...tiTestEnv, enableApiDocs: true },
+      prisma: createPrismaMock(),
+    });
+
+    const response = await request(app).get("/openapi.json").expect(200);
+
+    expect(response.body.paths).toHaveProperty("/ti/requests/list");
+    for (const path of tiPublicOpenApiPaths) {
+      expect(response.body.paths).toHaveProperty(path);
+    }
+
+    const operationIds = new Set<string>();
+    for (const [path, expectedMethods] of Object.entries(tiPublicOpenApiOperations)) {
+      const pathItem = response.body.paths[path];
+      const documentedMethods = openApiHttpMethods.filter(
+        (method) => pathItem[method] !== undefined,
+      );
+
+      expect(documentedMethods).toEqual(expectedMethods);
+      for (const method of expectedMethods) {
+        const operation = pathItem[method];
+        const operationId = operation.operationId;
+
+        expect(operationId).toEqual(expect.any(String));
+        expect(operationIds.has(operationId)).toBe(false);
+        operationIds.add(operationId);
+        expect(operation.security).toEqual([{ bearerAuth: [] }]);
+        expect(operation.responses["200"] ?? operation.responses["201"]).toBeDefined();
+        expect(operation.responses).toHaveProperty("401");
+      }
+    }
   });
 });
 

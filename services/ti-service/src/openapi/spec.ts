@@ -2,6 +2,410 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { TiServiceEnv } from "../config/env.js";
 
+type OpenApiSchema = Record<string, unknown>;
+type OpenApiParameter = Record<string, unknown>;
+type OpenApiResponse = Record<string, unknown>;
+type OpenApiOperation = Record<string, unknown>;
+
+const jsonEnvelopeContent = {
+  "application/json": {
+    schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+  },
+};
+
+const jsonErrorContent = {
+  "application/json": {
+    schema: { $ref: "#/components/schemas/ErrorEnvelope" },
+  },
+};
+
+const errorDescriptions: Record<number, string> = {
+  400: "Requisicao invalida",
+  401: "Autenticacao obrigatoria",
+  403: "Permissao insuficiente",
+  404: "Recurso nao encontrado",
+  409: "Conflito de dominio",
+};
+
+function successResponse(description: string): OpenApiResponse {
+  return {
+    description,
+    content: jsonEnvelopeContent,
+  };
+}
+
+function errorResponse(status: number): OpenApiResponse {
+  return {
+    description: errorDescriptions[status] ?? "Erro",
+    content: jsonErrorContent,
+  };
+}
+
+function errorResponses(statuses: number[]): Record<string, OpenApiResponse> {
+  return Object.fromEntries(statuses.map((status) => [String(status), errorResponse(status)]));
+}
+
+function pathIdParameter(description: string): OpenApiParameter {
+  return {
+    in: "path",
+    name: "id",
+    description,
+    schema: { type: "string", format: "uuid" },
+    required: true,
+  };
+}
+
+function uuidQueryParameter(name: string, description: string): OpenApiParameter {
+  return {
+    in: "query",
+    name,
+    description,
+    schema: { type: "string", format: "uuid" },
+    required: false,
+  };
+}
+
+function stringQueryParameter(name: string, description: string): OpenApiParameter {
+  return {
+    in: "query",
+    name,
+    description,
+    schema: { type: "string" },
+    required: false,
+  };
+}
+
+function enumQueryParameter(name: string, description: string, values: string[]): OpenApiParameter {
+  return {
+    in: "query",
+    name,
+    description,
+    schema: { type: "string", enum: values },
+    required: false,
+  };
+}
+
+function dateTimeQueryParameter(name: string, description: string): OpenApiParameter {
+  return {
+    in: "query",
+    name,
+    description,
+    schema: { type: "string", format: "date-time" },
+    required: false,
+  };
+}
+
+function jsonRequestBody(schemaRef: string): Record<string, unknown> {
+  return {
+    required: true,
+    content: {
+      "application/json": {
+        schema: { $ref: schemaRef },
+      },
+    },
+  };
+}
+
+function publicTiOperation({
+  operationId,
+  tags,
+  summary,
+  parameters,
+  requestBody,
+  successStatus = 200,
+  successDescription,
+  errors,
+}: {
+  operationId: string;
+  tags: string[];
+  summary: string;
+  parameters?: OpenApiParameter[];
+  requestBody?: Record<string, unknown>;
+  successStatus?: 200 | 201;
+  successDescription: string;
+  errors: number[];
+}): OpenApiOperation {
+  return {
+    operationId,
+    tags,
+    summary,
+    security: [{ bearerAuth: [] }],
+    ...(parameters ? { parameters } : {}),
+    ...(requestBody ? { requestBody } : {}),
+    responses: {
+      [String(successStatus)]: successResponse(successDescription),
+      ...errorResponses(errors),
+    },
+  };
+}
+
+const urgencyValues = ["Low", "Medium", "High", "Critical"];
+const requestStatusValues = ["New", "In_Progress", "Waiting", "Resolved", "Closed"];
+
+const schemas: Record<string, OpenApiSchema> = {
+  SuccessEnvelope: {
+    type: "object",
+    description: "Resposta de sucesso padrao do workspace",
+    additionalProperties: true,
+  },
+  ErrorEnvelope: {
+    type: "object",
+    description: "Resposta de erro padrao do workspace",
+    required: ["success", "error", "code"],
+    properties: {
+      success: { type: "boolean", enum: [false] },
+      error: { type: "string" },
+      code: { type: "string" },
+      requestId: { type: "string" },
+    },
+    additionalProperties: true,
+  },
+  TiInventoryInput: {
+    type: "object",
+    required: ["asset_code", "category_id"],
+    properties: {
+      asset_code: { type: "string", minLength: 1 },
+      category_id: { type: "string", format: "uuid" },
+      location_id: { type: "string", format: "uuid" },
+      user_id: { type: "string", format: "uuid" },
+      responsible_it_staff_id: { type: "string", format: "uuid" },
+      notes: { type: "string" },
+      delivery_date: { type: "string", format: "date-time" },
+    },
+    additionalProperties: false,
+  },
+  TiInventoryUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      asset_code: { type: "string", minLength: 1 },
+      category_id: { type: "string", format: "uuid" },
+      location_id: { type: "string", format: "uuid" },
+      user_id: { type: "string", format: "uuid" },
+      responsible_it_staff_id: { type: "string", format: "uuid" },
+      notes: { type: "string" },
+      delivery_date: { type: "string", format: "date-time" },
+    },
+    additionalProperties: false,
+  },
+  TiInventoryAssignInput: {
+    type: "object",
+    required: ["user_id"],
+    properties: {
+      user_id: { type: "string", format: "uuid" },
+      delivery_date: { type: "string", format: "date-time" },
+    },
+    additionalProperties: false,
+  },
+  TiInventoryReturnInput: {
+    type: "object",
+    properties: {
+      return_date: { type: "string", format: "date-time" },
+      notes: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+  TiInventoryCategoryInput: {
+    type: "object",
+    required: ["name"],
+    properties: {
+      name: { type: "string", minLength: 1 },
+      tag: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+  TiInventoryCategoryUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      name: { type: "string", minLength: 1 },
+      tag: { type: "string" },
+      active: { type: "boolean" },
+    },
+    additionalProperties: false,
+  },
+  TiInventoryLocationInput: {
+    type: "object",
+    required: ["name"],
+    properties: {
+      name: { type: "string", minLength: 1 },
+    },
+    additionalProperties: false,
+  },
+  TiInventoryLocationUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      name: { type: "string", minLength: 1 },
+      active: { type: "boolean" },
+    },
+    additionalProperties: false,
+  },
+  TiRequestInput: {
+    type: "object",
+    required: ["title", "description", "category_id"],
+    properties: {
+      title: { type: "string", minLength: 1 },
+      description: { type: "string", minLength: 1 },
+      category_id: { type: "string", format: "uuid" },
+      requester_id: { type: "string", format: "uuid" },
+      assigned_to_id: { type: "string", format: "uuid" },
+      urgency: {
+        type: "string",
+        enum: urgencyValues,
+        default: "Medium",
+      },
+      attachment: { type: "string", format: "uri" },
+    },
+    additionalProperties: false,
+  },
+  TiRequestUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      title: { type: "string", minLength: 1 },
+      description: { type: "string", minLength: 1 },
+      category_id: { type: "string", format: "uuid" },
+      urgency: { type: "string", enum: urgencyValues },
+      attachment: { type: "string", format: "uri" },
+    },
+    additionalProperties: false,
+  },
+  TiRequestAssignInput: {
+    type: "object",
+    required: ["assigned_to_id"],
+    properties: {
+      assigned_to_id: { type: "string", format: "uuid" },
+    },
+    additionalProperties: false,
+  },
+  TiRequestStatusInput: {
+    type: "object",
+    required: ["status"],
+    properties: {
+      status: {
+        type: "string",
+        enum: requestStatusValues,
+      },
+    },
+    additionalProperties: false,
+  },
+  TiMessageInput: {
+    type: "object",
+    required: ["message"],
+    properties: {
+      message: { type: "string", minLength: 1 },
+      attachment: { type: "string", format: "uri" },
+      type: {
+        type: "string",
+        enum: ["Message", "Solution", "Rejection", "Acceptance"],
+        default: "Message",
+      },
+    },
+    additionalProperties: false,
+  },
+  TiRequestCategoryInput: {
+    type: "object",
+    required: ["name"],
+    properties: {
+      name: { type: "string", minLength: 1 },
+    },
+    additionalProperties: false,
+  },
+  TiRequestCategoryUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      name: { type: "string", minLength: 1 },
+      active: { type: "boolean" },
+    },
+    additionalProperties: false,
+  },
+  TiPasswordInput: {
+    type: "object",
+    required: ["local", "user_id", "password"],
+    properties: {
+      local: { type: "string", minLength: 1 },
+      user_id: { type: "string", format: "uuid" },
+      password: { type: "string", minLength: 1 },
+      notes: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+  TiPasswordUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      local: { type: "string", minLength: 1 },
+      user_id: { type: "string", format: "uuid" },
+      password: { type: "string", minLength: 1 },
+      notes: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+  TiExtensionInput: {
+    type: "object",
+    required: ["user_id", "number"],
+    properties: {
+      user_id: { type: "string", format: "uuid" },
+      number: { type: "string", minLength: 1 },
+    },
+    additionalProperties: false,
+  },
+  TiExtensionUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      user_id: { type: "string", format: "uuid" },
+      number: { type: "string", minLength: 1 },
+    },
+    additionalProperties: false,
+  },
+  TiTermInput: {
+    type: "object",
+    required: ["date", "user_name", "user_cpf"],
+    properties: {
+      date: { type: "string", format: "date-time" },
+      user_name: { type: "string", minLength: 1 },
+      user_cpf: { type: "string", minLength: 1 },
+      user_id: { type: "string", format: "uuid" },
+      department_id: { type: "string", format: "uuid" },
+      address: { type: "string" },
+      reason: { type: "string" },
+      equipament_list: { type: "string" },
+      brand: { type: "string" },
+      asset_code: { type: "string" },
+      imei: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+  TiTermUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      date: { type: "string", format: "date-time" },
+      user_name: { type: "string", minLength: 1 },
+      user_cpf: { type: "string", minLength: 1 },
+      user_id: { type: "string", format: "uuid" },
+      department_id: { type: "string", format: "uuid" },
+      address: { type: "string" },
+      reason: { type: "string" },
+      equipament_list: { type: "string" },
+      brand: { type: "string" },
+      asset_code: { type: "string" },
+      imei: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+  TiTermSignInput: {
+    type: "object",
+    properties: {
+      reason: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+};
+
 export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): OpenApiDocument {
   return {
     openapi: "3.0.3",
@@ -18,6 +422,9 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
       { name: "TI Inventory Locations", description: "Locais de inventario de TI" },
       { name: "TI Requests", description: "Chamados e mensagens de TI" },
       { name: "TI Request Categories", description: "Categorias de chamados de TI" },
+      { name: "TI Passwords", description: "Senhas de TI" },
+      { name: "TI Extensions", description: "Ramais de TI" },
+      { name: "TI Terms", description: "Termos de responsabilidade de TI" },
     ],
     components: {
       securitySchemes: {
@@ -26,904 +433,416 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
           scheme: "bearer",
         },
       },
-      schemas: {
-        SuccessEnvelope: {
-          type: "object",
-          description: "Resposta de sucesso padrao do workspace",
-          additionalProperties: true,
-        },
-        TiInventoryInput: {
-          type: "object",
-          required: ["asset_code", "category_id"],
-          properties: {
-            asset_code: { type: "string", minLength: 1 },
-            category_id: { type: "string", format: "uuid" },
-            location_id: { type: "string", format: "uuid" },
-            user_id: { type: "string", format: "uuid" },
-            responsible_it_staff_id: { type: "string", format: "uuid" },
-            notes: { type: "string" },
-            delivery_date: { type: "string", format: "date-time" },
-          },
-          additionalProperties: false,
-        },
-        TiInventoryUpdateInput: {
-          type: "object",
-          properties: {
-            asset_code: { type: "string", minLength: 1 },
-            category_id: { type: "string", format: "uuid" },
-            location_id: { type: "string", format: "uuid" },
-            user_id: { type: "string", format: "uuid" },
-            responsible_it_staff_id: { type: "string", format: "uuid" },
-            notes: { type: "string" },
-            delivery_date: { type: "string", format: "date-time" },
-          },
-          additionalProperties: false,
-        },
-        TiInventoryAssignInput: {
-          type: "object",
-          required: ["user_id"],
-          properties: {
-            user_id: { type: "string", format: "uuid" },
-            delivery_date: { type: "string", format: "date-time" },
-          },
-          additionalProperties: false,
-        },
-        TiInventoryReturnInput: {
-          type: "object",
-          properties: {
-            return_date: { type: "string", format: "date-time" },
-            notes: { type: "string" },
-          },
-          additionalProperties: false,
-        },
-        TiInventoryCategoryInput: {
-          type: "object",
-          required: ["name"],
-          properties: {
-            name: { type: "string", minLength: 1 },
-            tag: { type: "string" },
-          },
-          additionalProperties: false,
-        },
-        TiInventoryCategoryUpdateInput: {
-          type: "object",
-          properties: {
-            name: { type: "string", minLength: 1 },
-            tag: { type: "string" },
-            active: { type: "boolean" },
-          },
-          additionalProperties: false,
-        },
-        TiInventoryLocationInput: {
-          type: "object",
-          required: ["name"],
-          properties: {
-            name: { type: "string", minLength: 1 },
-          },
-          additionalProperties: false,
-        },
-        TiInventoryLocationUpdateInput: {
-          type: "object",
-          properties: {
-            name: { type: "string", minLength: 1 },
-            active: { type: "boolean" },
-          },
-          additionalProperties: false,
-        },
-        TiRequestInput: {
-          type: "object",
-          required: ["title", "description", "category_id"],
-          properties: {
-            title: { type: "string", minLength: 1 },
-            description: { type: "string", minLength: 1 },
-            category_id: { type: "string", format: "uuid" },
-            requester_id: { type: "string", format: "uuid" },
-            assigned_to_id: { type: "string", format: "uuid" },
-            urgency: {
-              type: "string",
-              enum: ["Low", "Medium", "High", "Critical"],
-              default: "Medium",
-            },
-            attachment: { type: "string", format: "uri" },
-          },
-          additionalProperties: false,
-        },
-        TiRequestUpdateInput: {
-          type: "object",
-          properties: {
-            title: { type: "string", minLength: 1 },
-            description: { type: "string", minLength: 1 },
-            category_id: { type: "string", format: "uuid" },
-            urgency: { type: "string", enum: ["Low", "Medium", "High", "Critical"] },
-            attachment: { type: "string", format: "uri" },
-          },
-          additionalProperties: false,
-        },
-        TiRequestAssignInput: {
-          type: "object",
-          required: ["assigned_to_id"],
-          properties: {
-            assigned_to_id: { type: "string", format: "uuid" },
-          },
-          additionalProperties: false,
-        },
-        TiRequestStatusInput: {
-          type: "object",
-          required: ["status"],
-          properties: {
-            status: {
-              type: "string",
-              enum: ["New", "In_Progress", "Waiting", "Resolved", "Closed"],
-            },
-          },
-          additionalProperties: false,
-        },
-        TiMessageInput: {
-          type: "object",
-          required: ["message"],
-          properties: {
-            message: { type: "string", minLength: 1 },
-            attachment: { type: "string", format: "uri" },
-            type: {
-              type: "string",
-              enum: ["Message", "Solution", "Rejection", "Acceptance"],
-              default: "Message",
-            },
-          },
-          additionalProperties: false,
-        },
-        TiRequestCategoryInput: {
-          type: "object",
-          required: ["name"],
-          properties: {
-            name: { type: "string", minLength: 1 },
-          },
-          additionalProperties: false,
-        },
-        TiRequestCategoryUpdateInput: {
-          type: "object",
-          properties: {
-            name: { type: "string", minLength: 1 },
-            active: { type: "boolean" },
-          },
-          additionalProperties: false,
-        },
-      },
+      schemas,
     },
     paths: {
       "/health": {
         get: {
+          operationId: "getTiServiceHealth",
           tags: ["Health"],
           summary: "Health check",
           responses: {
-            "200": {
-              description: "Servico disponivel",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
+            "200": successResponse("Servico disponivel"),
           },
         },
       },
       "/ready": {
         get: {
+          operationId: "getTiServiceReadiness",
           tags: ["Health"],
           summary: "Readiness",
           responses: {
-            "200": {
-              description: "Servico pronto",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
+            "200": successResponse("Servico pronto"),
           },
         },
       },
       "/ti/inventory/list": {
-        get: {
+        get: publicTiOperation({
+          operationId: "listTiInventory",
           tags: ["TI Inventory"],
           summary: "Lista ativos de inventario de TI",
-          security: [{ bearerAuth: [] }],
           parameters: [
-            {
-              in: "query",
-              name: "category_id",
-              schema: { type: "string", format: "uuid" },
-              required: false,
-            },
-            {
-              in: "query",
-              name: "location_id",
-              schema: { type: "string", format: "uuid" },
-              required: false,
-            },
-            {
-              in: "query",
-              name: "user_id",
-              schema: { type: "string", format: "uuid" },
-              required: false,
-            },
-            {
-              in: "query",
-              name: "asset_code",
-              schema: { type: "string" },
-              required: false,
-            },
+            uuidQueryParameter("category_id", "Categoria do ativo"),
+            uuidQueryParameter("location_id", "Local do ativo"),
+            uuidQueryParameter("user_id", "Usuario vinculado ao ativo"),
+            stringQueryParameter("asset_code", "Codigo patrimonial"),
           ],
-          responses: {
-            "200": {
-              description: "Ativos listados",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          successDescription: "Ativos listados",
+          errors: [400, 401, 403],
+        }),
       },
       "/ti/inventory": {
-        post: {
+        post: publicTiOperation({
+          operationId: "createTiInventory",
           tags: ["TI Inventory"],
           summary: "Cria ativo de inventario de TI",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiInventoryInput" },
-              },
-            },
-          },
-          responses: {
-            "201": {
-              description: "Ativo criado",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          requestBody: jsonRequestBody("#/components/schemas/TiInventoryInput"),
+          successStatus: 201,
+          successDescription: "Ativo criado",
+          errors: [400, 401, 403, 404, 409],
+        }),
       },
       "/ti/inventory/{id}": {
-        get: {
+        get: publicTiOperation({
+          operationId: "getTiInventory",
           tags: ["TI Inventory"],
           summary: "Busca ativo de inventario de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          responses: {
-            "200": {
-              description: "Ativo encontrado",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
-        patch: {
+          parameters: [pathIdParameter("Ativo de inventario de TI")],
+          successDescription: "Ativo encontrado",
+          errors: [400, 401, 403, 404],
+        }),
+        patch: publicTiOperation({
+          operationId: "updateTiInventory",
           tags: ["TI Inventory"],
           summary: "Atualiza ativo de inventario de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiInventoryUpdateInput" },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Ativo atualizado",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          parameters: [pathIdParameter("Ativo de inventario de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiInventoryUpdateInput"),
+          successDescription: "Ativo atualizado",
+          errors: [400, 401, 403, 404, 409],
+        }),
       },
       "/ti/inventory/{id}/assign-user": {
-        patch: {
+        patch: publicTiOperation({
+          operationId: "assignTiInventoryUser",
           tags: ["TI Inventory"],
           summary: "Atribui usuario ao ativo de inventario de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiInventoryAssignInput" },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Ativo atribuido",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          parameters: [pathIdParameter("Ativo de inventario de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiInventoryAssignInput"),
+          successDescription: "Ativo atribuido",
+          errors: [400, 401, 403, 404],
+        }),
       },
       "/ti/inventory/{id}/return": {
-        patch: {
+        patch: publicTiOperation({
+          operationId: "returnTiInventory",
           tags: ["TI Inventory"],
           summary: "Registra devolucao de ativo de inventario de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiInventoryReturnInput" },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Devolucao registrada",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          parameters: [pathIdParameter("Ativo de inventario de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiInventoryReturnInput"),
+          successDescription: "Devolucao registrada",
+          errors: [400, 401, 403, 404],
+        }),
       },
       "/ti/inventory-categories/list": {
-        get: {
+        get: publicTiOperation({
+          operationId: "listTiInventoryCategories",
           tags: ["TI Inventory Categories"],
           summary: "Lista categorias de inventario de TI",
-          security: [{ bearerAuth: [] }],
-          responses: {
-            "200": {
-              description: "Categorias listadas",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          successDescription: "Categorias listadas",
+          errors: [401, 403],
+        }),
       },
       "/ti/inventory-categories": {
-        post: {
+        post: publicTiOperation({
+          operationId: "createTiInventoryCategory",
           tags: ["TI Inventory Categories"],
           summary: "Cria categoria de inventario de TI",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiInventoryCategoryInput" },
-              },
-            },
-          },
-          responses: {
-            "201": {
-              description: "Categoria criada",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          requestBody: jsonRequestBody("#/components/schemas/TiInventoryCategoryInput"),
+          successStatus: 201,
+          successDescription: "Categoria criada",
+          errors: [400, 401, 403, 409],
+        }),
       },
       "/ti/inventory-categories/{id}": {
-        patch: {
+        patch: publicTiOperation({
+          operationId: "updateTiInventoryCategory",
           tags: ["TI Inventory Categories"],
           summary: "Atualiza categoria de inventario de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiInventoryCategoryUpdateInput" },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Categoria atualizada",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          parameters: [pathIdParameter("Categoria de inventario de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiInventoryCategoryUpdateInput"),
+          successDescription: "Categoria atualizada",
+          errors: [400, 401, 403, 404],
+        }),
       },
       "/ti/inventory-locations/list": {
-        get: {
+        get: publicTiOperation({
+          operationId: "listTiInventoryLocations",
           tags: ["TI Inventory Locations"],
           summary: "Lista locais de inventario de TI",
-          security: [{ bearerAuth: [] }],
-          responses: {
-            "200": {
-              description: "Locais listados",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          successDescription: "Locais listados",
+          errors: [401, 403],
+        }),
       },
       "/ti/inventory-locations": {
-        post: {
+        post: publicTiOperation({
+          operationId: "createTiInventoryLocation",
           tags: ["TI Inventory Locations"],
           summary: "Cria local de inventario de TI",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiInventoryLocationInput" },
-              },
-            },
-          },
-          responses: {
-            "201": {
-              description: "Local criado",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          requestBody: jsonRequestBody("#/components/schemas/TiInventoryLocationInput"),
+          successStatus: 201,
+          successDescription: "Local criado",
+          errors: [400, 401, 403, 409],
+        }),
       },
       "/ti/inventory-locations/{id}": {
-        patch: {
+        patch: publicTiOperation({
+          operationId: "updateTiInventoryLocation",
           tags: ["TI Inventory Locations"],
           summary: "Atualiza local de inventario de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiInventoryLocationUpdateInput" },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Local atualizado",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          parameters: [pathIdParameter("Local de inventario de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiInventoryLocationUpdateInput"),
+          successDescription: "Local atualizado",
+          errors: [400, 401, 403, 404],
+        }),
       },
       "/ti/requests/list": {
-        get: {
+        get: publicTiOperation({
+          operationId: "listTiRequests",
           tags: ["TI Requests"],
           summary: "Lista chamados de TI",
-          security: [{ bearerAuth: [] }],
           parameters: [
-            {
-              in: "query",
-              name: "status",
-              schema: {
-                type: "string",
-                enum: ["New", "In_Progress", "Waiting", "Resolved", "Closed"],
-              },
-              required: false,
-            },
-            {
-              in: "query",
-              name: "urgency",
-              schema: { type: "string", enum: ["Low", "Medium", "High", "Critical"] },
-              required: false,
-            },
-            {
-              in: "query",
-              name: "category_id",
-              schema: { type: "string", format: "uuid" },
-              required: false,
-            },
-            {
-              in: "query",
-              name: "requester_id",
-              schema: { type: "string", format: "uuid" },
-              required: false,
-            },
-            {
-              in: "query",
-              name: "assigned_to_id",
-              schema: { type: "string", format: "uuid" },
-              required: false,
-            },
-            {
-              in: "query",
-              name: "created_from",
-              schema: { type: "string", format: "date-time" },
-              required: false,
-            },
-            {
-              in: "query",
-              name: "created_to",
-              schema: { type: "string", format: "date-time" },
-              required: false,
-            },
+            enumQueryParameter("status", "Status do chamado", requestStatusValues),
+            enumQueryParameter("urgency", "Urgencia do chamado", urgencyValues),
+            uuidQueryParameter("category_id", "Categoria do chamado"),
+            uuidQueryParameter("requester_id", "Solicitante do chamado"),
+            uuidQueryParameter("assigned_to_id", "Responsavel pelo chamado"),
+            dateTimeQueryParameter("created_from", "Data inicial de criacao"),
+            dateTimeQueryParameter("created_to", "Data final de criacao"),
           ],
-          responses: {
-            "200": {
-              description: "Chamados listados",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          successDescription: "Chamados listados",
+          errors: [400, 401, 403],
+        }),
       },
       "/ti/requests": {
-        post: {
+        post: publicTiOperation({
+          operationId: "createTiRequest",
           tags: ["TI Requests"],
           summary: "Cria chamado de TI",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiRequestInput" },
-              },
-            },
-          },
-          responses: {
-            "201": {
-              description: "Chamado criado",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          requestBody: jsonRequestBody("#/components/schemas/TiRequestInput"),
+          successStatus: 201,
+          successDescription: "Chamado criado",
+          errors: [400, 401, 403, 404],
+        }),
       },
       "/ti/requests/{id}": {
-        get: {
+        get: publicTiOperation({
+          operationId: "getTiRequest",
           tags: ["TI Requests"],
           summary: "Busca chamado de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          responses: {
-            "200": {
-              description: "Chamado encontrado",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
-        patch: {
+          parameters: [pathIdParameter("Chamado de TI")],
+          successDescription: "Chamado encontrado",
+          errors: [400, 401, 403, 404],
+        }),
+        patch: publicTiOperation({
+          operationId: "updateTiRequest",
           tags: ["TI Requests"],
           summary: "Atualiza chamado de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiRequestUpdateInput" },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Chamado atualizado",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          parameters: [pathIdParameter("Chamado de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiRequestUpdateInput"),
+          successDescription: "Chamado atualizado",
+          errors: [400, 401, 403, 404],
+        }),
       },
       "/ti/requests/{id}/assign": {
-        patch: {
+        patch: publicTiOperation({
+          operationId: "assignTiRequest",
           tags: ["TI Requests"],
           summary: "Atribui responsavel ao chamado de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiRequestAssignInput" },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Chamado atribuido",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          parameters: [pathIdParameter("Chamado de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiRequestAssignInput"),
+          successDescription: "Chamado atribuido",
+          errors: [400, 401, 403, 404],
+        }),
       },
       "/ti/requests/{id}/status": {
-        patch: {
+        patch: publicTiOperation({
+          operationId: "updateTiRequestStatus",
           tags: ["TI Requests"],
           summary: "Atualiza status do chamado de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiRequestStatusInput" },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Status atualizado",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          parameters: [pathIdParameter("Chamado de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiRequestStatusInput"),
+          successDescription: "Status atualizado",
+          errors: [400, 401, 403, 404],
+        }),
       },
       "/ti/requests/{id}/messages": {
-        get: {
+        get: publicTiOperation({
+          operationId: "listTiRequestMessages",
           tags: ["TI Requests"],
           summary: "Lista mensagens de um chamado de TI",
-          security: [{ bearerAuth: [] }],
           parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-            {
-              in: "query",
-              name: "created_from",
-              schema: { type: "string", format: "date-time" },
-              required: false,
-            },
-            {
-              in: "query",
-              name: "created_to",
-              schema: { type: "string", format: "date-time" },
-              required: false,
-            },
+            pathIdParameter("Chamado de TI"),
+            dateTimeQueryParameter("created_from", "Data inicial de criacao"),
+            dateTimeQueryParameter("created_to", "Data final de criacao"),
           ],
-          responses: {
-            "200": {
-              description: "Mensagens listadas",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
-        post: {
+          successDescription: "Mensagens listadas",
+          errors: [400, 401, 403, 404],
+        }),
+        post: publicTiOperation({
+          operationId: "createTiRequestMessage",
           tags: ["TI Requests"],
           summary: "Cria mensagem em chamado de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiMessageInput" },
-              },
-            },
-          },
-          responses: {
-            "201": {
-              description: "Mensagem criada",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          parameters: [pathIdParameter("Chamado de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiMessageInput"),
+          successStatus: 201,
+          successDescription: "Mensagem criada",
+          errors: [400, 401, 403, 404],
+        }),
       },
       "/ti/request-categories/list": {
-        get: {
+        get: publicTiOperation({
+          operationId: "listTiRequestCategories",
           tags: ["TI Request Categories"],
           summary: "Lista categorias de chamados de TI",
-          security: [{ bearerAuth: [] }],
           parameters: [
-            {
-              in: "query",
-              name: "active",
-              schema: { type: "string", enum: ["true", "false"] },
-              required: false,
-            },
+            enumQueryParameter("active", "Filtro de categoria ativa", ["true", "false"]),
           ],
-          responses: {
-            "200": {
-              description: "Categorias listadas",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          successDescription: "Categorias listadas",
+          errors: [400, 401, 403],
+        }),
       },
       "/ti/request-categories": {
-        post: {
+        post: publicTiOperation({
+          operationId: "createTiRequestCategory",
           tags: ["TI Request Categories"],
           summary: "Cria categoria de chamado de TI",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiRequestCategoryInput" },
-              },
-            },
-          },
-          responses: {
-            "201": {
-              description: "Categoria criada",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          requestBody: jsonRequestBody("#/components/schemas/TiRequestCategoryInput"),
+          successStatus: 201,
+          successDescription: "Categoria criada",
+          errors: [400, 401, 403, 409],
+        }),
       },
       "/ti/request-categories/{id}": {
-        patch: {
+        patch: publicTiOperation({
+          operationId: "updateTiRequestCategory",
           tags: ["TI Request Categories"],
           summary: "Atualiza categoria de chamado de TI",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              in: "path",
-              name: "id",
-              schema: { type: "string", format: "uuid" },
-              required: true,
-            },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TiRequestCategoryUpdateInput" },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Categoria atualizada",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-                },
-              },
-            },
-          },
-        },
+          parameters: [pathIdParameter("Categoria de chamado de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiRequestCategoryUpdateInput"),
+          successDescription: "Categoria atualizada",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/passwords/list": {
+        get: publicTiOperation({
+          operationId: "listTiPasswords",
+          tags: ["TI Passwords"],
+          summary: "Lista senhas de TI",
+          parameters: [uuidQueryParameter("user_id", "Usuario vinculado a senha")],
+          successDescription: "Senhas listadas",
+          errors: [400, 401, 403],
+        }),
+      },
+      "/ti/passwords": {
+        post: publicTiOperation({
+          operationId: "createTiPassword",
+          tags: ["TI Passwords"],
+          summary: "Cria senha de TI",
+          requestBody: jsonRequestBody("#/components/schemas/TiPasswordInput"),
+          successStatus: 201,
+          successDescription: "Senha criada",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/passwords/{id}": {
+        get: publicTiOperation({
+          operationId: "getTiPassword",
+          tags: ["TI Passwords"],
+          summary: "Busca senha de TI",
+          parameters: [pathIdParameter("Senha de TI")],
+          successDescription: "Senha encontrada",
+          errors: [400, 401, 403, 404],
+        }),
+        patch: publicTiOperation({
+          operationId: "updateTiPassword",
+          tags: ["TI Passwords"],
+          summary: "Atualiza senha de TI",
+          parameters: [pathIdParameter("Senha de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiPasswordUpdateInput"),
+          successDescription: "Senha atualizada",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/extensions/list": {
+        get: publicTiOperation({
+          operationId: "listTiExtensions",
+          tags: ["TI Extensions"],
+          summary: "Lista ramais de TI",
+          parameters: [uuidQueryParameter("user_id", "Usuario vinculado ao ramal")],
+          successDescription: "Ramais listados",
+          errors: [400, 401, 403],
+        }),
+      },
+      "/ti/extensions": {
+        post: publicTiOperation({
+          operationId: "createTiExtension",
+          tags: ["TI Extensions"],
+          summary: "Cria ramal de TI",
+          requestBody: jsonRequestBody("#/components/schemas/TiExtensionInput"),
+          successStatus: 201,
+          successDescription: "Ramal criado",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/extensions/{id}": {
+        get: publicTiOperation({
+          operationId: "getTiExtension",
+          tags: ["TI Extensions"],
+          summary: "Busca ramal de TI",
+          parameters: [pathIdParameter("Ramal de TI")],
+          successDescription: "Ramal encontrado",
+          errors: [400, 401, 403, 404],
+        }),
+        patch: publicTiOperation({
+          operationId: "updateTiExtension",
+          tags: ["TI Extensions"],
+          summary: "Atualiza ramal de TI",
+          parameters: [pathIdParameter("Ramal de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiExtensionUpdateInput"),
+          successDescription: "Ramal atualizado",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/terms/list": {
+        get: publicTiOperation({
+          operationId: "listTiTerms",
+          tags: ["TI Terms"],
+          summary: "Lista termos de TI",
+          parameters: [uuidQueryParameter("user_id", "Usuario vinculado ao termo")],
+          successDescription: "Termos listados",
+          errors: [400, 401, 403],
+        }),
+      },
+      "/ti/terms": {
+        post: publicTiOperation({
+          operationId: "createTiTerm",
+          tags: ["TI Terms"],
+          summary: "Cria termo de TI",
+          requestBody: jsonRequestBody("#/components/schemas/TiTermInput"),
+          successStatus: 201,
+          successDescription: "Termo criado",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/terms/{id}": {
+        get: publicTiOperation({
+          operationId: "getTiTerm",
+          tags: ["TI Terms"],
+          summary: "Busca termo de TI",
+          parameters: [pathIdParameter("Termo de TI")],
+          successDescription: "Termo encontrado",
+          errors: [400, 401, 403, 404],
+        }),
+        patch: publicTiOperation({
+          operationId: "updateTiTerm",
+          tags: ["TI Terms"],
+          summary: "Atualiza termo de TI",
+          parameters: [pathIdParameter("Termo de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiTermUpdateInput"),
+          successDescription: "Termo atualizado",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/terms/{id}/sign": {
+        patch: publicTiOperation({
+          operationId: "signTiTerm",
+          tags: ["TI Terms"],
+          summary: "Assina termo de TI",
+          parameters: [pathIdParameter("Termo de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiTermSignInput"),
+          successDescription: "Termo assinado",
+          errors: [400, 401, 403, 404],
+        }),
       },
     },
   };
