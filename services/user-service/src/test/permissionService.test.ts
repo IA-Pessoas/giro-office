@@ -96,4 +96,22 @@ describe("PermissionService", () => {
       data: expect.objectContaining({ fiscal: 2 }),
     });
   });
+
+  it("update repassa permissao de TI para o Prisma", async () => {
+    prismaMock.permission.findFirst.mockResolvedValue({
+      id: "permission-1",
+      user_id: "user-1",
+      organization_id: "org-1",
+      ti: null,
+    });
+    prismaMock.permission.updateMany.mockResolvedValue({ count: 1 });
+    const service = new PermissionService();
+
+    await service.update("user-1", { ti: 3 }, "org-1");
+
+    expect(prismaMock.permission.updateMany).toHaveBeenCalledWith({
+      where: { user_id: "user-1", organization_id: "org-1" },
+      data: expect.objectContaining({ ti: 3 }),
+    });
+  });
 });
