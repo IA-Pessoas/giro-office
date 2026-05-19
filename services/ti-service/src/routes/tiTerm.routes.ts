@@ -9,15 +9,14 @@ import { type Request, Router } from "express";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { requireTiPermission, TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import {
-  assignTiInventoryUserBodySchema,
-  createTiInventoryBodySchema,
-  listTiInventoryQuerySchema,
-  returnTiInventoryBodySchema,
-  tiInventoryIdParamsSchema,
-  updateTiInventoryBodySchema,
-} from "../schemas/tiInventory.schemas.js";
-import { TiInventoryService } from "../services/tiInventoryService.js";
+  createTiTermBodySchema,
+  listTiTermsQuerySchema,
+  signTiTermBodySchema,
+  tiTermIdParamsSchema,
+  updateTiTermBodySchema,
+} from "../schemas/tiTerm.schemas.js";
 import type { TiAuthContext } from "../services/tiRequestService.js";
+import { TiTermService } from "../services/tiTermService.js";
 
 function getContext(request: Request): TiAuthContext {
   if (!request.user_id || !request.organization_id) {
@@ -31,9 +30,9 @@ function getContext(request: Request): TiAuthContext {
   };
 }
 
-export function createTiInventoryRoutes(prisma: PrismaClient): Router {
+export function createTiTermRoutes(prisma: PrismaClient): Router {
   const router = Router();
-  const service = new TiInventoryService(prisma);
+  const service = new TiTermService(prisma);
 
   router.get(
     "/list",
@@ -41,12 +40,12 @@ export function createTiInventoryRoutes(prisma: PrismaClient): Router {
     async (request, response, next) => {
       try {
         const context = getContext(request);
-        const query = parseWithZod(listTiInventoryQuerySchema, request.query);
+        const query = parseWithZod(listTiTermsQuerySchema, request.query);
         const result = await service.list(context, query);
 
         response.status(200).json(createSuccessResponse(result));
       } catch (err: unknown) {
-        logError("Erro ao listar inventario de TI", { err });
+        logError("Erro ao listar termos de TI", { err });
         next(err);
       }
     },
@@ -58,12 +57,12 @@ export function createTiInventoryRoutes(prisma: PrismaClient): Router {
     async (request, response, next) => {
       try {
         const context = getContext(request);
-        const params = parseWithZod(tiInventoryIdParamsSchema, request.params);
+        const params = parseWithZod(tiTermIdParamsSchema, request.params);
         const result = await service.getById(context, params.id);
 
         response.status(200).json(createSuccessResponse(result));
       } catch (err: unknown) {
-        logError("Erro ao buscar ativo de inventario de TI", { err });
+        logError("Erro ao buscar termo de TI", { err });
         next(err);
       }
     },
@@ -75,12 +74,12 @@ export function createTiInventoryRoutes(prisma: PrismaClient): Router {
     async (request, response, next) => {
       try {
         const context = getContext(request);
-        const body = parseWithZod(createTiInventoryBodySchema, request.body);
+        const body = parseWithZod(createTiTermBodySchema, request.body);
         const result = await service.create(context, body);
 
         response.status(201).json(createSuccessResponse(result));
       } catch (err: unknown) {
-        logError("Erro ao criar ativo de inventario de TI", { err });
+        logError("Erro ao criar termo de TI", { err });
         next(err);
       }
     },
@@ -92,49 +91,31 @@ export function createTiInventoryRoutes(prisma: PrismaClient): Router {
     async (request, response, next) => {
       try {
         const context = getContext(request);
-        const params = parseWithZod(tiInventoryIdParamsSchema, request.params);
-        const body = parseWithZod(updateTiInventoryBodySchema, request.body);
+        const params = parseWithZod(tiTermIdParamsSchema, request.params);
+        const body = parseWithZod(updateTiTermBodySchema, request.body);
         const result = await service.update(context, params.id, body);
 
         response.status(200).json(createSuccessResponse(result));
       } catch (err: unknown) {
-        logError("Erro ao atualizar ativo de inventario de TI", { err });
+        logError("Erro ao atualizar termo de TI", { err });
         next(err);
       }
     },
   );
 
   router.patch(
-    "/:id/assign-user",
-    requireTiPermission(TiPermissionLevel.Admin),
+    "/:id/sign",
+    requireTiPermission(TiPermissionLevel.Requester),
     async (request, response, next) => {
       try {
         const context = getContext(request);
-        const params = parseWithZod(tiInventoryIdParamsSchema, request.params);
-        const body = parseWithZod(assignTiInventoryUserBodySchema, request.body);
-        const result = await service.assignUser(context, params.id, body);
+        const params = parseWithZod(tiTermIdParamsSchema, request.params);
+        const body = parseWithZod(signTiTermBodySchema, request.body);
+        const result = await service.sign(context, params.id, body);
 
         response.status(200).json(createSuccessResponse(result));
       } catch (err: unknown) {
-        logError("Erro ao atribuir ativo de inventario de TI", { err });
-        next(err);
-      }
-    },
-  );
-
-  router.patch(
-    "/:id/return",
-    requireTiPermission(TiPermissionLevel.Admin),
-    async (request, response, next) => {
-      try {
-        const context = getContext(request);
-        const params = parseWithZod(tiInventoryIdParamsSchema, request.params);
-        const body = parseWithZod(returnTiInventoryBodySchema, request.body);
-        const result = await service.returnAsset(context, params.id, body);
-
-        response.status(200).json(createSuccessResponse(result));
-      } catch (err: unknown) {
-        logError("Erro ao devolver ativo de inventario de TI", { err });
+        logError("Erro ao assinar termo de TI", { err });
         next(err);
       }
     },

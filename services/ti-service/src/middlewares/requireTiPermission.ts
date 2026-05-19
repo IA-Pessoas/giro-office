@@ -1,7 +1,13 @@
 import { requireAuthenticatedRequestContext, ServiceError } from "@workspace/shared";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
-export function requireTiPermission(minPermission: number): RequestHandler {
+export enum TiPermissionLevel {
+  Requester = 1,
+  Technician = 2,
+  Admin = 3,
+}
+
+export function requireTiPermission(minPermission: TiPermissionLevel): RequestHandler {
   return function requireTiPermissionMiddleware(
     request: Request,
     _response: Response,
