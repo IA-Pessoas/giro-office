@@ -100,12 +100,7 @@ export function RhPointAdjustmentRequestModal({
 
     const trimmedJustification = formState.justification.trim();
 
-    if (
-      !formState.clockIn ||
-      !formState.lunchOut ||
-      !formState.lunchIn ||
-      !formState.clockOut
-    ) {
+    if (!formState.clockIn || !formState.lunchOut || !formState.lunchIn || !formState.clockOut) {
       toast.warn("Preencha todos os horários do ajuste.");
       return;
     }

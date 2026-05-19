@@ -3,12 +3,12 @@ import { toast } from "react-toastify";
 
 import { Dialog } from "@shared/components";
 import { useSignRhTimeSheetMutation } from "../hooks/useRhCalendar";
-import type { RhTimeSheet } from "../types";
+import type { RhTimeSheetListItem } from "../types";
 import { formatRhDateTime } from "../utils/rhDate";
 
 interface RhTimesheetSignDialogProps {
   open: boolean;
-  sheet: RhTimeSheet | null;
+  sheet: RhTimeSheetListItem | null;
   onClose: () => void;
 }
 

@@ -8,13 +8,9 @@ interface RhPointFiltersProps {
   currentUserLabel: string;
   selectedUserId: string;
   month: string;
-  dateFrom: string;
-  dateTo: string;
   selectedAdjustmentStatus: "" | RhPointAdjustmentStatus;
   onUserChange: (value: string) => void;
   onMonthChange: (value: string) => void;
-  onDateFromChange: (value: string) => void;
-  onDateToChange: (value: string) => void;
   onAdjustmentStatusChange: (value: "" | RhPointAdjustmentStatus) => void;
 }
 
@@ -24,18 +20,20 @@ export function RhPointFilters({
   currentUserLabel,
   selectedUserId,
   month,
-  dateFrom,
-  dateTo,
   selectedAdjustmentStatus,
   onUserChange,
   onMonthChange,
-  onDateFromChange,
-  onDateToChange,
   onAdjustmentStatusChange,
 }: RhPointFiltersProps) {
   return (
     <div className="w-full min-w-0 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Registros de ponto
+        </h2>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {canManagePoint ? (
           <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
             <span>Colaborador</span>
@@ -63,26 +61,6 @@ export function RhPointFilters({
             type="month"
             value={month}
             onChange={(event) => onMonthChange(event.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </label>
-
-        <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
-          <span>Período inicial</span>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(event) => onDateFromChange(event.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </label>
-
-        <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
-          <span>Período final</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(event) => onDateToChange(event.target.value)}
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </label>

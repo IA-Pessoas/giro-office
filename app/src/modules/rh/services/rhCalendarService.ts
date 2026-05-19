@@ -8,9 +8,12 @@ import type {
   DeleteRhHolidayPayload,
   RhHoliday,
   RhMutationMessage,
+  RhTimeBankOverview,
   RhTimeBankRelease,
   RhTimeBankReleaseListFilters,
-  RhTimeSheet,
+  RhTimeBankSummary,
+  RhTimeSheetDetail,
+  RhTimeSheetListItem,
   RhTimeSheetListFilters,
   SignRhTimeSheetPayload,
   UpdateRhHolidayPayload,
@@ -62,6 +65,27 @@ export const rhCalendarService = {
     return unwrapRhEnvelope<RhTimeBankRelease[]>(response.data);
   },
 
+  async getMyTimeBankSummary(): Promise<RhTimeBankSummary> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.timeBankSummary);
+
+    return unwrapRhEnvelope<RhTimeBankSummary>(response.data);
+  },
+
+  async getTimeBankSummaryByUserId(userId: string): Promise<RhTimeBankSummary> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.timeBankSummaryByUser(userId));
+
+    return unwrapRhEnvelope<RhTimeBankSummary>(response.data);
+  },
+
+  async getTimeBankOverview(): Promise<RhTimeBankOverview> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.timeBankOverview);
+
+    return unwrapRhEnvelope<RhTimeBankOverview>(response.data);
+  },
+
   async createTimeBankRelease(
     payload: CreateRhTimeBankReleasePayload,
   ): Promise<RhTimeBankRelease> {
@@ -80,26 +104,33 @@ export const rhCalendarService = {
     return unwrapRhEnvelope<RhTimeBankRelease>(response.data);
   },
 
-  async listTimeSheets(filters: RhTimeSheetListFilters = {}): Promise<RhTimeSheet[]> {
+  async listTimeSheets(filters: RhTimeSheetListFilters = {}): Promise<RhTimeSheetListItem[]> {
     const api = setupAPIClient();
     const response = await api.get(RH_ENDPOINTS.timeSheets, {
       params: buildRhTimeSheetListParams(filters),
     });
 
-    return unwrapRhEnvelope<RhTimeSheet[]>(response.data);
+    return unwrapRhEnvelope<RhTimeSheetListItem[]>(response.data);
   },
 
-  async createTimeSheet(payload: CreateRhTimeSheetPayload): Promise<RhTimeSheet> {
+  async getTimeSheetDetail(id: string): Promise<RhTimeSheetDetail> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.timeSheetDetail(id));
+
+    return unwrapRhEnvelope<RhTimeSheetDetail>(response.data);
+  },
+
+  async createTimeSheet(payload: CreateRhTimeSheetPayload): Promise<RhTimeSheetDetail> {
     const api = setupAPIClient();
     const response = await api.post(RH_ENDPOINTS.timeSheets, payload);
 
-    return unwrapRhEnvelope<RhTimeSheet>(response.data);
+    return unwrapRhEnvelope<RhTimeSheetDetail>(response.data);
   },
 
-  async signTimeSheet(payload: SignRhTimeSheetPayload): Promise<RhTimeSheet> {
+  async signTimeSheet(payload: SignRhTimeSheetPayload): Promise<RhTimeSheetDetail> {
     const api = setupAPIClient();
     const response = await api.put(RH_ENDPOINTS.signTimeSheet, payload);
 
-    return unwrapRhEnvelope<RhTimeSheet>(response.data);
+    return unwrapRhEnvelope<RhTimeSheetDetail>(response.data);
   },
 };

@@ -34,14 +34,7 @@ export function RhTimeBankFilters({
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Banco de horas
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Consulte e gerencie os lançamentos de banco de horas.
-          </p>
-        </div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Banco de horas</h2>
 
         {canManageTimeBank ? (
           <button
@@ -82,9 +75,7 @@ export function RhTimeBankFilters({
           <div className="relative">
             <select
               value={selectedStatus}
-              onChange={(event) =>
-                onStatusChange(event.target.value as RhTimeBankStatusFilter)
-              }
+              onChange={(event) => onStatusChange(event.target.value as RhTimeBankStatusFilter)}
               className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
               <option value="all">Todos</option>

@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
+import { Clock3, FileText, WalletCards } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { useAuth } from "@/context/AuthContext";
-import { permissionService } from "@modules/users/services/permissionService";
-import { normalizePermissionResponse } from "@modules/users/utils/permissionUtils";
-import { useFetch } from "@shared/hooks";
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
+import { useRhPermissions } from "../hooks/useRhPermissions";
 import type { RhPointAdjustmentStatus, RhPointListItem } from "../types";
 import {
   useRhPointAdjustmentRequests,
@@ -67,7 +65,7 @@ function getMonthDateRange(month: string) {
 }
 
 export function RhPointSection() {
-  const { user } = useAuth();
+  const { user, canManageRh } = useRhPermissions("point");
   const [activePointTab, setActivePointTab] = useState<"point" | "timebank" | "timesheets">(
     "point",
   );
@@ -80,32 +78,7 @@ export function RhPointSection() {
   >("");
   const [selectedPointForAdjustment, setSelectedPointForAdjustment] =
     useState<RhPointListItem | null>(null);
-
-  const permissionQuery = useFetch(
-    ["rh", "point", "permissions", user?.id ?? ""],
-    () => permissionService.getByUserId(user?.id ?? ""),
-    {
-      enabled: Boolean(user?.id),
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-
-  const normalizedPermissions = useMemo(() => {
-    if (!permissionQuery.data) {
-      return null;
-    }
-
-    return normalizePermissionResponse(permissionQuery.data).known;
-  }, [permissionQuery.data]);
-
-  const isRhResponsible = Boolean(
-    normalizedPermissions?.rh !== null &&
-      normalizedPermissions?.rh !== undefined &&
-      normalizedPermissions.rh >= 1,
-  );
-  const isGlobalAdmin = user?.permission === 2;
-  const canManagePoint = isRhResponsible || isGlobalAdmin;
+  const canManagePoint = canManageRh;
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManagePoint,
@@ -115,19 +88,20 @@ export function RhPointSection() {
   const currentUserName = user?.name?.trim() || "Você";
   const effectiveUserId = canManagePoint ? selectedUserId || (user?.id ?? "") : user?.id ?? "";
   const hasAuthenticatedUser = Boolean(user?.id);
+  const isPointTabActive = activePointTab === "point";
   const shouldShowTodayCard = !canManagePoint || !selectedUserId || selectedUserId === user?.id;
 
   const pointConfigQuery = useRhPointConfig(
     canManagePoint ? selectedUserId || undefined : undefined,
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const myPointConfigQuery = useRhPointConfig(undefined, {
-    enabled: hasAuthenticatedUser,
+    enabled: hasAuthenticatedUser && isPointTabActive,
   });
   const todayPointQuery = useRhTodayPoint({
-    enabled: hasAuthenticatedUser,
+    enabled: hasAuthenticatedUser && isPointTabActive,
   });
   const pointsQuery = useRhPoints(
     {
@@ -136,7 +110,7 @@ export function RhPointSection() {
       date_to: dateTo || undefined,
     },
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const summaryQuery = useRhPointSummary(
@@ -145,7 +119,7 @@ export function RhPointSection() {
       user_id: effectiveUserId || undefined,
     },
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const adjustmentsQuery = useRhPointAdjustmentRequests(
@@ -154,7 +128,7 @@ export function RhPointSection() {
       status: selectedAdjustmentStatus || undefined,
     },
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const registerMutation = useRegisterRhPointMutation();
@@ -164,6 +138,17 @@ export function RhPointSection() {
     setDateFrom(nextDateFrom);
     setDateTo(nextDateTo);
   }, [month]);
+
+  useEffect(() => {
+    if (activePointTab === "point") {
+      return;
+    }
+
+    setSelectedUserId("");
+    setMonth(getCurrentMonthValue());
+    setSelectedAdjustmentStatus("");
+    setSelectedPointForAdjustment(null);
+  }, [activePointTab]);
 
   async function handleRegisterPoint() {
     try {
@@ -193,66 +178,114 @@ export function RhPointSection() {
   const pointConfigTargetLabel =
     canManagePoint && selectedUserId ? getUserLabel(selectedUserId) : currentUserName;
 
+  const pointSections = [
+    {
+      key: "point" as const,
+      title: "Registros de ponto",
+      description: "Batidas, resumo do mês e ajustes.",
+      icon: Clock3,
+    },
+    {
+      key: "timebank" as const,
+      title: "Banco de horas",
+      description: "Lançamentos, saldo e aprovações.",
+      icon: WalletCards,
+    },
+    {
+      key: "timesheets" as const,
+      title: "Folhas de ponto",
+      description: "Folhas geradas, assinatura e consulta.",
+      icon: FileText,
+    },
+  ];
+
   return (
     <div className="min-w-0 space-y-6">
-      <div className="flex justify-center">
-        <div className="max-w-full overflow-x-auto">
-          <div className="inline-flex min-w-max items-center gap-1 rounded-full border border-gray-200 bg-gray-100/90 p-1 dark:border-gray-700 dark:bg-gray-800/80">
-            <button
-              type="button"
-              onClick={() => setActivePointTab("point")}
-              className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                activePointTab === "point"
-                  ? "bg-white text-blue-700 shadow-sm dark:bg-gray-700 dark:text-blue-300"
-                  : "text-gray-600 hover:bg-white/70 dark:text-gray-400 dark:hover:bg-gray-700/80"
-              }`}
-            >
-              Ponto
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePointTab("timebank")}
-              className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                activePointTab === "timebank"
-                  ? "bg-white text-blue-700 shadow-sm dark:bg-gray-700 dark:text-blue-300"
-                  : "text-gray-600 hover:bg-white/70 dark:text-gray-400 dark:hover:bg-gray-700/80"
-              }`}
-            >
-              Banco de Horas
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePointTab("timesheets")}
-              className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                activePointTab === "timesheets"
-                  ? "bg-white text-blue-700 shadow-sm dark:bg-gray-700 dark:text-blue-300"
-                  : "text-gray-600 hover:bg-white/70 dark:text-gray-400 dark:hover:bg-gray-700/80"
-              }`}
-            >
-              Folhas de Ponto
-            </button>
+      <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="bg-transparent px-4 pb-0 pt-4">
+          <div className="flex max-w-full flex-wrap items-end gap-2">
+            {pointSections.map((section) => {
+              const Icon = section.icon;
+              const isActive = activePointTab === section.key;
+
+              return (
+                <button
+                  key={section.key}
+                  type="button"
+                  onClick={() => setActivePointTab(section.key)}
+                  className={`flex min-w-0 items-center gap-3 px-4 py-3 text-left transition-colors ${
+                    isActive
+                      ? "-mb-px rounded-t-2xl bg-gray-50/80 text-gray-900 shadow-sm dark:bg-gray-800/90 dark:text-white"
+                      : "rounded-2xl bg-transparent text-gray-500 opacity-55 hover:opacity-75 dark:text-gray-500 dark:hover:bg-gray-700/10"
+                  }`}
+                >
+                  <div
+                    className={`rounded-lg p-2 ${
+                      isActive
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                        : "bg-transparent text-gray-500 dark:text-gray-500"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p
+                      className={`text-sm font-semibold ${
+                        isActive
+                          ? "text-gray-900 dark:text-white"
+                          : "text-gray-600 dark:text-gray-400"
+                      }`}
+                    >
+                      {section.title}
+                    </p>
+                    <p
+                      className={`mt-1 text-xs leading-5 ${
+                        isActive
+                          ? "text-gray-600 dark:text-gray-400"
+                          : "text-gray-500 dark:text-gray-500"
+                      }`}
+                    >
+                      {section.description}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
+
+        {activePointTab === "point" ? (
+          <div className="bg-gray-50/80 p-4 dark:bg-gray-800/90">
+            <RhPointFilters
+              assignableUsers={assignableUsers}
+              canManagePoint={canManagePoint}
+              currentUserLabel={currentUserName}
+              selectedUserId={selectedUserId}
+              month={month}
+              selectedAdjustmentStatus={selectedAdjustmentStatus}
+              onUserChange={setSelectedUserId}
+              onMonthChange={setMonth}
+              onAdjustmentStatusChange={setSelectedAdjustmentStatus}
+            />
+          </div>
+        ) : null}
+
+        {activePointTab === "timebank" ? (
+          <div className="bg-gray-50/80 p-4 dark:bg-gray-800/90">
+            <RhTimeBankSection />
+          </div>
+        ) : null}
+
+        {activePointTab === "timesheets" ? (
+          <div className="bg-gray-50/80 p-4 dark:bg-gray-800/90">
+            <RhTimesheetsSection />
+          </div>
+        ) : null}
       </div>
 
       {activePointTab === "point" ? (
         <>
-          <RhPointFilters
-            assignableUsers={assignableUsers}
-            canManagePoint={canManagePoint}
-            currentUserLabel={currentUserName}
-            selectedUserId={selectedUserId}
-            month={month}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            selectedAdjustmentStatus={selectedAdjustmentStatus}
-            onUserChange={setSelectedUserId}
-            onMonthChange={setMonth}
-            onDateFromChange={setDateFrom}
-            onDateToChange={setDateTo}
-            onAdjustmentStatusChange={setSelectedAdjustmentStatus}
-          />
-
           <RhPointConfigCard
             config={pointConfigQuery.data ?? null}
             isLoading={pointConfigQuery.isLoading}
@@ -309,9 +342,6 @@ export function RhPointSection() {
           />
         </>
       ) : null}
-
-      {activePointTab === "timebank" ? <RhTimeBankSection /> : null}
-      {activePointTab === "timesheets" ? <RhTimesheetsSection /> : null}
     </div>
   );
 }

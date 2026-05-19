@@ -7,6 +7,8 @@ import type {
   UserItem,
 } from "../types";
 
+const PERMISSION_METADATA_KEYS = new Set(["id", "user_id", "organization_id"]);
+
 function isDevelopmentEnvironment(): boolean {
   return process.env.NODE_ENV === "development";
 }
@@ -65,6 +67,10 @@ export function normalizePermissionResponse(raw: Record<string, unknown>): Permi
 
   for (const [key, value] of Object.entries(raw)) {
     if (isKnownPermissionModuleKey(key)) {
+      continue;
+    }
+
+    if (PERMISSION_METADATA_KEYS.has(key)) {
       continue;
     }
 
