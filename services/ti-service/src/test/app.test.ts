@@ -13,7 +13,7 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 
 import { requestContext } from "../middlewares/requestContext.js";
-import { requireTiPermission } from "../middlewares/requireTiPermission.js";
+import { requireTiPermission, TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import { createTestApp } from "./tiServiceTestUtils.js";
 
 function createPermissionTestApp() {
@@ -26,7 +26,7 @@ function createPermissionTestApp() {
   });
 
   app.use(requestContext);
-  app.get("/admin", requireTiPermission(3), (_request, response) => {
+  app.get("/admin", requireTiPermission(TiPermissionLevel.Admin), (_request, response) => {
     response.status(200).json({ ok: true });
   });
   app.use(

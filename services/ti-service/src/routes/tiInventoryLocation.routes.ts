@@ -7,7 +7,7 @@ import {
 import { type Request, Router } from "express";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
-import { requireTiPermission } from "../middlewares/requireTiPermission.js";
+import { requireTiPermission, TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import {
   createTiInventoryLocationBodySchema,
   tiInventoryLocationIdParamsSchema,
@@ -27,44 +27,56 @@ export function createTiInventoryLocationRoutes(prisma: PrismaClient): Router {
   const router = Router();
   const service = new TiInventoryLocationService(prisma);
 
-  router.get("/list", requireTiPermission(1), async (request, response, next) => {
-    try {
-      const organizationId = getOrganizationId(request);
-      const result = await service.list({ organizationId });
+  router.get(
+    "/list",
+    requireTiPermission(TiPermissionLevel.Requester),
+    async (request, response, next) => {
+      try {
+        const organizationId = getOrganizationId(request);
+        const result = await service.list({ organizationId });
 
-      response.status(200).json(createSuccessResponse(result));
-    } catch (err: unknown) {
-      logError("Erro ao listar locais de inventario de TI", { err });
-      next(err);
-    }
-  });
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao listar locais de inventario de TI", { err });
+        next(err);
+      }
+    },
+  );
 
-  router.post("/", requireTiPermission(3), async (request, response, next) => {
-    try {
-      const organizationId = getOrganizationId(request);
-      const body = parseWithZod(createTiInventoryLocationBodySchema, request.body);
-      const result = await service.create({ organizationId }, body);
+  router.post(
+    "/",
+    requireTiPermission(TiPermissionLevel.Admin),
+    async (request, response, next) => {
+      try {
+        const organizationId = getOrganizationId(request);
+        const body = parseWithZod(createTiInventoryLocationBodySchema, request.body);
+        const result = await service.create({ organizationId }, body);
 
-      response.status(201).json(createSuccessResponse(result));
-    } catch (err: unknown) {
-      logError("Erro ao criar local de inventario de TI", { err });
-      next(err);
-    }
-  });
+        response.status(201).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao criar local de inventario de TI", { err });
+        next(err);
+      }
+    },
+  );
 
-  router.patch("/:id", requireTiPermission(3), async (request, response, next) => {
-    try {
-      const organizationId = getOrganizationId(request);
-      const params = parseWithZod(tiInventoryLocationIdParamsSchema, request.params);
-      const body = parseWithZod(updateTiInventoryLocationBodySchema, request.body);
-      const result = await service.update({ organizationId }, params.id, body);
+  router.patch(
+    "/:id",
+    requireTiPermission(TiPermissionLevel.Admin),
+    async (request, response, next) => {
+      try {
+        const organizationId = getOrganizationId(request);
+        const params = parseWithZod(tiInventoryLocationIdParamsSchema, request.params);
+        const body = parseWithZod(updateTiInventoryLocationBodySchema, request.body);
+        const result = await service.update({ organizationId }, params.id, body);
 
-      response.status(200).json(createSuccessResponse(result));
-    } catch (err: unknown) {
-      logError("Erro ao atualizar local de inventario de TI", { err });
-      next(err);
-    }
-  });
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao atualizar local de inventario de TI", { err });
+        next(err);
+      }
+    },
+  );
 
   return router;
 }
