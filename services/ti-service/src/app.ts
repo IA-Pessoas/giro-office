@@ -14,6 +14,9 @@ import type { TiServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildTiServiceOpenApiSpec } from "./openapi/spec.js";
+import { createTiInventoryRoutes } from "./routes/tiInventory.routes.js";
+import { createTiInventoryCategoryRoutes } from "./routes/tiInventoryCategory.routes.js";
+import { createTiInventoryLocationRoutes } from "./routes/tiInventoryLocation.routes.js";
 import { createTiRequestRoutes } from "./routes/tiRequest.routes.js";
 import { createTiRequestCategoryRoutes } from "./routes/tiRequestCategory.routes.js";
 
@@ -71,6 +74,9 @@ export function createTiApplication({
     );
   });
 
+  app.use("/ti/inventory", createTiInventoryRoutes(prisma));
+  app.use("/ti/inventory-categories", createTiInventoryCategoryRoutes(prisma));
+  app.use("/ti/inventory-locations", createTiInventoryLocationRoutes(prisma));
   app.use("/ti/requests", createTiRequestRoutes(prisma));
   app.use("/ti/request-categories", createTiRequestCategoryRoutes(prisma));
 
