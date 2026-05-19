@@ -88,19 +88,20 @@ export function RhPointSection() {
   const currentUserName = user?.name?.trim() || "Você";
   const effectiveUserId = canManagePoint ? selectedUserId || (user?.id ?? "") : user?.id ?? "";
   const hasAuthenticatedUser = Boolean(user?.id);
+  const isPointTabActive = activePointTab === "point";
   const shouldShowTodayCard = !canManagePoint || !selectedUserId || selectedUserId === user?.id;
 
   const pointConfigQuery = useRhPointConfig(
     canManagePoint ? selectedUserId || undefined : undefined,
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const myPointConfigQuery = useRhPointConfig(undefined, {
-    enabled: hasAuthenticatedUser,
+    enabled: hasAuthenticatedUser && isPointTabActive,
   });
   const todayPointQuery = useRhTodayPoint({
-    enabled: hasAuthenticatedUser,
+    enabled: hasAuthenticatedUser && isPointTabActive,
   });
   const pointsQuery = useRhPoints(
     {
@@ -109,7 +110,7 @@ export function RhPointSection() {
       date_to: dateTo || undefined,
     },
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const summaryQuery = useRhPointSummary(
@@ -118,7 +119,7 @@ export function RhPointSection() {
       user_id: effectiveUserId || undefined,
     },
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const adjustmentsQuery = useRhPointAdjustmentRequests(
@@ -127,7 +128,7 @@ export function RhPointSection() {
       status: selectedAdjustmentStatus || undefined,
     },
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const registerMutation = useRegisterRhPointMutation();
