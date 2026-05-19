@@ -8,6 +8,62 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 
 export function createPrismaMock(): PrismaClient {
   return {
+    inventoryCategoryTecnologia: {
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async ({ where }) => {
+        if (!where.id) {
+          return null;
+        }
+
+        return {
+          id: where.id,
+          name: "Notebook",
+          tag: "NB",
+          active: where.active ?? true,
+          organization_id: where.organization_id,
+        };
+      }),
+      create: vi.fn(async ({ data }) => ({ id: "inv-cat-1", ...data })),
+      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+    },
+    inventoryLocationTecnologia: {
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async ({ where }) => {
+        if (!where.id) {
+          return null;
+        }
+
+        return {
+          id: where.id,
+          name: "Almoxarifado TI",
+          active: where.active ?? true,
+          organization_id: where.organization_id,
+        };
+      }),
+      create: vi.fn(async ({ data }) => ({ id: "inv-loc-1", ...data })),
+      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+    },
+    inventoryTecnologia: {
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async ({ where }) => {
+        if (where.asset_code) {
+          return null;
+        }
+
+        return {
+          id: where.id,
+          asset_code: "NB-001",
+          category_id: "20000000-0000-4000-8000-000000000001",
+          location_id: "30000000-0000-4000-8000-000000000001",
+          user_id: null,
+          responsible_it_staff_id: null,
+          notes: null,
+          organization_id: where.organization_id,
+        };
+      }),
+      create: vi.fn(async ({ data }) => ({ id: "asset-1", ...data })),
+      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+    },
     tICategoryRequest: {
       findMany: vi.fn(async () => []),
       findFirst: vi.fn(async ({ where }) => {

@@ -26,6 +26,8 @@ As variaveis sao lidas em `src/config/env.ts`.
 - URL upstream: `TI_SERVICE_URL` (ex.: `http://localhost:3040`)
 - Prefixo publico: `/ti`
 - Exemplo: `GET /ti/requests/list`
+- Exemplo: `GET /ti/inventory/list`
+- Exemplo: `POST /ti/inventory`
 
 ## Desenvolvimento
 
