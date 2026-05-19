@@ -431,6 +431,7 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
         bearerAuth: {
           type: "http",
           scheme: "bearer",
+          bearerFormat: "JWT",
         },
       },
       schemas,
