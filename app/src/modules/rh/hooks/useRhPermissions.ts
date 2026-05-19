@@ -1,11 +1,24 @@
 import { useMemo } from "react";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 import { useAuth } from "@/context/AuthContext";
 import { permissionService } from "@modules/users/services/permissionService";
 import { normalizePermissionResponse } from "@modules/users/utils/permissionUtils";
 import { useFetch } from "@shared/hooks";
 
-export function useRhPermissions(scope: string) {
+type RhPermissionPayload = Awaited<ReturnType<typeof permissionService.getByUserId>>;
+type RhKnownPermissions = ReturnType<typeof normalizePermissionResponse>["known"];
+
+interface UseRhPermissionsResult {
+  user: ReturnType<typeof useAuth>["user"];
+  permissionQuery: UseQueryResult<RhPermissionPayload, Error>;
+  knownPermissions: RhKnownPermissions | null;
+  isRhResponsible: boolean;
+  isGlobalAdmin: boolean;
+  canManageRh: boolean;
+}
+
+export function useRhPermissions(scope: string): UseRhPermissionsResult {
   const { user } = useAuth();
 
   const permissionQuery = useFetch(
