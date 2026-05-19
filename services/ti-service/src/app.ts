@@ -14,6 +14,7 @@ import type { TiServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildTiServiceOpenApiSpec } from "./openapi/spec.js";
+import { createTiRequestRoutes } from "./routes/tiRequest.routes.js";
 import { createTiRequestCategoryRoutes } from "./routes/tiRequestCategory.routes.js";
 
 function tiServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -70,6 +71,7 @@ export function createTiApplication({
     );
   });
 
+  app.use("/ti/requests", createTiRequestRoutes(prisma));
   app.use("/ti/request-categories", createTiRequestCategoryRoutes(prisma));
 
   if (env.enableApiDocs) {
