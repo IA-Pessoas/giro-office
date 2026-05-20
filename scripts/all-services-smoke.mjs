@@ -92,6 +92,17 @@ const INTERNAL_SERVICE_TOKENS = getInternalServiceTokenEnvKeys();
 const SERVICE_URL_ENV_KEYS = getServiceUrlEnvKeys();
 const SERVICE_URL_DEFAULTS = getServiceUrlDefaults();
 
+const WorkspacePermissionLevel = Object.freeze({
+  User: 1,
+  Admin: 2,
+});
+
+const TiPermissionLevel = Object.freeze({
+  Requester: 1,
+  Technician: 2,
+  Admin: 3,
+});
+
 const env = {
   gatewayUrl: process.env.GATEWAY_URL?.trim() || "",
   gatewayPort: process.env.GATEWAY_PORT ?? "3010",
@@ -247,7 +258,7 @@ function buildUrl(target, service, routePath, query) {
   return url;
 }
 
-function createAdminToken(permission = 2) {
+function createAdminToken(permission = WorkspacePermissionLevel.Admin) {
   if (!state.session) {
     throw new Error("Cannot mint admin token before login succeeds.");
   }
@@ -303,7 +314,7 @@ function getAuthHeaders(auth, service) {
   if (auth === "admin-bearer") {
     if (!state.adminBearerToken) {
       state.adminBearerToken =
-        state.session?.permission === 2 && state.session?.token
+        state.session?.permission === WorkspacePermissionLevel.Admin && state.session?.token
           ? state.session.token
           : createAdminToken();
     }
@@ -326,7 +337,7 @@ function getAuthHeaders(auth, service) {
 }
 
 function getTiAdminHeaders() {
-  return { Authorization: `Bearer ${createAdminToken(3)}` };
+  return { Authorization: `Bearer ${createAdminToken(TiPermissionLevel.Admin)}` };
 }
 
 function ensureSuccessEnvelope(op, body) {
@@ -1304,7 +1315,8 @@ const handlers = {
     const session = await bootstrapAndLogin();
     state.session = session;
     state.bearerToken = session.token;
-    state.adminBearerToken = session.permission === 2 ? session.token : createAdminToken();
+    state.adminBearerToken =
+      session.permission === WorkspacePermissionLevel.Admin ? session.token : createAdminToken();
     state.baselineDepartmentId = session.department_id || state.baselineDepartmentId;
     log(
       "PASS",
