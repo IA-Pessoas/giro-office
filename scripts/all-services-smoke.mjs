@@ -199,6 +199,9 @@ const state = {
   tiInventoryCategoryId: "",
   tiInventoryLocationId: "",
   tiInventoryId: "",
+  tiStockCategoryId: "",
+  tiStockLocationId: "",
+  tiStockItemId: "",
   tiPasswordId: "",
   tiExtensionId: "",
   tiTermId: "",
@@ -1172,6 +1175,139 @@ const handlers = {
       headers: getTiAdminHeaders(),
       json: {
         notes: "Smoke TI inventory asset returned.",
+      },
+    });
+  },
+
+  async tiStockCategoryList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiStockCategoryCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Stock Category"),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiStockCategoryId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiStockCategoryPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/stock/categories/${requireState("tiStockCategoryId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Stock Category Updated"),
+      },
+    });
+  },
+
+  async tiStockLocationList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiStockLocationCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Stock Location"),
+        floor: 1,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiStockLocationId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiStockLocationPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/stock/locations/${requireState("tiStockLocationId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Stock Location Updated"),
+      },
+    });
+  },
+
+  async tiStockItemList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiStockItemCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Stock Item"),
+        category_id: requireState("tiStockCategoryId"),
+        location_id: requireState("tiStockLocationId"),
+        quantity: 10,
+        description: "Smoke TI stock item.",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiStockItemId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiStockItemGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/stock/items/${requireState("tiStockItemId")}`,
+    });
+  },
+
+  async tiStockItemPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/stock/items/${requireState("tiStockItemId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        description: "Smoke TI stock item updated.",
+      },
+    });
+  },
+
+  async tiStockEntryCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/ti/stock/items/${requireState("tiStockItemId")}/entries`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        quantity: 2,
+      },
+    });
+  },
+
+  async tiStockExitCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/ti/stock/items/${requireState("tiStockItemId")}/exits`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        quantity: 1,
+        requester_id: await ensureRhTargetUser(),
+        destination: "Smoke TI stock exit.",
       },
     });
   },

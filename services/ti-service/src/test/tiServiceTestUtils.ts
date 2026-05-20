@@ -7,7 +7,190 @@ import type { TiServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 
 export function createPrismaMock(): PrismaClient {
+  const organizationId = "10000000-0000-4000-8000-000000000001";
+  const departmentId = "50000000-0000-4000-8000-000000000001";
+  const stockId = "80000000-0000-4000-8000-000000000001";
+  let stockQuantity = 5;
+  const stockTransaction = {
+    stock: {
+      findFirst: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId || where.department_id !== departmentId) {
+          return null;
+        }
+
+        return {
+          id: where.id,
+          name: "Notebook",
+          category_id: "60000000-0000-4000-8000-000000000001",
+          location_id: "70000000-0000-4000-8000-000000000001",
+          quantity: stockQuantity,
+          department_id: departmentId,
+          organization_id: where.organization_id,
+        };
+      }),
+      update: vi.fn(async ({ where, data }) => {
+        stockQuantity += data.quantity.increment;
+        return { id: where.id, quantity: stockQuantity };
+      }),
+      updateMany: vi.fn(async ({ where, data }) => {
+        if (
+          where.organization_id !== organizationId ||
+          where.department_id !== departmentId ||
+          stockQuantity < where.quantity.gte
+        ) {
+          return { count: 0 };
+        }
+
+        stockQuantity -= data.quantity.decrement;
+        return { count: 1 };
+      }),
+    },
+    entryStock: {
+      create: vi.fn(async ({ data }) => ({ id: "entry-1", ...data })),
+    },
+    exitStock: {
+      create: vi.fn(async ({ data }) => ({ id: "exit-1", ...data })),
+    },
+    user: {
+      findFirst: vi.fn(async ({ where }) =>
+        where.organization_id === organizationId
+          ? {
+              id: where.id,
+              organization_id: where.organization_id,
+            }
+          : null,
+      ),
+    },
+    locationStock: {
+      findFirst: vi.fn(async ({ where }) =>
+        where.organization_id === organizationId && where.department_id === departmentId
+          ? {
+              id: where.id,
+              department_id: where.department_id,
+              organization_id: where.organization_id,
+              status: true,
+            }
+          : null,
+      ),
+    },
+    categoryStock: {
+      findFirst: vi.fn(async ({ where }) =>
+        where.organization_id === organizationId && where.department_id === departmentId
+          ? {
+              id: where.id,
+              department_id: where.department_id,
+              organization_id: where.organization_id,
+              status: true,
+            }
+          : null,
+      ),
+    },
+  };
+
   return {
+    department: {
+      findFirst: vi.fn(async ({ where }) =>
+        where.organization_id === organizationId
+          ? {
+              id: departmentId,
+              name: "Tecnologia",
+              organization_id: where.organization_id,
+            }
+          : null,
+      ),
+    },
+    locationStock: {
+      findMany: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId || where.department_id !== departmentId) {
+          throw new Error("Stock location list missing Tecnologia department scope.");
+        }
+
+        return [];
+      }),
+      findFirst: vi.fn(async ({ where }) => {
+        if (
+          !where.id ||
+          where.organization_id !== organizationId ||
+          where.department_id !== departmentId
+        ) {
+          return null;
+        }
+
+        return {
+          id: where.id,
+          name: "Almoxarifado TI",
+          floor: 2,
+          department_id: where.department_id,
+          status: where.status ?? true,
+          organization_id: where.organization_id,
+        };
+      }),
+      create: vi.fn(async ({ data }) => ({ id: "stock-loc-1", ...data })),
+      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+    },
+    categoryStock: {
+      findMany: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId || where.department_id !== departmentId) {
+          throw new Error("Stock category list missing Tecnologia department scope.");
+        }
+
+        return [];
+      }),
+      findFirst: vi.fn(async ({ where }) => {
+        if (
+          !where.id ||
+          where.organization_id !== organizationId ||
+          where.department_id !== departmentId
+        ) {
+          return null;
+        }
+
+        return {
+          id: where.id,
+          name: "Perifericos",
+          department_id: where.department_id,
+          status: where.status ?? true,
+          organization_id: where.organization_id,
+        };
+      }),
+      create: vi.fn(async ({ data }) => ({ id: "stock-cat-1", ...data })),
+      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+    },
+    stock: {
+      findMany: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId || where.department_id !== departmentId) {
+          throw new Error("Stock item list missing Tecnologia department scope.");
+        }
+
+        return [];
+      }),
+      findFirst: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId || where.department_id !== departmentId) {
+          return null;
+        }
+
+        return {
+          id: where.id ?? stockId,
+          name: "Notebook",
+          category_id: "60000000-0000-4000-8000-000000000001",
+          location_id: "70000000-0000-4000-8000-000000000001",
+          quantity: stockQuantity,
+          description: "Notebook Dell.",
+          department_id: where.department_id,
+          status: true,
+          organization_id: where.organization_id,
+        };
+      }),
+      create: vi.fn(async ({ data }) => ({ id: stockId, ...data })),
+      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+    },
+    entryStock: {
+      create: vi.fn(async ({ data }) => ({ id: "entry-1", ...data })),
+    },
+    exitStock: {
+      create: vi.fn(async ({ data }) => ({ id: "exit-1", ...data })),
+    },
+    $transaction: vi.fn(async (callback) => callback(stockTransaction)),
     inventoryCategoryTecnologia: {
       findMany: vi.fn(async () => []),
       findFirst: vi.fn(async ({ where }) => {
