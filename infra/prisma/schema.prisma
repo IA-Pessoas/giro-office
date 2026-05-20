@@ -178,6 +178,8 @@ model Organization {
   tiCategories                  TICategoryRequest[]
   tiMessages                    TIMessage[]
   tiRequests                    TIRequest[]
+  tiRobotRuns                   TIRobotRun[]
+  tiRobots                      TIRobot[]
   termsTecnologia               TermTecnologia[]
   triageConfigs                 TriageConfig[]
   triageMonthlys                TriageMonthly[]
@@ -1959,6 +1961,39 @@ model TIMessage {
   sender          User         @relation(fields: [sender_id], references: [id])
 
   @@map("tecnologia.request_messages")
+}
+
+model TIRobot {
+  id              String       @id @default(uuid())
+  name            String
+  description     String?
+  type            String
+  schedule        String?
+  status          String
+  active          Boolean      @default(true)
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  runs            TIRobotRun[]
+
+  @@map("tecnologia.robots")
+}
+
+model TIRobotRun {
+  id              String       @id @default(uuid())
+  robot_id        String
+  status          String
+  started_at      DateTime     @default(now())
+  finished_at     DateTime?
+  message         String?
+  metadata_json   Json?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  robot           TIRobot      @relation(fields: [robot_id], references: [id], onDelete: Cascade)
+
+  @@index([robot_id, started_at])
+  @@map("tecnologia.robot_runs")
 }
 
 model TriageConfig {

@@ -205,6 +205,7 @@ const state = {
   tiPasswordId: "",
   tiExtensionId: "",
   tiTermId: "",
+  tiRobotId: "",
 };
 
 const cleanupTasks = [];
@@ -1444,6 +1445,70 @@ const handlers = {
       json: {
         reason: "Smoke TI term signed.",
       },
+    });
+  },
+
+  async tiRobotList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiRobotCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Robot"),
+        description: "Smoke TI robot registry.",
+        type: "Backup",
+        schedule: "0 2 * * *",
+        status: "active",
+        active: true,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiRobotId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiRobotGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/robots/${requireState("tiRobotId")}`,
+    });
+  },
+
+  async tiRobotPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/robots/${requireState("tiRobotId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        description: "Smoke TI robot registry updated.",
+      },
+    });
+  },
+
+  async tiRobotRunCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/ti/robots/${requireState("tiRobotId")}/runs`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        status: "success",
+        message: "Smoke TI robot run.",
+        metadata_json: { source: "smoke" },
+      },
+    });
+  },
+
+  async tiRobotRunList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/robots/${requireState("tiRobotId")}/runs/list`,
     });
   },
 

@@ -487,6 +487,59 @@ const schemas: Record<string, OpenApiSchema> = {
     },
     additionalProperties: false,
   },
+  TiRobotInput: {
+    type: "object",
+    required: ["name", "type"],
+    properties: {
+      name: { type: "string", minLength: 1 },
+      description: { type: "string" },
+      type: {
+        type: "string",
+        enum: ["Backup", "Relatorio", "Integracao", "Manutencao", "Monitoramento"],
+      },
+      schedule: { type: "string" },
+      status: {
+        type: "string",
+        enum: ["active", "inactive", "running", "failed"],
+        default: "active",
+      },
+      active: { type: "boolean", default: true },
+    },
+    additionalProperties: false,
+  },
+  TiRobotUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      name: { type: "string", minLength: 1 },
+      description: { type: "string", nullable: true },
+      type: {
+        type: "string",
+        enum: ["Backup", "Relatorio", "Integracao", "Manutencao", "Monitoramento"],
+      },
+      schedule: { type: "string", nullable: true },
+      status: {
+        type: "string",
+        enum: ["active", "inactive", "running", "failed"],
+      },
+      active: { type: "boolean" },
+    },
+    additionalProperties: false,
+  },
+  TiRobotRunInput: {
+    type: "object",
+    required: ["status"],
+    properties: {
+      status: {
+        type: "string",
+        enum: ["success", "failed", "running", "cancelled"],
+      },
+      finished_at: { type: "string", format: "date-time" },
+      message: { type: "string" },
+      metadata_json: { type: "object", additionalProperties: true },
+    },
+    additionalProperties: false,
+  },
 };
 
 export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): OpenApiDocument {
@@ -509,6 +562,7 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
       { name: "TI Extensions", description: "Ramais de TI" },
       { name: "TI Terms", description: "Termos de responsabilidade de TI" },
       { name: "TI Stock", description: "Estoque de TI filtrado pelo departamento Tecnologia" },
+      { name: "TI Robots", description: "Robos e historico de execucao de TI" },
     ],
     components: {
       securitySchemes: {
@@ -798,6 +852,91 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
           parameters: [pathIdParameter("Local de estoque de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiStockLocationUpdateInput"),
           successDescription: "Local de estoque atualizado",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/robots/list": {
+        get: publicTiOperation({
+          operationId: "listTiRobots",
+          tags: ["TI Robots"],
+          summary: "Lista robos de TI",
+          parameters: [
+            enumQueryParameter("type", "Tipo do robo", [
+              "Backup",
+              "Relatorio",
+              "Integracao",
+              "Manutencao",
+              "Monitoramento",
+            ]),
+            enumQueryParameter("status", "Status do robo", [
+              "active",
+              "inactive",
+              "running",
+              "failed",
+            ]),
+            enumQueryParameter("active", "Filtro de robo ativo", ["true", "false"]),
+          ],
+          successDescription: "Robos listados",
+          errors: [400, 401, 403],
+        }),
+      },
+      "/ti/robots": {
+        post: publicTiOperation({
+          operationId: "createTiRobot",
+          tags: ["TI Robots"],
+          summary: "Cria robo de TI",
+          requestBody: jsonRequestBody("#/components/schemas/TiRobotInput"),
+          successStatus: 201,
+          successDescription: "Robo criado",
+          errors: [400, 401, 403],
+        }),
+      },
+      "/ti/robots/{id}": {
+        get: publicTiOperation({
+          operationId: "getTiRobot",
+          tags: ["TI Robots"],
+          summary: "Busca robo de TI",
+          parameters: [pathIdParameter("Robo de TI")],
+          successDescription: "Robo encontrado",
+          errors: [400, 401, 403, 404],
+        }),
+        patch: publicTiOperation({
+          operationId: "updateTiRobot",
+          tags: ["TI Robots"],
+          summary: "Atualiza robo de TI",
+          parameters: [pathIdParameter("Robo de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiRobotUpdateInput"),
+          successDescription: "Robo atualizado",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/robots/{id}/runs": {
+        post: publicTiOperation({
+          operationId: "createTiRobotRun",
+          tags: ["TI Robots"],
+          summary: "Registra execucao de robo de TI",
+          parameters: [pathIdParameter("Robo de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiRobotRunInput"),
+          successStatus: 201,
+          successDescription: "Execucao registrada",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/robots/{id}/runs/list": {
+        get: publicTiOperation({
+          operationId: "listTiRobotRuns",
+          tags: ["TI Robots"],
+          summary: "Lista execucoes de robo de TI",
+          parameters: [
+            pathIdParameter("Robo de TI"),
+            enumQueryParameter("status", "Status da execucao", [
+              "success",
+              "failed",
+              "running",
+              "cancelled",
+            ]),
+          ],
+          successDescription: "Execucoes listadas",
           errors: [400, 401, 403, 404],
         }),
       },
