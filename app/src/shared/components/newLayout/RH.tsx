@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Award, BarChart3, Calendar, Clock, FileText, Users } from "lucide-react";
 
 import {
@@ -9,6 +9,7 @@ import {
   RhScoreSection,
   useRhRequests,
 } from "@modules/rh";
+import { useRhPermissions } from "@modules/rh/hooks/useRhPermissions";
 import { Dialog } from "@shared/components";
 
 type RhMainTab = "dashboard" | "requests" | "evaluations" | "point";
@@ -16,6 +17,7 @@ type RhMainTab = "dashboard" | "requests" | "evaluations" | "point";
 export function RH() {
   const [activeTab, setActiveTab] = useState<RhMainTab>("dashboard");
   const [isHolidaysManagerOpen, setIsHolidaysManagerOpen] = useState(false);
+  const { canManageRh, permissionQuery } = useRhPermissions("rh-shell");
   const newRequestsQuery = useRhRequests({ status: "New" });
   const inProgressRequestsQuery = useRhRequests({ status: "In_Progress" });
 
@@ -24,6 +26,12 @@ export function RH() {
     const inProgressCount = inProgressRequestsQuery.data?.length ?? 0;
     return newCount + inProgressCount;
   }, [inProgressRequestsQuery.data, newRequestsQuery.data]);
+
+  useEffect(() => {
+    if (!permissionQuery.isLoading && !canManageRh && activeTab === "dashboard") {
+      setActiveTab("requests");
+    }
+  }, [activeTab, canManageRh, permissionQuery.isLoading]);
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
@@ -40,27 +48,31 @@ export function RH() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setIsHolidaysManagerOpen(true)}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            <Calendar className="h-4 w-4" />
-            <span>Gerenciar feriados</span>
-          </button>
-        </div>
+        {canManageRh ? (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsHolidaysManagerOpen(true)}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              <Calendar className="h-4 w-4" />
+              <span>Gerenciar feriados</span>
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
         <div className="overflow-x-auto">
           <div className="flex min-w-max items-center justify-center gap-1">
-            <RhTabButton
-              active={activeTab === "dashboard"}
-              icon={BarChart3}
-              label="Dashboard"
-              onClick={() => setActiveTab("dashboard")}
-            />
+            {canManageRh ? (
+              <RhTabButton
+                active={activeTab === "dashboard"}
+                icon={BarChart3}
+                label="Dashboard"
+                onClick={() => setActiveTab("dashboard")}
+              />
+            ) : null}
             <RhTabButton
               active={activeTab === "requests"}
               icon={FileText}
@@ -84,7 +96,7 @@ export function RH() {
         </div>
       </div>
 
-      {activeTab === "dashboard" ? (
+      {canManageRh && activeTab === "dashboard" ? (
         <RhDashboardSection
           isActive={activeTab === "dashboard"}
           onNavigateToTab={setActiveTab}

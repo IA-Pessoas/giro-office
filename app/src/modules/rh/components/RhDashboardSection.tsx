@@ -1,9 +1,16 @@
 import { useMemo, type ReactNode } from "react";
-import { ArrowRight, Bell, Clock3, Loader2, TrendingUp } from "lucide-react";
+import {
+  ArrowRight,
+  Bell,
+  ClipboardCheck,
+  FileSignature,
+  Loader2,
+  TrendingUp,
+} from "lucide-react";
 
-import { useRhPermissions } from "../hooks/useRhPermissions";
-import { useRhPointSummary } from "../hooks/useRhPoint";
+import { useRhTimeSheets } from "../hooks/useRhCalendar";
 import { useRhRequests } from "../hooks/useRhRequests";
+import { useRhPendingScoreEvaluations } from "../hooks/useRhScore";
 import type { RhRequest } from "../types";
 import { formatRhDateTime } from "../utils/rhDate";
 import {
@@ -18,25 +25,6 @@ type RhDashboardTab = "requests" | "point" | "evaluations";
 interface RhDashboardSectionProps {
   isActive: boolean;
   onNavigateToTab: (tab: RhDashboardTab) => void;
-}
-
-function getCurrentMonthValue() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function formatMinutes(minutes: number | null | undefined) {
-  if (minutes === null || minutes === undefined) {
-    return "--";
-  }
-
-  const isNegative = minutes < 0;
-  const absoluteMinutes = Math.abs(minutes);
-  const hours = Math.floor(absoluteMinutes / 60);
-  const remainingMinutes = absoluteMinutes % 60;
-  const label = `${String(hours).padStart(2, "0")}:${String(remainingMinutes).padStart(2, "0")}`;
-
-  return isNegative ? `-${label}` : label;
 }
 
 function sortRequestsByUpdatedAt(requests: RhRequest[]) {
@@ -190,19 +178,9 @@ export function RhDashboardSection({
   isActive,
   onNavigateToTab,
 }: RhDashboardSectionProps) {
-  const { user } = useRhPermissions("dashboard");
-  const month = getCurrentMonthValue();
-
   const requestsQuery = useRhRequests({}, { enabled: isActive });
-  const pointSummaryQuery = useRhPointSummary(
-    {
-      month,
-      user_id: user?.id ?? undefined,
-    },
-    {
-      enabled: isActive && Boolean(user?.id),
-    },
-  );
+  const pendingEvaluationsQuery = useRhPendingScoreEvaluations({ enabled: isActive });
+  const timeSheetsQuery = useRhTimeSheets({}, { enabled: isActive });
 
   const requests = requestsQuery.data ?? [];
   const recentRequests = useMemo(() => sortRequestsByUpdatedAt(requests).slice(0, 4), [requests]);
@@ -212,7 +190,13 @@ export function RhDashboardSection({
   const resolvedRequestsCount = requests.filter(
     (request) => request.status === "Resolved" || request.status === "Closed",
   ).length;
+  const pendingEvaluationsCount = pendingEvaluationsQuery.data?.length ?? 0;
+  const unsignedTimeSheetsCount =
+    timeSheetsQuery.data?.filter((sheet) => !sheet.signature).length ?? 0;
+  const totalTimeSheetsCount = timeSheetsQuery.data?.length ?? 0;
   const hasPendingRequests = pendingRequestsCount > 0;
+  const totalPendingActions =
+    pendingRequestsCount + pendingEvaluationsCount + unsignedTimeSheetsCount;
 
   return (
     <div className="space-y-6">
@@ -223,8 +207,8 @@ export function RhDashboardSection({
           value={requestsQuery.isLoading ? "--" : pendingRequestsCount}
           description={
             hasPendingRequests
-              ? "As demandas que ainda precisam de retorno ou acompanhamento do RH."
-              : "Nenhuma pendência aberta no momento. Novas solicitações aparecerão aqui quando precisarem de atenção."
+              ? "Demandas do RH que ainda precisam de retorno ou acompanhamento."
+              : "Nenhuma solicitação aberta no momento. Novas demandas da área aparecerão aqui quando exigirem atenção."
           }
           tone={hasPendingRequests ? "highlight" : "calm"}
         />
@@ -236,18 +220,14 @@ export function RhDashboardSection({
             value={requestsQuery.isLoading ? "--" : resolvedRequestsCount}
           />
           <MetricCard
-            icon={Clock3}
-            label="Ajustes pendentes"
-            value={pointSummaryQuery.isLoading ? "--" : pointSummaryQuery.data?.pending_adjustments ?? 0}
+            icon={ClipboardCheck}
+            label="Avaliações pendentes"
+            value={pendingEvaluationsQuery.isLoading ? "--" : pendingEvaluationsCount}
           />
           <MetricCard
-            icon={Clock3}
-            label="Saldo do mês"
-            value={
-              pointSummaryQuery.isLoading
-                ? "--"
-                : formatMinutes(pointSummaryQuery.data?.balance_minutes)
-            }
+            icon={FileSignature}
+            label="Folhas sem assinatura"
+            value={timeSheetsQuery.isLoading ? "--" : unsignedTimeSheetsCount}
           />
         </div>
       </div>
@@ -315,40 +295,63 @@ export function RhDashboardSection({
         </SectionCard>
 
         <SectionCard
-          title="Resumo operacional"
-          description="Indicadores rápidos para leitura da situação atual sem entrar nos módulos."
-          actionLabel="Abrir ponto"
-          onAction={() => onNavigateToTab("point")}
+          title="Pendências do RH"
+          description="Leitura rápida dos itens que ainda pedem ação da área."
         >
-          {pointSummaryQuery.isLoading ? (
+          {pendingEvaluationsQuery.isLoading || timeSheetsQuery.isLoading ? (
             <StateBox>
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Carregando resumo operacional...</span>
+                <span>Carregando pendências gerenciais...</span>
               </div>
             </StateBox>
-          ) : pointSummaryQuery.error ? (
-            <StateBox tone="danger">Não foi possível carregar o resumo operacional.</StateBox>
-          ) : !pointSummaryQuery.data ? (
-            <StateBox>Nenhum resumo operacional disponível no momento.</StateBox>
+          ) : pendingEvaluationsQuery.error || timeSheetsQuery.error ? (
+            <StateBox tone="danger">Não foi possível carregar o resumo gerencial do RH.</StateBox>
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <SummaryTile
-                label="Ajustes pendentes"
-                value={pointSummaryQuery.data.pending_adjustments}
-              />
-              <SummaryTile
-                label="Saldo do mês"
-                value={formatMinutes(pointSummaryQuery.data.balance_minutes)}
-              />
-              <SummaryTile
-                label="Horas trabalhadas"
-                value={formatMinutes(pointSummaryQuery.data.total_worked_minutes)}
-              />
-              <SummaryTile
-                label="Horas previstas"
-                value={formatMinutes(pointSummaryQuery.data.expected_minutes)}
-              />
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-5 dark:border-gray-700 dark:bg-gray-900/20">
+                <p className="text-xs font-medium uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
+                  Ação imediata
+                </p>
+                <div className="mt-3 flex items-end justify-between gap-4">
+                  <div>
+                    <p className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                      {totalPendingActions}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      {totalPendingActions > 0
+                        ? "itens ainda aguardam acompanhamento da área."
+                        : "nenhum item pendente no momento."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <SummaryTile label="Solicitações abertas" value={pendingRequestsCount} />
+                <SummaryTile label="Avaliações pendentes" value={pendingEvaluationsCount} />
+                <SummaryTile label="Folhas pendentes" value={unsignedTimeSheetsCount} />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-900/20">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Solicitações concluídas
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">
+                    {resolvedRequestsCount}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-900/20">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Folhas no período
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">
+                    {totalTimeSheetsCount}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </SectionCard>
