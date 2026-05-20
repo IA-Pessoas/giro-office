@@ -18,6 +18,14 @@ export const operations = [
   {
     service: "ti-service",
     method: "GET",
+    path: "/ti/dashboard",
+    action: "tiDashboardSummary",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "ti-service",
+    method: "GET",
     path: "/ti/request-categories/list",
     action: "tiRequestCategoryList",
     target: "gateway",

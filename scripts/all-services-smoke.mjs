@@ -970,6 +970,10 @@ const handlers = {
     });
   },
 
+  async tiDashboardSummary(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
   async tiRequestList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },

@@ -540,6 +540,30 @@ const schemas: Record<string, OpenApiSchema> = {
     },
     additionalProperties: false,
   },
+  TiDashboardSummary: {
+    type: "object",
+    required: [
+      "openRequests",
+      "criticalRequests",
+      "resolvedLastSevenDays",
+      "inventoryAssets",
+      "assignedInventoryAssets",
+      "pendingTerms",
+      "lowStockItems",
+      "activeRobots",
+    ],
+    properties: {
+      openRequests: { type: "integer", minimum: 0 },
+      criticalRequests: { type: "integer", minimum: 0 },
+      resolvedLastSevenDays: { type: "integer", minimum: 0 },
+      inventoryAssets: { type: "integer", minimum: 0 },
+      assignedInventoryAssets: { type: "integer", minimum: 0 },
+      pendingTerms: { type: "integer", minimum: 0 },
+      lowStockItems: { type: "integer", minimum: 0 },
+      activeRobots: { type: "integer", minimum: 0 },
+    },
+    additionalProperties: false,
+  },
 };
 
 export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): OpenApiDocument {
@@ -563,6 +587,7 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
       { name: "TI Terms", description: "Termos de responsabilidade de TI" },
       { name: "TI Stock", description: "Estoque de TI filtrado pelo departamento Tecnologia" },
       { name: "TI Robots", description: "Robos e historico de execucao de TI" },
+      { name: "TI Dashboard", description: "Resumo consolidado do modulo de TI" },
     ],
     components: {
       securitySchemes: {
@@ -594,6 +619,15 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
             "200": successResponse("Servico pronto"),
           },
         },
+      },
+      "/ti/dashboard": {
+        get: publicTiOperation({
+          operationId: "getTiDashboardSummary",
+          tags: ["TI Dashboard"],
+          summary: "Busca resumo consolidado do modulo de TI",
+          successDescription: "Resumo do dashboard de TI",
+          errors: [401, 403],
+        }),
       },
       "/ti/inventory/list": {
         get: publicTiOperation({

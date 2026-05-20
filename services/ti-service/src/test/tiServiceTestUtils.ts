@@ -158,6 +158,13 @@ export function createPrismaMock(): PrismaClient {
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
     },
     stock: {
+      count: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId || where.department_id !== departmentId) {
+          throw new Error("Stock dashboard count missing Tecnologia department scope.");
+        }
+
+        return 0;
+      }),
       findMany: vi.fn(async ({ where }) => {
         if (where.organization_id !== organizationId || where.department_id !== departmentId) {
           throw new Error("Stock item list missing Tecnologia department scope.");
@@ -228,6 +235,13 @@ export function createPrismaMock(): PrismaClient {
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
     },
     inventoryTecnologia: {
+      count: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId) {
+          throw new Error("Inventory dashboard count missing organization scope.");
+        }
+
+        return where.user_id ? 3 : 5;
+      }),
       findMany: vi.fn(async () => []),
       findFirst: vi.fn(async ({ where }) => {
         if (where.asset_code) {
@@ -272,6 +286,19 @@ export function createPrismaMock(): PrismaClient {
       })),
     },
     tIRequest: {
+      count: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId) {
+          throw new Error("Request dashboard count missing organization scope.");
+        }
+        if (where.urgency) {
+          return 1;
+        }
+        if (where.status === "Resolved") {
+          return 1;
+        }
+
+        return 2;
+      }),
       findMany: vi.fn(async () => []),
       findFirst: vi.fn(async ({ where }) => ({
         id: where.id,
@@ -286,6 +313,13 @@ export function createPrismaMock(): PrismaClient {
       create: vi.fn(async ({ data }) => ({ id: "msg-1", ...data })),
     },
     tIRobot: {
+      count: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId) {
+          throw new Error("Robot dashboard count missing organization scope.");
+        }
+
+        return 0;
+      }),
       findMany: vi.fn(async ({ where }) => {
         if (where.organization_id !== organizationId) {
           throw new Error("Robot list missing organization scope.");
@@ -321,6 +355,15 @@ export function createPrismaMock(): PrismaClient {
         return [];
       }),
       create: vi.fn(async ({ data }) => ({ id: "run-1", ...data })),
+    },
+    termTecnologia: {
+      count: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId) {
+          throw new Error("Term dashboard count missing organization scope.");
+        }
+
+        return 1;
+      }),
     },
   } as unknown as PrismaClient;
 }
