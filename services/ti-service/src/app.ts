@@ -21,6 +21,7 @@ import { createTiInventoryLocationRoutes } from "./routes/tiInventoryLocation.ro
 import { createTiPasswordRoutes } from "./routes/tiPassword.routes.js";
 import { createTiRequestRoutes } from "./routes/tiRequest.routes.js";
 import { createTiRequestCategoryRoutes } from "./routes/tiRequestCategory.routes.js";
+import { createTiRobotRoutes } from "./routes/tiRobot.routes.js";
 import { createTiStockRoutes } from "./routes/tiStock.routes.js";
 import { createTiTermRoutes } from "./routes/tiTerm.routes.js";
 
@@ -85,6 +86,7 @@ export function createTiApplication({
   app.use("/ti/extensions", createTiExtensionRoutes(prisma));
   app.use("/ti/terms", createTiTermRoutes(prisma));
   app.use("/ti/stock", createTiStockRoutes(prisma));
+  app.use("/ti/robots", createTiRobotRoutes(prisma));
   app.use("/ti/requests", createTiRequestRoutes(prisma));
   app.use("/ti/request-categories", createTiRequestCategoryRoutes(prisma));
 

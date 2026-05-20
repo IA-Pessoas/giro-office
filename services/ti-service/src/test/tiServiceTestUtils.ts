@@ -10,6 +10,7 @@ export function createPrismaMock(): PrismaClient {
   const organizationId = "10000000-0000-4000-8000-000000000001";
   const departmentId = "50000000-0000-4000-8000-000000000001";
   const stockId = "80000000-0000-4000-8000-000000000001";
+  const robotId = "90000000-0000-4000-8000-000000000001";
   let stockQuantity = 5;
   const stockTransaction = {
     stock: {
@@ -283,6 +284,43 @@ export function createPrismaMock(): PrismaClient {
     tIMessage: {
       findMany: vi.fn(async () => []),
       create: vi.fn(async ({ data }) => ({ id: "msg-1", ...data })),
+    },
+    tIRobot: {
+      findMany: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId) {
+          throw new Error("Robot list missing organization scope.");
+        }
+
+        return [];
+      }),
+      findFirst: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId) {
+          return null;
+        }
+
+        return {
+          id: where.id ?? robotId,
+          name: "Backup diario",
+          description: "Executa backup dos arquivos internos.",
+          type: "Backup",
+          schedule: "0 2 * * *",
+          status: "active",
+          active: true,
+          organization_id: where.organization_id,
+        };
+      }),
+      create: vi.fn(async ({ data }) => ({ id: robotId, ...data })),
+      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+    },
+    tIRobotRun: {
+      findMany: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId) {
+          throw new Error("Robot run list missing organization scope.");
+        }
+
+        return [];
+      }),
+      create: vi.fn(async ({ data }) => ({ id: "run-1", ...data })),
     },
   } as unknown as PrismaClient;
 }
