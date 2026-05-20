@@ -1,6 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
   CreateTiExtensionBody,
   ListTiExtensionsQuery,
@@ -46,6 +47,7 @@ export class TiExtensionService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async list(context: TiAuthContext, query: ListTiExtensionsQuery): Promise<unknown[]> {
+    const { skip, take } = getPaginationParams(query);
     const extensions = await this.prisma.extensionsTecnologia.findMany({
       where: {
         organization_id: context.organizationId,
@@ -53,6 +55,8 @@ export class TiExtensionService {
       },
       include: SAFE_USER_INCLUDE,
       orderBy: { number: "asc" },
+      skip,
+      take,
     });
 
     return extensions.map((extension) => withoutNestedUserPassword(extension));
@@ -93,6 +97,9 @@ export class TiExtensionService {
     } catch (err: unknown) {
       logError("Erro ao criar ramal de TI", { err });
       if (err instanceof ServiceError) throw err;
+      if (isUniqueConstraintError(err)) {
+        throw new ServiceError(409, "Ja existe um ramal de TI com este numero.", err);
+      }
       throw new ServiceError(500, "Erro ao criar ramal de TI.", err);
     }
   }
@@ -126,6 +133,9 @@ export class TiExtensionService {
     } catch (err: unknown) {
       logError("Erro ao atualizar ramal de TI", { err });
       if (err instanceof ServiceError) throw err;
+      if (isUniqueConstraintError(err)) {
+        throw new ServiceError(409, "Ja existe um ramal de TI com este numero.", err);
+      }
       throw new ServiceError(500, "Erro ao atualizar ramal de TI.", err);
     }
   }
@@ -139,4 +149,13 @@ export class TiExtensionService {
       throw new ServiceError(404, "Usuario nao encontrado.");
     }
   }
+}
+
+function isUniqueConstraintError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "P2002"
+  );
 }

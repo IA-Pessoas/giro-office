@@ -237,7 +237,13 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
 
   for (const service of getGatewayServiceDefinitions(env)) {
     for (const routePrefix of service.routePrefixes) {
-      app.use(routePrefix, buildHttpProxyMiddleware(service.targetUrl));
+      app.use(
+        routePrefix,
+        buildHttpProxyMiddleware(service.targetUrl, {
+          internalServiceToken: service.internalServiceToken,
+          permissionModule: service.permissionModule,
+        }),
+      );
     }
   }
   if (env.auditEnabled) {
@@ -255,7 +261,10 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
       next(new ServiceError(404, "Rota não mapeada no gateway."));
       return;
     }
-    return buildHttpProxyMiddleware(service.targetUrl)(request, response, next);
+    return buildHttpProxyMiddleware(service.targetUrl, {
+      internalServiceToken: service.internalServiceToken,
+      permissionModule: service.permissionModule,
+    })(request, response, next);
   });
   app.use(buildAuditErrorCaptureMiddleware());
   app.use(

@@ -1,6 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
   AssignTiInventoryUserBody,
   CreateTiInventoryBody,
@@ -14,6 +15,8 @@ export class TiInventoryService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async list(context: TiAuthContext, query: ListTiInventoryQuery): Promise<unknown[]> {
+    const { skip, take } = getPaginationParams(query);
+
     return this.prisma.inventoryTecnologia.findMany({
       where: {
         organization_id: context.organizationId,
@@ -29,6 +32,8 @@ export class TiInventoryService {
         responsible_it_staff: true,
       },
       orderBy: { asset_code: "asc" },
+      skip,
+      take,
     });
   }
 
@@ -91,6 +96,9 @@ export class TiInventoryService {
     } catch (err: unknown) {
       logError("Erro ao criar ativo de inventario de TI", { err });
       if (err instanceof ServiceError) throw err;
+      if (isUniqueConstraintError(err)) {
+        throw new ServiceError(409, "Ja existe um ativo de TI com este codigo patrimonial.", err);
+      }
       throw new ServiceError(500, "Erro ao criar ativo de inventario de TI.", err);
     }
   }
@@ -136,6 +144,9 @@ export class TiInventoryService {
     } catch (err: unknown) {
       logError("Erro ao atualizar ativo de inventario de TI", { err });
       if (err instanceof ServiceError) throw err;
+      if (isUniqueConstraintError(err)) {
+        throw new ServiceError(409, "Ja existe um ativo de TI com este codigo patrimonial.", err);
+      }
       throw new ServiceError(500, "Erro ao atualizar ativo de inventario de TI.", err);
     }
   }
@@ -204,4 +215,13 @@ export class TiInventoryService {
       throw new ServiceError(404, message);
     }
   }
+}
+
+function isUniqueConstraintError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "P2002"
+  );
 }

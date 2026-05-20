@@ -33,6 +33,7 @@ function getRequestBody(request: Request): string | ReadableStream | undefined {
 
 interface HttpProxyOptions {
   internalServiceToken?: string;
+  permissionModule?: string;
 }
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -109,8 +110,14 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     headers.set(FORWARDED_AUTH_USER_ID_HEADER, request.auth.userId);
     headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, request.auth.organizationId);
 
-    if (typeof request.auth.claims.permission === "number") {
-      headers.set(FORWARDED_AUTH_PERMISSION_HEADER, String(request.auth.claims.permission));
+    const modules = request.auth.claims.modules as Record<string, number | null> | undefined;
+    const modulePermission =
+      options.permissionModule && modules ? modules[options.permissionModule] : undefined;
+    const forwardedPermission =
+      options.permissionModule && modules ? modulePermission : request.auth.claims.permission;
+
+    if (typeof forwardedPermission === "number") {
+      headers.set(FORWARDED_AUTH_PERMISSION_HEADER, String(forwardedPermission));
     }
   }
 

@@ -4,6 +4,7 @@ import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -18,6 +19,7 @@ function gatewayHeaders(permission: number): Record<string, string> {
     [FORWARDED_AUTH_USER_ID_HEADER]: userId,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: organizationId,
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
+    [INTERNAL_SERVICE_TOKEN_HEADER]: "ti-service-internal-token-test",
   };
 }
 

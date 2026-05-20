@@ -16,6 +16,24 @@ const context = {
 };
 
 describe("TiRequestService", () => {
+  it("list applies bounded offset pagination", async () => {
+    const prisma = {
+      tIRequest: {
+        findMany: vi.fn(async () => []),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    await service.list(context, { page: 3, page_size: 20 });
+
+    expect(prisma.tIRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 40,
+        take: 20,
+      }),
+    );
+  });
+
   it("creates request for authenticated user when requester_id is omitted", async () => {
     const prisma = {
       tICategoryRequest: { findFirst: vi.fn(async () => ({ id: categoryId, active: true })) },

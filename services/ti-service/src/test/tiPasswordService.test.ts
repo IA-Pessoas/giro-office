@@ -1,5 +1,6 @@
 import "./envBootstrap.js";
 
+import { EncryptionService } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { TiPasswordService } from "../services/tiPasswordService.js";
@@ -13,13 +14,14 @@ const context = {
   userId,
   permission: 3,
 };
+const encryption = new EncryptionService("MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=");
 
 function passwordRecord() {
   return {
     id: passwordId,
     local: "VPN",
     user_id: userId,
-    password: "segredo-vpn",
+    password: encryption.encrypt("segredo-vpn"),
     notes: "Acesso remoto",
     organization_id: organizationId,
     user: {
@@ -37,7 +39,7 @@ describe("TiPasswordService", () => {
         findMany: vi.fn(async () => [passwordRecord()]),
       },
     };
-    const service = new TiPasswordService(prisma as never);
+    const service = new TiPasswordService(prisma as never, encryption);
 
     const result = (await service.list(context, {})) as Array<Record<string, unknown>>;
 
@@ -58,6 +60,8 @@ describe("TiPasswordService", () => {
         },
       },
       orderBy: { local: "asc" },
+      skip: 0,
+      take: 50,
     });
   });
 
@@ -67,7 +71,7 @@ describe("TiPasswordService", () => {
         findFirst: vi.fn(async () => passwordRecord()),
       },
     };
-    const service = new TiPasswordService(prisma as never);
+    const service = new TiPasswordService(prisma as never, encryption);
 
     const result = (await service.getById({ ...context, permission: 1 }, passwordId)) as Record<
       string,
@@ -84,7 +88,7 @@ describe("TiPasswordService", () => {
         findFirst: vi.fn(async () => passwordRecord()),
       },
     };
-    const service = new TiPasswordService(prisma as never);
+    const service = new TiPasswordService(prisma as never, encryption);
 
     const result = (await service.getById(context, passwordId)) as Record<string, unknown>;
 
@@ -100,7 +104,7 @@ describe("TiPasswordService", () => {
         create: vi.fn(async ({ data }) => ({ id: passwordId, ...data })),
       },
     };
-    const service = new TiPasswordService(prisma as never);
+    const service = new TiPasswordService(prisma as never, encryption);
 
     const result = await service.create(context, {
       local: "VPN",
@@ -113,8 +117,13 @@ describe("TiPasswordService", () => {
       id: passwordId,
       local: "VPN",
       user_id: userId,
-      password: "segredo-vpn",
       organization_id: organizationId,
+    });
+    expect(result).not.toHaveProperty("password");
+    expect(prisma.passwordTecnologia.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        password: expect.not.stringMatching(/^segredo-vpn$/),
+      }),
     });
     expect(prisma.user.findFirst).toHaveBeenCalledWith({
       where: { id: userId, organization_id: organizationId },
@@ -131,7 +140,7 @@ describe("TiPasswordService", () => {
         update: vi.fn(async ({ where, data }) => ({ id: where.id, ...passwordRecord(), ...data })),
       },
     };
-    const service = new TiPasswordService(prisma as never);
+    const service = new TiPasswordService(prisma as never, encryption);
 
     const result = await service.update(context, passwordId, {
       user_id: userId,

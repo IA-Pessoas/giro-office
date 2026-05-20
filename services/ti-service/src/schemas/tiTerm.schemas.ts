@@ -1,16 +1,20 @@
 import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+import { paginationQuerySchema } from "./pagination.schemas.js";
+
 export const tiTermIdParamsSchema = z
   .object({
     id: z.string().uuid({ message: "Termo de TI invalido." }),
   })
   .strict();
 
-export const listTiTermsQuerySchema = z
-  .object({
-    user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
-  })
+export const listTiTermsQuerySchema = paginationQuerySchema
+  .merge(
+    z.object({
+      user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
+    }),
+  )
   .strict();
 
 export const createTiTermBodySchema = z

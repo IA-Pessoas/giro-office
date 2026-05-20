@@ -1,6 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type { CreateTiMessageBody, ListTiMessagesQuery } from "../schemas/tiRequest.schemas.js";
 import type { TiAuthContext } from "./tiRequestService.js";
 
@@ -13,6 +14,7 @@ export class TiMessageService {
     query: ListTiMessagesQuery,
   ): Promise<unknown[]> {
     await this.ensureRequest(context.organizationId, requestId);
+    const { skip, take } = getPaginationParams(query);
 
     return this.prisma.tIMessage.findMany({
       where: {
@@ -28,6 +30,8 @@ export class TiMessageService {
           : {}),
       },
       orderBy: { created_at: "asc" },
+      skip,
+      take,
     });
   }
 

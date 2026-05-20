@@ -1,6 +1,8 @@
 import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+import { paginationQuerySchema } from "./pagination.schemas.js";
+
 export const tiRequestUrgencySchema = z.enum(["Low", "Medium", "High", "Critical"]);
 export const tiRequestStatusSchema = z.enum([
   "New",
@@ -61,23 +63,27 @@ export const createTiMessageBodySchema = z
   })
   .strict();
 
-export const listTiRequestsQuerySchema = z
-  .object({
-    status: tiRequestStatusSchema.optional(),
-    urgency: tiRequestUrgencySchema.optional(),
-    category_id: z.string().uuid({ message: "Categoria de TI invalida." }).optional(),
-    requester_id: z.string().uuid({ message: "Solicitante invalido." }).optional(),
-    assigned_to_id: z.string().uuid({ message: "Responsavel invalido." }).optional(),
-    created_from: zIsoDate("created_from").optional(),
-    created_to: zIsoDate("created_to").optional(),
-  })
+export const listTiRequestsQuerySchema = paginationQuerySchema
+  .merge(
+    z.object({
+      status: tiRequestStatusSchema.optional(),
+      urgency: tiRequestUrgencySchema.optional(),
+      category_id: z.string().uuid({ message: "Categoria de TI invalida." }).optional(),
+      requester_id: z.string().uuid({ message: "Solicitante invalido." }).optional(),
+      assigned_to_id: z.string().uuid({ message: "Responsavel invalido." }).optional(),
+      created_from: zIsoDate("created_from").optional(),
+      created_to: zIsoDate("created_to").optional(),
+    }),
+  )
   .strict();
 
-export const listTiMessagesQuerySchema = z
-  .object({
-    created_from: zIsoDate("created_from").optional(),
-    created_to: zIsoDate("created_to").optional(),
-  })
+export const listTiMessagesQuerySchema = paginationQuerySchema
+  .merge(
+    z.object({
+      created_from: zIsoDate("created_from").optional(),
+      created_to: zIsoDate("created_to").optional(),
+    }),
+  )
   .strict();
 
 export type CreateTiRequestBody = z.infer<typeof createTiRequestBodySchema>;

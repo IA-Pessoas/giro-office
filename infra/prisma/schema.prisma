@@ -1849,6 +1849,7 @@ model ExtensionsTecnologia {
   organization    Organization @relation(fields: [organization_id], references: [id])
   user            User         @relation(fields: [user_id], references: [id])
 
+  @@unique([organization_id, number], map: "uq_tecnologia_extensions_org_number")
   @@map("tecnologia.extensions")
 }
 
@@ -1895,6 +1896,7 @@ model InventoryTecnologia {
   user                    User?                        @relation("user", fields: [user_id], references: [id])
 
   @@index([organization_id, user_id], map: "idx_tecnologia_inventory_org_user")
+  @@unique([organization_id, asset_code], map: "uq_tecnologia_inventory_org_asset_code")
   @@map("tecnologia.inventory")
 }
 
@@ -1928,6 +1930,7 @@ model TIRequest {
   assigned_to_id  String?
   urgency         String
   status          String
+  attachment      String?
   created_at      DateTime          @default(now())
   updated_at      DateTime          @updatedAt
   organization_id String

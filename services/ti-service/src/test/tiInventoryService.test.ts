@@ -11,6 +11,24 @@ const context = {
 };
 
 describe("TiInventoryService", () => {
+  it("list applies bounded offset pagination", async () => {
+    const prisma = {
+      inventoryTecnologia: {
+        findMany: vi.fn(async () => []),
+      },
+    };
+    const service = new TiInventoryService(prisma as never);
+
+    await service.list(context, { page: 2, page_size: 25 });
+
+    expect(prisma.inventoryTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 25,
+        take: 25,
+      }),
+    );
+  });
+
   it("creates inventory asset with unique asset_code", async () => {
     const prisma = {
       inventoryTecnologia: {

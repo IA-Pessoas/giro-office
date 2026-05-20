@@ -55,6 +55,7 @@ const gatewayEnvSchema = z
     contabilServiceUrl: z.string().url().default("http://localhost:3038"),
     regularizeServiceUrl: z.string().url().default("http://localhost:3039"),
     tiServiceUrl: z.string().url().default("http://localhost:3040"),
+    tiServiceInternalToken: z.string().optional().default("ti-service-token"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -101,6 +102,12 @@ const gatewayEnvSchema = z
       envName: "AUDIT_SERVICE_TOKEN",
       token: env.auditServiceToken,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: env.nodeEnv,
+      serviceName: "gateway",
+      envName: "TI_SERVICE_INTERNAL_TOKEN",
+      token: env.tiServiceInternalToken,
+    });
     validateProductionCorsOrigins({
       nodeEnv: env.nodeEnv,
       serviceName: "gateway",
@@ -131,6 +138,7 @@ export interface GatewayEnv {
   contabilServiceUrl: string;
   regularizeServiceUrl: string;
   tiServiceUrl: string;
+  tiServiceInternalToken: string;
   websocketUpstreamUrl?: string;
   jwtSecret: string;
   logLevel: LoggerLevel;
@@ -160,6 +168,7 @@ export function getGatewayEnv(): GatewayEnv {
     contabilServiceUrl: process.env.CONTABIL_SERVICE_URL,
     regularizeServiceUrl: process.env.REGULARIZE_SERVICE_URL,
     tiServiceUrl: process.env.TI_SERVICE_URL,
+    tiServiceInternalToken: process.env.TI_SERVICE_INTERNAL_TOKEN,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,

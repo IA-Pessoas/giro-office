@@ -5,6 +5,7 @@ import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
@@ -25,6 +26,7 @@ const tiTestEnv = {
   auditServiceUrl: "http://localhost:3020",
   auditServiceToken: "audit-service-token-test",
   internalServiceToken: "ti-service-internal-token-test",
+  passwordEncryptionKey: "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=",
   allowedOrigins: ["*"],
   enableApiDocs: false,
   logLevel: "info",
@@ -137,6 +139,36 @@ describe("ti-service app", () => {
     const response = await request(app).get("/health").set("x-request-id", "req-ti-1").expect(200);
 
     expect(response.headers["x-request-id"]).toBe("req-ti-1");
+  });
+
+  it("rejeita contexto encaminhado sem token interno", async () => {
+    const app = createTestApp();
+
+    const response = await request(app)
+      .get("/ti/dashboard")
+      .set(FORWARDED_AUTH_USER_ID_HEADER, "00000000-0000-4000-8000-000000000001")
+      .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, "10000000-0000-4000-8000-000000000001")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "1")
+      .expect(401);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "UNAUTHORIZED",
+    });
+  });
+
+  it("aceita contexto encaminhado com token interno valido", async () => {
+    const app = createTestApp();
+
+    const response = await request(app)
+      .get("/ti/dashboard")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "ti-service-internal-token-test")
+      .set(FORWARDED_AUTH_USER_ID_HEADER, "00000000-0000-4000-8000-000000000001")
+      .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, "10000000-0000-4000-8000-000000000001")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "1")
+      .expect(200);
+
+    expect(response.body.success).toBe(true);
   });
 
   it("serve a especificacao OpenAPI publica quando habilitada", async () => {

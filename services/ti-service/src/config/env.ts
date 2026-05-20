@@ -30,6 +30,7 @@ const tiServiceEnvSchema = z
     auditServiceUrl: z.string().url("AUDIT_SERVICE_URL invalida."),
     auditServiceToken: z.string().min(1, "AUDIT_SERVICE_TOKEN nao definido."),
     internalServiceToken: z.string().min(1, "TI_SERVICE_INTERNAL_TOKEN nao definido."),
+    passwordEncryptionKey: z.string().min(1, "MTK_ENCRYPTION_KEY nao definido."),
     allowedOrigins: z
       .string()
       .optional()
@@ -86,6 +87,7 @@ export function getTiServiceEnv(): TiServiceEnv {
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     internalServiceToken: process.env.TI_SERVICE_INTERNAL_TOKEN,
+    passwordEncryptionKey: process.env.MTK_ENCRYPTION_KEY,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
     logLevel: process.env.LOG_LEVEL,

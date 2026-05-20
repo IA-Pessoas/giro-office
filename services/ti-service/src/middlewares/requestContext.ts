@@ -4,7 +4,9 @@ import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
+  ServiceError,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 
@@ -40,4 +42,21 @@ export function requestContext(request: Request, response: Response, next: NextF
   response.setHeader(REQUEST_ID_HEADER, requestId);
 
   next();
+}
+
+export function createForwardedAuthContextMiddleware(internalServiceToken: string) {
+  return function forwardedAuthContext(
+    request: Request,
+    _response: Response,
+    next: NextFunction,
+  ): void {
+    const token = getHeaderValue(request.headers[INTERNAL_SERVICE_TOKEN_HEADER]);
+
+    if (token !== internalServiceToken) {
+      next(new ServiceError(401, "Token interno do ti-service invalido."));
+      return;
+    }
+
+    next();
+  };
 }

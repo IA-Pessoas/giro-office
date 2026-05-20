@@ -1,6 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
   AssignTiRequestBody,
   CreateTiRequestBody,
@@ -27,6 +28,8 @@ export class TiRequestService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async list(context: TiAuthContext, query: ListTiRequestsQuery): Promise<unknown[]> {
+    const { skip, take } = getPaginationParams(query);
+
     return this.prisma.tIRequest.findMany({
       where: {
         organization_id: context.organizationId,
@@ -45,6 +48,8 @@ export class TiRequestService {
           : {}),
       },
       orderBy: { created_at: "desc" },
+      skip,
+      take,
     });
   }
 
@@ -95,6 +100,7 @@ export class TiRequestService {
           requester_id: requesterId,
           assigned_to_id: body.assigned_to_id,
           urgency: body.urgency,
+          attachment: body.attachment,
           status: "New",
           organization_id: context.organizationId,
         },
@@ -113,9 +119,7 @@ export class TiRequestService {
       await this.ensureCategory(context.organizationId, body.category_id);
     }
 
-    const { attachment: _attachment, ...data } = body;
-
-    return this.prisma.tIRequest.update({ where: { id }, data });
+    return this.prisma.tIRequest.update({ where: { id }, data: body });
   }
 
   async assign(context: TiAuthContext, id: string, body: AssignTiRequestBody): Promise<unknown> {
