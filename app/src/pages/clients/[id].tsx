@@ -245,7 +245,7 @@ export default function ClientDetailPage() {
         ) : (
           <>
             <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <div className={`${PANEL_CLASSNAME} p-6`}>
+              <div className={`${PANEL_CLASSNAME} flex h-full flex-col p-6`}>
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Resumo</h2>
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <SummaryItem label="Nome" value={client.name} />
@@ -263,12 +263,12 @@ export default function ClientDetailPage() {
                   Ações disponíveis apenas para administradores.
                 </p>
 
-                <div className="mt-5 space-y-3">
+                <div className="mt-5 flex flex-1 flex-col gap-3">
                   <button
                     type="button"
                     onClick={() => void handleActivate()}
                     disabled={!isAdmin || activateClientMutation.isPending || uiStatus === "Ativo"}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                   >
                     <RotateCcw className="h-4 w-4" />
                     {activateClientMutation.isPending ? "Reativando..." : "Reativar cliente"}
@@ -278,19 +278,22 @@ export default function ClientDetailPage() {
                     type="button"
                     onClick={() => void handleDeactivate()}
                     disabled={!isAdmin || deactivateClientMutation.isPending || uiStatus === "Inativo"}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-950/30"
                   >
                     <Power className="h-4 w-4" />
                     {deactivateClientMutation.isPending ? "Desativando..." : "Desativar cliente"}
                   </button>
-                  <SummaryItem
-                      label="Desativado em"
+
+                  <div className="mt-auto pt-1">
+                    <SummaryItem
+                      label={client.deletion_date ? "Desativado em" : "Situação"}
                       value={
                         client.deletion_date
                           ? new Date(client.deletion_date).toLocaleString("pt-BR")
-                          : "Ativo"
+                          : "Cliente ativo"
                       }
                     />
+                  </div>
                 </div>
               </div>
             </section>
@@ -330,7 +333,7 @@ export default function ClientDetailPage() {
                 </p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <ClientAccessCard
                   title="PA"
                   description="Gerencie os dados de PA do cliente."
@@ -389,7 +392,7 @@ export default function ClientDetailPage() {
                 </p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <ClientAccessCard
                   title="Históricos"
                   description="Crie e edite históricos do cliente."
@@ -431,16 +434,16 @@ function ClientAccessCard({
   icon: typeof FileText;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-1">
+    <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
+      <div className="flex h-full flex-col gap-4">
+        <div className="min-h-0 flex-1 space-y-1">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">{description}</p>
         </div>
 
         <Link
           href={href}
-          className="inline-flex min-h-12 min-w-[176px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 self-start rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] sm:w-auto sm:min-w-[176px]"
         >
           <Icon className="h-4 w-4" />
           {actionLabel}

@@ -710,8 +710,8 @@ export function Administracao() {
           </section>
         </div>
       ) : (
-        <div className="grid gap-4 xl:h-[92vh] xl:grid-cols-[350px_minmax(0,1fr)] xl:items-stretch">
-          <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 max-xl:h-[680px] xl:self-start`}>
+        <div className="grid gap-4 xl:h-[575px] xl:grid-cols-[350px_minmax(0,1fr)] xl:items-stretch">
+          <aside className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-4 max-xl:h-[680px] xl:h-full`}>
             <div className="flex h-full min-h-0 flex-col space-y-4">
               <div className="space-y-1">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">
@@ -747,7 +747,7 @@ export function Administracao() {
                   </span>
                 </div>
 
-                <div className="min-h-0 space-y-3 overflow-y-auto pr-1 xl:max-h-[385px]">
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                   {isPermissionUsersLoading ? (
                     <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
                       <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuários ativos...</p>
@@ -799,7 +799,7 @@ export function Administracao() {
             </div>
           </aside>
 
-          <section className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-6 xl:self-start`}>
+          <section className={`${ADMIN_PANEL_CLASSNAME} overflow-hidden p-6 xl:h-full`}>
             {!selectedPermissionUser ? (
               <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center dark:border-slate-700 dark:bg-slate-950/30">
                 <div>
@@ -881,7 +881,7 @@ export function Administracao() {
                   </button>
                 </div>
 
-                <div className="space-y-4 overflow-y-auto pr-1 xl:max-h-[344px]">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
                   {permissionSaveError ? (
                     <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100">
                       <p className="text-sm font-semibold">Não foi possível salvar as permissões.</p>
@@ -906,7 +906,7 @@ export function Administracao() {
                     </div>
                   ) : null}
 
-                  <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="grid gap-4 xl:grid-cols-2">
                     {PERMISSION_MODULE_GROUPS.map((group) => (
                       <section key={group.title} className={`${ADMIN_SUBPANEL_CLASSNAME} p-4`}>
                         <div className="space-y-1">
@@ -919,9 +919,12 @@ export function Administracao() {
                           {group.keys.map((moduleKey) => (
                             <div
                               key={moduleKey}
-                              className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
+                              className="grid gap-2 2xl:grid-cols-[minmax(0,1fr)_200px] 2xl:items-center"
                             >
-                              <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                              <label
+                                className="block max-w-full truncate text-sm font-medium text-slate-700 dark:text-slate-200"
+                                title={getPermissionModuleLabel(moduleKey)}
+                              >
                                 {getPermissionModuleLabel(moduleKey)}
                               </label>
                               <select
