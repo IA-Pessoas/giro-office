@@ -10,6 +10,7 @@ import { buildProjectServiceOpenApiSpec } from "../../../project-service/src/ope
 import { buildRegularizeServiceOpenApiSpec } from "../../../regularize-service/src/openapi/spec.js";
 import { buildRhServiceOpenApiSpec } from "../../../rh-service/src/openapi/spec.js";
 import { buildTaskServiceOpenApiSpec } from "../../../task-service/src/openapi/spec.js";
+import { buildTiServiceOpenApiSpec } from "../../../ti-service/src/openapi/spec.js";
 import { buildUserServiceOpenApiSpec } from "../../../user-service/src/openapi/spec.js";
 import type { GatewayEnv } from "../config/env.js";
 
@@ -129,6 +130,13 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       buildSpec: () =>
         buildContabilServiceOpenApiSpec({ port: getPortFromUrl(env.contabilServiceUrl) } as never),
       includePath: (path) => path !== "/health",
+    },
+    {
+      key: "ti-service",
+      label: "TI Service",
+      buildSpec: () =>
+        buildTiServiceOpenApiSpec({ port: getPortFromUrl(env.tiServiceUrl) } as never),
+      includePath: (path) => path !== "/health" && path !== "/ready",
     },
     {
       key: "audit-service",
@@ -457,7 +465,7 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
       title: "office-gateway",
       version: "1.0.0",
       description:
-        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
+        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service, fiscal-service, contabil-service, ti-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
     },
     servers: [{ url: "http://localhost" }],
     tags: [

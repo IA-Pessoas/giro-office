@@ -54,6 +54,7 @@ const gatewayEnvSchema = z
     fiscalServiceUrl: z.string().url().default("http://localhost:3037"),
     contabilServiceUrl: z.string().url().default("http://localhost:3038"),
     regularizeServiceUrl: z.string().url().default("http://localhost:3039"),
+    tiServiceUrl: z.string().url().default("http://localhost:3040"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -129,6 +130,7 @@ export interface GatewayEnv {
   fiscalServiceUrl: string;
   contabilServiceUrl: string;
   regularizeServiceUrl: string;
+  tiServiceUrl: string;
   websocketUpstreamUrl?: string;
   jwtSecret: string;
   logLevel: LoggerLevel;
@@ -157,6 +159,7 @@ export function getGatewayEnv(): GatewayEnv {
     fiscalServiceUrl: process.env.FISCAL_SERVICE_URL,
     contabilServiceUrl: process.env.CONTABIL_SERVICE_URL,
     regularizeServiceUrl: process.env.REGULARIZE_SERVICE_URL,
+    tiServiceUrl: process.env.TI_SERVICE_URL,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,

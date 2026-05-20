@@ -102,7 +102,7 @@ export function extractOpenApiOperationsFromSource(source) {
       continue;
     }
 
-    const methodMatch = line.match(/^\s*"?(get|post|put|patch|delete)"?:\s*{/i);
+    const methodMatch = line.match(/^\s*"?(get|post|put|patch|delete)"?:\s*(?:\{|[A-Za-z_$])/i);
     if (methodMatch && currentPath) {
       operations.push({
         method: methodMatch[1].toUpperCase(),

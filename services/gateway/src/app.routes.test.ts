@@ -126,6 +126,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     fiscalServiceUrl: "http://127.0.0.1:3037",
     contabilServiceUrl: "http://127.0.0.1:3038",
     regularizeServiceUrl: "http://127.0.0.1:3039",
+    tiServiceUrl: "http://127.0.0.1:3040",
 
     jwtSecret: "test-secret",
     logLevel: "silent",
@@ -648,6 +649,7 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/regularize/passwords"]).toBeTruthy();
     expect(body.paths["/fiscal/ncm"]).toBeTruthy();
     expect(body.paths["/contabil/controls"]).toBeTruthy();
+    expect(body.paths["/ti/requests/list"]).toBeTruthy();
     expect(body.paths["/audit/requests"]).toBeTruthy();
   } finally {
     await stopServer(server);
@@ -672,6 +674,7 @@ it("does not duplicate gateway path prefixes in the aggregated OpenAPI JSON", as
     expect(body.paths["/client/client/list"]).toBe(undefined);
     expect(body.paths["/fiscal/fiscal/ncm"]).toBe(undefined);
     expect(body.paths["/contabil/contabil/controls"]).toBe(undefined);
+    expect(body.paths["/ti/ti/requests/list"]).toBe(undefined);
   } finally {
     await stopServer(server);
   }
@@ -698,6 +701,7 @@ it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", 
     expect(body.paths["/user/me"]?.get?.security).toEqual([{ bearerAuth: [] }]);
     expect(body.paths["/user/{id}"]?.get?.security).toEqual([{ bearerAuth: [] }]);
     expect(body.paths["/audit/requests"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(body.paths["/ti/requests/list"]?.get?.security).toEqual([{ bearerAuth: [] }]);
   } finally {
     await stopServer(server);
   }
@@ -890,6 +894,47 @@ it("proxies rh-service routes mapped in the gateway", async () => {
   }
 });
 
+it("proxies ti-service routes mapped in the gateway", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 3,
+  });
+  const tiService = createServer((request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: { service: "ti-service", path: request.url },
+      }),
+    );
+  });
+  const tiServiceUrl = await startServer(tiService);
+
+  const app = createApp(createEnv({ tiServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/ti/requests/list`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      success: true,
+      data: { service: "ti-service", path: "/ti/requests/list" },
+    });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(tiService);
+  }
+});
+
 it("returns 404 for routes not mapped to any upstream", async () => {
   const token = createToken({
     user_id: "user-1",
@@ -1069,6 +1114,50 @@ it("records organization-service route targets when audit is enabled", async () 
     await waitForRecords(auditService.records, 1);
 
     expect(auditService.records[0]?.metadata?.routeTarget).toBe("organization-service");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+    await stopServer(auditService.server);
+  }
+});
+
+it("records ti-service route targets when audit is enabled", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 3,
+  });
+  const auditService = await startAuditIngestServer();
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ ok: true }));
+  });
+  const tiServiceUrl = await startServer(upstream);
+
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      tiServiceUrl,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/ti/requests/list`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+
+    await waitForRecords(auditService.records, 1);
+
+    expect(auditService.records[0]?.metadata?.routeTarget).toBe("ti-service");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
