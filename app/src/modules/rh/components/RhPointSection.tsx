@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
-import { Clock3, FileText, WalletCards } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
-import { useRhPermissions } from "../hooks/useRhPermissions";
-import type { RhPointAdjustmentStatus, RhPointListItem } from "../types";
 import {
   useRhPointAdjustmentRequests,
   useRhPointConfig,
@@ -14,6 +11,8 @@ import {
   useRegisterRhPointMutation,
   useRhTodayPoint,
 } from "../hooks/useRhPoint";
+import { useRhPermissions } from "../hooks/useRhPermissions";
+import type { RhPointAdjustmentStatus, RhPointListItem } from "../types";
 import { RhPointAdjustmentPanel } from "./RhPointAdjustmentPanel";
 import { RhPointAdjustmentRequestModal } from "./RhPointAdjustmentRequestModal";
 import { RhPointConfigCard } from "./RhPointConfigCard";
@@ -61,6 +60,48 @@ function getMonthDateRange(month: string) {
   return {
     dateFrom: formatInputDate(monthStart),
     dateTo: formatInputDate(monthEnd),
+  };
+}
+
+function isBusinessDay(date: Date) {
+  const day = date.getDay();
+  return day !== 0 && day !== 6;
+}
+
+function getLastBusinessDaysRange(month: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) {
+    return getMonthDateRange(month);
+  }
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 0);
+  const today = new Date();
+  const isCurrentMonth =
+    today.getFullYear() === year && today.getMonth() === monthIndex;
+  const rangeEnd = isCurrentMonth && today < monthEnd ? today : monthEnd;
+  const cursor = new Date(rangeEnd);
+  let businessDaysFound = 0;
+
+  while (cursor >= monthStart) {
+    if (isBusinessDay(cursor)) {
+      businessDaysFound += 1;
+
+      if (businessDaysFound === 5) {
+        break;
+      }
+    }
+
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  const rangeStart = cursor < monthStart ? monthStart : cursor;
+
+  return {
+    dateFrom: formatInputDate(rangeStart),
+    dateTo: formatInputDate(rangeEnd),
   };
 }
 
@@ -134,7 +175,7 @@ export function RhPointSection() {
   const registerMutation = useRegisterRhPointMutation();
 
   useEffect(() => {
-    const { dateFrom: nextDateFrom, dateTo: nextDateTo } = getMonthDateRange(month);
+    const { dateFrom: nextDateFrom, dateTo: nextDateTo } = getLastBusinessDaysRange(month);
     setDateFrom(nextDateFrom);
     setDateTo(nextDateTo);
   }, [month]);
@@ -162,7 +203,9 @@ export function RhPointSection() {
           : error instanceof Error
             ? error.message
             : "Não foi possível registrar o ponto.";
-      toast.error(message);
+      toast.error(message, {
+        autoClose: typeof responseMessage === "string" ? 8000 : 5000,
+      });
     }
   }
 
@@ -179,33 +222,26 @@ export function RhPointSection() {
     canManagePoint && selectedUserId ? getUserLabel(selectedUserId) : currentUserName;
 
   const pointSections = [
-    {
-      key: "point" as const,
-      title: "Registros de ponto",
-      description: "Batidas, resumo do mês e ajustes.",
-      icon: Clock3,
-    },
-    {
-      key: "timebank" as const,
-      title: "Banco de horas",
-      description: "Lançamentos, saldo e aprovações.",
-      icon: WalletCards,
-    },
-    {
-      key: "timesheets" as const,
-      title: "Folhas de ponto",
-      description: "Folhas geradas, assinatura e consulta.",
-      icon: FileText,
-    },
+    { key: "point" as const, title: "Registros de ponto" },
+    { key: "timebank" as const, title: "Banco de horas" },
+    { key: "timesheets" as const, title: "Folhas de ponto" },
   ];
 
   return (
     <div className="min-w-0 space-y-6">
-      <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="bg-transparent px-4 pb-0 pt-4">
-          <div className="flex max-w-full flex-wrap items-end gap-2">
+      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+              Controle de jornada
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
+              Batidas, banco de horas e folhas de ponto.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 lg:justify-end">
             {pointSections.map((section) => {
-              const Icon = section.icon;
               const isActive = activePointTab === section.key;
 
               return (
@@ -213,50 +249,23 @@ export function RhPointSection() {
                   key={section.key}
                   type="button"
                   onClick={() => setActivePointTab(section.key)}
-                  className={`flex min-w-0 items-center gap-3 px-4 py-3 text-left transition-colors ${
+                  className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                     isActive
-                      ? "-mb-px rounded-t-2xl bg-gray-50/80 text-gray-900 shadow-sm dark:bg-gray-800/90 dark:text-white"
-                      : "rounded-2xl bg-transparent text-gray-500 opacity-55 hover:opacity-75 dark:text-gray-500 dark:hover:bg-gray-700/10"
+                      ? "bg-blue-600 text-white"
+                      : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300 dark:hover:bg-gray-700"
                   }`}
                 >
-                  <div
-                    className={`rounded-lg p-2 ${
-                      isActive
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
-                        : "bg-transparent text-gray-500 dark:text-gray-500"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </div>
-
-                  <div className="min-w-0">
-                    <p
-                      className={`text-sm font-semibold ${
-                        isActive
-                          ? "text-gray-900 dark:text-white"
-                          : "text-gray-600 dark:text-gray-400"
-                      }`}
-                    >
-                      {section.title}
-                    </p>
-                    <p
-                      className={`mt-1 text-xs leading-5 ${
-                        isActive
-                          ? "text-gray-600 dark:text-gray-400"
-                          : "text-gray-500 dark:text-gray-500"
-                      }`}
-                    >
-                      {section.description}
-                    </p>
-                  </div>
+                  {section.title}
                 </button>
               );
             })}
           </div>
         </div>
+      </section>
 
-        {activePointTab === "point" ? (
-          <div className="bg-gray-50/80 p-4 dark:bg-gray-800/90">
+      {activePointTab === "point" ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-xl bg-gray-50/80 p-4 dark:bg-gray-900/20">
             <RhPointFilters
               assignableUsers={assignableUsers}
               canManagePoint={canManagePoint}
@@ -269,20 +278,24 @@ export function RhPointSection() {
               onAdjustmentStatusChange={setSelectedAdjustmentStatus}
             />
           </div>
-        ) : null}
+        </div>
+      ) : null}
 
-        {activePointTab === "timebank" ? (
-          <div className="bg-gray-50/80 p-4 dark:bg-gray-800/90">
+      {activePointTab === "timebank" ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-xl bg-gray-50/80 p-4 dark:bg-gray-900/20">
             <RhTimeBankSection />
           </div>
-        ) : null}
+        </div>
+      ) : null}
 
-        {activePointTab === "timesheets" ? (
-          <div className="bg-gray-50/80 p-4 dark:bg-gray-800/90">
+      {activePointTab === "timesheets" ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-xl bg-gray-50/80 p-4 dark:bg-gray-900/20">
             <RhTimesheetsSection />
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {activePointTab === "point" ? (
         <>

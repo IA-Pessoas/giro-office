@@ -28,6 +28,10 @@ import type {
 } from "../types";
 import { RH_QUERY_KEY } from "./useRhRequests";
 
+interface RhCalendarReadQueryOptions {
+  enabled?: boolean;
+}
+
 export function rhHolidaysQueryKey() {
   return [...RH_QUERY_KEY, "calendar", "holidays"] as const;
 }
@@ -104,11 +108,13 @@ export function useRhTimeBankOverview(enabled = true): UseQueryResult<RhTimeBank
 
 export function useRhTimeSheets(
   filters: RhTimeSheetListFilters = {},
+  options?: RhCalendarReadQueryOptions,
 ): UseQueryResult<RhTimeSheetListItem[], Error> {
   return useFetch(
     rhTimeSheetsQueryKey(filters),
     () => rhCalendarService.listTimeSheets(filters),
     {
+      enabled: options?.enabled ?? true,
       refetchOnWindowFocus: false,
     },
   );

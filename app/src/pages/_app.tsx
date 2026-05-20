@@ -106,7 +106,12 @@ function MyApp({ Component, pageProps }: AppProps) {
                   <Component {...pageProps} />
                 </AppLayout>
               )}
-              <ToastContainer position="bottom-right" autoClose={2000} />
+              <ToastContainer
+                position="bottom-right"
+                autoClose={5000}
+                pauseOnHover
+                closeOnClick={false}
+              />
             </ChatProvider>
           </SocketProvider>
         </AuthProvider>

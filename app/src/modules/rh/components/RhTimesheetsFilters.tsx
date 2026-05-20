@@ -53,9 +53,9 @@ export function RhTimesheetsFilters({
         ) : null}
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,220px)_minmax(0,300px)_200px_200px]">
+      <div className="mt-4 grid gap-3">
         {canManageTimesheets ? (
-          <>
+          <div className="grid gap-3 lg:grid-cols-2">
             <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
               <span>Departamento</span>
               <div className="relative">
@@ -93,28 +93,30 @@ export function RhTimesheetsFilters({
                 <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               </div>
             </label>
-          </>
+          </div>
         ) : null}
 
-        <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
-          <span>Período inicial</span>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(event) => onDateFromChange(event.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </label>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
+            <span>Período inicial</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(event) => onDateFromChange(event.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+          </label>
 
-        <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
-          <span>Período final</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(event) => onDateToChange(event.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </label>
+          <label className="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
+            <span>Período final</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(event) => onDateToChange(event.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+          </label>
+        </div>
       </div>
     </div>
   );

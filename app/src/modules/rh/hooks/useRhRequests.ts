@@ -27,6 +27,10 @@ import type {
 
 export const RH_QUERY_KEY = ["rh"] as const;
 
+interface RhRequestsReadQueryOptions {
+  enabled?: boolean;
+}
+
 export function rhCategoriesQueryKey(filters: RhCategoryListFilters = {}) {
   return [...RH_QUERY_KEY, "categories", filters.activeOnly ?? false] as const;
 }
@@ -60,8 +64,10 @@ export function useRhCategories(
 
 export function useRhRequests(
   filters: RhRequestListFilters = {},
+  options?: RhRequestsReadQueryOptions,
 ): UseQueryResult<RhRequest[], Error> {
   return useFetch(rhRequestsQueryKey(filters), () => rhRequestsService.listRequests(filters), {
+    enabled: options?.enabled ?? true,
     refetchOnWindowFocus: false,
   });
 }
