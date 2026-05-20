@@ -404,6 +404,89 @@ const schemas: Record<string, OpenApiSchema> = {
     },
     additionalProperties: false,
   },
+  TiStockItemInput: {
+    type: "object",
+    required: ["name", "category_id", "location_id", "quantity"],
+    properties: {
+      name: { type: "string", minLength: 1 },
+      category_id: { type: "string", format: "uuid" },
+      location_id: { type: "string", format: "uuid" },
+      quantity: { type: "integer", minimum: 0 },
+      description: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+  TiStockItemUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      name: { type: "string", minLength: 1 },
+      category_id: { type: "string", format: "uuid" },
+      location_id: { type: "string", format: "uuid" },
+      description: { type: "string" },
+      status: { type: "boolean" },
+    },
+    additionalProperties: false,
+  },
+  TiStockEntryInput: {
+    type: "object",
+    required: ["quantity"],
+    properties: {
+      quantity: { type: "integer", minimum: 1 },
+      entry_date: { type: "string", format: "date-time" },
+    },
+    additionalProperties: false,
+  },
+  TiStockExitInput: {
+    type: "object",
+    required: ["quantity", "requester_id"],
+    properties: {
+      quantity: { type: "integer", minimum: 1 },
+      destination: { type: "string" },
+      requester_id: { type: "string", format: "uuid" },
+      approver_id: { type: "string", format: "uuid" },
+      operator_id: { type: "string", format: "uuid" },
+      location_destination_id: { type: "string", format: "uuid" },
+      exit_date: { type: "string", format: "date-time" },
+    },
+    additionalProperties: false,
+  },
+  TiStockCategoryInput: {
+    type: "object",
+    required: ["name"],
+    properties: {
+      name: { type: "string", minLength: 1 },
+    },
+    additionalProperties: false,
+  },
+  TiStockCategoryUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      name: { type: "string", minLength: 1 },
+      status: { type: "boolean" },
+    },
+    additionalProperties: false,
+  },
+  TiStockLocationInput: {
+    type: "object",
+    required: ["name"],
+    properties: {
+      name: { type: "string", minLength: 1 },
+      floor: { type: "integer" },
+    },
+    additionalProperties: false,
+  },
+  TiStockLocationUpdateInput: {
+    type: "object",
+    minProperties: 1,
+    properties: {
+      name: { type: "string", minLength: 1 },
+      floor: { type: "integer", nullable: true },
+      status: { type: "boolean" },
+    },
+    additionalProperties: false,
+  },
 };
 
 export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): OpenApiDocument {
@@ -425,6 +508,7 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
       { name: "TI Passwords", description: "Senhas de TI" },
       { name: "TI Extensions", description: "Ramais de TI" },
       { name: "TI Terms", description: "Termos de responsabilidade de TI" },
+      { name: "TI Stock", description: "Estoque de TI filtrado pelo departamento Tecnologia" },
     ],
     components: {
       securitySchemes: {
@@ -583,6 +667,137 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
           parameters: [pathIdParameter("Local de inventario de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiInventoryLocationUpdateInput"),
           successDescription: "Local atualizado",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/stock/items/list": {
+        get: publicTiOperation({
+          operationId: "listTiStockItems",
+          tags: ["TI Stock"],
+          summary: "Lista itens de estoque de TI",
+          parameters: [
+            uuidQueryParameter("category_id", "Categoria do item"),
+            uuidQueryParameter("location_id", "Local do item"),
+            stringQueryParameter("name", "Nome do item"),
+            enumQueryParameter("status", "Filtro de item ativo", ["true", "false"]),
+          ],
+          successDescription: "Itens de estoque listados",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/stock/items": {
+        post: publicTiOperation({
+          operationId: "createTiStockItem",
+          tags: ["TI Stock"],
+          summary: "Cria item de estoque de TI",
+          requestBody: jsonRequestBody("#/components/schemas/TiStockItemInput"),
+          successStatus: 201,
+          successDescription: "Item de estoque criado",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/stock/items/{id}": {
+        get: publicTiOperation({
+          operationId: "getTiStockItem",
+          tags: ["TI Stock"],
+          summary: "Busca item de estoque de TI",
+          parameters: [pathIdParameter("Item de estoque de TI")],
+          successDescription: "Item de estoque encontrado",
+          errors: [400, 401, 403, 404],
+        }),
+        patch: publicTiOperation({
+          operationId: "updateTiStockItem",
+          tags: ["TI Stock"],
+          summary: "Atualiza item de estoque de TI",
+          parameters: [pathIdParameter("Item de estoque de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiStockItemUpdateInput"),
+          successDescription: "Item de estoque atualizado",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/stock/items/{id}/entries": {
+        post: publicTiOperation({
+          operationId: "createTiStockEntry",
+          tags: ["TI Stock"],
+          summary: "Registra entrada de estoque de TI",
+          parameters: [pathIdParameter("Item de estoque de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiStockEntryInput"),
+          successStatus: 201,
+          successDescription: "Entrada de estoque registrada",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/stock/items/{id}/exits": {
+        post: publicTiOperation({
+          operationId: "createTiStockExit",
+          tags: ["TI Stock"],
+          summary: "Registra saida de estoque de TI",
+          parameters: [pathIdParameter("Item de estoque de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiStockExitInput"),
+          successStatus: 201,
+          successDescription: "Saida de estoque registrada",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/stock/categories/list": {
+        get: publicTiOperation({
+          operationId: "listTiStockCategories",
+          tags: ["TI Stock"],
+          summary: "Lista categorias de estoque de TI",
+          successDescription: "Categorias de estoque listadas",
+          errors: [401, 403, 404],
+        }),
+      },
+      "/ti/stock/categories": {
+        post: publicTiOperation({
+          operationId: "createTiStockCategory",
+          tags: ["TI Stock"],
+          summary: "Cria categoria de estoque de TI",
+          requestBody: jsonRequestBody("#/components/schemas/TiStockCategoryInput"),
+          successStatus: 201,
+          successDescription: "Categoria de estoque criada",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/stock/categories/{id}": {
+        patch: publicTiOperation({
+          operationId: "updateTiStockCategory",
+          tags: ["TI Stock"],
+          summary: "Atualiza categoria de estoque de TI",
+          parameters: [pathIdParameter("Categoria de estoque de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiStockCategoryUpdateInput"),
+          successDescription: "Categoria de estoque atualizada",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/stock/locations/list": {
+        get: publicTiOperation({
+          operationId: "listTiStockLocations",
+          tags: ["TI Stock"],
+          summary: "Lista locais de estoque de TI",
+          successDescription: "Locais de estoque listados",
+          errors: [401, 403, 404],
+        }),
+      },
+      "/ti/stock/locations": {
+        post: publicTiOperation({
+          operationId: "createTiStockLocation",
+          tags: ["TI Stock"],
+          summary: "Cria local de estoque de TI",
+          requestBody: jsonRequestBody("#/components/schemas/TiStockLocationInput"),
+          successStatus: 201,
+          successDescription: "Local de estoque criado",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/stock/locations/{id}": {
+        patch: publicTiOperation({
+          operationId: "updateTiStockLocation",
+          tags: ["TI Stock"],
+          summary: "Atualiza local de estoque de TI",
+          parameters: [pathIdParameter("Local de estoque de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiStockLocationUpdateInput"),
+          successDescription: "Local de estoque atualizado",
           errors: [400, 401, 403, 404],
         }),
       },
