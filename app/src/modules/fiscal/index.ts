@@ -1,5 +1,5 @@
 export { FiscalShell } from "./components";
-export { fiscalNcmSearchQueryKey, FISCAL_QUERY_KEY } from "./hooks";
+export { fiscalNcmSearchQueryKey, FISCAL_QUERY_KEY, useFiscalNcmSearch } from "./hooks";
 
 export type {
   CreateFiscalIcmsPayload,
