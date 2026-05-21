@@ -8,6 +8,7 @@ import {
   getFiscalErrorMessage,
   parseCommaSeparatedCodes,
 } from "../utils";
+import { FiscalNcmFormPanel } from "./FiscalNcmFormPanel";
 
 type FiscalNcmPanelIntent =
   | { mode: "create" }
@@ -116,11 +117,12 @@ export function FiscalNcmSection() {
       </div>
 
       {panelIntent ? (
-        <div className="rounded-xl border border-dashed border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/10 dark:text-blue-300">
-          {panelIntent.mode === "create"
-            ? "O painel inline de criação entra na próxima etapa deste fluxo."
-            : "O painel inline de edição entra na próxima etapa deste fluxo."}
-        </div>
+        <FiscalNcmFormPanel
+          mode={panelIntent.mode}
+          ncmId={panelIntent.mode === "edit" ? panelIntent.ncmId : undefined}
+          searchCodes={submittedCodes}
+          onClose={() => setPanelIntent(null)}
+        />
       ) : null}
 
       {!hasSubmittedSearch ? (
