@@ -130,7 +130,7 @@ export function FiscalSearchSection() {
 
             <button
               type="submit"
-              className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              className="inline-flex h-[46px] min-w-[112px] items-center justify-center self-end rounded-xl bg-blue-600 px-5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
             >
               Buscar
             </button>
@@ -333,10 +333,18 @@ function StateBox({
 }
 
 function SummaryCard({ label, value }: { label: string; value: string | number }) {
+  const isTextStatus = typeof value === "string";
+
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
       <p className="text-sm font-medium text-gray-600 dark:text-slate-400">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
+      <p
+        className={`mt-2 font-semibold text-gray-900 dark:text-white ${
+          isTextStatus ? "text-lg leading-6" : "text-xl"
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
