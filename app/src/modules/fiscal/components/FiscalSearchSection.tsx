@@ -183,14 +183,14 @@ export function FiscalSearchSection() {
           ) : null}
         </div>
 
-        <form className="mt-4 space-y-2.5" onSubmit={handleSubmit}>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
-                Código NCM
-              </span>
+        <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
+          <div className="space-y-2">
+            <span className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+              Código NCM
+            </span>
+            <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
                 <input
                   type="text"
                   value={inputValue}
@@ -207,20 +207,20 @@ export function FiscalSearchSection() {
                   placeholder="Ex.: 84719012"
                   inputMode="numeric"
                   maxLength={NCM_CODE_LENGTH}
-                  className="w-full rounded-xl border border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
+                  className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-[13px] text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
                 />
               </div>
-              <span className="mt-2 block text-xs text-gray-500 dark:text-slate-400">
-                Digite os 8 dígitos do NCM, sem letras ou separadores.
-              </span>
-            </label>
 
-            <button
-              type="submit"
-              className="inline-flex h-[46px] min-w-[112px] items-center justify-center self-end rounded-xl bg-blue-600 px-5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-            >
-              Buscar
-            </button>
+              <button
+                type="submit"
+                className="inline-flex h-9 min-w-[88px] items-center justify-center rounded-lg bg-blue-600 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              >
+                Buscar
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-slate-400">
+              Busca manual por código NCM completo.
+            </p>
           </div>
 
           {validationMessage ? (

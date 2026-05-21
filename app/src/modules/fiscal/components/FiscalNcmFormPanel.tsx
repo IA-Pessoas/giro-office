@@ -258,7 +258,7 @@ export function FiscalNcmFormPanel({
         <button
           type="button"
           onClick={handleCancel}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-white dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3 text-[13px] font-medium text-gray-700 transition-colors hover:bg-white dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
         >
           Cancelar
         </button>
@@ -358,7 +358,7 @@ export function FiscalNcmFormPanel({
           type="button"
           onClick={() => void handleSubmit()}
           disabled={isSubmitting}
-          className="inline-flex min-w-[160px] items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-9 min-w-[132px] items-center justify-center rounded-lg bg-blue-600 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting ? (
             <span className="inline-flex items-center gap-2">
@@ -399,7 +399,7 @@ function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+        className="h-9 rounded-lg border border-gray-300 px-3 text-[13px] text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
       />
     </label>
   );
@@ -426,7 +426,7 @@ function DateField({
         type="date"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+        className="h-9 rounded-lg border border-gray-300 px-3 text-[13px] text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
       />
     </label>
   );
@@ -451,7 +451,7 @@ function TextareaField({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         rows={3}
-        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+        className="rounded-lg border border-gray-300 px-3 py-2 text-[13px] text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
       />
     </label>
   );
