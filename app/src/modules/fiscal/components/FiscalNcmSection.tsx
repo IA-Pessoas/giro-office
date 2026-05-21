@@ -1,0 +1,292 @@
+import { useMemo, useState } from "react";
+import { AlertCircle, Loader2, Plus, Search, ScrollText } from "lucide-react";
+
+import { useFiscalNcmList } from "../hooks";
+import type { FiscalNcm } from "../types";
+import {
+  formatFiscalDateLabel,
+  getFiscalErrorMessage,
+  parseCommaSeparatedCodes,
+} from "../utils";
+
+type FiscalNcmPanelIntent =
+  | { mode: "create" }
+  | { mode: "edit"; ncmId: string }
+  | null;
+
+const ACTION_BUTTON_CLASSNAME =
+  "inline-flex h-8 min-w-[88px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+
+export function FiscalNcmSection() {
+  const [filterValue, setFilterValue] = useState("");
+  const [submittedCodes, setSubmittedCodes] = useState<string[]>([]);
+  const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [panelIntent, setPanelIntent] = useState<FiscalNcmPanelIntent>(null);
+
+  const searchQuery = useFiscalNcmList(submittedCodes, hasSubmittedSearch);
+  const errorMessage = searchQuery.error
+    ? getFiscalErrorMessage(searchQuery.error)
+    : null;
+
+  const submittedLabel = useMemo(() => submittedCodes.join(", "), [submittedCodes]);
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const normalizedCodes = parseCommaSeparatedCodes(filterValue);
+    if (normalizedCodes.length === 0) {
+      setValidationMessage("Informe ao menos um código NCM para buscar.");
+      return;
+    }
+
+    setValidationMessage(null);
+    setSubmittedCodes(normalizedCodes);
+    setHasSubmittedSearch(true);
+  }
+
+  return (
+    <section className="space-y-5">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
+                <ScrollText className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">NCM</h2>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Consulte códigos específicos e prepare novos cadastros no mesmo fluxo.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setPanelIntent({ mode: "create" })}
+            className="inline-flex h-[42px] items-center justify-center gap-2 self-start rounded-xl bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          >
+            <Plus className="h-4 w-4" />
+            Novo NCM
+          </button>
+        </div>
+
+        <form className="mt-4 space-y-2.5" onSubmit={handleSubmit}>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
+                Códigos NCM
+              </span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
+                <input
+                  type="text"
+                  value={filterValue}
+                  onChange={(event) => {
+                    setFilterValue(event.target.value);
+                    if (validationMessage) {
+                      setValidationMessage(null);
+                    }
+                  }}
+                  placeholder="Ex.: 84719012, 84715010"
+                  className="w-full rounded-xl border border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
+                />
+              </div>
+              <span className="mt-2 block text-xs text-gray-500 dark:text-slate-400">
+                Separe múltiplos códigos por vírgula. A lista só é consultada quando você clicar em buscar.
+              </span>
+            </label>
+
+            <button
+              type="submit"
+              className="inline-flex h-[46px] min-w-[112px] items-center justify-center self-end rounded-xl bg-blue-600 px-5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            >
+              Buscar
+            </button>
+          </div>
+
+          {validationMessage ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+              {validationMessage}
+            </div>
+          ) : null}
+        </form>
+      </div>
+
+      {panelIntent ? (
+        <div className="rounded-xl border border-dashed border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/10 dark:text-blue-300">
+          {panelIntent.mode === "create"
+            ? "O painel inline de criação entra na próxima etapa deste fluxo."
+            : "O painel inline de edição entra na próxima etapa deste fluxo."}
+        </div>
+      ) : null}
+
+      {!hasSubmittedSearch ? (
+        <StateBox icon={Search} title="Informe os códigos e clique em buscar">
+          Use a consulta sob demanda para listar apenas os NCMs que fazem sentido neste momento.
+        </StateBox>
+      ) : null}
+
+      {hasSubmittedSearch && searchQuery.isLoading && !searchQuery.data ? (
+        <StateBox icon={Loader2} title="Buscando NCMs">
+          Estamos consultando os registros para os códigos informados.
+        </StateBox>
+      ) : null}
+
+      {searchQuery.error && !searchQuery.data ? (
+        <StateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar a lista de NCM">
+          {errorMessage}
+        </StateBox>
+      ) : null}
+
+      {searchQuery.data ? (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                {searchQuery.data.length === 1
+                  ? "1 registro encontrado"
+                  : `${searchQuery.data.length} registros encontrados`}
+              </p>
+              <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
+                Busca atual: {submittedLabel}
+              </p>
+            </div>
+
+            {searchQuery.isFetching ? (
+              <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Atualizando resultados
+              </div>
+            ) : null}
+          </div>
+
+          {searchQuery.error ? (
+            <StateBox icon={AlertCircle} tone="danger" title="Não foi possível atualizar a listagem">
+              {errorMessage}
+            </StateBox>
+          ) : null}
+
+          {searchQuery.data.length > 0 ? (
+            <FiscalNcmTable
+              items={searchQuery.data}
+              onEdit={(item) => setPanelIntent({ mode: "edit", ncmId: item.id })}
+            />
+          ) : (
+            <StateBox icon={ScrollText} title="Nenhum NCM encontrado">
+              Não localizamos registros para os códigos informados. Revise a busca e tente novamente.
+            </StateBox>
+          )}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function FiscalNcmTable({
+  items,
+  onEdit,
+}: {
+  items: FiscalNcm[];
+  onEdit: (item: FiscalNcm) => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+      <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-slate-700">
+        <thead className="bg-gray-50 dark:bg-slate-800/60">
+          <tr>
+            <th className="w-[14%] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              NCM
+            </th>
+            <th className="w-[30%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              Descrição
+            </th>
+            <th className="w-[16%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              Regime
+            </th>
+            <th className="w-[16%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              Tributação federal
+            </th>
+            <th className="w-[10%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              Vigência inicial
+            </th>
+            <th className="w-[10%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              Vigência final
+            </th>
+            <th className="w-[12%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              Ações
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+          {items.map((item) => (
+            <tr key={item.id} className="align-top hover:bg-gray-50 dark:hover:bg-slate-800/30">
+              <td className="px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                {item.ncm_code}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                {item.description}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                {item.tax_regime}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                {item.federal_taxation_type}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                {formatFiscalDateLabel(item.validity_start_date)}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                {formatFiscalDateLabel(item.validity_end_date)}
+              </td>
+              <td className="px-5 py-3">
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(item)}
+                    className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
+                  >
+                    Editar
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function StateBox({
+  children,
+  icon: Icon,
+  title,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  icon: typeof Search;
+  title: string;
+  tone?: "neutral" | "danger";
+}) {
+  const className =
+    tone === "danger"
+      ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300"
+      : "border-dashed border-gray-200 bg-gray-50/70 text-gray-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300";
+
+  return (
+    <div className={`rounded-2xl border p-5 ${className}`}>
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
+          <Icon className={`h-4 w-4 ${Icon === Loader2 ? "animate-spin" : ""}`} />
+        </div>
+        <div>
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="mt-1 text-sm leading-6">{children}</p>
+        </div>
+      </div>
+    </div>
+  );
+}

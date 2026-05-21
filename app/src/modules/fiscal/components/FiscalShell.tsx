@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import type { FiscalTabId } from "../types";
+import { FiscalNcmSection } from "./FiscalNcmSection";
 import { FiscalPlaceholderSection } from "./FiscalPlaceholderSection";
 import { FiscalSearchSection } from "./FiscalSearchSection";
 
@@ -136,15 +137,9 @@ function FiscalSearchTab() {
 }
 
 function FiscalNcmTab() {
-  const tab = fiscalTabs.find((item) => item.id === "ncm");
-
   return (
     <div role="tabpanel" id="fiscal-panel-ncm" aria-labelledby="fiscal-tab-ncm">
-      <FiscalPlaceholderSection
-        title={tab?.panelTitle ?? "NCM"}
-        description={tab?.description ?? ""}
-        icon={tab?.icon ?? ScrollText}
-      />
+      <FiscalNcmSection />
     </div>
   );
 }
