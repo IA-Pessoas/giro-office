@@ -2,6 +2,7 @@ export interface AuthIdentity {
   user_id: string;
   organization_id?: string;
   permission?: number;
+  modules?: Record<string, number | null>;
   name?: string;
   login?: string;
   [key: string]: unknown;

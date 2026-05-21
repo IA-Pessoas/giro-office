@@ -92,6 +92,17 @@ const INTERNAL_SERVICE_TOKENS = getInternalServiceTokenEnvKeys();
 const SERVICE_URL_ENV_KEYS = getServiceUrlEnvKeys();
 const SERVICE_URL_DEFAULTS = getServiceUrlDefaults();
 
+const WorkspacePermissionLevel = Object.freeze({
+  User: 1,
+  Admin: 2,
+});
+
+const TiPermissionLevel = Object.freeze({
+  Requester: 1,
+  Technician: 2,
+  Admin: 3,
+});
+
 const env = {
   gatewayUrl: process.env.GATEWAY_URL?.trim() || "",
   gatewayPort: process.env.GATEWAY_PORT ?? "3010",
@@ -183,6 +194,18 @@ const state = {
   contabilControlCompetence: "",
   contabilResponsibleId: "",
   contabilRelationshipId: "",
+  tiRequestCategoryId: "",
+  tiRequestId: "",
+  tiInventoryCategoryId: "",
+  tiInventoryLocationId: "",
+  tiInventoryId: "",
+  tiStockCategoryId: "",
+  tiStockLocationId: "",
+  tiStockItemId: "",
+  tiPasswordId: "",
+  tiExtensionId: "",
+  tiTermId: "",
+  tiRobotId: "",
 };
 
 const cleanupTasks = [];
@@ -239,7 +262,7 @@ function buildUrl(target, service, routePath, query) {
   return url;
 }
 
-function createAdminToken() {
+function createAdminToken(permission = WorkspacePermissionLevel.Admin) {
   if (!state.session) {
     throw new Error("Cannot mint admin token before login succeeds.");
   }
@@ -253,7 +276,7 @@ function createAdminToken() {
     organization_id: state.session.organization_id,
     name: state.session.name,
     login: state.session.login,
-    permission: 2,
+    permission,
     sub: state.session.id,
     iat: now,
     exp: now + 60 * 60,
@@ -295,7 +318,7 @@ function getAuthHeaders(auth, service) {
   if (auth === "admin-bearer") {
     if (!state.adminBearerToken) {
       state.adminBearerToken =
-        state.session?.permission === 2 && state.session?.token
+        state.session?.permission === WorkspacePermissionLevel.Admin && state.session?.token
           ? state.session.token
           : createAdminToken();
     }
@@ -315,6 +338,10 @@ function getAuthHeaders(auth, service) {
   }
 
   throw new Error(`Unsupported auth mode: ${auth}`);
+}
+
+function getTiAdminHeaders() {
+  return { Authorization: `Bearer ${createAdminToken(TiPermissionLevel.Admin)}` };
 }
 
 function ensureSuccessEnvelope(op, body) {
@@ -908,11 +935,593 @@ const handlers = {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
+  async tiRequestCategoryList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { active: "true" },
+    });
+  },
+
+  async tiRequestCategoryCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Request Category"),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiRequestCategoryId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiRequestCategoryPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/request-categories/${requireState("tiRequestCategoryId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Request Category Updated"),
+      },
+    });
+  },
+
+  async tiDashboardSummary(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiRequestList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiRequestCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        title: uniqueText("Smoke TI Request"),
+        description: "Smoke TI request created by the workspace harness.",
+        category_id: requireState("tiRequestCategoryId"),
+        urgency: "Medium",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiRequestId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiRequestGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/requests/${requireState("tiRequestId")}`,
+    });
+  },
+
+  async tiRequestPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/requests/${requireState("tiRequestId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        title: uniqueText("Smoke TI Request Updated"),
+      },
+    });
+  },
+
+  async tiRequestAssign(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/requests/${requireState("tiRequestId")}/assign`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        assigned_to_id: requireState("session").id,
+      },
+    });
+  },
+
+  async tiRequestStatusPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/requests/${requireState("tiRequestId")}/status`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        status: "In_Progress",
+      },
+    });
+  },
+
+  async tiRequestMessageList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/requests/${requireState("tiRequestId")}/messages`,
+    });
+  },
+
+  async tiRequestMessageCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/ti/requests/${requireState("tiRequestId")}/messages`,
+      json: {
+        message: "Smoke message for TI request.",
+      },
+    });
+  },
+
+  async tiInventoryCategoryList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiInventoryCategoryCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Inventory Category"),
+        tag: "SMK",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiInventoryCategoryId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiInventoryCategoryPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory-categories/${requireState("tiInventoryCategoryId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        tag: "SMK2",
+      },
+    });
+  },
+
+  async tiInventoryLocationList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiInventoryLocationCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Inventory Location"),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiInventoryLocationId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiInventoryLocationPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory-locations/${requireState("tiInventoryLocationId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Inventory Location Updated"),
+      },
+    });
+  },
+
+  async tiInventoryList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiInventoryCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        asset_code: uniqueText("SMOKE-TI-ASSET"),
+        category_id: requireState("tiInventoryCategoryId"),
+        location_id: requireState("tiInventoryLocationId"),
+        notes: "Smoke TI inventory asset.",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiInventoryId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiInventoryGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory/${requireState("tiInventoryId")}`,
+    });
+  },
+
+  async tiInventoryPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory/${requireState("tiInventoryId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        notes: "Smoke TI inventory asset updated.",
+      },
+    });
+  },
+
+  async tiInventoryAssignUser(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory/${requireState("tiInventoryId")}/assign-user`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        user_id: await ensureRhTargetUser(),
+      },
+    });
+  },
+
+  async tiInventoryReturn(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory/${requireState("tiInventoryId")}/return`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        notes: "Smoke TI inventory asset returned.",
+      },
+    });
+  },
+
+  async tiStockCategoryList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiStockCategoryCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Stock Category"),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiStockCategoryId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiStockCategoryPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/stock/categories/${requireState("tiStockCategoryId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Stock Category Updated"),
+      },
+    });
+  },
+
+  async tiStockLocationList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiStockLocationCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Stock Location"),
+        floor: 1,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiStockLocationId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiStockLocationPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/stock/locations/${requireState("tiStockLocationId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Stock Location Updated"),
+      },
+    });
+  },
+
+  async tiStockItemList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiStockItemCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Stock Item"),
+        category_id: requireState("tiStockCategoryId"),
+        location_id: requireState("tiStockLocationId"),
+        quantity: 10,
+        description: "Smoke TI stock item.",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiStockItemId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiStockItemGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/stock/items/${requireState("tiStockItemId")}`,
+    });
+  },
+
+  async tiStockItemPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/stock/items/${requireState("tiStockItemId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        description: "Smoke TI stock item updated.",
+      },
+    });
+  },
+
+  async tiStockEntryCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/ti/stock/items/${requireState("tiStockItemId")}/entries`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        quantity: 2,
+      },
+    });
+  },
+
+  async tiStockExitCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/ti/stock/items/${requireState("tiStockItemId")}/exits`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        quantity: 1,
+        requester_id: await ensureRhTargetUser(),
+        destination: "Smoke TI stock exit.",
+      },
+    });
+  },
+
+  async tiPasswordList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiPasswordCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        local: uniqueText("Smoke TI Password"),
+        user_id: await ensureRhTargetUser(),
+        password: "smoke-secret",
+        notes: "Smoke TI password entry.",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiPasswordId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiPasswordGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/passwords/${requireState("tiPasswordId")}`,
+    });
+  },
+
+  async tiPasswordPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/passwords/${requireState("tiPasswordId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        notes: "Smoke TI password entry updated.",
+      },
+    });
+  },
+
+  async tiExtensionList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiExtensionCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        user_id: await ensureRhTargetUser(),
+        number: uniqueDigits(4),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiExtensionId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiExtensionGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/extensions/${requireState("tiExtensionId")}`,
+    });
+  },
+
+  async tiExtensionPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/extensions/${requireState("tiExtensionId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        number: uniqueDigits(4),
+      },
+    });
+  },
+
+  async tiTermList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiTermCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        date: new Date().toISOString(),
+        user_name: uniqueText("Smoke TI User"),
+        user_cpf: uniqueDigits(11),
+        user_id: await ensureRhTargetUser(),
+        reason: "Smoke TI term.",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiTermId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiTermGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/terms/${requireState("tiTermId")}`,
+    });
+  },
+
+  async tiTermPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/terms/${requireState("tiTermId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        reason: "Smoke TI term updated.",
+      },
+    });
+  },
+
+  async tiTermSign(op) {
+    const targetToken = await ensureRhTargetUserToken();
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/terms/${requireState("tiTermId")}/sign`,
+      auth: "public",
+      headers: { Authorization: `Bearer ${targetToken}` },
+      json: {
+        reason: "Smoke TI term signed.",
+      },
+    });
+  },
+
+  async tiRobotList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiRobotCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        name: uniqueText("Smoke TI Robot"),
+        description: "Smoke TI robot registry.",
+        type: "Backup",
+        schedule: "0 2 * * *",
+        status: "active",
+        active: true,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tiRobotId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async tiRobotGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/robots/${requireState("tiRobotId")}`,
+    });
+  },
+
+  async tiRobotPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/robots/${requireState("tiRobotId")}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        description: "Smoke TI robot registry updated.",
+      },
+    });
+  },
+
+  async tiRobotRunCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/ti/robots/${requireState("tiRobotId")}/runs`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        status: "success",
+        message: "Smoke TI robot run.",
+        metadata_json: { source: "smoke" },
+      },
+    });
+  },
+
+  async tiRobotRunList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/robots/${requireState("tiRobotId")}/runs/list`,
+    });
+  },
+
   async userSession(_op) {
     const session = await bootstrapAndLogin();
     state.session = session;
     state.bearerToken = session.token;
-    state.adminBearerToken = session.permission === 2 ? session.token : createAdminToken();
+    state.adminBearerToken =
+      session.permission === WorkspacePermissionLevel.Admin ? session.token : createAdminToken();
     state.baselineDepartmentId = session.department_id || state.baselineDepartmentId;
     log(
       "PASS",

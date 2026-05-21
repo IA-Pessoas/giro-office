@@ -43,6 +43,7 @@ const MODULE_FIELDS = [
   "pessoal",
   "regularize",
   "rh",
+  "ti",
   "triagem",
   "wiki",
 ] as const;

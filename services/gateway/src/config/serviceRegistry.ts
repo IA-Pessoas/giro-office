@@ -20,6 +20,8 @@ const FISCAL_SERVICE_PREFIXES = ["/fiscal"] as const;
 
 const CONTABIL_SERVICE_PREFIXES = ["/contabil"] as const;
 
+const TI_SERVICE_PREFIXES = ["/ti"] as const;
+
 function getNormalizedPath(path: string): string {
   try {
     return new URL(path, "http://localhost").pathname;
@@ -37,6 +39,8 @@ export interface GatewayServiceDefinition {
   targetUrl: string;
   auditTarget: string;
   routePrefixes: string[];
+  internalServiceToken?: string;
+  permissionModule?: string;
 }
 
 export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDefinition[] {
@@ -100,6 +104,14 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.contabilServiceUrl,
       auditTarget: "contabil-service",
       routePrefixes: [...CONTABIL_SERVICE_PREFIXES],
+    },
+    {
+      key: "ti-service",
+      targetUrl: env.tiServiceUrl,
+      auditTarget: "ti-service",
+      routePrefixes: [...TI_SERVICE_PREFIXES],
+      internalServiceToken: env.tiServiceInternalToken,
+      permissionModule: "ti",
     },
   ];
 }

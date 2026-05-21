@@ -69,6 +69,12 @@ generator contabilServiceClient {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator tiServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/ti-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -172,6 +178,8 @@ model Organization {
   tiCategories                  TICategoryRequest[]
   tiMessages                    TIMessage[]
   tiRequests                    TIRequest[]
+  tiRobotRuns                   TIRobotRun[]
+  tiRobots                      TIRobot[]
   termsTecnologia               TermTecnologia[]
   triageConfigs                 TriageConfig[]
   triageMonthlys                TriageMonthly[]
@@ -213,6 +221,7 @@ model Department {
   locationsStock            LocationStock[]
   users                     User[]
 
+  @@index([organization_id, name], map: "idx_departments_org_name")
   @@map("departments")
 }
 
@@ -327,6 +336,7 @@ model Permission {
   pessoal         Int?
   regularize      Int?
   rh              Int?
+  ti              Int?
   triagem         Int?
   wiki            Int?
   organization_id String
@@ -980,6 +990,7 @@ model Stock {
   entries         EntryStock[]
   exits           ExitStock[]
 
+  @@index([organization_id, department_id, status, quantity], map: "idx_stock_org_department_status_quantity")
   @@map("stock")
 }
 
@@ -1838,6 +1849,7 @@ model ExtensionsTecnologia {
   organization    Organization @relation(fields: [organization_id], references: [id])
   user            User         @relation(fields: [user_id], references: [id])
 
+  @@unique([organization_id, number], map: "uq_tecnologia_extensions_org_number")
   @@map("tecnologia.extensions")
 }
 
@@ -1883,6 +1895,8 @@ model InventoryTecnologia {
   responsible_it_staff    User?                        @relation("staff", fields: [responsible_it_staff_id], references: [id])
   user                    User?                        @relation("user", fields: [user_id], references: [id])
 
+  @@index([organization_id, user_id], map: "idx_tecnologia_inventory_org_user")
+  @@unique([organization_id, asset_code], map: "uq_tecnologia_inventory_org_asset_code")
   @@map("tecnologia.inventory")
 }
 
@@ -1903,6 +1917,7 @@ model TermTecnologia {
   organization    Organization @relation(fields: [organization_id], references: [id])
   user            User?        @relation(fields: [user_id], references: [id])
 
+  @@index([organization_id, reason], map: "idx_tecnologia_terms_org_reason")
   @@map("tecnologia.terms")
 }
 
@@ -1915,6 +1930,7 @@ model TIRequest {
   assigned_to_id  String?
   urgency         String
   status          String
+  attachment      String?
   created_at      DateTime          @default(now())
   updated_at      DateTime          @updatedAt
   organization_id String
@@ -1924,6 +1940,8 @@ model TIRequest {
   organization    Organization      @relation(fields: [organization_id], references: [id])
   requester       User              @relation("TiRequester", fields: [requester_id], references: [id])
 
+  @@index([organization_id, status, updated_at], map: "idx_tecnologia_requests_org_status_updated")
+  @@index([organization_id, urgency, status], map: "idx_tecnologia_requests_org_urgency_status")
   @@map("tecnologia.requests")
 }
 
@@ -1952,6 +1970,40 @@ model TIMessage {
   sender          User         @relation(fields: [sender_id], references: [id])
 
   @@map("tecnologia.request_messages")
+}
+
+model TIRobot {
+  id              String       @id @default(uuid())
+  name            String
+  description     String?
+  type            String
+  schedule        String?
+  status          String
+  active          Boolean      @default(true)
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  runs            TIRobotRun[]
+
+  @@index([organization_id, active], map: "idx_tecnologia_robots_org_active")
+  @@map("tecnologia.robots")
+}
+
+model TIRobotRun {
+  id              String       @id @default(uuid())
+  robot_id        String
+  status          String
+  started_at      DateTime     @default(now())
+  finished_at     DateTime?
+  message         String?
+  metadata_json   Json?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  robot           TIRobot      @relation(fields: [robot_id], references: [id], onDelete: Cascade)
+
+  @@index([robot_id, started_at])
+  @@map("tecnologia.robot_runs")
 }
 
 model TriageConfig {

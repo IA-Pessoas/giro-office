@@ -2,6 +2,22 @@ import jwt, { type JwtPayload } from "jsonwebtoken";
 
 import type { AuthContext, AuthIdentity } from "./types.js";
 
+function normalizePermissionModules(value: unknown): Record<string, number | null> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const modules: Record<string, number | null> = {};
+
+  for (const [key, modulePermission] of Object.entries(value)) {
+    if (typeof modulePermission === "number" || modulePermission === null) {
+      modules[key] = modulePermission;
+    }
+  }
+
+  return modules;
+}
+
 /**
  * Extrai e normaliza os claims do payload JWT para AuthIdentity.
  * Aceita user_id ou sub (padrão JWT) como identificador do usuário.
@@ -24,6 +40,7 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
     organization_id:
       typeof payload.organization_id === "string" ? payload.organization_id : undefined,
     permission: typeof payload.permission === "number" ? payload.permission : undefined,
+    modules: normalizePermissionModules(payload.modules),
     name: typeof payload.name === "string" ? payload.name : undefined,
     login: typeof payload.login === "string" ? payload.login : undefined,
   };
