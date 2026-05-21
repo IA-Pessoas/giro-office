@@ -57,7 +57,7 @@ export function FiscalShell() {
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div>
         <div>
           <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
@@ -68,10 +68,6 @@ export function FiscalShell() {
           <p className="text-gray-600 dark:text-gray-400">
             Consulta e cadastro de NCM, ICMS e IPI
           </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-          Estrutura inicial do novo módulo, sem dependência ativa do mock legado.
         </div>
       </div>
 
