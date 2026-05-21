@@ -1,6 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
   AssignTiRequestBody,
@@ -86,14 +87,14 @@ export class TiRequestService {
     try {
       const requesterId = body.requester_id ?? context.userId;
 
-      if (requesterId !== context.userId && context.permission < 2) {
+      if (requesterId !== context.userId && context.permission < TiPermissionLevel.Technician) {
         throw new ServiceError(
           403,
           "Permissao insuficiente para criar chamado para outro usuario.",
         );
       }
 
-      if (body.assigned_to_id && context.permission < 3) {
+      if (body.assigned_to_id && context.permission < TiPermissionLevel.Admin) {
         throw new ServiceError(403, "Permissao insuficiente para atribuir chamado.");
       }
 
@@ -139,7 +140,7 @@ export class TiRequestService {
   }
 
   async assign(context: TiAuthContext, id: string, body: AssignTiRequestBody): Promise<unknown> {
-    if (context.permission < 3) {
+    if (context.permission < TiPermissionLevel.Admin) {
       throw new ServiceError(403, "Permissao insuficiente para atribuir chamado.");
     }
 
@@ -166,7 +167,7 @@ export class TiRequestService {
     if (request.status !== body.status) {
       const allowed = allowedTransitions.get(request.status) ?? [];
 
-      if (!allowed.includes(body.status) && context.permission < 3) {
+      if (!allowed.includes(body.status) && context.permission < TiPermissionLevel.Admin) {
         throw new ServiceError(403, "Permissao insuficiente para esta transicao.");
       }
     }
