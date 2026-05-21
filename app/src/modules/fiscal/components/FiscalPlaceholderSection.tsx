@@ -36,19 +36,19 @@ export function FiscalPlaceholderSection({
           <div className="rounded-2xl bg-slate-50 px-4 py-4 dark:border dark:border-slate-700 dark:bg-slate-800">
             <p className="text-sm font-medium text-slate-950 dark:text-white">Estrutura pronta</p>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              A aba j&aacute; nasce isolada para receber hooks e queries pr&oacute;prios.
+              A aba já nasce isolada para receber seus próprios hooks e queries.
             </p>
           </div>
           <div className="rounded-2xl bg-slate-50 px-4 py-4 dark:border dark:border-slate-700 dark:bg-slate-800">
-            <p className="text-sm font-medium text-slate-950 dark:text-white">Sem requests autom&aacute;ticos</p>
+            <p className="text-sm font-medium text-slate-950 dark:text-white">Sem requests automáticos</p>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Nenhuma consulta &eacute; disparada enquanto a funda&ccedil;&atilde;o visual &eacute; montada.
+              Nenhuma consulta é disparada enquanto a fundação visual é montada.
             </p>
           </div>
           <div className="rounded-2xl bg-slate-50 px-4 py-4 dark:border dark:border-slate-700 dark:bg-slate-800">
             <p className="text-sm font-medium text-slate-950 dark:text-white">Pronta para evoluir</p>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Filtros, tabelas e formul&aacute;rios entram nas pr&oacute;ximas PRs sem retrabalho estrutural.
+              Filtros, tabelas e formulários entram nas próximas PRs sem retrabalho estrutural.
             </p>
           </div>
         </div>
