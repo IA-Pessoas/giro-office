@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Landmark,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { useFiscalNcmSearch } from "../hooks";
+import type { FiscalNcmSearchResult } from "../types";
 import { getFiscalErrorMessage } from "../utils";
 
 const ncmFieldLabels: Array<{
@@ -41,28 +42,87 @@ const ncmFieldLabels: Array<{
   { key: "validity_end_date", label: "Vigência final" },
 ];
 
+const LAST_FISCAL_SEARCH_STORAGE_KEY = "fiscal:last-ncm-search";
+const NCM_CODE_LENGTH = 8;
+
+type StoredFiscalSearch = {
+  code: string;
+  result: FiscalNcmSearchResult;
+};
+
 export function FiscalSearchSection() {
   const [inputValue, setInputValue] = useState("");
   const [submittedCode, setSubmittedCode] = useState<string>();
+  const [storedSearch, setStoredSearch] = useState<StoredFiscalSearch | null>(null);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
 
   const searchQuery = useFiscalNcmSearch(submittedCode);
   const hasSearched = Boolean(submittedCode);
-  const hasResultData = Boolean(searchQuery.data);
+  const displayedResult = searchQuery.data ?? storedSearch?.result ?? null;
+  const hasResultData = Boolean(displayedResult);
+  const displayedLastSearch = submittedCode ?? storedSearch?.code ?? null;
   const errorMessage = searchQuery.error
     ? getFiscalErrorMessage(searchQuery.error)
     : null;
   const searchSummary = useMemo(() => {
-    if (!searchQuery.data) {
+    if (!displayedResult) {
       return null;
     }
 
     return {
-      hasNcm: Boolean(searchQuery.data.ncm),
-      icmsCount: searchQuery.data.icms.length,
-      ipiCount: searchQuery.data.ipi.length,
+      hasNcm: Boolean(displayedResult.ncm),
+      icmsCount: displayedResult.icms.length,
+      ipiCount: displayedResult.ipi.length,
     };
-  }, [searchQuery.data]);
+  }, [displayedResult]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const rawStoredSearch = window.localStorage.getItem(LAST_FISCAL_SEARCH_STORAGE_KEY);
+    if (!rawStoredSearch) {
+      return;
+    }
+
+    try {
+      const parsedSearch = JSON.parse(rawStoredSearch) as Partial<StoredFiscalSearch>;
+      if (
+        typeof parsedSearch.code !== "string" ||
+        !parsedSearch.code.trim() ||
+        !parsedSearch.result
+      ) {
+        return;
+      }
+
+      const restoredSearch = {
+        code: parsedSearch.code,
+        result: parsedSearch.result as FiscalNcmSearchResult,
+      };
+
+      setStoredSearch(restoredSearch);
+    } catch {
+      window.localStorage.removeItem(LAST_FISCAL_SEARCH_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !submittedCode || !searchQuery.data) {
+      return;
+    }
+
+    const nextStoredSearch = {
+      code: submittedCode,
+      result: searchQuery.data,
+    };
+
+    window.localStorage.setItem(
+      LAST_FISCAL_SEARCH_STORAGE_KEY,
+      JSON.stringify(nextStoredSearch),
+    );
+    setStoredSearch(nextStoredSearch);
+  }, [submittedCode, searchQuery.data]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,8 +133,26 @@ export function FiscalSearchSection() {
       return;
     }
 
+    if (!/^\d+$/.test(trimmedCode)) {
+      setValidationMessage("Informe apenas números no código NCM.");
+      return;
+    }
+
+    if (trimmedCode.length !== NCM_CODE_LENGTH) {
+      setValidationMessage("Informe um código NCM com 8 dígitos.");
+      return;
+    }
+
     setValidationMessage(null);
+
+    if (trimmedCode === submittedCode) {
+      setInputValue("");
+      void searchQuery.refetch();
+      return;
+    }
+
     setSubmittedCode(trimmedCode);
+    setInputValue("");
   }
 
   return (
@@ -97,10 +175,10 @@ export function FiscalSearchSection() {
             </div>
           </div>
 
-          {hasSearched ? (
+          {displayedLastSearch ? (
             <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
               Última busca:{" "}
-              <span className="font-medium text-gray-900 dark:text-white">{submittedCode}</span>
+              <span className="font-medium text-gray-900 dark:text-white">{displayedLastSearch}</span>
             </div>
           ) : null}
         </div>
@@ -117,15 +195,24 @@ export function FiscalSearchSection() {
                   type="text"
                   value={inputValue}
                   onChange={(event) => {
-                    setInputValue(event.target.value);
+                    const normalizedValue = event.target.value
+                      .replace(/\D/g, "")
+                      .slice(0, NCM_CODE_LENGTH);
+
+                    setInputValue(normalizedValue);
                     if (validationMessage) {
                       setValidationMessage(null);
                     }
                   }}
                   placeholder="Ex.: 84719012"
+                  inputMode="numeric"
+                  maxLength={NCM_CODE_LENGTH}
                   className="w-full rounded-xl border border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
                 />
               </div>
+              <span className="mt-2 block text-xs text-gray-500 dark:text-slate-400">
+                Digite os 8 dígitos do NCM, sem letras ou separadores.
+              </span>
             </label>
 
             <button
@@ -144,7 +231,7 @@ export function FiscalSearchSection() {
         </form>
       </div>
 
-      {!hasSearched ? (
+      {!hasSearched && !hasResultData ? (
         <StateBox icon={Search} title="Informe o código e clique em buscar">
           Use a busca manual para consultar o NCM principal e os registros relacionados de ICMS e IPI.
         </StateBox>
@@ -194,13 +281,13 @@ export function FiscalSearchSection() {
               title="NCM"
               description="Registro principal encontrado para o código pesquisado."
             >
-              {searchQuery.data?.ncm ? (
+              {displayedResult?.ncm ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {ncmFieldLabels.map((field) => (
                     <FieldCard
                       key={field.key}
                       label={field.label}
-                      value={searchQuery.data?.ncm?.[field.key] ?? null}
+                      value={displayedResult.ncm[field.key] ?? null}
                     />
                   ))}
                 </div>
@@ -216,9 +303,9 @@ export function FiscalSearchSection() {
               title="ICMS"
               description="Registros relacionados retornados pela busca agregada."
             >
-              {searchQuery.data && searchQuery.data.icms.length > 0 ? (
+              {displayedResult && displayedResult.icms.length > 0 ? (
                 <div className="space-y-3">
-                  {searchQuery.data.icms.map((item) => (
+                  {displayedResult.icms.map((item) => (
                     <ResultCard
                       key={item.id}
                       title={item.description}
@@ -246,9 +333,9 @@ export function FiscalSearchSection() {
               title="IPI"
               description="Registros de IPI vinculados ao código NCM informado."
             >
-              {searchQuery.data && searchQuery.data.ipi.length > 0 ? (
+              {displayedResult && displayedResult.ipi.length > 0 ? (
                 <div className="space-y-3">
-                  {searchQuery.data.ipi.map((item) => (
+                  {displayedResult.ipi.map((item) => (
                     <ResultCard
                       key={item.id}
                       title={item.description || item.ncm}
