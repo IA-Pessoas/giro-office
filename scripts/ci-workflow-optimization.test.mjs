@@ -113,6 +113,19 @@ test("compose-vps-buildx-push plans cached service build for a backend service",
   assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/client-service:abc1234/);
 });
 
+test("compose-vps-buildx-push plans cached service build for ti-service", async () => {
+  const output = await dryRunBuildxPush("ti-service");
+  assert.match(output, /docker buildx build/);
+  assert.match(output, /--file docker\/service\.Dockerfile/);
+  assert.match(output, /--build-arg WORKSPACE_PACKAGE=@workspace\/ti-service/);
+  assert.match(output, /--build-arg SERVICE_DIR=services\/ti-service/);
+  assert.match(
+    output,
+    /--cache-from type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-ti-service:buildcache/,
+  );
+  assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/ti-service:abc1234/);
+});
+
 test("compose-vps-buildx-push plans cached web build with Next.js build args", async () => {
   const output = await dryRunBuildxPush("web");
   assert.match(output, /--file docker\/app\.Dockerfile/);
