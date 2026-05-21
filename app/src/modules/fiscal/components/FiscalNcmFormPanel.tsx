@@ -107,13 +107,17 @@ export function FiscalNcmFormPanel({
   }, [createMutation.error, updateMutation.error]);
 
   useEffect(() => {
+    createMutation.reset();
+    updateMutation.reset();
+    setValidationMessage(null);
+
     if (isEditing) {
       setFormState(buildFormState(detailQuery.data));
       return;
     }
 
     setFormState(DEFAULT_FORM_STATE);
-  }, [detailQuery.data, isEditing, ncmId]);
+  }, [createMutation, detailQuery.data, isEditing, ncmId, updateMutation]);
 
   function handleChange<K extends keyof FiscalNcmFormState>(
     key: K,
@@ -127,9 +131,19 @@ export function FiscalNcmFormPanel({
     if (validationMessage) {
       setValidationMessage(null);
     }
+
+    if (createMutation.error) {
+      createMutation.reset();
+    }
+
+    if (updateMutation.error) {
+      updateMutation.reset();
+    }
   }
 
   function handleCancel() {
+    createMutation.reset();
+    updateMutation.reset();
     setValidationMessage(null);
     setFormState(isEditing ? buildFormState(detailQuery.data) : DEFAULT_FORM_STATE);
     onClose();
@@ -187,6 +201,8 @@ export function FiscalNcmFormPanel({
       }
 
       setFormState(DEFAULT_FORM_STATE);
+      createMutation.reset();
+      updateMutation.reset();
       onClose();
     } catch {
       // Inline feedback is rendered below.
