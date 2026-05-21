@@ -10,11 +10,51 @@ interface LoginRequest {
   password: string;
 }
 
+type ModulePermissionKey =
+  | "atendimento"
+  | "certificado"
+  | "comercial"
+  | "contabil"
+  | "financeiro"
+  | "fiscal"
+  | "integracao"
+  | "marketing"
+  | "parcelamento"
+  | "pec"
+  | "pessoal"
+  | "regularize"
+  | "rh"
+  | "ti"
+  | "triagem"
+  | "wiki";
+
+type ModulePermissions = Record<ModulePermissionKey, number | null>;
+
+const MODULE_PERMISSION_KEYS: ModulePermissionKey[] = [
+  "atendimento",
+  "certificado",
+  "comercial",
+  "contabil",
+  "financeiro",
+  "fiscal",
+  "integracao",
+  "marketing",
+  "parcelamento",
+  "pec",
+  "pessoal",
+  "regularize",
+  "rh",
+  "ti",
+  "triagem",
+  "wiki",
+];
+
 export interface LoginResult {
   id: string;
   name: string;
   login: string;
   permission: number;
+  modules: ModulePermissions;
   department_id: string;
   organization_id: string;
   token: string;
@@ -34,7 +74,10 @@ class AuthService {
   async login({ login, password }: LoginRequest): Promise<LoginResult> {
     const user = await prismaClient.user.findFirst({
       where: { login },
-      include: { department: { select: { organization_id: true } } },
+      include: {
+        department: { select: { organization_id: true } },
+        permissions: true,
+      },
     });
 
     if (!user) {
@@ -52,6 +95,13 @@ class AuthService {
     }
 
     const jwtSecret = getUserServiceEnv().jwtSecret;
+    const permissionRecord = user.permissions.find(
+      (permission) => permission.organization_id === organizationId,
+    );
+    const modules = MODULE_PERMISSION_KEYS.reduce<ModulePermissions>((acc, key) => {
+      acc[key] = permissionRecord?.[key] ?? null;
+      return acc;
+    }, {} as ModulePermissions);
 
     const token = jwt.sign(
       {
@@ -60,6 +110,7 @@ class AuthService {
         name: user.name,
         login: user.login,
         permission: user.permission,
+        modules,
       },
       jwtSecret,
       {
@@ -73,6 +124,7 @@ class AuthService {
       name: user.name,
       login: user.login,
       permission: user.permission,
+      modules,
       department_id: user.department_id,
       organization_id: organizationId,
       token,

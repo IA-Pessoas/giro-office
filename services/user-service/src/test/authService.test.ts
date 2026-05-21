@@ -67,6 +67,27 @@ describe("AuthService", () => {
       department_id: "dep-1",
       organization_id: "org-1",
       department: { organization_id: "org-1" },
+      permissions: [
+        {
+          organization_id: "org-1",
+          atendimento: null,
+          certificado: null,
+          comercial: null,
+          contabil: null,
+          financeiro: null,
+          fiscal: null,
+          integracao: null,
+          marketing: null,
+          parcelamento: null,
+          pec: null,
+          pessoal: null,
+          regularize: null,
+          rh: null,
+          ti: 2,
+          triagem: null,
+          wiki: null,
+        },
+      ],
     });
     bcryptMock.compare.mockResolvedValue(true);
     jwtMock.sign.mockReturnValue("jwt-token");
@@ -79,10 +100,36 @@ describe("AuthService", () => {
       name: "Admin",
       login: "admin",
       permission: 2,
+      modules: {
+        atendimento: null,
+        certificado: null,
+        comercial: null,
+        contabil: null,
+        financeiro: null,
+        fiscal: null,
+        integracao: null,
+        marketing: null,
+        parcelamento: null,
+        pec: null,
+        pessoal: null,
+        regularize: null,
+        rh: null,
+        ti: 2,
+        triagem: null,
+        wiki: null,
+      },
       department_id: "dep-1",
       organization_id: "org-1",
       token: "jwt-token",
     });
+    expect(jwtMock.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        permission: 2,
+        modules: expect.objectContaining({ ti: 2 }),
+      }),
+      "jwt-secret",
+      expect.any(Object),
+    );
   });
 
   it("firstCreate cria admin inicial quando banco está vazio", async () => {

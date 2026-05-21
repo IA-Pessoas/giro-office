@@ -1,6 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
   CreateTiStockCategoryBody,
   CreateTiStockEntryBody,
@@ -26,6 +27,7 @@ export class TiStockService {
 
   async listItems(context: TiAuthContext, query: ListTiStockItemsQuery): Promise<unknown[]> {
     const departmentId = await this.resolveDepartment(context.organizationId);
+    const { skip, take } = getPaginationParams(query);
 
     return this.prisma.stock.findMany({
       where: {
@@ -42,6 +44,8 @@ export class TiStockService {
         department: true,
       },
       orderBy: { name: "asc" },
+      skip,
+      take,
     });
   }
 

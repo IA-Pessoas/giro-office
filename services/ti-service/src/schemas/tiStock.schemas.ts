@@ -1,6 +1,8 @@
 import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+import { paginationQuerySchema } from "./pagination.schemas.js";
+
 export const stockItemIdParamsSchema = z
   .object({
     id: z.string().uuid({ message: "Item de estoque invalido." }),
@@ -95,16 +97,18 @@ export const updateTiStockLocationBodySchema = z
     message: "Informe ao menos um campo para atualizar.",
   });
 
-export const listTiStockItemsQuerySchema = z
-  .object({
-    category_id: z.string().uuid({ message: "Categoria de estoque invalida." }).optional(),
-    location_id: z.string().uuid({ message: "Local de estoque invalido." }).optional(),
-    name: z.string().optional(),
-    status: z
-      .enum(["true", "false"])
-      .optional()
-      .transform((value) => (value === undefined ? undefined : value === "true")),
-  })
+export const listTiStockItemsQuerySchema = paginationQuerySchema
+  .merge(
+    z.object({
+      category_id: z.string().uuid({ message: "Categoria de estoque invalida." }).optional(),
+      location_id: z.string().uuid({ message: "Local de estoque invalido." }).optional(),
+      name: z.string().optional(),
+      status: z
+        .enum(["true", "false"])
+        .optional()
+        .transform((value) => (value === undefined ? undefined : value === "true")),
+    }),
+  )
   .strict();
 
 export type CreateTiStockItemBody = z.infer<typeof createTiStockItemBodySchema>;

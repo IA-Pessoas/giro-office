@@ -1,5 +1,6 @@
 import {
   createSuccessResponse,
+  type EncryptionService,
   error as logError,
   parseWithZod,
   ServiceError,
@@ -29,9 +30,12 @@ function getContext(request: Request): TiAuthContext {
   };
 }
 
-export function createTiPasswordRoutes(prisma: PrismaClient): Router {
+export function createTiPasswordRoutes(
+  prisma: PrismaClient,
+  encryption: EncryptionService,
+): Router {
   const router = Router();
-  const service = new TiPasswordService(prisma);
+  const service = new TiPasswordService(prisma, encryption);
 
   router.get(
     "/list",

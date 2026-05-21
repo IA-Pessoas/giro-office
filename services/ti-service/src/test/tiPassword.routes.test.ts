@@ -1,9 +1,11 @@
 import "./envBootstrap.js";
 
 import {
+  EncryptionService,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -13,12 +15,14 @@ import { createTestApp } from "./tiServiceTestUtils.js";
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const passwordId = "40000000-0000-4000-8000-000000000001";
+const encryption = new EncryptionService("MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=");
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
     [FORWARDED_AUTH_USER_ID_HEADER]: userId,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: organizationId,
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
+    [INTERNAL_SERVICE_TOKEN_HEADER]: "ti-service-internal-token-test",
   };
 }
 
@@ -27,7 +31,7 @@ function passwordRecord() {
     id: passwordId,
     local: "VPN",
     user_id: userId,
-    password: "segredo-vpn",
+    password: encryption.encrypt("segredo-vpn"),
     notes: "Acesso remoto",
     organization_id: organizationId,
     user: {

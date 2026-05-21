@@ -1,6 +1,8 @@
 import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+import { paginationQuerySchema } from "./pagination.schemas.js";
+
 export const tiInventoryIdParamsSchema = z
   .object({
     id: z.string().uuid({ message: "Ativo de TI invalido." }),
@@ -39,13 +41,15 @@ export const returnTiInventoryBodySchema = z
   })
   .strict();
 
-export const listTiInventoryQuerySchema = z
-  .object({
-    category_id: z.string().uuid({ message: "Categoria de inventario invalida." }).optional(),
-    location_id: z.string().uuid({ message: "Local de inventario invalido." }).optional(),
-    user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
-    asset_code: z.string().optional(),
-  })
+export const listTiInventoryQuerySchema = paginationQuerySchema
+  .merge(
+    z.object({
+      category_id: z.string().uuid({ message: "Categoria de inventario invalida." }).optional(),
+      location_id: z.string().uuid({ message: "Local de inventario invalido." }).optional(),
+      user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
+      asset_code: z.string().optional(),
+    }),
+  )
   .strict();
 
 export type CreateTiInventoryBody = z.infer<typeof createTiInventoryBodySchema>;

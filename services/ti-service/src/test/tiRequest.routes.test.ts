@@ -4,6 +4,7 @@ import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
@@ -20,6 +21,7 @@ function gatewayHeaders(permission: number): Record<string, string> {
     [FORWARDED_AUTH_USER_ID_HEADER]: userId,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: organizationId,
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
+    [INTERNAL_SERVICE_TOKEN_HEADER]: "ti-service-internal-token-test",
   };
 }
 
@@ -57,7 +59,7 @@ describe("ti request routes", () => {
     expect(response.status).toBe(401);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Usuário ou organização não identificados.",
+      error: "Token interno do ti-service invalido.",
       code: "UNAUTHORIZED",
     });
   });

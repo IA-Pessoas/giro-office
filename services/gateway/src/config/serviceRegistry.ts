@@ -39,6 +39,8 @@ export interface GatewayServiceDefinition {
   targetUrl: string;
   auditTarget: string;
   routePrefixes: string[];
+  internalServiceToken?: string;
+  permissionModule?: string;
 }
 
 export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDefinition[] {
@@ -108,6 +110,8 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.tiServiceUrl,
       auditTarget: "ti-service",
       routePrefixes: [...TI_SERVICE_PREFIXES],
+      internalServiceToken: env.tiServiceInternalToken,
+      permissionModule: "ti",
     },
   ];
 }

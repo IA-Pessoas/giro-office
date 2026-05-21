@@ -1,6 +1,8 @@
 import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+import { paginationQuerySchema } from "./pagination.schemas.js";
+
 export const tiRobotTypeSchema = z.enum([
   "Backup",
   "Relatorio",
@@ -19,15 +21,17 @@ export const tiRobotIdParamsSchema = z
   })
   .strict();
 
-export const listTiRobotsQuerySchema = z
-  .object({
-    type: tiRobotTypeSchema.optional(),
-    status: tiRobotStatusSchema.optional(),
-    active: z
-      .enum(["true", "false"])
-      .optional()
-      .transform((value) => (value === undefined ? undefined : value === "true")),
-  })
+export const listTiRobotsQuerySchema = paginationQuerySchema
+  .merge(
+    z.object({
+      type: tiRobotTypeSchema.optional(),
+      status: tiRobotStatusSchema.optional(),
+      active: z
+        .enum(["true", "false"])
+        .optional()
+        .transform((value) => (value === undefined ? undefined : value === "true")),
+    }),
+  )
   .strict();
 
 export const createTiRobotBodySchema = z
@@ -64,10 +68,12 @@ export const createTiRobotRunBodySchema = z
   })
   .strict();
 
-export const listTiRobotRunsQuerySchema = z
-  .object({
-    status: tiRobotRunStatusSchema.optional(),
-  })
+export const listTiRobotRunsQuerySchema = paginationQuerySchema
+  .merge(
+    z.object({
+      status: tiRobotRunStatusSchema.optional(),
+    }),
+  )
   .strict();
 
 export type CreateTiRobotBody = z.infer<typeof createTiRobotBodySchema>;

@@ -4,6 +4,7 @@ process.env.DATABASE_URL = "postgresql://localhost/ti_service_test";
 process.env.AUDIT_SERVICE_URL = "http://localhost:3020";
 process.env.AUDIT_SERVICE_TOKEN = "audit-service-token-test";
 process.env.TI_SERVICE_INTERNAL_TOKEN = "ti-service-internal-token-test";
+process.env.MTK_ENCRYPTION_KEY = "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=";
 process.env.SERVICE_ALLOWED_ORIGINS = "*";
 process.env.ENABLE_API_DOCS = "false";
 process.env.LOG_LEVEL = "info";

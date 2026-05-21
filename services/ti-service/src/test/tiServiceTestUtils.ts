@@ -376,6 +376,7 @@ export function createTestApp(prisma = createPrismaMock()) {
     auditServiceUrl: "http://localhost:3020",
     auditServiceToken: "audit-service-token-test",
     internalServiceToken: "ti-service-internal-token-test",
+    passwordEncryptionKey: "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=",
     allowedOrigins: ["*"],
     enableApiDocs: false,
     logLevel: "info",

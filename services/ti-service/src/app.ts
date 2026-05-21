@@ -3,6 +3,7 @@ import {
   createSecurityHeadersMiddleware,
   createServiceCorsOptions,
   createSuccessResponse,
+  EncryptionService,
 } from "@workspace/shared";
 import { mountOpenApiDocs } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
@@ -12,7 +13,10 @@ import "express-async-errors";
 
 import type { TiServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
-import { requestContext } from "./middlewares/requestContext.js";
+import {
+  createForwardedAuthContextMiddleware,
+  requestContext,
+} from "./middlewares/requestContext.js";
 import { buildTiServiceOpenApiSpec } from "./openapi/spec.js";
 import { createTiDashboardRoutes } from "./routes/tiDashboard.routes.js";
 import { createTiExtensionRoutes } from "./routes/tiExtension.routes.js";
@@ -54,6 +58,7 @@ export function createTiApplication({
   prisma,
 }: CreateTiApplicationOptions): express.Express {
   const app = express();
+  const encryptionService = new EncryptionService(env.passwordEncryptionKey);
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -80,10 +85,12 @@ export function createTiApplication({
     );
   });
 
+  app.use("/ti", createForwardedAuthContextMiddleware(env.internalServiceToken));
+
   app.use("/ti/inventory", createTiInventoryRoutes(prisma));
   app.use("/ti/inventory-categories", createTiInventoryCategoryRoutes(prisma));
   app.use("/ti/inventory-locations", createTiInventoryLocationRoutes(prisma));
-  app.use("/ti/passwords", createTiPasswordRoutes(prisma));
+  app.use("/ti/passwords", createTiPasswordRoutes(prisma, encryptionService));
   app.use("/ti/extensions", createTiExtensionRoutes(prisma));
   app.use("/ti/terms", createTiTermRoutes(prisma));
   app.use("/ti/stock", createTiStockRoutes(prisma));

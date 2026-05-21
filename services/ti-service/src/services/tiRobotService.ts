@@ -1,6 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
   CreateTiRobotBody,
   CreateTiRobotRunBody,
@@ -14,6 +15,8 @@ export class TiRobotService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async list(context: TiAuthContext, query: ListTiRobotsQuery): Promise<unknown[]> {
+    const { skip, take } = getPaginationParams(query);
+
     return this.prisma.tIRobot.findMany({
       where: {
         organization_id: context.organizationId,
@@ -22,6 +25,8 @@ export class TiRobotService {
         ...(query.active === undefined ? {} : { active: query.active }),
       },
       orderBy: { name: "asc" },
+      skip,
+      take,
     });
   }
 
@@ -90,6 +95,7 @@ export class TiRobotService {
     query: ListTiRobotRunsQuery,
   ): Promise<unknown[]> {
     await this.ensureRobot(context, robotId);
+    const { skip, take } = getPaginationParams(query);
 
     return this.prisma.tIRobotRun.findMany({
       where: {
@@ -98,6 +104,8 @@ export class TiRobotService {
         ...(query.status ? { status: query.status } : {}),
       },
       orderBy: { started_at: "desc" },
+      skip,
+      take,
     });
   }
 

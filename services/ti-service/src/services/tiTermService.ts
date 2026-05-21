@@ -1,6 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
   CreateTiTermBody,
   ListTiTermsQuery,
@@ -47,6 +48,7 @@ export class TiTermService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async list(context: TiAuthContext, query: ListTiTermsQuery): Promise<unknown[]> {
+    const { skip, take } = getPaginationParams(query);
     const terms = await this.prisma.termTecnologia.findMany({
       where: {
         organization_id: context.organizationId,
@@ -54,6 +56,8 @@ export class TiTermService {
       },
       include: SAFE_USER_INCLUDE,
       orderBy: { date: "desc" },
+      skip,
+      take,
     });
 
     return terms.map((term) => withoutNestedUserPassword(term));

@@ -95,6 +95,25 @@ function dateTimeQueryParameter(name: string, description: string): OpenApiParam
   };
 }
 
+function paginationParameters(): OpenApiParameter[] {
+  return [
+    {
+      in: "query",
+      name: "page",
+      description: "Pagina da listagem",
+      schema: { type: "integer", minimum: 1, default: 1 },
+      required: false,
+    },
+    {
+      in: "query",
+      name: "page_size",
+      description: "Quantidade de itens por pagina",
+      schema: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+      required: false,
+    },
+  ];
+}
+
 function jsonRequestBody(schemaRef: string): Record<string, unknown> {
   return {
     required: true,
@@ -639,6 +658,7 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
             uuidQueryParameter("location_id", "Local do ativo"),
             uuidQueryParameter("user_id", "Usuario vinculado ao ativo"),
             stringQueryParameter("asset_code", "Codigo patrimonial"),
+            ...paginationParameters(),
           ],
           successDescription: "Ativos listados",
           errors: [400, 401, 403],
@@ -768,6 +788,7 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
             uuidQueryParameter("location_id", "Local do item"),
             stringQueryParameter("name", "Nome do item"),
             enumQueryParameter("status", "Filtro de item ativo", ["true", "false"]),
+            ...paginationParameters(),
           ],
           successDescription: "Itens de estoque listados",
           errors: [400, 401, 403, 404],
@@ -909,6 +930,7 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
               "failed",
             ]),
             enumQueryParameter("active", "Filtro de robo ativo", ["true", "false"]),
+            ...paginationParameters(),
           ],
           successDescription: "Robos listados",
           errors: [400, 401, 403],
@@ -969,6 +991,7 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
               "running",
               "cancelled",
             ]),
+            ...paginationParameters(),
           ],
           successDescription: "Execucoes listadas",
           errors: [400, 401, 403, 404],
@@ -987,6 +1010,7 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
             uuidQueryParameter("assigned_to_id", "Responsavel pelo chamado"),
             dateTimeQueryParameter("created_from", "Data inicial de criacao"),
             dateTimeQueryParameter("created_to", "Data final de criacao"),
+            ...paginationParameters(),
           ],
           successDescription: "Chamados listados",
           errors: [400, 401, 403],
@@ -1053,6 +1077,7 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
             pathIdParameter("Chamado de TI"),
             dateTimeQueryParameter("created_from", "Data inicial de criacao"),
             dateTimeQueryParameter("created_to", "Data final de criacao"),
+            ...paginationParameters(),
           ],
           successDescription: "Mensagens listadas",
           errors: [400, 401, 403, 404],
@@ -1107,7 +1132,10 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
           operationId: "listTiPasswords",
           tags: ["TI Passwords"],
           summary: "Lista senhas de TI",
-          parameters: [uuidQueryParameter("user_id", "Usuario vinculado a senha")],
+          parameters: [
+            uuidQueryParameter("user_id", "Usuario vinculado a senha"),
+            ...paginationParameters(),
+          ],
           successDescription: "Senhas listadas",
           errors: [400, 401, 403],
         }),
@@ -1147,7 +1175,10 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
           operationId: "listTiExtensions",
           tags: ["TI Extensions"],
           summary: "Lista ramais de TI",
-          parameters: [uuidQueryParameter("user_id", "Usuario vinculado ao ramal")],
+          parameters: [
+            uuidQueryParameter("user_id", "Usuario vinculado ao ramal"),
+            ...paginationParameters(),
+          ],
           successDescription: "Ramais listados",
           errors: [400, 401, 403],
         }),
@@ -1187,7 +1218,10 @@ export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): Ope
           operationId: "listTiTerms",
           tags: ["TI Terms"],
           summary: "Lista termos de TI",
-          parameters: [uuidQueryParameter("user_id", "Usuario vinculado ao termo")],
+          parameters: [
+            uuidQueryParameter("user_id", "Usuario vinculado ao termo"),
+            ...paginationParameters(),
+          ],
           successDescription: "Termos listados",
           errors: [400, 401, 403],
         }),

@@ -127,6 +127,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     contabilServiceUrl: "http://127.0.0.1:3038",
     regularizeServiceUrl: "http://127.0.0.1:3039",
     tiServiceUrl: "http://127.0.0.1:3040",
+    tiServiceInternalToken: "ti-service-token",
 
     jwtSecret: "test-secret",
     logLevel: "silent",
@@ -141,7 +142,12 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
 }
 
 function createToken(
-  claims: { user_id: string; organization_id: string; permission: number },
+  claims: {
+    user_id: string;
+    organization_id: string;
+    permission: number;
+    modules?: Record<string, number | null>;
+  },
   secret = "test-secret",
 ): string {
   return jwt.sign(claims, secret);
@@ -929,6 +935,50 @@ it("proxies ti-service routes mapped in the gateway", async () => {
       success: true,
       data: { service: "ti-service", path: "/ti/requests/list" },
     });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(tiService);
+  }
+});
+
+it("forwards modular TI permission instead of global user permission", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 3,
+    modules: { ti: 1 },
+  });
+  let seenPermission: string | undefined;
+  let seenInternalToken: string | undefined;
+  const tiService = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    seenInternalToken = request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const tiServiceUrl = await startServer(tiService);
+
+  const app = createApp(
+    createEnv({
+      tiServiceUrl,
+      tiServiceInternalToken: "ti-service-token",
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/ti/requests/list`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("1");
+    expect(seenInternalToken).toBe("ti-service-token");
   } finally {
     await stopServer(gateway);
     await stopServer(tiService);
