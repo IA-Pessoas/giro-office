@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, Loader2, Plus, Search, ScrollText } from "lucide-react";
+import { AlertCircle, ArrowLeft, Loader2, Plus, Search, ScrollText } from "lucide-react";
 
 import { useFiscalNcmList } from "../hooks";
 import type { FiscalNcm } from "../types";
@@ -46,6 +46,62 @@ export function FiscalNcmSection() {
     setHasSubmittedSearch(true);
   }
 
+  if (panelIntent) {
+    return (
+      <section className="space-y-5">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPanelIntent(null)}
+                className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-gray-300 px-3 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Listagem
+              </button>
+              <div className="inline-flex h-8 items-center justify-center rounded-md bg-blue-50 px-3 text-[13px] font-semibold text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                {panelIntent.mode === "edit" ? "Edição" : "Novo cadastro"}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {panelIntent.mode === "edit" ? "Editar NCM" : "Novo NCM"}
+                </h2>
+                <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
+                  {panelIntent.mode === "edit"
+                    ? "Revise os campos do cadastro selecionado e salve quando terminar."
+                    : "Preencha os dados fiscais para criar um novo cadastro de NCM."}
+                </p>
+              </div>
+
+              {submittedCodes.length > 0 ? (
+                <div className="text-sm text-gray-500 dark:text-slate-400">
+                  Busca atual:{" "}
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {submittedLabel}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-5">
+            <FiscalNcmFormPanel
+              mode={panelIntent.mode}
+              ncmId={panelIntent.mode === "edit" ? panelIntent.ncmId : undefined}
+              searchCodes={submittedCodes}
+              onClose={() => setPanelIntent(null)}
+              showHeader={false}
+              bare
+            />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-5">
       <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
@@ -67,7 +123,7 @@ export function FiscalNcmSection() {
           <button
             type="button"
             onClick={() => setPanelIntent({ mode: "create" })}
-            className="inline-flex h-[42px] items-center justify-center gap-2 self-start rounded-xl bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
           >
             <Plus className="h-4 w-4" />
             Novo NCM
@@ -115,15 +171,6 @@ export function FiscalNcmSection() {
           ) : null}
         </form>
       </div>
-
-      {panelIntent ? (
-        <FiscalNcmFormPanel
-          mode={panelIntent.mode}
-          ncmId={panelIntent.mode === "edit" ? panelIntent.ncmId : undefined}
-          searchCodes={submittedCodes}
-          onClose={() => setPanelIntent(null)}
-        />
-      ) : null}
 
       {!hasSubmittedSearch ? (
         <StateBox icon={Search} title="Informe os códigos e clique em buscar">

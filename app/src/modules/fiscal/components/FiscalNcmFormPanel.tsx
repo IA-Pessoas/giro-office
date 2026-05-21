@@ -21,6 +21,8 @@ interface FiscalNcmFormPanelProps {
   ncmId?: string;
   searchCodes: string[];
   onClose: () => void;
+  showHeader?: boolean;
+  bare?: boolean;
 }
 
 interface FiscalNcmFormState {
@@ -84,6 +86,8 @@ export function FiscalNcmFormPanel({
   ncmId,
   searchCodes,
   onClose,
+  showHeader = true,
+  bare = false,
 }: FiscalNcmFormPanelProps) {
   const detailQuery = useFiscalNcmDetail(ncmId, mode === "edit");
   const createMutation = useCreateFiscalNcmMutation();
@@ -107,8 +111,6 @@ export function FiscalNcmFormPanel({
   }, [createMutation.error, updateMutation.error]);
 
   useEffect(() => {
-    createMutation.reset();
-    updateMutation.reset();
     setValidationMessage(null);
 
     if (isEditing) {
@@ -117,7 +119,7 @@ export function FiscalNcmFormPanel({
     }
 
     setFormState(DEFAULT_FORM_STATE);
-  }, [createMutation, detailQuery.data, isEditing, ncmId, updateMutation]);
+  }, [detailQuery.data, isEditing, ncmId]);
 
   function handleChange<K extends keyof FiscalNcmFormState>(
     key: K,
@@ -211,7 +213,13 @@ export function FiscalNcmFormPanel({
 
   if (isLoadingDetail) {
     return (
-      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+      <section
+        className={
+          bare
+            ? "p-0"
+            : "rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+        }
+      >
         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
           <Loader2 className="h-4 w-4 animate-spin" />
           Carregando dados do NCM para edição.
@@ -222,7 +230,13 @@ export function FiscalNcmFormPanel({
 
   if (isEditing && detailQuery.error && !detailQuery.data) {
     return (
-      <section className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">
+      <section
+        className={
+          bare
+            ? "rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300"
+            : "rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300"
+        }
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -245,26 +259,34 @@ export function FiscalNcmFormPanel({
   }
 
   return (
-    <section className="rounded-xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900/30 dark:bg-blue-900/10">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-            {isEditing ? "Editar NCM" : "Novo NCM"}
-          </h3>
-          <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
-            Preencha os campos fiscais e salve quando estiver tudo revisado.
-          </p>
+    <section
+      className={
+        bare
+          ? "p-0"
+          : "rounded-xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900/30 dark:bg-blue-900/10"
+      }
+    >
+      {showHeader ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+              {isEditing ? "Editar NCM" : "Novo NCM"}
+            </h3>
+            <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
+              Preencha os campos fiscais e salve quando estiver tudo revisado.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3 text-[13px] font-medium text-gray-700 transition-colors hover:bg-white dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            Cancelar
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3 text-[13px] font-medium text-gray-700 transition-colors hover:bg-white dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
-          Cancelar
-        </button>
-      </div>
+      ) : null}
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+      <div className={`${showHeader ? "mt-4" : ""} grid gap-4 xl:grid-cols-2`}>
         <TextField
           label="Regime tributário"
           value={formState.tax_regime}
