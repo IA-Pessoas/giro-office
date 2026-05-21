@@ -29,6 +29,70 @@ describe("TiInventoryService", () => {
     );
   });
 
+  it("list selects only safe user fields", async () => {
+    const prisma = {
+      inventoryTecnologia: {
+        findMany: vi.fn(async () => []),
+      },
+    };
+    const service = new TiInventoryService(prisma as never);
+
+    await service.list(context, {});
+
+    expect(prisma.inventoryTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          user: {
+            select: expect.not.objectContaining({
+              password: true,
+              cpf: true,
+              rg: true,
+            }),
+          },
+          responsible_it_staff: {
+            select: expect.not.objectContaining({
+              password: true,
+              cpf: true,
+              rg: true,
+            }),
+          },
+        }),
+      }),
+    );
+  });
+
+  it("getById selects only safe user fields", async () => {
+    const prisma = {
+      inventoryTecnologia: {
+        findFirst: vi.fn(async () => ({ id: "asset-1" })),
+      },
+    };
+    const service = new TiInventoryService(prisma as never);
+
+    await service.getById(context, "10000000-0000-4000-8000-000000000010");
+
+    expect(prisma.inventoryTecnologia.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          user: {
+            select: expect.not.objectContaining({
+              password: true,
+              cpf: true,
+              rg: true,
+            }),
+          },
+          responsible_it_staff: {
+            select: expect.not.objectContaining({
+              password: true,
+              cpf: true,
+              rg: true,
+            }),
+          },
+        }),
+      }),
+    );
+  });
+
   it("creates inventory asset with unique asset_code", async () => {
     const prisma = {
       inventoryTecnologia: {

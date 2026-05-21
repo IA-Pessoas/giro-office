@@ -59,7 +59,7 @@ describe("TiRequestService", () => {
     });
   });
 
-  it("rejects creating request for another user without admin permission", async () => {
+  it("rejects creating request for another user without technician permission", async () => {
     const service = new TiRequestService({} as never);
 
     await expect(
@@ -79,6 +79,68 @@ describe("TiRequestService", () => {
     });
   });
 
+  it("allows technician to create request for another user", async () => {
+    const prisma = {
+      tICategoryRequest: { findFirst: vi.fn(async () => ({ id: categoryId, active: true })) },
+      user: {
+        findFirst: vi.fn(async () => ({ id: otherUserId, organization_id: organizationId })),
+      },
+      tIRequest: {
+        create: vi.fn(async ({ data }) => ({ id: "req-1", ...data })),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    const result = await service.create(
+      { ...context, permission: 2 },
+      {
+        title: "Acesso",
+        description: "Criar acesso.",
+        category_id: categoryId,
+        requester_id: otherUserId,
+        urgency: "Low",
+      },
+    );
+
+    expect(result).toMatchObject({
+      id: "req-1",
+      requester_id: otherUserId,
+      organization_id: organizationId,
+    });
+  });
+
+  it("getById selects only safe user fields", async () => {
+    const prisma = {
+      tIRequest: {
+        findFirst: vi.fn(async () => ({ id: "req-1", status: "New" })),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    await service.getById(context, "30000000-0000-4000-8000-000000000001");
+
+    expect(prisma.tIRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          requester: {
+            select: expect.not.objectContaining({
+              password: true,
+              cpf: true,
+              rg: true,
+            }),
+          },
+          assigned_to: {
+            select: expect.not.objectContaining({
+              password: true,
+              cpf: true,
+              rg: true,
+            }),
+          },
+        }),
+      }),
+    );
+  });
+
   it("rejects transition from Closed without admin permission", async () => {
     const prisma = {
       tIRequest: {
@@ -93,5 +155,35 @@ describe("TiRequestService", () => {
       statusCode: 403,
       message: "Permissao insuficiente para esta transicao.",
     });
+  });
+
+  it("rejects reopening resolved request without admin permission", async () => {
+    const prisma = {
+      tIRequest: {
+        findFirst: vi.fn(async () => ({ id: "req-1", status: "Resolved" })),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.updateStatus({ ...context, permission: 2 }, "req-1", { status: "In_Progress" }),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      message: "Permissao insuficiente para esta transicao.",
+    });
+  });
+
+  it("allows admin to reopen resolved request", async () => {
+    const prisma = {
+      tIRequest: {
+        findFirst: vi.fn(async () => ({ id: "req-1", status: "Resolved" })),
+        update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    const result = await service.updateStatus(context, "req-1", { status: "In_Progress" });
+
+    expect(result).toMatchObject({ id: "req-1", status: "In_Progress" });
   });
 });

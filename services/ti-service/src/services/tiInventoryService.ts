@@ -11,6 +11,25 @@ import type {
 } from "../schemas/tiInventory.schemas.js";
 import type { TiAuthContext } from "./tiRequestService.js";
 
+const SAFE_USER_SELECT = {
+  id: true,
+  name: true,
+  full_name: true,
+  department_id: true,
+  organization_id: true,
+} as const;
+
+const INVENTORY_INCLUDE = {
+  category: true,
+  location: true,
+  user: {
+    select: SAFE_USER_SELECT,
+  },
+  responsible_it_staff: {
+    select: SAFE_USER_SELECT,
+  },
+} as const;
+
 export class TiInventoryService {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -25,12 +44,7 @@ export class TiInventoryService {
         ...(query.user_id ? { user_id: query.user_id } : {}),
         ...(query.asset_code ? { asset_code: { contains: query.asset_code } } : {}),
       },
-      include: {
-        category: true,
-        location: true,
-        user: true,
-        responsible_it_staff: true,
-      },
+      include: INVENTORY_INCLUDE,
       orderBy: { asset_code: "asc" },
       skip,
       take,
@@ -40,12 +54,7 @@ export class TiInventoryService {
   async getById(context: TiAuthContext, id: string): Promise<unknown> {
     const asset = await this.prisma.inventoryTecnologia.findFirst({
       where: { id, organization_id: context.organizationId },
-      include: {
-        category: true,
-        location: true,
-        user: true,
-        responsible_it_staff: true,
-      },
+      include: INVENTORY_INCLUDE,
     });
 
     if (!asset) {

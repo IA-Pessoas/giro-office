@@ -20,9 +20,17 @@ const allowedTransitions = new Map<string, string[]>([
   ["New", ["In_Progress", "Waiting", "Resolved", "Closed"]],
   ["In_Progress", ["Waiting", "Resolved", "Closed"]],
   ["Waiting", ["In_Progress", "Resolved", "Closed"]],
-  ["Resolved", ["Closed", "In_Progress"]],
+  ["Resolved", ["Closed"]],
   ["Closed", []],
 ]);
+
+const SAFE_USER_SELECT = {
+  id: true,
+  name: true,
+  full_name: true,
+  department_id: true,
+  organization_id: true,
+} as const;
 
 export class TiRequestService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -56,7 +64,15 @@ export class TiRequestService {
   async getById(context: TiAuthContext, id: string): Promise<unknown> {
     const request = await this.prisma.tIRequest.findFirst({
       where: { id, organization_id: context.organizationId },
-      include: { category: true, requester: true, assigned_to: true },
+      include: {
+        category: true,
+        requester: {
+          select: SAFE_USER_SELECT,
+        },
+        assigned_to: {
+          select: SAFE_USER_SELECT,
+        },
+      },
     });
 
     if (!request) {
@@ -70,7 +86,7 @@ export class TiRequestService {
     try {
       const requesterId = body.requester_id ?? context.userId;
 
-      if (requesterId !== context.userId && context.permission < 3) {
+      if (requesterId !== context.userId && context.permission < 2) {
         throw new ServiceError(
           403,
           "Permissao insuficiente para criar chamado para outro usuario.",
