@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { Fiscal } from "../shared/components/newLayout/Fiscal";
+import { FiscalShell } from "@modules/fiscal";
 
 export default function FiscalPage() {
   return (
@@ -10,7 +10,7 @@ export default function FiscalPage() {
       <Head>
         <title>Fiscal</title>
       </Head>
-      <Fiscal />
+      <FiscalShell />
     </>
   );
 }
