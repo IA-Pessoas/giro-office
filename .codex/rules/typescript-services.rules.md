@@ -28,6 +28,12 @@ System.Object[]
 - `OrganizationService`: logica de organizacao e banco.
 - Rotas coordenam chamadas entre services.
 
+## Enums e literais de dominio
+- Evitar literais magicos para permissoes, status, niveis, papeis, tipos de evento e outros valores de dominio recorrentes.
+- Quando existir enum, `const enum`, objeto `as const` ou tipo union exportado para o valor, importar e usar o nome simbolico em services, routes, tests e scripts.
+- Ao criar um novo conjunto de valores de dominio reutilizavel, declarar uma representacao nomeada perto do dominio responsavel antes de espalhar comparacoes com strings ou numeros.
+- Literais so sao aceitaveis quando representarem dados externos brutos, valores pontuais sem semantica de dominio reutilizavel ou fixtures onde o literal seja justamente o dado testado.
+
 ## Validacao de entrada (Zod)
 - Onde validar: na rota, com `parseWithZod` (`@workspace/shared`) e schemas em `services/<servico>/src/schemas/*.schemas.ts`.
 - Quando validar na rota: body em `POST`/`PUT`/`PATCH`, query em listagens/filtros, params quando precisarem de tipo ou formato.
@@ -49,4 +55,3 @@ System.Object[]
 - No `catch`, registrar antes de ramificar: `logError("contexto", { err })`.
 - Encaminhar com `next(err)` ou `next(new ServiceError(...))` conforme o caso.
 - Nao misturar esse fluxo com `response.status(...).json(...)` para o mesmo erro.
-
