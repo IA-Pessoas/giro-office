@@ -157,11 +157,11 @@ export function FiscalSearchSection() {
 
   return (
     <section className="space-y-5">
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
                 <Search className="h-4 w-4" />
               </div>
               <div>
@@ -176,14 +176,14 @@ export function FiscalSearchSection() {
           </div>
 
           {displayedLastSearch ? (
-            <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
               Última busca:{" "}
               <span className="font-medium text-gray-900 dark:text-white">{displayedLastSearch}</span>
             </div>
           ) : null}
         </div>
 
-        <form className="mt-5 space-y-3" onSubmit={handleSubmit}>
+        <form className="mt-4 space-y-2.5" onSubmit={handleSubmit}>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
