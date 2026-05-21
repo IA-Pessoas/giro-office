@@ -57,43 +57,27 @@ export function FiscalShell() {
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
-      <header className="relative overflow-hidden rounded-[32px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(255,255,255,0.96))] px-6 py-8 shadow-[0_24px_70px_-42px_rgba(15,23,42,0.35)] dark:border-slate-700 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] dark:shadow-[0_28px_70px_-40px_rgba(2,6,23,0.92)] sm:px-8">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_48%),radial-gradient(circle_at_top_left,rgba(15,23,42,0.06),transparent_35%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.2),transparent_45%),radial-gradient(circle_at_top_left,rgba(15,23,42,0.12),transparent_35%)]"
-        />
-
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,rgba(37,99,235,0.96),rgba(30,64,175,0.96))] text-white shadow-[0_20px_35px_-20px_rgba(37,99,235,0.75)]">
-                <Receipt className="h-6 w-6" />
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Módulo fiscal
-                </p>
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-950 dark:text-slate-50 sm:text-[2rem]">
-                  Fiscal
-                </h1>
-              </div>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
+              <Receipt className="h-5 w-5 text-white" />
             </div>
-
-            <p className="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400 sm:text-base">
-              Consulta e cadastro de NCM, ICMS e IPI
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-600 backdrop-blur dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
-            Estrutura inicial do novo módulo, sem dependência ativa do mock legado.
-          </div>
+            Fiscal
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Consulta e cadastro de NCM, ICMS e IPI
+          </p>
         </div>
-      </header>
 
-      <div className="rounded-[28px] border border-slate-200/80 bg-white p-2 shadow-[0_18px_48px_-30px_rgba(15,23,42,0.22)] dark:border-slate-700 dark:bg-slate-900 dark:shadow-[0_20px_55px_-36px_rgba(2,6,23,0.9)]">
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+          Estrutura inicial do novo módulo, sem dependência ativa do mock legado.
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
         <nav aria-label="Abas do módulo fiscal" className="overflow-x-auto">
-          <div role="tablist" className="flex min-w-max items-center gap-2">
+          <div role="tablist" className="flex min-w-max items-center gap-1">
             {fiscalTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = tab.id === activeTab;
@@ -107,14 +91,14 @@ export function FiscalShell() {
                   id={`fiscal-tab-${tab.id}`}
                   aria-selected={isActive}
                   aria-controls={`fiscal-panel-${tab.id}`}
-                  className={`inline-flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                  className={`inline-flex shrink-0 items-center rounded-lg px-5 py-2.5 font-medium transition-all ${
                     isActive
-                      ? "bg-slate-900 text-white shadow-[0_16px_30px_-18px_rgba(15,23,42,0.85)] dark:bg-blue-900/40 dark:text-blue-100 dark:shadow-[0_16px_30px_-18px_rgba(30,64,175,0.55)]"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800"
                   }`}
                   tabIndex={isActive ? 0 : -1}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="mr-2 h-4 w-4" />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -123,7 +107,7 @@ export function FiscalShell() {
         </nav>
       </div>
 
-      <div className="rounded-[32px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.96))] p-3 shadow-[0_26px_60px_-40px_rgba(15,23,42,0.32)] dark:border-slate-700 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.86),rgba(15,23,42,0.96))] dark:shadow-[0_30px_65px_-42px_rgba(2,6,23,0.94)] sm:p-4">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
         <FiscalActiveTabPanel activeTab={activeTab} />
       </div>
     </div>
