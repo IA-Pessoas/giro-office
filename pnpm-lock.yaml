@@ -18,6 +18,7 @@ overrides:
   cookie: 0.7.2
   picomatch: 4.0.4
   postcss: 8.5.11
+  ws: 8.20.1
 
 importers:
 

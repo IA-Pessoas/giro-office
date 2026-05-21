@@ -17,7 +17,7 @@ type RhTimeBankReasonPreset =
   | ""
   | "Hora extra"
   | "Compensação de horas"
-  | "Libera mais cedo"
+  | "Saída mais cedo"
   | "Ajuste manual";
 
 interface RhTimeBankFormState {
@@ -149,9 +149,7 @@ export function RhTimeBankFormPanel({
       onClose();
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Não foi possível criar o lançamento.";
+        error instanceof Error ? error.message : "Não foi possível criar o lançamento.";
       toast.error(message);
     }
   }
@@ -226,7 +224,7 @@ export function RhTimeBankFormPanel({
                 <option value="">Selecionar</option>
                 <option value="Hora extra">Hora extra</option>
                 <option value="Compensação de horas">Compensação de horas</option>
-                <option value="Libera mais cedo">Libera mais cedo</option>
+                <option value="Saída mais cedo">Saída mais cedo</option>
                 <option value="Ajuste manual">Ajuste manual</option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />

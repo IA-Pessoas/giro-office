@@ -1,13 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 
-import { useAuth } from "@/context/AuthContext";
-import { permissionService } from "@modules/users/services/permissionService";
-import { normalizePermissionResponse } from "@modules/users/utils/permissionUtils";
-import { useFetch } from "@shared/hooks";
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
-import type { RhPointAdjustmentStatus, RhPointListItem } from "../types";
 import {
   useRhPointAdjustmentRequests,
   useRhPointConfig,
@@ -16,6 +11,8 @@ import {
   useRegisterRhPointMutation,
   useRhTodayPoint,
 } from "../hooks/useRhPoint";
+import { useRhPermissions } from "../hooks/useRhPermissions";
+import type { RhPointAdjustmentStatus, RhPointListItem } from "../types";
 import { RhPointAdjustmentPanel } from "./RhPointAdjustmentPanel";
 import { RhPointAdjustmentRequestModal } from "./RhPointAdjustmentRequestModal";
 import { RhPointConfigCard } from "./RhPointConfigCard";
@@ -66,8 +63,50 @@ function getMonthDateRange(month: string) {
   };
 }
 
+function isBusinessDay(date: Date) {
+  const day = date.getDay();
+  return day !== 0 && day !== 6;
+}
+
+function getLastBusinessDaysRange(month: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) {
+    return getMonthDateRange(month);
+  }
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 0);
+  const today = new Date();
+  const isCurrentMonth =
+    today.getFullYear() === year && today.getMonth() === monthIndex;
+  const rangeEnd = isCurrentMonth && today < monthEnd ? today : monthEnd;
+  const cursor = new Date(rangeEnd);
+  let businessDaysFound = 0;
+
+  while (cursor >= monthStart) {
+    if (isBusinessDay(cursor)) {
+      businessDaysFound += 1;
+
+      if (businessDaysFound === 5) {
+        break;
+      }
+    }
+
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  const rangeStart = cursor < monthStart ? monthStart : cursor;
+
+  return {
+    dateFrom: formatInputDate(rangeStart),
+    dateTo: formatInputDate(rangeEnd),
+  };
+}
+
 export function RhPointSection() {
-  const { user } = useAuth();
+  const { user, canManageRh } = useRhPermissions("point");
   const [activePointTab, setActivePointTab] = useState<"point" | "timebank" | "timesheets">(
     "point",
   );
@@ -80,32 +119,7 @@ export function RhPointSection() {
   >("");
   const [selectedPointForAdjustment, setSelectedPointForAdjustment] =
     useState<RhPointListItem | null>(null);
-
-  const permissionQuery = useFetch(
-    ["rh", "point", "permissions", user?.id ?? ""],
-    () => permissionService.getByUserId(user?.id ?? ""),
-    {
-      enabled: Boolean(user?.id),
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-
-  const normalizedPermissions = useMemo(() => {
-    if (!permissionQuery.data) {
-      return null;
-    }
-
-    return normalizePermissionResponse(permissionQuery.data).known;
-  }, [permissionQuery.data]);
-
-  const isRhResponsible = Boolean(
-    normalizedPermissions?.rh !== null &&
-      normalizedPermissions?.rh !== undefined &&
-      normalizedPermissions.rh >= 1,
-  );
-  const isGlobalAdmin = user?.permission === 2;
-  const canManagePoint = isRhResponsible || isGlobalAdmin;
+  const canManagePoint = canManageRh;
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManagePoint,
@@ -115,19 +129,20 @@ export function RhPointSection() {
   const currentUserName = user?.name?.trim() || "Você";
   const effectiveUserId = canManagePoint ? selectedUserId || (user?.id ?? "") : user?.id ?? "";
   const hasAuthenticatedUser = Boolean(user?.id);
+  const isPointTabActive = activePointTab === "point";
   const shouldShowTodayCard = !canManagePoint || !selectedUserId || selectedUserId === user?.id;
 
   const pointConfigQuery = useRhPointConfig(
     canManagePoint ? selectedUserId || undefined : undefined,
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const myPointConfigQuery = useRhPointConfig(undefined, {
-    enabled: hasAuthenticatedUser,
+    enabled: hasAuthenticatedUser && isPointTabActive,
   });
   const todayPointQuery = useRhTodayPoint({
-    enabled: hasAuthenticatedUser,
+    enabled: hasAuthenticatedUser && isPointTabActive,
   });
   const pointsQuery = useRhPoints(
     {
@@ -136,7 +151,7 @@ export function RhPointSection() {
       date_to: dateTo || undefined,
     },
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const summaryQuery = useRhPointSummary(
@@ -145,7 +160,7 @@ export function RhPointSection() {
       user_id: effectiveUserId || undefined,
     },
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const adjustmentsQuery = useRhPointAdjustmentRequests(
@@ -154,16 +169,27 @@ export function RhPointSection() {
       status: selectedAdjustmentStatus || undefined,
     },
     {
-      enabled: hasAuthenticatedUser,
+      enabled: hasAuthenticatedUser && isPointTabActive,
     },
   );
   const registerMutation = useRegisterRhPointMutation();
 
   useEffect(() => {
-    const { dateFrom: nextDateFrom, dateTo: nextDateTo } = getMonthDateRange(month);
+    const { dateFrom: nextDateFrom, dateTo: nextDateTo } = getLastBusinessDaysRange(month);
     setDateFrom(nextDateFrom);
     setDateTo(nextDateTo);
   }, [month]);
+
+  useEffect(() => {
+    if (activePointTab === "point") {
+      return;
+    }
+
+    setSelectedUserId("");
+    setMonth(getCurrentMonthValue());
+    setSelectedAdjustmentStatus("");
+    setSelectedPointForAdjustment(null);
+  }, [activePointTab]);
 
   async function handleRegisterPoint() {
     try {
@@ -177,7 +203,9 @@ export function RhPointSection() {
           : error instanceof Error
             ? error.message
             : "Não foi possível registrar o ponto.";
-      toast.error(message);
+      toast.error(message, {
+        autoClose: typeof responseMessage === "string" ? 8000 : 5000,
+      });
     }
   }
 
@@ -193,66 +221,84 @@ export function RhPointSection() {
   const pointConfigTargetLabel =
     canManagePoint && selectedUserId ? getUserLabel(selectedUserId) : currentUserName;
 
+  const pointSections = [
+    { key: "point" as const, title: "Registros de ponto" },
+    { key: "timebank" as const, title: "Banco de horas" },
+    { key: "timesheets" as const, title: "Folhas de ponto" },
+  ];
+
   return (
     <div className="min-w-0 space-y-6">
-      <div className="flex justify-center">
-        <div className="max-w-full overflow-x-auto">
-          <div className="inline-flex min-w-max items-center gap-1 rounded-full border border-gray-200 bg-gray-100/90 p-1 dark:border-gray-700 dark:bg-gray-800/80">
-            <button
-              type="button"
-              onClick={() => setActivePointTab("point")}
-              className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                activePointTab === "point"
-                  ? "bg-white text-blue-700 shadow-sm dark:bg-gray-700 dark:text-blue-300"
-                  : "text-gray-600 hover:bg-white/70 dark:text-gray-400 dark:hover:bg-gray-700/80"
-              }`}
-            >
-              Ponto
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePointTab("timebank")}
-              className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                activePointTab === "timebank"
-                  ? "bg-white text-blue-700 shadow-sm dark:bg-gray-700 dark:text-blue-300"
-                  : "text-gray-600 hover:bg-white/70 dark:text-gray-400 dark:hover:bg-gray-700/80"
-              }`}
-            >
-              Banco de Horas
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePointTab("timesheets")}
-              className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                activePointTab === "timesheets"
-                  ? "bg-white text-blue-700 shadow-sm dark:bg-gray-700 dark:text-blue-300"
-                  : "text-gray-600 hover:bg-white/70 dark:text-gray-400 dark:hover:bg-gray-700/80"
-              }`}
-            >
-              Folhas de Ponto
-            </button>
+      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+              Controle de jornada
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
+              Batidas, banco de horas e folhas de ponto.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            {pointSections.map((section) => {
+              const isActive = activePointTab === section.key;
+
+              return (
+                <button
+                  key={section.key}
+                  type="button"
+                  onClick={() => setActivePointTab(section.key)}
+                  className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-blue-600 text-white"
+                      : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {section.title}
+                </button>
+              );
+            })}
           </div>
         </div>
-      </div>
+      </section>
+
+      {activePointTab === "point" ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-xl bg-gray-50/80 p-4 dark:bg-gray-900/20">
+            <RhPointFilters
+              assignableUsers={assignableUsers}
+              canManagePoint={canManagePoint}
+              currentUserLabel={currentUserName}
+              selectedUserId={selectedUserId}
+              month={month}
+              selectedAdjustmentStatus={selectedAdjustmentStatus}
+              onUserChange={setSelectedUserId}
+              onMonthChange={setMonth}
+              onAdjustmentStatusChange={setSelectedAdjustmentStatus}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {activePointTab === "timebank" ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-xl bg-gray-50/80 p-4 dark:bg-gray-900/20">
+            <RhTimeBankSection />
+          </div>
+        </div>
+      ) : null}
+
+      {activePointTab === "timesheets" ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-xl bg-gray-50/80 p-4 dark:bg-gray-900/20">
+            <RhTimesheetsSection />
+          </div>
+        </div>
+      ) : null}
 
       {activePointTab === "point" ? (
         <>
-          <RhPointFilters
-            assignableUsers={assignableUsers}
-            canManagePoint={canManagePoint}
-            currentUserLabel={currentUserName}
-            selectedUserId={selectedUserId}
-            month={month}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            selectedAdjustmentStatus={selectedAdjustmentStatus}
-            onUserChange={setSelectedUserId}
-            onMonthChange={setMonth}
-            onDateFromChange={setDateFrom}
-            onDateToChange={setDateTo}
-            onAdjustmentStatusChange={setSelectedAdjustmentStatus}
-          />
-
           <RhPointConfigCard
             config={pointConfigQuery.data ?? null}
             isLoading={pointConfigQuery.isLoading}
@@ -309,9 +355,6 @@ export function RhPointSection() {
           />
         </>
       ) : null}
-
-      {activePointTab === "timebank" ? <RhTimeBankSection /> : null}
-      {activePointTab === "timesheets" ? <RhTimesheetsSection /> : null}
     </div>
   );
 }

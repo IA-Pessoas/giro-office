@@ -38,12 +38,12 @@ export const PERMISSION_MODULE_LABELS: Record<KnownPermissionModuleKey, string> 
 
 export const PERMISSION_MODULE_GROUPS = [
   {
-    title: "Atendimento e Comercial",
-    keys: ["atendimento", "certificado", "comercial", "marketing"],
-  },
-  {
     title: "Financeiro e Fiscal",
     keys: ["contabil", "financeiro", "fiscal", "parcelamento", "regularize"],
+  },
+  {
+    title: "Atendimento e Comercial",
+    keys: ["atendimento", "certificado", "comercial", "marketing"],
   },
   {
     title: "Pessoas e Operação",

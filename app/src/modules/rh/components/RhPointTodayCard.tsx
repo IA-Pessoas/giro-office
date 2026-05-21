@@ -51,8 +51,8 @@ export function RhPointTodayCard({
           <div className="space-y-4">
             {isConfigMissing ? (
               <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-200">
-                Configure sua jornada para o sistema calcular saldo e fechamento do
-                dia corretamente.
+                Configure sua jornada para o sistema calcular saldo e fechamento do dia
+                corretamente.
               </div>
             ) : null}
 

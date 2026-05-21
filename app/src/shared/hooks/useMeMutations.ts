@@ -20,6 +20,18 @@ function shouldSkipToastForServerError(error: unknown): boolean {
   );
 }
 
+function getUploadPhotoErrorMessage(error: unknown): string {
+  if (isAxiosError(error)) {
+    const responseMessage = error.response?.data?.error;
+
+    if (responseMessage === "Assinatura do arquivo não corresponde ao tipo informado.") {
+      return "A imagem selecionada não parece ser um JPEG, PNG ou WebP válido. Exporte o arquivo novamente e tente de novo.";
+    }
+  }
+
+  return "Nao foi possivel atualizar a foto.";
+}
+
 function updateMeCache(queryClient: ReturnType<typeof useQueryClient>, me: MeSessionUser): void {
   queryClient.setQueryData(ME_QUERY_KEY, me);
   void queryClient.invalidateQueries({ queryKey: ["user", "profile"] });
@@ -64,7 +76,7 @@ export function useUploadMePhoto(): UseMutationResult<MeSessionUser, unknown, Fi
         return;
       }
 
-      toast.error("Nao foi possivel atualizar a foto.");
+      toast.error(getUploadPhotoErrorMessage(error));
       console.log(error);
     },
   });

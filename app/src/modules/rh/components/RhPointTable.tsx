@@ -46,7 +46,7 @@ export function RhPointTable({
           Histórico de registros
         </h3>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Os registros de ponto do período selecionado serão listados aqui.
+          Os registros dos últimos 5 dias úteis do mês selecionado serão listados aqui.
         </p>
       </div>
 

@@ -25,6 +25,10 @@ import type {
 } from "../types";
 import { RH_QUERY_KEY } from "./useRhRequests";
 
+interface RhScoreReadQueryOptions {
+  enabled?: boolean;
+}
+
 export function rhScoreQuestionsQueryKey(filters: RhScoreQuestionListFilters = {}) {
   return [...RH_QUERY_KEY, "score", "questions", filters.type ?? "", filters.all ?? false] as const;
 }
@@ -70,7 +74,9 @@ export function useRhScoreDetail(id: string | undefined): UseQueryResult<RhScore
   );
 }
 
-export function useRhPendingScoreEvaluations(): UseQueryResult<
+export function useRhPendingScoreEvaluations(
+  options?: RhScoreReadQueryOptions,
+): UseQueryResult<
   RhPendingScoreEvaluation[],
   Error
 > {
@@ -78,6 +84,7 @@ export function useRhPendingScoreEvaluations(): UseQueryResult<
     rhPendingScoreEvaluationsQueryKey(),
     () => rhScoreService.listPendingEvaluations(),
     {
+      enabled: options?.enabled ?? true,
       refetchOnWindowFocus: false,
     },
   );

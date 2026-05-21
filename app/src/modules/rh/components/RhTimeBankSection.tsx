@@ -3,21 +3,17 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { useAuth } from "@/context/AuthContext";
-import { permissionService } from "@modules/users/services/permissionService";
-import { normalizePermissionResponse } from "@modules/users/utils/permissionUtils";
-import { useFetch } from "@shared/hooks";
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import {
   useApproveRhTimeBankReleaseMutation,
   useRhTimeBankReleases,
+  useRhTimeBankSummary,
 } from "../hooks/useRhCalendar";
+import { useRhPermissions } from "../hooks/useRhPermissions";
 import type { RhTimeBankRelease, RhTimeBankReleaseListFilters } from "../types";
-import {
-  RhTimeBankFilters,
-  type RhTimeBankStatusFilter,
-} from "./RhTimeBankFilters";
+import { RhTimeBankFilters, type RhTimeBankStatusFilter } from "./RhTimeBankFilters";
 import { RhTimeBankFormPanel } from "./RhTimeBankFormPanel";
+import { RhTimeBankSummaryCards } from "./RhTimeBankSummaryCards";
 import { RhTimeBankTable } from "./RhTimeBankTable";
 
 function formatInputDate(date: Date) {
@@ -36,10 +32,9 @@ function getTodayInputValue() {
 }
 
 export function RhTimeBankSection() {
-  const { user } = useAuth();
+  const { user, canManageRh: canManageTimeBank } = useRhPermissions("time-bank");
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [selectedStatus, setSelectedStatus] =
-    useState<RhTimeBankStatusFilter>("all");
+  const [selectedStatus, setSelectedStatus] = useState<RhTimeBankStatusFilter>("all");
   const [dateFrom, setDateFrom] = useState(getMonthStartInputValue);
   const [dateTo, setDateTo] = useState(getTodayInputValue);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -47,31 +42,7 @@ export function RhTimeBankSection() {
     useState<RhTimeBankRelease | null>(null);
 
   const approveMutation = useApproveRhTimeBankReleaseMutation();
-  const permissionQuery = useFetch(
-    ["rh", "time-bank", "permissions", user?.id ?? ""],
-    () => permissionService.getByUserId(user?.id ?? ""),
-    {
-      enabled: Boolean(user?.id),
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-
-  const normalizedPermissions = useMemo(() => {
-    if (!permissionQuery.data) {
-      return null;
-    }
-
-    return normalizePermissionResponse(permissionQuery.data).known;
-  }, [permissionQuery.data]);
-
-  const isRhResponsible = Boolean(
-    normalizedPermissions?.rh !== null &&
-      normalizedPermissions?.rh !== undefined &&
-      normalizedPermissions.rh >= 1,
-  );
-  const isGlobalAdmin = user?.permission === 2;
-  const canManageTimeBank = isRhResponsible || isGlobalAdmin;
+  const shouldShowSummary = !canManageTimeBank || Boolean(selectedUserId);
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManageTimeBank,
@@ -81,16 +52,16 @@ export function RhTimeBankSection() {
   const filters: RhTimeBankReleaseListFilters = {
     user_id: effectiveUserId || undefined,
     is_approved:
-      selectedStatus === "all"
-        ? undefined
-        : selectedStatus === "approved"
-          ? true
-          : false,
+      selectedStatus === "all" ? undefined : selectedStatus === "approved" ? true : false,
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
   };
 
   const releasesQuery = useRhTimeBankReleases(filters);
+  const timeBankSummaryQuery = useRhTimeBankSummary(
+    canManageTimeBank ? selectedUserId || undefined : undefined,
+    shouldShowSummary,
+  );
   const assignableUsers = assignableUsersQuery.data ?? [];
   const releases = releasesQuery.data ?? [];
 
@@ -99,6 +70,9 @@ export function RhTimeBankSection() {
   }, [assignableUsers]);
 
   const currentUserName = user?.name?.trim() || "Você";
+  const selectedUserLabel = selectedUserId
+    ? assignableUsers.find((assignableUser) => assignableUser.id === selectedUserId)?.name ?? null
+    : null;
 
   function getUserLabel(userId: string) {
     if (user?.id === userId) {
@@ -135,9 +109,7 @@ export function RhTimeBankSection() {
       setReleasePendingApproval(null);
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Não foi possível aprovar o lançamento.";
+        error instanceof Error ? error.message : "Não foi possível aprovar o lançamento.";
       toast.error(message);
     }
   }
@@ -145,9 +117,7 @@ export function RhTimeBankSection() {
   const isLoading =
     releasesQuery.isLoading ||
     (canManageTimeBank && assignableUsersQuery.isLoading && !assignableUsersQuery.data);
-  const error =
-    releasesQuery.error ||
-    (canManageTimeBank ? assignableUsersQuery.error : null);
+  const error = releasesQuery.error || (canManageTimeBank ? assignableUsersQuery.error : null);
 
   return (
     <div className="space-y-6">
@@ -164,6 +134,16 @@ export function RhTimeBankSection() {
         onDateToChange={setDateTo}
         onOpenCreate={handleOpenCreate}
       />
+
+      {shouldShowSummary ? (
+        <RhTimeBankSummaryCards
+          currentUserLabel={currentUserName}
+          selectedUserLabel={selectedUserLabel}
+          summary={timeBankSummaryQuery.data ?? null}
+          isLoading={timeBankSummaryQuery.isLoading}
+          hasError={Boolean(timeBankSummaryQuery.error)}
+        />
+      ) : null}
 
       {canManageTimeBank ? (
         <RhTimeBankFormPanel
@@ -213,9 +193,7 @@ export function RhTimeBankSection() {
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay className="fixed inset-0 z-[1800] bg-black/60 backdrop-blur-sm" />
           <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-[1900] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-lg focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-            <DialogPrimitive.Title className="sr-only">
-              Aprovar lançamento
-            </DialogPrimitive.Title>
+            <DialogPrimitive.Title className="sr-only">Aprovar lançamento</DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">
               Confirmação de aprovação de lançamento de banco de horas
             </DialogPrimitive.Description>
@@ -230,8 +208,8 @@ export function RhTimeBankSection() {
                     Aprovar lançamento
                   </h3>
                   <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
-                    Deseja aprovar este lançamento de banco de horas? Essa ação atualiza o
-                    status do registro.
+                    Deseja aprovar este lançamento de banco de horas? Essa ação atualiza o status
+                    do registro.
                   </p>
                 </div>
               </div>

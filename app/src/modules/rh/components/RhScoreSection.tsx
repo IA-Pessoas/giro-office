@@ -15,12 +15,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "react-toastify";
-import { useAuth } from "@/context/AuthContext";
 import { Dialog } from "@shared/components";
-import { permissionService } from "@modules/users/services/permissionService";
-import { normalizePermissionResponse } from "@modules/users/utils/permissionUtils";
-import { useFetch } from "@shared/hooks";
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
+import { useRhPermissions } from "../hooks/useRhPermissions";
 import {
   useCreateRhScoreQuestionMutation,
   useDeleteRhScoreQuestionMutation,
@@ -85,13 +82,13 @@ interface NitroDraftState {
 
 const SCORE_TAB_META: Record<RhScoreTab, { label: string; description: string }> = {
   history: {
-    label: "HistÃ³rico",
+    label: "Histórico",
     description: "Consulte ciclos trimestrais e detalhes.",
   },
 
   pending: {
     label: "Pendentes",
-    description: "Responda as avaliaÃ§Ãµes atribuÃ­das ao seu perfil.",
+    description: "Responda as avaliações atribuídas ao seu perfil.",
   },
 
   questions: {
@@ -257,7 +254,7 @@ function QuestionFormDialog({
       }
       onClose();
     } catch (error) {
-      toast.error(getErrorMessage(error, "NÃƒÂ£o foi possÃƒÂ­vel salvar a pergunta."));
+      toast.error(getErrorMessage(error, "Não foi possível salvar a pergunta."));
     }
   }
 
@@ -270,7 +267,7 @@ function QuestionFormDialog({
         }
       }}
       title={isEditing ? "Editar pergunta de score" : "Nova pergunta de score"}
-      description="FormulÃƒÂ¡rio de perguntas do score trimestral"
+      description="Formulário de perguntas do score trimestral"
       contentClassName="w-[min(92vw,680px)]"
       bodyClassName="space-y-4"
       footer={
@@ -288,7 +285,7 @@ function QuestionFormDialog({
             disabled={isSubmitting}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Salvando..." : isEditing ? "Salvar alteraÃ§Ãµes" : "Criar pergunta"}
+            {isSubmitting ? "Salvando..." : isEditing ? "Salvar alterações" : "Criar pergunta"}
           </button>
         </>
       }
@@ -305,7 +302,7 @@ function QuestionFormDialog({
             }))
           }
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          placeholder="Ex.: Como foi a colaboraÃ§Ã£o do trimestre?"
+          placeholder="Ex.: Como foi a colaboração do trimestre?"
         />
       </label>
 
@@ -362,7 +359,7 @@ function RhScoreQuarterGenerationPanel() {
       });
       toast.success("Trimestre gerado com sucesso.");
     } catch (error) {
-      toast.error(getErrorMessage(error, "N?o foi poss?vel gerar o trimestre."));
+      toast.error(getErrorMessage(error, "Não foi possível gerar o trimestre."));
     }
   }
   return (
@@ -422,7 +419,7 @@ function RhScoreQuarterGenerationPanel() {
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
             {getErrorMessage(
               assignableUsersQuery.error,
-              "N?o foi poss?vel carregar os colaboradores dispon?veis.",
+              "Não foi possível carregar os colaboradores disponíveis.",
             )}
           </div>
         ) : null}
@@ -479,7 +476,7 @@ function RhScoreQuestionsTab() {
         question.active ? "Pergunta desativada com sucesso." : "Pergunta ativada com sucesso.",
       );
     } catch (error) {
-      toast.error(getErrorMessage(error, "NÃƒÂ£o foi possÃƒÂ­vel atualizar a pergunta."));
+      toast.error(getErrorMessage(error, "Não foi possível atualizar a pergunta."));
     }
   }
 
@@ -490,9 +487,9 @@ function RhScoreQuestionsTab() {
 
     try {
       await deleteMutation.mutateAsync({ id: question.id });
-      toast.success("Pergunta excluÃƒÂ­da com sucesso.");
+      toast.success("Pergunta excluída com sucesso.");
     } catch (error) {
-      toast.error(getErrorMessage(error, "NÃƒÂ£o foi possÃƒÂ­vel excluir a pergunta."));
+      toast.error(getErrorMessage(error, "Não foi possível excluir a pergunta."));
     }
   }
 
@@ -517,7 +514,7 @@ function RhScoreQuestionsTab() {
                   </div>
                 ) : questionsQuery.error ? (
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Preview indisponÃ­vel no momento.
+                    Preview indisponível no momento.
                   </p>
                 ) : questions.length === 0 ? (
                   <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -572,14 +569,14 @@ function RhScoreQuestionsTab() {
         open={isQuestionListOpen}
         onOpenChange={(nextOpen) => setIsQuestionListOpen(nextOpen)}
         title="Perguntas cadastradas"
-        description="Consulte, edite e gerencie as perguntas de score em um sÃ³ lugar."
+        description="Consulte, edite e gerencie as perguntas de score em um só lugar."
         contentClassName="w-[min(94vw,1100px)]"
         bodyClassName="space-y-5"
       >
         <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {totalQuestions}{" "}
-            {totalQuestions === 1 ? "pergunta disponÃ­vel" : "perguntas disponÃ­veis"} para gestÃ£o
+            {totalQuestions === 1 ? "pergunta disponível" : "perguntas disponíveis"} para gestão
             do score.
           </p>
 
@@ -609,7 +606,7 @@ function RhScoreQuestionsTab() {
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
             {getErrorMessage(
               questionsQuery.error,
-              "NÃ£o foi possÃ­vel carregar as perguntas de score.",
+              "Não foi possível carregar as perguntas de score.",
             )}
           </div>
         ) : questions.length === 0 ? (
@@ -757,10 +754,10 @@ function RhPendingEvaluationsTab() {
           obs: answer.obs?.trim() ? answer.obs.trim() : undefined,
         })),
       });
-      toast.success("AvaliaÃ§Ã£o enviada com sucesso.");
+      toast.success("Avaliação enviada com sucesso.");
       setSelectedEvaluation(null);
     } catch (error) {
-      toast.error(getErrorMessage(error, "NÃ£o foi possÃ­vel enviar a avaliaÃ§Ã£o."));
+      toast.error(getErrorMessage(error, "Não foi possível enviar a avaliação."));
     }
   }
 
@@ -771,13 +768,13 @@ function RhPendingEvaluationsTab() {
       {pendingQuery.isLoading ? (
         <div className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-14 text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Carregando avaliaÃ§Ãµes pendentes...
+          Carregando avaliações pendentes...
         </div>
       ) : pendingQuery.error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
           {getErrorMessage(
             pendingQuery.error,
-            "NÃ£o foi possÃ­vel carregar as avaliaÃ§Ãµes pendentes.",
+            "Não foi possível carregar as avaliações pendentes.",
           )}
         </div>
       ) : pendingEvaluations.length === 0 ? (
@@ -786,11 +783,11 @@ function RhPendingEvaluationsTab() {
             <Award className="h-5 w-5" />
           </div>
           <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">
-            Nenhuma avaliaÃ§Ã£o pendente
+            Nenhuma avaliação pendente
           </h3>
 
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Quando houver avaliaÃ§Ãµes atribuÃ­das ao seu perfil, elas aparecerÃ£o aqui.
+            Quando houver avaliações atribuídas ao seu perfil, elas aparecerão aqui.
           </p>
         </div>
       ) : (
@@ -833,7 +830,7 @@ function RhPendingEvaluationsTab() {
                 </div>
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/50">
                   <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    MÃ©dia atual
+                    Média atual
                   </p>
 
                   <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
@@ -848,7 +845,7 @@ function RhPendingEvaluationsTab() {
                 className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
               >
                 <Award className="h-4 w-4" />
-                Responder avaliaÃ§Ã£o
+                Responder avaliação
               </button>
             </article>
           ))}
@@ -861,7 +858,7 @@ function RhPendingEvaluationsTab() {
             setSelectedEvaluation(null);
           }
         }}
-        title="Submeter avaliaÃ§Ã£o"
+        title="Submeter avaliação"
         description={
           selectedEvaluation
             ? `${getRhPendingEvaluationTargetName(selectedEvaluation)} - ${formatRhQuarterLabel(
@@ -887,7 +884,7 @@ function RhPendingEvaluationsTab() {
               disabled={submitMutation.isPending}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitMutation.isPending ? "Enviando..." : "Enviar avaliaÃ§Ã£o"}
+              {submitMutation.isPending ? "Enviando..." : "Enviar avaliação"}
             </button>
           </>
         }
@@ -896,7 +893,7 @@ function RhPendingEvaluationsTab() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-200/90">
-                AvaliaÃ§Ã£o pendente
+                Avaliação pendente
               </p>
 
               <h3 className="mt-2 text-2xl font-semibold">
@@ -983,7 +980,7 @@ function RhPendingEvaluationsTab() {
                     </div>
 
                     <label className="flex flex-col gap-2 text-sm text-slate-700 dark:text-slate-300">
-                      <span>ObservaÃ§Ã£o</span>
+                      <span>Observação</span>
                       <textarea
                         rows={3}
                         value={answer.obs ?? ""}
@@ -991,7 +988,7 @@ function RhPendingEvaluationsTab() {
                           updateObservation(answer.question_id, event.target.value)
                         }
                         className="rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-                        placeholder="ComentÃƒÂ¡rio adicional opcional"
+                        placeholder="Comentário adicional opcional"
                       />
                     </label>
                   </div>
@@ -1033,7 +1030,7 @@ function RhScoreDetailDialog({
 
     const rawValue = nitroDraft[type];
     if (rawValue.trim() === "") {
-      toast.warn("Informe um valor para a mÃ©trica Nitro.");
+      toast.warn("Informe um valor para a métrica Nitro.");
 
       return;
     }
@@ -1041,12 +1038,12 @@ function RhScoreDetailDialog({
     const value = Number(rawValue);
 
     if (!Number.isFinite(value)) {
-      toast.warn("Informe um valor numÃ©rico vÃ¡lido para a mÃ©trica Nitro.");
+      toast.warn("Informe um valor numérico válido para a métrica Nitro.");
       return;
     }
 
     if (value < RH_NITRO_MIN || value > RH_NITRO_MAX) {
-      toast.warn(`Use um valor entre ${RH_NITRO_MIN} e ${RH_NITRO_MAX} para a mÃ©trica Nitro.`);
+      toast.warn(`Use um valor entre ${RH_NITRO_MIN} e ${RH_NITRO_MAX} para a métrica Nitro.`);
       return;
     }
 
@@ -1058,7 +1055,7 @@ function RhScoreDetailDialog({
       });
       toast.success("Nitro atualizado com sucesso.");
     } catch (error) {
-      toast.error(getErrorMessage(error, "NÃ£o foi possÃ­vel atualizar o Nitro."));
+      toast.error(getErrorMessage(error, "Não foi possível atualizar o Nitro."));
     }
   }
 
@@ -1115,7 +1112,7 @@ function RhScoreDetailDialog({
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
             {getErrorMessage(
               detailQuery.error,
-              "NÃƒÂ£o foi possÃƒÂ­vel carregar o detalhe do trimestre.",
+              "Não foi possível carregar o detalhe do trimestre.",
             )}
           </div>
         ) : score ? (
@@ -1139,8 +1136,8 @@ function RhScoreDetailDialog({
                   </div>
 
                   <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">
-                    Visualize a composiÃ§Ã£o do trimestre, consulte as respostas enviadas e ajuste
-                    as mÃ©tricas de Nitro sem sair do contexto.
+                    Visualize a composição do trimestre, consulte as respostas enviadas e ajuste
+                    as métricas de Nitro sem sair do contexto.
                   </p>
                 </div>
 
@@ -1182,7 +1179,7 @@ function RhScoreDetailDialog({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                    Eixos de avaliaÃ§Ã£o
+                    Eixos de avaliação
                   </h3>
 
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
@@ -1215,7 +1212,7 @@ function RhScoreDetailDialog({
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Nitro</h3>
 
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    MÃ©tricas trimestrais associadas ao score.
+                    Métricas trimestrais associadas ao score.
                   </p>
                 </div>
 
@@ -1284,11 +1281,11 @@ function RhScoreDetailDialog({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                    AvaliaÃ§Ãµes submetidas
+                    Avaliações submetidas
                   </h3>
 
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    Respostas que jÃ¡ compÃµem o trimestre.
+                    Respostas que já compõem o trimestre.
                   </p>
                 </div>
 
@@ -1345,7 +1342,7 @@ function RhScoreDetailDialog({
                                 </div>
 
                                 <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white">
-                                  MÃ©dia {formatRhScoreValue(evaluation.average_score)}
+                                  Média {formatRhScoreValue(evaluation.average_score)}
                                 </span>
                               </div>
 
@@ -1387,7 +1384,7 @@ function RhScoreDetailDialog({
                 </div>
               ) : (
                 <div className="mt-5 rounded-2xl border border-dashed border-slate-200 p-5 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-400">
-                  Nenhuma avaliaÃ§Ã£o submetida para este ciclo.
+                  Nenhuma avaliação submetida para este ciclo.
                 </div>
               )}
             </section>
@@ -1417,13 +1414,13 @@ function RhScoreHistoryTab({ canManageScore }: { canManageScore: boolean }) {
       {historyQuery.isLoading ? (
         <div className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-14 text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Carregando histÃ³rico trimestral...
+          Carregando histórico trimestral...
         </div>
       ) : historyQuery.error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
           {getErrorMessage(
             historyQuery.error,
-            "NÃ£o foi possÃ­vel carregar o histÃ³rico trimestral.",
+            "Não foi possível carregar o histórico trimestral.",
           )}
         </div>
       ) : scoreHistory2026.length === 0 ? (
@@ -1433,11 +1430,11 @@ function RhScoreHistoryTab({ canManageScore }: { canManageScore: boolean }) {
           </div>
 
           <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">
-            {"Hist\u00f3rico indispon\u00edvel"}
+            {"Histórico indisponível"}
           </h3>
 
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Seus trimestres de 2026 aparecerÃ£o aqui assim que forem gerados.
+            Seus trimestres de 2026 aparecerão aqui assim que forem gerados.
           </p>
         </div>
       ) : (
@@ -1508,34 +1505,8 @@ function RhScoreHistoryTab({ canManageScore }: { canManageScore: boolean }) {
   );
 }
 export function RhScoreSection() {
-  const { user } = useAuth();
-
-  const permissionQuery = useFetch(
-    ["rh", "score", "permissions", user?.id ?? ""],
-    () => permissionService.getByUserId(user?.id ?? ""),
-    {
-      enabled: Boolean(user?.id),
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-
-  const normalizedPermissions = useMemo(() => {
-    if (!permissionQuery.data) {
-      return null;
-    }
-
-    return normalizePermissionResponse(permissionQuery.data).known;
-  }, [permissionQuery.data]);
-
-  const isRhResponsible = Boolean(
-    normalizedPermissions?.rh !== null &&
-      normalizedPermissions?.rh !== undefined &&
-      normalizedPermissions.rh >= 1,
-  );
-
-  const isGlobalAdmin = user?.permission === 2;
-  const canManageScore = isRhResponsible || isGlobalAdmin;
+  const { canManageRh, permissionQuery } = useRhPermissions("score");
+  const canManageScore = canManageRh;
   const [activeTab, setActiveTab] = useState<RhScoreTab>(canManageScore ? "questions" : "pending");
 
   const hasInitializedAdminDefaultTab = useRef(false);
@@ -1572,10 +1543,10 @@ export function RhScoreSection() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-              {"AvaliaÃ§Ãµes de score"}
+              {"Avaliações de score"}
             </h2>
             <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
-              {"Perguntas, pendÃªncias e histÃ³rico trimestral."}
+              {"Perguntas, pendências e histórico trimestral."}
             </p>
           </div>
 
@@ -1602,7 +1573,7 @@ export function RhScoreSection() {
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
           {getErrorMessage(
             permissionQuery.error,
-            "NÃ£o foi possÃ­vel validar as permissÃµes do score. O backend continuar como fonte de verdade.",
+            "Não foi possível validar as permissões do score. O backend continuar como fonte de verdade.",
           )}
         </div>
       ) : null}
@@ -1617,7 +1588,7 @@ export function RhScoreSection() {
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4" />
-            AÃ§Ãµes administrativas de score estÃ£o disponÃ­veis apenas para RH e admins.
+            Ações administrativas de score estão disponíveis apenas para RH e admins.
           </div>
         </div>
       ) : null}

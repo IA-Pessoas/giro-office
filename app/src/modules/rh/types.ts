@@ -303,13 +303,58 @@ export interface ApproveRhTimeBankReleasePayload {
   id: string;
 }
 
-export interface RhTimeSheet {
+export interface RhTimeBankSummary {
+  user_id: string;
+  balance_minutes: number;
+  approved_releases_count: number;
+  pending_releases_count: number;
+}
+
+export interface RhTimeBankOverview {
+  total_pending_releases: number;
+  total_approved_releases: number;
+  users_with_positive_balance: number;
+  users_with_negative_balance: number;
+}
+
+export interface RhTimeSheetRecord {
   id: string;
   user_id: string;
   start_time: string;
   end_time: string;
   signature: string | null;
-  organization_id: string;
+  status: string;
+  organization_id?: string;
+}
+
+export interface RhTimeSheetDay {
+  date: string;
+  clock_in: string | null;
+  lunch_out: string | null;
+  lunch_in: string | null;
+  clock_out: string | null;
+  worked_minutes: number;
+  expected_minutes: number;
+  balance_minutes: number;
+  status: string;
+}
+
+export interface RhTimeSheetTotals {
+  worked_minutes: number;
+  expected_minutes: number;
+  balance_minutes: number;
+  absence_count: number;
+}
+
+export interface RhTimeSheetListItem extends Omit<RhTimeSheetRecord, "organization_id"> {
+  has_details: boolean;
+  worked_minutes: number;
+  balance_minutes: number;
+}
+
+export interface RhTimeSheetDetail extends RhTimeSheetRecord {
+  days: RhTimeSheetDay[];
+  totals: RhTimeSheetTotals;
 }
 
 export interface RhTimeSheetListFilters {
