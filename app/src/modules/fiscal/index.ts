@@ -34,3 +34,4 @@ export {
   unwrapFiscalEnvelope,
   unwrapFiscalMutation,
 } from "./services";
+export { getFiscalErrorMessage } from "./utils";

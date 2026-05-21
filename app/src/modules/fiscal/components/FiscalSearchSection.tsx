@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { useFiscalNcmSearch } from "../hooks";
+import { getFiscalErrorMessage } from "../utils";
 
 const ncmFieldLabels: Array<{
   key:
@@ -48,6 +49,9 @@ export function FiscalSearchSection() {
   const searchQuery = useFiscalNcmSearch(submittedCode);
   const hasSearched = Boolean(submittedCode);
   const hasResultData = Boolean(searchQuery.data);
+  const errorMessage = searchQuery.error
+    ? getFiscalErrorMessage(searchQuery.error)
+    : null;
   const searchSummary = useMemo(() => {
     if (!searchQuery.data) {
       return null;
@@ -95,7 +99,8 @@ export function FiscalSearchSection() {
 
           {hasSearched ? (
             <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-              Última busca: <span className="font-medium text-gray-900 dark:text-white">{submittedCode}</span>
+              Última busca:{" "}
+              <span className="font-medium text-gray-900 dark:text-white">{submittedCode}</span>
             </div>
           ) : null}
         </div>
@@ -151,6 +156,12 @@ export function FiscalSearchSection() {
         </StateBox>
       ) : null}
 
+      {searchQuery.error && !hasResultData ? (
+        <StateBox icon={AlertCircle} tone="danger" title="Não foi possível buscar os dados fiscais">
+          {errorMessage}
+        </StateBox>
+      ) : null}
+
       {hasResultData ? (
         <div className="space-y-5">
           {searchQuery.isFetching ? (
@@ -173,7 +184,7 @@ export function FiscalSearchSection() {
 
           {searchQuery.error ? (
             <StateBox icon={AlertCircle} tone="danger" title="Não foi possível atualizar a busca">
-              Os últimos resultados visíveis foram mantidos enquanto a atualização falhou.
+              {errorMessage}
             </StateBox>
           ) : null}
 
