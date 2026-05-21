@@ -10,6 +10,7 @@ import {
 
 import type { FiscalTabId } from "../types";
 import { FiscalPlaceholderSection } from "./FiscalPlaceholderSection";
+import { FiscalSearchSection } from "./FiscalSearchSection";
 
 const fiscalTabs: Array<{
   description: string;
@@ -127,15 +128,9 @@ function FiscalActiveTabPanel({ activeTab }: { activeTab: FiscalTabId }) {
 }
 
 function FiscalSearchTab() {
-  const tab = fiscalTabs.find((item) => item.id === "search");
-
   return (
     <div role="tabpanel" id="fiscal-panel-search" aria-labelledby="fiscal-tab-search">
-      <FiscalPlaceholderSection
-        title={tab?.panelTitle ?? "Busca Fiscal"}
-        description={tab?.description ?? ""}
-        icon={tab?.icon ?? Search}
-      />
+      <FiscalSearchSection />
     </div>
   );
 }
