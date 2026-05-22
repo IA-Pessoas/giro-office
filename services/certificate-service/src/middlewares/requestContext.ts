@@ -30,6 +30,9 @@ function parseCertificatePermission(value: string | undefined): CertificatePermi
 
   try {
     const parsed: unknown = JSON.parse(normalized);
+    if (typeof parsed === "number" && Number.isInteger(parsed)) {
+      return { certificado: parsed };
+    }
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       const certificado = (parsed as Record<string, unknown>).certificado;
       return typeof certificado === "number" && Number.isInteger(certificado)
