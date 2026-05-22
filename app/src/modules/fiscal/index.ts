@@ -1,13 +1,19 @@
 export { FiscalShell } from "./components";
 export {
+  fiscalIcmsDetailQueryKey,
+  fiscalIcmsListQueryKey,
   fiscalNcmDetailQueryKey,
   fiscalNcmListQueryKey,
   fiscalNcmSearchQueryKey,
   FISCAL_QUERY_KEY,
+  useCreateFiscalIcmsMutation,
+  useFiscalIcmsDetail,
+  useFiscalIcmsList,
   useCreateFiscalNcmMutation,
   useFiscalNcmDetail,
   useFiscalNcmList,
   useFiscalNcmSearch,
+  useUpdateFiscalIcmsMutation,
   useUpdateFiscalNcmMutation,
 } from "./hooks";
 
