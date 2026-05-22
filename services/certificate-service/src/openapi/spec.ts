@@ -51,8 +51,8 @@ function certificatePfIdParameter() {
 function publicCertificateOperation({
   operationId,
   summary,
-  tag = "Certificate PJ",
-  notFoundDescription = "Certificado PJ nao encontrado",
+  tag,
+  notFoundDescription,
   successStatus = 200,
   successDescription,
   parameters,
@@ -60,8 +60,8 @@ function publicCertificateOperation({
 }: {
   operationId: string;
   summary: string;
-  tag?: "Certificate PJ" | "Certificate PF";
-  notFoundDescription?: string;
+  tag: "Certificate PJ" | "Certificate PF";
+  notFoundDescription: string;
   successStatus?: 200 | 201;
   successDescription: string;
   parameters?: Record<string, unknown>[];
@@ -144,8 +144,10 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
       "/certificate/pj/list": {
         get: publicCertificateOperation({
           operationId: "listCertificatePj",
+          tag: "Certificate PJ",
           summary: "Lista certificados PJ da organizacao autenticada",
           successDescription: "Certificados PJ listados",
+          notFoundDescription: "Certificado PJ nao encontrado",
           parameters: [
             {
               in: "query",
@@ -177,23 +179,29 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
       "/certificate/pj": {
         post: publicCertificateOperation({
           operationId: "createCertificatePj",
+          tag: "Certificate PJ",
           summary: "Cria certificado PJ",
           successStatus: 201,
           successDescription: "Certificado PJ criado",
+          notFoundDescription: "Certificado PJ nao encontrado",
           requestBody: certificatePjRequestBody(),
         }),
       },
       "/certificate/pj/{id}": {
         get: publicCertificateOperation({
           operationId: "getCertificatePj",
+          tag: "Certificate PJ",
           summary: "Busca certificado PJ por ID",
           successDescription: "Certificado PJ encontrado",
+          notFoundDescription: "Certificado PJ nao encontrado",
           parameters: [certificatePjIdParameter()],
         }),
         patch: publicCertificateOperation({
           operationId: "updateCertificatePj",
+          tag: "Certificate PJ",
           summary: "Atualiza certificado PJ",
           successDescription: "Certificado PJ atualizado",
+          notFoundDescription: "Certificado PJ nao encontrado",
           parameters: [certificatePjIdParameter()],
           requestBody: certificatePjRequestBody(false),
         }),
