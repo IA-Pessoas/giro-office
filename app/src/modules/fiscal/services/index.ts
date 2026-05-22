@@ -12,4 +12,5 @@ export {
   unwrapFiscalEnvelope,
   unwrapFiscalMutation,
 } from "./fiscalService.contract";
+export { fiscalNcmService } from "./fiscalNcmService";
 export { fiscalSearchService } from "./fiscalSearchService";
