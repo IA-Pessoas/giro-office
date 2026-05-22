@@ -248,7 +248,7 @@ export function FiscalIpiFormPanel({
           required
         />
         <TextField
-          label="EX"
+          label="Código EX"
           value={formState.ex}
           onChange={(value) => handleChange("ex", value)}
         />
