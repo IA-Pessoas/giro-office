@@ -12,47 +12,32 @@ import type { FiscalTabId } from "../types";
 import { FiscalIcmsSection } from "./FiscalIcmsSection";
 import { FiscalIpiSection } from "./FiscalIpiSection";
 import { FiscalNcmSection } from "./FiscalNcmSection";
-import { FiscalPlaceholderSection } from "./FiscalPlaceholderSection";
 import { FiscalSearchSection } from "./FiscalSearchSection";
 
 const fiscalTabs: Array<{
-  description: string;
   icon: LucideIcon;
   id: FiscalTabId;
   label: string;
-  panelTitle: string;
 }> = [
   {
     id: "search",
     label: "Busca Fiscal",
     icon: Search,
-    panelTitle: "Busca fiscal por NCM",
-    description:
-      "A busca agregada vai reunir NCM, ICMS e IPI em um fluxo único, com ativação controlada pela aba.",
   },
   {
     id: "ncm",
     label: "NCM",
     icon: ScrollText,
-    panelTitle: "Cadastro e consulta de NCM",
-    description:
-      "Esta área vai concentrar listagem, detalhe e formulário de NCM usando o contrato novo do fiscal-service.",
   },
   {
     id: "icms",
     label: "ICMS",
     icon: Landmark,
-    panelTitle: "Cadastro e consulta de ICMS",
-    description:
-      "A aba de ICMS já está preparada para receber filtros, tabela e edição apoiados pelo novo módulo.",
   },
   {
     id: "ipi",
     label: "IPI",
     icon: Percent,
-    panelTitle: "Cadastro e consulta de IPI",
-    description:
-      "O espaço de IPI fica isolado desde agora para crescer com queries habilitadas somente quando a aba estiver ativa.",
   },
 ];
 
