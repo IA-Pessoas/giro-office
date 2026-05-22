@@ -267,7 +267,7 @@ export function FiscalIcmsFormPanel({
           label="Descrição"
           value={formState.description}
           onChange={(value) => handleChange("description", value)}
-          placeholder="Descreva o ICMS"
+          placeholder="Descreva o registro de ICMS"
           required
         />
         <TextField

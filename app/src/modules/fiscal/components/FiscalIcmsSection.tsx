@@ -69,7 +69,7 @@ export function FiscalIcmsSection() {
                 <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
                   {panelIntent.mode === "edit"
                     ? "Revise os campos do cadastro selecionado e salve quando terminar."
-                    : "Prepare um novo cadastro de ICMS sem sair da aba atual."}
+                    : "Preencha os dados fiscais para criar um novo cadastro de ICMS."}
                 </p>
               </div>
 
@@ -144,7 +144,7 @@ export function FiscalIcmsSection() {
                       setValidationMessage(null);
                     }
                   }}
-                  placeholder="Ex.: autopeças, energia, bebidas"
+                  placeholder="Ex.: substituição tributária, bebidas frias"
                   className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-[13px] text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
                 />
               </div>
@@ -157,7 +157,7 @@ export function FiscalIcmsSection() {
               </button>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              Use vírgulas para buscar mais de uma descrição cadastrada.
+              A busca considera a descrição cadastrada no ICMS. Use vírgulas para consultar mais de uma.
             </p>
           </div>
 
@@ -171,7 +171,7 @@ export function FiscalIcmsSection() {
 
       {!hasSubmittedSearch ? (
         <StateBox icon={Search} title="Informe as descrições e clique em buscar">
-          Use a consulta sob demanda para listar apenas os registros de ICMS que fazem sentido neste momento.
+          Use a consulta manual para listar apenas os registros de ICMS que fazem sentido neste momento.
         </StateBox>
       ) : null}
 
@@ -222,7 +222,7 @@ export function FiscalIcmsSection() {
             />
           ) : (
             <StateBox icon={Landmark} title="Nenhum ICMS encontrado">
-              Não localizamos registros para as descrições informadas. Revise a busca e tente novamente.
+              Não localizamos registros para as descrições informadas. Revise os termos da busca e tente novamente.
             </StateBox>
           )}
         </div>
