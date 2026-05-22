@@ -92,6 +92,25 @@ describe("certificate-service app", () => {
     expect(response.body.paths).toHaveProperty("/certificate/pj");
     expect(response.body.paths["/certificate/pj"]).toHaveProperty("post");
   });
+
+  it("documents certificate PF public routes in OpenAPI", async () => {
+    const app = createCertificateApplication({
+      env: { ...env, enableApiDocs: true },
+      logger,
+      prisma: {} as never,
+    });
+
+    const response = await request(app).get("/openapi.json");
+
+    expect(response.status).toBe(200);
+    expect(response.body.paths).toHaveProperty("/certificate/pf/list");
+    expect(response.body.paths["/certificate/pf/list"]).toHaveProperty("get");
+    expect(response.body.paths).toHaveProperty("/certificate/pf/{id}");
+    expect(response.body.paths["/certificate/pf/{id}"]).toHaveProperty("get");
+    expect(response.body.paths["/certificate/pf/{id}"]).toHaveProperty("patch");
+    expect(response.body.paths).toHaveProperty("/certificate/pf");
+    expect(response.body.paths["/certificate/pf"]).toHaveProperty("post");
+  });
 });
 
 describe("certificate-service auth context", () => {
