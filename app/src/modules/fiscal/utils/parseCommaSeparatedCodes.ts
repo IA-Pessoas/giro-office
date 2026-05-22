@@ -1,6 +1,6 @@
-export function parseCommaSeparatedCodes(value: string): string[] {
+export function parseCommaSeparatedValues(value: string): string[] {
   const seen = new Set<string>();
-  const normalizedCodes: string[] = [];
+  const normalizedValues: string[] = [];
 
   value
     .split(",")
@@ -12,8 +12,12 @@ export function parseCommaSeparatedCodes(value: string): string[] {
       }
 
       seen.add(item);
-      normalizedCodes.push(item);
+      normalizedValues.push(item);
     });
 
-  return normalizedCodes;
+  return normalizedValues;
+}
+
+export function parseCommaSeparatedCodes(value: string): string[] {
+  return parseCommaSeparatedValues(value);
 }

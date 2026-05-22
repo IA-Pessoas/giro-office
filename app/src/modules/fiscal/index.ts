@@ -38,6 +38,7 @@ export {
   buildFiscalNcmListParams,
   buildFiscalNcmSearchParams,
   FISCAL_ENDPOINTS,
+  fiscalIcmsService,
   fiscalNcmService,
   fiscalSearchService,
   unwrapFiscalCreate,
@@ -49,6 +50,7 @@ export {
   formatFiscalDateLabel,
   getFiscalErrorMessage,
   parseCommaSeparatedCodes,
+  parseCommaSeparatedValues,
   toFiscalInputDate,
   toFiscalIsoDate,
 } from "./utils";
