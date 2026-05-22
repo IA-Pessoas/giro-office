@@ -4,6 +4,7 @@ export { FiscalIpiFormPanel } from "./FiscalIpiFormPanel";
 export { FiscalIpiSection } from "./FiscalIpiSection";
 export { FiscalNcmSection } from "./FiscalNcmSection";
 export { FiscalNcmFormPanel } from "./FiscalNcmFormPanel";
+export { FiscalStateBox } from "./FiscalStateBox";
 export { FiscalPlaceholderSection } from "./FiscalPlaceholderSection";
 export { FiscalSearchSection } from "./FiscalSearchSection";
 export { FiscalShell } from "./FiscalShell";

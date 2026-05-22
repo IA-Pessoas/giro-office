@@ -11,6 +11,7 @@ import {
 import { useFiscalNcmSearch } from "../hooks";
 import type { FiscalNcmSearchResult } from "../types";
 import { getFiscalErrorMessage } from "../utils";
+import { FiscalStateBox } from "./FiscalStateBox";
 
 const ncmFieldLabels: Array<{
   key:
@@ -232,21 +233,21 @@ export function FiscalSearchSection() {
       </div>
 
       {!hasSearched && !hasResultData ? (
-        <StateBox icon={Search} title="Informe o código e clique em buscar">
+        <FiscalStateBox icon={Search} title="Informe o código e clique em buscar">
           Use a busca manual para consultar o NCM principal e os registros relacionados de ICMS e IPI.
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {hasSearched && searchQuery.isLoading && !hasResultData ? (
-        <StateBox icon={Loader2} title="Buscando dados fiscais">
+        <FiscalStateBox icon={Loader2} tone="loading" title="Buscando dados fiscais">
           Estamos consultando NCM, ICMS e IPI para o código informado.
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {searchQuery.error && !hasResultData ? (
-        <StateBox icon={AlertCircle} tone="danger" title="Não foi possível buscar os dados fiscais">
+        <FiscalStateBox icon={AlertCircle} tone="danger" title="Não foi possível buscar os dados fiscais">
           {errorMessage}
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {hasResultData ? (
@@ -270,9 +271,9 @@ export function FiscalSearchSection() {
           ) : null}
 
           {searchQuery.error ? (
-            <StateBox icon={AlertCircle} tone="danger" title="Não foi possível atualizar a busca">
+            <FiscalStateBox icon={AlertCircle} tone="danger" title="Não foi possível atualizar a busca">
               {errorMessage}
-            </StateBox>
+            </FiscalStateBox>
           ) : null}
 
           <div className="grid gap-5 xl:grid-cols-3">
@@ -388,36 +389,6 @@ function SearchResultPanel({
   );
 }
 
-function StateBox({
-  children,
-  icon: Icon,
-  title,
-  tone = "neutral",
-}: {
-  children: React.ReactNode;
-  icon: typeof Search;
-  title: string;
-  tone?: "neutral" | "danger";
-}) {
-  const className =
-    tone === "danger"
-      ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300"
-      : "border-dashed border-gray-200 bg-gray-50/70 text-gray-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300";
-
-  return (
-    <div className={`rounded-2xl border p-5 ${className}`}>
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
-          <Icon className={`h-4 w-4 ${Icon === Loader2 ? "animate-spin" : ""}`} />
-        </div>
-        <div>
-          <p className="text-sm font-semibold">{title}</p>
-          <p className="mt-1 text-sm leading-6">{children}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function SummaryCard({ label, value }: { label: string; value: string | number }) {
   const isTextStatus = typeof value === "string";

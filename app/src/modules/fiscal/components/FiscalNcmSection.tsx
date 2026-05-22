@@ -9,6 +9,7 @@ import {
   parseCommaSeparatedCodes,
 } from "../utils";
 import { FiscalNcmFormPanel } from "./FiscalNcmFormPanel";
+import { FiscalStateBox } from "./FiscalStateBox";
 
 type FiscalNcmPanelIntent =
   | { mode: "create" }
@@ -173,21 +174,21 @@ export function FiscalNcmSection() {
       </div>
 
       {!hasSubmittedSearch ? (
-        <StateBox icon={Search} title="Informe os códigos e clique em buscar">
+        <FiscalStateBox icon={Search} title="Informe os códigos e clique em buscar" compact>
           Use a consulta sob demanda para listar apenas os NCMs que fazem sentido neste momento.
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {hasSubmittedSearch && searchQuery.isLoading && !searchQuery.data ? (
-        <StateBox icon={Loader2} title="Buscando NCMs">
+        <FiscalStateBox icon={Loader2} tone="loading" title="Buscando NCMs" compact>
           Estamos consultando os registros para os códigos informados.
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {searchQuery.error && !searchQuery.data ? (
-        <StateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar a lista de NCM">
+        <FiscalStateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar a lista de NCM" compact>
           {errorMessage}
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {searchQuery.data ? (
@@ -213,9 +214,9 @@ export function FiscalNcmSection() {
           </div>
 
           {searchQuery.error ? (
-            <StateBox icon={AlertCircle} tone="danger" title="Não foi possível atualizar a listagem">
+            <FiscalStateBox icon={AlertCircle} tone="danger" title="Não foi possível atualizar a listagem" compact>
               {errorMessage}
-            </StateBox>
+            </FiscalStateBox>
           ) : null}
 
           {searchQuery.data.length > 0 ? (
@@ -224,9 +225,9 @@ export function FiscalNcmSection() {
               onEdit={(item) => setPanelIntent({ mode: "edit", ncmId: item.id })}
             />
           ) : (
-            <StateBox icon={ScrollText} title="Nenhum NCM encontrado">
+            <FiscalStateBox icon={ScrollText} title="Nenhum NCM encontrado" compact>
               Não localizamos registros para os códigos informados. Revise a busca e tente novamente.
-            </StateBox>
+            </FiscalStateBox>
           )}
         </div>
       ) : null}
@@ -305,37 +306,6 @@ function FiscalNcmTable({
           ))}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function StateBox({
-  children,
-  icon: Icon,
-  title,
-  tone = "neutral",
-}: {
-  children: React.ReactNode;
-  icon: typeof Search;
-  title: string;
-  tone?: "neutral" | "danger";
-}) {
-  const className =
-    tone === "danger"
-      ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300"
-      : "border-dashed border-gray-200 bg-gray-50/70 text-gray-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300";
-
-  return (
-    <div className={`rounded-2xl border p-4 ${className}`}>
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
-          <Icon className={`h-4 w-4 ${Icon === Loader2 ? "animate-spin" : ""}`} />
-        </div>
-        <div>
-          <p className="text-sm font-semibold">{title}</p>
-          <p className="mt-1 text-sm leading-6">{children}</p>
-        </div>
-      </div>
     </div>
   );
 }

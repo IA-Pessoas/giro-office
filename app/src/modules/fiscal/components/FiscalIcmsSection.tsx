@@ -8,6 +8,7 @@ import {
   parseCommaSeparatedValues,
 } from "../utils";
 import { FiscalIcmsFormPanel } from "./FiscalIcmsFormPanel";
+import { FiscalStateBox } from "./FiscalStateBox";
 
 type FiscalIcmsPanelIntent =
   | { mode: "create" }
@@ -170,21 +171,21 @@ export function FiscalIcmsSection() {
       </div>
 
       {!hasSubmittedSearch ? (
-        <StateBox icon={Search} title="Informe as descrições e clique em buscar">
+        <FiscalStateBox icon={Search} title="Informe as descrições e clique em buscar" compact>
           Use a consulta manual para listar apenas os registros de ICMS que fazem sentido neste momento.
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {hasSubmittedSearch && listQuery.isLoading && !listQuery.data ? (
-        <StateBox icon={Loader2} title="Buscando ICMS">
+        <FiscalStateBox icon={Loader2} tone="loading" title="Buscando ICMS" compact>
           Estamos consultando os registros para as descrições informadas.
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {listQuery.error && !listQuery.data ? (
-        <StateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar a lista de ICMS">
+        <FiscalStateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar a lista de ICMS" compact>
           {errorMessage}
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {listQuery.data ? (
@@ -210,9 +211,9 @@ export function FiscalIcmsSection() {
           </div>
 
           {listQuery.error ? (
-            <StateBox icon={AlertCircle} tone="danger" title="Não foi possível atualizar a listagem">
+            <FiscalStateBox icon={AlertCircle} tone="danger" title="Não foi possível atualizar a listagem" compact>
               {errorMessage}
-            </StateBox>
+            </FiscalStateBox>
           ) : null}
 
           {listQuery.data.length > 0 ? (
@@ -221,9 +222,9 @@ export function FiscalIcmsSection() {
               onEdit={(item) => setPanelIntent({ mode: "edit", icmsId: item.id })}
             />
           ) : (
-            <StateBox icon={Landmark} title="Nenhum ICMS encontrado">
+            <FiscalStateBox icon={Landmark} title="Nenhum ICMS encontrado" compact>
               Não localizamos registros para as descrições informadas. Revise os termos da busca e tente novamente.
-            </StateBox>
+            </FiscalStateBox>
           )}
         </div>
       ) : null}
@@ -314,37 +315,6 @@ function FiscalIcmsTable({
             ))}
           </tbody>
       </table>
-    </div>
-  );
-}
-
-function StateBox({
-  children,
-  icon: Icon,
-  title,
-  tone = "neutral",
-}: {
-  children: React.ReactNode;
-  icon: typeof Search;
-  title: string;
-  tone?: "danger" | "neutral";
-}) {
-  const className =
-    tone === "danger"
-      ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300"
-      : "border-dashed border-gray-200 bg-gray-50/70 text-gray-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300";
-
-  return (
-      <div className={`rounded-2xl border p-4 ${className}`}>
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
-            <Icon className={`h-4 w-4 ${Icon === Loader2 ? "animate-spin" : ""}`} />
-        </div>
-        <div>
-          <p className="text-sm font-semibold">{title}</p>
-          <p className="mt-1 text-sm leading-6">{children}</p>
-        </div>
-      </div>
     </div>
   );
 }

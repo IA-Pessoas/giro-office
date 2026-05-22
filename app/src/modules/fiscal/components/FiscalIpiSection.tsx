@@ -8,6 +8,7 @@ import {
   parseCommaSeparatedCodes,
 } from "../utils";
 import { FiscalIpiFormPanel } from "./FiscalIpiFormPanel";
+import { FiscalStateBox } from "./FiscalStateBox";
 
 type FiscalIpiPanelIntent =
   | { mode: "create" }
@@ -170,21 +171,21 @@ export function FiscalIpiSection() {
       </div>
 
       {!hasSubmittedSearch ? (
-        <StateBox icon={Search} title="Informe os códigos e clique em buscar">
+        <FiscalStateBox icon={Search} title="Informe os códigos e clique em buscar" compact>
           Use a consulta sob demanda para listar apenas os IPIs que fazem sentido neste momento.
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {hasSubmittedSearch && listQuery.isLoading && !listQuery.data ? (
-        <StateBox icon={Loader2} title="Buscando IPIs">
+        <FiscalStateBox icon={Loader2} tone="loading" title="Buscando IPIs" compact>
           Estamos consultando os registros para os códigos informados.
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {listQuery.error && !listQuery.data ? (
-        <StateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar a lista de IPI">
+        <FiscalStateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar a lista de IPI" compact>
           {errorMessage}
-        </StateBox>
+        </FiscalStateBox>
       ) : null}
 
       {listQuery.data ? (
@@ -210,9 +211,9 @@ export function FiscalIpiSection() {
           </div>
 
           {listQuery.error ? (
-            <StateBox icon={AlertCircle} tone="danger" title="Não foi possível atualizar a listagem">
+            <FiscalStateBox icon={AlertCircle} tone="danger" title="Não foi possível atualizar a listagem" compact>
               {errorMessage}
-            </StateBox>
+            </FiscalStateBox>
           ) : null}
 
           {listQuery.data.length > 0 ? (
@@ -221,9 +222,9 @@ export function FiscalIpiSection() {
               onEdit={(item) => setPanelIntent({ mode: "edit", ipiId: item.id })}
             />
           ) : (
-            <StateBox icon={Percent} title="Nenhum IPI encontrado">
+            <FiscalStateBox icon={Percent} title="Nenhum IPI encontrado" compact>
               Não localizamos registros para os códigos informados. Revise a busca e tente novamente.
-            </StateBox>
+            </FiscalStateBox>
           )}
         </div>
       ) : null}
@@ -290,37 +291,6 @@ function FiscalIpiTable({
           ))}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function StateBox({
-  children,
-  icon: Icon,
-  title,
-  tone = "neutral",
-}: {
-  children: React.ReactNode;
-  icon: typeof Search;
-  title: string;
-  tone?: "danger" | "neutral";
-}) {
-  const className =
-    tone === "danger"
-      ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300"
-      : "border-dashed border-gray-200 bg-gray-50/70 text-gray-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300";
-
-  return (
-    <div className={`rounded-2xl border p-4 ${className}`}>
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
-          <Icon className={`h-4 w-4 ${Icon === Loader2 ? "animate-spin" : ""}`} />
-        </div>
-        <div>
-          <p className="text-sm font-semibold">{title}</p>
-          <p className="mt-1 text-sm leading-6">{children}</p>
-        </div>
-      </div>
     </div>
   );
 }
