@@ -1,48 +1,44 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Loader2, Plus, Search, ScrollText } from "lucide-react";
+import { AlertCircle, ArrowLeft, Landmark, Loader2, Plus, Search } from "lucide-react";
 
-import { useFiscalNcmList } from "../hooks";
-import type { FiscalNcm } from "../types";
+import { useFiscalIcmsList } from "../hooks";
+import type { FiscalIcms } from "../types";
 import {
-  formatFiscalDateLabel,
   getFiscalErrorMessage,
-  parseCommaSeparatedCodes,
+  parseCommaSeparatedValues,
 } from "../utils";
-import { FiscalNcmFormPanel } from "./FiscalNcmFormPanel";
+import { FiscalIcmsFormPanel } from "./FiscalIcmsFormPanel";
 
-type FiscalNcmPanelIntent =
+type FiscalIcmsPanelIntent =
   | { mode: "create" }
-  | { mode: "edit"; ncmId: string }
+  | { mode: "edit"; icmsId: string }
   | null;
 
 const ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 min-w-[88px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
 
-export function FiscalNcmSection() {
+export function FiscalIcmsSection() {
   const [filterValue, setFilterValue] = useState("");
-  const [submittedCodes, setSubmittedCodes] = useState<string[]>([]);
+  const [submittedTerms, setSubmittedTerms] = useState<string[]>([]);
   const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
-  const [panelIntent, setPanelIntent] = useState<FiscalNcmPanelIntent>(null);
+  const [panelIntent, setPanelIntent] = useState<FiscalIcmsPanelIntent>(null);
 
-  const searchQuery = useFiscalNcmList(submittedCodes, hasSubmittedSearch);
-  const errorMessage = searchQuery.error
-    ? getFiscalErrorMessage(searchQuery.error)
-    : null;
-
-  const submittedLabel = useMemo(() => submittedCodes.join(", "), [submittedCodes]);
+  const listQuery = useFiscalIcmsList(submittedTerms, hasSubmittedSearch);
+  const errorMessage = listQuery.error ? getFiscalErrorMessage(listQuery.error) : null;
+  const submittedLabel = useMemo(() => submittedTerms.join(", "), [submittedTerms]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const normalizedCodes = parseCommaSeparatedCodes(filterValue);
-    if (normalizedCodes.length === 0) {
-      setValidationMessage("Informe ao menos um código NCM para buscar.");
+    const normalizedTerms = parseCommaSeparatedValues(filterValue);
+    if (normalizedTerms.length === 0) {
+      setValidationMessage("Informe ao menos uma descrição para buscar.");
       return;
     }
 
     setValidationMessage(null);
-    setSubmittedCodes(normalizedCodes);
+    setSubmittedTerms(normalizedTerms);
     setHasSubmittedSearch(true);
   }
 
@@ -68,16 +64,16 @@ export function FiscalNcmSection() {
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {panelIntent.mode === "edit" ? "Editar NCM" : "Novo NCM"}
+                  {panelIntent.mode === "edit" ? "Editar ICMS" : "Novo ICMS"}
                 </h2>
                 <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
                   {panelIntent.mode === "edit"
                     ? "Revise os campos do cadastro selecionado e salve quando terminar."
-                    : "Preencha os dados fiscais para criar um novo cadastro de NCM."}
+                    : "Preencha os dados fiscais para criar um novo cadastro de ICMS."}
                 </p>
               </div>
 
-              {submittedCodes.length > 0 ? (
+              {submittedTerms.length > 0 ? (
                 <div className="text-sm text-gray-500 dark:text-slate-400">
                   Busca atual:{" "}
                   <span className="font-medium text-gray-900 dark:text-white">
@@ -87,11 +83,12 @@ export function FiscalNcmSection() {
               ) : null}
             </div>
           </div>
+
           <div className="mt-4">
-            <FiscalNcmFormPanel
+            <FiscalIcmsFormPanel
               mode={panelIntent.mode}
-              ncmId={panelIntent.mode === "edit" ? panelIntent.ncmId : undefined}
-              searchCodes={submittedCodes}
+              icmsId={panelIntent.mode === "edit" ? panelIntent.icmsId : undefined}
+              searchDescriptions={submittedTerms}
               onClose={() => setPanelIntent(null)}
               showHeader={false}
               bare
@@ -109,12 +106,12 @@ export function FiscalNcmSection() {
           <div className="space-y-1.5">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
-                <ScrollText className="h-4 w-4" />
+                <Landmark className="h-4 w-4" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">NCM</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">ICMS</h2>
                 <p className="text-sm text-gray-600 dark:text-slate-400">
-                  Consulte códigos específicos e prepare novos cadastros no mesmo fluxo.
+                  Consulte descrições cadastradas e mantenha os registros no mesmo fluxo.
                 </p>
               </div>
             </div>
@@ -126,14 +123,14 @@ export function FiscalNcmSection() {
             className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
           >
             <Plus className="h-4 w-4" />
-            Novo NCM
+            Novo ICMS
           </button>
         </div>
 
         <form className="mt-3 space-y-2.5" onSubmit={handleSubmit}>
           <div className="space-y-1.5">
             <span className="block text-sm font-medium text-gray-700 dark:text-slate-300">
-              Códigos NCM
+              Descrições
             </span>
             <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
               <div className="relative">
@@ -147,7 +144,7 @@ export function FiscalNcmSection() {
                       setValidationMessage(null);
                     }
                   }}
-                  placeholder="Ex.: 84719012, 84715010"
+                  placeholder="Ex.: substituição tributária, bebidas frias"
                   className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-[13px] text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
                 />
               </div>
@@ -160,7 +157,7 @@ export function FiscalNcmSection() {
               </button>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              Use vírgulas para consultar mais de um código.
+              A busca considera a descrição cadastrada no ICMS. Use vírgulas para consultar mais de uma.
             </p>
           </div>
 
@@ -173,38 +170,38 @@ export function FiscalNcmSection() {
       </div>
 
       {!hasSubmittedSearch ? (
-        <StateBox icon={Search} title="Informe os códigos e clique em buscar">
-          Use a consulta sob demanda para listar apenas os NCMs que fazem sentido neste momento.
+        <StateBox icon={Search} title="Informe as descrições e clique em buscar">
+          Use a consulta manual para listar apenas os registros de ICMS que fazem sentido neste momento.
         </StateBox>
       ) : null}
 
-      {hasSubmittedSearch && searchQuery.isLoading && !searchQuery.data ? (
-        <StateBox icon={Loader2} title="Buscando NCMs">
-          Estamos consultando os registros para os códigos informados.
+      {hasSubmittedSearch && listQuery.isLoading && !listQuery.data ? (
+        <StateBox icon={Loader2} title="Buscando ICMS">
+          Estamos consultando os registros para as descrições informadas.
         </StateBox>
       ) : null}
 
-      {searchQuery.error && !searchQuery.data ? (
-        <StateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar a lista de NCM">
+      {listQuery.error && !listQuery.data ? (
+        <StateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar a lista de ICMS">
           {errorMessage}
         </StateBox>
       ) : null}
 
-      {searchQuery.data ? (
+      {listQuery.data ? (
         <div className="space-y-4">
           <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                {searchQuery.data.length === 1
+                {listQuery.data.length === 1
                   ? "1 registro encontrado"
-                  : `${searchQuery.data.length} registros encontrados`}
+                  : `${listQuery.data.length} registros encontrados`}
               </p>
               <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
                 Busca atual: {submittedLabel}
               </p>
             </div>
 
-            {searchQuery.isFetching ? (
+            {listQuery.isFetching ? (
               <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Atualizando resultados
@@ -212,20 +209,20 @@ export function FiscalNcmSection() {
             ) : null}
           </div>
 
-          {searchQuery.error ? (
+          {listQuery.error ? (
             <StateBox icon={AlertCircle} tone="danger" title="Não foi possível atualizar a listagem">
               {errorMessage}
             </StateBox>
           ) : null}
 
-          {searchQuery.data.length > 0 ? (
-            <FiscalNcmTable
-              items={searchQuery.data}
-              onEdit={(item) => setPanelIntent({ mode: "edit", ncmId: item.id })}
+          {listQuery.data.length > 0 ? (
+            <FiscalIcmsTable
+              items={listQuery.data}
+              onEdit={(item) => setPanelIntent({ mode: "edit", icmsId: item.id })}
             />
           ) : (
-            <StateBox icon={ScrollText} title="Nenhum NCM encontrado">
-              Não localizamos registros para os códigos informados. Revise a busca e tente novamente.
+            <StateBox icon={Landmark} title="Nenhum ICMS encontrado">
+              Não localizamos registros para as descrições informadas. Revise os termos da busca e tente novamente.
             </StateBox>
           )}
         </div>
@@ -234,76 +231,88 @@ export function FiscalNcmSection() {
   );
 }
 
-function FiscalNcmTable({
+function FiscalIcmsTable({
   items,
   onEdit,
 }: {
-  items: FiscalNcm[];
-  onEdit: (item: FiscalNcm) => void;
+  items: FiscalIcms[];
+  onEdit: (item: FiscalIcms) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
       <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-slate-700">
-        <thead className="bg-gray-50 dark:bg-slate-800/60">
-          <tr>
-            <th className="w-[12%] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              NCM
-            </th>
-            <th className="w-[28%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Descrição
-            </th>
-            <th className="w-[16%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Regime
-            </th>
-            <th className="w-[16%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Tributação federal
-            </th>
-            <th className="w-[9%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Vigência inicial
-            </th>
-            <th className="w-[9%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Vigência final
-            </th>
-            <th className="w-[10%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Ações
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-          {items.map((item) => (
-            <tr key={item.id} className="align-top hover:bg-gray-50 dark:hover:bg-slate-800/30">
-              <td className="px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                {item.ncm_code}
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
-                {item.description}
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
-                {item.tax_regime}
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
-                {item.federal_taxation_type}
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
-                {formatFiscalDateLabel(item.validity_start_date)}
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
-                {formatFiscalDateLabel(item.validity_end_date)}
-              </td>
-              <td className="px-5 py-3">
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => onEdit(item)}
-                    className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
-                  >
-                    Editar
-                  </button>
-                </div>
-              </td>
+          <thead className="bg-gray-50 dark:bg-slate-800/60">
+            <tr>
+              <th className="w-[8%] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+                UF
+              </th>
+              <th className="w-[26%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+                Descrição
+              </th>
+              <th className="w-[10%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+                Item
+              </th>
+              <th className="w-[10%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+                CEST
+              </th>
+              <th className="w-[14%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+                Convênio
+              </th>
+              <th className="w-[8%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+                MVA aplicada
+              </th>
+              <th className="w-[8%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+                MVA ajustada
+              </th>
+              <th className="w-[8%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+                MVA original
+              </th>
+              <th className="w-[8%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+                Ações
+              </th>
             </tr>
-          ))}
-        </tbody>
+          </thead>
+          <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+            {items.map((item) => (
+              <tr key={item.id} className="align-top hover:bg-gray-50 dark:hover:bg-slate-800/30">
+                <td className="whitespace-nowrap px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                  {item.state}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                  {item.description}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                  {item.item_number ?? "—"}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                  {item.cest_code ?? "—"}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                  {item.interstate_agreement ?? "—"}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                  {item.applied_original_mva ?? "—"}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                  {item.adjusted_mva ?? "—"}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                  {item.original_mva ?? "—"}
+                </td>
+                <td className="px-5 py-3">
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(item)}
+                      className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
+                    >
+                      Editar
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
       </table>
     </div>
   );
@@ -318,7 +327,7 @@ function StateBox({
   children: React.ReactNode;
   icon: typeof Search;
   title: string;
-  tone?: "neutral" | "danger";
+  tone?: "danger" | "neutral";
 }) {
   const className =
     tone === "danger"
@@ -326,10 +335,10 @@ function StateBox({
       : "border-dashed border-gray-200 bg-gray-50/70 text-gray-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300";
 
   return (
-    <div className={`rounded-2xl border p-4 ${className}`}>
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
-          <Icon className={`h-4 w-4 ${Icon === Loader2 ? "animate-spin" : ""}`} />
+      <div className={`rounded-2xl border p-4 ${className}`}>
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
+            <Icon className={`h-4 w-4 ${Icon === Loader2 ? "animate-spin" : ""}`} />
         </div>
         <div>
           <p className="text-sm font-semibold">{title}</p>

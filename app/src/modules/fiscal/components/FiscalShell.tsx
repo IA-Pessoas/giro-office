@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import type { FiscalTabId } from "../types";
+import { FiscalIcmsSection } from "./FiscalIcmsSection";
 import { FiscalNcmSection } from "./FiscalNcmSection";
 import { FiscalPlaceholderSection } from "./FiscalPlaceholderSection";
 import { FiscalSearchSection } from "./FiscalSearchSection";
@@ -145,15 +146,9 @@ function FiscalNcmTab() {
 }
 
 function FiscalIcmsTab() {
-  const tab = fiscalTabs.find((item) => item.id === "icms");
-
   return (
     <div role="tabpanel" id="fiscal-panel-icms" aria-labelledby="fiscal-tab-icms">
-      <FiscalPlaceholderSection
-        title={tab?.panelTitle ?? "ICMS"}
-        description={tab?.description ?? ""}
-        icon={tab?.icon ?? Landmark}
-      />
+      <FiscalIcmsSection />
     </div>
   );
 }
