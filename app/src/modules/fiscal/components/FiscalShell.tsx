@@ -62,7 +62,7 @@ export function FiscalShell() {
 
       <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
         <nav aria-label="Abas do módulo fiscal" className="overflow-x-auto">
-          <div role="tablist" className="flex min-w-max items-center gap-1">
+          <div role="tablist" className="flex min-w-max items-center justify-center gap-1">
             {fiscalTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = tab.id === activeTab;
