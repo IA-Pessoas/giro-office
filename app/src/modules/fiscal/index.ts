@@ -45,6 +45,7 @@ export {
   buildFiscalNcmSearchParams,
   FISCAL_ENDPOINTS,
   fiscalIcmsService,
+  fiscalIpiService,
   fiscalNcmService,
   fiscalSearchService,
   unwrapFiscalCreate,
