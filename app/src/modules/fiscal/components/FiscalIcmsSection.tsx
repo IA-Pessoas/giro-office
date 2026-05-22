@@ -7,6 +7,7 @@ import {
   getFiscalErrorMessage,
   parseCommaSeparatedValues,
 } from "../utils";
+import { FiscalIcmsFormPanel } from "./FiscalIcmsFormPanel";
 
 type FiscalIcmsPanelIntent =
   | { mode: "create" }
@@ -83,8 +84,15 @@ export function FiscalIcmsSection() {
             </div>
           </div>
 
-          <div className="mt-5 rounded-xl border border-dashed border-gray-300 px-4 py-8 text-sm text-gray-600 dark:border-slate-700 dark:text-slate-400">
-            O formulário de create/edit entra no próximo commit desta PR.
+          <div className="mt-5">
+            <FiscalIcmsFormPanel
+              mode={panelIntent.mode}
+              icmsId={panelIntent.mode === "edit" ? panelIntent.icmsId : undefined}
+              searchDescriptions={submittedTerms}
+              onClose={() => setPanelIntent(null)}
+              showHeader={false}
+              bare
+            />
           </div>
         </div>
       </section>
