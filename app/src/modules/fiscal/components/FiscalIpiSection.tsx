@@ -7,6 +7,7 @@ import {
   getFiscalErrorMessage,
   parseCommaSeparatedCodes,
 } from "../utils";
+import { FiscalIpiFormPanel } from "./FiscalIpiFormPanel";
 
 type FiscalIpiPanelIntent =
   | { mode: "create" }
@@ -83,8 +84,15 @@ export function FiscalIpiSection() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-dashed border-gray-300 px-4 py-8 text-sm text-gray-600 dark:border-slate-700 dark:text-slate-400">
-            O formulário de create/edit entra no próximo commit desta PR.
+          <div className="mt-4">
+            <FiscalIpiFormPanel
+              mode={panelIntent.mode}
+              ipiId={panelIntent.mode === "edit" ? panelIntent.ipiId : undefined}
+              searchCodes={submittedCodes}
+              onClose={() => setPanelIntent(null)}
+              showHeader={false}
+              bare
+            />
           </div>
         </div>
       </section>
