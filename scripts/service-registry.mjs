@@ -33,6 +33,16 @@ export const serviceRegistry = [
     prismaOutputPath: "services/client-service/src/generated/prisma",
   },
   {
+    name: "certificate-service",
+    packagePath: "services/certificate-service",
+    defaultUrl: "http://localhost:3041",
+    urlEnvKey: "CERTIFICATE_SERVICE_URL",
+    openapiSpecPath: null,
+    authModes: ["public", "bearer", "admin-bearer", "internal-token"],
+    internalTokenEnvKey: "CERTIFICATE_SERVICE_INTERNAL_TOKEN",
+    prismaOutputPath: "services/certificate-service/src/generated/prisma",
+  },
+  {
     name: "contabil-service",
     packagePath: "services/contabil-service",
     defaultUrl: "http://localhost:3038",
