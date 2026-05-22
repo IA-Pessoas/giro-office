@@ -158,7 +158,7 @@ export function FiscalIcmsSection() {
               </button>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              A busca considera a descrição cadastrada no ICMS. Use vírgulas para consultar mais de uma.
+              Use vírgulas para consultar mais de uma descrição cadastrada.
             </p>
           </div>
 

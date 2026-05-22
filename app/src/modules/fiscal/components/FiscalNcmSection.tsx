@@ -161,7 +161,7 @@ export function FiscalNcmSection() {
               </button>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              Use vírgulas para consultar mais de um código.
+              Use vírgulas para consultar mais de um código NCM.
             </p>
           </div>
 
@@ -174,7 +174,7 @@ export function FiscalNcmSection() {
       </div>
 
       {!hasSubmittedSearch ? (
-        <FiscalStateBox icon={Search} title="Informe os códigos e clique em buscar" compact>
+        <FiscalStateBox icon={Search} title="Informe os códigos NCM e clique em buscar" compact>
           Use a consulta sob demanda para listar apenas os NCMs que fazem sentido neste momento.
         </FiscalStateBox>
       ) : null}
