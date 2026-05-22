@@ -1,0 +1,12 @@
+process.env.NODE_ENV ??= "test";
+process.env.PORT ??= "3041";
+process.env.DATABASE_URL ??= "postgresql://user:password@localhost:5432/workspace_test";
+process.env.JWT_SECRET ??= "test-secret";
+process.env.AUDIT_SERVICE_URL ??= "http://localhost:3020";
+process.env.AUDIT_SERVICE_TOKEN ??= "test-audit-token";
+process.env.CERTIFICATE_SERVICE_INTERNAL_TOKEN ??= "test-internal-token";
+process.env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS ??= "30";
+process.env.SERVICE_ALLOWED_ORIGINS ??= "*";
+process.env.ENABLE_API_DOCS ??= "true";
+process.env.LOG_LEVEL ??= "silent";
+process.env.LOG_PRETTY ??= "false";
