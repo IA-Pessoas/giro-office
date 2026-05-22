@@ -44,9 +44,9 @@ export function FiscalIcmsSection() {
 
   if (panelIntent) {
     return (
-      <section className="space-y-5">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-          <div className="space-y-3">
+      <section className="space-y-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+          <div className="space-y-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -61,7 +61,7 @@ export function FiscalIcmsSection() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                   {panelIntent.mode === "edit" ? "Editar ICMS" : "Novo ICMS"}
@@ -84,7 +84,7 @@ export function FiscalIcmsSection() {
             </div>
           </div>
 
-          <div className="mt-5">
+          <div className="mt-4">
             <FiscalIcmsFormPanel
               mode={panelIntent.mode}
               icmsId={panelIntent.mode === "edit" ? panelIntent.icmsId : undefined}
@@ -100,9 +100,9 @@ export function FiscalIcmsSection() {
   }
 
   return (
-    <section className="space-y-5">
-      <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <section className="space-y-4">
+      <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-1.5">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
@@ -127,8 +127,8 @@ export function FiscalIcmsSection() {
           </button>
         </div>
 
-        <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
-          <div className="space-y-2">
+        <form className="mt-3 space-y-2.5" onSubmit={handleSubmit}>
+          <div className="space-y-1.5">
             <span className="block text-sm font-medium text-gray-700 dark:text-slate-300">
               Descrições
             </span>
@@ -240,35 +240,34 @@ function FiscalIcmsTable({
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-      <div className="overflow-x-auto">
-        <table className="min-w-[1200px] divide-y divide-gray-200 dark:divide-slate-700">
+      <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-slate-700">
           <thead className="bg-gray-50 dark:bg-slate-800/60">
             <tr>
-              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className="w-[8%] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
                 UF
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className="w-[26%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
                 Descrição
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className="w-[10%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
                 Item
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className="w-[10%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
                 CEST
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className="w-[14%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
                 Convênio
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className="w-[8%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
                 MVA aplicada
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className="w-[8%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
                 MVA ajustada
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className="w-[8%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
                 MVA original
               </th>
-              <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className="w-[8%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
                 Ações
               </th>
             </tr>
@@ -279,7 +278,7 @@ function FiscalIcmsTable({
                 <td className="whitespace-nowrap px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">
                   {item.state}
                 </td>
-                <td className="min-w-[280px] px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
                   {item.description}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
@@ -314,8 +313,7 @@ function FiscalIcmsTable({
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
+      </table>
     </div>
   );
 }
@@ -331,26 +329,20 @@ function StateBox({
   title: string;
   tone?: "danger" | "neutral";
 }) {
-  const iconClasses =
+  const className =
     tone === "danger"
-      ? "bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-300"
-      : "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300";
+      ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300"
+      : "border-dashed border-gray-200 bg-gray-50/70 text-gray-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300";
 
   return (
-    <div
-      className={`rounded-xl border px-4 py-5 ${
-        tone === "danger"
-          ? "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-900/10"
-          : "border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900"
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconClasses}`}>
-          <Icon className={`h-4 w-4 ${title === "Buscando ICMS" ? "animate-spin" : ""}`} />
+      <div className={`rounded-2xl border p-4 ${className}`}>
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
+            <Icon className={`h-4 w-4 ${Icon === Loader2 ? "animate-spin" : ""}`} />
         </div>
-        <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
-          <p className="text-sm text-gray-600 dark:text-slate-400">{children}</p>
+        <div>
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="mt-1 text-sm leading-6">{children}</p>
         </div>
       </div>
     </div>

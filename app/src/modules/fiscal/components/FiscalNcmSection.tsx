@@ -48,9 +48,9 @@ export function FiscalNcmSection() {
 
   if (panelIntent) {
     return (
-      <section className="space-y-5">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-          <div className="space-y-3">
+      <section className="space-y-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+          <div className="space-y-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -65,7 +65,7 @@ export function FiscalNcmSection() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                   {panelIntent.mode === "edit" ? "Editar NCM" : "Novo NCM"}
@@ -87,7 +87,7 @@ export function FiscalNcmSection() {
               ) : null}
             </div>
           </div>
-          <div className="mt-5">
+          <div className="mt-4">
             <FiscalNcmFormPanel
               mode={panelIntent.mode}
               ncmId={panelIntent.mode === "edit" ? panelIntent.ncmId : undefined}
@@ -103,9 +103,9 @@ export function FiscalNcmSection() {
   }
 
   return (
-    <section className="space-y-5">
-      <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <section className="space-y-4">
+      <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-1.5">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
@@ -130,8 +130,8 @@ export function FiscalNcmSection() {
           </button>
         </div>
 
-        <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
-          <div className="space-y-2">
+        <form className="mt-3 space-y-2.5" onSubmit={handleSubmit}>
+          <div className="space-y-1.5">
             <span className="block text-sm font-medium text-gray-700 dark:text-slate-300">
               Códigos NCM
             </span>
@@ -246,10 +246,10 @@ function FiscalNcmTable({
       <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-slate-700">
         <thead className="bg-gray-50 dark:bg-slate-800/60">
           <tr>
-            <th className="w-[14%] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+            <th className="w-[12%] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
               NCM
             </th>
-            <th className="w-[30%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+            <th className="w-[28%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
               Descrição
             </th>
             <th className="w-[16%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
@@ -258,13 +258,13 @@ function FiscalNcmTable({
             <th className="w-[16%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
               Tributação federal
             </th>
-            <th className="w-[10%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+            <th className="w-[9%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
               Vigência inicial
             </th>
-            <th className="w-[10%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+            <th className="w-[9%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
               Vigência final
             </th>
-            <th className="w-[12%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+            <th className="w-[10%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
               Ações
             </th>
           </tr>
@@ -326,7 +326,7 @@ function StateBox({
       : "border-dashed border-gray-200 bg-gray-50/70 text-gray-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300";
 
   return (
-    <div className={`rounded-2xl border p-5 ${className}`}>
+    <div className={`rounded-2xl border p-4 ${className}`}>
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
           <Icon className={`h-4 w-4 ${Icon === Loader2 ? "animate-spin" : ""}`} />
