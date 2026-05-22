@@ -17,6 +17,7 @@ import {
   requestContext,
 } from "./middlewares/requestContext.js";
 import { buildCertificateServiceOpenApiSpec } from "./openapi/spec.js";
+import { createCertificatePjRoutes } from "./routes/certificatePj.routes.js";
 
 function certificateServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const out: Record<string, unknown> = {};
@@ -73,6 +74,7 @@ export function createCertificateApplication({
   });
 
   app.use("/certificate", createForwardedAuthContextMiddleware(env.internalServiceToken));
+  app.use("/certificate/pj", createCertificatePjRoutes(_prisma));
 
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {
