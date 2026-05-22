@@ -111,7 +111,7 @@ export function FiscalIpiSection() {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">IPI</h2>
                 <p className="text-sm text-gray-600 dark:text-slate-400">
-                  Consulte códigos NCM específicos e mantenha os registros de IPI no mesmo fluxo.
+                  Consulte códigos específicos e mantenha os registros de IPI no mesmo fluxo.
                 </p>
               </div>
             </div>
@@ -157,7 +157,7 @@ export function FiscalIpiSection() {
               </button>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              Use vírgulas para buscar mais de um código NCM.
+              Use vírgulas para consultar mais de um código.
             </p>
           </div>
 
@@ -171,7 +171,7 @@ export function FiscalIpiSection() {
 
       {!hasSubmittedSearch ? (
         <StateBox icon={Search} title="Informe os códigos e clique em buscar">
-          Use a consulta manual para listar apenas os registros de IPI que fazem sentido neste momento.
+          Use a consulta sob demanda para listar apenas os IPIs que fazem sentido neste momento.
         </StateBox>
       ) : null}
 
