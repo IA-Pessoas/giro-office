@@ -1,3 +1,4 @@
+export { FiscalIcmsSection } from "./FiscalIcmsSection";
 export { FiscalNcmSection } from "./FiscalNcmSection";
 export { FiscalNcmFormPanel } from "./FiscalNcmFormPanel";
 export { FiscalPlaceholderSection } from "./FiscalPlaceholderSection";
