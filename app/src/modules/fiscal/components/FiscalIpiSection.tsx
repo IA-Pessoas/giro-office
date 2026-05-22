@@ -17,6 +17,7 @@ type FiscalIpiPanelIntent =
 
 const ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 min-w-[88px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+const NCM_CODE_LENGTH = 8;
 
 export function FiscalIpiSection() {
   const [filterValue, setFilterValue] = useState("");
@@ -35,6 +36,11 @@ export function FiscalIpiSection() {
     const normalizedCodes = parseCommaSeparatedCodes(filterValue);
     if (normalizedCodes.length === 0) {
       setValidationMessage("Informe ao menos um código NCM para buscar.");
+      return;
+    }
+
+    if (normalizedCodes.some((code) => !/^\d{8}$/.test(code))) {
+      setValidationMessage("Informe apenas códigos NCM com 8 dígitos.");
       return;
     }
 
@@ -140,12 +146,15 @@ export function FiscalIpiSection() {
                   type="text"
                   value={filterValue}
                   onChange={(event) => {
-                    setFilterValue(event.target.value);
+                    const normalizedValue = event.target.value.replace(/[^\d,]/g, "");
+
+                    setFilterValue(normalizedValue);
                     if (validationMessage) {
                       setValidationMessage(null);
                     }
                   }}
                   placeholder="Ex.: 84719012, 84715010"
+                  inputMode="numeric"
                   className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-[13px] text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
                 />
               </div>
