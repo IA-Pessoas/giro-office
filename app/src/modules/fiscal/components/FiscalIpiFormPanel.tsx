@@ -34,6 +34,7 @@ const DEFAULT_FORM_STATE: FiscalIpiFormState = {
   description: "",
   aliquot: "",
 };
+const NCM_CODE_LENGTH = 8;
 
 function buildFormState(ipi: FiscalIpi | null | undefined): FiscalIpiFormState {
   if (!ipi) {
@@ -126,6 +127,11 @@ export function FiscalIpiFormPanel({
   async function handleSubmit() {
     if (!formState.ncm.trim()) {
       setValidationMessage("Preencha o código NCM antes de salvar.");
+      return;
+    }
+
+    if (!/^\d{8}$/.test(formState.ncm.trim())) {
+      setValidationMessage("Informe um código NCM com 8 dígitos.");
       return;
     }
 
@@ -243,8 +249,12 @@ export function FiscalIpiFormPanel({
         <TextField
           label="Código NCM"
           value={formState.ncm}
-          onChange={(value) => handleChange("ncm", value)}
+          onChange={(value) =>
+            handleChange("ncm", value.replace(/\D/g, "").slice(0, NCM_CODE_LENGTH))
+          }
           placeholder="Ex.: 84719012"
+          inputMode="numeric"
+          maxLength={NCM_CODE_LENGTH}
           required
         />
         <TextField
@@ -302,13 +312,17 @@ export function FiscalIpiFormPanel({
 }
 
 function TextField({
+  inputMode,
   label,
+  maxLength,
   onChange,
   placeholder,
   required = false,
   value,
 }: {
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   label: string;
+  maxLength?: number;
   onChange: (value: string) => void;
   placeholder?: string;
   required?: boolean;
@@ -324,6 +338,8 @@ function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        inputMode={inputMode}
+        maxLength={maxLength}
         className="h-9 rounded-lg border border-gray-300 px-3 text-[13px] text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
       />
     </label>

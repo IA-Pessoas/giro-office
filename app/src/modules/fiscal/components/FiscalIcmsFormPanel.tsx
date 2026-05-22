@@ -167,7 +167,7 @@ export function FiscalIcmsFormPanel({
         if (!searchDescriptions.includes(createdIcms.description)) {
           toast.success("Cadastro criado. Inclua a descrição na busca para visualizar.");
         } else {
-          toast.success("ICMS criado com sucesso.");
+          toast.success("ICMS cadastrado com sucesso.");
         }
       }
 

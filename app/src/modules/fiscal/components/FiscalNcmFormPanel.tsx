@@ -196,9 +196,9 @@ export function FiscalNcmFormPanel({
         const createdNcm = await createMutation.mutateAsync(basePayload);
 
         if (!searchCodes.includes(createdNcm.ncm_code)) {
-          toast.success("Cadastro criado. Inclua o código na busca para visualizar.");
+          toast.success("Cadastro criado. Inclua o código NCM na busca para visualizar.");
         } else {
-          toast.success("NCM criado com sucesso.");
+          toast.success("NCM cadastrado com sucesso.");
         }
       }
 
