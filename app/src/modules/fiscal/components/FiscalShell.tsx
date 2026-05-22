@@ -10,6 +10,7 @@ import {
 
 import type { FiscalTabId } from "../types";
 import { FiscalIcmsSection } from "./FiscalIcmsSection";
+import { FiscalIpiSection } from "./FiscalIpiSection";
 import { FiscalNcmSection } from "./FiscalNcmSection";
 import { FiscalPlaceholderSection } from "./FiscalPlaceholderSection";
 import { FiscalSearchSection } from "./FiscalSearchSection";
@@ -154,15 +155,9 @@ function FiscalIcmsTab() {
 }
 
 function FiscalIpiTab() {
-  const tab = fiscalTabs.find((item) => item.id === "ipi");
-
   return (
     <div role="tabpanel" id="fiscal-panel-ipi" aria-labelledby="fiscal-tab-ipi">
-      <FiscalPlaceholderSection
-        title={tab?.panelTitle ?? "IPI"}
-        description={tab?.description ?? ""}
-        icon={tab?.icon ?? Percent}
-      />
+      <FiscalIpiSection />
     </div>
   );
 }

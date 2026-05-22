@@ -19,3 +19,11 @@ export function fiscalIcmsListQueryKey(icmsTerms: string[]) {
 export function fiscalIcmsDetailQueryKey(icmsId?: string | null) {
   return [...FISCAL_QUERY_KEY, "icms", "detail", icmsId ?? ""] as const;
 }
+
+export function fiscalIpiListQueryKey(ipiCodes: string[]) {
+  return [...FISCAL_QUERY_KEY, "ipi", "list", ipiCodes.join("|")] as const;
+}
+
+export function fiscalIpiDetailQueryKey(ipiId?: string | null) {
+  return [...FISCAL_QUERY_KEY, "ipi", "detail", ipiId ?? ""] as const;
+}
