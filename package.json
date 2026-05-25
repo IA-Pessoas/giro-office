@@ -26,7 +26,16 @@
     "smoke:coverage": "node scripts/check-smoke-spec-coverage.mjs",
     "smoke:scaffold": "node scripts/generate-service-harness.mjs",
     "harness:test": "node --test scripts/service-harness.test.mjs scripts/check-compose-security.test.mjs scripts/ci-workflow-optimization.test.mjs",
-    "hooks:test": "node --test scripts/git-hook-scope.test.mjs scripts/understand-anything-reminder.test.mjs",
+    "hooks:test": "node --test scripts/git-hook-scope.test.mjs scripts/graphify-context.test.mjs scripts/graphify-postprocess.test.mjs scripts/graphify-refresh.test.mjs scripts/graphify-reminder.test.mjs scripts/graphify-scope.test.mjs",
+    "graphify:ui": "node scripts/graphify-scope.mjs ui extract",
+    "graphify:services": "node scripts/graphify-scope.mjs services extract",
+    "graphify:update:ui": "node scripts/graphify-scope.mjs ui update",
+    "graphify:update:services": "node scripts/graphify-scope.mjs services update",
+    "graphify:context:ui": "node scripts/graphify-context.mjs ui",
+    "graphify:context:services": "node scripts/graphify-context.mjs services",
+    "graphify:postprocess:ui": "node scripts/graphify-postprocess.mjs ui",
+    "graphify:postprocess:services": "node scripts/graphify-postprocess.mjs services",
+    "graphify:refresh": "node scripts/graphify-refresh.mjs",
     "security:compose": "node scripts/check-compose-security.mjs"
   },
   "devDependencies": {

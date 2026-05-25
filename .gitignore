@@ -11,6 +11,9 @@ tsconfig.tests*
 # Turborepo
 .turbo/
 
+# Local knowledge graph outputs
+**/graphify-out/
+
 # PNPM
 .pnpm-store/        
 
