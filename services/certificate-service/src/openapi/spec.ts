@@ -2,22 +2,34 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { CertificateServiceEnv } from "../config/env.js";
 
-const jsonEnvelopeContent = {
-  "application/json": {
-    schema: { $ref: "#/components/schemas/SuccessEnvelope" },
-  },
-};
-
 const jsonErrorContent = {
   "application/json": {
     schema: { $ref: "#/components/schemas/ErrorEnvelope" },
   },
 };
 
-function successResponse(description: string) {
+function successEnvelopeContent(dataSchema: Record<string, unknown>) {
+  return {
+    "application/json": {
+      schema: {
+        allOf: [
+          { $ref: "#/components/schemas/SuccessEnvelope" },
+          {
+            type: "object",
+            properties: {
+              data: dataSchema,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+function successResponse(description: string, dataSchema: Record<string, unknown>) {
   return {
     description,
-    content: jsonEnvelopeContent,
+    content: successEnvelopeContent(dataSchema),
   };
 }
 
@@ -55,6 +67,7 @@ function publicCertificateOperation({
   notFoundDescription,
   successStatus = 200,
   successDescription,
+  successDataSchema,
   parameters,
   requestBody,
 }: {
@@ -64,6 +77,7 @@ function publicCertificateOperation({
   notFoundDescription: string;
   successStatus?: 200 | 201;
   successDescription: string;
+  successDataSchema: Record<string, unknown>;
   parameters?: Record<string, unknown>[];
   requestBody?: Record<string, unknown>;
 }) {
@@ -75,13 +89,24 @@ function publicCertificateOperation({
     ...(parameters ? { parameters } : {}),
     ...(requestBody ? { requestBody } : {}),
     responses: {
-      [String(successStatus)]: successResponse(successDescription),
+      [String(successStatus)]: successResponse(successDescription, successDataSchema),
       "400": errorResponse("Requisicao invalida"),
       "401": errorResponse("Autenticacao obrigatoria"),
       "403": errorResponse("Permissao insuficiente"),
       "404": errorResponse(notFoundDescription),
       "409": errorResponse("Conflito de dominio"),
     },
+  };
+}
+
+function componentRef(name: string) {
+  return { $ref: `#/components/schemas/${name}` };
+}
+
+function componentArrayRef(name: string) {
+  return {
+    type: "array",
+    items: componentRef(name),
   };
 }
 
@@ -92,7 +117,10 @@ function certificateNotificationListOperation() {
     summary: "Lista notificacoes de certificados da organizacao autenticada",
     security: [{ bearerAuth: [] }],
     responses: {
-      "200": successResponse("Notificacoes de certificados listadas"),
+      "200": successResponse(
+        "Notificacoes de certificados listadas",
+        componentArrayRef("CertificateNotification"),
+      ),
       "401": errorResponse("Autenticacao obrigatoria"),
       "403": errorResponse("Permissao insuficiente"),
     },
@@ -118,7 +146,10 @@ function internalCertificateNotificationRunOperation() {
       },
     },
     responses: {
-      "200": successResponse("Reconciliacao de notificacoes executada"),
+      "200": successResponse(
+        "Reconciliacao de notificacoes executada",
+        componentRef("CertificateNotificationRunResult"),
+      ),
       "400": errorResponse("Requisicao invalida"),
       "401": errorResponse("Autenticacao obrigatoria"),
     },
@@ -187,6 +218,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PJ",
           summary: "Lista certificados PJ da organizacao autenticada",
           successDescription: "Certificados PJ listados",
+          successDataSchema: componentArrayRef("CertificatePj"),
           notFoundDescription: "Certificado PJ nao encontrado",
           parameters: [
             {
@@ -223,6 +255,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           summary: "Cria certificado PJ",
           successStatus: 201,
           successDescription: "Certificado PJ criado",
+          successDataSchema: componentRef("CertificatePj"),
           notFoundDescription: "Certificado PJ nao encontrado",
           requestBody: certificatePjRequestBody(),
         }),
@@ -233,6 +266,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PJ",
           summary: "Busca certificado PJ por ID",
           successDescription: "Certificado PJ encontrado",
+          successDataSchema: componentRef("CertificatePj"),
           notFoundDescription: "Certificado PJ nao encontrado",
           parameters: [certificatePjIdParameter()],
         }),
@@ -241,6 +275,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PJ",
           summary: "Atualiza certificado PJ",
           successDescription: "Certificado PJ atualizado",
+          successDataSchema: componentRef("CertificatePj"),
           notFoundDescription: "Certificado PJ nao encontrado",
           parameters: [certificatePjIdParameter()],
           requestBody: certificatePjRequestBody(false),
@@ -255,6 +290,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PF",
           summary: "Lista certificados PF da organizacao autenticada",
           successDescription: "Certificados PF listados",
+          successDataSchema: componentArrayRef("CertificatePf"),
           notFoundDescription: "Certificado PF nao encontrado",
           parameters: [
             {
@@ -303,6 +339,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           summary: "Cria certificado PF",
           successStatus: 201,
           successDescription: "Certificado PF criado",
+          successDataSchema: componentRef("CertificatePf"),
           notFoundDescription: "Certificado PF nao encontrado",
           requestBody: certificatePfRequestBody(),
         }),
@@ -313,6 +350,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PF",
           summary: "Busca certificado PF por ID",
           successDescription: "Certificado PF encontrado",
+          successDataSchema: componentRef("CertificatePf"),
           notFoundDescription: "Certificado PF nao encontrado",
           parameters: [certificatePfIdParameter()],
         }),
@@ -321,6 +359,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PF",
           summary: "Atualiza certificado PF",
           successDescription: "Certificado PF atualizado",
+          successDataSchema: componentRef("CertificatePf"),
           notFoundDescription: "Certificado PF nao encontrado",
           parameters: [certificatePfIdParameter()],
           requestBody: certificatePfRequestBody(false),
@@ -362,6 +401,43 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           },
           required: ["success", "error", "code"],
         },
+        CertificatePj: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            client_castelo_status: { type: "boolean" },
+            client_focus_status: { type: "boolean" },
+            name: { type: "string" },
+            cnpj: { type: "string" },
+            responsible: { type: "string" },
+            model: { type: "string" },
+            legal_nature: { type: "string" },
+            password: { type: "string", nullable: true },
+            expiration_date: { type: "string", format: "date-time" },
+            notes: { type: "string", nullable: true },
+            was_paid: { type: "boolean" },
+            payment_date: { type: "string", format: "date-time", nullable: true },
+            payment_amount: { type: "number", nullable: true },
+            contact_info: { type: "string", nullable: true },
+            file_path: { type: "string", nullable: true },
+            has_certificate: { type: "boolean" },
+            organization_id: { type: "string", format: "uuid" },
+          },
+          required: [
+            "id",
+            "client_castelo_status",
+            "client_focus_status",
+            "name",
+            "cnpj",
+            "responsible",
+            "model",
+            "legal_nature",
+            "expiration_date",
+            "was_paid",
+            "has_certificate",
+            "organization_id",
+          ],
+        },
         CertificatePjInput: {
           type: "object",
           properties: {
@@ -382,6 +458,41 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
             file_path: { type: "string", nullable: true },
             has_certificate: { type: "boolean" },
           },
+        },
+        CertificatePf: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            client_castelo_status: { type: "boolean" },
+            client_focus_status: { type: "boolean" },
+            name: { type: "string" },
+            cpf: { type: "string" },
+            model: { type: "string" },
+            password: { type: "string", nullable: true },
+            expiration_date: { type: "string", format: "date-time" },
+            notes: { type: "string", nullable: true },
+            enterprise: { type: "string", nullable: true },
+            cnpj: { type: "string", nullable: true },
+            was_paid: { type: "boolean" },
+            payment_date: { type: "string", format: "date-time", nullable: true },
+            payment_amount: { type: "number", nullable: true },
+            contact_info: { type: "string", nullable: true },
+            file_path: { type: "string", nullable: true },
+            has_certificate: { type: "boolean" },
+            organization_id: { type: "string", format: "uuid" },
+          },
+          required: [
+            "id",
+            "client_castelo_status",
+            "client_focus_status",
+            "name",
+            "cpf",
+            "model",
+            "expiration_date",
+            "was_paid",
+            "has_certificate",
+            "organization_id",
+          ],
         },
         CertificatePfInput: {
           type: "object",
