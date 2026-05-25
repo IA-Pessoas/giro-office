@@ -10,6 +10,8 @@ cd "$ROOT"
 
 # shellcheck source=scripts/ci/vps-deploy-scope.sh
 . "$ROOT/scripts/ci/vps-deploy-scope.sh"
+# shellcheck source=scripts/ci/vps-compose-args.sh
+. "$ROOT/scripts/ci/vps-compose-args.sh"
 
 log() {
   printf "\n>>> %s\n" "$*" >&2
@@ -32,43 +34,11 @@ if [[ -z "${DOCKER_REGISTRY_URL:-}" || -z "${DOCKER_REGISTRY_USERNAME:-}" || -z 
   exit 1
 fi
 
-COMPOSE_ARGS=( -f docker-compose.vps.yml )
-# staging: só base → 8085 / 3010 / 3000 (web)
+# staging: base + runtime override → 8085 / 3010 / 3000 (web)
 # develop: + slot-develop → 8086 / 3011 / 3001 (web)
 # test-develop: + slot-test-develop → 8087 / 3013 / 3002 (web)
 # test-staging: + slot-test-staging → 8086 / 3012 / 3003 (web)
-case "${DEPLOY_SLOT:-}" in
-  develop)
-    SLOT_OVERRIDE="docker-compose.vps.slot-develop.yml"
-    if [[ ! -f "$SLOT_OVERRIDE" ]]; then
-      echo "::error::$SLOT_OVERRIDE não encontrado (override develop)" >&2
-      exit 1
-    fi
-    COMPOSE_ARGS+=( -f "$SLOT_OVERRIDE" )
-    ;;
-  test-develop)
-    SLOT_OVERRIDE="docker-compose.vps.slot-test-develop.yml"
-    if [[ ! -f "$SLOT_OVERRIDE" ]]; then
-      echo "::error::$SLOT_OVERRIDE não encontrado (override test-develop)" >&2
-      exit 1
-    fi
-    COMPOSE_ARGS+=( -f "$SLOT_OVERRIDE" )
-    ;;
-  test-staging)
-    SLOT_OVERRIDE="docker-compose.vps.slot-test-staging.yml"
-    if [[ ! -f "$SLOT_OVERRIDE" ]]; then
-      echo "::error::$SLOT_OVERRIDE não encontrado (override test-staging)" >&2
-      exit 1
-    fi
-    COMPOSE_ARGS+=( -f "$SLOT_OVERRIDE" )
-    ;;
-  staging)
-    ;;
-  *)
-    echo "::error::vps-remote-deploy: DEPLOY_SLOT inválido: ${DEPLOY_SLOT:-}(esperado develop, staging, test-develop ou test-staging)" >&2
-    exit 1
-    ;;
-esac
+vps_build_compose_args
 
 export WORKSPACE_VPS_IMAGE_TAG="${WORKSPACE_VPS_IMAGE_TAG:-vps}"
 
@@ -168,14 +138,14 @@ if [[ "$pull_rc" -ne 0 ]]; then
   exit 1
 fi
 
-log "compose up -d --wait (projeto=$COMPOSE_PROJECT)"
+log "compose up -d (projeto=$COMPOSE_PROJECT; healthchecks contínuos desativados via runtime override)"
 set +e
 if [[ "${#COMPOSE_SERVICE_ARGS[@]}" -gt 0 ]]; then
   log "compose up seletivo: ${COMPOSE_SERVICE_ARGS[*]}"
-  compose up -d --wait --wait-timeout 900 --no-build "${COMPOSE_SERVICE_ARGS[@]}"
+  compose up -d --no-build "${COMPOSE_SERVICE_ARGS[@]}"
 else
   log "compose up completo"
-  compose up -d --wait --wait-timeout 900 --no-build
+  compose up -d --no-build
 fi
 up_rc=$?
 set -e
@@ -185,13 +155,39 @@ if [[ "$up_rc" -ne 0 ]]; then
   rollback_images "$IDS_FILE"
   set +e
   if [[ "${#COMPOSE_SERVICE_ARGS[@]}" -gt 0 ]]; then
-    compose up -d --wait --wait-timeout 300 --no-build "${COMPOSE_SERVICE_ARGS[@]}" || true
+    compose up -d --no-build "${COMPOSE_SERVICE_ARGS[@]}" || true
   else
-    compose up -d --wait --wait-timeout 300 --no-build || true
+    compose up -d --no-build || true
   fi
   set -e
   dump_compose_logs
   echo "::error::deploy falhou na VPS; rollback tentado" >&2
+  exit 1
+fi
+
+if [[ "${#COMPOSE_SERVICE_ARGS[@]}" -gt 0 ]]; then
+  export VPS_WAIT_SERVICES="${COMPOSE_SERVICE_ARGS[*]}"
+else
+  export VPS_WAIT_SERVICES=""
+fi
+log "verificação pontual de endpoints (vps-wait-endpoints.sh)"
+set +e
+bash scripts/ci/vps-wait-endpoints.sh
+wait_rc=$?
+set -e
+
+if [[ "$wait_rc" -ne 0 ]]; then
+  log "verificação de endpoints falhou (rc=$wait_rc); rollback e diagnóstico"
+  rollback_images "$IDS_FILE"
+  set +e
+  if [[ "${#COMPOSE_SERVICE_ARGS[@]}" -gt 0 ]]; then
+    compose up -d --no-build "${COMPOSE_SERVICE_ARGS[@]}" || true
+  else
+    compose up -d --no-build || true
+  fi
+  set -e
+  dump_compose_logs
+  echo "::error::deploy falhou na VPS (endpoints); rollback tentado" >&2
   exit 1
 fi
 
