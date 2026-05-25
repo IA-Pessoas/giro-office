@@ -1,14 +1,16 @@
-import React from 'react';
-import 'react-toastify/dist/ReactToastify.css';
+import React from "react";
+import Link from "next/link";
+import "react-toastify/dist/ReactToastify.css";
+import { ArrowLeft } from "lucide-react";
 import { LuFolder } from "react-icons/lu";
 import { IoCreate } from "react-icons/io5";
-import styles from './DepartmentPage.module.css';
 
-import { canSSRAuth } from '@modules/auth';
-import { setupAPIClient } from '@shared/services/api';
-import LogDrawer from '@shared/components/LogDrawer';
-import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@shared/components';
-import { useDepForm, departmentService, type DepItem } from '@modules/departments';
+import styles from "./DepartmentPage.module.css";
+
+import { canSSRAuth } from "@modules/auth";
+import { useDepForm, departmentService, type DepItem } from "@modules/departments";
+import { LogDrawer, TabsContent, TabsList, TabsRoot, TabsTrigger } from "@shared/components";
+import { setupAPIClient } from "@shared/services/api";
 interface Props {
     dep: DepItem
 }
@@ -22,7 +24,22 @@ export default function Department({ dep }: Props) {
     } = useDepForm(dep);
 
     return (
-        <>
+        <div className="space-y-6">
+            <div className="space-y-3">
+                <Link
+                    href="/organizations"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                >
+                    <ArrowLeft className="h-4 w-4" />
+                    Voltar para departamentos
+                </Link>
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{dep.name}</h1>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Atualize nome, cor, status e vínculo com solução.
+                    </p>
+                </div>
+            </div>
             <TabsRoot defaultValue="dados">
                 <TabsList>
                     <TabsTrigger value="dados">
@@ -82,7 +99,7 @@ export default function Department({ dep }: Props) {
                         </div>
                 </TabsContent>
             </TabsRoot>
-        </>
+        </div>
     );
 }
 

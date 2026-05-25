@@ -4,7 +4,7 @@ import Head from "next/head";
 import { canSSRAuth } from "@modules/auth";
 import { Departments } from "../../shared/components/newLayout/Departments";
 
-export default function OrganizationsPage() {
+export default function DepartmentsPage() {
   return (
     <>
       <Head>
