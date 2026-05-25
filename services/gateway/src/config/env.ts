@@ -26,6 +26,45 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function parseOptionalString(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function isValidJsonBodyLimit(value: string): boolean {
+  const match = /^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb|tb)?$/i.exec(value);
+
+  if (!match) {
+    return false;
+  }
+
+  return Number.parseFloat(match[1] ?? "0") > 0;
+}
+
+function parseJsonBodyLimit(value: string | undefined, ctx: z.RefinementCtx): string {
+  const normalized = parseOptionalString(value) ?? "1mb";
+
+  if (!isValidJsonBodyLimit(normalized)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "GATEWAY_JSON_BODY_LIMIT inválido.",
+    });
+    return z.NEVER;
+  }
+
+  return normalized;
+}
+
+const optionalUrlEnvSchema = z
+  .string()
+  .optional()
+  .transform((value) => parseOptionalString(value))
+  .pipe(z.union([z.string().url(), z.undefined()]));
+
 const gatewayEnvSchema = z
   .object({
     nodeEnv: z.string().optional().default("development"),
@@ -59,13 +98,9 @@ const gatewayEnvSchema = z
     websocketUpstreamUrl: z
       .string()
       .optional()
-      .transform((value) => {
-        if (value === undefined || value.trim() === "") {
-          return undefined;
-        }
-        return value.trim();
-      })
+      .transform((value) => parseOptionalString(value))
       .pipe(z.union([z.string().url(), z.undefined()])),
+    publicGatewayUrl: optionalUrlEnvSchema,
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o gateway."),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
@@ -94,6 +129,10 @@ const gatewayEnvSchema = z
       .string()
       .optional()
       .transform((value) => parsePositiveInteger(value, 60_000)),
+    jsonBodyLimit: z
+      .string()
+      .optional()
+      .transform((value, ctx) => parseJsonBodyLimit(value, ctx)),
   })
   .transform((env) => {
     validateProductionInternalServiceToken({
@@ -140,6 +179,7 @@ export interface GatewayEnv {
   tiServiceUrl: string;
   tiServiceInternalToken: string;
   websocketUpstreamUrl?: string;
+  publicGatewayUrl?: string;
   jwtSecret: string;
   logLevel: LoggerLevel;
   logPretty: boolean;
@@ -148,6 +188,7 @@ export interface GatewayEnv {
   rateLimitWindowMs: number;
   authRateLimitMax: number;
   authRateLimitWindowMs: number;
+  jsonBodyLimit: string;
 }
 
 export function getGatewayEnv(): GatewayEnv {
@@ -170,6 +211,7 @@ export function getGatewayEnv(): GatewayEnv {
     tiServiceUrl: process.env.TI_SERVICE_URL,
     tiServiceInternalToken: process.env.TI_SERVICE_INTERNAL_TOKEN,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
+    publicGatewayUrl: process.env.GATEWAY_PUBLIC_URL,
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
@@ -178,5 +220,6 @@ export function getGatewayEnv(): GatewayEnv {
     rateLimitWindowMs: process.env.GATEWAY_RATE_LIMIT_WINDOW_MS,
     authRateLimitMax: process.env.GATEWAY_AUTH_RATE_LIMIT_MAX,
     authRateLimitWindowMs: process.env.GATEWAY_AUTH_RATE_LIMIT_WINDOW_MS,
+    jsonBodyLimit: process.env.GATEWAY_JSON_BODY_LIMIT,
   }) as GatewayEnv;
 }

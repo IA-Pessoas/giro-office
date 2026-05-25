@@ -6,7 +6,6 @@ import {
   createSecurityHeadersMiddleware,
   createServiceCorsOptions,
   createSuccessResponse,
-  gatewayError,
   type Logger,
   type LogLevel,
   ServiceError,
@@ -26,6 +25,10 @@ import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
+
+type GatewayOpenApiSpec = ReturnType<typeof buildGatewayOpenApiSpec>;
+type AuditRecorder = ReturnType<typeof createAuditRecorder>;
+type GatewayProxy = ReturnType<typeof buildHttpProxyMiddleware>;
 
 function getRequestLogger(request: Request, logger: Logger): Logger {
   return (
@@ -148,18 +151,49 @@ function buildRequestLifecycleMiddleware(logger: Logger) {
   };
 }
 
-export function createApp(env: GatewayEnv, logger: Logger): express.Express {
-  const app = express();
-  const gatewayOpenApiSpec = buildGatewayOpenApiSpec(env);
-  const recordAuditRequest = createAuditRecorder({
-    enabled: env.auditEnabled,
-    serviceUrl: env.auditServiceUrl,
-    serviceToken: env.auditServiceToken,
-    logger,
-  });
+function getPublicServerUrl(env: GatewayEnv, request: Request): string {
+  return env.publicGatewayUrl ?? `${request.protocol}://${request.get("host")}`;
+}
 
+function isJsonBodyLimitError(error: Error): boolean {
+  const candidate = error as Error & {
+    status?: unknown;
+    statusCode?: unknown;
+    type?: unknown;
+  };
+
+  return (
+    candidate.type === "entity.too.large" ||
+    candidate.status === 413 ||
+    candidate.statusCode === 413
+  );
+}
+
+function normalizeJsonBodyLimitError(
+  error: Error,
+  _request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  if (isJsonBodyLimitError(error)) {
+    next(new ServiceError(413, "Corpo da requisição excede o limite permitido.", error));
+    return;
+  }
+
+  next(error);
+}
+
+function configureExpress(app: express.Express, env: GatewayEnv): void {
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
+}
+
+function mountObservability(
+  app: express.Express,
+  env: GatewayEnv,
+  logger: Logger,
+  recordAuditRequest: AuditRecorder,
+): void {
   app.use(buildRequestContextMiddleware(logger));
   app.use(
     buildAuditLifecycleMiddleware({
@@ -170,17 +204,28 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     }),
   );
   app.use(buildRequestLifecycleMiddleware(logger));
+}
+
+function mountCorsAndParsing(app: express.Express, env: GatewayEnv): void {
   const corsOptions = createServiceCorsOptions(env.allowedOrigins, "gateway");
+
   app.use(cors(corsOptions));
   app.options("*", cors(corsOptions));
-  app.use(express.json());
+  app.use(express.json({ limit: env.jsonBodyLimit ?? "1mb" }));
+}
 
+function mountPublicRoutes(
+  app: express.Express,
+  env: GatewayEnv,
+  gatewayOpenApiSpec: GatewayOpenApiSpec,
+): void {
   app.get("/openapi.json", (request: Request, response: Response) => {
     response.json({
       ...gatewayOpenApiSpec,
-      servers: [{ url: `${request.protocol}://${request.get("host")}` }],
+      servers: [{ url: getPublicServerUrl(env, request) }],
     });
   });
+
   mountOpenApiDocs(app, {
     spec: gatewayOpenApiSpec,
     docsPath: "/docs",
@@ -198,54 +243,95 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
     );
   });
 
-  app.get("/ready", (_request, response) => {
+  app.get("/ready", (_request, response, next) => {
+    const services = getGatewayServiceDefinitions(env);
+
+    if (services.length === 0) {
+      next(new ServiceError(503, "Gateway sem serviços configurados."));
+      return;
+    }
+
     response.status(200).json(
       createSuccessResponse({
         status: "ready",
         service: "gateway",
+        services: services.length,
       }),
     );
   });
+}
 
-  const generalRateLimit = createRateLimitMiddleware({
-    key: "gateway:general",
-    max: env.rateLimitMax,
-    windowMs: env.rateLimitWindowMs,
-  });
+function mountAuthRateLimits(app: express.Express, env: GatewayEnv): void {
   const authRateLimit = createRateLimitMiddleware({
     key: "gateway:auth",
     max: env.authRateLimitMax,
     windowMs: env.authRateLimitWindowMs,
     methods: ["POST"],
   });
+
   app.use("/user/session", authRateLimit);
   app.use("/user/start-config", authRateLimit);
+}
 
+function mountPublicBlockedRoutes(app: express.Express, env: GatewayEnv): void {
   if (!env.auditEnabled) {
     app.use("/audit", (_request, _response, next) => {
       next(new ServiceError(404, "Recurso não encontrado."));
     });
   }
+}
+
+function mountAuthenticationBoundary(app: express.Express, env: GatewayEnv): void {
+  const generalRateLimit = createRateLimitMiddleware({
+    key: "gateway:general",
+    max: env.rateLimitMax,
+    windowMs: env.rateLimitWindowMs,
+  });
 
   app.use(buildAuthenticateMiddleware(env.jwtSecret));
   app.use(generalRateLimit);
   app.use(authorizeRequest);
+}
 
+function mountProtectedBlockedRoutes(app: express.Express): void {
   app.use("/regularize/internal", (_request, _response, next) => {
-    next(new ServiceError(404, "Recurso nÃ£o encontrado."));
+    next(new ServiceError(404, "Recurso não encontrado."));
   });
+}
+
+function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
+  const proxyByServiceKey = new Map<string, GatewayProxy>();
 
   for (const service of getGatewayServiceDefinitions(env)) {
+    proxyByServiceKey.set(
+      service.key,
+      buildHttpProxyMiddleware(service.targetUrl, {
+        internalServiceToken: service.internalServiceToken,
+        permissionModule: service.permissionModule,
+      }),
+    );
+  }
+
+  return proxyByServiceKey;
+}
+
+function mountServiceRoutes(app: express.Express, env: GatewayEnv): void {
+  const proxyByServiceKey = buildServiceProxyMap(env);
+
+  for (const service of getGatewayServiceDefinitions(env)) {
+    const proxy = proxyByServiceKey.get(service.key);
+
     for (const routePrefix of service.routePrefixes) {
       app.use(
         routePrefix,
-        buildHttpProxyMiddleware(service.targetUrl, {
-          internalServiceToken: service.internalServiceToken,
-          permissionModule: service.permissionModule,
-        }),
+        proxy ??
+          ((_request, _response, next) => {
+            next(new ServiceError(502, "Serviço mapeado sem proxy configurado."));
+          }),
       );
     }
   }
+
   if (env.auditEnabled) {
     app.use(
       "/audit",
@@ -254,18 +340,16 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
       }),
     );
   }
+}
 
-  app.use((request, response, next) => {
-    const service = resolveGatewayService(env, request.originalUrl);
-    if (service === null) {
-      next(new ServiceError(404, "Rota não mapeada no gateway."));
-      return;
-    }
-    return buildHttpProxyMiddleware(service.targetUrl, {
-      internalServiceToken: service.internalServiceToken,
-      permissionModule: service.permissionModule,
-    })(request, response, next);
+function mountFallbackRoute(app: express.Express): void {
+  app.use((_request, _response, next) => {
+    next(new ServiceError(404, "Rota não mapeada no gateway."));
   });
+}
+
+function mountErrorHandlers(app: express.Express, env: GatewayEnv, logger: Logger): void {
+  app.use(normalizeJsonBodyLimitError);
   app.use(buildAuditErrorCaptureMiddleware());
   app.use(
     createExpressErrorHandler({
@@ -281,14 +365,29 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
       },
     }),
   );
-  app.use((error: Error, request: Request, response: Response, _next: NextFunction) => {
-    gatewayError({
-      requestId: request.requestId ?? "",
-      message: error.message,
-    });
+}
 
-    response.status(500).json({ error: "Erro interno no gateway." });
+export function createApp(env: GatewayEnv, logger: Logger): express.Express {
+  const app = express();
+  const gatewayOpenApiSpec = buildGatewayOpenApiSpec(env);
+  const recordAuditRequest = createAuditRecorder({
+    enabled: env.auditEnabled,
+    serviceUrl: env.auditServiceUrl,
+    serviceToken: env.auditServiceToken,
+    logger,
   });
+
+  configureExpress(app, env);
+  mountObservability(app, env, logger, recordAuditRequest);
+  mountCorsAndParsing(app, env);
+  mountPublicRoutes(app, env, gatewayOpenApiSpec);
+  mountAuthRateLimits(app, env);
+  mountPublicBlockedRoutes(app, env);
+  mountAuthenticationBoundary(app, env);
+  mountProtectedBlockedRoutes(app);
+  mountServiceRoutes(app, env);
+  mountFallbackRoute(app);
+  mountErrorHandlers(app, env, logger);
 
   return app;
 }
