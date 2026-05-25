@@ -26,7 +26,7 @@
     "smoke:coverage": "node scripts/check-smoke-spec-coverage.mjs",
     "smoke:scaffold": "node scripts/generate-service-harness.mjs",
     "harness:test": "node --test scripts/service-harness.test.mjs scripts/check-compose-security.test.mjs scripts/ci-workflow-optimization.test.mjs",
-    "hooks:test": "node --test scripts/git-hook-scope.test.mjs",
+    "hooks:test": "node --test scripts/git-hook-scope.test.mjs scripts/understand-anything-reminder.test.mjs",
     "security:compose": "node scripts/check-compose-security.mjs"
   },
   "devDependencies": {

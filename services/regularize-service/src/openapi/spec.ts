@@ -1,6 +1,12 @@
-import type { OpenApiDocument } from "@workspace/shared/http";
+type OpenApiDocument = Record<string, unknown> & {
+  openapi: string;
+  info: { title: string; version: string; description?: string };
+  paths: Record<string, unknown>;
+};
 
-import type { RegularizeServiceEnv } from "../config/env.js";
+interface RegularizeServiceOpenApiEnv {
+  port: number;
+}
 
 function successEnvelopeContent() {
   return {
@@ -12,7 +18,9 @@ function successEnvelopeContent() {
   };
 }
 
-export function buildRegularizeServiceOpenApiSpec(env: RegularizeServiceEnv): OpenApiDocument {
+export function buildRegularizeServiceOpenApiSpec(
+  env: RegularizeServiceOpenApiEnv,
+): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
 
   return {
