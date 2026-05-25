@@ -16,9 +16,15 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `ORGANIZATION_SERVICE_URL`
 - `RH_SERVICE_URL`
 - `USER_SERVICE_URL`
+- `DEPARTMENT_SERVICE_URL`
 - `TASK_SERVICE_URL`
 - `PROJECT_SERVICE_URL`
 - `CLIENT_SERVICE_URL`
+- `FISCAL_SERVICE_URL`
+- `CONTABIL_SERVICE_URL`
+- `REGULARIZE_SERVICE_URL`
+- `TI_SERVICE_URL`, `TI_SERVICE_INTERNAL_TOKEN`
+- `CERTIFICATE_SERVICE_URL`, `CERTIFICATE_SERVICE_INTERNAL_TOKEN`
 - `WEBSOCKET_UPSTREAM_URL`
 
 ## Upstreams
@@ -28,9 +34,20 @@ O gateway encaminha estes prefixos para os servicos configurados no env:
 - `/organizations` -> `ORGANIZATION_SERVICE_URL`
 - `/rh` -> `RH_SERVICE_URL`
 - `/user` -> `USER_SERVICE_URL`
+- `/department` -> `DEPARTMENT_SERVICE_URL`
 - `/task` -> `TASK_SERVICE_URL`
 - `/project` -> `PROJECT_SERVICE_URL`
 - `/client` -> `CLIENT_SERVICE_URL`
+- `/fiscal` -> `FISCAL_SERVICE_URL`
+- `/contabil` -> `CONTABIL_SERVICE_URL`
+- `/regularize` -> `REGULARIZE_SERVICE_URL`
+- `/ti` -> `TI_SERVICE_URL`
+- `/certificate` -> `CERTIFICATE_SERVICE_URL`
+
+Para servicos que validam contexto autenticado encaminhado internamente, o gateway injeta tokens internos por upstream:
+
+- `/ti` usa `TI_SERVICE_INTERNAL_TOKEN`.
+- `/certificate` usa `CERTIFICATE_SERVICE_INTERNAL_TOKEN`.
 
 Quando `AUDIT_ENABLED=true`, o gateway tambem proxya `/audit` para `AUDIT_SERVICE_URL` e injeta o header interno com `AUDIT_SERVICE_TOKEN`.
 
