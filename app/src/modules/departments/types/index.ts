@@ -9,8 +9,7 @@ export interface DepItem {
 export interface CreateDepData {
   name: string;
   color: string;
-  solution: boolean;
-  status: string;
+  solution?: boolean;
 }
 
 export interface UpdateDepData {

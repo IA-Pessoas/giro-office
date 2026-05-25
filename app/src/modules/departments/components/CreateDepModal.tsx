@@ -1,41 +1,72 @@
-import React, { useState } from 'react';
-import { toast } from 'react-toastify';
+import React, { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
+import { toast } from "react-toastify";
 
-import { setupAPIClient } from '@shared/services/api';
-import { Dialog } from '@shared/components';
-import type { DepItem } from '../types';
+import { Dialog } from "@shared/components";
+import { departmentService } from "../services/departmentService";
+import type { DepItem } from "../types";
 
 interface CreateDepModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreated: (newDep: DepItem) => void;
+  onCreated?: (newDep: DepItem) => void;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (isAxiosError(error)) {
+    const responseMessage = error.response?.data?.error;
+    if (typeof responseMessage === "string" && responseMessage.trim().length > 0) {
+      return responseMessage;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "Erro ao cadastrar departamento.";
 }
 
 export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalProps) {
-  const [formData, setFormData] = useState({ name: '', color: '' });
+  const queryClient = useQueryClient();
+  const [formData, setFormData] = useState({
+    name: "",
+    color: "#3B82F6",
+    solution: false,
+  });
   const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { value } = e.target;
-    setFormData(prev => ({ ...prev, [e.target.name]: value }));
+    const { name, value } = e.target;
+    const nextValue =
+      e.target instanceof HTMLInputElement && e.target.type === "checkbox" ? e.target.checked : value;
+
+    setFormData((prev) => ({ ...prev, [name]: nextValue }));
   };
 
   const handleCadastrar = async () => {
-    if (!formData.name) {
-      toast.warn('Preencha todos os campos obrigatórios!');
+    if (!formData.name.trim()) {
+      toast.warn("Preencha o nome do departamento.");
       return;
     }
+
     setIsLoading(true);
     try {
-      const apiClient = setupAPIClient();
-      const response = await apiClient.post('/departments', formData);
-      toast.success("Departamento cadastrado com sucesso!");
-      onCreated(response.data.dep);
+      const createdDepartment = await departmentService.create({
+        name: formData.name.trim(),
+        color: formData.color,
+        solution: formData.solution,
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ["departments"] });
+      toast.success("Departamento cadastrado com sucesso.");
+      onCreated?.(createdDepartment);
       onClose();
-      setFormData({ name: '', color: '' });
-    } catch (err) {
-      toast.error('Erro ao cadastrar departamento.');
-      console.error(err);
+      setFormData({ name: "", color: "#3B82F6", solution: false });
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+      console.error(error);
     } finally {
       setIsLoading(false);
     }
@@ -45,19 +76,30 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open) {
+          onClose();
+        }
       }}
-      title="Cadastrar Novo Departamento"
-      footer={(
+      title="Cadastrar novo departamento"
+      footer={
         <>
-          <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100" onClick={onClose}>
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
+            onClick={onClose}
+          >
             Cancelar
           </button>
-          <button type="button" className="ui-button-primary" disabled={isLoading} onClick={handleCadastrar}>
-            {isLoading ? 'Salvando...' : 'Salvar'}
+          <button
+            type="button"
+            className="ui-button-primary"
+            disabled={isLoading}
+            onClick={handleCadastrar}
+          >
+            {isLoading ? "Salvando..." : "Salvar"}
           </button>
         </>
-      )}
+      }
     >
       <div className="u-stack u-gap-4">
         <div className="u-stack u-gap-2">
@@ -73,6 +115,7 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
             required
           />
         </div>
+
         <div className="u-stack u-gap-2">
           <label htmlFor="dep-color" className="text-sm font-medium text-[var(--colors-blue-500)]">
             Cor
@@ -87,6 +130,18 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
             required
           />
         </div>
+
+        <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200">
+          <input
+            id="dep-solution"
+            name="solution"
+            type="checkbox"
+            checked={formData.solution}
+            onChange={handleInputChange}
+            className="h-4 w-4 rounded border-slate-300 text-[var(--colors-brand-gradient-end)] focus:ring-[var(--colors-brand-gradient-start)]"
+          />
+          Marcar como departamento de solução
+        </label>
       </div>
     </Dialog>
   );
