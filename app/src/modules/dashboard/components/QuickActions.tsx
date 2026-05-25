@@ -41,13 +41,13 @@ export function QuickActions() {
       tone: "purple",
     },
     {
-      label: "Organizações",
+      label: "Departamentos",
       icon: Briefcase,
       href: "/organizations",
       tone: "cyan",
     },
     {
-      label: "Departamentos",
+      label: "Triagem",
       icon: Layers,
       href: "/triagem",
       tone: "indigo",

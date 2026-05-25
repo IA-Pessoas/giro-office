@@ -2,15 +2,15 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { Organizations } from "../../shared/components/newLayout/Organizations";
+import { Departments } from "../../shared/components/newLayout/Departments";
 
 export default function OrganizationsPage() {
   return (
     <>
       <Head>
-        <title>Organizações</title>
+        <title>Departamentos</title>
       </Head>
-      <Organizations />
+      <Departments />
     </>
   );
 }

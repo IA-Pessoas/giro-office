@@ -95,7 +95,7 @@ const moduleCategories = [
       { path: "/clients", name: "Clientes", icon: ContactRound },
       { path: "/projects", name: "Projetos", icon: FolderKanban },
       { path: "/tasks", name: "Tarefas", icon: SquareCheck },
-      { path: "/organizations", name: "Organização", icon: Building2 },
+      { path: "/organizations", name: "Departamentos", icon: Building2 },
     ],
   },
   {
@@ -556,4 +556,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
