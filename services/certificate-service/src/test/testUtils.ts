@@ -138,6 +138,30 @@ export function createCertificatePrismaMock(): PrismaClient {
         ...data,
       })),
     },
+    certificateNotification: {
+      findMany: vi.fn(async () => [
+        {
+          id: "40000000-0000-4000-8000-000000000001",
+          certificate_id: "20000000-0000-4000-8000-000000000001",
+          client_name: "Empresa Castelo",
+          type: "PJ",
+          date: new Date("2026-12-31T00:00:00.000Z"),
+          organization_id: certificateOrganizationId,
+        },
+      ]),
+      findFirst: vi.fn(async () => null),
+      create: vi.fn(async ({ data }) => ({
+        id: "40000000-0000-4000-8000-000000000002",
+        ...data,
+      })),
+      update: vi.fn(async ({ where, data }) => ({
+        id: where.id,
+        certificate_id: "20000000-0000-4000-8000-000000000001",
+        type: "PJ",
+        organization_id: certificateOrganizationId,
+        ...data,
+      })),
+    },
   } as unknown as PrismaClient;
 }
 
