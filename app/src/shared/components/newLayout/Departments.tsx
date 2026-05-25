@@ -3,6 +3,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { Building2, PencilLine, Plus, Search } from "lucide-react";
 
 import { CreateDepModal, departmentService, type DepItem } from "@modules/departments";
+import { getDepartmentColorLabel } from "@modules/departments/utils/colors";
 import { useFetch } from "@shared/hooks";
 
 const DEPARTMENTS_GRADIENT_ICON_CLASSNAME =
@@ -157,26 +158,25 @@ export function Departments() {
                 <th className="px-6 py-4 font-medium">Departamento</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Cor</th>
-                <th className="px-6 py-4 font-medium">Solução</th>
                 <th className="px-6 py-4 font-medium text-center">Ação</th>
               </tr>
             </thead>
             <tbody>
               {departmentsQuery.isLoading ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={4}>
                     Carregando departamentos...
                   </td>
                 </tr>
               ) : departmentsQuery.isError ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={4}>
                     Não foi possível carregar a listagem no momento.
                   </td>
                 </tr>
               ) : filteredDepartments.length === 0 ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={4}>
                     Nenhum departamento encontrado para os filtros atuais.
                   </td>
                 </tr>
@@ -210,12 +210,9 @@ export function Departments() {
                           style={{ backgroundColor: department.color }}
                         />
                         <span className="text-sm text-slate-600 dark:text-slate-300">
-                          {department.color}
+                          {getDepartmentColorLabel(department.color)}
                         </span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
-                      {department.solution ? "Sim" : "Não"}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <Link

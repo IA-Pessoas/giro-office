@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import { Dialog } from "@shared/components";
 import { departmentService } from "../services/departmentService";
 import type { DepItem } from "../types";
+import { DepartmentColorField } from "./DepartmentColorField";
 
 interface CreateDepModalProps {
   isOpen: boolean;
@@ -32,17 +33,15 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     name: "",
-    color: "#3B82F6",
+    color: "#2563eb",
     solution: false,
   });
   const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    const nextValue =
-      e.target instanceof HTMLInputElement && e.target.type === "checkbox" ? e.target.checked : value;
 
-    setFormData((prev) => ({ ...prev, [name]: nextValue }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleCadastrar = async () => {
@@ -63,7 +62,7 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
       toast.success("Departamento cadastrado com sucesso.");
       onCreated?.(createdDepartment);
       onClose();
-      setFormData({ name: "", color: "#3B82F6", solution: false });
+      setFormData({ name: "", color: "#2563eb", solution: false });
     } catch (error) {
       toast.error(getErrorMessage(error));
       console.error(error);
@@ -117,31 +116,14 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
         </div>
 
         <div className="u-stack u-gap-2">
-          <label htmlFor="dep-color" className="text-sm font-medium text-[var(--colors-blue-500)]">
-            Cor
-          </label>
-          <input
+          <DepartmentColorField
             id="dep-color"
-            name="color"
-            type="color"
             value={formData.color}
-            onChange={handleInputChange}
-            className="h-10 w-full rounded-lg border border-black/15 bg-white p-1"
-            required
+            onChange={(color) => setFormData((prev) => ({ ...prev, color }))}
+            labelClassName="text-sm font-medium text-[var(--colors-blue-500)]"
+            containerClassName="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60"
           />
         </div>
-
-        <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200">
-          <input
-            id="dep-solution"
-            name="solution"
-            type="checkbox"
-            checked={formData.solution}
-            onChange={handleInputChange}
-            className="h-4 w-4 rounded border-slate-300 text-[var(--colors-brand-gradient-end)] focus:ring-[var(--colors-brand-gradient-start)]"
-          />
-          Marcar como departamento de solução
-        </label>
       </div>
     </Dialog>
   );

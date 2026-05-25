@@ -6,11 +6,23 @@ import { toast } from "react-toastify";
 import { departmentService } from "../services/departmentService";
 import type { DepItem } from "../types";
 
+function normalizeDepartmentStatus(status?: string): string {
+  if (status === "active") {
+    return "Ativo";
+  }
+
+  if (status === "inactive") {
+    return "Inativo";
+  }
+
+  return status || "Ativo";
+}
+
 const getInitialState = (dep: DepItem) => ({
   name: dep?.name || "",
   color: dep?.color || "#3B82F6",
   solution: dep.solution || false,
-  status: dep?.status || "Ativo",
+  status: normalizeDepartmentStatus(dep?.status),
 });
 
 function getErrorMessage(error: unknown): string {
@@ -30,9 +42,15 @@ function getErrorMessage(error: unknown): string {
 
 export const useDepForm = (initialDep: DepItem) => {
   const queryClient = useQueryClient();
+  const [savedState, setSavedState] = useState(getInitialState(initialDep));
   const [formData, setFormData] = useState(getInitialState(initialDep));
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const isDirty =
+    formData.name.trim() !== savedState.name.trim() ||
+    formData.color.toLowerCase() !== savedState.color.toLowerCase() ||
+    formData.status !== savedState.status ||
+    formData.solution !== savedState.solution;
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -52,10 +70,12 @@ export const useDepForm = (initialDep: DepItem) => {
         name: formData.name.trim(),
         color: formData.color,
         solution: formData.solution,
-        status: formData.status,
+        status: normalizeDepartmentStatus(formData.status),
       });
 
-      setFormData(getInitialState(updated));
+      const nextState = getInitialState(updated);
+      setSavedState(nextState);
+      setFormData(nextState);
       await queryClient.invalidateQueries({ queryKey: ["departments"] });
       toast.success("Atualizado com sucesso.");
     } catch (error) {
@@ -68,6 +88,7 @@ export const useDepForm = (initialDep: DepItem) => {
 
   return {
     formData,
+    isDirty,
     isLoading,
     file,
     handleInputChange,
