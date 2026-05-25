@@ -85,6 +85,46 @@ function publicCertificateOperation({
   };
 }
 
+function certificateNotificationListOperation() {
+  return {
+    operationId: "listCertificateNotifications",
+    tags: ["Certificate Notification"],
+    summary: "Lista notificacoes de certificados da organizacao autenticada",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      "200": successResponse("Notificacoes de certificados listadas"),
+      "401": errorResponse("Autenticacao obrigatoria"),
+      "403": errorResponse("Permissao insuficiente"),
+    },
+  };
+}
+
+function internalCertificateNotificationRunOperation() {
+  return {
+    operationId: "runCertificateNotificationReconciliation",
+    tags: ["Internal"],
+    summary: "Executa reconciliacao interna de notificacoes de certificados",
+    "x-internal": true,
+    security: [{ internalToken: [] }],
+    requestBody: {
+      required: false,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            additionalProperties: false,
+          },
+        },
+      },
+    },
+    responses: {
+      "200": successResponse("Reconciliacao de notificacoes executada"),
+      "400": errorResponse("Requisicao invalida"),
+      "401": errorResponse("Autenticacao obrigatoria"),
+    },
+  };
+}
+
 function certificatePjRequestBody(required = true) {
   return {
     required,
@@ -206,6 +246,9 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           requestBody: certificatePjRequestBody(false),
         }),
       },
+      "/certificate/notifications": {
+        get: certificateNotificationListOperation(),
+      },
       "/certificate/pf/list": {
         get: publicCertificateOperation({
           operationId: "listCertificatePf",
@@ -283,6 +326,9 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           requestBody: certificatePfRequestBody(false),
         }),
       },
+      "/internal/notifications/run": {
+        post: internalCertificateNotificationRunOperation(),
+      },
     },
     components: {
       securitySchemes: {
@@ -357,6 +403,27 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
             file_path: { type: "string", nullable: true },
             has_certificate: { type: "boolean" },
           },
+        },
+        CertificateNotification: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            certificate_id: { type: "string", format: "uuid" },
+            client_name: { type: "string" },
+            type: { type: "string", enum: ["PJ", "PF"] },
+            date: { type: "string", format: "date-time" },
+            organization_id: { type: "string", format: "uuid" },
+          },
+          required: ["id", "certificate_id", "client_name", "type", "date", "organization_id"],
+        },
+        CertificateNotificationRunResult: {
+          type: "object",
+          properties: {
+            evaluated: { type: "integer", minimum: 0 },
+            created: { type: "integer", minimum: 0 },
+            updated: { type: "integer", minimum: 0 },
+          },
+          required: ["evaluated", "created", "updated"],
         },
       },
     },

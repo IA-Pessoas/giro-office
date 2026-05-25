@@ -17,8 +17,10 @@ import {
   requestContext,
 } from "./middlewares/requestContext.js";
 import { buildCertificateServiceOpenApiSpec } from "./openapi/spec.js";
+import { createCertificateNotificationRoutes } from "./routes/certificateNotification.routes.js";
 import { createCertificatePfRoutes } from "./routes/certificatePf.routes.js";
 import { createCertificatePjRoutes } from "./routes/certificatePj.routes.js";
+import { createInternalNotificationRoutes } from "./routes/internalNotification.routes.js";
 
 function certificateServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const out: Record<string, unknown> = {};
@@ -75,8 +77,10 @@ export function createCertificateApplication({
   });
 
   app.use("/certificate", createForwardedAuthContextMiddleware(env.internalServiceToken));
+  app.use("/certificate/notifications", createCertificateNotificationRoutes(_prisma));
   app.use("/certificate/pj", createCertificatePjRoutes(_prisma));
   app.use("/certificate/pf", createCertificatePfRoutes(_prisma));
+  app.use("/internal/notifications", createInternalNotificationRoutes(_prisma, env));
 
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {
