@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { IoAdd, IoTrash } from "react-icons/io5";
 import { toast } from 'react-toastify';
+import { departmentService } from '@modules/departments';
 import { setupAPIClient } from '@shared/services/api';
 import { extractUsersList } from '@modules/users/services/userService';
 import { integracaoService } from '../services/integracaoService';
@@ -250,16 +251,16 @@ export function TaskModelModal({ isOpen, onClose, initialData, onSave }: ModalPr
                 setLoadingData(true);
 
                 // Busca usuários e departamentos
-                const [usersRes, depsRes, tasksRes] = await Promise.all([
+                const [usersRes, depsList, tasksRes] = await Promise.all([
                     apiClient.get('/user/users', { params: { status: 'Ativo' } }),
-                    apiClient.get('/departments', { params: { status: 'Ativo' } }),
+                    departmentService.list({ status: 'Ativo' }),
                     // Busca tarefas para popular o select de dependentes
                     // Ajuste a rota se necessário, estou usando a listagem padrão
                     apiClient.get('/task/models') 
                 ]);
 
                 setUsers(extractUsersList(usersRes.data));
-                setDepartments(depsRes.data);
+                setDepartments(depsList);
                 setAllTasks(tasksRes.data); // Assume que retorna array com id e name
 
             } catch (err) {

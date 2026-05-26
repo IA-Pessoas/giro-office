@@ -8,6 +8,8 @@ import {
   User,
   Users,
 } from "lucide-react";
+import { isAdminPermission } from "@modules/auth/utils/permissions";
+import { useMe } from "@shared/hooks";
 
 interface QuickAction {
   label: string;
@@ -20,6 +22,8 @@ const MotionDiv = motion.div;
 
 export function QuickActions() {
   const router = useRouter();
+  const meQuery = useMe();
+  const isAdmin = isAdminPermission(meQuery.data?.permission ?? null);
 
   const actions: QuickAction[] = [
     {
@@ -40,14 +44,18 @@ export function QuickActions() {
       href: "/users",
       tone: "purple",
     },
+    ...(isAdmin
+      ? [
+          {
+            label: "Departamentos",
+            icon: Briefcase,
+            href: "/departments",
+            tone: "cyan" as const,
+          },
+        ]
+      : []),
     {
-      label: "Organizações",
-      icon: Briefcase,
-      href: "/organizations",
-      tone: "cyan",
-    },
-    {
-      label: "Departamentos",
+      label: "Triagem",
       icon: Layers,
       href: "/triagem",
       tone: "indigo",

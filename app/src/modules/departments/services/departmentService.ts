@@ -43,14 +43,14 @@ function extractDepartment(payload: unknown): DepItem {
 }
 
 export const departmentService = {
-  list: async (filters?: { status?: string }): Promise<DepItem[]> => {
-    const api = setupAPIClient();
+  list: async (filters?: { status?: string }, ctx?: unknown): Promise<DepItem[]> => {
+    const api = setupAPIClient(ctx);
     const response = await api.get('/department/list', { params: filters });
     return extractDepartmentList(response.data);
   },
 
-  getById: async (id: string): Promise<DepItem> => {
-    const api = setupAPIClient();
+  getById: async (id: string, ctx?: unknown): Promise<DepItem> => {
+    const api = setupAPIClient(ctx);
     const response = await api.get('/department', {
       params: { dep_id: id },
     });

@@ -1,123 +1,160 @@
-import React from 'react';
-import 'react-toastify/dist/ReactToastify.css';
-import { LuFolder } from "react-icons/lu";
-import { IoCreate } from "react-icons/io5";
-import styles from './DepartmentPage.module.css';
+import React from "react";
+import Link from "next/link";
+import "react-toastify/dist/ReactToastify.css";
+import { ArrowLeft, Save } from "lucide-react";
+import { parseCookies } from "nookies";
 
-import { canSSRAuth } from '@modules/auth';
-import { setupAPIClient } from '@shared/services/api';
-import LogDrawer from '@shared/components/LogDrawer';
-import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@shared/components';
-import { useDepForm, departmentService, type DepItem } from '@modules/departments';
+import { canSSRAuth } from "@modules/auth";
+import { getPermissionFromToken, isAdminPermission } from "@modules/auth/utils/permissions";
+import { useDepForm, departmentService, type DepItem } from "@modules/departments";
+import { DepartmentColorField } from "@modules/departments/components/DepartmentColorField";
+
+const PANEL_CLASSNAME =
+  "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
+
+const INPUT_CLASSNAME =
+  "h-13 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500";
+
+const SELECT_ARROW_STYLE = {
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+} as const;
+
 interface Props {
-    dep: DepItem
+  dep: DepItem;
 }
 
 export default function Department({ dep }: Props) {
-    const {
-        formData,
-        isLoading,
-        handleInputChange,
-        handleUpdate
-    } = useDepForm(dep);
+  const { formData, isDirty, isLoading, handleInputChange, handleUpdate } = useDepForm(dep);
 
-    return (
-        <>
-            <TabsRoot defaultValue="dados">
-                <TabsList>
-                    <TabsTrigger value="dados">
-                        <span className="inline-flex items-center gap-2 text-sm">
-                            <LuFolder />
-                            Dados
-                        </span>
-                    </TabsTrigger>
-                </TabsList>
+  const handleColorChange = (color: string) => {
+    handleInputChange({
+      target: {
+        name: "color",
+        value: color,
+      },
+    } as React.ChangeEvent<HTMLInputElement>);
+  };
 
-                <TabsContent value="dados">
-                        <div className={styles.wrapper}>
-                            <form className={styles.form} onSubmit={(e) => { e.preventDefault(); handleUpdate(); }}>
-                                <div className={styles.row}>
-                                    <div className={styles.field}>
-                                        <label>Nome</label>
-                                        <input name="name" value={formData.name} onChange={handleInputChange} />
-                                    </div>
-                                    <div className={styles.field}>
-                                        <label>Cor</label>
-                                        <input type="color" name="color" value={formData.color} onChange={handleInputChange} />
-                                    </div>
-                                </div>
+  return (
+    <div className="mx-auto max-w-6xl space-y-5">
+      <div className="space-y-2">
+        <Link
+          href="/departments"
+          className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar para departamentos
+        </Link>
 
-                                <div className={styles.row}>
-                                    <div className={styles.field}>
-                                        <label htmlFor="solution">Solução?</label>
-                                        <input
-                                            id="solution"
-                                            name="solution"
-                                            type="checkbox"
-                                            checked={formData.solution}
-                                            onChange={handleInputChange}
-                                        />
-                                    </div>
-                                    <div className={styles.field}>
-                                        <label>Status</label>
-                                        <select name="status" value={formData.status} onChange={handleInputChange}>
-                                            <option value="Ativo">Ativo</option>
-                                            <option value="Inativo">Inativo</option>
-                                        </select>
-                                    </div>
-                                </div>
+        <div>
+          <h1 className="text-balance text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            {dep.name}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            Atualize nome, status e cor do departamento.
+          </p>
+        </div>
+      </div>
 
-                                <div className={styles.actions}>
-                                    <LogDrawer referring="departments" referringId={dep.id} />
-                                    <button
-                                        type="submit"
-                                        className={styles.saveButton}
-                                        disabled={isLoading}
-                                    >
-                                        <IoCreate />
-                                        Salvar Alterações
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                </TabsContent>
-            </TabsRoot>
-        </>
-    );
+      <section className={`${PANEL_CLASSNAME} overflow-visible`}>
+        <form
+          className="space-y-5 p-5 sm:p-6"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleUpdate();
+          }}
+        >
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_220px_minmax(260px,320px)] lg:items-start">
+            <label className="space-y-2">
+              <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                Nome
+              </span>
+              <input
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                className={INPUT_CLASSNAME}
+                placeholder="Nome do departamento"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                Status
+              </span>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleInputChange}
+                className={`${INPUT_CLASSNAME} appearance-none bg-[length:14px] bg-[position:right_1.25rem_center] bg-no-repeat pr-12`}
+                style={SELECT_ARROW_STYLE}
+              >
+                <option value="Ativo">Ativo</option>
+                <option value="Inativo">Inativo</option>
+              </select>
+            </label>
+
+            <DepartmentColorField value={formData.color} onChange={handleColorChange} />
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <button
+              type="submit"
+              className={`inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold text-white transition-all disabled:cursor-not-allowed ${
+                isDirty
+                  ? "bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/25 ring-2 ring-[var(--colors-brand-gradient-start)]/20 hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]"
+                  : "bg-slate-400 shadow-none dark:bg-slate-700"
+              } disabled:opacity-60`}
+              disabled={isLoading || !isDirty}
+            >
+              <Save className="h-4 w-4" />
+              {isLoading ? "Salvando..." : "Salvar alterações"}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
 }
 
 export const getServerSideProps = canSSRAuth(async (ctx) => {
-    const { id } = ctx.params;
+  const { id } = ctx.params as { id: string };
+  const cookies = parseCookies(ctx);
+  const permission = getPermissionFromToken(cookies["cw.token"]);
 
-    try {
-        const apiClient = setupAPIClient(ctx);
-        const [meResponse, dep] = await Promise.all([
-            apiClient.get('/user/me'),
-            departmentService.getById(id as string)
-        ]);
+  if (!isAdminPermission(permission)) {
+    return {
+      redirect: {
+        destination: "/dashboard",
+        permanent: false,
+      },
+    };
+  }
 
-        if (!dep || meResponse.data.user.permission === 0) {
-            return {
-                redirect: {
-                    destination: '/dashboard',
-                    permanent: false,
-                },
-            };
-        }
+  try {
+    const dep = await departmentService.getById(id, ctx);
 
-        return {
-            props: {
-                me: meResponse.data.user,
-                dep,
-            },
-        };
-    } catch (error) {
-        console.log(error);
-        return {
-            redirect: {
-                destination: '/dashboard',
-                permanent: false,
-            },
-        };
+    if (!dep) {
+      return {
+        redirect: {
+          destination: "/dashboard",
+          permanent: false,
+        },
+      };
     }
+
+    return {
+      props: {
+        dep,
+      },
+    };
+  } catch (error) {
+    return {
+      redirect: {
+        destination: "/dashboard",
+        permanent: false,
+      },
+    };
+  }
 });
