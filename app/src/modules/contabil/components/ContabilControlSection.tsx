@@ -1,14 +1,29 @@
-import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2, Lock } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, CheckCircle2, Loader2, Lock } from "lucide-react";
 
-import { useContabilControlBootstrapMutation } from "../hooks";
-import { getContabilErrorMessage } from "../services";
-import type { ContabilCompetence, ContabilControl } from "../types";
 import {
+  useContabilControlBootstrapMutation,
+  usePatchContabilControlFieldMutation,
+} from "../hooks";
+import { getContabilErrorMessage } from "../services";
+import type {
+  ContabilCompetence,
+  ContabilControl,
+  ContabilControlField,
+} from "../types";
+import {
+  CONTABIL_CONTROL_FIELDS,
   CONTABIL_CONTROL_CHECKLIST_FIELDS,
   CONTABIL_CONTROL_NOTES_FIELD,
 } from "./contabilControlFields";
-import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
+import {
+  applyLocalContabilFieldValue,
+  createContabilFieldStatusMap,
+  getCurrentContabilCompetence,
+  rollbackContabilFieldValue,
+  type ContabilControlFieldSaveStatus,
+  updateContabilControlFieldStatus,
+} from "./contabilControlSection.helpers";
 import { ContabilStateBox } from "./ContabilStateBox";
 
 interface ContabilControlSectionProps {
@@ -16,23 +31,50 @@ interface ContabilControlSectionProps {
   canEdit: boolean;
 }
 
+const SAVE_STATUS_LABELS: Record<ContabilControlFieldSaveStatus, string> = {
+  idle: "",
+  saving: "Salvando...",
+  saved: "Salvo",
+  error: "Falha ao salvar",
+};
+
+const SAVE_SUCCESS_FEEDBACK_MS = 1200;
+const FIELD_SAVE_DEBOUNCE_MS = 400;
+
 export function ContabilControlSection({
   clientId,
   canEdit,
 }: ContabilControlSectionProps) {
   const bootstrapMutation = useContabilControlBootstrapMutation();
+  const patchMutation = usePatchContabilControlFieldMutation();
   const [competence, setCompetence] = useState(() => getCurrentContabilCompetence());
+  const [controlId, setControlId] = useState<string | null>(null);
   const [control, setControl] = useState<ContabilControl | null>(null);
+  const [fieldStatuses, setFieldStatuses] = useState(() =>
+    createContabilFieldStatusMap(CONTABIL_CONTROL_FIELDS),
+  );
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+
+  const confirmedControlRef = useRef<ContabilControl | null>(null);
+  const bootstrapRequestRef = useRef(0);
+  const saveTimersRef = useRef<Map<ContabilControlField, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
+  const successTimersRef = useRef<Map<ContabilControlField, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   const checklistItems = useMemo(
     () =>
       CONTABIL_CONTROL_CHECKLIST_FIELDS.map((fieldDefinition) => ({
         ...fieldDefinition,
         checked: Boolean(control?.[fieldDefinition.field]),
+        status: fieldStatuses[fieldDefinition.field],
       })),
-    [control],
+    [control, fieldStatuses],
   );
+
+  const notesValue = control?.notes ?? "";
 
   useEffect(() => {
     if (!clientId) {
@@ -40,11 +82,66 @@ export function ContabilControlSection({
     }
 
     void bootstrapControl(clientId, competence);
+
+    return () => {
+      clearAllTimers();
+    };
   }, [clientId, competence]);
 
+  useEffect(() => {
+    return () => {
+      clearAllTimers();
+    };
+  }, []);
+
+  function clearAllTimers() {
+    for (const timer of saveTimersRef.current.values()) {
+      clearTimeout(timer);
+    }
+
+    for (const timer of successTimersRef.current.values()) {
+      clearTimeout(timer);
+    }
+
+    saveTimersRef.current.clear();
+    successTimersRef.current.clear();
+  }
+
+  function clearFieldTimers(field: ContabilControlField) {
+    const saveTimer = saveTimersRef.current.get(field);
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimersRef.current.delete(field);
+    }
+
+    const successTimer = successTimersRef.current.get(field);
+    if (successTimer) {
+      clearTimeout(successTimer);
+      successTimersRef.current.delete(field);
+    }
+  }
+
+  function scheduleIdleReset(field: ContabilControlField) {
+    clearFieldTimers(field);
+
+    const timer = setTimeout(() => {
+      setFieldStatuses((current) => updateContabilControlFieldStatus(current, field, "idle"));
+      successTimersRef.current.delete(field);
+    }, SAVE_SUCCESS_FEEDBACK_MS);
+
+    successTimersRef.current.set(field, timer);
+  }
+
   async function bootstrapControl(nextClientId: string, nextCompetence: ContabilCompetence) {
+    const requestId = bootstrapRequestRef.current + 1;
+    bootstrapRequestRef.current = requestId;
+
+    clearAllTimers();
     setBootstrapError(null);
+    setControlId(null);
     setControl(null);
+    setFieldStatuses(createContabilFieldStatusMap(CONTABIL_CONTROL_FIELDS));
+    confirmedControlRef.current = null;
 
     try {
       const nextControl = await bootstrapMutation.mutateAsync({
@@ -52,8 +149,18 @@ export function ContabilControlSection({
         competence: nextCompetence,
       });
 
+      if (bootstrapRequestRef.current !== requestId) {
+        return;
+      }
+
       setControl(nextControl);
+      setControlId(nextControl.id);
+      confirmedControlRef.current = nextControl;
     } catch (error) {
+      if (bootstrapRequestRef.current !== requestId) {
+        return;
+      }
+
       setBootstrapError(getContabilErrorMessage(error));
     }
   }
@@ -62,19 +169,57 @@ export function ContabilControlSection({
     setCompetence((value || getCurrentContabilCompetence()) as ContabilCompetence);
   }
 
-  function handleChecklistChange(field: keyof ContabilControl, checked: boolean) {
+  function queueFieldSave(field: ContabilControlField, value: boolean | string) {
+    if (!controlId || !control) {
+      return;
+    }
+
+    clearFieldTimers(field);
+    setFieldStatuses((current) => updateContabilControlFieldStatus(current, field, "saving"));
+
+    const timer = setTimeout(async () => {
+      try {
+        const updatedControl = await patchMutation.mutateAsync({
+          clientId,
+          competence,
+          controlId,
+          payload: {
+            field,
+            value,
+          },
+        });
+
+        confirmedControlRef.current = updatedControl;
+        setControl(updatedControl);
+        setFieldStatuses((current) => updateContabilControlFieldStatus(current, field, "saved"));
+        scheduleIdleReset(field);
+      } catch {
+        setFieldStatuses((current) => updateContabilControlFieldStatus(current, field, "error"));
+
+        if (field !== "notes" && confirmedControlRef.current) {
+          setControl((current) =>
+            current
+              ? rollbackContabilFieldValue(current, confirmedControlRef.current!, field)
+              : current,
+          );
+        }
+      } finally {
+        saveTimersRef.current.delete(field);
+      }
+    }, FIELD_SAVE_DEBOUNCE_MS);
+
+    saveTimersRef.current.set(field, timer);
+  }
+
+  function handleChecklistChange(field: ContabilControlField, checked: boolean) {
     if (!control || !canEdit) {
       return;
     }
 
     setControl((current) =>
-      current
-        ? {
-            ...current,
-            [field]: checked,
-          }
-        : current,
+      current ? applyLocalContabilFieldValue(current, field, checked) : current,
     );
+    queueFieldSave(field, checked);
   }
 
   function handleNotesChange(value: string) {
@@ -83,13 +228,9 @@ export function ContabilControlSection({
     }
 
     setControl((current) =>
-      current
-        ? {
-            ...current,
-            notes: value,
-          }
-        : current,
+      current ? applyLocalContabilFieldValue(current, "notes", value) : current,
     );
+    queueFieldSave("notes", value);
   }
 
   return (
@@ -188,9 +329,12 @@ export function ContabilControlSection({
                     />
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {item.label}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {item.label}
+                        </p>
+                        <FieldStatusBadge status={item.status} />
+                      </div>
                     </div>
                   </div>
                 </label>
@@ -209,9 +353,11 @@ export function ContabilControlSection({
                 </p>
               </div>
 
+              <FieldStatusBadge status={fieldStatuses.notes} />
+
               <div className="mt-4">
                 <textarea
-                  value={control.notes ?? ""}
+                  value={notesValue}
                   onChange={(event) => handleNotesChange(event.target.value)}
                   disabled={!canEdit}
                   rows={4}
@@ -224,5 +370,27 @@ export function ContabilControlSection({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function FieldStatusBadge({ status }: { status: ContabilControlFieldSaveStatus }) {
+  if (status === "idle") {
+    return null;
+  }
+
+  const className =
+    status === "error"
+      ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300"
+      : status === "saved"
+        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
+        : "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ${className}`}
+    >
+      {status === "saved" ? <CheckCircle2 className="h-3 w-3" /> : null}
+      {SAVE_STATUS_LABELS[status]}
+    </span>
   );
 }
