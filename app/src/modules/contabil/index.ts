@@ -1,8 +1,15 @@
 export {
+  ContabilControlSection,
+  CONTABIL_CONTROL_FIELDS,
+  ContabilStateBox,
+} from "./components";
+export {
   contabilControlQueryKey,
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
   CONTABIL_QUERY_KEY,
+  useContabilControlBootstrapMutation,
+  usePatchContabilControlFieldMutation,
   useContabilPermissions,
 } from "./hooks";
 export { resolveContabilPermissionAccess } from "./hooks/contabilPermissionAccess";
