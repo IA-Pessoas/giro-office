@@ -11,6 +11,9 @@ Por padrao: **3041** (`PORT`).
 
 As variaveis sao lidas em `src/config/env.ts`.
 
+Use `.env.example` como base para criar o `.env` local do service. O `.env` real nao deve ser
+versionado.
+
 - `NODE_ENV`
 - `PORT`
 - `DATABASE_URL`
