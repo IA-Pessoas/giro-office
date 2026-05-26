@@ -9,6 +9,7 @@ import {
   formatGeneratedSmokeModule,
   mergeServiceRegistryEntry,
 } from "./service-harness-lib.mjs";
+import { getServiceRegistryEntry } from "./service-registry.mjs";
 
 test("deriveServiceHarnessConfig creates deterministic defaults for a new service", () => {
   const config = deriveServiceHarnessConfig({
@@ -52,6 +53,21 @@ test("mergeServiceRegistryEntry replaces an existing service without duplicating
     merged.find((entry) => entry.name === "billing-service")?.defaultUrl,
     "http://localhost:3040",
   );
+});
+
+test("certificate-service registry entry exposes OpenAPI and internal smoke metadata", () => {
+  const entry = getServiceRegistryEntry("certificate-service");
+
+  assert.deepEqual(entry, {
+    name: "certificate-service",
+    packagePath: "services/certificate-service",
+    defaultUrl: "http://localhost:3041",
+    urlEnvKey: "CERTIFICATE_SERVICE_URL",
+    openapiSpecPath: "services/certificate-service/src/openapi/spec.ts",
+    authModes: ["public", "bearer", "admin-bearer", "internal-token"],
+    internalTokenEnvKey: "CERTIFICATE_SERVICE_INTERNAL_TOKEN",
+    prismaOutputPath: "services/certificate-service/src/generated/prisma",
+  });
 });
 
 test("extractOpenApiOperationsFromSource discovers path operations from spec source", () => {
@@ -147,4 +163,16 @@ test("all-services smoke builds user and task payloads from a verified departmen
   assert.doesNotMatch(source, /user_id: requireState\("session"\)\.id/);
   assert.match(source, /name: uniqueText\("Smoke Helper Department"\)/);
   assert.match(source, /department_id: await ensureDepartmentId\(\)/);
+});
+
+test("all-services smoke includes certificate-service state and handlers", () => {
+  const source = fs.readFileSync(new URL("./all-services-smoke.mjs", import.meta.url), "utf8");
+
+  assert.match(source, /certificatePjId: ""/);
+  assert.match(source, /certificatePfId: ""/);
+  assert.match(source, /modules: \{ certificado: 1 \}/);
+  assert.match(source, /modules: \{ certificado: 2 \}/);
+  assert.match(source, /async certificatePjCreate\(op\)/);
+  assert.match(source, /async certificatePfCreate\(op\)/);
+  assert.match(source, /async certificateNotificationRun\(op\)/);
 });

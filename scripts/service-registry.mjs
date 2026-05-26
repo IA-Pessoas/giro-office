@@ -37,7 +37,7 @@ export const serviceRegistry = [
     packagePath: "services/certificate-service",
     defaultUrl: "http://localhost:3041",
     urlEnvKey: "CERTIFICATE_SERVICE_URL",
-    openapiSpecPath: null,
+    openapiSpecPath: "services/certificate-service/src/openapi/spec.ts",
     authModes: ["public", "bearer", "admin-bearer", "internal-token"],
     internalTokenEnvKey: "CERTIFICATE_SERVICE_INTERNAL_TOKEN",
     prismaOutputPath: "services/certificate-service/src/generated/prisma",
