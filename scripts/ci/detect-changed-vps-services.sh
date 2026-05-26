@@ -112,6 +112,9 @@ for f in "${files[@]}"; do
     services/rh-service/* )
       services[rh-service]=1
       ;;
+    services/certificate-service/* )
+      services[certificate-service]=1
+      ;;
     services/audit-service/* )
       services[audit-service]=1
       ;;
