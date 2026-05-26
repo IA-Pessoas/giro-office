@@ -61,9 +61,13 @@ export interface ContabilResponsible {
 export interface ContabilRelationship {
   id: string;
   client_id: string;
+  bidding: boolean;
+  chart_accounts: string;
+  tool: string;
+  system: string;
+  note: string;
   created_at?: string | null;
   updated_at?: string | null;
-  [field: string]: string | boolean | number | null | undefined;
 }
 
 export interface ContabilControlFilters {
@@ -102,11 +106,19 @@ export interface DeleteContabilResponsiblePayload {
 
 export interface CreateContabilRelationshipPayload {
   client_id: string;
-  [field: string]: string | boolean | number | null | undefined;
+  bidding: boolean;
+  chart_accounts: string;
+  tool: string;
+  system: string;
+  note: string;
 }
 
 export interface UpdateContabilRelationshipPayload {
-  [field: string]: string | boolean | number | null | undefined;
+  bidding?: boolean;
+  chart_accounts?: string;
+  tool?: string;
+  system?: string;
+  note?: string;
 }
 
 export interface DeleteContabilRelationshipPayload {
