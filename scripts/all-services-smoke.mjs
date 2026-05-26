@@ -206,6 +206,8 @@ const state = {
   tiExtensionId: "",
   tiTermId: "",
   tiRobotId: "",
+  certificatePjId: "",
+  certificatePfId: "",
 };
 
 const cleanupTasks = [];
@@ -262,7 +264,7 @@ function buildUrl(target, service, routePath, query) {
   return url;
 }
 
-function createAdminToken(permission = WorkspacePermissionLevel.Admin) {
+function createAdminToken(permission = WorkspacePermissionLevel.Admin, options = {}) {
   if (!state.session) {
     throw new Error("Cannot mint admin token before login succeeds.");
   }
@@ -277,6 +279,7 @@ function createAdminToken(permission = WorkspacePermissionLevel.Admin) {
     name: state.session.name,
     login: state.session.login,
     permission,
+    ...(options.modules ? { modules: options.modules } : {}),
     sub: state.session.id,
     iat: now,
     exp: now + 60 * 60,
@@ -309,6 +312,13 @@ function getAuthHeaders(auth, service) {
   }
 
   if (auth === "bearer") {
+    if (service === "certificate-service") {
+      return {
+        Authorization: `Bearer ${createAdminToken(WorkspacePermissionLevel.User, {
+          modules: { certificado: 1 },
+        })}`,
+      };
+    }
     if (!state.bearerToken) {
       throw new Error("Bearer token is not available.");
     }
@@ -316,6 +326,13 @@ function getAuthHeaders(auth, service) {
   }
 
   if (auth === "admin-bearer") {
+    if (service === "certificate-service") {
+      return {
+        Authorization: `Bearer ${createAdminToken(WorkspacePermissionLevel.Admin, {
+          modules: { certificado: 2 },
+        })}`,
+      };
+    }
     if (!state.adminBearerToken) {
       state.adminBearerToken =
         state.session?.permission === WorkspacePermissionLevel.Admin && state.session?.token
@@ -933,6 +950,121 @@ const handlers = {
 
   async serviceReady(op) {
     await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async certificatePjList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { name: uniqueText("Smoke Certificate PJ") },
+    });
+  },
+
+  async certificatePjCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_castelo_status: true,
+        client_focus_status: false,
+        name: uniqueText("Smoke Certificate PJ"),
+        cnpj: uniqueDigits(14),
+        responsible: uniqueText("Smoke Certificate Responsible"),
+        model: "A1",
+        legal_nature: "LTDA",
+        password: "smoke-secret",
+        expiration_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        notes: "Smoke certificate PJ.",
+        was_paid: true,
+        payment_date: new Date().toISOString(),
+        payment_amount: 123.45,
+        contact_info: "smoke@example.com",
+        file_path: null,
+        has_certificate: true,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.certificatePjId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async certificatePjGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/certificate/pj/${requireState("certificatePjId")}`,
+    });
+  },
+
+  async certificatePjPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/certificate/pj/${requireState("certificatePjId")}`,
+      json: {
+        notes: "Smoke certificate PJ updated.",
+      },
+    });
+  },
+
+  async certificatePfList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { search: uniqueText("Smoke Certificate PF") },
+    });
+  },
+
+  async certificatePfCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_castelo_status: true,
+        client_focus_status: false,
+        name: uniqueText("Smoke Certificate PF"),
+        cpf: uniqueDigits(11),
+        model: "A1",
+        password: "smoke-secret",
+        expiration_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        notes: "Smoke certificate PF.",
+        enterprise: uniqueText("Smoke Enterprise"),
+        cnpj: uniqueDigits(14),
+        was_paid: true,
+        payment_date: new Date().toISOString(),
+        payment_amount: 234.56,
+        contact_info: "smoke@example.com",
+        file_path: null,
+        has_certificate: true,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.certificatePfId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async certificatePfGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/certificate/pf/${requireState("certificatePfId")}`,
+    });
+  },
+
+  async certificatePfPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/certificate/pf/${requireState("certificatePfId")}`,
+      json: {
+        notes: "Smoke certificate PF updated.",
+      },
+    });
+  },
+
+  async certificateNotificationList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async certificateNotificationRun(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      json: {},
+    });
   },
 
   async tiRequestCategoryList(op) {
