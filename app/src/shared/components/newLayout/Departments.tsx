@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
-import { Building2, PencilLine, Plus, Search } from "lucide-react";
+import { Building2, Plus, Search } from "lucide-react";
 
 import { CreateDepModal, departmentService, type DepItem } from "@modules/departments";
 import { getDepartmentColorLabel } from "@modules/departments/utils/colors";
@@ -219,7 +219,6 @@ export function Departments() {
                         href={`/departments/${department.id}`}
                         className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                       >
-                        <PencilLine className="h-4 w-4" />
                         Editar
                       </Link>
                     </td>

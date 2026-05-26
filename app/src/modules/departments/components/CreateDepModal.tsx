@@ -84,14 +84,14 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
         <>
           <button
             type="button"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
+            className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             onClick={onClose}
           >
             Cancelar
           </button>
           <button
             type="button"
-            className="ui-button-primary"
+            className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isLoading}
             onClick={handleCadastrar}
           >
@@ -102,7 +102,7 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
     >
       <div className="u-stack u-gap-4">
         <div className="u-stack u-gap-2">
-          <label htmlFor="dep-name" className="text-sm font-medium text-[var(--colors-blue-500)]">
+          <label htmlFor="dep-name" className="text-sm font-medium text-slate-700 dark:text-slate-200">
             Nome
           </label>
           <input
@@ -110,7 +110,7 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
             name="name"
             value={formData.name}
             onChange={handleInputChange}
-            className="ui-input"
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
             required
           />
         </div>
@@ -120,8 +120,8 @@ export function CreateDepModal({ isOpen, onClose, onCreated }: CreateDepModalPro
             id="dep-color"
             value={formData.color}
             onChange={(color) => setFormData((prev) => ({ ...prev, color }))}
-            labelClassName="text-sm font-medium text-[var(--colors-blue-500)]"
-            containerClassName="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60"
+            labelClassName="text-sm font-medium text-slate-700 dark:text-slate-200"
+            containerClassName="flex h-12 items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
           />
         </div>
       </div>
