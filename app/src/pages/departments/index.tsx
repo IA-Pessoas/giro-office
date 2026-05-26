@@ -4,7 +4,7 @@ import { parseCookies } from "nookies";
 
 import { canSSRAuth } from "@modules/auth";
 import { getPermissionFromToken, isAdminPermission } from "@modules/auth/utils/permissions";
-import { Departments } from "../../shared/components/newLayout/Departments";
+import { Departments } from "@shared/components/newLayout/Departments";
 
 export default function DepartmentsPage() {
   return (

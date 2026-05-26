@@ -49,7 +49,7 @@ export function QuickActions() {
           {
             label: "Departamentos",
             icon: Briefcase,
-            href: "/organizations",
+            href: "/departments",
             tone: "cyan" as const,
           },
         ]

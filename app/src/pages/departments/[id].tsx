@@ -40,7 +40,7 @@ export default function Department({ dep }: Props) {
     <div className="mx-auto max-w-6xl space-y-5">
       <div className="space-y-2">
         <Link
-          href="/organizations"
+          href="/departments"
           className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />

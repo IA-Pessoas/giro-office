@@ -96,7 +96,7 @@ const moduleCategories = [
       { path: "/clients", name: "Clientes", icon: ContactRound },
       { path: "/projects", name: "Projetos", icon: FolderKanban },
       { path: "/tasks", name: "Tarefas", icon: SquareCheck },
-      { path: "/organizations", name: "Departamentos", icon: Building2 },
+      { path: "/departments", name: "Departamentos", icon: Building2 },
     ],
   },
   {
@@ -184,7 +184,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     .map((category) => ({
       ...category,
       modules: category.modules.filter((module) =>
-        module.path === "/organizations" ? isAdmin : true,
+        module.path === "/departments" ? isAdmin : true,
       ),
     }))
     .filter((category) => category.modules.length > 0);
