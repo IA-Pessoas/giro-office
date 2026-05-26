@@ -32,14 +32,6 @@ export function unwrapContabilEnvelope<T>(body: unknown): T {
   return body as T;
 }
 
-export function unwrapContabilNullableDetail<T>(body: unknown): T | null {
-  if (body === null) {
-    return null;
-  }
-
-  return unwrapContabilEnvelope<T>(body);
-}
-
 export function isNotFoundError(error: unknown): boolean {
   return isAxiosError(error) && error.response?.status === 404;
 }
@@ -49,7 +41,7 @@ export async function executeNullableContabilRequest<T>(
 ): Promise<T | null> {
   try {
     const response = await request();
-    return unwrapContabilNullableDetail<T>(response.data);
+    return response.data === null ? null : unwrapContabilEnvelope<T>(response.data);
   } catch (error) {
     if (isNotFoundError(error)) {
       return null;

@@ -5,7 +5,6 @@ export {
   isNotFoundError,
   normalizeContabilCompetence,
   unwrapContabilEnvelope,
-  unwrapContabilNullableDetail,
 } from "./contabilService.contract";
 export { contabilControlService } from "./contabilControlService";
 export { getContabilErrorMessage } from "./contabilError";

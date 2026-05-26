@@ -16,7 +16,6 @@ export {
   isNotFoundError,
   normalizeContabilCompetence,
   unwrapContabilEnvelope,
-  unwrapContabilNullableDetail,
 } from "./services";
 export type {
   ContabilCompetence,
