@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-
 import {
   buildContabilControlParams,
   CONTABIL_ENDPOINTS,
@@ -20,6 +19,7 @@ import {
   CONTABIL_CONTROL_FIELDS,
   CONTABIL_CONTROL_NOTES_FIELD,
 } from "./components/contabilControlFields.ts";
+import { CONTABIL_RELATIONSHIP_FIELDS } from "./components/contabilRelationshipFields.ts";
 import {
   applyLocalContabilFieldValue,
   createContabilFieldStatusMap,
@@ -27,6 +27,13 @@ import {
   rollbackContabilFieldValue,
   updateContabilControlFieldStatus,
 } from "./components/contabilControlSection.helpers.ts";
+import {
+  buildContabilRelationshipFormValues,
+  buildContabilResponsibleFormValues,
+  getContabilSelectLabel,
+  isContabilTextValueFilled,
+  mapAssignableUsersToContabilOptions,
+} from "./components/contabilPartySection.helpers.ts";
 
 async function runTest(name, fn) {
   try {
@@ -235,6 +242,67 @@ await (async () => {
     ]);
   });
 
+  await runTest("relationship field registry matches the backend contract", () => {
+    assert.deepEqual(
+      CONTABIL_RELATIONSHIP_FIELDS.map((field) => field.field),
+      ["bidding", "chart_accounts", "tool", "system", "note"],
+    );
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[0].requiredOnCreate, true);
+  });
+
+  await runTest("responsible and relationship form helpers normalize nullable backend values", () => {
+    assert.deepEqual(buildContabilResponsibleFormValues(null), {
+      person_responsible_id: "",
+      posted_by_id: "",
+      customer_with_movement: false,
+    });
+
+    assert.deepEqual(buildContabilRelationshipFormValues(null), {
+      bidding: false,
+      chart_accounts: "",
+      tool: "",
+      system: "",
+      note: "",
+    });
+  });
+
+  await runTest("assignable user helper maps active users into select labels", () => {
+    const options = mapAssignableUsersToContabilOptions([
+      {
+        id: "user-1",
+        name: "Ana",
+        status: "active",
+        departmentName: "Contábil",
+        photoUrl: null,
+      },
+      {
+        id: "user-2",
+        name: "Bruno",
+        status: "active",
+        departmentName: null,
+        photoUrl: null,
+      },
+    ]);
+
+    assert.deepEqual(options, [
+      {
+        value: "user-1",
+        label: "Ana - Contábil",
+      },
+      {
+        value: "user-2",
+        label: "Bruno",
+      },
+    ]);
+    assert.equal(getContabilSelectLabel("user-1", options), "Ana - Contábil");
+    assert.equal(getContabilSelectLabel(null, options), "Não informado");
+  });
+
+  await runTest("text helper distinguishes filled and blank values", () => {
+    assert.equal(isContabilTextValueFilled(" ERP X "), true);
+    assert.equal(isContabilTextValueFilled("   "), false);
+  });
+
   await runTest("resolveContabilPermissionAccess blocks normal users without contabil permission", () => {
     assert.deepEqual(resolveContabilPermissionAccess(null, 1), {
       canViewContabil: false,
@@ -281,8 +349,20 @@ await (async () => {
     );
 
     assert.equal(
+      getContabilErrorMessage({
+        isAxiosError: true,
+        response: {
+          data: {
+            message: "Já está cadastrado para esta organização.",
+          },
+        },
+      }),
+      "Já está cadastrado para esta organização.",
+    );
+
+    assert.equal(
       getContabilErrorMessage(new Error("boom")),
-      "N\u00e3o foi poss\u00edvel concluir a opera\u00e7\u00e3o cont\u00e1bil agora. Tente novamente em instantes.",
+      "boom",
     );
   });
 })();
