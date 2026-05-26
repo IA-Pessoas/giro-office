@@ -1,13 +1,50 @@
 export type ContabilCompetence = `${number}-${number}`;
 
+export type ContabilControlChecklistField =
+  | "regenerate_accounting_entries"
+  | "check_summary_by_accumulator"
+  | "post_accounting_transaction"
+  | "import_bank_statements"
+  | "reconcile_bank_statements"
+  | "reconcile_vendors"
+  | "integrate_taxes"
+  | "settle_federal_taxes_via_ecac"
+  | "settle_state_taxes_via_sefaz_ba"
+  | "integrate_payroll"
+  | "suspense_accounts"
+  | "check_overdrawn_accounts"
+  | "general_account_reconciliation"
+  | "check_loan_and_interest_accounts"
+  | "monthly_closing"
+  | "reconcile_icms_pis_cofins"
+  | "depreciation";
+
+export type ContabilControlField = ContabilControlChecklistField | "notes";
+
 export interface ContabilControl {
   id: string;
   client_id: string;
   competence: ContabilCompetence;
+  regenerate_accounting_entries: boolean;
+  check_summary_by_accumulator: boolean;
+  post_accounting_transaction: boolean;
+  import_bank_statements: boolean;
+  reconcile_bank_statements: boolean;
+  reconcile_vendors: boolean;
+  integrate_taxes: boolean;
+  settle_federal_taxes_via_ecac: boolean;
+  settle_state_taxes_via_sefaz_ba: boolean;
+  integrate_payroll: boolean;
+  suspense_accounts: boolean;
+  check_overdrawn_accounts: boolean;
+  general_account_reconciliation: boolean;
+  check_loan_and_interest_accounts: boolean;
+  monthly_closing: boolean;
+  reconcile_icms_pis_cofins: boolean;
+  depreciation: boolean;
   notes: string | null;
   created_at?: string | null;
   updated_at?: string | null;
-  [field: string]: boolean | string | null | undefined;
 }
 
 export interface ContabilResponsible {
@@ -40,7 +77,7 @@ export interface CreateOrGetContabilControlPayload {
 }
 
 export interface PatchContabilControlFieldPayload {
-  field: string;
+  field: ContabilControlField;
   value: boolean | string | null;
 }
 
