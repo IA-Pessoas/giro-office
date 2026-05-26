@@ -1,9 +1,12 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import type { CertificateNotificationListQuery } from "../schemas/certificateNotification.schemas.js";
+import { getPaginationParams } from "../schemas/pagination.schemas.js";
 
 export interface CertificateNotificationListInput {
   organizationId: string;
+  query: CertificateNotificationListQuery;
 }
 
 export interface CertificateNotificationResult {
@@ -43,6 +46,12 @@ const certificateNotificationCandidateSelect = {
   expiration_date: true,
   organization_id: true,
 };
+const certificateNotificationIdentitySelect = {
+  certificate_id: true,
+  organization_id: true,
+  type: true,
+};
+const RECONCILIATION_BATCH_SIZE = 25;
 
 function getWindowEnd(now: Date, windowDays: number): Date {
   const windowEnd = new Date(now);
@@ -51,15 +60,36 @@ function getWindowEnd(now: Date, windowDays: number): Date {
   return windowEnd;
 }
 
+function getNotificationIdentityKey(
+  candidate: Pick<CertificateCandidate, "id" | "organization_id">,
+  type: CertificateNotificationType,
+): string {
+  return `${candidate.organization_id}:${candidate.id}:${type}`;
+}
+
+async function runInChunks<T>(
+  items: T[],
+  chunkSize: number,
+  handler: (items: T[]) => Promise<void>,
+): Promise<void> {
+  for (let index = 0; index < items.length; index += chunkSize) {
+    const chunk = items.slice(index, index + chunkSize);
+    await handler(chunk);
+  }
+}
+
 export class CertificateNotificationService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async listCertificateNotifications(
     input: CertificateNotificationListInput,
   ): Promise<CertificateNotificationListResult> {
+    const pagination = getPaginationParams(input.query);
+
     return this.prisma.certificateNotification.findMany({
       where: { organization_id: input.organizationId },
       orderBy: [{ date: "asc" }, { client_name: "asc" }],
+      ...pagination,
     });
   }
 
@@ -91,12 +121,8 @@ export class CertificateNotificationService {
         updated: 0,
       };
 
-      for (const candidate of certificatePj) {
-        await this.upsertCertificateNotification(candidate, "PJ", result);
-      }
-      for (const candidate of certificatePf) {
-        await this.upsertCertificateNotification(candidate, "PF", result);
-      }
+      await this.upsertCertificateNotifications(certificatePj, "PJ", result);
+      await this.upsertCertificateNotifications(certificatePf, "PF", result);
 
       return result;
     } catch (err: unknown) {
@@ -106,42 +132,66 @@ export class CertificateNotificationService {
     }
   }
 
-  private async upsertCertificateNotification(
-    candidate: CertificateCandidate,
+  private async upsertCertificateNotifications(
+    candidates: CertificateCandidate[],
     type: CertificateNotificationType,
     result: CertificateNotificationRunResult,
   ): Promise<void> {
-    result.evaluated += 1;
-
-    const existing = await this.prisma.certificateNotification.findFirst({
-      where: {
-        certificate_id: candidate.id,
-        type,
-        organization_id: candidate.organization_id,
-      },
-    });
-
-    if (existing) {
-      await this.prisma.certificateNotification.update({
-        where: { id: existing.id },
-        data: {
-          client_name: candidate.name,
-          date: candidate.expiration_date,
-        },
-      });
-      result.updated += 1;
+    if (candidates.length === 0) {
       return;
     }
 
-    await this.prisma.certificateNotification.create({
-      data: {
-        certificate_id: candidate.id,
-        client_name: candidate.name,
-        type,
-        date: candidate.expiration_date,
-        organization_id: candidate.organization_id,
-      },
+    await runInChunks(candidates, RECONCILIATION_BATCH_SIZE, async (chunk) => {
+      const existingNotifications = await this.prisma.certificateNotification.findMany({
+        where: {
+          type,
+          organization_id: {
+            in: [...new Set(chunk.map((candidate) => candidate.organization_id))],
+          },
+          certificate_id: { in: chunk.map((candidate) => candidate.id) },
+        },
+        select: certificateNotificationIdentitySelect,
+      });
+      const existingKeys = new Set(
+        existingNotifications.map(
+          (notification) =>
+            `${notification.organization_id}:${notification.certificate_id}:${notification.type}`,
+        ),
+      );
+
+      result.evaluated += chunk.length;
+      for (const candidate of chunk) {
+        if (existingKeys.has(getNotificationIdentityKey(candidate, type))) {
+          result.updated += 1;
+        } else {
+          result.created += 1;
+        }
+      }
+
+      await Promise.all(
+        chunk.map((candidate) =>
+          this.prisma.certificateNotification.upsert({
+            where: {
+              certificateNotificationIdentity: {
+                organization_id: candidate.organization_id,
+                certificate_id: candidate.id,
+                type,
+              },
+            },
+            update: {
+              client_name: candidate.name,
+              date: candidate.expiration_date,
+            },
+            create: {
+              certificate_id: candidate.id,
+              client_name: candidate.name,
+              type,
+              date: candidate.expiration_date,
+              organization_id: candidate.organization_id,
+            },
+          }),
+        ),
+      );
     });
-    result.created += 1;
   }
 }

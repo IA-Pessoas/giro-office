@@ -31,11 +31,14 @@ describe("CertificateNotificationService", () => {
 
     const result = await service.listCertificateNotifications({
       organizationId: certificateOrganizationId,
+      query: { page: 2, page_size: 10 },
     });
 
     expect(prisma.certificateNotification.findMany).toHaveBeenCalledWith({
       where: { organization_id: certificateOrganizationId },
       orderBy: [{ date: "asc" }, { client_name: "asc" }],
+      skip: 10,
+      take: 10,
     });
     expect(result).toEqual([createNotificationRecord()]);
   });
@@ -63,9 +66,8 @@ describe("CertificateNotificationService", () => {
         ]),
       },
       certificateNotification: {
-        findFirst: vi.fn(async () => null),
-        create: vi.fn(async ({ data }) => ({ id: crypto.randomUUID(), ...data })),
-        update: vi.fn(),
+        findMany: vi.fn(async () => []),
+        upsert: vi.fn(async ({ create }) => ({ id: crypto.randomUUID(), ...create })),
       },
     };
     const service = new CertificateNotificationService(prisma as never);
@@ -99,9 +101,20 @@ describe("CertificateNotificationService", () => {
         organization_id: true,
       },
     });
-    expect(prisma.certificateNotification.create).toHaveBeenCalledTimes(2);
-    expect(prisma.certificateNotification.create).toHaveBeenNthCalledWith(1, {
-      data: {
+    expect(prisma.certificateNotification.upsert).toHaveBeenCalledTimes(2);
+    expect(prisma.certificateNotification.upsert).toHaveBeenNthCalledWith(1, {
+      where: {
+        certificateNotificationIdentity: {
+          organization_id: certificateOrganizationId,
+          certificate_id: "20000000-0000-4000-8000-000000000001",
+          type: "PJ",
+        },
+      },
+      update: {
+        client_name: "Empresa Vencida",
+        date: new Date("2026-05-20T00:00:00.000Z"),
+      },
+      create: {
         certificate_id: "20000000-0000-4000-8000-000000000001",
         client_name: "Empresa Vencida",
         type: "PJ",
@@ -109,8 +122,19 @@ describe("CertificateNotificationService", () => {
         organization_id: certificateOrganizationId,
       },
     });
-    expect(prisma.certificateNotification.create).toHaveBeenNthCalledWith(2, {
-      data: {
+    expect(prisma.certificateNotification.upsert).toHaveBeenNthCalledWith(2, {
+      where: {
+        certificateNotificationIdentity: {
+          organization_id: certificateOrganizationId,
+          certificate_id: "30000000-0000-4000-8000-000000000001",
+          type: "PF",
+        },
+      },
+      update: {
+        client_name: "Joao Silva",
+        date: new Date("2026-06-10T00:00:00.000Z"),
+      },
+      create: {
         certificate_id: "30000000-0000-4000-8000-000000000001",
         client_name: "Joao Silva",
         type: "PF",
@@ -145,12 +169,10 @@ describe("CertificateNotificationService", () => {
         findMany: vi.fn(async () => []),
       },
       certificateNotification: {
-        findFirst: vi.fn(async () => existingNotification),
-        create: vi.fn(),
-        update: vi.fn(async ({ where, data }) => ({
+        findMany: vi.fn(async () => [existingNotification]),
+        upsert: vi.fn(async ({ update }) => ({
           ...existingNotification,
-          id: where.id,
-          ...data,
+          ...update,
         })),
       },
     };
@@ -161,25 +183,105 @@ describe("CertificateNotificationService", () => {
       windowDays: 30,
     });
 
-    expect(prisma.certificateNotification.findFirst).toHaveBeenCalledWith({
+    expect(prisma.certificateNotification.findMany).toHaveBeenCalledWith({
       where: {
-        certificate_id: "20000000-0000-4000-8000-000000000001",
         type: "PJ",
-        organization_id: certificateOrganizationId,
+        organization_id: { in: [certificateOrganizationId] },
+        certificate_id: { in: ["20000000-0000-4000-8000-000000000001"] },
+      },
+      select: {
+        certificate_id: true,
+        organization_id: true,
+        type: true,
       },
     });
-    expect(prisma.certificateNotification.update).toHaveBeenCalledWith({
-      where: { id: existingNotification.id },
-      data: {
+    expect(prisma.certificateNotification.upsert).toHaveBeenCalledWith({
+      where: {
+        certificateNotificationIdentity: {
+          organization_id: certificateOrganizationId,
+          certificate_id: "20000000-0000-4000-8000-000000000001",
+          type: "PJ",
+        },
+      },
+      update: {
         client_name: "Empresa Atualizada",
         date: new Date("2026-05-20T00:00:00.000Z"),
       },
+      create: {
+        certificate_id: "20000000-0000-4000-8000-000000000001",
+        client_name: "Empresa Atualizada",
+        type: "PJ",
+        date: new Date("2026-05-20T00:00:00.000Z"),
+        organization_id: certificateOrganizationId,
+      },
     });
-    expect(prisma.certificateNotification.create).not.toHaveBeenCalled();
     expect(result).toEqual({
       evaluated: 1,
       created: 0,
       updated: 1,
+    });
+  });
+
+  it("runCertificateNotificationReconciliation batches identity lookups and upserts", async () => {
+    const candidates = Array.from({ length: 26 }, (_, index) => ({
+      id: `20000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      name: `Empresa ${index + 1}`,
+      expiration_date: new Date("2026-05-20T00:00:00.000Z"),
+      organization_id: certificateOrganizationId,
+    }));
+    const prisma = {
+      certificatePJ: {
+        findMany: vi.fn(async () => candidates),
+      },
+      certificatePF: {
+        findMany: vi.fn(async () => []),
+      },
+      certificateNotification: {
+        findMany: vi.fn(async () => []),
+        upsert: vi.fn(async ({ create }) => ({ id: crypto.randomUUID(), ...create })),
+      },
+    };
+    const service = new CertificateNotificationService(prisma as never);
+
+    const result = await service.runCertificateNotificationReconciliation({
+      now,
+      windowDays: 30,
+    });
+
+    expect(prisma.certificateNotification.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.certificateNotification.findMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        type: "PJ",
+        organization_id: { in: [certificateOrganizationId] },
+        certificate_id: {
+          in: candidates.slice(0, 25).map((candidate) => candidate.id),
+        },
+      },
+      select: {
+        certificate_id: true,
+        organization_id: true,
+        type: true,
+      },
+    });
+    expect(prisma.certificateNotification.findMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        type: "PJ",
+        organization_id: { in: [certificateOrganizationId] },
+        certificate_id: {
+          in: candidates.slice(25).map((candidate) => candidate.id),
+        },
+      },
+      select: {
+        certificate_id: true,
+        organization_id: true,
+        type: true,
+      },
+    });
+    expect(prisma.certificateNotification.upsert).toHaveBeenCalledTimes(26);
+    expect(result).toEqual({
+      evaluated: 26,
+      created: 26,
+      updated: 0,
     });
   });
 });

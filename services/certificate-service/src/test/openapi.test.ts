@@ -42,6 +42,17 @@ function getSuccessDataSchemaRef(
   )?.properties?.data;
 }
 
+function getQueryParameterNames(
+  spec: ReturnType<typeof buildCertificateServiceOpenApiSpec>,
+  path: string,
+): string[] {
+  return (
+    spec.paths[path]?.get?.parameters
+      ?.filter((parameter) => parameter.in === "query")
+      .map((parameter) => parameter.name) ?? []
+  );
+}
+
 describe("certificate-service OpenAPI", () => {
   it("documents the public certificate and notification paths", () => {
     const spec = buildCertificateServiceOpenApiSpec(env);
@@ -57,6 +68,21 @@ describe("certificate-service OpenAPI", () => {
     expect(spec.paths["/certificate/pf/list"].get?.security).toEqual([{ bearerAuth: [] }]);
     expect(spec.paths["/certificate/pf/{id}"].get?.security).toEqual([{ bearerAuth: [] }]);
     expect(spec.paths["/certificate/notifications"].get?.security).toEqual([{ bearerAuth: [] }]);
+  });
+
+  it("documents pagination query parameters on list endpoints", () => {
+    const spec = buildCertificateServiceOpenApiSpec(env);
+
+    expect(getQueryParameterNames(spec, "/certificate/pj/list")).toEqual(
+      expect.arrayContaining(["page", "page_size"]),
+    );
+    expect(getQueryParameterNames(spec, "/certificate/pf/list")).toEqual(
+      expect.arrayContaining(["page", "page_size"]),
+    );
+    expect(getQueryParameterNames(spec, "/certificate/notifications")).toEqual(
+      expect.arrayContaining(["page", "page_size"]),
+    );
+    expect(spec.paths["/certificate/notifications"].get?.responses).toHaveProperty("400");
   });
 
   it("documents the internal notification run endpoint as internal-only", () => {

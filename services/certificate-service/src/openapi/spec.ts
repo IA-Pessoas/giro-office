@@ -60,6 +60,25 @@ function certificatePfIdParameter() {
   };
 }
 
+function paginationQueryParameters() {
+  return [
+    {
+      in: "query",
+      name: "page",
+      description: "Pagina da listagem, iniciando em 1",
+      schema: { type: "integer", minimum: 1, default: 1 },
+      required: false,
+    },
+    {
+      in: "query",
+      name: "page_size",
+      description: "Quantidade de itens por pagina",
+      schema: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+      required: false,
+    },
+  ];
+}
+
 function publicCertificateOperation({
   operationId,
   summary,
@@ -116,11 +135,13 @@ function certificateNotificationListOperation() {
     tags: ["Certificate Notification"],
     summary: "Lista notificacoes de certificados da organizacao autenticada",
     security: [{ bearerAuth: [] }],
+    parameters: paginationQueryParameters(),
     responses: {
       "200": successResponse(
         "Notificacoes de certificados listadas",
         componentArrayRef("CertificateNotification"),
       ),
+      "400": errorResponse("Requisicao invalida"),
       "401": errorResponse("Autenticacao obrigatoria"),
       "403": errorResponse("Permissao insuficiente"),
     },
@@ -221,6 +242,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           successDataSchema: componentArrayRef("CertificatePj"),
           notFoundDescription: "Certificado PJ nao encontrado",
           parameters: [
+            ...paginationQueryParameters(),
             {
               in: "query",
               name: "name",
@@ -293,6 +315,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           successDataSchema: componentArrayRef("CertificatePf"),
           notFoundDescription: "Certificado PF nao encontrado",
           parameters: [
+            ...paginationQueryParameters(),
             {
               in: "query",
               name: "search",

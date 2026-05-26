@@ -43,7 +43,7 @@ describe("CertificatePjService", () => {
 
     const result = await service.listCertificatePj({
       organizationId: certificateOrganizationId,
-      query: { has_certificate: true },
+      query: { has_certificate: true, page: 2, page_size: 25 },
     });
 
     expect(prisma.certificatePJ.findMany).toHaveBeenCalledWith({
@@ -52,6 +52,8 @@ describe("CertificatePjService", () => {
         has_certificate: true,
       },
       orderBy: [{ expiration_date: "asc" }, { name: "asc" }],
+      skip: 25,
+      take: 25,
       select: expect.not.objectContaining({ password: true }),
     });
     expect(result[0]).not.toHaveProperty("password");
@@ -129,6 +131,39 @@ describe("CertificatePjService", () => {
       },
     });
     expect(prisma.certificatePJ.create).not.toHaveBeenCalled();
+  });
+
+  it("createCertificatePj maps database unique violations to conflict", async () => {
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => {
+          throw { code: "P2002" };
+        }),
+      },
+    };
+    const service = new CertificatePjService(prisma as never);
+
+    await expect(
+      service.createCertificatePj({
+        organizationId: certificateOrganizationId,
+        data: {
+          client_castelo_status: true,
+          client_focus_status: false,
+          name: "Empresa Castelo",
+          cnpj: "11222333000144",
+          responsible: "Maria Silva",
+          model: "A1",
+          legal_nature: "LTDA",
+          password: "secret-password",
+          expiration_date: new Date("2026-12-31T00:00:00.000Z"),
+          was_paid: true,
+          has_certificate: true,
+        },
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+    } satisfies Partial<ServiceError>);
   });
 
   it("updateCertificatePj returns 404 when record does not exist in organization", async () => {
