@@ -288,6 +288,7 @@ jobs:
           ENV_VPS_REGULARIZE_SERVICE: ${{ secrets.ENV_VPS_REGULARIZE_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
           ENV_VPS_TI_SERVICE: ${{ secrets.ENV_VPS_TI_SERVICE }}
+          ENV_VPS_CERTIFICATE_SERVICE: ${{ secrets.ENV_VPS_CERTIFICATE_SERVICE }}
           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
           ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
         run: bash scripts/ci/materialize-vps-env.sh
@@ -374,6 +375,7 @@ jobs:
           ENV_VPS_REGULARIZE_SERVICE: ${{ secrets.ENV_VPS_REGULARIZE_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
           ENV_VPS_TI_SERVICE: ${{ secrets.ENV_VPS_TI_SERVICE }}
+          ENV_VPS_CERTIFICATE_SERVICE: ${{ secrets.ENV_VPS_CERTIFICATE_SERVICE }}
           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
           ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
         run: bash scripts/ci/materialize-vps-env.sh

@@ -62,6 +62,13 @@ test("detect-changed-vps-services emits a single service for service-only change
   );
 });
 
+test("detect-changed-vps-services emits certificate-service for certificate changes", async () => {
+  assert.equal(
+    await detectChangedServices("services/certificate-service/src/routes/certificatePj.routes.ts"),
+    "certificate-service",
+  );
+});
+
 test("detect-changed-vps-services emits web for app changes", async () => {
   assert.equal(await detectChangedServices("app/src/app/page.tsx"), "web");
 });
@@ -124,6 +131,19 @@ test("compose-vps-buildx-push plans cached service build for ti-service", async 
     /--cache-from type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-ti-service:buildcache/,
   );
   assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/ti-service:abc1234/);
+});
+
+test("compose-vps-buildx-push plans cached service build for certificate-service", async () => {
+  const output = await dryRunBuildxPush("certificate-service");
+  assert.match(output, /docker buildx build/);
+  assert.match(output, /--file docker\/service\.Dockerfile/);
+  assert.match(output, /--build-arg WORKSPACE_PACKAGE=@workspace\/certificate-service/);
+  assert.match(output, /--build-arg SERVICE_DIR=services\/certificate-service/);
+  assert.match(
+    output,
+    /--cache-from type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-certificate-service:buildcache/,
+  );
+  assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/certificate-service:abc1234/);
 });
 
 test("compose-vps-buildx-push plans cached web build with Next.js build args", async () => {
@@ -292,6 +312,27 @@ test("audit-service is part of the default VPS compose stack", async () => {
   assert.match(gatewayBlock, /depends_on:[\s\S]*audit-service:[\s\S]*condition: service_healthy/);
 });
 
+test("certificate-service is part of the default VPS compose stack", async () => {
+  const composeContents = await readFile(composeVpsFile, "utf8");
+  const certificateBlock = extractComposeServiceBlock(composeContents, "certificate-service");
+  const gatewayBlock = extractComposeServiceBlock(composeContents, "gateway");
+
+  assert.doesNotMatch(certificateBlock, /^\s+profiles:/m);
+  assert.match(
+    certificateBlock,
+    /image: workspace-certificate-service:\$\{WORKSPACE_VPS_IMAGE_TAG:-vps\}/,
+  );
+  assert.match(certificateBlock, /WORKSPACE_PACKAGE: "@workspace\/certificate-service"/);
+  assert.match(certificateBlock, /SERVICE_DIR: services\/certificate-service/);
+  assert.match(certificateBlock, /env_file:[\s\S]*\.env\.vps\.certificate-service/);
+  assert.match(certificateBlock, /expose:[\s\S]*- "3041"/);
+  assert.match(certificateBlock, /fetch\('http:\/\/127\.0\.0\.1:3041\/health'\)/);
+  assert.match(
+    gatewayBlock,
+    /depends_on:[\s\S]*certificate-service:[\s\S]*condition: service_healthy/,
+  );
+});
+
 test("VPS env materialization includes audit-service in active workflows", async () => {
   const manifest = await readFile(vpsSecretsManifest, "utf8");
   assert.match(manifest, /^ENV_VPS_AUDIT_SERVICE\|\.env\.vps\.audit-service$/m);
@@ -314,6 +355,33 @@ test("VPS env materialization includes audit-service in active workflows", async
         envWindow,
         /^\s+ENV_VPS_AUDIT_SERVICE:\s+\$\{\{ secrets\.ENV_VPS_AUDIT_SERVICE \}\}/m,
         `${path.relative(repoRoot, workflowFile)} materialize step at line ${index + 1} should map ENV_VPS_AUDIT_SERVICE`,
+      );
+    }
+  }
+});
+
+test("VPS env materialization includes certificate-service in active workflows", async () => {
+  const manifest = await readFile(vpsSecretsManifest, "utf8");
+  assert.match(manifest, /^ENV_VPS_CERTIFICATE_SERVICE\|\.env\.vps\.certificate-service$/m);
+
+  const workflowsDir = path.join(repoRoot, ".github", "workflows");
+  const workflowFiles = (await readdir(workflowsDir))
+    .filter((file) => file.endsWith(".yml"))
+    .map((file) => path.join(workflowsDir, file));
+
+  for (const workflowFile of workflowFiles) {
+    const contents = await readFile(workflowFile, "utf8");
+    const lines = contents.split(/\r?\n/);
+    for (const [index, line] of lines.entries()) {
+      if (!/^\s*run:\s+bash scripts\/ci\/materialize-vps-env\.sh\s*$/.test(line)) {
+        continue;
+      }
+
+      const envWindow = lines.slice(Math.max(0, index - 30), index).join("\n");
+      assert.match(
+        envWindow,
+        /^\s+ENV_VPS_CERTIFICATE_SERVICE:\s+\$\{\{ secrets\.ENV_VPS_CERTIFICATE_SERVICE \}\}/m,
+        `${path.relative(repoRoot, workflowFile)} materialize step at line ${index + 1} should map ENV_VPS_CERTIFICATE_SERVICE`,
       );
     }
   }
