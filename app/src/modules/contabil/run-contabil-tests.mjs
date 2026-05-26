@@ -15,6 +15,18 @@ import {
 } from "./hooks/queryKeys.ts";
 import { getContabilErrorMessage } from "./services/contabilError.ts";
 import { resolveContabilPermissionAccess } from "./hooks/contabilPermissionAccess.ts";
+import {
+  CONTABIL_CONTROL_CHECKLIST_FIELDS,
+  CONTABIL_CONTROL_FIELDS,
+  CONTABIL_CONTROL_NOTES_FIELD,
+} from "./components/contabilControlFields.ts";
+import {
+  applyLocalContabilFieldValue,
+  createContabilFieldStatusMap,
+  getCurrentContabilCompetence,
+  rollbackContabilFieldValue,
+  updateContabilControlFieldStatus,
+} from "./components/contabilControlSection.helpers.ts";
 
 async function runTest(name, fn) {
   try {
@@ -63,6 +75,98 @@ await (async () => {
 
     assert.deepEqual(unwrapContabilEnvelope({ data: payload }), payload);
     assert.deepEqual(unwrapContabilEnvelope(payload), payload);
+  });
+
+  await runTest("control field registry matches the backend-updatable fields", () => {
+    assert.equal(CONTABIL_CONTROL_FIELDS.length, 18);
+    assert.equal(CONTABIL_CONTROL_CHECKLIST_FIELDS.length, 17);
+    assert.equal(CONTABIL_CONTROL_NOTES_FIELD?.field, "notes");
+    assert.deepEqual(
+      CONTABIL_CONTROL_CHECKLIST_FIELDS.map((field) => field.field),
+      [
+        "regenerate_accounting_entries",
+        "check_summary_by_accumulator",
+        "post_accounting_transaction",
+        "import_bank_statements",
+        "reconcile_bank_statements",
+        "reconcile_vendors",
+        "integrate_taxes",
+        "settle_federal_taxes_via_ecac",
+        "settle_state_taxes_via_sefaz_ba",
+        "integrate_payroll",
+        "suspense_accounts",
+        "check_overdrawn_accounts",
+        "general_account_reconciliation",
+        "check_loan_and_interest_accounts",
+        "monthly_closing",
+        "reconcile_icms_pis_cofins",
+        "depreciation",
+      ],
+    );
+  });
+
+  await runTest("getCurrentContabilCompetence formats the current month as YYYY-MM", () => {
+    assert.equal(getCurrentContabilCompetence(new Date("2026-05-20T12:00:00.000Z")), "2026-05");
+    assert.equal(getCurrentContabilCompetence(new Date(2026, 10, 1, 12, 0, 0)), "2026-11");
+  });
+
+  await runTest("field status helpers start idle and update individual fields", () => {
+    const initialStatusMap = createContabilFieldStatusMap(CONTABIL_CONTROL_FIELDS);
+
+    assert.equal(initialStatusMap.notes, "idle");
+    assert.equal(initialStatusMap.regenerate_accounting_entries, "idle");
+
+    const updatedStatusMap = updateContabilControlFieldStatus(
+      initialStatusMap,
+      "regenerate_accounting_entries",
+      "saving",
+    );
+
+    assert.equal(updatedStatusMap.regenerate_accounting_entries, "saving");
+    assert.equal(updatedStatusMap.notes, "idle");
+  });
+
+  await runTest("control field helpers apply local updates and rollback checklist values", () => {
+    const baseControl = {
+      id: "control-1",
+      client_id: "client-1",
+      competence: "2026-05",
+      regenerate_accounting_entries: false,
+      check_summary_by_accumulator: false,
+      post_accounting_transaction: false,
+      import_bank_statements: false,
+      reconcile_bank_statements: false,
+      reconcile_vendors: false,
+      integrate_taxes: false,
+      settle_federal_taxes_via_ecac: false,
+      settle_state_taxes_via_sefaz_ba: false,
+      integrate_payroll: false,
+      suspense_accounts: false,
+      check_overdrawn_accounts: false,
+      general_account_reconciliation: false,
+      check_loan_and_interest_accounts: false,
+      monthly_closing: false,
+      reconcile_icms_pis_cofins: false,
+      depreciation: false,
+      notes: "",
+    };
+
+    const locallyUpdated = applyLocalContabilFieldValue(
+      baseControl,
+      "regenerate_accounting_entries",
+      true,
+    );
+    assert.equal(locallyUpdated.regenerate_accounting_entries, true);
+
+    const notesUpdated = applyLocalContabilFieldValue(baseControl, "notes", "Fechamento iniciado");
+    assert.equal(notesUpdated.notes, "Fechamento iniciado");
+
+    const rolledBack = rollbackContabilFieldValue(
+      locallyUpdated,
+      baseControl,
+      "regenerate_accounting_entries",
+    );
+    assert.equal(rolledBack.regenerate_accounting_entries, false);
   });
 
   await runTest("executeNullableContabilRequest returns null on 404 responses", async () => {
