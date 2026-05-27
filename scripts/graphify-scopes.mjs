@@ -1,5 +1,4 @@
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 export const GRAPHIFY_SCOPES = {
   ui: {
@@ -107,11 +106,14 @@ function normalizeExecutionPath(value) {
   }
   let raw = String(value);
   if (raw.startsWith("file:")) {
-    raw = fileURLToPath(raw);
+    raw = decodeURIComponent(new URL(raw).pathname);
   }
   const normalized = raw.replaceAll("\\", "/");
   if (/^\/?[A-Za-z]:\//.test(normalized)) {
     return normalized.replace(/^\//, "").toLowerCase();
+  }
+  if (normalized.startsWith("/")) {
+    return normalized;
   }
   return resolve(raw).replaceAll("\\", "/");
 }
