@@ -59,12 +59,18 @@ export default function ContabilPage() {
         ) : !canViewContabil ? (
           <AccessDeniedPanel />
         ) : (
-          <>
+          <ContabilShell
+            key={selectedClientId ?? "without-client"}
+            clientId={selectedClientId}
+            clientName={selectedClientName}
+            canEdit={canEditContabil}
+            defaultTab={selectedClientId ? "control" : "client"}
+            clientPickerContent={
             <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-1">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-50 text-cyan-600 dark:bg-cyan-900/20 dark:text-cyan-300">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
                       <Users className="h-4 w-4" />
                     </div>
                     <div>
@@ -99,7 +105,7 @@ export default function ContabilPage() {
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Buscar por nome, razão social ou CPF/CNPJ"
-                    className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
+                    className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
                   />
                 </div>
                 <p className="text-xs text-gray-500 dark:text-slate-400">
@@ -129,7 +135,7 @@ export default function ContabilPage() {
                           onClick={() => handleSelectClient(client.id, client.name)}
                           className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors ${
                             isActive
-                              ? "bg-cyan-50 text-cyan-900 dark:bg-cyan-900/20 dark:text-cyan-100"
+                              ? "bg-blue-50 text-blue-900 dark:bg-blue-900/20 dark:text-blue-100"
                               : "hover:bg-white dark:hover:bg-slate-900/70"
                           }`}
                         >
@@ -149,14 +155,8 @@ export default function ContabilPage() {
                 )}
               </div>
             </section>
-
-            <ContabilShell
-              key={selectedClientId ?? "without-client"}
-              clientId={selectedClientId}
-              clientName={selectedClientName}
-              canEdit={canEditContabil}
-            />
-          </>
+            }
+          />
         )}
       </div>
     </>
