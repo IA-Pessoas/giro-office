@@ -2,7 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 
-import { getGraphifyScope, resolveScopePath } from "./graphify-scopes.mjs";
+import { getGraphifyScope, isDirectScriptExecution, resolveScopePath } from "./graphify-scopes.mjs";
 
 export function buildGraphifyCommand(scopeName, action) {
   const scope = getGraphifyScope(scopeName);
@@ -65,6 +65,6 @@ function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectScriptExecution(import.meta.url)) {
   main();
 }

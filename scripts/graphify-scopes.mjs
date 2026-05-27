@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const GRAPHIFY_SCOPES = {
   ui: {
@@ -98,4 +99,26 @@ export function displayGraphFilePath(scope, sourceFile) {
     return normalized;
   }
   return `${scope.path}/${normalized}`;
+}
+
+function normalizeExecutionPath(value) {
+  if (!value) {
+    return "";
+  }
+  let raw = String(value);
+  if (raw.startsWith("file:")) {
+    raw = fileURLToPath(raw);
+  }
+  const normalized = raw.replaceAll("\\", "/");
+  if (/^\/?[A-Za-z]:\//.test(normalized)) {
+    return normalized.replace(/^\//, "").toLowerCase();
+  }
+  return resolve(raw).replaceAll("\\", "/");
+}
+
+export function isDirectScriptExecution(importMetaUrl, argvPath = process.argv[1]) {
+  if (!argvPath) {
+    return false;
+  }
+  return normalizeExecutionPath(importMetaUrl) === normalizeExecutionPath(argvPath);
 }
