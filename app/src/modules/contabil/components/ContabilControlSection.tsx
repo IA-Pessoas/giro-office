@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Loader2, Lock } from "lucide-react";
+import { AlertCircle, CheckCircle2, CheckSquare, Loader2, Lock } from "lucide-react";
 
 import {
   useContabilControlBootstrapMutation,
@@ -75,6 +75,10 @@ export function ContabilControlSection({
   );
 
   const notesValue = control?.notes ?? "";
+  const isAnyFieldSaving = useMemo(
+    () => Object.values(fieldStatuses).some((status) => status === "saving"),
+    [fieldStatuses],
+  );
 
   useEffect(() => {
     if (!clientId) {
@@ -166,6 +170,10 @@ export function ContabilControlSection({
   }
 
   function handleCompetenceChange(value: string) {
+    if (isAnyFieldSaving) {
+      return;
+    }
+
     setCompetence((value || getCurrentContabilCompetence()) as ContabilCompetence);
   }
 
@@ -235,30 +243,6 @@ export function ContabilControlSection({
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Controle mensal contábil
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-slate-400">
-              Acompanhe o checklist operacional da competência e registre observações do
-              fechamento.
-            </p>
-          </div>
-
-          <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-slate-300">
-            <span>Competência</span>
-            <input
-              type="month"
-              value={competence}
-              onChange={(event) => handleCompetenceChange(event.target.value)}
-              className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            />
-          </label>
-        </div>
-      </div>
-
       {!canEdit ? (
         <ContabilStateBox icon={Lock} title="Modo visualização" compact>
           Você pode acompanhar o checklist desta competência, mas não tem permissão para
@@ -292,22 +276,45 @@ export function ContabilControlSection({
       {control ? (
         <div className="space-y-4">
           <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                  Checklist operacional
-                </h3>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <CheckSquare className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Checklist operacional
+                    </h3>
+                  </div>
+                </div>
                 <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
                   Marque cada atividade concluída ao longo do fechamento da competência.
                 </p>
               </div>
 
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
-                {competence}
-              </span>
+              <div className="flex items-center gap-3 text-sm text-gray-700 dark:text-slate-300">
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 whitespace-nowrap text-sm font-medium text-gray-600 dark:text-slate-400">
+                    Competência
+                  </span>
+                  {isAnyFieldSaving ? (
+                    <Loader2
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 animate-spin text-gray-500 dark:text-slate-400"
+                    />
+                  ) : null}
+                </div>
+                <input
+                  aria-label="Competência"
+                  type="month"
+                  value={competence}
+                  onChange={(event) => handleCompetenceChange(event.target.value)}
+                  disabled={isAnyFieldSaving}
+                  className="h-10 min-w-[180px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                />
+              </div>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="mt-4 grid gap-3 md:grid-cols-2"> 
               {checklistItems.map((item) => (
                 <label
                   key={item.field}
@@ -345,7 +352,7 @@ export function ContabilControlSection({
           {CONTABIL_CONTROL_NOTES_FIELD ? (
             <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
               <div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   {CONTABIL_CONTROL_NOTES_FIELD.label}
                 </h3>
                 <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
@@ -394,3 +401,6 @@ function FieldStatusBadge({ status }: { status: ContabilControlFieldSaveStatus }
     </span>
   );
 }
+
+
+
