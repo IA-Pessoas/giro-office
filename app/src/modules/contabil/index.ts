@@ -1,6 +1,9 @@
 export {
   ContabilControlSection,
   CONTABIL_CONTROL_FIELDS,
+  CONTABIL_RELATIONSHIP_FIELDS,
+  ContabilRelationshipSection,
+  ContabilResponsibleSection,
   ContabilStateBox,
 } from "./components";
 export {
@@ -8,8 +11,18 @@ export {
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
   CONTABIL_QUERY_KEY,
+  syncContabilRelationshipQueryCache,
+  syncContabilResponsibleQueryCache,
   useContabilControlBootstrapMutation,
+  useContabilRelationship,
+  useContabilResponsible,
+  useCreateContabilRelationshipMutation,
+  useCreateContabilResponsibleMutation,
+  useDeleteContabilRelationshipMutation,
+  useDeleteContabilResponsibleMutation,
   usePatchContabilControlFieldMutation,
+  useUpdateContabilRelationshipMutation,
+  useUpdateContabilResponsibleMutation,
   useContabilPermissions,
 } from "./hooks";
 export { resolveContabilPermissionAccess } from "./hooks/contabilPermissionAccess";

@@ -6,7 +6,7 @@ import {
   buildFileStats,
   loadGraphifyBundle,
 } from "./graphify-postprocess.mjs";
-import { resolveScopePath } from "./graphify-scopes.mjs";
+import { isDirectScriptExecution, resolveScopePath } from "./graphify-scopes.mjs";
 
 const STOPWORDS = new Set([
   "a",
@@ -201,6 +201,6 @@ function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectScriptExecution(import.meta.url)) {
   main();
 }

@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 import {
   getGraphifyScope,
+  isDirectScriptExecution,
   listGraphifyScopes,
   pathScopeName,
   resolveScopePath,
@@ -111,6 +112,6 @@ function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectScriptExecution(import.meta.url)) {
   main();
 }

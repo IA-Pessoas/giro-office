@@ -2,7 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 
-import { pathScopeName } from "./graphify-scopes.mjs";
+import { isDirectScriptExecution, pathScopeName } from "./graphify-scopes.mjs";
 
 function uniqueValues(values) {
   return [...new Set(values.filter(Boolean))];
@@ -72,6 +72,6 @@ function main() {
   );
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectScriptExecution(import.meta.url)) {
   main();
 }
