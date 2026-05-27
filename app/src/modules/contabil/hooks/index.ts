@@ -1,4 +1,8 @@
 export {
+  syncContabilRelationshipQueryCache,
+  syncContabilResponsibleQueryCache,
+} from "./contabilQueryCache";
+export {
   contabilControlQueryKey,
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
@@ -8,6 +12,18 @@ export {
   useContabilControlBootstrapMutation,
   usePatchContabilControlFieldMutation,
 } from "./useContabilControl";
+export {
+  useContabilRelationship,
+  useCreateContabilRelationshipMutation,
+  useDeleteContabilRelationshipMutation,
+  useUpdateContabilRelationshipMutation,
+} from "./useContabilRelationship";
+export {
+  useContabilResponsible,
+  useCreateContabilResponsibleMutation,
+  useDeleteContabilResponsibleMutation,
+  useUpdateContabilResponsibleMutation,
+} from "./useContabilResponsible";
 export {
   useContabilPermissions,
 } from "./useContabilPermissions";
