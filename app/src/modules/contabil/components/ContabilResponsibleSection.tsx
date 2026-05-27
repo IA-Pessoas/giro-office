@@ -49,7 +49,7 @@ export function ContabilResponsibleSection({
   const createMutation = useCreateContabilResponsibleMutation();
   const updateMutation = useUpdateContabilResponsibleMutation();
   const deleteMutation = useDeleteContabilResponsibleMutation();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<ContabilResponsibleFormValues>(
@@ -57,9 +57,8 @@ export function ContabilResponsibleSection({
   );
 
   const responsible = responsibleQuery.data ?? null;
-  const isFormVisible = isEditing;
   const assignableUsersQuery = useAssignableUsers({
-    enabled: canEdit && isFormVisible,
+    enabled: canEdit && isEditorOpen,
   });
 
   const assignableOptions = useMemo(
@@ -73,26 +72,30 @@ export function ContabilResponsibleSection({
       return;
     }
 
-    if (!isEditing) {
+    if (!isEditorOpen) {
       setFormValues(buildContabilResponsibleFormValues(null));
     }
-  }, [responsible, isEditing]);
+  }, [responsible, isEditorOpen]);
 
   function handleStartCreate() {
     setSubmitError(null);
-    setIsEditing(true);
+    setIsEditorOpen(true);
     setFormValues(buildContabilResponsibleFormValues(null));
   }
 
   function handleStartEdit() {
+    if (!responsible) {
+      return;
+    }
+
     setSubmitError(null);
-    setIsEditing(true);
+    setIsEditorOpen(true);
     setFormValues(buildContabilResponsibleFormValues(responsible));
   }
 
-  function handleCancelEdit() {
+  function handleCloseEditor() {
     setSubmitError(null);
-    setIsEditing(false);
+    setIsEditorOpen(false);
     setFormValues(buildContabilResponsibleFormValues(responsible));
   }
 
@@ -130,7 +133,7 @@ export function ContabilResponsibleSection({
         });
       }
 
-      setIsEditing(false);
+      setIsEditorOpen(false);
     } catch (error) {
       setSubmitError(getContabilErrorMessage(error));
     }
@@ -149,7 +152,7 @@ export function ContabilResponsibleSection({
         clientId,
       });
       setIsDeleteDialogOpen(false);
-      setIsEditing(false);
+      setIsEditorOpen(false);
       setFormValues(buildContabilResponsibleFormValues(null));
     } catch (error) {
       setSubmitError(getContabilErrorMessage(error));
@@ -165,16 +168,20 @@ export function ContabilResponsibleSection({
       <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Responsável contábil
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <UserCog className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Responsável contábil
+                </h2>
+              </div>
+            </div>
             <p className="max-w-2xl text-sm text-gray-600 dark:text-slate-400">
-              Defina o responsável principal, o usuário que realizou o apontamento e se o
-              cliente possui movimentação.
+              Defina os responsáveis e a movimentação do cliente.
             </p>
           </div>
 
-          {!isFormVisible && canEdit ? (
+          {responsible && canEdit ? (
             <button
               type="button"
               onClick={handleStartEdit}
@@ -206,29 +213,75 @@ export function ContabilResponsibleSection({
         </ContabilStateBox>
       ) : null}
 
-      {!responsibleQuery.isLoading && !responsibleQuery.error && !responsible && !isEditing ? (
-        <ContabilStateBox icon={UserCog} title="Responsável não cadastrado" compact>
-          <span className="block">
-            Ainda não existe um responsável contábil definido para este cliente.
-          </span>
-          {canEdit ? (
-            <button
-              type="button"
-              onClick={handleStartCreate}
-              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4" />
-              Cadastrar responsável
-            </button>
-          ) : null}
-        </ContabilStateBox>
+      {!responsibleQuery.isLoading && !responsibleQuery.error && !responsible ? (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 p-4 text-gray-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                Responsável não cadastrado
+              </p>
+              <p className="mt-1 text-sm leading-6">
+                Ainda não existe um responsável contábil definido para este cliente.
+              </p>
+            </div>
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={handleStartCreate}
+                className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:self-center"
+              >
+                <Plus className="h-4 w-4" />
+                Cadastrar responsável
+              </button>
+            ) : null}
+          </div>
+        </div>
       ) : null}
 
-      {!responsibleQuery.isLoading && !responsibleQuery.error && isFormVisible ? (
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
-        >
+      {!responsibleQuery.isLoading && !responsibleQuery.error && responsible ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-gray-500 dark:text-slate-500">
+                Responsável principal
+              </p>
+              <p className="text-sm text-gray-900 dark:text-white">
+                {getContabilSelectLabel(responsible.person_responsible_id, assignableOptions)}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-gray-500 dark:text-slate-500">
+                Lançado por
+              </p>
+              <p className="text-sm text-gray-900 dark:text-white">
+                {getContabilSelectLabel(responsible.posted_by_id, assignableOptions)}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-gray-500 dark:text-slate-500">
+                Cliente com movimentação
+              </p>
+              <p className="text-sm text-gray-900 dark:text-white">
+                {responsible.customer_with_movement ? "Sim" : "Não"}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <Dialog
+        open={isEditorOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCloseEditor();
+          }
+        }}
+        title={responsible ? "Editar responsável contábil" : "Cadastrar responsável contábil"}
+        description="Cadastro do responsável contábil"
+        contentClassName="w-[min(92vw,760px)]"
+        bodyClassName="space-y-4"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
             <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-slate-300">
               <span>Responsável principal</span>
@@ -314,16 +367,14 @@ export function ContabilResponsibleSection({
                 {responsible ? "Salvar alterações" : "Cadastrar responsável"}
               </button>
 
-              {responsible ? (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  disabled={isSubmitting}
-                  className={SECONDARY_BUTTON_CLASSNAME}
-                >
-                  Cancelar
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onClick={handleCloseEditor}
+                disabled={isSubmitting}
+                className={SECONDARY_BUTTON_CLASSNAME}
+              >
+                Cancelar
+              </button>
             </div>
 
             {responsible && canEdit ? (
@@ -339,38 +390,7 @@ export function ContabilResponsibleSection({
             ) : null}
           </div>
         </form>
-      ) : null}
-
-      {!responsibleQuery.isLoading && !responsibleQuery.error && responsible && !isFormVisible ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-gray-500 dark:text-slate-500">
-                Responsável principal
-              </p>
-              <p className="text-sm text-gray-900 dark:text-white">
-                {getContabilSelectLabel(responsible.person_responsible_id, assignableOptions)}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-gray-500 dark:text-slate-500">
-                Lançado por
-              </p>
-              <p className="text-sm text-gray-900 dark:text-white">
-                {getContabilSelectLabel(responsible.posted_by_id, assignableOptions)}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-gray-500 dark:text-slate-500">
-                Cliente com movimentação
-              </p>
-              <p className="text-sm text-gray-900 dark:text-white">
-                {responsible.customer_with_movement ? "Sim" : "Não"}
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </Dialog>
 
       <Dialog
         open={isDeleteDialogOpen}
