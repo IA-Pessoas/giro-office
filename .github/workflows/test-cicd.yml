@@ -7,6 +7,7 @@
 # Segredos do repositório → arquivos na raiz (gitignored). Pares: scripts/ci/vps-secrets.manifest.
 #
 # ENV_VPS_AUDIT_SERVICE → .env.vps.audit-service
+# ENV_VPS_CERTIFICATE_SERVICE → .env.vps.certificate-service
 #
 # Pós-merge: cadastrar todos os segredos em Settings → Secrets and variables → Actions,
 # garantir DATABASE_URL/SUPABASE acessíveis a partir dos runners do GitHub e validar na aba Actions.
@@ -102,6 +103,7 @@ jobs:
           ENV_VPS_REGULARIZE_SERVICE: ${{ secrets.ENV_VPS_REGULARIZE_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
           ENV_VPS_TI_SERVICE: ${{ secrets.ENV_VPS_TI_SERVICE }}
+          ENV_VPS_CERTIFICATE_SERVICE: ${{ secrets.ENV_VPS_CERTIFICATE_SERVICE }}
           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
           ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
         run: bash scripts/ci/materialize-vps-env.sh
@@ -193,6 +195,7 @@ jobs:
           ENV_VPS_REGULARIZE_SERVICE: ${{ secrets.ENV_VPS_REGULARIZE_SERVICE }}
           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
           ENV_VPS_TI_SERVICE: ${{ secrets.ENV_VPS_TI_SERVICE }}
+          ENV_VPS_CERTIFICATE_SERVICE: ${{ secrets.ENV_VPS_CERTIFICATE_SERVICE }}
           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
           ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
         run: bash scripts/ci/materialize-vps-env.sh

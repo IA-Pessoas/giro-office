@@ -168,6 +168,8 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     regularizeServiceUrl: "http://127.0.0.1:3039",
     tiServiceUrl: "http://127.0.0.1:3040",
     tiServiceInternalToken: "ti-service-token",
+    certificateServiceUrl: "http://127.0.0.1:3041",
+    certificateServiceInternalToken: "certificate-service-token",
 
     jwtSecret: "test-secret",
     logLevel: "silent",
@@ -768,6 +770,8 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/fiscal/ncm"]).toBeTruthy();
     expect(body.paths["/contabil/controls"]).toBeTruthy();
     expect(body.paths["/ti/requests/list"]).toBeTruthy();
+    expect(body.paths["/certificate/pj/list"]).toBeTruthy();
+    expect(body.paths["/certificate/notifications"]).toBeTruthy();
     expect(body.paths["/audit/requests"]).toBeTruthy();
   } finally {
     await stopServer(server);
@@ -820,6 +824,7 @@ it("does not duplicate gateway path prefixes in the aggregated OpenAPI JSON", as
     expect(body.paths["/fiscal/fiscal/ncm"]).toBe(undefined);
     expect(body.paths["/contabil/contabil/controls"]).toBe(undefined);
     expect(body.paths["/ti/ti/requests/list"]).toBe(undefined);
+    expect(body.paths["/certificate/certificate/pj/list"]).toBe(undefined);
   } finally {
     await stopServer(server);
   }
@@ -847,6 +852,25 @@ it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", 
     expect(body.paths["/user/{id}"]?.get?.security).toEqual([{ bearerAuth: [] }]);
     expect(body.paths["/audit/requests"]?.get?.security).toEqual([{ bearerAuth: [] }]);
     expect(body.paths["/ti/requests/list"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(body.paths["/certificate/pj/list"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("does not expose certificate internal notification routes in the aggregated OpenAPI JSON", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/openapi.json`);
+    const body = (await response.json()) as {
+      paths: Record<string, unknown>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.paths["/internal/notifications/run"]).toBe(undefined);
   } finally {
     await stopServer(server);
   }
@@ -1121,6 +1145,136 @@ it("forwards modular TI permission instead of global user permission", async () 
   } finally {
     await stopServer(gateway);
     await stopServer(tiService);
+  }
+});
+
+it("proxies certificate-service public routes mapped in the gateway", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 3,
+    modules: { certificado: 1 },
+  });
+  const seenUrls: string[] = [];
+  const certificateService = createServer((request, response) => {
+    seenUrls.push(request.url ?? "");
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: { service: "certificate-service", path: request.url },
+      }),
+    );
+  });
+  const certificateServiceUrl = await startServer(certificateService);
+
+  const app = createApp(createEnv({ certificateServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const pjResponse = await fetch(`${gatewayUrl}/certificate/pj/list`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const notificationResponse = await fetch(`${gatewayUrl}/certificate/notifications`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const pjBody = (await pjResponse.json()) as Record<string, unknown>;
+    const notificationBody = (await notificationResponse.json()) as Record<string, unknown>;
+
+    expect(pjResponse.status).toBe(200);
+    expect(notificationResponse.status).toBe(200);
+    expect(pjBody).toEqual({
+      success: true,
+      data: { service: "certificate-service", path: "/certificate/pj/list" },
+    });
+    expect(notificationBody).toEqual({
+      success: true,
+      data: { service: "certificate-service", path: "/certificate/notifications" },
+    });
+    expect(seenUrls).toEqual(["/certificate/pj/list", "/certificate/notifications"]);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(certificateService);
+  }
+});
+
+it("forwards modular certificate permission and internal token to certificate-service", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 3,
+    modules: { certificado: 1 },
+  });
+  let seenPermission: string | undefined;
+  let seenInternalToken: string | undefined;
+  const certificateService = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    seenInternalToken = request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const certificateServiceUrl = await startServer(certificateService);
+
+  const app = createApp(
+    createEnv({
+      certificateServiceUrl,
+      certificateServiceInternalToken: "certificate-service-token",
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/certificate/pj/list`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("1");
+    expect(seenInternalToken).toBe("certificate-service-token");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(certificateService);
+  }
+});
+
+it("does not expose certificate internal notification routes through the gateway", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 3,
+    modules: { certificado: 2 },
+  });
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/internal/notifications/run`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(404);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Rota não mapeada no gateway.");
+  } finally {
+    await stopServer(server);
   }
 });
 
@@ -1401,6 +1555,51 @@ it("records ti-service route targets when audit is enabled", async () => {
     await waitForRecords(auditService.records, 1);
 
     expect(auditService.records[0]?.metadata?.routeTarget).toBe("ti-service");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+    await stopServer(auditService.server);
+  }
+});
+
+it("records certificate-service route targets when audit is enabled", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 3,
+    modules: { certificado: 1 },
+  });
+  const auditService = await startAuditIngestServer();
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ ok: true }));
+  });
+  const certificateServiceUrl = await startServer(upstream);
+
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      certificateServiceUrl,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/certificate/pj/list`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+
+    await waitForRecords(auditService.records, 1);
+
+    expect(auditService.records[0]?.metadata?.routeTarget).toBe("certificate-service");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

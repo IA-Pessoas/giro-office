@@ -95,6 +95,8 @@ const gatewayEnvSchema = z
     regularizeServiceUrl: z.string().url().default("http://localhost:3039"),
     tiServiceUrl: z.string().url().default("http://localhost:3040"),
     tiServiceInternalToken: z.string().optional().default("ti-service-token"),
+    certificateServiceUrl: z.string().url().default("http://localhost:3041"),
+    certificateServiceInternalToken: z.string().optional().default("certificate-service-token"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -147,6 +149,12 @@ const gatewayEnvSchema = z
       envName: "TI_SERVICE_INTERNAL_TOKEN",
       token: env.tiServiceInternalToken,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: env.nodeEnv,
+      serviceName: "gateway",
+      envName: "CERTIFICATE_SERVICE_INTERNAL_TOKEN",
+      token: env.certificateServiceInternalToken,
+    });
     validateProductionCorsOrigins({
       nodeEnv: env.nodeEnv,
       serviceName: "gateway",
@@ -178,6 +186,8 @@ export interface GatewayEnv {
   regularizeServiceUrl: string;
   tiServiceUrl: string;
   tiServiceInternalToken: string;
+  certificateServiceUrl: string;
+  certificateServiceInternalToken: string;
   websocketUpstreamUrl?: string;
   publicGatewayUrl?: string;
   jwtSecret: string;
@@ -210,6 +220,8 @@ export function getGatewayEnv(): GatewayEnv {
     regularizeServiceUrl: process.env.REGULARIZE_SERVICE_URL,
     tiServiceUrl: process.env.TI_SERVICE_URL,
     tiServiceInternalToken: process.env.TI_SERVICE_INTERNAL_TOKEN,
+    certificateServiceUrl: process.env.CERTIFICATE_SERVICE_URL,
+    certificateServiceInternalToken: process.env.CERTIFICATE_SERVICE_INTERNAL_TOKEN,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     publicGatewayUrl: process.env.GATEWAY_PUBLIC_URL,
     jwtSecret: process.env.JWT_SECRET,
