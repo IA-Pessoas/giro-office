@@ -5,6 +5,7 @@ export {
   CONTABIL_RELATIONSHIP_FIELDS,
   ContabilRelationshipSection,
   ContabilResponsibleSection,
+  ContabilShell,
   ContabilStateBox,
 } from "./components";
 export {
