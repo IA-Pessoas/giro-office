@@ -2,6 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 
+import { buildGraphifyEnv, renderGraphifyApiKeyHint } from "./graphify-env.mjs";
 import { getGraphifyScope, isDirectScriptExecution, resolveScopePath } from "./graphify-scopes.mjs";
 
 export function buildGraphifyCommand(scopeName, action) {
@@ -43,10 +44,16 @@ function main() {
 
   try {
     const { command, args, env } = buildGraphifyCommand(scopeName, action);
+    const graphifyEnv = buildGraphifyEnv(scopeName, {
+      baseEnv: { ...process.env, ...env },
+    });
+    if (action === "extract") {
+      console.log(renderGraphifyApiKeyHint(graphifyEnv));
+    }
     console.log(`$ ${[command, ...args].join(" ")}`);
     const result = spawnSync(command, args, {
       stdio: "inherit",
-      env: { ...process.env, ...env },
+      env: graphifyEnv.env,
     });
     if (result.error) {
       console.error(

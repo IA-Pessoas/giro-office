@@ -37,6 +37,8 @@ graphify query "<pergunta>" --graph app/graphify-out/graph.json
 
 - Leia os arquivos reais antes de editar.
 - Nao cole `GRAPH_REPORT.md` inteiro no contexto; prefira o brief e o contexto curto.
+- Para `pnpm graphify:ui`, use `GEMINI_API_KEY` ou `GOOGLE_API_KEY` no ambiente, `.env.local` ou `app/.env.local` quando a extracao semantica for necessaria.
+- `pnpm graphify:update:ui`, `pnpm graphify:postprocess:ui` e `pnpm graphify:context:ui` nao exigem chave.
 - Se Graphify nao estiver disponivel ou o grafo nao existir, use o fallback manual de `../AGENTS.md`.
 
 ## Validacao

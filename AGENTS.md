@@ -53,6 +53,12 @@ Instrucoes do Codex para este repositorio.
 - Consultar frontend: `graphify query "<pergunta>" --graph app/graphify-out/graph.json`.
 - Consultar services: `graphify query "<pergunta>" --graph services/graphify-out/graph.json`.
 
+### Chave Gemini
+- `pnpm graphify:ui` e `pnpm graphify:services` podem precisar de `GEMINI_API_KEY` ou `GOOGLE_API_KEY` para extracao semantica.
+- O wrapper carrega essas chaves do ambiente, de `.env.local`, de `.env`, ou dos arquivos equivalentes dentro de `app/` e `services/`.
+- Nunca versione chaves; `.env*` ja deve ficar local.
+- `pnpm graphify:update:ui`, `pnpm graphify:update:services`, `graphify:postprocess:*` e `graphify:context:*` continuam utilizaveis sem chave, pois dependem do grafo/AST local.
+
 ### Fallback sem Graphify
 - Se `graphify` nao estiver disponivel, se o grafo ainda nao existir ou se a extracao falhar, nao bloqueie a tarefa apenas por isso.
 - Informe brevemente: `Graphify indisponivel ou sem grafo local; vou usar descoberta manual.`
