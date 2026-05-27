@@ -6,6 +6,8 @@ import type {
   CreateCertificatePjInput,
   UpdateCertificatePjInput,
 } from "../schemas/certificatePj.schemas.js";
+import { getPaginationParams } from "../schemas/pagination.schemas.js";
+import { isPrismaUniqueConstraintError } from "./prismaErrors.js";
 
 export interface CertificatePjContext {
   organizationId: string;
@@ -104,9 +106,11 @@ export class CertificatePjService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async listCertificatePj(input: CertificatePjListInput): Promise<CertificatePjListResult> {
+    const pagination = getPaginationParams(input.query);
     const records = await this.prisma.certificatePJ.findMany({
       where: buildListWhere(input.organizationId, input.query),
       orderBy: [{ expiration_date: "asc" }, { name: "asc" }],
+      ...pagination,
       select: certificatePjPublicSelect,
     });
 
@@ -147,7 +151,7 @@ export class CertificatePjService {
         throw new ServiceError(409, "Ja existe um certificado PJ com estes dados.");
       }
 
-      return this.prisma.certificatePJ.create({
+      return await this.prisma.certificatePJ.create({
         data: {
           ...input.data,
           organization_id: input.organizationId,
@@ -156,6 +160,9 @@ export class CertificatePjService {
     } catch (err: unknown) {
       logError("Erro ao criar certificado PJ", { err });
       if (err instanceof ServiceError) throw err;
+      if (isPrismaUniqueConstraintError(err)) {
+        throw new ServiceError(409, "Ja existe um certificado PJ com estes dados.", err);
+      }
       throw new ServiceError(500, "Erro ao criar certificado PJ.", err);
     }
   }
@@ -194,13 +201,16 @@ export class CertificatePjService {
         }
       }
 
-      return this.prisma.certificatePJ.update({
+      return await this.prisma.certificatePJ.update({
         where: { id: input.id, organization_id: input.organizationId },
         data: input.data,
       });
     } catch (err: unknown) {
       logError("Erro ao atualizar certificado PJ", { err });
       if (err instanceof ServiceError) throw err;
+      if (isPrismaUniqueConstraintError(err)) {
+        throw new ServiceError(409, "Ja existe um certificado PJ com estes dados.", err);
+      }
       throw new ServiceError(500, "Erro ao atualizar certificado PJ.", err);
     }
   }

@@ -434,6 +434,8 @@ model CertificateNotification {
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
 
+  @@unique([organization_id, certificate_id, type], name: "certificateNotificationIdentity", map: "uq_cert_not_org_cert_type")
+  @@index([organization_id, date, client_name], map: "idx_cert_not_org_date_name")
   @@map("notification.certificate")
 }
 
@@ -1095,6 +1097,9 @@ model CertificatePJ {
   organization_id       String
   organization          Organization @relation(fields: [organization_id], references: [id])
 
+  @@unique([organization_id, name, cnpj, model], name: "certificatePjIdentity", map: "uq_cert_pj_org_name_cnpj_model")
+  @@index([organization_id, expiration_date, name], map: "idx_cert_pj_org_exp_name")
+  @@index([organization_id, has_certificate, expiration_date, name], map: "idx_cert_pj_org_has_exp_name")
   @@map("certificate.pj")
 }
 
@@ -1119,6 +1124,9 @@ model CertificatePF {
   organization_id       String
   organization          Organization @relation(fields: [organization_id], references: [id])
 
+  @@unique([organization_id, name, cpf, model], name: "certificatePfIdentity", map: "uq_cert_pf_org_name_cpf_model")
+  @@index([organization_id, expiration_date, name], map: "idx_cert_pf_org_exp_name")
+  @@index([organization_id, has_certificate, expiration_date, name], map: "idx_cert_pf_org_has_exp_name")
   @@map("certificate.pf")
 }
 

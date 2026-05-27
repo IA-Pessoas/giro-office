@@ -43,7 +43,7 @@ describe("CertificatePfService", () => {
 
     const result = await service.listCertificatePf({
       organizationId: certificateOrganizationId,
-      query: { search: "Joao", has_certificate: true },
+      query: { search: "Joao", has_certificate: true, page: 3, page_size: 10 },
     });
 
     expect(prisma.certificatePF.findMany).toHaveBeenCalledWith({
@@ -58,6 +58,8 @@ describe("CertificatePfService", () => {
         has_certificate: true,
       },
       orderBy: [{ expiration_date: "asc" }, { name: "asc" }],
+      skip: 20,
+      take: 10,
       select: expect.not.objectContaining({ password: true }),
     });
     expect(result[0]).not.toHaveProperty("password");
@@ -133,6 +135,37 @@ describe("CertificatePfService", () => {
       },
     });
     expect(prisma.certificatePF.create).not.toHaveBeenCalled();
+  });
+
+  it("createCertificatePf maps database unique violations to conflict", async () => {
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => {
+          throw { code: "P2002" };
+        }),
+      },
+    };
+    const service = new CertificatePfService(prisma as never);
+
+    await expect(
+      service.createCertificatePf({
+        organizationId: certificateOrganizationId,
+        data: {
+          client_castelo_status: true,
+          client_focus_status: false,
+          name: "Joao Silva",
+          cpf: "12345678901",
+          model: "A1",
+          password: "secret-password",
+          expiration_date: new Date("2026-12-31T00:00:00.000Z"),
+          was_paid: true,
+          has_certificate: true,
+        },
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+    } satisfies Partial<ServiceError>);
   });
 
   it("updateCertificatePf returns 404 when record does not exist in organization", async () => {

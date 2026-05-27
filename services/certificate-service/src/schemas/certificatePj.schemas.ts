@@ -1,6 +1,8 @@
 import { zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+import { paginationQueryFields } from "./pagination.schemas.js";
+
 function parseBooleanInput(value: unknown): unknown {
   if (typeof value === "boolean") {
     return value;
@@ -23,6 +25,7 @@ const optionalNullableNumber = z.coerce.number().nullable().optional();
 
 export const certificatePjListQuerySchema = z
   .object({
+    ...paginationQueryFields,
     name: z.string().optional(),
     cnpj: z.string().optional(),
     responsible: z.string().optional(),

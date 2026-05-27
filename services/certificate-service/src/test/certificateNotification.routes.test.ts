@@ -47,6 +47,22 @@ describe("certificate notification routes", () => {
     expect(prisma.certificateNotification.findMany).toHaveBeenCalledWith({
       where: { organization_id: certificateOrganizationId },
       orderBy: [{ date: "asc" }, { client_name: "asc" }],
+      skip: 0,
+      take: 50,
+    });
+  });
+
+  it("GET /certificate/notifications rejects invalid pagination", async () => {
+    const app = createCertificateTestApp();
+
+    const response = await request(app)
+      .get("/certificate/notifications?page_size=101")
+      .set(certificateGatewayHeaders(1));
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "BAD_REQUEST",
     });
   });
 
@@ -89,13 +105,11 @@ describe("certificate notification routes", () => {
     prisma.certificatePF.findMany = vi.fn(async () => []) as never;
     Object.assign(prisma, {
       certificateNotification: {
-        findMany: vi.fn(),
-        findFirst: vi.fn(async () => null),
-        create: vi.fn(async ({ data }) => ({
+        findMany: vi.fn(async () => []),
+        upsert: vi.fn(async ({ create }) => ({
           id: "40000000-0000-4000-8000-000000000001",
-          ...data,
+          ...create,
         })),
-        update: vi.fn(),
       },
     });
 
