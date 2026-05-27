@@ -1,4 +1,8 @@
 export {
+  getContabilCardState,
+  shouldShowContabilNav,
+} from "./contabilAccessUi";
+export {
   syncContabilRelationshipQueryCache,
   syncContabilResponsibleQueryCache,
 } from "./contabilQueryCache";

@@ -1,3 +1,4 @@
+export { AccessDeniedPanel } from "./AccessDeniedPanel";
 export { ContabilControlSection } from "./ContabilControlSection";
 export { CONTABIL_CONTROL_FIELDS } from "./contabilControlFields";
 export { CONTABIL_RELATIONSHIP_FIELDS } from "./contabilRelationshipFields";

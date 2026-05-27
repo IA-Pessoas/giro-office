@@ -1,4 +1,5 @@
 export {
+  AccessDeniedPanel,
   ContabilControlSection,
   CONTABIL_CONTROL_FIELDS,
   CONTABIL_RELATIONSHIP_FIELDS,
@@ -11,6 +12,8 @@ export {
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
   CONTABIL_QUERY_KEY,
+  getContabilCardState,
+  shouldShowContabilNav,
   syncContabilRelationshipQueryCache,
   syncContabilResponsibleQueryCache,
   useContabilControlBootstrapMutation,
