@@ -3,7 +3,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-import { displayGraphFilePath, getGraphifyScope, resolveScopePath } from "./graphify-scopes.mjs";
+import {
+  displayGraphFilePath,
+  getGraphifyScope,
+  isDirectScriptExecution,
+  resolveScopePath,
+} from "./graphify-scopes.mjs";
 
 const MAX_BRIEF_COMMUNITIES = 12;
 const MAX_BRIEF_FILES = 16;
@@ -368,6 +373,6 @@ function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectScriptExecution(import.meta.url)) {
   main();
 }

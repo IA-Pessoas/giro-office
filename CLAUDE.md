@@ -17,6 +17,8 @@ Instrucoes do Claude para este repositorio.
 - Depois de mudancas relevantes, rode `pnpm graphify:update:ui` ou `pnpm graphify:update:services` quando o grafo do escopo existir.
 - Nao instale hooks automaticos do Graphify e nao versione `graphify-out/` sem pedido explicito.
 - Nao cole relatorios inteiros no contexto; abra primeiro os arquivos candidatos retornados por `graphify:context:*`.
+- Para extracao semantica, `GEMINI_API_KEY` ou `GOOGLE_API_KEY` pode ficar no ambiente, em `.env.local`, `.env`, `app/.env.local` ou `services/.env.local`; nao versione chaves.
+- Updates AST, postprocess e context continuam funcionando sem chave.
 
 ## Fallback sem Graphify
 - Se `graphify` nao estiver disponivel, se o grafo nao existir ou se a extracao falhar, nao bloqueie a tarefa.

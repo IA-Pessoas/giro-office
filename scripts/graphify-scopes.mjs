@@ -99,3 +99,28 @@ export function displayGraphFilePath(scope, sourceFile) {
   }
   return `${scope.path}/${normalized}`;
 }
+
+function normalizeExecutionPath(value) {
+  if (!value) {
+    return "";
+  }
+  let raw = String(value);
+  if (raw.startsWith("file:")) {
+    raw = decodeURIComponent(new URL(raw).pathname);
+  }
+  const normalized = raw.replaceAll("\\", "/");
+  if (/^\/?[A-Za-z]:\//.test(normalized)) {
+    return normalized.replace(/^\//, "").toLowerCase();
+  }
+  if (normalized.startsWith("/")) {
+    return normalized;
+  }
+  return resolve(raw).replaceAll("\\", "/");
+}
+
+export function isDirectScriptExecution(importMetaUrl, argvPath = process.argv[1]) {
+  if (!argvPath) {
+    return false;
+  }
+  return normalizeExecutionPath(importMetaUrl) === normalizeExecutionPath(argvPath);
+}

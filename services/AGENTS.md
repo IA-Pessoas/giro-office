@@ -38,6 +38,8 @@ graphify query "<pergunta>" --graph services/graphify-out/graph.json
 - Quando a tarefa tocar contratos compartilhados, leia manualmente `../shared/`, `../packages/api/`, `../infra/prisma/` e `../scripts/` conforme necessario.
 - Leia os arquivos reais antes de editar.
 - Nao cole `GRAPH_REPORT.md` inteiro no contexto; prefira o brief e o contexto curto.
+- Para `pnpm graphify:services`, use `GEMINI_API_KEY` ou `GOOGLE_API_KEY` no ambiente, `.env.local` ou `services/.env.local` quando a extracao semantica for necessaria.
+- `pnpm graphify:update:services`, `pnpm graphify:postprocess:services` e `pnpm graphify:context:services` nao exigem chave.
 - Se Graphify nao estiver disponivel ou o grafo nao existir, use o fallback manual de `../AGENTS.md`.
 
 ## Validacao
