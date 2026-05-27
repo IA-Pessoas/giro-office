@@ -1,6 +1,12 @@
-import type { OpenApiDocument } from "@workspace/shared/http";
+type OpenApiDocument = Record<string, unknown> & {
+  openapi: string;
+  info: { title: string; version: string; description?: string };
+  paths: Record<string, unknown>;
+};
 
-import type { TiServiceEnv } from "../config/env.js";
+interface TiServiceOpenApiEnv {
+  port: number;
+}
 
 type OpenApiSchema = Record<string, unknown>;
 type OpenApiParameter = Record<string, unknown>;
@@ -585,7 +591,7 @@ const schemas: Record<string, OpenApiSchema> = {
   },
 };
 
-export function buildTiServiceOpenApiSpec(env?: Pick<TiServiceEnv, "port">): OpenApiDocument {
+export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDocument {
   return {
     openapi: "3.0.3",
     info: {

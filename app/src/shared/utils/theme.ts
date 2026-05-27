@@ -1,4 +1,4 @@
-import Cookie from "js-cookie";
+import { setCookie } from "nookies";
 
 export type AppTheme = "light" | "dark";
 
@@ -15,8 +15,8 @@ export function applyTheme(theme: AppTheme) {
   localStorage.setItem("workspace-theme", theme);
   localStorage.setItem("chakra-ui-color-mode", theme);
 
-  Cookie.set("chakra-ui-color-mode", theme, {
-    expires: 365,
+  setCookie(undefined, "chakra-ui-color-mode", theme, {
+    maxAge: 60 * 60 * 24 * 365,
     path: "/",
   });
 }

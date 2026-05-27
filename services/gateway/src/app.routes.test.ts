@@ -1,5 +1,6 @@
 ﻿import { once } from "node:events";
 import { createServer, type IncomingMessage, request as nodeRequest, type Server } from "node:http";
+import { Writable } from "node:stream";
 
 import type { CreateAuditRequestPayload } from "@workspace/shared";
 import {
@@ -15,6 +16,28 @@ import { expect, it } from "vitest";
 
 import { createApp } from "./app.js";
 import type { GatewayEnv } from "./config/env.js";
+import { getGatewayServiceDefinitions } from "./config/serviceRegistry.js";
+
+class CapturingLogStream extends Writable {
+  private readonly chunks: string[] = [];
+
+  override _write(
+    chunk: string | Uint8Array,
+    _encoding: BufferEncoding,
+    callback: (error?: Error | null) => void,
+  ): void {
+    this.chunks.push(chunk.toString());
+    callback();
+  }
+
+  entries(): Record<string, unknown>[] {
+    return this.chunks
+      .join("")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+  }
+}
 
 async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
@@ -75,6 +98,12 @@ async function waitForRecords(
   }
 }
 
+async function waitForLogs(): Promise<void> {
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
 async function startAuditIngestServer(): Promise<{
   records: CreateAuditRequestPayload[];
   server: Server;
@@ -109,6 +138,17 @@ function createTestLogger() {
   });
 }
 
+function createCapturedTestLogger() {
+  const stream = new CapturingLogStream();
+  const logger = createLogger({
+    service: "gateway-test",
+    env: "test",
+    destination: stream,
+  });
+
+  return { logger, stream };
+}
+
 function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
   return {
     nodeEnv: "test",
@@ -139,6 +179,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     rateLimitWindowMs: 60_000,
     authRateLimitMax: 10,
     authRateLimitWindowMs: 60_000,
+    jsonBodyLimit: "1mb",
     ...overrides,
   };
 }
@@ -548,6 +589,46 @@ it("rate limits repeated public login attempts", async () => {
   }
 });
 
+it("rejects JSON request bodies above the configured gateway limit before proxying", async () => {
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { token: "ok" } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+
+  const app = createApp(
+    createEnv({
+      userServiceUrl,
+      jsonBodyLimit: "10b",
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/session`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ login: "user", password: "secret" }),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(413);
+    expect(body.success).toBe(false);
+    expect(body.code).toBe("PAYLOAD_TOO_LARGE");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("returns the shared success envelope for gateway health", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
@@ -563,6 +644,37 @@ it("returns the shared success envelope for gateway health", async () => {
       data: {
         status: "ok",
         service: "gateway",
+      },
+    });
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("returns the gateway readiness envelope with configured service count", async () => {
+  const env = createEnv();
+  const app = createApp(env, createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/ready`);
+    const body = (await response.json()) as {
+      success: boolean;
+      data: {
+        status: string;
+        service: string;
+        services: number;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      success: true,
+      data: {
+        status: "ready",
+        service: "gateway",
+        services: getGatewayServiceDefinitions(env).length,
       },
     });
   } finally {
@@ -661,6 +773,33 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/certificate/pj/list"]).toBeTruthy();
     expect(body.paths["/certificate/notifications"]).toBeTruthy();
     expect(body.paths["/audit/requests"]).toBeTruthy();
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("uses the configured public gateway URL in the aggregated OpenAPI JSON", async () => {
+  const app = createApp(
+    createEnv({
+      publicGatewayUrl: "https://api.example.com",
+    }),
+    createTestLogger(),
+  );
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/openapi.json`, {
+      headers: {
+        Host: "unexpected.example",
+      },
+    });
+    const body = (await response.json()) as {
+      servers?: Array<{ url: string }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.servers?.[0]?.url).toBe("https://api.example.com");
   } finally {
     await stopServer(server);
   }
@@ -1165,6 +1304,60 @@ it("returns 404 for routes not mapped to any upstream", async () => {
   }
 });
 
+it("requires authentication before blocking regularize internal routes", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/regularize/internal/status`);
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(401);
+    expect(body.success).toBe(false);
+    expect(body.code).toBe("UNAUTHORIZED");
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("returns 404 for authenticated regularize internal routes without proxying", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const regularizeServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ regularizeServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/regularize/internal/status`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(404);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Recurso não encontrado.");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("returns 404 for audit routes when the feature flag is disabled", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
@@ -1550,6 +1743,122 @@ it("records aborted requests when audit is enabled", async () => {
     await stopServer(gateway);
     await stopServer(upstream);
     await stopServer(auditService.server);
+  }
+});
+
+it("logs completed requests with status, duration, auth context, and response size", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const upstreamBody = JSON.stringify({ success: true, data: { ok: true } });
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.setHeader("content-length", String(Buffer.byteLength(upstreamBody)));
+    response.end(upstreamBody);
+  });
+  const taskServiceUrl = await startServer(upstream);
+  const { logger, stream } = createCapturedTestLogger();
+  const app = createApp(createEnv({ taskServiceUrl }), logger);
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/task/list`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    await response.arrayBuffer();
+    await waitForLogs();
+
+    const completedLogs = stream
+      .entries()
+      .filter((entry) => entry.event === "http.request.completed");
+    expect(completedLogs).toHaveLength(1);
+
+    const completedLog = completedLogs[0] as {
+      auth?: Record<string, unknown>;
+      http?: Record<string, unknown>;
+    };
+
+    expect(completedLog.auth).toEqual({
+      userId: "user-1",
+      organizationId: "org-1",
+      permission: 2,
+    });
+    expect(completedLog.http?.statusCode).toBe(200);
+    expect(completedLog.http?.durationMs).toEqual(expect.any(Number));
+    expect(completedLog.http?.responseSizeBytes).toBe(Buffer.byteLength(upstreamBody));
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("logs aborted requests exactly once", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const upstream = createServer((_request, response) => {
+    setTimeout(() => {
+      if (!response.headersSent) {
+        response.statusCode = 200;
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify({ success: true, data: { ok: true } }));
+      }
+    }, 100);
+  });
+  const taskServiceUrl = await startServer(upstream);
+  const { logger, stream } = createCapturedTestLogger();
+  const app = createApp(createEnv({ taskServiceUrl }), logger);
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const { hostname, port } = new URL(gatewayUrl);
+
+  try {
+    await new Promise<void>((resolve) => {
+      const request = nodeRequest(
+        {
+          hostname,
+          port,
+          path: "/task/list",
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+        () => {
+          resolve();
+        },
+      );
+
+      request.on("error", () => {
+        resolve();
+      });
+      request.end();
+
+      setTimeout(() => {
+        request.destroy();
+      }, 10);
+    });
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 150);
+    });
+    await waitForLogs();
+
+    const abortedLogs = stream.entries().filter((entry) => entry.event === "http.request.aborted");
+    expect(abortedLogs).toHaveLength(1);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
   }
 });
 

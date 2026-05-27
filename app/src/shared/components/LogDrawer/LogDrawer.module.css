@@ -1,7 +1,6 @@
 .trigger {
   width: auto;
-  margin-top: 0.75rem;
-  margin-bottom: 1rem;
+  margin: 0;
   padding: 0.6rem 0.9rem;
   display: inline-flex;
   align-items: center;
@@ -9,7 +8,13 @@
   border: 1px solid #cbd5e1;
   border-radius: 0.5rem;
   background: #fff;
+  color: #334155;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   cursor: pointer;
+}
+
+.trigger:hover {
+  background: #f8fafc;
 }
 
 .overlay {
@@ -77,4 +82,55 @@
   margin: 0.2rem 0;
   font-size: 0.9rem;
   color: #334155;
+}
+
+:global(html[data-theme="dark"]) .trigger,
+:global(html.dark) .trigger,
+:global(.chakra-ui-dark) .trigger {
+  border-color: #334155;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .trigger:hover,
+:global(html.dark) .trigger:hover,
+:global(.chakra-ui-dark) .trigger:hover {
+  background: #1e293b;
+}
+
+:global(html[data-theme="dark"]) .drawer,
+:global(html.dark) .drawer,
+:global(.chakra-ui-dark) .drawer {
+  background: #020617;
+  box-shadow: -8px 0 24px rgba(2, 6, 23, 0.55);
+}
+
+:global(html[data-theme="dark"]) .closeBtn,
+:global(html.dark) .closeBtn,
+:global(.chakra-ui-dark) .closeBtn,
+:global(html[data-theme="dark"]) .header,
+:global(html.dark) .header,
+:global(.chakra-ui-dark) .header,
+:global(html[data-theme="dark"]) .text,
+:global(html.dark) .text,
+:global(.chakra-ui-dark) .text,
+:global(html[data-theme="dark"]) .logTitle,
+:global(html.dark) .logTitle,
+:global(.chakra-ui-dark) .logTitle,
+:global(html[data-theme="dark"]) .spinner,
+:global(html.dark) .spinner,
+:global(.chakra-ui-dark) .spinner {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .header,
+:global(html.dark) .header,
+:global(.chakra-ui-dark) .header {
+  border-bottom-color: #1e293b;
+}
+
+:global(html[data-theme="dark"]) .logCard,
+:global(html.dark) .logCard,
+:global(.chakra-ui-dark) .logCard {
+  background: #0f172a;
 }

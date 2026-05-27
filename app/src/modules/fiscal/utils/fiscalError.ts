@@ -1,7 +1,7 @@
 import { isAxiosError } from "axios";
 
 const DEFAULT_FISCAL_ERROR_MESSAGE =
-  "Não foi possível concluir a busca fiscal agora. Tente novamente em instantes.";
+  "Não foi possível concluir a operação fiscal agora. Tente novamente em instantes.";
 
 export function getFiscalErrorMessage(error: unknown): string {
   if (isAxiosError(error)) {

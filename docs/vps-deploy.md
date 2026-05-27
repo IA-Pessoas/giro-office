@@ -157,6 +157,21 @@ Workflows que **não** definem `environment` (ex.: `test-cicd.yml` em branch de 
 
 3. Com **develop** e **staging** na mesma VPS: **staging** usa só `docker-compose.vps.yml` (proxy **8085**, gateway **3010**). **develop** usa `docker-compose.vps.yml` + `docker-compose.vps.slot-develop.yml` (proxy **8086**, gateway **3011**). O `vps-remote-deploy.sh` aplica o override quando `DEPLOY_SLOT=develop`.
 
+### Healthchecks (VPS persistente vs CI/DAST)
+
+O `docker-compose.vps.yml` define `healthcheck` com `node -e fetch(...)` a cada 30s. Isso é útil para `docker compose up --wait` em DAST/local (`scripts/ci/dast-local-stack.sh`), mas na VPS persistente gera muitos `runc exec` e sobrecarrega o `dockerd`.
+
+O deploy remoto (`vps-remote-deploy.sh`) aplica sempre:
+
+- `docker-compose.vps.runtime-override.yml` — desativa healthchecks contínuos e troca `depends_on: service_healthy` por `service_started`
+- `scripts/ci/vps-wait-endpoints.sh` — após `compose up -d`, verifica endpoints **uma vez** (loop com timeout, default 900s) via `curl` no host e `curlimages/curl` na rede `backend`
+
+Comandos manuais na VPS devem incluir o runtime override, por exemplo:
+
+```bash
+docker compose -f docker-compose.vps.yml -f docker-compose.vps.runtime-override.yml -p workspace-develop up -d
+```
+
 ### Smoke / logs
 
 O deploy remoto corre na VPS; se falhar, o script tenta reverter as imagens `workspace-*:<WORKSPACE_VPS_IMAGE_TAG>` anteriores e imprime `docker compose ps` e `docker compose logs` no log do GitHub Actions.
@@ -210,6 +225,6 @@ Escopos:
 - Lista de servicos: o workflow constroi e publica apenas as imagens selecionadas usando `scripts/ci/compose-vps-buildx-push.sh` com cache Buildx por servico.
 - `ALL`: o workflow constroi todas as imagens workspace e mantem limpeza agressiva de disco antes do build.
 
-O deploy remoto preserva rollback. Antes de puxar novas imagens, `scripts/ci/vps-remote-deploy.sh` grava os IDs locais em `.deploy/image-ids-before-<tag>.txt`. Se `compose up` falhar, o script reetiqueta as imagens anteriores e tenta subir novamente o mesmo escopo.
+O deploy remoto preserva rollback. Antes de puxar novas imagens, `scripts/ci/vps-remote-deploy.sh` grava os IDs locais em `.deploy/image-ids-before-<tag>.txt`. Se `compose up` ou a verificação pontual de endpoints falhar, o script reetiqueta as imagens anteriores e tenta subir novamente o mesmo escopo.
 
 Rollback nao e fallback. Falha em deploy seletivo nao vira deploy `ALL` automaticamente. Deploy completo acontece quando o detector retorna `ALL` ou quando o workflow e ajustado explicitamente para isso.

@@ -12,6 +12,8 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 
 - `JWT_SECRET`
 - `GATEWAY_ALLOWED_ORIGINS`
+- `GATEWAY_PUBLIC_URL` (opcional, usado no `servers[0].url` do OpenAPI agregado)
+- `GATEWAY_JSON_BODY_LIMIT` (opcional, padrao `1mb`)
 - `AUDIT_ENABLED`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN`
 - `ORGANIZATION_SERVICE_URL`
 - `RH_SERVICE_URL`

@@ -1,5 +1,27 @@
 export { FiscalShell } from "./components";
-export { fiscalNcmSearchQueryKey, FISCAL_QUERY_KEY, useFiscalNcmSearch } from "./hooks";
+export {
+  fiscalIcmsDetailQueryKey,
+  fiscalIcmsListQueryKey,
+  fiscalIpiDetailQueryKey,
+  fiscalIpiListQueryKey,
+  fiscalNcmDetailQueryKey,
+  fiscalNcmListQueryKey,
+  fiscalNcmSearchQueryKey,
+  FISCAL_QUERY_KEY,
+  useCreateFiscalIcmsMutation,
+  useCreateFiscalIpiMutation,
+  useFiscalIcmsDetail,
+  useFiscalIcmsList,
+  useFiscalIpiDetail,
+  useFiscalIpiList,
+  useCreateFiscalNcmMutation,
+  useFiscalNcmDetail,
+  useFiscalNcmList,
+  useFiscalNcmSearch,
+  useUpdateFiscalIpiMutation,
+  useUpdateFiscalIcmsMutation,
+  useUpdateFiscalNcmMutation,
+} from "./hooks";
 
 export type {
   CreateFiscalIcmsPayload,
@@ -28,10 +50,20 @@ export {
   buildFiscalNcmListParams,
   buildFiscalNcmSearchParams,
   FISCAL_ENDPOINTS,
+  fiscalIcmsService,
+  fiscalIpiService,
+  fiscalNcmService,
   fiscalSearchService,
   unwrapFiscalCreate,
   unwrapFiscalDetail,
   unwrapFiscalEnvelope,
   unwrapFiscalMutation,
 } from "./services";
-export { getFiscalErrorMessage } from "./utils";
+export {
+  formatFiscalDateLabel,
+  getFiscalErrorMessage,
+  parseCommaSeparatedCodes,
+  parseCommaSeparatedValues,
+  toFiscalInputDate,
+  toFiscalIsoDate,
+} from "./utils";

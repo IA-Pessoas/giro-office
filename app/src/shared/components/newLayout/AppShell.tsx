@@ -33,6 +33,7 @@ import {
 
 import { useMe } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
+import { isAdminPermission } from "@modules/auth/utils/permissions";
 import { useAuth } from "../../../context/AuthContext";
 
 function getInitials(name: string): string {
@@ -95,7 +96,7 @@ const moduleCategories = [
       { path: "/clients", name: "Clientes", icon: ContactRound },
       { path: "/projects", name: "Projetos", icon: FolderKanban },
       { path: "/tasks", name: "Tarefas", icon: SquareCheck },
-      { path: "/organizations", name: "Organização", icon: Building2 },
+      { path: "/departments", name: "Departamentos", icon: Building2 },
     ],
   },
   {
@@ -178,6 +179,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const displayUserLogin = meQuery.data?.login ?? user?.email ?? user?.login ?? "";
   const displayUserPhoto = resolvePhotoUrl(meQuery.data?.photo_url ?? null);
   const displayUserInitials = getInitials(displayUserName);
+  const isAdmin = isAdminPermission(meQuery.data?.permission ?? user?.permission ?? null);
+  const filteredModuleCategories = moduleCategories
+    .map((category) => ({
+      ...category,
+      modules: category.modules.filter((module) =>
+        module.path === "/departments" ? isAdmin : true,
+      ),
+    }))
+    .filter((category) => category.modules.length > 0);
 
   useEffect(() => {
     setHasUserPhotoLoadError(false);
@@ -290,7 +300,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
 
         <nav className="p-3 space-y-6 overflow-y-auto h-[calc(100vh-4rem)]">
-          {moduleCategories.map((category) => (
+          {filteredModuleCategories.map((category) => (
             <div key={category.name}>
               {isSidebarOpen ? (
                 <div className="px-3 mb-2">
@@ -556,4 +566,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-

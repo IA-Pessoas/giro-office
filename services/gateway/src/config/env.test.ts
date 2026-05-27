@@ -53,4 +53,31 @@ describe("gateway env security validation", () => {
 
     expect(() => getGatewayEnv()).toThrow(/GATEWAY_ALLOWED_ORIGINS/);
   });
+
+  it("uses safe defaults for optional gateway public URL and JSON body limit", () => {
+    setGatewayEnv({});
+
+    const env = getGatewayEnv();
+
+    expect(env.publicGatewayUrl).toBeUndefined();
+    expect(env.jsonBodyLimit).toBe("1mb");
+  });
+
+  it("parses optional gateway public URL and JSON body limit overrides", () => {
+    setGatewayEnv({
+      GATEWAY_PUBLIC_URL: "https://api.example.com",
+      GATEWAY_JSON_BODY_LIMIT: "512kb",
+    });
+
+    const env = getGatewayEnv();
+
+    expect(env.publicGatewayUrl).toBe("https://api.example.com");
+    expect(env.jsonBodyLimit).toBe("512kb");
+  });
+
+  it("rejects invalid gateway JSON body limit values", () => {
+    setGatewayEnv({ GATEWAY_JSON_BODY_LIMIT: "abc" });
+
+    expect(() => getGatewayEnv()).toThrow(/GATEWAY_JSON_BODY_LIMIT/);
+  });
 });

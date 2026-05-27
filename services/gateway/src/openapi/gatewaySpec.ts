@@ -98,7 +98,7 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       buildSpec: () =>
         buildRegularizeServiceOpenApiSpec({
           port: getPortFromUrl(env.regularizeServiceUrl),
-        } as never),
+        }),
       includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
       isInternalPath: (path) => path.startsWith("/internal/"),
     },
@@ -135,8 +135,7 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
     {
       key: "ti-service",
       label: "TI Service",
-      buildSpec: () =>
-        buildTiServiceOpenApiSpec({ port: getPortFromUrl(env.tiServiceUrl) } as never),
+      buildSpec: () => buildTiServiceOpenApiSpec({ port: getPortFromUrl(env.tiServiceUrl) }),
       includePath: (path) => path !== "/health" && path !== "/ready",
     },
     {
