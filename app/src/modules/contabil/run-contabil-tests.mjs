@@ -34,6 +34,10 @@ import {
   isContabilTextValueFilled,
   mapAssignableUsersToContabilOptions,
 } from "./components/contabilPartySection.helpers.ts";
+import {
+  getContabilCardState,
+  shouldShowContabilNav,
+} from "./hooks/contabilAccessUi.ts";
 
 async function runTest(name, fn) {
   try {
@@ -333,6 +337,18 @@ await (async () => {
       canEditContabil: true,
       isReadOnlyContabil: false,
     });
+  });
+
+  await runTest("shouldShowContabilNav mirrors view permission", () => {
+    assert.equal(shouldShowContabilNav(true), true);
+    assert.equal(shouldShowContabilNav(false), false);
+  });
+
+  await runTest("getContabilCardState hides, disables and enables the client card correctly", () => {
+    assert.equal(getContabilCardState(true, false), "hidden");
+    assert.equal(getContabilCardState(false, true), "disabled");
+    assert.equal(getContabilCardState(true, true), "enabled");
+    assert.equal(getContabilCardState(undefined, true), "enabled");
   });
 
   await runTest("getContabilErrorMessage prefers backend error strings and falls back otherwise", () => {
