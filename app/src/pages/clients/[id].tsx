@@ -5,6 +5,7 @@ import { useEffect, useState, type ChangeEvent } from "react";
 import {
   ArrowLeft,
   BriefcaseBusiness,
+  Calculator,
   CircleDollarSign,
   FileText,
   NotebookText,
@@ -18,6 +19,7 @@ import { toast } from "react-toastify";
 
 import { canSSRAuth } from "@modules/auth";
 import { ClientForm } from "@modules/clients/components/ClientForm";
+import { getContabilCardState, useContabilPermissions } from "@modules/contabil";
 import {
   useActivateClientMutation,
   useClient,
@@ -72,11 +74,13 @@ export default function ClientDetailPage() {
   const updateClientMutation = useUpdateClientMutation(clientId ?? "");
   const activateClientMutation = useActivateClientMutation(clientId ?? "");
   const deactivateClientMutation = useDeactivateClientMutation(clientId ?? "");
+  const { canViewContabil, permissionQuery } = useContabilPermissions();
   const [formValues, setFormValues] = useState<ClientFormValues>(createInitialFormValues());
 
   const isAdmin = user?.permission === 2;
   const client = clientQuery.data;
   const uiStatus = mapClientStatusFromApi(client?.status);
+  const contabilCardState = getContabilCardState(client?.contabil, canViewContabil);
   const organizationName =
     (client as { organization?: { name?: string } } | null)?.organization?.name ??
     "Organização atual";
@@ -366,6 +370,18 @@ export default function ClientDetailPage() {
                   icon={CircleDollarSign}
                 />
 
+                {!permissionQuery.isLoading && contabilCardState !== "hidden" ? (
+                  <ClientAccessCard
+                    title="Contábil"
+                    description="Acesse o controle mensal e os cadastros contábeis do cliente."
+                    href={`/clients/${client.id}/contabil`}
+                    actionLabel="Abrir contábil"
+                    icon={Calculator}
+                    disabled={contabilCardState === "disabled"}
+                    disabledMessage="Serviço contábil não contratado para este cliente."
+                  />
+                ) : null}
+
                 <ClientAccessCard
                   title="Regularize"
                   description="Atualize os dados cadastrais, fiscais e operacionais do cliente."
@@ -426,12 +442,16 @@ function ClientAccessCard({
   href,
   actionLabel,
   icon: Icon,
+  disabled = false,
+  disabledMessage,
 }: {
   title: string;
   description: string;
   href: string;
   actionLabel: string;
   icon: typeof FileText;
+  disabled?: boolean;
+  disabledMessage?: string;
 }) {
   return (
     <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
@@ -439,15 +459,27 @@ function ClientAccessCard({
         <div className="min-h-0 flex-1 space-y-1">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">{description}</p>
+          {disabledMessage ? (
+            <p className="pt-2 text-sm font-medium text-slate-500 dark:text-slate-400">
+              {disabledMessage}
+            </p>
+          ) : null}
         </div>
 
-        <Link
-          href={href}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 self-start rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] sm:w-auto sm:min-w-[176px]"
-        >
-          <Icon className="h-4 w-4" />
-          {actionLabel}
-        </Link>
+        {disabled ? (
+          <span className="inline-flex min-h-12 w-full items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-semibold text-slate-400 sm:w-auto sm:min-w-[176px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500">
+            <Icon className="h-4 w-4" />
+            Indisponível
+          </span>
+        ) : (
+          <Link
+            href={href}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 self-start rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] sm:w-auto sm:min-w-[176px]"
+          >
+            <Icon className="h-4 w-4" />
+            {actionLabel}
+          </Link>
+        )}
       </div>
     </div>
   );
