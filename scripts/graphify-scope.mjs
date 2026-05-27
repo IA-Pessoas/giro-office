@@ -32,7 +32,7 @@ function parseDotEnv(contents) {
     }
     let value = match[2].trim();
     const quote = value[0];
-    if ((quote === "\"" || quote === "'") && value.endsWith(quote)) {
+    if ((quote === '"' || quote === "'") && value.endsWith(quote)) {
       value = value.slice(1, -1);
     } else {
       value = value.replace(/\s+#.*$/, "").trim();

@@ -63,7 +63,7 @@ describe("loadGraphifyDotEnv", () => {
       join(cwd, ".env"),
       [
         "OPENAI_API_KEY=from-file",
-        "ANTHROPIC_API_KEY=\"quoted value\"",
+        'ANTHROPIC_API_KEY="quoted value"',
         "IGNORED_SERVICE_SECRET=not-needed",
         "",
       ].join("\n"),

@@ -64,6 +64,20 @@ describe("buildGraphifyEnv", () => {
     assert.equal(result.hasGeminiKey, true);
   });
 
+  it("lets dotenv files fill empty shell values", async () => {
+    const cwd = createTempWorkspace();
+    await mkdir(join(cwd, "app"), { recursive: true });
+    writeFileSync(join(cwd, ".env.local"), "GEMINI_API_KEY=from-file\n");
+
+    const result = buildGraphifyEnv("ui", {
+      cwd,
+      baseEnv: { GEMINI_API_KEY: "" },
+    });
+
+    assert.equal(result.env.GEMINI_API_KEY, "from-file");
+    assert.equal(result.hasGeminiKey, true);
+  });
+
   it("loads scope-specific env files after root env files", async () => {
     const cwd = createTempWorkspace();
     await mkdir(join(cwd, "app"), { recursive: true });
