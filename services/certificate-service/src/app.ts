@@ -102,7 +102,23 @@ export function createCertificateApplication({
       }),
     }),
   );
-  app.use("/certificate/pf", createCertificatePfRoutes(_prisma));
+  app.use(
+    "/certificate/pf",
+    createCertificatePfRoutes({
+      prisma: _prisma,
+      certificateFileStorage,
+      certificateFileCrypto,
+      maxFileSizeBytes: env.certificateFileMaxSizeBytes,
+      storageProvider: env.storageMode,
+      storageBucket: env.storageBucket,
+      uploadRateLimit: createRateLimitMiddleware({
+        key: "certificate-service:pf-file-upload",
+        max: env.uploadRateLimitMax,
+        windowMs: env.uploadRateLimitWindowMs,
+        methods: ["POST"],
+      }),
+    }),
+  );
   app.use("/internal/notifications", createInternalNotificationRoutes(_prisma, env));
 
   if (env.enableApiDocs) {
