@@ -4102,8 +4102,12 @@ async function run() {
     for (const f of failures) {
       process.stderr.write(`  - ${f.id}: ${f.error}\n`);
     }
-    // Never stop when a route fails
-    // process.exit(1);
+    process.exitCode = 1;
+    log(
+      "FAIL",
+      `Smoke run completed with failures. Executed ${executed.length}, skipped ${skipped.length}, failed ${failures.length}. (${elapsed}s)`,
+    );
+    return;
   }
 
   log(
