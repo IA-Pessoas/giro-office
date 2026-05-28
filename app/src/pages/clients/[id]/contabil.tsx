@@ -39,7 +39,7 @@ export default function ClientContabilPage() {
   const router = useRouter();
   const clientId = typeof router.query.id === "string" ? router.query.id : undefined;
   const clientQuery = useClient(clientId);
-  const { canViewContabil, canEditContabil, permissionQuery } = useContabilPermissions();
+  const { canViewContabil, canEditContabil, isLoading } = useContabilPermissions();
   const client = clientQuery.data;
   let content: ReactNode;
 
@@ -55,7 +55,7 @@ export default function ClientContabilPage() {
     );
   } else if (!client) {
     content = <PanelMessage>Cliente não encontrado.</PanelMessage>;
-  } else if (permissionQuery.isLoading) {
+  } else if (isLoading) {
     content = <PanelMessage>Carregando permissões do módulo contábil...</PanelMessage>;
   } else if (!canViewContabil) {
     content = (

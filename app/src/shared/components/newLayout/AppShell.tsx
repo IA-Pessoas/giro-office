@@ -31,10 +31,11 @@ import {
   X,
 } from "lucide-react";
 
+import type { ModuleKey } from "@modules/auth";
+import { APP_ROUTE_MODULE_MAP, useModuleAccessMap } from "@modules/auth";
+import { isAdminPermission } from "@modules/auth/utils/permissions";
 import { useMe } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
-import { isAdminPermission } from "@modules/auth/utils/permissions";
-import { useContabilPermissions } from "@modules/contabil";
 import { useAuth } from "../../../context/AuthContext";
 
 function getInitials(name: string): string {
@@ -89,6 +90,10 @@ function Logo({ showText }: { showText: boolean }) {
   );
 }
 
+const visibleModuleKeys = Object.values(APP_ROUTE_MODULE_MAP).filter(
+  (moduleKey): moduleKey is ModuleKey => Boolean(moduleKey),
+);
+
 const moduleCategories = [
   {
     name: "Principal",
@@ -103,16 +108,16 @@ const moduleCategories = [
   {
     name: "Módulos",
     modules: [
-      { path: "/comercial", name: "Comercial", icon: BriefcaseBusiness },
-      { path: "/marketing", name: "Marketing", icon: Megaphone },
-      { path: "/regularize", name: "Regularize", icon: ShieldCheck },
-      { path: "/fiscal", name: "Fiscal", icon: Receipt },
+      { path: "/comercial", name: "Comercial", icon: BriefcaseBusiness, moduleKey: "comercial" as ModuleKey },
+      { path: "/marketing", name: "Marketing", icon: Megaphone, moduleKey: "marketing" as ModuleKey },
+      { path: "/regularize", name: "Regularize", icon: ShieldCheck, moduleKey: "regularize" as ModuleKey },
+      { path: "/fiscal", name: "Fiscal", icon: Receipt, moduleKey: "fiscal" as ModuleKey },
       { path: "/contabil", name: "Contábil", icon: Calculator },
-      { path: "/rh", name: "RH", icon: Users },
-      { path: "/departamento-pessoal", name: "Dep. Pessoal", icon: UserRoundCog },
-      { path: "/tecnologia", name: "Tecnologia", icon: Code },
-      { path: "/triagem", name: "Triagem", icon: Filter },
-      { path: "/parcelamento", name: "Parcelamento", icon: BadgeDollarSign },
+      { path: "/rh", name: "RH", icon: Users, moduleKey: "rh" as ModuleKey },
+      { path: "/departamento-pessoal", name: "Dep. Pessoal", icon: UserRoundCog, moduleKey: "pessoal" as ModuleKey },
+      { path: "/tecnologia", name: "Tecnologia", icon: Code, moduleKey: "ti" as ModuleKey },
+      { path: "/triagem", name: "Triagem", icon: Filter, moduleKey: "triagem" as ModuleKey },
+      { path: "/parcelamento", name: "Parcelamento", icon: BadgeDollarSign, moduleKey: "parcelamento" as ModuleKey },
     ],
   },
   {
@@ -136,7 +141,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
   const meQuery = useMe();
-  const { canViewContabil, permissionQuery } = useContabilPermissions();
+  const { accessMap: moduleAccessMap, isLoading: isModuleAccessLoading } = useModuleAccessMap(
+    visibleModuleKeys,
+  );
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -185,13 +192,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const filteredModuleCategories = moduleCategories
     .map((category) => ({
       ...category,
-      modules: category.modules.filter((module) =>
-        module.path === "/departments"
-          ? isAdmin
-          : module.path === "/contabil"
-            ? !permissionQuery.isLoading && canViewContabil
-            : true,
-      ),
+      modules: category.modules.filter((module) => {
+        if (module.path === "/departments") {
+          return isAdmin;
+        }
+
+        const moduleKey =
+          ("moduleKey" in module ? module.moduleKey : undefined) ?? APP_ROUTE_MODULE_MAP[module.path];
+
+        if (!moduleKey) {
+          return true;
+        }
+
+        return !isModuleAccessLoading && moduleAccessMap[moduleKey].canView;
+      }),
     }))
     .filter((category) => category.modules.length > 0);
 
