@@ -47,27 +47,38 @@ function extractMeRecord(payload: unknown): InternalMeRecord {
   const name = userPayload.name;
   const login = userPayload.login;
   const permission = userPayload.permission;
+  const departmentId = userPayload.department_id;
 
   if (
     typeof id !== "string" ||
     typeof name !== "string" ||
     typeof login !== "string" ||
-    typeof permission !== "number"
+    typeof permission !== "number" ||
+    typeof departmentId !== "string"
   ) {
     throw new Error("Unexpected current-user payload shape.");
   }
+
+  const department = isRecord(userPayload.department)
+    ? {
+        name: typeof userPayload.department.name === "string" ? userPayload.department.name : "",
+        color: typeof userPayload.department.color === "string" ? userPayload.department.color : "",
+      }
+    : undefined;
 
   return {
     id,
     name,
     login,
     permission,
+    department_id: departmentId,
     photo_url: readOptionalString(userPayload.photo_url),
     organization_id: readOptionalString(userPayload.organization_id),
     type:
       userPayload.type === "owner" || userPayload.type === "admin" || userPayload.type === "user"
         ? userPayload.type
         : null,
+    department,
   };
 }
 

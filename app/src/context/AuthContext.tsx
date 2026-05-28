@@ -4,6 +4,7 @@ import Router from "next/router";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+import { getModulePermissionsFromToken } from "@modules/auth/utils/sessionToken";
 import { api } from "@shared/services/apiClient";
 
 interface UserProps {
@@ -12,6 +13,10 @@ interface UserProps {
     login: string;
     email?: string;
     permission: number;
+    department_id?: string;
+    organization_id?: string | null;
+    type?: "owner" | "admin" | "user" | null;
+    modules?: Record<string, number | null> | null;
 }
 
 interface SignInProps {
@@ -62,6 +67,25 @@ function isValidAuthUser(data: unknown): data is UserProps {
         typeof (data as UserProps).permission === "number";
 }
 
+function buildCurrentUser(
+    data: UserProps,
+    fallbackModules?: Record<string, number | null> | null,
+): UserProps {
+    return {
+        id: data.id,
+        name: data.name,
+        login: data.login,
+        permission: data.permission,
+        department_id: typeof data.department_id === "string" ? data.department_id : undefined,
+        organization_id: typeof data.organization_id === "string" ? data.organization_id : null,
+        type:
+            data.type === "owner" || data.type === "admin" || data.type === "user"
+                ? data.type
+                : null,
+        modules: data.modules ?? fallbackModules ?? null,
+    };
+}
+
 export function signOut() {
     try {
         clearAuthCookie();
@@ -78,13 +102,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     useEffect(() => {
         const { "cw.token": token } = parseCookies();
+        const fallbackModules = getModulePermissionsFromToken(token);
 
         if (token) {
             api.get("/user/me").then((response) => {
                 const userData = response.data?.data;
 
                 if (isValidAuthUser(userData)) {
-                    setUser(userData);
+                    setUser(buildCurrentUser(userData, fallbackModules));
                     api.defaults.headers.common.Authorization = `Bearer ${token}`;
                 } else {
                     clearAuthCookie();
@@ -123,12 +148,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 path: "/",
             });
 
-            setUser({
-                id: sessionData.id,
-                name: sessionData.name,
-                login: sessionData.login,
-                permission: sessionData.permission,
-            });
+            setUser(buildCurrentUser(sessionData));
 
             api.defaults.headers.common.Authorization = `Bearer ${sessionData.token}`;
 
