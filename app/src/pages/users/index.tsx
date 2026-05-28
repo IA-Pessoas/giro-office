@@ -16,17 +16,19 @@ import {
   type UserItem,
 } from "@modules/users";
 import { extractUsersList } from "@modules/users/services/userService";
+import { AdminAccessDeniedState } from "@shared/components/AdminAccessDeniedState";
 import { setupAPIClient } from "@shared/services/api";
 
 interface Props {
-  users: UserItem[];
-  deps: DepItem[];
-  me: any;
+  users?: UserItem[];
+  deps?: DepItem[];
+  me?: any;
+  forbidden?: boolean;
 }
 
-export default function Users({ users, deps, me }: Props) {
+export default function Users({ users = [], deps = [], me, forbidden = false }: Props) {
   const router = useRouter();
-  const [usersList, setUsersList] = useState<UserItem[]>(users || []);
+  const [usersList, setUsersList] = useState<UserItem[]>(users);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("Ativo");
@@ -48,7 +50,7 @@ export default function Users({ users, deps, me }: Props) {
       return;
     }
 
-    toast.info(`Usuario ${newUser.name} criado, mude o filtro para "Ativo" para ve-lo.`);
+    toast.info(`Usuário ${newUser.name} criado, mude o filtro para "Ativo" para vê-lo.`);
   };
 
   const handleFilterChange = async (status: string) => {
@@ -64,11 +66,22 @@ export default function Users({ users, deps, me }: Props) {
         return;
       }
 
-      toast.error("Erro ao buscar usuarios.");
+      toast.error("Erro ao buscar usuários.");
     } finally {
       setIsListLoading(false);
     }
   };
+
+  if (forbidden) {
+    return (
+      <>
+        <Head>
+          <title>Usuários</title>
+        </Head>
+        <AdminAccessDeniedState description="Você não possui permissão para acessar a área de usuários." />
+      </>
+    );
+  }
 
   if (!hasAdminAccess) {
     return null;
@@ -77,7 +90,7 @@ export default function Users({ users, deps, me }: Props) {
   return (
     <>
       <Head>
-        <title>Usuarios</title>
+        <title>Usuários</title>
       </Head>
 
       <section className="users-shell u-split-panel relative">
@@ -126,24 +139,33 @@ export default function Users({ users, deps, me }: Props) {
   );
 }
 
-export const getServerSideProps = canSSRAdmin(async (ctx) => {
-  try {
-    const apiClient = setupAPIClient(ctx);
-    const [meResponse, usersResponse, deps] = await Promise.all([
-      apiClient.get("/user/me"),
-      apiClient.get("/user/users", { params: { status: "Ativo" } }),
-      departmentService.list(undefined, ctx),
-    ]);
+export const getServerSideProps = canSSRAdmin<Props>(
+  async (ctx) => {
+    try {
+      const apiClient = setupAPIClient(ctx);
+      const [meResponse, usersResponse, deps] = await Promise.all([
+        apiClient.get("/user/me"),
+        apiClient.get("/user/users", { params: { status: "Ativo" } }),
+        departmentService.list(undefined, ctx),
+      ]);
 
-    return {
+      return {
+        props: {
+          me: meResponse.data.user,
+          users: extractUsersList(usersResponse.data),
+          deps,
+        },
+      };
+    } catch (error) {
+      console.error("Erro no getServerSideProps da página de usuários:", error);
+      return { redirect: { destination: "/dashboard", permanent: false } };
+    }
+  },
+  {
+    onForbidden: () => ({
       props: {
-        me: meResponse.data.user,
-        users: extractUsersList(usersResponse.data),
-        deps,
+        forbidden: true,
       },
-    };
-  } catch (error) {
-    console.error("Erro no getServerSideProps da pagina de usuarios:", error);
-    return { redirect: { destination: "/dashboard", permanent: false } };
-  }
-});
+    }),
+  },
+);

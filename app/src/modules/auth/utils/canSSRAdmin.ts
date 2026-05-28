@@ -1,9 +1,12 @@
 import type { GetServerSideProps, GetServerSidePropsContext, GetServerSidePropsResult } from "next";
+import { jwtDecode } from "jwt-decode";
 import { destroyCookie, parseCookies } from "nookies";
 
-import { AuthTokenError } from "../../../shared/services/errors/AuthTokenError.ts";
+interface SessionTokenPayload {
+  permission?: number;
+}
 
-import { getPermissionFromToken, isAdminPermission } from "./permissions.ts";
+const ADMIN_PERMISSION = 2;
 
 function redirectTo<P>(destination: string): GetServerSidePropsResult<P> {
   return {
@@ -14,7 +17,56 @@ function redirectTo<P>(destination: string): GetServerSidePropsResult<P> {
   };
 }
 
-export function canSSRAdmin<P>(fn: GetServerSideProps<P>) {
+interface CanSSRAdminOptions<P> {
+  onForbidden?: (ctx: GetServerSidePropsContext) => GetServerSidePropsResult<P>;
+}
+
+function getPermissionFromToken(token?: string | null): number | null {
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const payload = jwtDecode<SessionTokenPayload>(token);
+    return typeof payload.permission === "number" ? payload.permission : null;
+  } catch {
+    return null;
+  }
+}
+
+function isAdminPermission(permission?: number | null): boolean {
+  return permission === ADMIN_PERMISSION;
+}
+
+function isAuthTokenFailure(err: unknown): boolean {
+  if (!err || typeof err !== "object") {
+    return false;
+  }
+
+  const maybeError = err as {
+    name?: string;
+    message?: string;
+    constructor?: { name?: string };
+  };
+
+  const errorName =
+    maybeError.name === "Error"
+      ? maybeError.constructor?.name ?? maybeError.name
+      : maybeError.name || maybeError.constructor?.name;
+  const errorMessage = maybeError.message ?? "";
+
+  return (
+    errorName === "AuthTokenError" ||
+    errorMessage === "Unauthorized" ||
+    errorMessage === "Erro de autorização" ||
+    errorMessage.includes("401")
+  );
+}
+
+export function canSSRAdmin<P>(
+  fn: GetServerSideProps<P>,
+  options?: CanSSRAdminOptions<P>,
+) {
   return async (ctx: GetServerSidePropsContext): Promise<GetServerSidePropsResult<P>> => {
     const cookies = parseCookies(ctx);
     const token = cookies["cw.token"];
@@ -25,16 +77,13 @@ export function canSSRAdmin<P>(fn: GetServerSideProps<P>) {
 
     const permission = getPermissionFromToken(token);
     if (!isAdminPermission(permission)) {
-      return redirectTo("/dashboard");
+      return options?.onForbidden?.(ctx) ?? redirectTo("/dashboard");
     }
 
     try {
       return await fn(ctx);
     } catch (err) {
-      if (
-        err instanceof AuthTokenError ||
-        (err instanceof Error && (err.message === "Unauthorized" || err.message.includes("401")))
-      ) {
+      if (isAuthTokenFailure(err)) {
         destroyCookie(ctx, "cw.token", { path: "/" });
         return redirectTo("/login");
       }

@@ -86,6 +86,19 @@ await (async () => {
     });
   });
 
+  await runTest("canSSRAdmin can render a forbidden state instead of redirecting", async () => {
+    const guard = canSSRAdmin(
+      async () => ({ props: { ok: true } }),
+      {
+        onForbidden: () => ({ props: { forbidden: true } }),
+      },
+    );
+
+    const result = await guard(createSsrContext(createToken({ permission: 1 })));
+
+    assert.deepEqual(result, { props: { forbidden: true } });
+  });
+
   await runTest("canSSRAdmin allows admin users through", async () => {
     const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
     const result = await guard(createSsrContext(createToken({ permission: 2 })));

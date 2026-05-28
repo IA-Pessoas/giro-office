@@ -4,6 +4,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { canSSRAdmin } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
 import { UserProfile, type UserItem } from "@modules/users";
+import { AdminAccessDeniedState } from "@shared/components/AdminAccessDeniedState";
 import { setupAPIClient } from "@shared/services/api";
 
 interface MeItem {
@@ -13,42 +14,62 @@ interface MeItem {
 }
 
 interface Props {
-  me: MeItem;
-  user: UserItem;
-  deps: DepItem[];
+  me?: MeItem;
+  user?: UserItem;
+  deps?: DepItem[];
+  forbidden?: boolean;
 }
 
-export default function User({ me, user, deps }: Props) {
+export default function User({ me, user, deps = [], forbidden = false }: Props) {
+  if (forbidden) {
+    return (
+      <AdminAccessDeniedState description="Você não possui permissão para acessar os detalhes deste usuário." />
+    );
+  }
+
+  if (!me || !user) {
+    return null;
+  }
+
   return <UserProfile userId={user.id} me={me} departments={deps} />;
 }
 
-export const getServerSideProps = canSSRAdmin(async (ctx) => {
-  const { id } = ctx.params as { id: string };
+export const getServerSideProps = canSSRAdmin<Props>(
+  async (ctx) => {
+    const { id } = ctx.params as { id: string };
 
-  try {
-    const apiClient = setupAPIClient(ctx);
-    const [meResponse, userResponse, deps] = await Promise.all([
-      apiClient.get("/user/me"),
-      apiClient.get("/users-detail", { params: { user_id: id } }),
-      departmentService.list(undefined, ctx),
-    ]);
+    try {
+      const apiClient = setupAPIClient(ctx);
+      const [meResponse, userResponse, deps] = await Promise.all([
+        apiClient.get("/user/me"),
+        apiClient.get("/users-detail", { params: { user_id: id } }),
+        departmentService.list(undefined, ctx),
+      ]);
 
-    const user = userResponse.data.user;
-    const me = meResponse.data.user;
+      const user = userResponse.data.user;
+      const me = meResponse.data.user;
 
-    if (!user) {
+      if (!user) {
+        return { redirect: { destination: "/dashboard", permanent: false } };
+      }
+
+      return {
+        props: {
+          me,
+          user,
+          deps,
+        },
+      };
+    } catch (error) {
+      console.log(error);
       return { redirect: { destination: "/dashboard", permanent: false } };
     }
-
-    return {
+  },
+  {
+    onForbidden: () => ({
       props: {
-        me,
-        user,
-        deps,
+        forbidden: true,
       },
-    };
-  } catch (error) {
-    console.log(error);
-    return { redirect: { destination: "/dashboard", permanent: false } };
-  }
-});
+    }),
+  },
+);
