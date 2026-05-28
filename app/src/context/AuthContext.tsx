@@ -1,10 +1,14 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { destroyCookie, parseCookies, setCookie } from "nookies";
 import Router from "next/router";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+import { getModulePermissionsFromToken } from "@modules/auth/utils/sessionToken";
+import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
+import { ME_QUERY_KEY } from "@shared/hooks";
 
 interface UserProps {
     id: string;
@@ -12,6 +16,10 @@ interface UserProps {
     login: string;
     email?: string;
     permission: number;
+    department_id?: string;
+    organization_id?: string | null;
+    type?: "owner" | "admin" | "user" | null;
+    modules?: Record<string, number | null> | null;
 }
 
 interface SignInProps {
@@ -36,10 +44,17 @@ type AuthProviderProps = {
 };
 
 export const AuthContext = createContext({} as AuthContextData);
+const SESSION_TRANSITION_MIN_DURATION_MS = 380;
 
 function clearAuthCookie() {
     destroyCookie(null, "cw.token", { path: "/" });
     delete api.defaults.headers.common.Authorization;
+}
+
+function wait(ms: number) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
 }
 
 function isValidAuthSessionData(data: unknown): data is AuthSessionData {
@@ -62,6 +77,25 @@ function isValidAuthUser(data: unknown): data is UserProps {
         typeof (data as UserProps).permission === "number";
 }
 
+function buildCurrentUser(
+    data: UserProps,
+    fallbackModules?: Record<string, number | null> | null,
+): UserProps {
+    return {
+        id: data.id,
+        name: data.name,
+        login: data.login,
+        permission: data.permission,
+        department_id: typeof data.department_id === "string" ? data.department_id : undefined,
+        organization_id: typeof data.organization_id === "string" ? data.organization_id : null,
+        type:
+            data.type === "owner" || data.type === "admin" || data.type === "user"
+                ? data.type
+                : null,
+        modules: data.modules ?? fallbackModules ?? null,
+    };
+}
+
 export function signOut() {
     try {
         clearAuthCookie();
@@ -75,27 +109,62 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const [user, setUser] = useState<UserProps | null>(null);
     const isAuthenticated = !!user;
     const [loading, setLoading] = useState(true);
+    const authRequestVersionRef = useRef(0);
+    const queryClient = useQueryClient();
+
+    function beginAuthTransition() {
+        authRequestVersionRef.current += 1;
+        return authRequestVersionRef.current;
+    }
+
+    function isCurrentAuthTransition(version: number, expectedToken?: string | null) {
+        if (authRequestVersionRef.current !== version) {
+            return false;
+        }
+
+        if (typeof expectedToken === "string") {
+            const { "cw.token": currentToken } = parseCookies();
+            return currentToken === expectedToken;
+        }
+
+        return true;
+    }
 
     useEffect(() => {
         const { "cw.token": token } = parseCookies();
+        const fallbackModules = getModulePermissionsFromToken(token);
+        const requestVersion = beginAuthTransition();
 
         if (token) {
             api.get("/user/me").then((response) => {
+                if (!isCurrentAuthTransition(requestVersion, token)) {
+                    return;
+                }
+
                 const userData = response.data?.data;
 
                 if (isValidAuthUser(userData)) {
-                    setUser(userData);
+                    const currentUser = buildCurrentUser(userData, fallbackModules);
+                    setUser(currentUser);
                     api.defaults.headers.common.Authorization = `Bearer ${token}`;
                 } else {
                     clearAuthCookie();
                     setUser(null);
+                    queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
                 }
             }).catch((error) => {
+                if (!isCurrentAuthTransition(requestVersion, token)) {
+                    return;
+                }
+
                 console.error("Erro ao verificar token:", error);
                 clearAuthCookie();
                 setUser(null);
+                queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             }).finally(() => {
-                setLoading(false);
+                if (isCurrentAuthTransition(requestVersion, token)) {
+                    setLoading(false);
+                }
             });
         } else {
             setLoading(false);
@@ -103,6 +172,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }, []);
 
     async function signIn({ login, password }: SignInProps) {
+        const requestVersion = beginAuthTransition();
+
         try {
             const response = await api.post("/user/session", {
                 login,
@@ -123,12 +194,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 path: "/",
             });
 
-            setUser({
-                id: sessionData.id,
-                name: sessionData.name,
-                login: sessionData.login,
-                permission: sessionData.permission,
-            });
+            if (!isCurrentAuthTransition(requestVersion)) {
+                return;
+            }
+
+            const currentUser = buildCurrentUser(sessionData);
+            setUser(currentUser);
+            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
 
             api.defaults.headers.common.Authorization = `Bearer ${sessionData.token}`;
 
@@ -175,10 +247,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     async function logoutUser() {
         try {
+            beginAuthTransition();
             clearAuthCookie();
-            toast.success("Sessão encerrada!");
-            Router.push("/login");
             setUser(null);
+            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            toast.success("Sessão encerrada!");
+            await wait(SESSION_TRANSITION_MIN_DURATION_MS);
+            await Router.push("/login");
         } catch (err) {
             toast.error("Erro ao sair!");
             console.log("ERRO AO SAIR", err);
@@ -187,9 +262,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     if (loading) {
         return (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
-                <h1>Carregando...</h1>
-            </div>
+            <SessionTransitionScreen
+                title="Preparando o Office"
+                description="Validando sua sessao e carregando os acessos necessarios para abrir o ambiente com seguranca."
+            />
         );
     }
 

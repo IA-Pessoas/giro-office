@@ -13,7 +13,7 @@ import {
 const CONTABIL_CLIENT_PICKER_LIMIT = 50;
 
 export default function ContabilPage() {
-  const { canViewContabil, canEditContabil, permissionQuery } = useContabilPermissions();
+  const { canViewContabil, canEditContabil, isLoading } = useContabilPermissions();
   const [search, setSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string>();
   const [selectedClientName, setSelectedClientName] = useState<string>();
@@ -52,7 +52,7 @@ export default function ContabilPage() {
       </Head>
 
       <div className="space-y-6">
-        {permissionQuery.isLoading ? (
+        {isLoading ? (
           <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
             Carregando permissões do módulo contábil...
           </section>

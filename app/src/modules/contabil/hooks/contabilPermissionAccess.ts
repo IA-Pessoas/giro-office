@@ -1,3 +1,5 @@
+import type { ModuleAccess } from "@modules/auth";
+
 export interface ContabilPermissionAccess {
   canViewContabil: boolean;
   canEditContabil: boolean;
@@ -5,19 +7,11 @@ export interface ContabilPermissionAccess {
 }
 
 export function resolveContabilPermissionAccess(
-  contabilPermission: number | null | undefined,
-  userPermission?: number | null,
+  access: Pick<ModuleAccess, "canView" | "canEdit">,
 ): ContabilPermissionAccess {
-  const isGlobalAdmin = userPermission === 2;
-  const hasContabilPermission =
-    contabilPermission !== null && contabilPermission !== undefined;
-  const canViewContabil = hasContabilPermission || isGlobalAdmin;
-  const canEditContabil =
-    (hasContabilPermission && contabilPermission >= 1) || isGlobalAdmin;
-
   return {
-    canViewContabil,
-    canEditContabil,
-    isReadOnlyContabil: canViewContabil && !canEditContabil,
+    canViewContabil: access.canView,
+    canEditContabil: access.canEdit,
+    isReadOnlyContabil: access.canView && !access.canEdit,
   };
 }

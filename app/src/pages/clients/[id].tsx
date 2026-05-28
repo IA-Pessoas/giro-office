@@ -74,7 +74,7 @@ export default function ClientDetailPage() {
   const updateClientMutation = useUpdateClientMutation(clientId ?? "");
   const activateClientMutation = useActivateClientMutation(clientId ?? "");
   const deactivateClientMutation = useDeactivateClientMutation(clientId ?? "");
-  const { canViewContabil, permissionQuery } = useContabilPermissions();
+  const { canViewContabil, isLoading: isContabilAccessLoading } = useContabilPermissions();
   const [formValues, setFormValues] = useState<ClientFormValues>(createInitialFormValues());
 
   const isAdmin = user?.permission === 2;
@@ -370,7 +370,7 @@ export default function ClientDetailPage() {
                   icon={CircleDollarSign}
                 />
 
-                {!permissionQuery.isLoading && contabilCardState !== "hidden" ? (
+                {!isContabilAccessLoading && contabilCardState !== "hidden" ? (
                   <ClientAccessCard
                     title="Contábil"
                     description="Acesse o controle mensal e os cadastros contábeis do cliente."

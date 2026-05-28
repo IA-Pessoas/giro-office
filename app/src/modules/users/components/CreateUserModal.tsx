@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 
+import { resolveDepartmentModuleKey } from '@modules/auth';
 import { Dialog } from '@shared/components';
 
 import {
@@ -74,8 +75,15 @@ function createInitialModuleSelections(): ModuleSelectionState {
   }, {} as ModuleSelectionState);
 }
 
-function buildModulesPayload(moduleSelections: ModuleSelectionState) {
+function buildModulesPayload(
+  moduleSelections: ModuleSelectionState,
+  departmentModuleKey?: ModuleKey | null,
+) {
   return Object.entries(moduleSelections).reduce<Record<string, number | null>>((acc, [key, config]) => {
+    if (key === departmentModuleKey) {
+      return acc;
+    }
+
     if (config.enabled) {
       acc[key] = config.level;
     }
@@ -120,6 +128,17 @@ export function CreateUserModal({
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const isCreateBlocked = departmentsLoading || departmentsError || departments.length === 0 || organizationIdLoading || !organizationId;
+  const selectedDepartmentName = useMemo(() => {
+    if (!formData.department_id) {
+      return null;
+    }
+
+    return departments.find((department) => department.id === formData.department_id)?.name ?? null;
+  }, [departments, formData.department_id]);
+  const departmentModuleKey = useMemo(
+    () => resolveDepartmentModuleKey(selectedDepartmentName),
+    [selectedDepartmentName],
+  );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -164,7 +183,7 @@ export function CreateUserModal({
     try {
       const { userService } = await import('../services/userService');
       const type = getUserTypeFromPermission(formData.permission);
-      const modules = buildModulesPayload(moduleSelections);
+      const modules = buildModulesPayload(moduleSelections, departmentModuleKey);
       const payload: AdminCreateUserData = {
         name: formData.name,
         login: formData.login,
@@ -323,12 +342,16 @@ export function CreateUserModal({
           <div className="mb-4 space-y-1">
             <label className={SECTION_TITLE_CLASSNAME}>Modulos adicionais</label>
             <p className={SECTION_DESCRIPTION_CLASSNAME}>
-              Defina o nível de acesso por departamento.
+              Defina apenas acessos complementares fora do departamento principal.
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              O modulo da area principal ja e concedido automaticamente pelo departamento.
             </p>
           </div>
           <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1">
             {CREATE_USER_MODULE_OPTIONS.map((moduleOption) => {
               const selection = moduleSelections[moduleOption.key];
+              const isDepartmentModule = departmentModuleKey === moduleOption.key;
 
               return (
                 <div key={moduleOption.key} className={MODULE_CARD_CLASSNAME}>
@@ -336,18 +359,24 @@ export function CreateUserModal({
                     <div className="min-w-0">
                       <p className="dialog-neutral-text truncate text-sm font-medium text-slate-700 dark:text-white">{moduleOption.label}</p>
                     </div>
-                    <select
-                      value={getModuleSelectValue(selection)}
-                      onChange={(e) => handleModuleLevelChange(moduleOption.key, e.target.value as ModuleSelectValue)}
-                      disabled={formData.permission === 2}
-                      className={`${SELECT_FIELD_CLASSNAME} h-10 px-3 text-sm`}
-                      style={SELECT_ARROW_STYLE}
-                    >
-                      <option value="none">Sem acesso</option>
-                      <option value="0">Visualizador</option>
-                      <option value="1">Usuario</option>
-                      <option value="2">Administrador</option>
-                    </select>
+                    {isDepartmentModule ? (
+                      <div className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        Acesso pelo departamento
+                      </div>
+                    ) : (
+                      <select
+                        value={getModuleSelectValue(selection)}
+                        onChange={(e) => handleModuleLevelChange(moduleOption.key, e.target.value as ModuleSelectValue)}
+                        disabled={formData.permission === 2}
+                        className={`${SELECT_FIELD_CLASSNAME} h-10 px-3 text-sm`}
+                        style={SELECT_ARROW_STYLE}
+                      >
+                        <option value="none">Sem acesso</option>
+                        <option value="0">Visualizador</option>
+                        <option value="1">Usuario</option>
+                        <option value="2">Administrador</option>
+                      </select>
+                    )}
                   </div>
                 </div>
               );

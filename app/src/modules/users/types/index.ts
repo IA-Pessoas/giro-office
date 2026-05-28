@@ -33,6 +33,7 @@ export type KnownPermissionModuleKey =
   | "pessoal"
   | "regularize"
   | "rh"
+  | "ti"
   | "triagem"
   | "wiki";
 

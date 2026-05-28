@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { AdminUserDetailsPanel, CreateUserModal, type UserItem } from "@modules/users";
+import { resolveDepartmentModuleKey } from "@modules/auth";
 import {
   PERMISSION_MODULE_GROUPS,
   PERMISSION_SELECT_OPTIONS,
@@ -197,6 +198,18 @@ export function Administracao() {
   const selectedPermissionUser = useMemo(() => {
     return permissionUsers.find((candidate) => candidate.id === selectedPermissionUserId) ?? null;
   }, [permissionUsers, selectedPermissionUserId]);
+  const selectedPermissionDepartmentModule = useMemo(() => {
+    if (!selectedPermissionUser) {
+      return null;
+    }
+
+    const departmentName =
+      departmentNameById.get(selectedPermissionUser.department_id) ??
+      selectedPermissionUser.department?.name ??
+      null;
+
+    return resolveDepartmentModuleKey(departmentName);
+  }, [departmentNameById, selectedPermissionUser]);
   const normalizedPermissionDraft = useMemo(() => {
     return normalizePermissionDraft(permissionDraft, permissionExtraKeys);
   }, [permissionDraft, permissionExtraKeys]);
@@ -863,7 +876,7 @@ export function Administracao() {
                       Níveis da permissão por módulo
                     </p>
                     <p className={ADMIN_MUTED_CLASSNAME}>
-                      Ajuste os acessos em lote para o usuário selecionado.
+                      Ajuste apenas acessos complementares ao modulo principal do usuario selecionado.
                     </p>
                   </div>
                   <button
@@ -916,37 +929,47 @@ export function Administracao() {
                         </div>
 
                         <div className="mt-4 space-y-3">
-                          {group.keys.map((moduleKey) => (
-                            <div
-                              key={moduleKey}
-                              className="grid gap-2 2xl:grid-cols-[minmax(0,1fr)_200px] 2xl:items-center"
-                            >
-                              <label
-                                className="block max-w-full truncate text-sm font-medium text-slate-700 dark:text-slate-200"
-                                title={getPermissionModuleLabel(moduleKey)}
+                          {group.keys.map((moduleKey) => {
+                            const isDepartmentModule = selectedPermissionDepartmentModule === moduleKey;
+
+                            return (
+                              <div
+                                key={moduleKey}
+                                className="grid gap-2 2xl:grid-cols-[minmax(0,1fr)_200px] 2xl:items-center"
                               >
-                                {getPermissionModuleLabel(moduleKey)}
-                              </label>
-                              <select
-                                value={getPermissionSelectValue(normalizedPermissionDraft[moduleKey])}
-                                onChange={(event) =>
-                                  handlePermissionChange(
-                                    moduleKey,
-                                    event.target.value as PermissionSelectValue,
-                                  )
-                                }
-                                className={ADMIN_SELECT_CLASSNAME}
-                                style={ADMIN_SELECT_ARROW_STYLE}
-                                disabled={isSelectedPermissionOwner}
-                              >
-                                {PERMISSION_SELECT_OPTIONS.map((option) => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          ))}
+                                <label
+                                  className="block max-w-full truncate text-sm font-medium text-slate-700 dark:text-slate-200"
+                                  title={getPermissionModuleLabel(moduleKey)}
+                                >
+                                  {getPermissionModuleLabel(moduleKey)}
+                                </label>
+                                {isDepartmentModule ? (
+                                  <div className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                    Acesso pelo departamento
+                                  </div>
+                                ) : (
+                                  <select
+                                    value={getPermissionSelectValue(normalizedPermissionDraft[moduleKey])}
+                                    onChange={(event) =>
+                                      handlePermissionChange(
+                                        moduleKey,
+                                        event.target.value as PermissionSelectValue,
+                                      )
+                                    }
+                                    className={ADMIN_SELECT_CLASSNAME}
+                                    style={ADMIN_SELECT_ARROW_STYLE}
+                                    disabled={isSelectedPermissionOwner}
+                                  >
+                                    {PERMISSION_SELECT_OPTIONS.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </section>
                     ))}
