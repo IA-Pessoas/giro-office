@@ -215,7 +215,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     logoutUser();
-    router.push("/login");
   };
 
   const getTimeLabel = () =>

@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 import { getModulePermissionsFromToken } from "@modules/auth/utils/sessionToken";
+import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
 import { ME_QUERY_KEY } from "@shared/hooks";
 
@@ -43,10 +44,17 @@ type AuthProviderProps = {
 };
 
 export const AuthContext = createContext({} as AuthContextData);
+const SESSION_TRANSITION_MIN_DURATION_MS = 380;
 
 function clearAuthCookie() {
     destroyCookie(null, "cw.token", { path: "/" });
     delete api.defaults.headers.common.Authorization;
+}
+
+function wait(ms: number) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
 }
 
 function isValidAuthSessionData(data: unknown): data is AuthSessionData {
@@ -241,10 +249,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
             beginAuthTransition();
             clearAuthCookie();
+            setUser(null);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             toast.success("Sessão encerrada!");
-            Router.push("/login");
-            setUser(null);
+            await wait(SESSION_TRANSITION_MIN_DURATION_MS);
+            await Router.push("/login");
         } catch (err) {
             toast.error("Erro ao sair!");
             console.log("ERRO AO SAIR", err);
@@ -253,9 +262,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     if (loading) {
         return (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
-                <h1>Carregando...</h1>
-            </div>
+            <SessionTransitionScreen
+                title="Preparando o Office"
+                description="Validando sua sessao e carregando os acessos necessarios para abrir o ambiente com seguranca."
+            />
         );
     }
 
