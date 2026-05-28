@@ -34,6 +34,7 @@ import {
 import { useMe } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
 import { isAdminPermission } from "@modules/auth/utils/permissions";
+import { useContabilPermissions } from "@modules/contabil";
 import { useAuth } from "../../../context/AuthContext";
 
 function getInitials(name: string): string {
@@ -135,6 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
   const meQuery = useMe();
+  const { canViewContabil, permissionQuery } = useContabilPermissions();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -184,7 +186,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     .map((category) => ({
       ...category,
       modules: category.modules.filter((module) =>
-        module.path === "/departments" ? isAdmin : true,
+        module.path === "/departments"
+          ? isAdmin
+          : module.path === "/contabil"
+            ? !permissionQuery.isLoading && canViewContabil
+            : true,
       ),
     }))
     .filter((category) => category.modules.length > 0);

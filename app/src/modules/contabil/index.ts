@@ -1,9 +1,11 @@
 export {
+  AccessDeniedPanel,
   ContabilControlSection,
   CONTABIL_CONTROL_FIELDS,
   CONTABIL_RELATIONSHIP_FIELDS,
   ContabilRelationshipSection,
   ContabilResponsibleSection,
+  ContabilShell,
   ContabilStateBox,
 } from "./components";
 export {
@@ -11,6 +13,8 @@ export {
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
   CONTABIL_QUERY_KEY,
+  getContabilCardState,
+  shouldShowContabilNav,
   syncContabilRelationshipQueryCache,
   syncContabilResponsibleQueryCache,
   useContabilControlBootstrapMutation,
