@@ -1,4 +1,5 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { destroyCookie, parseCookies, setCookie } from "nookies";
 import Router from "next/router";
 import { toast } from "react-toastify";
@@ -6,6 +7,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 import { getModulePermissionsFromToken } from "@modules/auth/utils/sessionToken";
 import { api } from "@shared/services/apiClient";
+import { ME_QUERY_KEY } from "@shared/hooks";
 
 interface UserProps {
     id: string;
@@ -99,28 +101,62 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const [user, setUser] = useState<UserProps | null>(null);
     const isAuthenticated = !!user;
     const [loading, setLoading] = useState(true);
+    const authRequestVersionRef = useRef(0);
+    const queryClient = useQueryClient();
+
+    function beginAuthTransition() {
+        authRequestVersionRef.current += 1;
+        return authRequestVersionRef.current;
+    }
+
+    function isCurrentAuthTransition(version: number, expectedToken?: string | null) {
+        if (authRequestVersionRef.current !== version) {
+            return false;
+        }
+
+        if (typeof expectedToken === "string") {
+            const { "cw.token": currentToken } = parseCookies();
+            return currentToken === expectedToken;
+        }
+
+        return true;
+    }
 
     useEffect(() => {
         const { "cw.token": token } = parseCookies();
         const fallbackModules = getModulePermissionsFromToken(token);
+        const requestVersion = beginAuthTransition();
 
         if (token) {
             api.get("/user/me").then((response) => {
+                if (!isCurrentAuthTransition(requestVersion, token)) {
+                    return;
+                }
+
                 const userData = response.data?.data;
 
                 if (isValidAuthUser(userData)) {
-                    setUser(buildCurrentUser(userData, fallbackModules));
+                    const currentUser = buildCurrentUser(userData, fallbackModules);
+                    setUser(currentUser);
                     api.defaults.headers.common.Authorization = `Bearer ${token}`;
                 } else {
                     clearAuthCookie();
                     setUser(null);
+                    queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
                 }
             }).catch((error) => {
+                if (!isCurrentAuthTransition(requestVersion, token)) {
+                    return;
+                }
+
                 console.error("Erro ao verificar token:", error);
                 clearAuthCookie();
                 setUser(null);
+                queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             }).finally(() => {
-                setLoading(false);
+                if (isCurrentAuthTransition(requestVersion, token)) {
+                    setLoading(false);
+                }
             });
         } else {
             setLoading(false);
@@ -128,6 +164,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }, []);
 
     async function signIn({ login, password }: SignInProps) {
+        const requestVersion = beginAuthTransition();
+
         try {
             const response = await api.post("/user/session", {
                 login,
@@ -148,7 +186,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 path: "/",
             });
 
-            setUser(buildCurrentUser(sessionData));
+            if (!isCurrentAuthTransition(requestVersion)) {
+                return;
+            }
+
+            const currentUser = buildCurrentUser(sessionData);
+            setUser(currentUser);
+            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
 
             api.defaults.headers.common.Authorization = `Bearer ${sessionData.token}`;
 
@@ -195,7 +239,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     async function logoutUser() {
         try {
+            beginAuthTransition();
             clearAuthCookie();
+            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             toast.success("Sessão encerrada!");
             Router.push("/login");
             setUser(null);

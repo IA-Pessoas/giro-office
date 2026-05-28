@@ -184,8 +184,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const pathname = router.asPath.split("?")[0] ?? "";
-  const displayUserName = meQuery.data?.name ?? user?.name ?? "Admin";
-  const displayUserLogin = meQuery.data?.login ?? user?.email ?? user?.login ?? "";
+  const displayUserName = user?.name ?? meQuery.data?.name ?? "Admin";
+  const displayUserLogin = user?.email ?? user?.login ?? meQuery.data?.login ?? "";
   const displayUserPhoto = resolvePhotoUrl(meQuery.data?.photo_url ?? null);
   const displayUserInitials = getInitials(displayUserName);
   const isAdmin = isAdminPermission(meQuery.data?.permission ?? user?.permission ?? null);
