@@ -21,6 +21,8 @@ import { createCertificateNotificationRoutes } from "./routes/certificateNotific
 import { createCertificatePfRoutes } from "./routes/certificatePf.routes.js";
 import { createCertificatePjRoutes } from "./routes/certificatePj.routes.js";
 import { createInternalNotificationRoutes } from "./routes/internalNotification.routes.js";
+import type { createCertificateFileCrypto } from "./services/certificateFileCrypto.js";
+import type { CertificateFileStorage } from "./services/certificateFileStorage.js";
 
 function certificateServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const out: Record<string, unknown> = {};
@@ -42,6 +44,8 @@ export interface CreateCertificateApplicationOptions {
   env: CertificateServiceEnv;
   logger: Logger;
   prisma: PrismaClient;
+  certificateFileStorage?: CertificateFileStorage;
+  certificateFileCrypto?: ReturnType<typeof createCertificateFileCrypto>;
 }
 
 export function createCertificateApplication({

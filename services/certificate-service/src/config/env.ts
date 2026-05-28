@@ -22,6 +22,13 @@ function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
 }
 
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const storageModeSchema = z.enum(["supabase", "local"]);
+
 const certificateServiceEnvSchema = z
   .object({
     nodeEnv: z.string().optional().default("development"),
@@ -44,6 +51,63 @@ const certificateServiceEnvSchema = z
       .optional()
       .default("false")
       .transform((value) => parseBoolean(value)),
+    storageMode: storageModeSchema.optional().default("supabase"),
+    storageBucket: z.string().optional().default("Certificados"),
+    storageDir: z.string().optional().default(".data/certificate-files"),
+    certificateFileMaxSizeBytes: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 5 * 1024 * 1024)),
+    certificateFileEncryptionKey: z
+      .string()
+      .min(1, "CERTIFICATE_FILE_ENCRYPTION_KEY nao definida."),
+    certificateFileEncryptionKeyVersion: z.string().optional().default("v1"),
+    supabaseUrl: z.string().trim().optional(),
+    supabaseServiceRoleKey: z.string().trim().optional(),
+    uploadRateLimitMax: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 30)),
+    uploadRateLimitWindowMs: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 600_000)),
+  })
+  .superRefine((env, ctx) => {
+    const key = Buffer.from(env.certificateFileEncryptionKey, "base64");
+    if (key.length !== 32) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CERTIFICATE_FILE_ENCRYPTION_KEY deve ser base64 com 32 bytes.",
+        path: ["certificateFileEncryptionKey"],
+      });
+    }
+
+    if (env.nodeEnv === "production" && env.storageMode === "local") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CERTIFICATE_STORAGE_MODE=local nao e permitido em producao.",
+        path: ["storageMode"],
+      });
+    }
+
+    if (env.storageMode === "supabase") {
+      if (!env.supabaseUrl || !z.string().url().safeParse(env.supabaseUrl).success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SUPABASE_URL invalida para certificate-service.",
+          path: ["supabaseUrl"],
+        });
+      }
+
+      if (!env.supabaseServiceRoleKey) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SUPABASE_SERVICE_ROLE_KEY nao definida para certificate-service.",
+          path: ["supabaseServiceRoleKey"],
+        });
+      }
+    }
   })
   .transform((env) => {
     const { enableApiDocsEnv, ...rest } = env;
@@ -74,6 +138,8 @@ const certificateServiceEnvSchema = z
     return {
       ...rest,
       enableApiDocs,
+      supabaseUrl: rest.supabaseUrl ?? "",
+      supabaseServiceRoleKey: rest.supabaseServiceRoleKey ?? "",
       logPretty: rest.nodeEnv !== "production" && rest.logPretty,
     };
   });
@@ -94,5 +160,15 @@ export function getCertificateServiceEnv(): CertificateServiceEnv {
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
+    storageMode: process.env.CERTIFICATE_STORAGE_MODE,
+    storageBucket: process.env.CERTIFICATE_STORAGE_BUCKET,
+    storageDir: process.env.CERTIFICATE_STORAGE_DIR,
+    certificateFileMaxSizeBytes: process.env.CERTIFICATE_FILE_MAX_SIZE_BYTES,
+    certificateFileEncryptionKey: process.env.CERTIFICATE_FILE_ENCRYPTION_KEY,
+    certificateFileEncryptionKeyVersion: process.env.CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    uploadRateLimitMax: process.env.UPLOAD_RATE_LIMIT_MAX,
+    uploadRateLimitWindowMs: process.env.UPLOAD_RATE_LIMIT_WINDOW_MS,
   });
 }
