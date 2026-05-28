@@ -1,4 +1,5 @@
 export { canSSRAuth } from './utils/canSSRAuth';
+export { canSSRAdmin } from "./utils/canSSRAdmin";
 export { canSSRGuest } from './utils/canSSRGuest';
 export { useModuleAccess, useModuleAccessMap } from "./hooks/useModuleAccess";
 export {
@@ -11,3 +12,4 @@ export {
   type ModuleAccess,
   type ModuleKey,
 } from "./utils/moduleAccess";
+export { canAccessAdministration } from "./utils/permissions";
