@@ -11,6 +11,8 @@ import { vi } from "vitest";
 import { createCertificateApplication } from "../app.js";
 import type { CertificateServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { createCertificateFileCrypto } from "../services/certificateFileCrypto.js";
+import type { CertificateFileStorage } from "../services/certificateFileStorage.js";
 
 export const certificateOrganizationId = "10000000-0000-4000-8000-000000000001";
 export const certificateUserId = "00000000-0000-4000-8000-000000000001";
@@ -165,7 +167,39 @@ export function createCertificatePrismaMock(): PrismaClient {
   } as unknown as PrismaClient;
 }
 
-export function createCertificateTestApp(prisma = createCertificatePrismaMock()) {
+export interface CreateCertificateTestAppOptions {
+  envOverrides?: Partial<CertificateServiceEnv>;
+  fileStorage?: CertificateFileStorage;
+  fileCrypto?: ReturnType<typeof createCertificateFileCrypto>;
+}
+
+export function createMemoryCertificateFileStorage(): CertificateFileStorage & {
+  objects: Map<string, Buffer>;
+} {
+  const objects = new Map<string, Buffer>();
+
+  return {
+    objects,
+    async putObject({ path, buffer }) {
+      objects.set(path, buffer);
+    },
+    async getObject(path) {
+      const object = objects.get(path);
+      if (!object) {
+        throw new Error("missing object");
+      }
+      return object;
+    },
+    async deleteObject(path) {
+      objects.delete(path);
+    },
+  };
+}
+
+export function createCertificateTestApp(
+  prisma = createCertificatePrismaMock(),
+  options: CreateCertificateTestAppOptions = {},
+) {
   const env = {
     nodeEnv: "test",
     port: 3041,
@@ -189,6 +223,7 @@ export function createCertificateTestApp(prisma = createCertificatePrismaMock())
     supabaseServiceRoleKey: "test-service-role",
     uploadRateLimitMax: 30,
     uploadRateLimitWindowMs: 600_000,
+    ...options.envOverrides,
   } satisfies CertificateServiceEnv;
   const logger = createLogger({
     service: "certificate-service-test",
@@ -201,5 +236,12 @@ export function createCertificateTestApp(prisma = createCertificatePrismaMock())
     env,
     logger,
     prisma,
+    certificateFileStorage: options.fileStorage ?? createMemoryCertificateFileStorage(),
+    certificateFileCrypto:
+      options.fileCrypto ??
+      createCertificateFileCrypto({
+        keyBase64: env.certificateFileEncryptionKey,
+        keyVersion: env.certificateFileEncryptionKeyVersion,
+      }),
   });
 }
