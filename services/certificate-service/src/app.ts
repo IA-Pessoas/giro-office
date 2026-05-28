@@ -1,5 +1,6 @@
 import {
   createExpressErrorHandler,
+  createRateLimitMiddleware,
   createSecurityHeadersMiddleware,
   createServiceCorsOptions,
   createSuccessResponse,
@@ -52,6 +53,8 @@ export function createCertificateApplication({
   env,
   logger,
   prisma: _prisma,
+  certificateFileStorage,
+  certificateFileCrypto,
 }: CreateCertificateApplicationOptions): express.Express {
   const app = express();
 
@@ -82,7 +85,23 @@ export function createCertificateApplication({
 
   app.use("/certificate", createForwardedAuthContextMiddleware(env.internalServiceToken));
   app.use("/certificate/notifications", createCertificateNotificationRoutes(_prisma));
-  app.use("/certificate/pj", createCertificatePjRoutes(_prisma));
+  app.use(
+    "/certificate/pj",
+    createCertificatePjRoutes({
+      prisma: _prisma,
+      certificateFileStorage,
+      certificateFileCrypto,
+      maxFileSizeBytes: env.certificateFileMaxSizeBytes,
+      storageProvider: env.storageMode,
+      storageBucket: env.storageBucket,
+      uploadRateLimit: createRateLimitMiddleware({
+        key: "certificate-service:pj-file-upload",
+        max: env.uploadRateLimitMax,
+        windowMs: env.uploadRateLimitWindowMs,
+        methods: ["POST"],
+      }),
+    }),
+  );
   app.use("/certificate/pf", createCertificatePfRoutes(_prisma));
   app.use("/internal/notifications", createInternalNotificationRoutes(_prisma, env));
 

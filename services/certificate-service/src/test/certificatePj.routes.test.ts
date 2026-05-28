@@ -1,17 +1,33 @@
 import "./envBootstrap.js";
 
+import type { IncomingMessage } from "node:http";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+import { createCertificateFileCrypto } from "../services/certificateFileCrypto.js";
 import {
   certificateGatewayHeaders,
   certificateGatewayHeadersWithoutPermission,
   certificateOrganizationId,
+  certificateUserId,
   createCertificatePrismaMock,
   createCertificateTestApp,
 } from "./testUtils.js";
 
 const certificateId = "20000000-0000-4000-8000-000000000001";
+
+function parseBinaryResponse(
+  response: IncomingMessage,
+  callback: (err: Error | null, body: Buffer) => void,
+): void {
+  const chunks: Buffer[] = [];
+
+  response.on("data", (chunk: Buffer | string) => {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  });
+  response.on("end", () => callback(null, Buffer.concat(chunks)));
+  response.on("error", (err: Error) => callback(err, Buffer.alloc(0)));
+}
 
 describe("certificate PJ routes", () => {
   it("GET /certificate/pj/list requires bearer context", async () => {
@@ -170,5 +186,231 @@ describe("certificate PJ routes", () => {
       success: false,
       code: "FORBIDDEN",
     });
+  });
+
+  it("POST /certificate/pj/:id/file rejects missing file", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+
+    const response = await request(app)
+      .post(`/certificate/pj/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "BAD_REQUEST",
+    });
+  });
+
+  it("POST /certificate/pj/:id/file rejects unsupported certificate files", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+
+    const response = await request(app)
+      .post(`/certificate/pj/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2))
+      .attach("file", Buffer.from("not-a-certificate"), {
+        filename: "certificate.txt",
+        contentType: "application/octet-stream",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "BAD_REQUEST",
+    });
+  });
+
+  it("POST /certificate/pj/:id/file rejects files above the configured limit", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock(), {
+      envOverrides: { certificateFileMaxSizeBytes: 4 },
+    });
+
+    const response = await request(app)
+      .post(`/certificate/pj/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2))
+      .attach("file", Buffer.from("too-large"), {
+        filename: "certificate.pfx",
+        contentType: "application/x-pkcs12",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "BAD_REQUEST",
+    });
+  });
+
+  it("POST /certificate/pj/:id/file requires elevated certificate permission", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+
+    const response = await request(app)
+      .post(`/certificate/pj/${certificateId}/file`)
+      .set(certificateGatewayHeaders(1))
+      .attach("file", Buffer.from("certificate-bytes"), {
+        filename: "certificate.pfx",
+        contentType: "application/x-pkcs12",
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("POST /certificate/pj/:id/file stores encrypted metadata and returns metadata only", async () => {
+    const prisma = createCertificatePrismaMock();
+    const fileStorage = {
+      putObject: vi.fn(async () => undefined),
+      getObject: vi.fn(),
+      deleteObject: vi.fn(),
+    };
+    const app = createCertificateTestApp(prisma, { fileStorage });
+
+    const response = await request(app)
+      .post(`/certificate/pj/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2))
+      .attach("file", Buffer.from("certificate-bytes"), {
+        filename: "Empresa Castelo.pfx",
+        contentType: "application/x-pkcs12",
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data).toMatchObject({
+      file_original_name: "Empresa Castelo.pfx",
+      file_mime_type: "application/x-pkcs12",
+      file_uploaded_by_user_id: certificateUserId,
+      file_storage_provider: "local",
+      file_storage_bucket: "Certificados",
+    });
+    expect(response.body.data.file_path).toMatch(
+      /^organizations\/10000000-0000-4000-8000-000000000001\/certificate-pj\/20000000-0000-4000-8000-000000000001\/\d+_Empresa_Castelo\.pfx\.enc$/,
+    );
+    expect(response.body.data).not.toHaveProperty("file_encryption_iv");
+    expect(response.body.data).not.toHaveProperty("file_encryption_tag");
+    expect(fileStorage.putObject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: response.body.data.file_path,
+        contentType: "application/octet-stream",
+      }),
+    );
+  });
+
+  it("GET /certificate/pj/:id/file requires elevated certificate permission", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+
+    const response = await request(app)
+      .get(`/certificate/pj/${certificateId}/file`)
+      .set(certificateGatewayHeaders(1));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("GET /certificate/pj/:id/file returns original bytes and no-store cache header", async () => {
+    const crypto = createCertificateFileCrypto({
+      keyBase64: Buffer.alloc(32, 7).toString("base64"),
+      keyVersion: "v1",
+    });
+    const originalBuffer = Buffer.from("certificate-bytes");
+    const encrypted = crypto.encrypt(originalBuffer);
+    const objectPath =
+      "organizations/10000000-0000-4000-8000-000000000001/certificate-pj/20000000-0000-4000-8000-000000000001/file.pfx.enc";
+    const prisma = createCertificatePrismaMock();
+    vi.mocked(prisma.certificatePJ.findFirst).mockResolvedValueOnce({
+      id: certificateId,
+      organization_id: certificateOrganizationId,
+      file_path: objectPath,
+      file_original_name: "Empresa Castelo.pfx",
+      file_mime_type: "application/x-pkcs12",
+      file_size_bytes: originalBuffer.length,
+      file_sha256: encrypted.sha256,
+      file_encryption_iv: encrypted.ivBase64,
+      file_encryption_tag: encrypted.authTagBase64,
+      file_encryption_key_version: encrypted.keyVersion,
+    } as never);
+    const fileStorage = {
+      putObject: vi.fn(),
+      getObject: vi.fn(async () => encrypted.encryptedBuffer),
+      deleteObject: vi.fn(),
+    };
+    const app = createCertificateTestApp(prisma, {
+      fileCrypto: crypto,
+      fileStorage,
+    });
+
+    const response = await request(app)
+      .get(`/certificate/pj/${certificateId}/file`)
+      .buffer(true)
+      .parse(parseBinaryResponse)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("application/x-pkcs12");
+    expect(response.headers["content-disposition"]).toBe(
+      'attachment; filename="Empresa Castelo.pfx"',
+    );
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body.equals(originalBuffer)).toBe(true);
+  });
+
+  it("GET /certificate/pj/:id/file returns 404 when the tenant has no file", async () => {
+    const prisma = createCertificatePrismaMock();
+    vi.mocked(prisma.certificatePJ.findFirst).mockResolvedValueOnce(null);
+    const app = createCertificateTestApp(prisma);
+
+    const response = await request(app)
+      .get(`/certificate/pj/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(404);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "NOT_FOUND",
+    });
+  });
+
+  it("DELETE /certificate/pj/:id/file clears metadata and deletes the object", async () => {
+    const objectPath =
+      "organizations/10000000-0000-4000-8000-000000000001/certificate-pj/20000000-0000-4000-8000-000000000001/file.pfx.enc";
+    const prisma = createCertificatePrismaMock();
+    vi.mocked(prisma.certificatePJ.findFirst).mockResolvedValueOnce({
+      id: certificateId,
+      organization_id: certificateOrganizationId,
+      file_path: objectPath,
+      file_original_name: "Empresa Castelo.pfx",
+      file_mime_type: "application/x-pkcs12",
+      file_encryption_iv: "iv",
+      file_encryption_tag: "tag",
+    } as never);
+    const fileStorage = {
+      putObject: vi.fn(),
+      getObject: vi.fn(),
+      deleteObject: vi.fn(async () => undefined),
+    };
+    const app = createCertificateTestApp(prisma, { fileStorage });
+
+    const response = await request(app)
+      .delete(`/certificate/pj/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: { ok: true },
+    });
+    expect(prisma.certificatePJ.update).toHaveBeenCalledWith({
+      where: { id: certificateId, organization_id: certificateOrganizationId },
+      data: expect.objectContaining({
+        file_path: null,
+        file_original_name: null,
+        has_certificate: false,
+      }),
+    });
+    expect(fileStorage.deleteObject).toHaveBeenCalledWith(objectPath);
   });
 });
