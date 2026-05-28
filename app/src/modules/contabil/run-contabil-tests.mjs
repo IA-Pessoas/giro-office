@@ -15,6 +15,10 @@ import {
 import { getContabilErrorMessage } from "./services/contabilError.ts";
 import { resolveContabilPermissionAccess } from "./hooks/contabilPermissionAccess.ts";
 import {
+  resolveDepartmentModuleKey,
+  resolveModuleAccess,
+} from "../auth/utils/moduleAccess.ts";
+import {
   CONTABIL_CONTROL_CHECKLIST_FIELDS,
   CONTABIL_CONTROL_FIELDS,
   CONTABIL_CONTROL_NOTES_FIELD,
@@ -307,36 +311,139 @@ await (async () => {
     assert.equal(isContabilTextValueFilled("   "), false);
   });
 
-  await runTest("resolveContabilPermissionAccess blocks normal users without contabil permission", () => {
-    assert.deepEqual(resolveContabilPermissionAccess(null, 1), {
-      canViewContabil: false,
-      canEditContabil: false,
-      isReadOnlyContabil: false,
+  await runTest("resolveModuleAccess blocks normal users without department or additional access", () => {
+    assert.deepEqual(resolveModuleAccess({ module: "contabil", userPermission: 1 }), {
+      level: "none",
+      canView: false,
+      canEdit: false,
+      isAdmin: false,
+      source: "none",
     });
   });
 
-  await runTest("resolveContabilPermissionAccess enables read-only mode for contabil viewer", () => {
-    assert.deepEqual(resolveContabilPermissionAccess(0, 1), {
-      canViewContabil: true,
-      canEditContabil: false,
-      isReadOnlyContabil: true,
+  await runTest("resolveModuleAccess enables read-only mode for the module of the current department", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        module: "contabil",
+        userPermission: 0,
+        departmentModule: "contabil",
+      }),
+      {
+        level: "view",
+        canView: true,
+        canEdit: false,
+        isAdmin: false,
+        source: "department",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess enables edit mode for department users", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        module: "contabil",
+        userPermission: 1,
+        departmentModule: "contabil",
+      }),
+      {
+        level: "edit",
+        canView: true,
+        canEdit: true,
+        isAdmin: false,
+        source: "department",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess uses additional modules outside the primary department", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        module: "contabil",
+        userPermission: 1,
+        departmentModule: "rh",
+        additionalModulePermissions: { contabil: 0 },
+      }),
+      {
+        level: "view",
+        canView: true,
+        canEdit: false,
+        isAdmin: false,
+        source: "additional-module",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess keeps department precedence over matching additional module values", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        module: "contabil",
+        userPermission: 1,
+        departmentModule: "contabil",
+        additionalModulePermissions: { contabil: null },
+      }),
+      {
+        level: "edit",
+        canView: true,
+        canEdit: true,
+        isAdmin: false,
+        source: "department",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess always unlocks global admins", () => {
+    assert.deepEqual(resolveModuleAccess({ module: "contabil", userPermission: 2 }), {
+      level: "admin",
+      canView: true,
+      canEdit: true,
+      isAdmin: true,
+      source: "admin",
     });
   });
 
-  await runTest("resolveContabilPermissionAccess enables edit mode for contabil users", () => {
-    assert.deepEqual(resolveContabilPermissionAccess(1, 1), {
-      canViewContabil: true,
-      canEditContabil: true,
-      isReadOnlyContabil: false,
-    });
+  await runTest("resolveDepartmentModuleKey maps known department names to shared module keys", () => {
+    assert.equal(resolveDepartmentModuleKey("Contábil"), "contabil");
+    assert.equal(resolveDepartmentModuleKey("Recursos Humanos"), "rh");
+    assert.equal(resolveDepartmentModuleKey("Tecnologia"), "ti");
+    assert.equal(resolveDepartmentModuleKey("Juridico"), null);
   });
 
-  await runTest("resolveContabilPermissionAccess always unlocks global admins", () => {
-    assert.deepEqual(resolveContabilPermissionAccess(null, 2), {
-      canViewContabil: true,
-      canEditContabil: true,
-      isReadOnlyContabil: false,
-    });
+  await runTest("resolveContabilPermissionAccess adapts shared module access to accounting flags", () => {
+    assert.deepEqual(
+      resolveContabilPermissionAccess({
+        canView: false,
+        canEdit: false,
+      }),
+      {
+        canViewContabil: false,
+        canEditContabil: false,
+        isReadOnlyContabil: false,
+      },
+    );
+
+    assert.deepEqual(
+      resolveContabilPermissionAccess({
+        canView: true,
+        canEdit: false,
+      }),
+      {
+        canViewContabil: true,
+        canEditContabil: false,
+        isReadOnlyContabil: true,
+      },
+    );
+
+    assert.deepEqual(
+      resolveContabilPermissionAccess({
+        canView: true,
+        canEdit: true,
+      }),
+      {
+        canViewContabil: true,
+        canEditContabil: true,
+        isReadOnlyContabil: false,
+      },
+    );
   });
 
   await runTest("shouldShowContabilNav mirrors view permission", () => {
