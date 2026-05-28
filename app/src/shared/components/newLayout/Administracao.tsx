@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { BarChart3, KeyRound, Lock, Plus, RotateCcw, Save, Search, Shield, Users } from "lucide-react";
+import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { AdminUserDetailsPanel, CreateUserModal, type UserItem } from "@modules/users";
-import { resolveDepartmentModuleKey } from "@modules/auth";
+import { canAccessAdministration, resolveDepartmentModuleKey } from "@modules/auth";
 import {
   PERMISSION_MODULE_GROUPS,
   PERMISSION_SELECT_OPTIONS,
@@ -103,6 +104,7 @@ function normalizeSearchText(value: string): string {
 }
 
 export function Administracao() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "permissions">("dashboard");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
@@ -122,6 +124,7 @@ export function Administracao() {
   const [permissionSaveError, setPermissionSaveError] = useState<string | null>(null);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
   const { user } = useAuth();
+  const hasAdminAccess = canAccessAdministration(user);
   const queryClient = useQueryClient();
 
   const {
@@ -133,6 +136,7 @@ export function Administracao() {
     ["admin-users", userStatusFilter],
     () => listAdminUsers(userStatusFilter),
     {
+      enabled: hasAdminAccess,
       retry: false,
       refetchOnWindowFocus: false,
     },
@@ -143,7 +147,7 @@ export function Administracao() {
     ["admin-users-summary", "active"],
     () => listAdminUsers("active"),
     {
-      enabled: activeTab === "dashboard",
+      enabled: hasAdminAccess && activeTab === "dashboard",
       retry: false,
       refetchOnWindowFocus: false,
     },
@@ -157,7 +161,7 @@ export function Administracao() {
     ["admin-users-summary", "permissions-active"],
     () => listAdminUsers("active"),
     {
-      enabled: activeTab === "permissions",
+      enabled: hasAdminAccess && activeTab === "permissions",
       retry: false,
       refetchOnWindowFocus: false,
     },
@@ -168,7 +172,7 @@ export function Administracao() {
     isLoading: isDepartmentsLoading,
     refetch: refetchDepartments,
   } = useFetch<DepItem[]>(["admin-departments"], () => departmentService.list(), {
-    enabled: activeTab === "users" || activeTab === "permissions" || isCreateModalOpen,
+    enabled: hasAdminAccess && (activeTab === "users" || activeTab === "permissions" || isCreateModalOpen),
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -224,7 +228,7 @@ export function Administracao() {
 
   const permissionQuery = useQuery<PermissionQueryResult>({
     queryKey: ["admin", "permissions", selectedPermissionUserId],
-    enabled: activeTab === "permissions" && !!selectedPermissionUserId,
+    enabled: hasAdminAccess && activeTab === "permissions" && !!selectedPermissionUserId,
     retry: false,
     queryFn: async ({ queryKey, signal }) => {
       const [, , userId] = queryKey as [string, string, string];
@@ -252,6 +256,16 @@ export function Administracao() {
       iconClassName: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
     },
   ];
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    if (!hasAdminAccess) {
+      void router.replace("/dashboard");
+    }
+  }, [hasAdminAccess, router, user]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -344,6 +358,27 @@ export function Administracao() {
       setPermissionSaveError(null);
     }
   }, [loadedPermissionUserId, selectedPermissionUserId]);
+
+  useEffect(() => {
+    if (
+      hasAdminAccess &&
+      permissionQuery.isError &&
+      isAxiosError(permissionQuery.error) &&
+      permissionQuery.error.response?.status === 403
+    ) {
+      void router.replace("/dashboard");
+    }
+  }, [hasAdminAccess, permissionQuery.error, permissionQuery.isError, router]);
+
+  useEffect(() => {
+    if (
+      hasAdminAccess &&
+      ((isAxiosError(usersError) && usersError.response?.status === 403) ||
+        (isAxiosError(permissionUsersError) && permissionUsersError.response?.status === 403))
+    ) {
+      void router.replace("/dashboard");
+    }
+  }, [hasAdminAccess, permissionUsersError, router, usersError]);
 
   useEffect(() => {
     if (!permissionQuery.data) {
@@ -478,6 +513,10 @@ export function Administracao() {
       setIsSavingPermissions(false);
     }
   };
+
+  if (!hasAdminAccess) {
+    return null;
+  }
 
   return (
     <div className="space-y-6">
