@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -13,6 +14,26 @@ import {
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
+const PANEL_TEXT_CLASSNAME = "p-6 text-sm";
+
+function PanelMessage({
+  children,
+  tone = "default",
+}: {
+  children: string;
+  tone?: "default" | "danger";
+}) {
+  const toneClassName =
+    tone === "danger"
+      ? "text-rose-600 dark:text-rose-300"
+      : "text-slate-500 dark:text-slate-400";
+
+  return (
+    <section className={`${PANEL_CLASSNAME} ${PANEL_TEXT_CLASSNAME} ${toneClassName}`}>
+      {children}
+    </section>
+  );
+}
 
 export default function ClientContabilPage() {
   const router = useRouter();
@@ -20,6 +41,36 @@ export default function ClientContabilPage() {
   const clientQuery = useClient(clientId);
   const { canViewContabil, canEditContabil, permissionQuery } = useContabilPermissions();
   const client = clientQuery.data;
+  let content: ReactNode;
+
+  if (!clientId) {
+    content = <PanelMessage>Cliente inválido.</PanelMessage>;
+  } else if (clientQuery.isLoading) {
+    content = <PanelMessage>Carregando cliente...</PanelMessage>;
+  } else if (clientQuery.isError) {
+    content = (
+      <PanelMessage tone="danger">
+        Não foi possível carregar o cliente para o fluxo contábil.
+      </PanelMessage>
+    );
+  } else if (!client) {
+    content = <PanelMessage>Cliente não encontrado.</PanelMessage>;
+  } else if (permissionQuery.isLoading) {
+    content = <PanelMessage>Carregando permissões do módulo contábil...</PanelMessage>;
+  } else if (!canViewContabil) {
+    content = (
+      <AccessDeniedPanel description="Você não possui permissão para acessar o fluxo contábil deste cliente." />
+    );
+  } else {
+    content = (
+      <ContabilShell
+        clientId={client.id}
+        clientName={client.name}
+        lockedClient
+        canEdit={canEditContabil}
+      />
+    );
+  }
 
   return (
     <>
@@ -38,36 +89,7 @@ export default function ClientContabilPage() {
           </Link>
         </div>
 
-        {!clientId ? (
-          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
-            Cliente inválido.
-          </section>
-        ) : clientQuery.isLoading ? (
-          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
-            Carregando cliente...
-          </section>
-        ) : clientQuery.isError ? (
-          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-rose-600 dark:text-rose-300`}>
-            Não foi possível carregar o cliente para o fluxo contábil.
-          </section>
-        ) : !client ? (
-          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
-            Cliente não encontrado.
-          </section>
-        ) : permissionQuery.isLoading ? (
-          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
-            Carregando permissões do módulo contábil...
-          </section>
-        ) : !canViewContabil ? (
-          <AccessDeniedPanel description="Você não possui permissão para acessar o fluxo contábil deste cliente." />
-        ) : (
-          <ContabilShell
-            clientId={client.id}
-            clientName={client.name}
-            lockedClient
-            canEdit={canEditContabil}
-          />
-        )}
+        {content}
       </div>
     </>
   );
