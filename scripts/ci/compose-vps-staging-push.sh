@@ -19,7 +19,10 @@ fi
 
 REF_HELPER="$ROOT/scripts/ci/docker-registry-image-ref.sh"
 
-mapfile -t local_imgs < <(bash scripts/ci/list-workspace-vps-images.sh)
+local_imgs=()
+while IFS= read -r local_img || [[ -n "$local_img" ]]; do
+  local_imgs+=("$local_img")
+done < <(bash scripts/ci/list-workspace-vps-images.sh)
 
 should_push() {
   local name="$1"
