@@ -179,6 +179,16 @@ export function createCertificateTestApp(prisma = createCertificatePrismaMock())
     enableApiDocs: false,
     logLevel: "info",
     logPretty: false,
+    storageMode: "local",
+    storageBucket: "Certificados",
+    storageDir: ".data/test-certificate-files",
+    certificateFileMaxSizeBytes: 5 * 1024 * 1024,
+    certificateFileEncryptionKey: Buffer.alloc(32, 7).toString("base64"),
+    certificateFileEncryptionKeyVersion: "v1",
+    supabaseUrl: "https://example.supabase.co",
+    supabaseServiceRoleKey: "test-service-role",
+    uploadRateLimitMax: 30,
+    uploadRateLimitWindowMs: 600_000,
   } satisfies CertificateServiceEnv;
   const logger = createLogger({
     service: "certificate-service-test",
