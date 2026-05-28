@@ -548,6 +548,7 @@ async function httpRequest(op, options) {
   const expectEnvelope =
     opOverrides?.expectEnvelope ??
     optionExpectEnvelope ??
+    op.expectEnvelope ??
     expectedStatus.every((status) => status < 400);
 
   const url = buildUrl(target, service, requestPath, query);
@@ -1004,6 +1005,36 @@ const handlers = {
     });
   },
 
+  async certificatePjFileUpload(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/certificate/pj/${requireState("certificatePjId")}/file`,
+      form: {
+        file: {
+          fieldName: "file",
+          path: env.fixturePath,
+          filename: "smoke-certificate.pfx",
+          contentType: "application/octet-stream",
+        },
+      },
+    });
+  },
+
+  async certificatePjFileDownload(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      expectEnvelope: false,
+      path: `/certificate/pj/${requireState("certificatePjId")}/file`,
+    });
+  },
+
+  async certificatePjFileDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/certificate/pj/${requireState("certificatePjId")}/file`,
+    });
+  },
+
   async certificatePfList(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -1053,6 +1084,36 @@ const handlers = {
       json: {
         notes: "Smoke certificate PF updated.",
       },
+    });
+  },
+
+  async certificatePfFileUpload(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/certificate/pf/${requireState("certificatePfId")}/file`,
+      form: {
+        file: {
+          fieldName: "file",
+          path: env.fixturePath,
+          filename: "smoke-certificate.pfx",
+          contentType: "application/octet-stream",
+        },
+      },
+    });
+  },
+
+  async certificatePfFileDownload(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      expectEnvelope: false,
+      path: `/certificate/pf/${requireState("certificatePfId")}/file`,
+    });
+  },
+
+  async certificatePfFileDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/certificate/pf/${requireState("certificatePfId")}/file`,
     });
   },
 

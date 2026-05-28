@@ -60,6 +60,44 @@ function certificatePfIdParameter() {
   };
 }
 
+const certificateFileUploadRequest = {
+  required: true,
+  content: {
+    "multipart/form-data": {
+      schema: {
+        type: "object",
+        required: ["file"],
+        properties: {
+          file: {
+            type: "string",
+            format: "binary",
+            description: "Arquivo de certificado .pfx ou .p12.",
+          },
+        },
+      },
+    },
+  },
+};
+
+const certificateFileDownloadResponse = {
+  description: "Arquivo de certificado descriptografado.",
+  headers: {
+    "Cache-Control": {
+      description: "Download protegido sem cache intermediario.",
+      schema: { type: "string", example: "no-store" },
+    },
+    "Content-Disposition": {
+      description: "Nome original do arquivo sanitizado para download.",
+      schema: { type: "string", example: 'attachment; filename="certificado.pfx"' },
+    },
+  },
+  content: {
+    "application/octet-stream": {
+      schema: { type: "string", format: "binary" },
+    },
+  },
+};
+
 function paginationQueryParameters() {
   return [
     {
@@ -126,6 +164,97 @@ function componentArrayRef(name: string) {
   return {
     type: "array",
     items: componentRef(name),
+  };
+}
+
+function certificateFileUploadOperation({
+  idParameter,
+  operationIdSuffix,
+  tag,
+  typeLabel,
+}: {
+  idParameter: Record<string, unknown>;
+  operationIdSuffix: "Pj" | "Pf";
+  tag: "Certificate PJ" | "Certificate PF";
+  typeLabel: "PJ" | "PF";
+}) {
+  return {
+    operationId: `uploadCertificate${operationIdSuffix}File`,
+    tags: [tag],
+    summary: `Envia arquivo do certificado ${typeLabel}`,
+    security: [{ bearerAuth: [] }],
+    parameters: [idParameter],
+    requestBody: certificateFileUploadRequest,
+    responses: {
+      "201": successResponse(
+        `Arquivo do certificado ${typeLabel} enviado`,
+        componentRef("CertificateFileMetadata"),
+      ),
+      "400": errorResponse("Arquivo de certificado invalido"),
+      "401": errorResponse("Autenticacao obrigatoria"),
+      "403": errorResponse("Permissao insuficiente"),
+      "404": errorResponse(`Certificado ${typeLabel} nao encontrado`),
+      "500": errorResponse("Erro interno"),
+    },
+  };
+}
+
+function certificateFileDownloadOperation({
+  idParameter,
+  operationIdSuffix,
+  tag,
+  typeLabel,
+}: {
+  idParameter: Record<string, unknown>;
+  operationIdSuffix: "Pj" | "Pf";
+  tag: "Certificate PJ" | "Certificate PF";
+  typeLabel: "PJ" | "PF";
+}) {
+  return {
+    operationId: `downloadCertificate${operationIdSuffix}File`,
+    tags: [tag],
+    summary: `Baixa arquivo do certificado ${typeLabel}`,
+    security: [{ bearerAuth: [] }],
+    parameters: [idParameter],
+    responses: {
+      "200": certificateFileDownloadResponse,
+      "400": errorResponse("Requisicao invalida"),
+      "401": errorResponse("Autenticacao obrigatoria"),
+      "403": errorResponse("Permissao insuficiente"),
+      "404": errorResponse(`Arquivo do certificado ${typeLabel} nao encontrado`),
+      "500": errorResponse("Erro interno"),
+    },
+  };
+}
+
+function certificateFileDeleteOperation({
+  idParameter,
+  operationIdSuffix,
+  tag,
+  typeLabel,
+}: {
+  idParameter: Record<string, unknown>;
+  operationIdSuffix: "Pj" | "Pf";
+  tag: "Certificate PJ" | "Certificate PF";
+  typeLabel: "PJ" | "PF";
+}) {
+  return {
+    operationId: `deleteCertificate${operationIdSuffix}File`,
+    tags: [tag],
+    summary: `Remove arquivo do certificado ${typeLabel}`,
+    security: [{ bearerAuth: [] }],
+    parameters: [idParameter],
+    responses: {
+      "200": successResponse(
+        `Arquivo do certificado ${typeLabel} removido`,
+        componentRef("CertificateFileDeleteResult"),
+      ),
+      "400": errorResponse("Requisicao invalida"),
+      "401": errorResponse("Autenticacao obrigatoria"),
+      "403": errorResponse("Permissao insuficiente"),
+      "404": errorResponse(`Arquivo do certificado ${typeLabel} nao encontrado`),
+      "500": errorResponse("Erro interno"),
+    },
   };
 }
 
@@ -303,6 +432,26 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           requestBody: certificatePjRequestBody(false),
         }),
       },
+      "/certificate/pj/{id}/file": {
+        post: certificateFileUploadOperation({
+          idParameter: certificatePjIdParameter(),
+          operationIdSuffix: "Pj",
+          tag: "Certificate PJ",
+          typeLabel: "PJ",
+        }),
+        get: certificateFileDownloadOperation({
+          idParameter: certificatePjIdParameter(),
+          operationIdSuffix: "Pj",
+          tag: "Certificate PJ",
+          typeLabel: "PJ",
+        }),
+        delete: certificateFileDeleteOperation({
+          idParameter: certificatePjIdParameter(),
+          operationIdSuffix: "Pj",
+          tag: "Certificate PJ",
+          typeLabel: "PJ",
+        }),
+      },
       "/certificate/notifications": {
         get: certificateNotificationListOperation(),
       },
@@ -386,6 +535,26 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           notFoundDescription: "Certificado PF nao encontrado",
           parameters: [certificatePfIdParameter()],
           requestBody: certificatePfRequestBody(false),
+        }),
+      },
+      "/certificate/pf/{id}/file": {
+        post: certificateFileUploadOperation({
+          idParameter: certificatePfIdParameter(),
+          operationIdSuffix: "Pf",
+          tag: "Certificate PF",
+          typeLabel: "PF",
+        }),
+        get: certificateFileDownloadOperation({
+          idParameter: certificatePfIdParameter(),
+          operationIdSuffix: "Pf",
+          tag: "Certificate PF",
+          typeLabel: "PF",
+        }),
+        delete: certificateFileDeleteOperation({
+          idParameter: certificatePfIdParameter(),
+          operationIdSuffix: "Pf",
+          tag: "Certificate PF",
+          typeLabel: "PF",
         }),
       },
       "/internal/notifications/run": {
@@ -537,6 +706,38 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
             file_path: { type: "string", nullable: true },
             has_certificate: { type: "boolean" },
           },
+        },
+        CertificateFileMetadata: {
+          type: "object",
+          properties: {
+            file_path: { type: "string" },
+            file_original_name: { type: "string" },
+            file_mime_type: { type: "string" },
+            file_size_bytes: { type: "integer", minimum: 1 },
+            file_sha256: { type: "string" },
+            file_uploaded_at: { type: "string", format: "date-time" },
+            file_uploaded_by_user_id: { type: "string", format: "uuid" },
+            file_storage_provider: { type: "string" },
+            file_storage_bucket: { type: "string" },
+          },
+          required: [
+            "file_path",
+            "file_original_name",
+            "file_mime_type",
+            "file_size_bytes",
+            "file_sha256",
+            "file_uploaded_at",
+            "file_uploaded_by_user_id",
+            "file_storage_provider",
+            "file_storage_bucket",
+          ],
+        },
+        CertificateFileDeleteResult: {
+          type: "object",
+          properties: {
+            ok: { type: "boolean", enum: [true] },
+          },
+          required: ["ok"],
         },
         CertificateNotification: {
           type: "object",

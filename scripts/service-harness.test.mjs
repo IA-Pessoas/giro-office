@@ -173,6 +173,12 @@ test("all-services smoke includes certificate-service state and handlers", () =>
   assert.match(source, /modules: \{ certificado: 1 \}/);
   assert.match(source, /modules: \{ certificado: 2 \}/);
   assert.match(source, /async certificatePjCreate\(op\)/);
+  assert.match(source, /async certificatePjFileUpload\(op\)/);
+  assert.match(source, /async certificatePjFileDownload\(op\)/);
+  assert.match(source, /async certificatePjFileDelete\(op\)/);
   assert.match(source, /async certificatePfCreate\(op\)/);
+  assert.match(source, /async certificatePfFileUpload\(op\)/);
+  assert.match(source, /async certificatePfFileDownload\(op\)/);
+  assert.match(source, /async certificatePfFileDelete\(op\)/);
   assert.match(source, /async certificateNotificationRun\(op\)/);
 });
