@@ -1,4 +1,4 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import { error as logError, warn as logWarn, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type {
@@ -7,6 +7,12 @@ import type {
   UpdateCertificatePfInput,
 } from "../schemas/certificatePf.schemas.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
+import type { createCertificateFileCrypto } from "./certificateFileCrypto.js";
+import {
+  buildCertificateObjectPath,
+  type CertificateFileStorage,
+} from "./certificateFileStorage.js";
+import type { CertificateUploadFile } from "./certificateFileValidation.js";
 import { isPrismaUniqueConstraintError } from "./prismaErrors.js";
 
 export interface CertificatePfContext {
@@ -29,6 +35,15 @@ export interface CertificatePfCreateInput extends CertificatePfContext {
 export interface CertificatePfUpdateInput extends CertificatePfContext {
   id: string;
   data: UpdateCertificatePfInput;
+}
+
+export interface CertificatePfFileInput extends CertificatePfContext {
+  id: string;
+}
+
+export interface CertificatePfFileUploadInput extends CertificatePfFileInput {
+  userId: string;
+  file: CertificateUploadFile;
 }
 
 export interface CertificatePfPublicResult {
@@ -57,6 +72,50 @@ export interface CertificatePfDetailResult extends CertificatePfPublicResult {
 
 export type CertificatePfListResult = CertificatePfPublicResult[];
 
+export interface CertificatePfFileMetadataResult {
+  file_path: string;
+  file_original_name: string;
+  file_mime_type: string;
+  file_size_bytes: number;
+  file_sha256: string;
+  file_uploaded_at: Date;
+  file_uploaded_by_user_id: string;
+  file_storage_provider: string;
+  file_storage_bucket: string;
+}
+
+export interface CertificatePfFileDownloadResult {
+  buffer: Buffer;
+  originalName: string;
+  mimeType: string;
+}
+
+export interface CertificatePfFileDeleteResult {
+  ok: true;
+}
+
+export interface CertificatePfFileDeps {
+  fileStorage: CertificateFileStorage;
+  fileCrypto: ReturnType<typeof createCertificateFileCrypto>;
+  storageProvider: string;
+  storageBucket: string;
+}
+
+type CertificatePfPrivateRecord = CertificatePfDetailResult &
+  Partial<{
+    file_original_name: string | null;
+    file_mime_type: string | null;
+    file_size_bytes: number | null;
+    file_sha256: string | null;
+    file_uploaded_at: Date | null;
+    file_uploaded_by_user_id: string | null;
+    file_storage_provider: string | null;
+    file_storage_bucket: string | null;
+    file_encryption_iv: string | null;
+    file_encryption_tag: string | null;
+    file_encryption_key_version: string | null;
+  }>;
+
 const certificatePfPublicSelect = {
   id: true,
   client_castelo_status: true,
@@ -80,6 +139,25 @@ const certificatePfPublicSelect = {
 function removePassword(record: CertificatePfDetailResult): CertificatePfPublicResult {
   const { password: _password, ...publicRecord } = record;
   return publicRecord;
+}
+
+function removeFilePrivateMetadata(record: CertificatePfPrivateRecord): CertificatePfDetailResult {
+  const {
+    file_original_name: _fileOriginalName,
+    file_mime_type: _fileMimeType,
+    file_size_bytes: _fileSizeBytes,
+    file_sha256: _fileSha256,
+    file_uploaded_at: _fileUploadedAt,
+    file_uploaded_by_user_id: _fileUploadedByUserId,
+    file_storage_provider: _fileStorageProvider,
+    file_storage_bucket: _fileStorageBucket,
+    file_encryption_iv: _fileEncryptionIv,
+    file_encryption_tag: _fileEncryptionTag,
+    file_encryption_key_version: _fileEncryptionKeyVersion,
+    ...safeRecord
+  } = record;
+
+  return safeRecord;
 }
 
 function buildListWhere(organizationId: string, query: CertificatePfListQuery) {
@@ -114,7 +192,10 @@ function buildListWhere(organizationId: string, query: CertificatePfListQuery) {
 }
 
 export class CertificatePfService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly fileDeps?: CertificatePfFileDeps,
+  ) {}
 
   async listCertificatePf(input: CertificatePfListInput): Promise<CertificatePfListResult> {
     const pagination = getPaginationParams(input.query);
@@ -141,10 +222,10 @@ export class CertificatePfService {
     }
 
     if (!input.canViewPassword) {
-      return removePassword(record);
+      return removePassword(removeFilePrivateMetadata(record));
     }
 
-    return record;
+    return removeFilePrivateMetadata(record);
   }
 
   async createCertificatePf(input: CertificatePfCreateInput): Promise<CertificatePfDetailResult> {
@@ -224,5 +305,178 @@ export class CertificatePfService {
       }
       throw new ServiceError(500, "Erro ao atualizar certificado PF.", err);
     }
+  }
+
+  async uploadCertificatePfFile(
+    input: CertificatePfFileUploadInput,
+  ): Promise<CertificatePfFileMetadataResult> {
+    const deps = this.requireFileDeps();
+
+    const existing = await this.findCertificatePfForFile(input);
+    const encrypted = deps.fileCrypto.encrypt(input.file.buffer);
+    const objectPath = buildCertificateObjectPath({
+      organizationId: input.organizationId,
+      kind: "pf",
+      certificateId: input.id,
+      originalName: input.file.originalname,
+    });
+
+    await deps.fileStorage.putObject({
+      path: objectPath,
+      buffer: encrypted.encryptedBuffer,
+      contentType: "application/octet-stream",
+    });
+
+    const uploadedAt = new Date();
+    const metadata = {
+      file_path: objectPath,
+      file_original_name: input.file.originalname,
+      file_mime_type: input.file.mimetype,
+      file_size_bytes: input.file.size,
+      file_sha256: encrypted.sha256,
+      file_uploaded_at: uploadedAt,
+      file_uploaded_by_user_id: input.userId,
+      file_storage_provider: deps.storageProvider,
+      file_storage_bucket: deps.storageBucket,
+      file_encryption_iv: encrypted.ivBase64,
+      file_encryption_tag: encrypted.authTagBase64,
+      file_encryption_key_version: encrypted.keyVersion,
+      has_certificate: true,
+    };
+
+    try {
+      await this.prisma.certificatePF.update({
+        where: { id: input.id, organization_id: input.organizationId },
+        data: metadata,
+      });
+    } catch (err: unknown) {
+      logError("Erro ao atualizar metadados do arquivo do certificado PF", { err });
+      try {
+        await deps.fileStorage.deleteObject(objectPath);
+      } catch (cleanupErr: unknown) {
+        logWarn("Erro ao remover arquivo novo apos falha de metadados do certificado PF", {
+          err: cleanupErr,
+        });
+      }
+      throw err;
+    }
+
+    if (existing.file_path && existing.file_path !== objectPath) {
+      try {
+        await deps.fileStorage.deleteObject(existing.file_path);
+      } catch (err: unknown) {
+        logWarn("Erro ao remover arquivo anterior do certificado PF", { err });
+      }
+    }
+
+    return {
+      file_path: metadata.file_path,
+      file_original_name: metadata.file_original_name,
+      file_mime_type: metadata.file_mime_type,
+      file_size_bytes: metadata.file_size_bytes,
+      file_sha256: metadata.file_sha256,
+      file_uploaded_at: metadata.file_uploaded_at,
+      file_uploaded_by_user_id: metadata.file_uploaded_by_user_id,
+      file_storage_provider: metadata.file_storage_provider,
+      file_storage_bucket: metadata.file_storage_bucket,
+    };
+  }
+
+  async downloadCertificatePfFile(
+    input: CertificatePfFileInput,
+  ): Promise<CertificatePfFileDownloadResult> {
+    const deps = this.requireFileDeps();
+    const record = await this.findCertificatePfForFile(input);
+    const fileMetadata = this.requireStoredFile(record);
+    const encryptedBuffer = await deps.fileStorage.getObject(fileMetadata.filePath);
+    const buffer = deps.fileCrypto.decrypt({
+      encryptedBuffer,
+      ivBase64: fileMetadata.ivBase64,
+      authTagBase64: fileMetadata.authTagBase64,
+    });
+
+    return {
+      buffer,
+      originalName: fileMetadata.originalName,
+      mimeType: fileMetadata.mimeType,
+    };
+  }
+
+  async deleteCertificatePfFile(
+    input: CertificatePfFileInput,
+  ): Promise<CertificatePfFileDeleteResult> {
+    const deps = this.requireFileDeps();
+    const record = await this.findCertificatePfForFile(input);
+    const fileMetadata = this.requireStoredFile(record);
+
+    await this.prisma.certificatePF.update({
+      where: { id: input.id, organization_id: input.organizationId },
+      data: {
+        file_path: null,
+        file_original_name: null,
+        file_mime_type: null,
+        file_size_bytes: null,
+        file_sha256: null,
+        file_uploaded_at: null,
+        file_uploaded_by_user_id: null,
+        file_storage_provider: null,
+        file_storage_bucket: null,
+        file_encryption_iv: null,
+        file_encryption_tag: null,
+        file_encryption_key_version: null,
+        has_certificate: false,
+      },
+    });
+    await deps.fileStorage.deleteObject(fileMetadata.filePath);
+
+    return { ok: true };
+  }
+
+  private requireFileDeps(): CertificatePfFileDeps {
+    if (!this.fileDeps) {
+      throw new ServiceError(500, "Storage de arquivo de certificado nao configurado.");
+    }
+
+    return this.fileDeps;
+  }
+
+  private async findCertificatePfForFile(
+    input: CertificatePfFileInput,
+  ): Promise<CertificatePfPrivateRecord> {
+    const record = await this.prisma.certificatePF.findFirst({
+      where: { id: input.id, organization_id: input.organizationId },
+    });
+
+    if (!record) {
+      throw new ServiceError(404, "Certificado PF nao encontrado.");
+    }
+
+    return record;
+  }
+
+  private requireStoredFile(record: CertificatePfPrivateRecord): {
+    filePath: string;
+    originalName: string;
+    mimeType: string;
+    ivBase64: string;
+    authTagBase64: string;
+  } {
+    if (
+      !record.file_path ||
+      !record.file_original_name ||
+      !record.file_mime_type ||
+      !record.file_encryption_iv ||
+      !record.file_encryption_tag
+    ) {
+      throw new ServiceError(404, "Arquivo do certificado PF nao encontrado.");
+    }
+
+    return {
+      filePath: record.file_path,
+      originalName: record.file_original_name,
+      mimeType: record.file_mime_type,
+      ivBase64: record.file_encryption_iv,
+      authTagBase64: record.file_encryption_tag,
+    };
   }
 }
