@@ -1,7 +1,7 @@
 import React from "react";
 import "react-toastify/dist/ReactToastify.css";
 
-import { canSSRAuth } from "@modules/auth";
+import { canSSRAdmin } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
 import { UserProfile, type UserItem } from "@modules/users";
 import { setupAPIClient } from "@shared/services/api";
@@ -22,7 +22,7 @@ export default function User({ me, user, deps }: Props) {
   return <UserProfile userId={user.id} me={me} departments={deps} />;
 }
 
-export const getServerSideProps = canSSRAuth(async (ctx) => {
+export const getServerSideProps = canSSRAdmin(async (ctx) => {
   const { id } = ctx.params as { id: string };
 
   try {
@@ -36,7 +36,7 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
     const user = userResponse.data.user;
     const me = meResponse.data.user;
 
-    if (!user || (me.permission === 0 && me.id !== id)) {
+    if (!user) {
       return { redirect: { destination: "/dashboard", permanent: false } };
     }
 

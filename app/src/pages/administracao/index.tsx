@@ -1,7 +1,7 @@
 import React from "react";
 import Head from "next/head";
 
-import { canSSRAuth } from "@modules/auth";
+import { canSSRAdmin } from "@modules/auth";
 import { Administracao } from "../../shared/components/newLayout/Administracao";
 
 export default function AdministracaoPage() {
@@ -15,7 +15,7 @@ export default function AdministracaoPage() {
   );
 }
 
-export const getServerSideProps = canSSRAuth(async () => {
+export const getServerSideProps = canSSRAdmin(async () => {
   return {
     props: {},
   };

@@ -2,10 +2,8 @@ import React from "react";
 import Link from "next/link";
 import "react-toastify/dist/ReactToastify.css";
 import { ArrowLeft, Save } from "lucide-react";
-import { parseCookies } from "nookies";
 
-import { canSSRAuth } from "@modules/auth";
-import { getPermissionFromToken, isAdminPermission } from "@modules/auth/utils/permissions";
+import { canSSRAdmin } from "@modules/auth";
 import { useDepForm, departmentService, type DepItem } from "@modules/departments";
 import { DepartmentColorField } from "@modules/departments/components/DepartmentColorField";
 
@@ -118,19 +116,8 @@ export default function Department({ dep }: Props) {
   );
 }
 
-export const getServerSideProps = canSSRAuth(async (ctx) => {
+export const getServerSideProps = canSSRAdmin(async (ctx) => {
   const { id } = ctx.params as { id: string };
-  const cookies = parseCookies(ctx);
-  const permission = getPermissionFromToken(cookies["cw.token"]);
-
-  if (!isAdminPermission(permission)) {
-    return {
-      redirect: {
-        destination: "/dashboard",
-        permanent: false,
-      },
-    };
-  }
 
   try {
     const dep = await departmentService.getById(id, ctx);

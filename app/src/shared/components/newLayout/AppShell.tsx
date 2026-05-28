@@ -32,8 +32,7 @@ import {
 } from "lucide-react";
 
 import type { ModuleKey } from "@modules/auth";
-import { APP_ROUTE_MODULE_MAP, useModuleAccessMap } from "@modules/auth";
-import { isAdminPermission } from "@modules/auth/utils/permissions";
+import { APP_ROUTE_MODULE_MAP, canAccessAdministration, useModuleAccessMap } from "@modules/auth";
 import { useMe } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
@@ -188,7 +187,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const displayUserLogin = user?.email ?? user?.login ?? meQuery.data?.login ?? "";
   const displayUserPhoto = resolvePhotoUrl(meQuery.data?.photo_url ?? null);
   const displayUserInitials = getInitials(displayUserName);
-  const isAdmin = isAdminPermission(meQuery.data?.permission ?? user?.permission ?? null);
+  const isAdmin = canAccessAdministration(meQuery.data?.permission ?? user?.permission ?? null);
   const filteredModuleCategories = moduleCategories
     .map((category) => ({
       ...category,

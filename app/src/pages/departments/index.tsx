@@ -1,9 +1,7 @@
 import React from "react";
 import Head from "next/head";
-import { parseCookies } from "nookies";
 
-import { canSSRAuth } from "@modules/auth";
-import { getPermissionFromToken, isAdminPermission } from "@modules/auth/utils/permissions";
+import { canSSRAdmin } from "@modules/auth";
 import { Departments } from "@shared/components/newLayout/Departments";
 
 export default function DepartmentsPage() {
@@ -17,18 +15,6 @@ export default function DepartmentsPage() {
   );
 }
 
-export const getServerSideProps = canSSRAuth(async (ctx) => {
-  const cookies = parseCookies(ctx);
-  const permission = getPermissionFromToken(cookies["cw.token"]);
-
-  if (!isAdminPermission(permission)) {
-    return {
-      redirect: {
-        destination: "/dashboard",
-        permanent: false,
-      },
-    };
-  }
-
+export const getServerSideProps = canSSRAdmin(async () => {
   return { props: {} };
 });
