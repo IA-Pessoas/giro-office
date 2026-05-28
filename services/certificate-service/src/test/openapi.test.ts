@@ -10,7 +10,7 @@ const env = getCertificateServiceEnv();
 function getSuccessDataSchemaRef(
   spec: ReturnType<typeof buildCertificateServiceOpenApiSpec>,
   path: string,
-  method: "get" | "post" | "patch",
+  method: "delete" | "get" | "post" | "patch",
   status = "200",
 ) {
   const operation = spec.paths[path]?.[method] as
@@ -83,6 +83,48 @@ describe("certificate-service OpenAPI", () => {
       expect.arrayContaining(["page", "page_size"]),
     );
     expect(spec.paths["/certificate/notifications"].get?.responses).toHaveProperty("400");
+  });
+
+  it("documents certificate file upload, download and delete routes", () => {
+    const spec = buildCertificateServiceOpenApiSpec(env);
+
+    expect(spec.paths["/certificate/pj/{id}/file"]?.post).toBeDefined();
+    expect(spec.paths["/certificate/pj/{id}/file"]?.get).toBeDefined();
+    expect(spec.paths["/certificate/pj/{id}/file"]?.delete).toBeDefined();
+    expect(spec.paths["/certificate/pf/{id}/file"]?.post).toBeDefined();
+    expect(spec.paths["/certificate/pf/{id}/file"]?.get).toBeDefined();
+    expect(spec.paths["/certificate/pf/{id}/file"]?.delete).toBeDefined();
+
+    expect(spec.paths["/certificate/pj/{id}/file"]?.post?.requestBody?.content).toHaveProperty(
+      "multipart/form-data",
+    );
+    expect(spec.paths["/certificate/pf/{id}/file"]?.post?.requestBody?.content).toHaveProperty(
+      "multipart/form-data",
+    );
+    expect(spec.paths["/certificate/pj/{id}/file"]?.get?.responses["200"].content).toHaveProperty(
+      "application/octet-stream",
+    );
+    expect(spec.paths["/certificate/pf/{id}/file"]?.get?.responses["200"].content).toHaveProperty(
+      "application/octet-stream",
+    );
+    expect(spec.paths["/certificate/pj/{id}/file"]?.get?.responses["200"]).toHaveProperty(
+      "headers.Cache-Control",
+    );
+    expect(spec.paths["/certificate/pf/{id}/file"]?.get?.responses["200"]).toHaveProperty(
+      "headers.Cache-Control",
+    );
+    expect(getSuccessDataSchemaRef(spec, "/certificate/pj/{id}/file", "post", "201")).toEqual({
+      $ref: "#/components/schemas/CertificateFileMetadata",
+    });
+    expect(getSuccessDataSchemaRef(spec, "/certificate/pf/{id}/file", "post", "201")).toEqual({
+      $ref: "#/components/schemas/CertificateFileMetadata",
+    });
+    expect(getSuccessDataSchemaRef(spec, "/certificate/pj/{id}/file", "delete")).toEqual({
+      $ref: "#/components/schemas/CertificateFileDeleteResult",
+    });
+    expect(getSuccessDataSchemaRef(spec, "/certificate/pf/{id}/file", "delete")).toEqual({
+      $ref: "#/components/schemas/CertificateFileDeleteResult",
+    });
   });
 
   it("documents the internal notification run endpoint as internal-only", () => {

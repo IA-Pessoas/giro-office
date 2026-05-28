@@ -181,6 +181,7 @@ const op = ({
   expectationKind,
   expectedStatus,
   expectedLabel,
+  expectEnvelope,
   pairCoverageExempt = false,
   negativeCase = null,
   handlerAction = action,
@@ -196,6 +197,7 @@ const op = ({
   specOperation,
   condition,
   handlerAction,
+  ...(expectEnvelope === undefined ? {} : { expectEnvelope }),
   negativeCase,
   expectationKind: expectationKind ?? (specOperation === false ? "bad" : "good"),
   expectedStatus: inferExpectedStatus({

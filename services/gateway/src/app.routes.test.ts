@@ -771,6 +771,8 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/contabil/controls"]).toBeTruthy();
     expect(body.paths["/ti/requests/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/list"]).toBeTruthy();
+    expect(body.paths["/certificate/pj/{id}/file"]).toBeTruthy();
+    expect(body.paths["/certificate/pf/{id}/file"]).toBeTruthy();
     expect(body.paths["/certificate/notifications"]).toBeTruthy();
     expect(body.paths["/audit/requests"]).toBeTruthy();
   } finally {
@@ -853,6 +855,7 @@ it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", 
     expect(body.paths["/audit/requests"]?.get?.security).toEqual([{ bearerAuth: [] }]);
     expect(body.paths["/ti/requests/list"]?.get?.security).toEqual([{ bearerAuth: [] }]);
     expect(body.paths["/certificate/pj/list"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(body.paths["/certificate/pj/{id}/file"]?.get?.security).toEqual([{ bearerAuth: [] }]);
   } finally {
     await stopServer(server);
   }
