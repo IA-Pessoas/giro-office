@@ -17,7 +17,7 @@ type RhMainTab = "dashboard" | "requests" | "evaluations" | "point";
 export function RH() {
   const [activeTab, setActiveTab] = useState<RhMainTab>("dashboard");
   const [isHolidaysManagerOpen, setIsHolidaysManagerOpen] = useState(false);
-  const { canManageRh, permissionQuery } = useRhPermissions("rh-shell");
+  const { canManageRh, canViewRhDashboard, permissionQuery } = useRhPermissions("rh-shell");
   const newRequestsQuery = useRhRequests({ status: "New" });
   const inProgressRequestsQuery = useRhRequests({ status: "In_Progress" });
 
@@ -28,10 +28,10 @@ export function RH() {
   }, [inProgressRequestsQuery.data, newRequestsQuery.data]);
 
   useEffect(() => {
-    if (!permissionQuery.isLoading && !canManageRh && activeTab === "dashboard") {
+    if (!permissionQuery.isLoading && !canViewRhDashboard && activeTab === "dashboard") {
       setActiveTab("requests");
     }
-  }, [activeTab, canManageRh, permissionQuery.isLoading]);
+  }, [activeTab, canViewRhDashboard, permissionQuery.isLoading]);
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
@@ -65,7 +65,7 @@ export function RH() {
       <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
         <div className="overflow-x-auto">
           <div className="flex min-w-max items-center justify-center gap-1">
-            {canManageRh ? (
+            {canViewRhDashboard ? (
               <RhTabButton
                 active={activeTab === "dashboard"}
                 icon={BarChart3}
@@ -96,7 +96,7 @@ export function RH() {
         </div>
       </div>
 
-      {canManageRh && activeTab === "dashboard" ? (
+      {canViewRhDashboard && activeTab === "dashboard" ? (
         <RhDashboardSection
           isActive={activeTab === "dashboard"}
           onNavigateToTab={setActiveTab}

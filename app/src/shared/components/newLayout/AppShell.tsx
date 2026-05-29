@@ -196,6 +196,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           return isAdmin;
         }
 
+        if (module.path === "/rh") {
+          return true;
+        }
+
         const moduleKey =
           ("moduleKey" in module ? module.moduleKey : undefined) ?? APP_ROUTE_MODULE_MAP[module.path];
 
