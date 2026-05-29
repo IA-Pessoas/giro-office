@@ -1,7 +1,8 @@
 import { useMemo } from "react";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 import { useAuth } from "@/context/AuthContext";
-import { departmentService } from "@modules/departments";
+import { departmentService, type DepItem } from "@modules/departments";
 import { useFetch } from "@shared/hooks";
 import {
   MODULE_KEYS,
@@ -13,6 +14,20 @@ import {
 } from "../utils/moduleAccess";
 
 type ModuleAccessMap = Record<ModuleKey, ModuleAccess>;
+type AuthUser = ReturnType<typeof useAuth>["user"];
+
+type ModuleAccessMapResult = {
+  accessMap: ModuleAccessMap;
+  departmentName: string | null;
+  departmentModule: ModuleKey | null;
+  isLoading: boolean;
+  departmentsQuery: UseQueryResult<DepItem[], Error>;
+  user: AuthUser;
+};
+
+type ModuleAccessResult = Omit<ModuleAccessMapResult, "accessMap"> & {
+  access: ModuleAccess;
+};
 
 function createEmptyModuleAccessMap(): ModuleAccessMap {
   return MODULE_KEYS.reduce<ModuleAccessMap>((acc, moduleKey) => {
@@ -21,7 +36,9 @@ function createEmptyModuleAccessMap(): ModuleAccessMap {
   }, {} as ModuleAccessMap);
 }
 
-export function useModuleAccessMap(moduleKeys: readonly ModuleKey[] = MODULE_KEYS) {
+export function useModuleAccessMap(
+  moduleKeys: readonly ModuleKey[] = MODULE_KEYS,
+): ModuleAccessMapResult {
   const { user } = useAuth();
   const departmentsQuery = useFetch(
     ["module-access", "departments"],
@@ -87,7 +104,7 @@ export function useModuleAccessMap(moduleKeys: readonly ModuleKey[] = MODULE_KEY
   };
 }
 
-export function useModuleAccess(moduleKey: ModuleKey) {
+export function useModuleAccess(moduleKey: ModuleKey): ModuleAccessResult {
   const { accessMap, ...rest } = useModuleAccessMap([moduleKey]);
 
   return {
