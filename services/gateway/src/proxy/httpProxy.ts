@@ -180,8 +180,8 @@ function createHttpProxy(
         return;
       }
 
-      const data = await upstreamResponse.json();
-      response.json(data);
+      const data = Buffer.from(await upstreamResponse.arrayBuffer());
+      response.send(data);
     } catch (error) {
       next(new ServiceError(502, "Erro ao comunicar com o serviço upstream.", error));
     }

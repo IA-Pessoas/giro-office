@@ -545,6 +545,38 @@ it("passes upstream error responses through unchanged", async () => {
   }
 });
 
+it("passes upstream non-json error responses through without converting them to bad gateway", async () => {
+  const upstreamBody = "<html><body>Not Found</body></html>";
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 404;
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(upstreamBody);
+  });
+  const userServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/session`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ login: "user" }),
+    });
+    const body = await response.text();
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(body).toBe(upstreamBody);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("rate limits repeated public login attempts", async () => {
   let upstreamHits = 0;
   const upstream = createServer((_request, response) => {

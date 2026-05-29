@@ -228,6 +228,7 @@ model Department {
   users                     User[]
 
   @@index([organization_id, name], map: "idx_departments_org_name")
+  @@unique([organization_id, name], map: "uq_departments_org_name")
   @@map("departments")
 }
 
@@ -350,6 +351,7 @@ model Permission {
   user            User         @relation(fields: [user_id], references: [id])
   userPrimary     User?        @relation("UserPrimaryPermission")
 
+  @@unique([user_id, organization_id], map: "uq_permissions_user_org")
   @@map("permissions")
 }
 
