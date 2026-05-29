@@ -1,5 +1,6 @@
 import {
   createExpressErrorHandler,
+  createRateLimitMiddleware,
   createSecurityHeadersMiddleware,
   createServiceCorsOptions,
   createSuccessResponse,
@@ -21,6 +22,8 @@ import { createCertificateNotificationRoutes } from "./routes/certificateNotific
 import { createCertificatePfRoutes } from "./routes/certificatePf.routes.js";
 import { createCertificatePjRoutes } from "./routes/certificatePj.routes.js";
 import { createInternalNotificationRoutes } from "./routes/internalNotification.routes.js";
+import type { createCertificateFileCrypto } from "./services/certificateFileCrypto.js";
+import type { CertificateFileStorage } from "./services/certificateFileStorage.js";
 
 function certificateServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const out: Record<string, unknown> = {};
@@ -42,12 +45,16 @@ export interface CreateCertificateApplicationOptions {
   env: CertificateServiceEnv;
   logger: Logger;
   prisma: PrismaClient;
+  certificateFileStorage?: CertificateFileStorage;
+  certificateFileCrypto?: ReturnType<typeof createCertificateFileCrypto>;
 }
 
 export function createCertificateApplication({
   env,
   logger,
   prisma: _prisma,
+  certificateFileStorage,
+  certificateFileCrypto,
 }: CreateCertificateApplicationOptions): express.Express {
   const app = express();
 
@@ -78,8 +85,40 @@ export function createCertificateApplication({
 
   app.use("/certificate", createForwardedAuthContextMiddleware(env.internalServiceToken));
   app.use("/certificate/notifications", createCertificateNotificationRoutes(_prisma));
-  app.use("/certificate/pj", createCertificatePjRoutes(_prisma));
-  app.use("/certificate/pf", createCertificatePfRoutes(_prisma));
+  app.use(
+    "/certificate/pj",
+    createCertificatePjRoutes({
+      prisma: _prisma,
+      certificateFileStorage,
+      certificateFileCrypto,
+      maxFileSizeBytes: env.certificateFileMaxSizeBytes,
+      storageProvider: env.storageMode,
+      storageBucket: env.storageBucket,
+      uploadRateLimit: createRateLimitMiddleware({
+        key: "certificate-service:pj-file-upload",
+        max: env.uploadRateLimitMax,
+        windowMs: env.uploadRateLimitWindowMs,
+        methods: ["POST"],
+      }),
+    }),
+  );
+  app.use(
+    "/certificate/pf",
+    createCertificatePfRoutes({
+      prisma: _prisma,
+      certificateFileStorage,
+      certificateFileCrypto,
+      maxFileSizeBytes: env.certificateFileMaxSizeBytes,
+      storageProvider: env.storageMode,
+      storageBucket: env.storageBucket,
+      uploadRateLimit: createRateLimitMiddleware({
+        key: "certificate-service:pf-file-upload",
+        max: env.uploadRateLimitMax,
+        windowMs: env.uploadRateLimitWindowMs,
+        methods: ["POST"],
+      }),
+    }),
+  );
   app.use("/internal/notifications", createInternalNotificationRoutes(_prisma, env));
 
   if (env.enableApiDocs) {

@@ -88,6 +88,7 @@ function toMeSessionUser(record: InternalMeRecord): MeSessionUser {
     name: record.name,
     login: record.login,
     permission: record.permission,
+    department_id: record.department_id,
     photo_url: record.photo_url,
     organization_id: record.organization_id,
     type: record.type,

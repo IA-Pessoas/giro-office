@@ -10,7 +10,7 @@ const env = getCertificateServiceEnv();
 function getSuccessDataSchemaRef(
   spec: ReturnType<typeof buildCertificateServiceOpenApiSpec>,
   path: string,
-  method: "get" | "post" | "patch",
+  method: "delete" | "get" | "post" | "patch",
   status = "200",
 ) {
   const operation = spec.paths[path]?.[method] as
@@ -85,6 +85,48 @@ describe("certificate-service OpenAPI", () => {
     expect(spec.paths["/certificate/notifications"].get?.responses).toHaveProperty("400");
   });
 
+  it("documents certificate file upload, download and delete routes", () => {
+    const spec = buildCertificateServiceOpenApiSpec(env);
+
+    expect(spec.paths["/certificate/pj/{id}/file"]?.post).toBeDefined();
+    expect(spec.paths["/certificate/pj/{id}/file"]?.get).toBeDefined();
+    expect(spec.paths["/certificate/pj/{id}/file"]?.delete).toBeDefined();
+    expect(spec.paths["/certificate/pf/{id}/file"]?.post).toBeDefined();
+    expect(spec.paths["/certificate/pf/{id}/file"]?.get).toBeDefined();
+    expect(spec.paths["/certificate/pf/{id}/file"]?.delete).toBeDefined();
+
+    expect(spec.paths["/certificate/pj/{id}/file"]?.post?.requestBody?.content).toHaveProperty(
+      "multipart/form-data",
+    );
+    expect(spec.paths["/certificate/pf/{id}/file"]?.post?.requestBody?.content).toHaveProperty(
+      "multipart/form-data",
+    );
+    expect(spec.paths["/certificate/pj/{id}/file"]?.get?.responses["200"].content).toHaveProperty(
+      "application/octet-stream",
+    );
+    expect(spec.paths["/certificate/pf/{id}/file"]?.get?.responses["200"].content).toHaveProperty(
+      "application/octet-stream",
+    );
+    expect(spec.paths["/certificate/pj/{id}/file"]?.get?.responses["200"]).toHaveProperty(
+      "headers.Cache-Control",
+    );
+    expect(spec.paths["/certificate/pf/{id}/file"]?.get?.responses["200"]).toHaveProperty(
+      "headers.Cache-Control",
+    );
+    expect(getSuccessDataSchemaRef(spec, "/certificate/pj/{id}/file", "post", "201")).toEqual({
+      $ref: "#/components/schemas/CertificateFileMetadata",
+    });
+    expect(getSuccessDataSchemaRef(spec, "/certificate/pf/{id}/file", "post", "201")).toEqual({
+      $ref: "#/components/schemas/CertificateFileMetadata",
+    });
+    expect(getSuccessDataSchemaRef(spec, "/certificate/pj/{id}/file", "delete")).toEqual({
+      $ref: "#/components/schemas/CertificateFileDeleteResult",
+    });
+    expect(getSuccessDataSchemaRef(spec, "/certificate/pf/{id}/file", "delete")).toEqual({
+      $ref: "#/components/schemas/CertificateFileDeleteResult",
+    });
+  });
+
   it("documents the internal notification run endpoint as internal-only", () => {
     const spec = buildCertificateServiceOpenApiSpec(env);
     const operation = spec.paths["/internal/notifications/run"].post;
@@ -106,6 +148,15 @@ describe("certificate-service OpenAPI", () => {
 
   it("exposes domain schemas and typed success envelopes", () => {
     const spec = buildCertificateServiceOpenApiSpec(env);
+    const certificatePjInput = spec.components?.schemas?.CertificatePjInput as
+      | { properties?: Record<string, unknown> }
+      | undefined;
+    const certificatePfInput = spec.components?.schemas?.CertificatePfInput as
+      | { properties?: Record<string, unknown> }
+      | undefined;
+    const certificateFileMetadata = spec.components?.schemas?.CertificateFileMetadata as
+      | { properties?: Record<string, unknown> }
+      | undefined;
 
     expect(spec.components?.schemas).toEqual(
       expect.objectContaining({
@@ -119,6 +170,14 @@ describe("certificate-service OpenAPI", () => {
         CertificateNotificationRunResult: expect.any(Object),
       }),
     );
+    expect(certificatePjInput?.properties).not.toHaveProperty("file_path");
+    expect(certificatePjInput?.properties).not.toHaveProperty("has_certificate");
+    expect(certificatePfInput?.properties).not.toHaveProperty("file_path");
+    expect(certificatePfInput?.properties).not.toHaveProperty("has_certificate");
+    expect(certificateFileMetadata?.properties).not.toHaveProperty("file_path");
+    expect(certificateFileMetadata?.properties).not.toHaveProperty("file_sha256");
+    expect(certificateFileMetadata?.properties).not.toHaveProperty("file_storage_provider");
+    expect(certificateFileMetadata?.properties).not.toHaveProperty("file_storage_bucket");
 
     expect(getSuccessDataSchemaRef(spec, "/certificate/pj/list", "get")).toMatchObject({
       type: "array",
