@@ -35,7 +35,10 @@ if ! git rev-parse --verify "$AFTER^{commit}" >/dev/null 2>&1; then
   exit 1
 fi
 
-mapfile -t files < <(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null || true)
+files=()
+while IFS= read -r file || [[ -n "$file" ]]; do
+  files+=("$file")
+done < <(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null || true)
 
 if [[ "${#files[@]}" -eq 0 ]]; then
   printf "%s\n" "ALL"
@@ -54,11 +57,24 @@ if [[ "${#relevant[@]}" -eq 0 ]]; then
 fi
 files=("${relevant[@]}")
 
-declare -A services=()
+services=()
 
 mark_all() {
   printf "%s\n" "ALL"
   exit 0
+}
+
+add_service() {
+  local service="$1"
+  local existing
+  if [[ "${#services[@]}" -gt 0 ]]; then
+    for existing in "${services[@]}"; do
+      if [[ "$existing" == "$service" ]]; then
+        return 0
+      fi
+    done
+  fi
+  services+=("$service")
 }
 
 for f in "${files[@]}"; do
@@ -66,7 +82,7 @@ for f in "${files[@]}"; do
     mark_all
   fi
   if [[ "$f" == docker/nginx/* ]]; then
-    services[reverse-proxy]=1
+    add_service reverse-proxy
     continue
   fi
   case "$f" in
@@ -80,49 +96,49 @@ for f in "${files[@]}"; do
   esac
   case "$f" in
     services/gateway/* )
-      services[gateway]=1
+      add_service gateway
       ;;
     services/organization-service/* )
-      services[organization-service]=1
+      add_service organization-service
       ;;
     services/user-service/* )
-      services[user-service]=1
+      add_service user-service
       ;;
     services/task-service/* )
-      services[task-service]=1
+      add_service task-service
       ;;
     services/project-service/* )
-      services[project-service]=1
+      add_service project-service
       ;;
     services/client-service/* )
-      services[client-service]=1
+      add_service client-service
       ;;
     services/department-service/* )
-      services[department-service]=1
+      add_service department-service
       ;;
     services/fiscal-service/* )
-      services[fiscal-service]=1
+      add_service fiscal-service
       ;;
     services/contabil-service/* )
-      services[contabil-service]=1
+      add_service contabil-service
       ;;
     services/regularize-service/* )
-      services[regularize-service]=1
+      add_service regularize-service
       ;;
     services/rh-service/* )
-      services[rh-service]=1
+      add_service rh-service
       ;;
     services/certificate-service/* )
-      services[certificate-service]=1
+      add_service certificate-service
       ;;
     services/audit-service/* )
-      services[audit-service]=1
+      add_service audit-service
       ;;
     app/* )
-      services[web]=1
+      add_service web
       ;;
     packages/api/* )
-      services[web]=1
+      add_service web
       ;;
   esac
 done
@@ -132,6 +148,8 @@ if [[ "${#services[@]}" -eq 0 ]]; then
   exit 0
 fi
 
-# shellcheck disable=SC2207
-out=( $(printf "%s\n" "${!services[@]}" | sort -u) )
+out=()
+while IFS= read -r service || [[ -n "$service" ]]; do
+  out+=("$service")
+done < <(printf "%s\n" "${services[@]}" | sort -u)
 printf "%s\n" "${out[*]}"

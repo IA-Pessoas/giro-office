@@ -3,7 +3,7 @@ import type { LucideIcon } from "lucide-react";
 
 interface ContabilStateBoxProps {
   children: ReactNode;
-  icon: LucideIcon;
+  icon?: LucideIcon;
   title: string;
   tone?: "neutral" | "danger" | "loading";
   compact?: boolean;
@@ -23,10 +23,12 @@ export function ContabilStateBox({
 
   return (
     <div className={`rounded-2xl border ${compact ? "p-4" : "p-5"} ${className}`}>
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
-          <Icon className={`h-4 w-4 ${tone === "loading" ? "animate-spin" : ""}`} />
-        </div>
+      <div className={`flex items-start ${Icon ? "gap-3" : ""}`}>
+        {Icon ? (
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
+            <Icon className={`h-4 w-4 ${tone === "loading" ? "animate-spin" : ""}`} />
+          </div>
+        ) : null}
         <div>
           <p className="text-sm font-semibold">{title}</p>
           <p className="mt-1 text-sm leading-6">{children}</p>

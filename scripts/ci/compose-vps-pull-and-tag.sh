@@ -29,7 +29,10 @@ if ! head -1 < <(list_images) &>/dev/null; then
   exit 1
 fi
 
-mapfile -t local_imgs < <(list_images)
+local_imgs=()
+while IFS= read -r local_img || [[ -n "$local_img" ]]; do
+  local_imgs+=("$local_img")
+done < <(list_images)
 
 for local_img in "${local_imgs[@]}"; do
   # workspace-foo-service:<tag> -> foo-service

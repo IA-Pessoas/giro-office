@@ -32,6 +32,7 @@ export const CREATE_USER_MODULE_OPTIONS = [
   { key: "pessoal", label: "Pessoal" },
   { key: "regularize", label: "Regularize" },
   { key: "rh", label: "RH" },
+  { key: "ti", label: "Tecnologia" },
   { key: "triagem", label: "Triagem" },
   { key: "wiki", label: "Wiki" },
 ] as const;

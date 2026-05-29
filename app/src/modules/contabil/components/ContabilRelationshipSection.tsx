@@ -52,7 +52,7 @@ export function ContabilRelationshipSection({
   const createMutation = useCreateContabilRelationshipMutation();
   const updateMutation = useUpdateContabilRelationshipMutation();
   const deleteMutation = useDeleteContabilRelationshipMutation();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<ContabilRelationshipFormValues>(
@@ -60,7 +60,6 @@ export function ContabilRelationshipSection({
   );
 
   const relationship = relationshipQuery.data ?? null;
-  const isFormVisible = isEditing;
 
   useEffect(() => {
     if (relationship) {
@@ -68,26 +67,30 @@ export function ContabilRelationshipSection({
       return;
     }
 
-    if (!isEditing) {
+    if (!isEditorOpen) {
       setFormValues(buildContabilRelationshipFormValues(null));
     }
-  }, [relationship, isEditing]);
+  }, [relationship, isEditorOpen]);
 
   function handleStartCreate() {
     setSubmitError(null);
-    setIsEditing(true);
+    setIsEditorOpen(true);
     setFormValues(buildContabilRelationshipFormValues(null));
   }
 
   function handleStartEdit() {
+    if (!relationship) {
+      return;
+    }
+
     setSubmitError(null);
-    setIsEditing(true);
+    setIsEditorOpen(true);
     setFormValues(buildContabilRelationshipFormValues(relationship));
   }
 
-  function handleCancelEdit() {
+  function handleCloseEditor() {
     setSubmitError(null);
-    setIsEditing(false);
+    setIsEditorOpen(false);
     setFormValues(buildContabilRelationshipFormValues(relationship));
   }
 
@@ -151,7 +154,7 @@ export function ContabilRelationshipSection({
         });
       }
 
-      setIsEditing(false);
+      setIsEditorOpen(false);
     } catch (error) {
       setSubmitError(getContabilErrorMessage(error));
     }
@@ -170,7 +173,7 @@ export function ContabilRelationshipSection({
         clientId,
       });
       setIsDeleteDialogOpen(false);
-      setIsEditing(false);
+      setIsEditorOpen(false);
       setFormValues(buildContabilRelationshipFormValues(null));
     } catch (error) {
       setSubmitError(getContabilErrorMessage(error));
@@ -186,16 +189,20 @@ export function ContabilRelationshipSection({
       <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Relacionamento contábil
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Waypoints className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Relacionamento contábil
+                </h2>
+              </div>
+            </div>
             <p className="max-w-2xl text-sm text-gray-600 dark:text-slate-400">
-              Registre como o cliente se relaciona com o time contábil, o sistema utilizado e
-              observações operacionais do acompanhamento.
+              Registre sistema, ferramenta e contexto operacional do cliente.
             </p>
           </div>
 
-          {!isFormVisible && canEdit ? (
+          {relationship && canEdit ? (
             <button
               type="button"
               onClick={handleStartEdit}
@@ -227,29 +234,65 @@ export function ContabilRelationshipSection({
         </ContabilStateBox>
       ) : null}
 
-      {!relationshipQuery.isLoading && !relationshipQuery.error && !relationship && !isEditing ? (
-        <ContabilStateBox icon={Waypoints} title="Relacionamento não cadastrado" compact>
-          <span className="block">
-            Ainda não existe um relacionamento contábil registrado para este cliente.
-          </span>
-          {canEdit ? (
-            <button
-              type="button"
-              onClick={handleStartCreate}
-              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4" />
-              Cadastrar relacionamento
-            </button>
-          ) : null}
-        </ContabilStateBox>
+      {!relationshipQuery.isLoading && !relationshipQuery.error && !relationship ? (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 p-4 text-gray-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                Relacionamento não cadastrado
+              </p>
+              <p className="mt-1 text-sm leading-6">
+                Ainda não existe um relacionamento contábil registrado para este cliente.
+              </p>
+            </div>
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={handleStartCreate}
+                className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:self-center"
+              >
+                <Plus className="h-4 w-4" />
+                Cadastrar relacionamento
+              </button>
+            ) : null}
+          </div>
+        </div>
       ) : null}
 
-      {!relationshipQuery.isLoading && !relationshipQuery.error && isFormVisible ? (
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
-        >
+      {!relationshipQuery.isLoading && !relationshipQuery.error && relationship ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <div className="grid gap-4 md:grid-cols-2">
+            {CONTABIL_RELATIONSHIP_FIELDS.map((field) => (
+              <div key={field.field} className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-gray-500 dark:text-slate-500">
+                  {field.label}
+                </p>
+                <p className="text-sm text-gray-900 dark:text-white">
+                  {field.kind === "boolean"
+                    ? relationship[field.field]
+                      ? "Sim"
+                      : "Não"
+                    : relationship[field.field] || "Não informado"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <Dialog
+        open={isEditorOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCloseEditor();
+          }
+        }}
+        title={relationship ? "Editar relacionamento contábil" : "Cadastrar relacionamento contábil"}
+        description="Cadastro do relacionamento contábil"
+        contentClassName="w-[min(92vw,760px)]"
+        bodyClassName="space-y-4"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
             {CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS.map((field) => (
               <label
@@ -325,16 +368,14 @@ export function ContabilRelationshipSection({
                 {relationship ? "Salvar alterações" : "Cadastrar relacionamento"}
               </button>
 
-              {relationship ? (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  disabled={isSubmitting}
-                  className={SECONDARY_BUTTON_CLASSNAME}
-                >
-                  Cancelar
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onClick={handleCloseEditor}
+                disabled={isSubmitting}
+                className={SECONDARY_BUTTON_CLASSNAME}
+              >
+                Cancelar
+              </button>
             </div>
 
             {relationship && canEdit ? (
@@ -350,28 +391,7 @@ export function ContabilRelationshipSection({
             ) : null}
           </div>
         </form>
-      ) : null}
-
-      {!relationshipQuery.isLoading && !relationshipQuery.error && relationship && !isFormVisible ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-          <div className="grid gap-4 md:grid-cols-2">
-            {CONTABIL_RELATIONSHIP_FIELDS.map((field) => (
-              <div key={field.field} className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-[0.12em] text-gray-500 dark:text-slate-500">
-                  {field.label}
-                </p>
-                <p className="text-sm text-gray-900 dark:text-white">
-                  {field.kind === "boolean"
-                    ? relationship[field.field]
-                      ? "Sim"
-                      : "Não"
-                    : relationship[field.field] || "Não informado"}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      </Dialog>
 
       <Dialog
         open={isDeleteDialogOpen}

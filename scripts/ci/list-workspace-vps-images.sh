@@ -14,7 +14,10 @@ if ! compose_out="$(docker compose -f docker-compose.vps.yml config --images 2>/
   exit 1
 fi
 
-mapfile -t images < <(
+images=()
+while IFS= read -r image || [[ -n "$image" ]]; do
+  images+=("$image")
+done < <(
   printf "%s\n" "$compose_out" | sort -u | while IFS= read -r line || [[ -n "$line" ]]; do
     [[ -z "$line" ]] && continue
     [[ "$line" == workspace-*:"$WORKSPACE_VPS_IMAGE_TAG" ]] && printf "%s\n" "$line"

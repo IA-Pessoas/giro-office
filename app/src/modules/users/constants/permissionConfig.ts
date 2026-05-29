@@ -14,6 +14,7 @@ export const KNOWN_PERMISSION_MODULE_KEYS = [
   "pessoal",
   "regularize",
   "rh",
+  "ti",
   "triagem",
   "wiki",
 ] as const satisfies readonly KnownPermissionModuleKey[];
@@ -32,6 +33,7 @@ export const PERMISSION_MODULE_LABELS: Record<KnownPermissionModuleKey, string> 
   pessoal: "Pessoal",
   regularize: "Regularize",
   rh: "RH",
+  ti: "Tecnologia",
   triagem: "Triagem",
   wiki: "Wiki",
 };
@@ -51,7 +53,7 @@ export const PERMISSION_MODULE_GROUPS = [
   },
   {
     title: "Plataforma e Conhecimento",
-    keys: ["integracao", "wiki"],
+    keys: ["integracao", "ti", "wiki"],
   },
 ] as const satisfies ReadonlyArray<{
   title: string;

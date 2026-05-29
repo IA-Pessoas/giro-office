@@ -10,6 +10,7 @@ import '../styles/global.css'
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ChatProvider } from "@modules/chat";
 import { ChatControllerUI } from '@shared/components/ChatControllerUI';
+import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { SocketProvider } from '../context/SocketContext'
 import { AppShell } from "../shared/components/newLayout/AppShell";
 
@@ -17,19 +18,24 @@ function AppLayout({ children }) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const { user, loading } = useAuth();
   const router = useRouter();
-
-  // Se está na página de login ou index, não mostra layout
-  if (
+  const isPublicRoute =
     router.pathname === "/login" ||
     router.pathname === "/" ||
-    router.pathname === "/solicitar-acesso"
-  ) {
+    router.pathname === "/solicitar-acesso";
+
+  // Se está na página de login ou index, não mostra layout
+  if (isPublicRoute) {
     return <>{children}</>;
   }
 
   // Se está carregando ou não há usuário, mostra apenas children
   if (loading || !user) {
-    return <>{children}</>;
+    return (
+      <SessionTransitionScreen
+        title="Trocando de ambiente"
+        description="Estamos concluindo a transicao da sua sessao para exibir os dados corretos da conta atual."
+      />
+    );
   }
 
   return (
