@@ -167,6 +167,10 @@ test("all-services smoke builds user and task payloads from a verified departmen
 
 test("all-services smoke includes certificate-service state and handlers", () => {
   const source = fs.readFileSync(new URL("./all-services-smoke.mjs", import.meta.url), "utf8");
+  const generatedCertificateSmoke = fs.readFileSync(
+    new URL("./generated/certificate-service.smoke.mjs", import.meta.url),
+    "utf8",
+  );
 
   assert.match(source, /certificatePjId: ""/);
   assert.match(source, /certificatePfId: ""/);
@@ -181,4 +185,10 @@ test("all-services smoke includes certificate-service state and handlers", () =>
   assert.match(source, /async certificatePfFileDownload\(op\)/);
   assert.match(source, /async certificatePfFileDelete\(op\)/);
   assert.match(source, /async certificateNotificationRun\(op\)/);
+  assert.match(generatedCertificateSmoke, /certificatePjFileUploadForbidden/);
+  assert.match(generatedCertificateSmoke, /certificatePjFileDownloadForbidden/);
+  assert.match(generatedCertificateSmoke, /certificatePjFileDeleteForbidden/);
+  assert.match(generatedCertificateSmoke, /certificatePfFileUploadForbidden/);
+  assert.match(generatedCertificateSmoke, /certificatePfFileDownloadForbidden/);
+  assert.match(generatedCertificateSmoke, /certificatePfFileDeleteForbidden/);
 });

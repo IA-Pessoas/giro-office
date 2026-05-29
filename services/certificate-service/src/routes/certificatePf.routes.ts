@@ -38,7 +38,12 @@ export interface CreateCertificatePfRoutesOptions {
 function createCertificateFileUpload(maxFileSizeBytes: number): RequestHandler {
   const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: maxFileSizeBytes },
+    limits: {
+      fileSize: maxFileSizeBytes,
+      files: 1,
+      fields: 0,
+      fieldSize: 1024,
+    },
   });
 
   return (request, response, next) => {
@@ -50,6 +55,11 @@ function createCertificateFileUpload(maxFileSizeBytes: number): RequestHandler {
 
       if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
         next(new ServiceError(400, "Arquivo de certificado excede o limite permitido."));
+        return;
+      }
+
+      if (err instanceof multer.MulterError) {
+        next(new ServiceError(400, "Upload de certificado invalido."));
         return;
       }
 

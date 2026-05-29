@@ -66,6 +66,7 @@ describe("certificate PJ routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data[0]).not.toHaveProperty("password");
+    expect(response.body.data[0]).not.toHaveProperty("file_path");
   });
 
   it("GET /certificate/pj/:id returns password for permission certificado 2", async () => {
@@ -78,6 +79,35 @@ describe("certificate PJ routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data.password).toBe("secret-password");
+    expect(response.body.data).not.toHaveProperty("file_path");
+  });
+
+  it("POST /certificate/pj rejects storage-managed metadata in JSON body", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+
+    const response = await request(app)
+      .post("/certificate/pj")
+      .set(certificateGatewayHeaders(2))
+      .send({
+        client_castelo_status: false,
+        client_focus_status: false,
+        name: "Empresa Castelo",
+        cnpj: "11222333000144",
+        responsible: "Maria Silva",
+        model: "A1",
+        legal_nature: "LTDA",
+        password: "secret-password",
+        expiration_date: "2026-12-31T00:00:00.000Z",
+        was_paid: false,
+        file_path: "https://public.example/cert.pfx",
+        has_certificate: true,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "BAD_REQUEST",
+    });
   });
 
   it("POST /certificate/pj preserves explicit string false booleans", async () => {
@@ -106,7 +136,6 @@ describe("certificate PJ routes", () => {
         password: "secret-password",
         expiration_date: "2026-12-31T00:00:00.000Z",
         was_paid: "false",
-        has_certificate: "false",
       });
 
     expect(response.status).toBe(201);
@@ -114,7 +143,6 @@ describe("certificate PJ routes", () => {
       client_castelo_status: false,
       client_focus_status: false,
       was_paid: false,
-      has_certificate: false,
       organization_id: certificateOrganizationId,
     });
   });
@@ -136,7 +164,6 @@ describe("certificate PJ routes", () => {
         password: "secret-password",
         expiration_date: "2026-12-31T00:00:00.000Z",
         was_paid: false,
-        has_certificate: true,
       });
 
     expect(response.status).toBe(400);
@@ -163,7 +190,6 @@ describe("certificate PJ routes", () => {
         password: "secret-password",
         expiration_date: "2026-12-31T00:00:00.000Z",
         was_paid: true,
-        has_certificate: true,
       });
 
     expect(response.status).toBe(403);
@@ -185,6 +211,24 @@ describe("certificate PJ routes", () => {
     expect(response.body).toMatchObject({
       success: false,
       code: "FORBIDDEN",
+    });
+  });
+
+  it("PATCH /certificate/pj/:id rejects storage-managed metadata in JSON body", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+
+    const response = await request(app)
+      .patch(`/certificate/pj/${certificateId}`)
+      .set(certificateGatewayHeaders(2))
+      .send({
+        file_path: "organizations/org/certificate-pj/cert/file.pfx.enc",
+        has_certificate: true,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "BAD_REQUEST",
     });
   });
 
@@ -240,6 +284,25 @@ describe("certificate PJ routes", () => {
     });
   });
 
+  it("POST /certificate/pj/:id/file rejects unexpected multipart fields", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+
+    const response = await request(app)
+      .post(`/certificate/pj/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2))
+      .field("unexpected", "value")
+      .attach("file", Buffer.from("certificate-bytes"), {
+        filename: "certificate.pfx",
+        contentType: "application/x-pkcs12",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "BAD_REQUEST",
+    });
+  });
+
   it("POST /certificate/pj/:id/file requires elevated certificate permission", async () => {
     const app = createCertificateTestApp(createCertificatePrismaMock());
 
@@ -281,17 +344,18 @@ describe("certificate PJ routes", () => {
       file_original_name: "Empresa Castelo.pfx",
       file_mime_type: "application/x-pkcs12",
       file_uploaded_by_user_id: certificateUserId,
-      file_storage_provider: "local",
-      file_storage_bucket: "Certificados",
     });
-    expect(response.body.data.file_path).toMatch(
-      /^organizations\/10000000-0000-4000-8000-000000000001\/certificate-pj\/20000000-0000-4000-8000-000000000001\/\d+_Empresa_Castelo\.pfx\.enc$/,
-    );
+    expect(response.body.data).not.toHaveProperty("file_path");
+    expect(response.body.data).not.toHaveProperty("file_sha256");
+    expect(response.body.data).not.toHaveProperty("file_storage_provider");
+    expect(response.body.data).not.toHaveProperty("file_storage_bucket");
     expect(response.body.data).not.toHaveProperty("file_encryption_iv");
     expect(response.body.data).not.toHaveProperty("file_encryption_tag");
     expect(fileStorage.putObject).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: response.body.data.file_path,
+        path: expect.stringMatching(
+          /^organizations\/10000000-0000-4000-8000-000000000001\/certificate-pj\/20000000-0000-4000-8000-000000000001\/\d+_Empresa_Castelo\.pfx\.enc$/,
+        ),
         contentType: "application/octet-stream",
       }),
     );

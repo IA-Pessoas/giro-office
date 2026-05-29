@@ -61,8 +61,6 @@ export const createCertificatePfSchema = z
     payment_date: optionalNullableDate,
     payment_amount: optionalNullableNumber,
     contact_info: optionalNullableText,
-    file_path: optionalNullableText,
-    has_certificate: strictBooleanSchema,
   })
   .strict();
 
@@ -82,8 +80,6 @@ export const updateCertificatePfSchema = z
     payment_date: optionalNullableDate,
     payment_amount: optionalNullableNumber,
     contact_info: optionalNullableText,
-    file_path: optionalNullableText,
-    has_certificate: strictBooleanSchema.optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {
