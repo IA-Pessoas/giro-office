@@ -3,10 +3,9 @@ import "react-toastify/dist/ReactToastify.css";
 
 import { canSSRAdmin } from "@modules/auth";
 import { departmentService } from "@modules/departments";
-import { UserProfile } from "@modules/users";
+import { UserProfile, type UserDetailsPageProps } from "@modules/users";
 import { AdminAccessDeniedState } from "@shared/components/AdminAccessDeniedState";
 import { setupAPIClient } from "@shared/services/api";
-import type { UserDetailsPageProps } from "./pageProps";
 
 export default function User({
   me,

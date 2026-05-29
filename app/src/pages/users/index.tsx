@@ -14,11 +14,11 @@ import {
   UserList,
   userService,
   type UserItem,
+  type UsersIndexPageProps,
 } from "@modules/users";
 import { extractUsersList } from "@modules/users/services/userService";
 import { AdminAccessDeniedState } from "@shared/components/AdminAccessDeniedState";
 import { setupAPIClient } from "@shared/services/api";
-import type { UsersIndexPageProps } from "./pageProps";
 
 export default function Users({
   users = [],

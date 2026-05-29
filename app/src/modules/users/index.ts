@@ -10,3 +10,4 @@ export { useUserForm } from './hooks/useUserForm';
 export { userService } from './services/userService';
 
 export type { UserItem, CreateUserData, UpdateUserData } from './types';
+export type { AdminUserSession, UserDetailsPageProps, UsersIndexPageProps } from './types/pageProps';
