@@ -46,20 +46,50 @@ curl_backend() {
     curl -fsS --max-time 5 "$url" >/dev/null
 }
 
-declare -A BACKEND_CHECKS=(
-  [organization-service]="http://organization-service:3031/health"
-  [user-service]="http://user-service:3030/health"
-  [department-service]="http://department-service:3036/health"
-  [task-service]="http://task-service:3032/ready"
-  [project-service]="http://project-service:3033/health"
-  [client-service]="http://client-service:3035/ready"
-  [fiscal-service]="http://fiscal-service:3037/health"
-  [contabil-service]="http://contabil-service:3038/health"
-  [regularize-service]="http://regularize-service:3039/health"
-  [rh-service]="http://rh-service:3034/health"
-  [ti-service]="http://ti-service:3040/ready"
-  [audit-service]="http://audit-service:3020/ready"
-)
+backend_check_url() {
+  local service="$1"
+  case "$service" in
+    organization-service)
+      printf "%s\n" "http://organization-service:3031/health"
+      ;;
+    user-service)
+      printf "%s\n" "http://user-service:3030/health"
+      ;;
+    department-service)
+      printf "%s\n" "http://department-service:3036/health"
+      ;;
+    task-service)
+      printf "%s\n" "http://task-service:3032/ready"
+      ;;
+    project-service)
+      printf "%s\n" "http://project-service:3033/health"
+      ;;
+    client-service)
+      printf "%s\n" "http://client-service:3035/ready"
+      ;;
+    fiscal-service)
+      printf "%s\n" "http://fiscal-service:3037/health"
+      ;;
+    contabil-service)
+      printf "%s\n" "http://contabil-service:3038/health"
+      ;;
+    regularize-service)
+      printf "%s\n" "http://regularize-service:3039/health"
+      ;;
+    rh-service)
+      printf "%s\n" "http://rh-service:3034/health"
+      ;;
+    ti-service)
+      printf "%s\n" "http://ti-service:3040/ready"
+      ;;
+    audit-service)
+      printf "%s\n" "http://audit-service:3020/ready"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
 
 ALL_BACKEND_SERVICES=(
   organization-service
@@ -93,7 +123,7 @@ add_edge_check() {
 
 build_check_plan() {
   local -a selected=()
-  local svc
+  local backend_url svc
 
   if [[ -n "${VPS_WAIT_SERVICES:-}" ]]; then
     read -r -a selected <<<"${VPS_WAIT_SERVICES}"
@@ -103,7 +133,8 @@ build_check_plan() {
 
   if [[ "${#selected[@]}" -eq 0 ]]; then
     for svc in "${ALL_BACKEND_SERVICES[@]}"; do
-      CHECKS+=("backend|${BACKEND_CHECKS[$svc]}|$svc")
+      backend_url="$(backend_check_url "$svc")"
+      CHECKS+=("backend|${backend_url}|$svc")
     done
     add_edge_check gateway 3010 /ready
     add_edge_check web 3000 /
@@ -119,8 +150,8 @@ build_check_plan() {
   local need_proxy=0
 
   for svc in "${selected[@]}"; do
-    if [[ -n "${BACKEND_CHECKS[$svc]+x}" ]]; then
-      CHECKS+=("backend|${BACKEND_CHECKS[$svc]}|$svc")
+    if backend_url="$(backend_check_url "$svc")"; then
+      CHECKS+=("backend|${backend_url}|$svc")
       need_gateway=1
       continue
     fi

@@ -51,6 +51,30 @@ async function detectChangedServices(changedPath) {
   return stdout.trim();
 }
 
+test("CI shell scripts avoid Bash 4-only features", async () => {
+  const ciScriptsDir = path.join(repoRoot, "scripts", "ci");
+  const shellScripts = (await readdir(ciScriptsDir))
+    .filter((file) => file.endsWith(".sh"))
+    .map((file) => path.join(ciScriptsDir, file));
+  const violations = [];
+
+  for (const shellScript of shellScripts) {
+    const contents = await readFile(shellScript, "utf8");
+    const lines = contents.split(/\r?\n/);
+    for (const [index, line] of lines.entries()) {
+      const trimmed = line.trimStart();
+      if (trimmed.startsWith("#")) {
+        continue;
+      }
+      if (/\b(mapfile|readarray)\b|declare\s+-A/.test(line)) {
+        violations.push(`${path.relative(repoRoot, shellScript)}:${index + 1}:${line.trim()}`);
+      }
+    }
+  }
+
+  assert.deepEqual(violations, []);
+});
+
 test("detect-changed-vps-services emits NONE for docs-only changes", async () => {
   assert.equal(await detectChangedServices("docs/release-note.md"), "NONE");
 });

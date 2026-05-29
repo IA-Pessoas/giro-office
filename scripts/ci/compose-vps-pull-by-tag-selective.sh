@@ -64,7 +64,10 @@ docker_pull_with_retry() {
   done
 }
 
-mapfile -t local_imgs < <(bash scripts/ci/list-workspace-vps-images.sh)
+local_imgs=()
+while IFS= read -r local_img || [[ -n "$local_img" ]]; do
+  local_imgs+=("$local_img")
+done < <(bash scripts/ci/list-workspace-vps-images.sh)
 
 if [[ "${VPS_PULL_SERVICES:-}" == "NONE" ]]; then
   echo "VPS_PULL_SERVICES=NONE - skipping workspace image pulls from registry"

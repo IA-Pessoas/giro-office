@@ -77,7 +77,10 @@ REMOTE_ENV="${ROOT}/.ci-remote-env"
   echo "set +a"
 } >"$REMOTE_ENV"
 
-mapfile -t scp_files < <(
+scp_files=()
+while IFS= read -r scp_file || [[ -n "$scp_file" ]]; do
+  scp_files+=("$scp_file")
+done < <(
   while IFS= read -r raw || [[ -n "$raw" ]]; do
     line="${raw#"${raw%%[![:space:]]*}"}"
     [[ -z "$line" || "$line" == \#* ]] && continue

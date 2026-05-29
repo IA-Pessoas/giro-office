@@ -70,7 +70,10 @@ if [[ "$DEPLOY_MODE" == "skip" ]]; then
   exit 0
 fi
 
-mapfile -t COMPOSE_SERVICE_ARGS < <(vps_compose_service_args "$VPS_PULL_SERVICES")
+COMPOSE_SERVICE_ARGS=()
+while IFS= read -r compose_service_arg || [[ -n "$compose_service_arg" ]]; do
+  COMPOSE_SERVICE_ARGS+=("$compose_service_arg")
+done < <(vps_compose_service_args "$VPS_PULL_SERVICES")
 
 REG_LOGIN="${DOCKER_REGISTRY_URL#https://}"
 REG_LOGIN="${REG_LOGIN#http://}"
@@ -104,7 +107,10 @@ IDS_FILE="$ROOT/.deploy/image-ids-before-${DOCKER_IMAGE_TAG}.txt"
 mkdir -p "$ROOT/.deploy"
 rm -f "$IDS_FILE"
 touch "$IDS_FILE"
-mapfile -t local_imgs < <(bash scripts/ci/list-workspace-vps-images.sh)
+local_imgs=()
+while IFS= read -r local_img || [[ -n "$local_img" ]]; do
+  local_imgs+=("$local_img")
+done < <(bash scripts/ci/list-workspace-vps-images.sh)
 for local_img in "${local_imgs[@]}"; do
   id="$(docker image inspect "$local_img" -f '{{.Id}}' 2>/dev/null || true)"
   echo "${local_img}|${id:-}" >>"$IDS_FILE"
