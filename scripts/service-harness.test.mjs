@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   buildGeneratedSmokeOperations,
@@ -10,6 +14,27 @@ import {
   mergeServiceRegistryEntry,
 } from "./service-harness-lib.mjs";
 import { getServiceRegistryEntry } from "./service-registry.mjs";
+
+const smokeScriptPath = fileURLToPath(new URL("./all-services-smoke.mjs", import.meta.url));
+
+function runSmoke(args, env = {}) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "all-services-smoke-test-"));
+  try {
+    return spawnSync(process.execPath, [smokeScriptPath, ...args], {
+      cwd: path.resolve(path.dirname(smokeScriptPath), ".."),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GATEWAY_URL: "http://127.0.0.1:1",
+        SMOKE_REQUEST_TIMEOUT_MS: "50",
+        SMOKE_TMP_DIR: tmpDir,
+        ...env,
+      },
+    });
+  } finally {
+    fs.rmSync(tmpDir, { force: true, recursive: true });
+  }
+}
 
 test("deriveServiceHarnessConfig creates deterministic defaults for a new service", () => {
   const config = deriveServiceHarnessConfig({
@@ -175,4 +200,21 @@ test("all-services smoke includes certificate-service state and handlers", () =>
   assert.match(source, /async certificatePjCreate\(op\)/);
   assert.match(source, /async certificatePfCreate\(op\)/);
   assert.match(source, /async certificateNotificationRun\(op\)/);
+});
+
+test("all-services smoke exits non-zero when continue-on-failure collects failures", () => {
+  const result = runSmoke(["--filter=gatewayHealth"]);
+  const output = `${result.stdout}\n${result.stderr}`;
+
+  assert.equal(result.status, 1);
+  assert.match(output, /Smoke run completed with failures/);
+  assert.doesNotMatch(output, /Smoke run completed successfully/);
+});
+
+test("all-services smoke dry-run still exits successfully", () => {
+  const result = runSmoke(["--dry-run", "--filter=gatewayHealth"]);
+  const output = `${result.stdout}\n${result.stderr}`;
+
+  assert.equal(result.status, 0);
+  assert.match(output, /Smoke run completed successfully/);
 });
