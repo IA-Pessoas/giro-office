@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from "react";
 import Head from "next/head";
+import { useRouter } from "next/router";
+import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 import { FaUsers } from "react-icons/fa";
 
-import { canSSRAuth } from "@modules/auth";
-import { departmentService, type DepItem } from "@modules/departments";
+import { canAccessAdministration, canSSRAdmin } from "@modules/auth";
+import { departmentService } from "@modules/departments";
 import {
   CreateUserModal,
   UserDetailsView,
@@ -12,23 +14,26 @@ import {
   UserList,
   userService,
   type UserItem,
+  type UsersIndexPageProps,
 } from "@modules/users";
 import { extractUsersList } from "@modules/users/services/userService";
+import { AdminAccessDeniedState } from "@shared/components/AdminAccessDeniedState";
 import { setupAPIClient } from "@shared/services/api";
 
-interface Props {
-  users: UserItem[];
-  deps: DepItem[];
-  me: any;
-}
-
-export default function Users({ users, deps, me }: Props) {
-  const [usersList, setUsersList] = useState<UserItem[]>(users || []);
+export default function Users({
+  users = [],
+  deps = [],
+  me,
+  forbidden = false,
+}: UsersIndexPageProps) {
+  const router = useRouter();
+  const [usersList, setUsersList] = useState<UserItem[]>(users);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("Ativo");
   const [isListLoading, setIsListLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const hasAdminAccess = canAccessAdministration(me);
 
   const onModalOpen = () => setIsModalOpen(true);
   const onModalClose = () => setIsModalOpen(false);
@@ -55,11 +60,31 @@ export default function Users({ users, deps, me }: Props) {
       setFilterStatus(status);
       toast.success(`Filtro "${status}" aplicado.`);
     } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 403) {
+        await router.replace("/dashboard");
+        return;
+      }
+
       toast.error("Erro ao buscar usuários.");
     } finally {
       setIsListLoading(false);
     }
   };
+
+  if (forbidden) {
+    return (
+      <>
+        <Head>
+          <title>Usuários</title>
+        </Head>
+        <AdminAccessDeniedState description="Você não possui permissão para acessar a área de usuários." />
+      </>
+    );
+  }
+
+  if (!hasAdminAccess) {
+    return null;
+  }
 
   return (
     <>
@@ -113,28 +138,33 @@ export default function Users({ users, deps, me }: Props) {
   );
 }
 
-export const getServerSideProps = canSSRAuth(async (ctx) => {
-  try {
-    const apiClient = setupAPIClient(ctx);
-    const [meResponse, usersResponse, deps] = await Promise.all([
-      apiClient.get("/user/me"),
-      apiClient.get("/user/users", { params: { status: "Ativo" } }),
-      departmentService.list(undefined, ctx),
-    ]);
+export const getServerSideProps = canSSRAdmin<UsersIndexPageProps>(
+  async (ctx) => {
+    try {
+      const apiClient = setupAPIClient(ctx);
+      const [meResponse, usersResponse, deps] = await Promise.all([
+        apiClient.get("/user/me"),
+        apiClient.get("/user/users", { params: { status: "Ativo" } }),
+        departmentService.list(undefined, ctx),
+      ]);
 
-    if (meResponse.data.user.permission === 0) {
+      return {
+        props: {
+          me: meResponse.data.user,
+          users: extractUsersList(usersResponse.data),
+          deps,
+        },
+      };
+    } catch (error) {
+      console.error("Erro no getServerSideProps da página de usuários:", error);
       return { redirect: { destination: "/dashboard", permanent: false } };
     }
-
-    return {
+  },
+  {
+    onForbidden: () => ({
       props: {
-        me: meResponse.data.user,
-        users: extractUsersList(usersResponse.data),
-        deps,
+        forbidden: true,
       },
-    };
-  } catch (error) {
-    console.error("Erro no getServerSideProps da página de usuários:", error);
-    return { redirect: { destination: "/dashboard", permanent: false } };
-  }
-});
+    }),
+  },
+);

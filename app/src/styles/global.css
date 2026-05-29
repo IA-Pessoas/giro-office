@@ -298,6 +298,121 @@ html:not(.dark) .border-gray-200 {
         color: #64748b;
     }
 
+    .admin-access-denied {
+        position: relative;
+        overflow: hidden;
+        border-radius: 28px;
+        border: 1px solid rgb(96 165 250 / 0.12);
+        background:
+            radial-gradient(circle at top, rgb(59 130 246 / 0.16), transparent 34%),
+            linear-gradient(180deg, rgb(15 23 42 / 0.98) 0%, rgb(2 6 23) 100%);
+        padding: var(--space-6);
+        box-shadow: 0 24px 80px rgb(2 6 23 / 0.42);
+    }
+
+    .admin-access-denied__glow {
+        pointer-events: none;
+        position: absolute;
+        inset: 0;
+    }
+
+    .admin-access-denied__orb {
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(48px);
+    }
+
+    .admin-access-denied__orb--top {
+        top: -3rem;
+        right: -4rem;
+        height: 10rem;
+        width: 10rem;
+        background: rgb(96 165 250 / 0.12);
+    }
+
+    .admin-access-denied__orb--bottom {
+        bottom: -5rem;
+        left: -3rem;
+        height: 12rem;
+        width: 12rem;
+        background: rgb(34 211 238 / 0.10);
+    }
+
+    .admin-access-denied__content {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-6);
+    }
+
+    .admin-access-denied__icon {
+        display: flex;
+        height: 3.5rem;
+        width: 3.5rem;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        border-radius: 1rem;
+        border: 1px solid rgb(147 197 253 / 0.18);
+        background: rgb(96 165 250 / 0.10);
+        color: rgb(219 234 254);
+        box-shadow: 0 12px 30px rgb(59 130 246 / 0.14);
+    }
+
+    .admin-access-denied__badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        border: 1px solid rgb(147 197 253 / 0.15);
+        background: rgb(147 197 253 / 0.08);
+        padding: 0.25rem 0.75rem;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: rgb(219 234 254 / 0.85);
+    }
+
+    .admin-access-denied__action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
+        align-self: flex-start;
+        border-radius: 1rem;
+        border: 1px solid rgb(255 255 255 / 0.10);
+        background: rgb(255 255 255 / 0.06);
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: rgb(241 245 249);
+        transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    }
+
+    .admin-access-denied__action:hover {
+        border-color: rgb(255 255 255 / 0.20);
+        background: rgb(255 255 255 / 0.10);
+        color: rgb(255 255 255);
+    }
+
+    @media (min-width: 1024px) {
+        .admin-access-denied__content {
+            flex-direction: row;
+            align-items: flex-end;
+            justify-content: space-between;
+        }
+
+        .admin-access-denied__action {
+            align-self: auto;
+        }
+    }
+
+    @media (min-width: 640px) {
+        .admin-access-denied {
+            padding: var(--space-8);
+        }
+    }
+
     .dashboard-quick-actions {
         margin-bottom: var(--space-6);
     }

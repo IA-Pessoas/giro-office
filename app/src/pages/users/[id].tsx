@@ -1,54 +1,67 @@
 import React from "react";
 import "react-toastify/dist/ReactToastify.css";
 
-import { canSSRAuth } from "@modules/auth";
-import { departmentService, type DepItem } from "@modules/departments";
-import { UserProfile, type UserItem } from "@modules/users";
+import { canSSRAdmin } from "@modules/auth";
+import { departmentService } from "@modules/departments";
+import { UserProfile, type UserDetailsPageProps } from "@modules/users";
+import { AdminAccessDeniedState } from "@shared/components/AdminAccessDeniedState";
 import { setupAPIClient } from "@shared/services/api";
 
-interface MeItem {
-  id: string;
-  name: string;
-  permission: number;
-}
+export default function User({
+  me,
+  user,
+  deps = [],
+  forbidden = false,
+}: UserDetailsPageProps) {
+  if (forbidden) {
+    return (
+      <AdminAccessDeniedState description="Você não possui permissão para acessar os detalhes deste usuário." />
+    );
+  }
 
-interface Props {
-  me: MeItem;
-  user: UserItem;
-  deps: DepItem[];
-}
+  if (!me || !user) {
+    return null;
+  }
 
-export default function User({ me, user, deps }: Props) {
   return <UserProfile userId={user.id} me={me} departments={deps} />;
 }
 
-export const getServerSideProps = canSSRAuth(async (ctx) => {
-  const { id } = ctx.params as { id: string };
+export const getServerSideProps = canSSRAdmin<UserDetailsPageProps>(
+  async (ctx) => {
+    const { id } = ctx.params as { id: string };
 
-  try {
-    const apiClient = setupAPIClient(ctx);
-    const [meResponse, userResponse, deps] = await Promise.all([
-      apiClient.get("/user/me"),
-      apiClient.get("/users-detail", { params: { user_id: id } }),
-      departmentService.list(undefined, ctx),
-    ]);
+    try {
+      const apiClient = setupAPIClient(ctx);
+      const [meResponse, userResponse, deps] = await Promise.all([
+        apiClient.get("/user/me"),
+        apiClient.get("/users-detail", { params: { user_id: id } }),
+        departmentService.list(undefined, ctx),
+      ]);
 
-    const user = userResponse.data.user;
-    const me = meResponse.data.user;
+      const user = userResponse.data.user;
+      const me = meResponse.data.user;
 
-    if (!user || (me.permission === 0 && me.id !== id)) {
+      if (!user) {
+        return { redirect: { destination: "/dashboard", permanent: false } };
+      }
+
+      return {
+        props: {
+          me,
+          user,
+          deps,
+        },
+      };
+    } catch (error) {
+      console.log(error);
       return { redirect: { destination: "/dashboard", permanent: false } };
     }
-
-    return {
+  },
+  {
+    onForbidden: () => ({
       props: {
-        me,
-        user,
-        deps,
+        forbidden: true,
       },
-    };
-  } catch (error) {
-    console.log(error);
-    return { redirect: { destination: "/dashboard", permanent: false } };
-  }
-});
+    }),
+  },
+);

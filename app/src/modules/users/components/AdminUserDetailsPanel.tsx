@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { isAxiosError } from "axios";
+import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
+import { canAccessAdministration } from "@modules/auth";
+import { useAuth } from "@/context/AuthContext";
 import { CREATE_USER_PERMISSION_OPTIONS } from "../constants/createUserConfig";
 import { ADMIN_USER_STATUS_LABELS, type AdminUserStatus, normalizeAdminUserStatus } from "../services/adminUsersService";
 import { userService } from "../services/userService";
@@ -65,6 +69,9 @@ export function AdminUserDetailsPanel({
   departmentsError,
   onUserUpdated,
 }: AdminUserDetailsPanelProps) {
+  const router = useRouter();
+  const { user: currentUser } = useAuth();
+  const hasAdminAccess = canAccessAdministration(currentUser);
   const [user, setUser] = useState<UserItem | null>(null);
   const [formData, setFormData] = useState<FormState | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
@@ -73,6 +80,10 @@ export function AdminUserDetailsPanel({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const loadUser = async (nextUserId: string) => {
+    if (!hasAdminAccess) {
+      return;
+    }
+
     setIsLoadingUser(true);
     setLoadError(null);
 
@@ -81,6 +92,11 @@ export function AdminUserDetailsPanel({
       setUser(nextUser);
       setFormData(buildFormState(nextUser));
     } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 403) {
+        void router.replace("/dashboard");
+        return;
+      }
+
       setUser(null);
       setFormData(null);
       setLoadError("Nao foi possivel carregar os detalhes do usuario.");
@@ -89,6 +105,16 @@ export function AdminUserDetailsPanel({
       setIsLoadingUser(false);
     }
   };
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    if (!hasAdminAccess) {
+      void router.replace("/dashboard");
+    }
+  }, [currentUser, hasAdminAccess, router]);
 
   useEffect(() => {
     if (!userId) {
@@ -100,7 +126,7 @@ export function AdminUserDetailsPanel({
     }
 
     void loadUser(userId);
-  }, [userId]);
+  }, [hasAdminAccess, userId]);
 
   const isSaveDisabled = useMemo(() => {
     return isSaving || isLoadingUser || !userId || departmentsError || departments.length === 0 || !formData;
@@ -153,6 +179,11 @@ export function AdminUserDetailsPanel({
       toast.success("Usuario atualizado com sucesso!");
       await loadUser(userId);
     } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 403) {
+        await router.replace("/dashboard");
+        return;
+      }
+
       setSaveError("Nao foi possivel salvar as alteracoes do usuario.");
       toast.error("Erro ao atualizar usuario.");
       console.error(error);
@@ -172,6 +203,10 @@ export function AdminUserDetailsPanel({
         </div>
       </div>
     );
+  }
+
+  if (!hasAdminAccess) {
+    return null;
   }
 
   if (loadError) {

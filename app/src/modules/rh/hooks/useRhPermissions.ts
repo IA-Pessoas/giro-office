@@ -1,18 +1,16 @@
-import { useMemo } from "react";
-import type { UseQueryResult } from "@tanstack/react-query";
-
 import { useAuth } from "@/context/AuthContext";
-import { permissionService } from "@modules/users/services/permissionService";
-import { normalizePermissionResponse } from "@modules/users/utils/permissionUtils";
-import { useFetch } from "@shared/hooks";
+import { useModuleAccess } from "@modules/auth";
 
-type RhPermissionPayload = Awaited<ReturnType<typeof permissionService.getByUserId>>;
-type RhKnownPermissions = ReturnType<typeof normalizePermissionResponse>["known"];
+interface RhPermissionState {
+  isLoading: boolean;
+  error: Error | null;
+}
 
 interface UseRhPermissionsResult {
   user: ReturnType<typeof useAuth>["user"];
-  permissionQuery: UseQueryResult<RhPermissionPayload, Error>;
-  knownPermissions: RhKnownPermissions | null;
+  permissionQuery: RhPermissionState;
+  canAccessRhModule: boolean;
+  canViewRhDashboard: boolean;
   isRhResponsible: boolean;
   isGlobalAdmin: boolean;
   canManageRh: boolean;
@@ -20,36 +18,25 @@ interface UseRhPermissionsResult {
 
 export function useRhPermissions(scope: string): UseRhPermissionsResult {
   const { user } = useAuth();
-
-  const permissionQuery = useFetch(
-    ["rh", scope, "permissions", user?.id ?? ""],
-    () => permissionService.getByUserId(user?.id ?? ""),
-    {
-      enabled: Boolean(user?.id),
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-
-  const knownPermissions = useMemo(() => {
-    if (!permissionQuery.data) {
-      return null;
-    }
-
-    return normalizePermissionResponse(permissionQuery.data).known;
-  }, [permissionQuery.data]);
-
+  const { access, departmentModule, isLoading } = useModuleAccess("rh");
+  const explicitRhPermission = user?.modules?.rh;
   const isRhResponsible = Boolean(
-    knownPermissions?.rh !== null &&
-      knownPermissions?.rh !== undefined &&
-      knownPermissions.rh >= 1,
+    explicitRhPermission !== null &&
+      explicitRhPermission !== undefined &&
+      explicitRhPermission >= 1,
   );
   const isGlobalAdmin = user?.permission === 2;
+  const canViewRhDashboard = departmentModule === "rh" || isGlobalAdmin;
+  void scope;
 
   return {
     user,
-    permissionQuery,
-    knownPermissions,
+    permissionQuery: {
+      isLoading,
+      error: null,
+    },
+    canAccessRhModule: access.canView,
+    canViewRhDashboard,
     isRhResponsible,
     isGlobalAdmin,
     canManageRh: isRhResponsible || isGlobalAdmin,

@@ -2,12 +2,11 @@ import React from "react";
 import Link from "next/link";
 import "react-toastify/dist/ReactToastify.css";
 import { ArrowLeft, Save } from "lucide-react";
-import { parseCookies } from "nookies";
 
-import { canSSRAuth } from "@modules/auth";
-import { getPermissionFromToken, isAdminPermission } from "@modules/auth/utils/permissions";
+import { canSSRAdmin } from "@modules/auth";
 import { useDepForm, departmentService, type DepItem } from "@modules/departments";
 import { DepartmentColorField } from "@modules/departments/components/DepartmentColorField";
+import { AdminAccessDeniedState } from "@shared/components/AdminAccessDeniedState";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -21,10 +20,25 @@ const SELECT_ARROW_STYLE = {
 } as const;
 
 interface Props {
-  dep: DepItem;
+  dep?: DepItem;
+  forbidden?: boolean;
 }
 
-export default function Department({ dep }: Props) {
+export default function Department({ dep, forbidden = false }: Props) {
+  if (forbidden) {
+    return (
+      <AdminAccessDeniedState description="Você não possui permissão para editar departamentos." />
+    );
+  }
+
+  if (!dep) {
+    return null;
+  }
+
+  return <DepartmentForm dep={dep} />;
+}
+
+function DepartmentForm({ dep }: { dep: DepItem }) {
   const { formData, isDirty, isLoading, handleInputChange, handleUpdate } = useDepForm(dep);
 
   const handleColorChange = (color: string) => {
@@ -118,24 +132,28 @@ export default function Department({ dep }: Props) {
   );
 }
 
-export const getServerSideProps = canSSRAuth(async (ctx) => {
-  const { id } = ctx.params as { id: string };
-  const cookies = parseCookies(ctx);
-  const permission = getPermissionFromToken(cookies["cw.token"]);
+export const getServerSideProps = canSSRAdmin<Props>(
+  async (ctx) => {
+    const { id } = ctx.params as { id: string };
 
-  if (!isAdminPermission(permission)) {
-    return {
-      redirect: {
-        destination: "/dashboard",
-        permanent: false,
-      },
-    };
-  }
+    try {
+      const dep = await departmentService.getById(id, ctx);
 
-  try {
-    const dep = await departmentService.getById(id, ctx);
+      if (!dep) {
+        return {
+          redirect: {
+            destination: "/dashboard",
+            permanent: false,
+          },
+        };
+      }
 
-    if (!dep) {
+      return {
+        props: {
+          dep,
+        },
+      };
+    } catch {
       return {
         redirect: {
           destination: "/dashboard",
@@ -143,18 +161,12 @@ export const getServerSideProps = canSSRAuth(async (ctx) => {
         },
       };
     }
-
-    return {
+  },
+  {
+    onForbidden: () => ({
       props: {
-        dep,
+        forbidden: true,
       },
-    };
-  } catch (error) {
-    return {
-      redirect: {
-        destination: "/dashboard",
-        permanent: false,
-      },
-    };
-  }
-});
+    }),
+  },
+);
