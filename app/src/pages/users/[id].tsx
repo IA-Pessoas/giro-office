@@ -2,25 +2,18 @@ import React from "react";
 import "react-toastify/dist/ReactToastify.css";
 
 import { canSSRAdmin } from "@modules/auth";
-import { departmentService, type DepItem } from "@modules/departments";
-import { UserProfile, type UserItem } from "@modules/users";
+import { departmentService } from "@modules/departments";
+import { UserProfile } from "@modules/users";
 import { AdminAccessDeniedState } from "@shared/components/AdminAccessDeniedState";
 import { setupAPIClient } from "@shared/services/api";
+import type { UserDetailsPageProps } from "./pageProps";
 
-interface MeItem {
-  id: string;
-  name: string;
-  permission: number;
-}
-
-interface Props {
-  me?: MeItem;
-  user?: UserItem;
-  deps?: DepItem[];
-  forbidden?: boolean;
-}
-
-export default function User({ me, user, deps = [], forbidden = false }: Props) {
+export default function User({
+  me,
+  user,
+  deps = [],
+  forbidden = false,
+}: UserDetailsPageProps) {
   if (forbidden) {
     return (
       <AdminAccessDeniedState description="Você não possui permissão para acessar os detalhes deste usuário." />
@@ -34,7 +27,7 @@ export default function User({ me, user, deps = [], forbidden = false }: Props) 
   return <UserProfile userId={user.id} me={me} departments={deps} />;
 }
 
-export const getServerSideProps = canSSRAdmin<Props>(
+export const getServerSideProps = canSSRAdmin<UserDetailsPageProps>(
   async (ctx) => {
     const { id } = ctx.params as { id: string };
 

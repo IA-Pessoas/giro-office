@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import { FaUsers } from "react-icons/fa";
 
 import { canAccessAdministration, canSSRAdmin } from "@modules/auth";
-import { departmentService, type DepItem } from "@modules/departments";
+import { departmentService } from "@modules/departments";
 import {
   CreateUserModal,
   UserDetailsView,
@@ -18,15 +18,14 @@ import {
 import { extractUsersList } from "@modules/users/services/userService";
 import { AdminAccessDeniedState } from "@shared/components/AdminAccessDeniedState";
 import { setupAPIClient } from "@shared/services/api";
+import type { UsersIndexPageProps } from "./pageProps";
 
-interface Props {
-  users?: UserItem[];
-  deps?: DepItem[];
-  me?: any;
-  forbidden?: boolean;
-}
-
-export default function Users({ users = [], deps = [], me, forbidden = false }: Props) {
+export default function Users({
+  users = [],
+  deps = [],
+  me,
+  forbidden = false,
+}: UsersIndexPageProps) {
   const router = useRouter();
   const [usersList, setUsersList] = useState<UserItem[]>(users);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -139,7 +138,7 @@ export default function Users({ users = [], deps = [], me, forbidden = false }: 
   );
 }
 
-export const getServerSideProps = canSSRAdmin<Props>(
+export const getServerSideProps = canSSRAdmin<UsersIndexPageProps>(
   async (ctx) => {
     try {
       const apiClient = setupAPIClient(ctx);

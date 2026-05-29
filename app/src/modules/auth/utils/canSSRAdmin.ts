@@ -8,13 +8,13 @@ interface SessionTokenPayload {
 
 const ADMIN_PERMISSION = 2;
 
-function redirectTo<P>(destination: string): GetServerSidePropsResult<P> {
+function redirectTo(destination: string) {
   return {
     redirect: {
       destination,
       permanent: false,
     },
-  };
+  } as const;
 }
 
 interface CanSSRAdminOptions<P> {
