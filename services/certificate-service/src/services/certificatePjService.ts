@@ -61,7 +61,6 @@ export interface CertificatePjPublicResult {
   payment_date: Date | null;
   payment_amount: number | null;
   contact_info: string | null;
-  file_path: string | null;
   has_certificate: boolean;
   organization_id: string;
 }
@@ -73,15 +72,12 @@ export interface CertificatePjDetailResult extends CertificatePjPublicResult {
 export type CertificatePjListResult = CertificatePjPublicResult[];
 
 export interface CertificatePjFileMetadataResult {
-  file_path: string;
   file_original_name: string;
   file_mime_type: string;
   file_size_bytes: number;
-  file_sha256: string;
   file_uploaded_at: Date;
   file_uploaded_by_user_id: string;
-  file_storage_provider: string;
-  file_storage_bucket: string;
+  has_certificate: true;
 }
 
 export interface CertificatePjFileDownloadResult {
@@ -103,6 +99,7 @@ export interface CertificatePjFileDeps {
 
 type CertificatePjPrivateRecord = CertificatePjDetailResult &
   Partial<{
+    file_path: string | null;
     file_original_name: string | null;
     file_mime_type: string | null;
     file_size_bytes: number | null;
@@ -131,7 +128,6 @@ const certificatePjPublicSelect = {
   payment_date: true,
   payment_amount: true,
   contact_info: true,
-  file_path: true,
   has_certificate: true,
   organization_id: true,
 };
@@ -143,6 +139,7 @@ function removePassword(record: CertificatePjDetailResult): CertificatePjPublicR
 
 function removeFilePrivateMetadata(record: CertificatePjPrivateRecord): CertificatePjDetailResult {
   const {
+    file_path: _filePath,
     file_original_name: _fileOriginalName,
     file_mime_type: _fileMimeType,
     file_size_bytes: _fileSizeBytes,
@@ -195,7 +192,7 @@ export class CertificatePjService {
       select: certificatePjPublicSelect,
     });
 
-    return records.map((record) => removePassword(record as CertificatePjDetailResult));
+    return records.map((record) => removePassword(removeFilePrivateMetadata(record)));
   }
 
   async getCertificatePj(input: CertificatePjGetInput): Promise<CertificatePjDetailResult> {
@@ -232,12 +229,15 @@ export class CertificatePjService {
         throw new ServiceError(409, "Ja existe um certificado PJ com estes dados.");
       }
 
-      return await this.prisma.certificatePJ.create({
+      const record = await this.prisma.certificatePJ.create({
         data: {
           ...input.data,
           organization_id: input.organizationId,
+          has_certificate: false,
         },
       });
+
+      return removeFilePrivateMetadata(record);
     } catch (err: unknown) {
       logError("Erro ao criar certificado PJ", { err });
       if (err instanceof ServiceError) throw err;
@@ -282,10 +282,12 @@ export class CertificatePjService {
         }
       }
 
-      return await this.prisma.certificatePJ.update({
+      const record = await this.prisma.certificatePJ.update({
         where: { id: input.id, organization_id: input.organizationId },
         data: input.data,
       });
+
+      return removeFilePrivateMetadata(record);
     } catch (err: unknown) {
       logError("Erro ao atualizar certificado PJ", { err });
       if (err instanceof ServiceError) throw err;
@@ -359,15 +361,12 @@ export class CertificatePjService {
     }
 
     return {
-      file_path: metadata.file_path,
       file_original_name: metadata.file_original_name,
       file_mime_type: metadata.file_mime_type,
       file_size_bytes: metadata.file_size_bytes,
-      file_sha256: metadata.file_sha256,
       file_uploaded_at: metadata.file_uploaded_at,
       file_uploaded_by_user_id: metadata.file_uploaded_by_user_id,
-      file_storage_provider: metadata.file_storage_provider,
-      file_storage_bucket: metadata.file_storage_bucket,
+      has_certificate: true,
     };
   }
 
@@ -398,6 +397,7 @@ export class CertificatePjService {
     const record = await this.findCertificatePjForFile(input);
     const fileMetadata = this.requireStoredFile(record);
 
+    await deps.fileStorage.deleteObject(fileMetadata.filePath);
     await this.prisma.certificatePJ.update({
       where: { id: input.id, organization_id: input.organizationId },
       data: {
@@ -416,7 +416,6 @@ export class CertificatePjService {
         has_certificate: false,
       },
     });
-    await deps.fileStorage.deleteObject(fileMetadata.filePath);
 
     return { ok: true };
   }

@@ -8,6 +8,20 @@ import { CertificatePjService } from "../services/certificatePjService.js";
 import { certificateOrganizationId, certificateUserId } from "./testUtils.js";
 
 const certificateId = "20000000-0000-4000-8000-000000000001";
+const privateFileMetadataFields = [
+  "file_path",
+  "file_original_name",
+  "file_mime_type",
+  "file_size_bytes",
+  "file_sha256",
+  "file_uploaded_at",
+  "file_uploaded_by_user_id",
+  "file_storage_provider",
+  "file_storage_bucket",
+  "file_encryption_iv",
+  "file_encryption_tag",
+  "file_encryption_key_version",
+];
 
 function createCertificatePjRecord(overrides: Record<string, unknown> = {}) {
   return {
@@ -69,6 +83,12 @@ function createCertificateFileDeps() {
   return { storage, crypto, storedObjects };
 }
 
+function expectNoPrivateFileMetadata(result: Record<string, unknown>) {
+  for (const field of privateFileMetadataFields) {
+    expect(result).not.toHaveProperty(field);
+  }
+}
+
 describe("CertificatePjService", () => {
   it("listCertificatePj filters by organization_id and never selects password", async () => {
     const prisma = {
@@ -94,6 +114,7 @@ describe("CertificatePjService", () => {
       select: expect.not.objectContaining({ password: true }),
     });
     expect(result[0]).not.toHaveProperty("password");
+    expect(result[0]).not.toHaveProperty("file_path");
   });
 
   it("getCertificatePj returns password when canViewPassword is true", async () => {
@@ -111,6 +132,7 @@ describe("CertificatePjService", () => {
     });
 
     expect(result.password).toBe("secret-password");
+    expect(result).not.toHaveProperty("file_path");
   });
 
   it("getCertificatePj removes password when canViewPassword is false", async () => {
@@ -153,7 +175,6 @@ describe("CertificatePjService", () => {
           password: "secret-password",
           expiration_date: new Date("2026-12-31T00:00:00.000Z"),
           was_paid: true,
-          has_certificate: true,
         },
       }),
     ).rejects.toMatchObject({
@@ -195,12 +216,57 @@ describe("CertificatePjService", () => {
           password: "secret-password",
           expiration_date: new Date("2026-12-31T00:00:00.000Z"),
           was_paid: true,
-          has_certificate: true,
         },
       }),
     ).rejects.toMatchObject({
       statusCode: 409,
     } satisfies Partial<ServiceError>);
+  });
+
+  it("createCertificatePj does not expose private file metadata returned by Prisma", async () => {
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async ({ data }) =>
+          createCertificatePjRecord({
+            ...data,
+            file_path:
+              "organizations/10000000-0000-4000-8000-000000000001/certificate-pj/20000000-0000-4000-8000-000000000001/file.pfx.enc",
+            file_original_name: "Empresa Castelo.pfx",
+            file_mime_type: "application/x-pkcs12",
+            file_size_bytes: 128,
+            file_sha256: "hash",
+            file_uploaded_at: new Date("2026-05-28T12:00:00.000Z"),
+            file_uploaded_by_user_id: certificateUserId,
+            file_storage_provider: "local",
+            file_storage_bucket: "Certificados",
+            file_encryption_iv: "iv",
+            file_encryption_tag: "tag",
+            file_encryption_key_version: "v1",
+          }),
+        ),
+      },
+    };
+    const service = new CertificatePjService(prisma as never);
+
+    const result = await service.createCertificatePj({
+      organizationId: certificateOrganizationId,
+      data: {
+        client_castelo_status: true,
+        client_focus_status: false,
+        name: "Empresa Castelo",
+        cnpj: "11222333000144",
+        responsible: "Maria Silva",
+        model: "A1",
+        legal_nature: "LTDA",
+        password: "secret-password",
+        expiration_date: new Date("2026-12-31T00:00:00.000Z"),
+        was_paid: true,
+      },
+    });
+
+    expectNoPrivateFileMetadata(result as unknown as Record<string, unknown>);
+    expect(result.has_certificate).toBe(false);
   });
 
   it("updateCertificatePj returns 404 when record does not exist in organization", async () => {
@@ -260,6 +326,41 @@ describe("CertificatePjService", () => {
     expect(prisma.certificatePJ.update).not.toHaveBeenCalled();
   });
 
+  it("updateCertificatePj does not expose private file metadata returned by Prisma", async () => {
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => createCertificatePjRecord()),
+        update: vi.fn(async ({ data }) =>
+          createCertificatePjRecord({
+            ...data,
+            file_path:
+              "organizations/10000000-0000-4000-8000-000000000001/certificate-pj/20000000-0000-4000-8000-000000000001/file.pfx.enc",
+            file_original_name: "Empresa Castelo.pfx",
+            file_mime_type: "application/x-pkcs12",
+            file_size_bytes: 128,
+            file_sha256: "hash",
+            file_uploaded_at: new Date("2026-05-28T12:00:00.000Z"),
+            file_uploaded_by_user_id: certificateUserId,
+            file_storage_provider: "local",
+            file_storage_bucket: "Certificados",
+            file_encryption_iv: "iv",
+            file_encryption_tag: "tag",
+            file_encryption_key_version: "v1",
+          }),
+        ),
+      },
+    };
+    const service = new CertificatePjService(prisma as never);
+
+    const result = await service.updateCertificatePj({
+      id: certificateId,
+      organizationId: certificateOrganizationId,
+      data: { notes: "Atualizado" },
+    });
+
+    expectNoPrivateFileMetadata(result as unknown as Record<string, unknown>);
+  });
+
   it("uploadCertificatePjFile stores encrypted bytes under organization-scoped path and updates metadata", async () => {
     const now = new Date("2026-05-28T12:00:00.000Z");
     vi.useFakeTimers();
@@ -299,12 +400,13 @@ describe("CertificatePjService", () => {
         buffer: expect.any(Buffer),
         contentType: "application/octet-stream",
       });
-      const storedBuffer = storedObjects.get(result.file_path);
+      const storedPath = storage.putObject.mock.calls[0]?.[0].path;
+      const storedBuffer = storedObjects.get(storedPath);
       expect(storedBuffer?.equals(originalBuffer)).toBe(false);
       expect(prisma.certificatePJ.update).toHaveBeenCalledWith({
         where: { id: certificateId, organization_id: certificateOrganizationId },
         data: expect.objectContaining({
-          file_path: result.file_path,
+          file_path: storedPath,
           file_original_name: "Empresa Castelo.pfx",
           file_mime_type: "application/x-pkcs12",
           file_size_bytes: originalBuffer.length,
@@ -316,6 +418,10 @@ describe("CertificatePjService", () => {
           has_certificate: true,
         }),
       });
+      expect(result).not.toHaveProperty("file_path");
+      expect(result).not.toHaveProperty("file_sha256");
+      expect(result).not.toHaveProperty("file_storage_provider");
+      expect(result).not.toHaveProperty("file_storage_bucket");
       expect(result).not.toHaveProperty("file_encryption_iv");
       expect(result).not.toHaveProperty("file_encryption_tag");
     } finally {
@@ -442,5 +548,42 @@ describe("CertificatePjService", () => {
     });
     expect(storage.deleteObject).toHaveBeenCalledWith(objectPath);
     expect(result).toEqual({ ok: true });
+  });
+
+  it("deleteCertificatePjFile keeps metadata when storage deletion fails", async () => {
+    const { storage, crypto } = createCertificateFileDeps();
+    const objectPath =
+      "organizations/10000000-0000-4000-8000-000000000001/certificate-pj/20000000-0000-4000-8000-000000000001/file.pfx.enc";
+    storage.deleteObject.mockRejectedValueOnce(new Error("storage unavailable"));
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () =>
+          createCertificatePjRecord({
+            file_path: objectPath,
+            file_original_name: "Empresa Castelo.pfx",
+            file_mime_type: "application/x-pkcs12",
+            file_encryption_iv: "iv",
+            file_encryption_tag: "tag",
+          }),
+        ),
+        update: vi.fn(),
+      },
+    };
+    const service = new CertificatePjService(prisma as never, {
+      fileStorage: storage,
+      fileCrypto: crypto,
+      storageProvider: "local",
+      storageBucket: "Certificados",
+    });
+
+    await expect(
+      service.deleteCertificatePjFile({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+      }),
+    ).rejects.toThrow("storage unavailable");
+
+    expect(storage.deleteObject).toHaveBeenCalledWith(objectPath);
+    expect(prisma.certificatePJ.update).not.toHaveBeenCalled();
   });
 });

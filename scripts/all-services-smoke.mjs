@@ -978,8 +978,6 @@ const handlers = {
         payment_date: new Date().toISOString(),
         payment_amount: 123.45,
         contact_info: "smoke@example.com",
-        file_path: null,
-        has_certificate: true,
       },
     });
     if (isBadExpectation(op)) {
@@ -1060,8 +1058,6 @@ const handlers = {
         payment_date: new Date().toISOString(),
         payment_amount: 234.56,
         contact_info: "smoke@example.com",
-        file_path: null,
-        has_certificate: true,
       },
     });
     if (isBadExpectation(op)) {

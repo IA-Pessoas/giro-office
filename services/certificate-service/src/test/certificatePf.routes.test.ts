@@ -66,7 +66,7 @@ describe("certificate PF routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data[0]).not.toHaveProperty("password");
-    expect(response.body.data[0]).toHaveProperty("file_path");
+    expect(response.body.data[0]).not.toHaveProperty("file_path");
     expect(response.body.data[0]).not.toHaveProperty("file_encryption_iv");
     expect(response.body.data[0]).not.toHaveProperty("file_encryption_tag");
   });
@@ -113,7 +113,7 @@ describe("certificate PF routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data.password).toBe("secret-password");
-    expect(response.body.data.file_path).toBe("organizations/org/certificate-pf/cert/file.pfx.enc");
+    expect(response.body.data).not.toHaveProperty("file_path");
     expect(response.body.data).not.toHaveProperty("file_encryption_iv");
     expect(response.body.data).not.toHaveProperty("file_encryption_tag");
     expect(response.body.data).not.toHaveProperty("file_storage_bucket");
@@ -143,7 +143,6 @@ describe("certificate PF routes", () => {
         password: "secret-password",
         expiration_date: "2026-12-31T00:00:00.000Z",
         was_paid: "false",
-        has_certificate: "false",
       });
 
     expect(response.status).toBe(201);
@@ -151,8 +150,33 @@ describe("certificate PF routes", () => {
       client_castelo_status: false,
       client_focus_status: false,
       was_paid: false,
-      has_certificate: false,
       organization_id: certificateOrganizationId,
+    });
+  });
+
+  it("POST /certificate/pf rejects storage-managed metadata in JSON body", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+
+    const response = await request(app)
+      .post("/certificate/pf")
+      .set(certificateGatewayHeaders(2))
+      .send({
+        client_castelo_status: false,
+        client_focus_status: false,
+        name: "Joao Silva",
+        cpf: "12345678901",
+        model: "A1",
+        password: "secret-password",
+        expiration_date: "2026-12-31T00:00:00.000Z",
+        was_paid: false,
+        file_path: "https://public.example/cert.pfx",
+        has_certificate: true,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "BAD_REQUEST",
     });
   });
 
@@ -171,7 +195,6 @@ describe("certificate PF routes", () => {
         password: "secret-password",
         expiration_date: "2026-12-31T00:00:00.000Z",
         was_paid: false,
-        has_certificate: true,
       });
 
     expect(response.status).toBe(400);
@@ -196,7 +219,6 @@ describe("certificate PF routes", () => {
         password: "secret-password",
         expiration_date: "2026-12-31T00:00:00.000Z",
         was_paid: true,
-        has_certificate: true,
       });
 
     expect(response.status).toBe(403);
@@ -218,6 +240,24 @@ describe("certificate PF routes", () => {
     expect(response.body).toMatchObject({
       success: false,
       code: "FORBIDDEN",
+    });
+  });
+
+  it("PATCH /certificate/pf/:id rejects storage-managed metadata in JSON body", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+
+    const response = await request(app)
+      .patch(`/certificate/pf/${certificateId}`)
+      .set(certificateGatewayHeaders(2))
+      .send({
+        file_path: "organizations/org/certificate-pf/cert/file.pfx.enc",
+        has_certificate: true,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "BAD_REQUEST",
     });
   });
 
@@ -273,6 +313,25 @@ describe("certificate PF routes", () => {
     });
   });
 
+  it("POST /certificate/pf/:id/file rejects unexpected multipart fields", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+
+    const response = await request(app)
+      .post(`/certificate/pf/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2))
+      .field("unexpected", "value")
+      .attach("file", Buffer.from("certificate-bytes"), {
+        filename: "certificate.pfx",
+        contentType: "application/x-pkcs12",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "BAD_REQUEST",
+    });
+  });
+
   it("POST /certificate/pf/:id/file requires elevated certificate permission", async () => {
     const app = createCertificateTestApp(createCertificatePrismaMock());
 
@@ -314,17 +373,18 @@ describe("certificate PF routes", () => {
       file_original_name: "Joao Silva.pfx",
       file_mime_type: "application/x-pkcs12",
       file_uploaded_by_user_id: certificateUserId,
-      file_storage_provider: "local",
-      file_storage_bucket: "Certificados",
     });
-    expect(response.body.data.file_path).toMatch(
-      /^organizations\/10000000-0000-4000-8000-000000000001\/certificate-pf\/30000000-0000-4000-8000-000000000001\/\d+_Joao_Silva\.pfx\.enc$/,
-    );
+    expect(response.body.data).not.toHaveProperty("file_path");
+    expect(response.body.data).not.toHaveProperty("file_sha256");
+    expect(response.body.data).not.toHaveProperty("file_storage_provider");
+    expect(response.body.data).not.toHaveProperty("file_storage_bucket");
     expect(response.body.data).not.toHaveProperty("file_encryption_iv");
     expect(response.body.data).not.toHaveProperty("file_encryption_tag");
     expect(fileStorage.putObject).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: response.body.data.file_path,
+        path: expect.stringMatching(
+          /^organizations\/10000000-0000-4000-8000-000000000001\/certificate-pf\/30000000-0000-4000-8000-000000000001\/\d+_Joao_Silva\.pfx\.enc$/,
+        ),
         contentType: "application/octet-stream",
       }),
     );

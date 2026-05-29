@@ -148,6 +148,15 @@ describe("certificate-service OpenAPI", () => {
 
   it("exposes domain schemas and typed success envelopes", () => {
     const spec = buildCertificateServiceOpenApiSpec(env);
+    const certificatePjInput = spec.components?.schemas?.CertificatePjInput as
+      | { properties?: Record<string, unknown> }
+      | undefined;
+    const certificatePfInput = spec.components?.schemas?.CertificatePfInput as
+      | { properties?: Record<string, unknown> }
+      | undefined;
+    const certificateFileMetadata = spec.components?.schemas?.CertificateFileMetadata as
+      | { properties?: Record<string, unknown> }
+      | undefined;
 
     expect(spec.components?.schemas).toEqual(
       expect.objectContaining({
@@ -161,6 +170,14 @@ describe("certificate-service OpenAPI", () => {
         CertificateNotificationRunResult: expect.any(Object),
       }),
     );
+    expect(certificatePjInput?.properties).not.toHaveProperty("file_path");
+    expect(certificatePjInput?.properties).not.toHaveProperty("has_certificate");
+    expect(certificatePfInput?.properties).not.toHaveProperty("file_path");
+    expect(certificatePfInput?.properties).not.toHaveProperty("has_certificate");
+    expect(certificateFileMetadata?.properties).not.toHaveProperty("file_path");
+    expect(certificateFileMetadata?.properties).not.toHaveProperty("file_sha256");
+    expect(certificateFileMetadata?.properties).not.toHaveProperty("file_storage_provider");
+    expect(certificateFileMetadata?.properties).not.toHaveProperty("file_storage_bucket");
 
     expect(getSuccessDataSchemaRef(spec, "/certificate/pj/list", "get")).toMatchObject({
       type: "array",
