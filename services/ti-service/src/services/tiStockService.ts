@@ -70,18 +70,18 @@ export class TiStockService {
         this.prisma,
       );
 
-      return this.prisma.stock.create({
-        data: {
-          department_id: departmentId,
-          name: body.name,
-          category_id: body.category_id,
-          location_id: body.location_id,
-          quantity: body.quantity,
-          description: body.description,
-          status: true,
-          organization_id: context.organizationId,
-        },
-      });
+      const data: Prisma.StockUncheckedCreateInput = {
+        department_id: departmentId,
+        name: body.name,
+        category_id: body.category_id,
+        location_id: body.location_id,
+        quantity: body.quantity,
+        description: body.description,
+        status: true,
+        organization_id: context.organizationId,
+      };
+
+      return this.prisma.stock.create({ data });
     } catch (err: unknown) {
       logError("Erro ao criar item de estoque de TI", { err });
       if (err instanceof ServiceError) throw err;
