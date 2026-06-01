@@ -52,3 +52,4 @@ novo layout/
 # Smoke test artifacts
 smoke-*/
 services_env_summary.md
+.codex/run-logs/

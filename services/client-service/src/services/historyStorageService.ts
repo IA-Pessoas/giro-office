@@ -1,13 +1,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { uploadPhoto } from "@workspace/shared/storage";
+import { ServiceError } from "@workspace/shared";
 
 export interface HistoryFileStorage {
   saveObjectPath(
     clientId: string,
     file: { buffer: Buffer; mimetype: string; originalName: string },
   ): Promise<string>;
+  createSignedAccessUrl(objectPath: string): Promise<string>;
 }
 
 /**
@@ -27,9 +28,15 @@ export class LocalHistoryFileStorage implements HistoryFileStorage {
     await fs.writeFile(full, file.buffer);
     return relative;
   }
+
+  async createSignedAccessUrl(objectPath: string): Promise<string> {
+    return objectPath;
+  }
 }
 
 export class SupabaseHistoryFileStorage implements HistoryFileStorage {
+  private readonly signedUrlExpiresInSeconds = 300;
+
   constructor(
     private readonly supabase: SupabaseClient,
     private readonly bucket: string,
@@ -42,11 +49,29 @@ export class SupabaseHistoryFileStorage implements HistoryFileStorage {
     const safeName = file.originalName.replace(/[^a-zA-Z0-9._-]/g, "_");
     const objectPath = `clients/historys/${clientId}/${Date.now()}_${safeName}`;
 
-    return uploadPhoto(
-      this.supabase,
-      objectPath,
-      { buffer: file.buffer, mimetype: file.mimetype },
-      { bucket: this.bucket },
-    );
+    const { error } = await this.supabase.storage
+      .from(this.bucket)
+      .upload(objectPath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (error) {
+      throw new ServiceError(500, "Erro ao fazer upload da foto.", error);
+    }
+
+    return objectPath;
+  }
+
+  async createSignedAccessUrl(objectPath: string): Promise<string> {
+    const { data, error } = await this.supabase.storage
+      .from(this.bucket)
+      .createSignedUrl(objectPath, this.signedUrlExpiresInSeconds);
+
+    if (error || !data?.signedUrl) {
+      throw new ServiceError(500, "Erro ao gerar link do anexo.", error);
+    }
+
+    return data.signedUrl;
   }
 }

@@ -2092,7 +2092,6 @@ const handlers = {
   },
 
   async clientHistoriesCreate(op) {
-    // File upload is optional — skip sending file to avoid storage dependency in smoke env
     // Do NOT send pending_id: the service auto-deletes the pending on link, which would break
     // clientHistoriesPendingDelete that runs later
     const response = await httpRequest(op, {
@@ -2102,6 +2101,12 @@ const handlers = {
         fields: {
           date: new Date().toISOString(),
           history: uniqueText("Smoke client history"),
+        },
+        file: {
+          fieldName: "file",
+          path: env.fixturePath,
+          filename: "smoke-upload.png",
+          contentType: "image/png",
         },
       },
     });
@@ -2115,6 +2120,13 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/client/${requireState("primaryClientId")}/histories/${requireState("clientHistoryId")}`,
+    });
+  },
+
+  async clientHistoriesFile(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/${requireState("primaryClientId")}/histories/${requireState("clientHistoryId")}/file`,
     });
   },
 

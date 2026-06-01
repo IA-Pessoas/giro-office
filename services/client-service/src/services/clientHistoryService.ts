@@ -79,6 +79,44 @@ export async function getClientHistoryDetail(
   return detail as Record<string, unknown> | null;
 }
 
+function isLegacyPublicUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+export async function createClientHistoryFileAccessUrl(
+  prisma: PrismaClient,
+  storage: HistoryFileStorage,
+  organizationId: string,
+  clientId: string,
+  historyId: string,
+): Promise<string> {
+  const history = await prisma.clientHistory.findFirst({
+    where: {
+      id: historyId,
+      client_id: clientId,
+      organization_id: organizationId,
+    },
+    select: {
+      id: true,
+      file: true,
+    },
+  });
+
+  if (!history) {
+    throw new ServiceError(404, "HistÃ³rico nÃ£o encontrado.");
+  }
+
+  if (!history.file) {
+    throw new ServiceError(404, "Anexo nÃ£o encontrado.");
+  }
+
+  if (isLegacyPublicUrl(history.file)) {
+    return history.file;
+  }
+
+  return storage.createSignedAccessUrl(history.file);
+}
+
 export async function listClientHistories(
   prisma: PrismaClient,
   organizationId: string,

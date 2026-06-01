@@ -603,6 +603,31 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+      "/client/{id}/histories/{historyId}/file": {
+        get: {
+          tags: ["Histories"],
+          summary: "Gerar link temporario para anexo de historico",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "historyId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Link temporario gerado",
+              ...successEnvelopeContent(),
+            },
+            "404": {
+              description: "Historico ou anexo nao encontrado",
+            },
+          },
+        },
+      },
       "/client/{id}/histories/pending": {
         post: {
           tags: ["Histories"],

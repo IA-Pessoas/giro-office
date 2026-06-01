@@ -92,6 +92,7 @@ function buildTestApp(
     overrides?.historyStorage ??
     ({
       saveObjectPath: vi.fn(),
+      createSignedAccessUrl: vi.fn(),
     } as unknown as HistoryFileStorage);
   return createApp({ clientService: mock, env, logger, prisma, historyStorage });
 }
@@ -509,6 +510,7 @@ describe("client-service", () => {
     const mock: IClientService = { ...mockServiceBase() };
     const historyStorage = {
       saveObjectPath: vi.fn(),
+      createSignedAccessUrl: vi.fn(),
     } as unknown as HistoryFileStorage;
     const app = buildTestApp(mock, { historyStorage });
     const token = bearerToken(TEST_ORG_ID);
@@ -594,6 +596,7 @@ describe("client-service", () => {
     } as unknown as PrismaClient;
     const historyStorage = {
       saveObjectPath: vi.fn().mockResolvedValue("client-history/doc.pdf"),
+      createSignedAccessUrl: vi.fn(),
     } as unknown as HistoryFileStorage;
     const app = buildTestApp(mock, { prisma, historyStorage });
     const token = bearerToken(TEST_ORG_ID);
@@ -615,6 +618,50 @@ describe("client-service", () => {
         mimetype: "application/pdf",
         originalName: "doc.pdf",
       }),
+    );
+  });
+
+  it("GET /client/:id/histories/:historyId/file returns a signed attachment URL", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const historyId = "770e8400-e29b-41d4-a716-446655440003";
+    const prisma = {
+      clientHistory: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: historyId,
+          client_id: TEST_CLIENT_ID,
+          file: "clients/historys/client-1/doc.pdf",
+        }),
+      },
+    } as unknown as PrismaClient;
+    const historyStorage = {
+      saveObjectPath: vi.fn(),
+      createSignedAccessUrl: vi
+        .fn()
+        .mockResolvedValue("https://example.supabase.co/signed/history-file"),
+    } as unknown as HistoryFileStorage;
+    const app = buildTestApp(mock, { prisma, historyStorage });
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .get(`/client/${TEST_CLIENT_ID}/histories/${historyId}/file`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toEqual({ url: "https://example.supabase.co/signed/history-file" });
+    expect(prisma.clientHistory.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: historyId,
+        client_id: TEST_CLIENT_ID,
+        organization_id: TEST_ORG_ID,
+      },
+      select: {
+        id: true,
+        file: true,
+      },
+    });
+    expect(historyStorage.createSignedAccessUrl).toHaveBeenCalledWith(
+      "clients/historys/client-1/doc.pdf",
     );
   });
 

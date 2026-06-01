@@ -910,6 +910,14 @@ const baseManifest = [
   }),
   op({
     service: "client-service",
+    method: "GET",
+    path: "/client/{id}/histories/{historyId}/file",
+    action: "clientHistoriesFile",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
     method: "PATCH",
     path: "/client/{id}/histories/{historyId}",
     action: "clientHistoriesPatch",

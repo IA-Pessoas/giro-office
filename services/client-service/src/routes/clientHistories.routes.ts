@@ -21,6 +21,7 @@ import {
 } from "../schemas/clientVerticals.schemas.js";
 import {
   createClientHistory,
+  createClientHistoryFileAccessUrl,
   createHistoryPending,
   deleteHistoryPending,
   getClientHistoryDetail,
@@ -158,6 +159,28 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
         response.json(createSuccessResponse({ detail }));
       } catch (err) {
         logError("Erro ao obter histórico", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
+    "/:id/histories/:historyId/file",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const params = parseWithZod(historyIdParamsSchema, request.params);
+        const organizationId = resolveOrganizationId(request, undefined);
+        const url = await createClientHistoryFileAccessUrl(
+          prisma,
+          historyStorage,
+          organizationId,
+          params.id,
+          params.historyId,
+        );
+        response.json(createSuccessResponse({ url }));
+      } catch (err) {
+        logError("Erro ao gerar link do anexo do histÃ³rico", { err });
         next(err);
       }
     },
