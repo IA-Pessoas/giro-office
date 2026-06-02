@@ -4,10 +4,7 @@ import { toast } from "react-toastify";
 
 import { Dialog } from "@shared/components";
 
-import {
-  useCreateRhRequestMutation,
-  useUpdateRhRequestMutation,
-} from "../hooks/useRhRequests";
+import { useCreateRhRequestMutation, useUpdateRhRequestMutation } from "../hooks/useRhRequests";
 import type {
   AssignableUser,
   RhCategory,
@@ -15,15 +12,14 @@ import type {
   RhRequestStatus,
   RhRequestUrgency,
 } from "../types";
-import {
-  formatRhCategoryLabel,
-  RH_REQUEST_STATUS_META,
-} from "../utils/rhRequestUi";
+import { formatRhCategoryLabel, RH_REQUEST_STATUS_META } from "../utils/rhRequestUi";
 
 interface RhRequestFormModalProps {
   open: boolean;
   categories: RhCategory[];
   assignableUsers: AssignableUser[];
+  canManageRequests: boolean;
+  assignableUsersUnavailableMessage?: string | null;
   request: RhRequest | null;
   onClose: () => void;
 }
@@ -65,17 +61,18 @@ export function RhRequestFormModal({
   open,
   categories,
   assignableUsers,
+  canManageRequests,
+  assignableUsersUnavailableMessage,
   request,
   onClose,
 }: RhRequestFormModalProps) {
   const createMutation = useCreateRhRequestMutation();
   const updateMutation = useUpdateRhRequestMutation();
-  const [formState, setFormState] = useState<RhRequestFormState>(
-    buildFormState(request),
-  );
+  const [formState, setFormState] = useState<RhRequestFormState>(buildFormState(request));
 
   const isEditing = Boolean(request);
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const isSelfServiceCreateBlocked = !canManageRequests && !isEditing;
 
   useEffect(() => {
     setFormState(buildFormState(request));
@@ -97,13 +94,18 @@ export function RhRequestFormModal({
   }
 
   async function handleSubmit() {
+    if (isSelfServiceCreateBlocked) {
+      toast.info("Você poderá abrir solicitações assim que esse fluxo for liberado.");
+      return;
+    }
+
     if (
       !formState.title.trim() ||
       !formState.description.trim() ||
       !formState.category_id ||
       !formState.assigned_to_user_id
     ) {
-      toast.warn("Preencha os campos obrigatórios da solicitação.");
+      toast.warn("Preencha os campos obrigatórios.");
       return;
     }
 
@@ -134,9 +136,7 @@ export function RhRequestFormModal({
       onClose();
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Não foi possível salvar a solicitação.";
+        error instanceof Error ? error.message : "Não foi possível salvar a solicitação.";
       toast.error(message);
     }
   }
@@ -163,20 +163,34 @@ export function RhRequestFormModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isSelfServiceCreateBlocked}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting
               ? "Salvando..."
-              : isEditing
-                ? "Salvar alterações"
-                : "Criar solicitação"}
+              : isSelfServiceCreateBlocked
+                ? "Indisponível no momento"
+                : isEditing
+                  ? "Salvar alterações"
+                  : "Criar solicitação"}
           </button>
         </>
       }
       contentClassName="w-[min(92vw,720px)]"
       bodyClassName="space-y-4"
     >
+      {isSelfServiceCreateBlocked ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+          Você poderá abrir solicitações assim que esse fluxo for liberado.
+        </div>
+      ) : null}
+
+      {canManageRequests && assignableUsersUnavailableMessage ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+          Não foi possível carregar os responsáveis agora.
+        </div>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300 md:col-span-2">
           <span>Título</span>
@@ -207,26 +221,26 @@ export function RhRequestFormModal({
           </div>
         </label>
 
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Responsável</span>
-          <div className="relative">
-            <select
-              value={formState.assigned_to_user_id}
-              onChange={(event) =>
-                handleChange("assigned_to_user_id", event.target.value)
-              }
-              className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="">Selecione</option>
-              {assignableUsers.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          </div>
-        </label>
+        {canManageRequests ? (
+          <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <span>Responsável</span>
+            <div className="relative">
+              <select
+                value={formState.assigned_to_user_id}
+                onChange={(event) => handleChange("assigned_to_user_id", event.target.value)}
+                className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Selecione</option>
+                {assignableUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            </div>
+          </label>
+        ) : null}
 
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300 md:col-span-2">
           <span>Urgência</span>
@@ -250,9 +264,7 @@ export function RhRequestFormModal({
           <span>Descrição</span>
           <textarea
             value={formState.description}
-            onChange={(event) =>
-              handleChange("description", event.target.value)
-            }
+            onChange={(event) => handleChange("description", event.target.value)}
             rows={5}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             placeholder="Descreva o contexto da solicitação"

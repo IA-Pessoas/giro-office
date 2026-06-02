@@ -1,15 +1,14 @@
 import { ChevronDown } from "lucide-react";
 
 import type { RhCategory, RhRequestStatus } from "../types";
-import {
-  formatRhCategoryLabel,
-  RH_REQUEST_STATUS_META,
-} from "../utils/rhRequestUi";
+import { formatRhCategoryLabel, RH_REQUEST_STATUS_META } from "../utils/rhRequestUi";
 
 interface RhRequestsFiltersProps {
   categories: RhCategory[];
   selectedStatus: RhRequestStatus | "all";
   selectedCategoryId: string;
+  title: string;
+  description: string;
   onStatusChange: (value: RhRequestStatus | "all") => void;
   onCategoryChange: (value: string) => void;
   onOpenCreate: () => void;
@@ -19,6 +18,8 @@ export function RhRequestsFilters({
   categories,
   selectedStatus,
   selectedCategoryId,
+  title,
+  description,
   onStatusChange,
   onCategoryChange,
   onOpenCreate,
@@ -26,12 +27,8 @@ export function RhRequestsFilters({
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Solicitações
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Acompanhe os chamados de RH por status e categoria.
-        </p>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">{description}</p>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
