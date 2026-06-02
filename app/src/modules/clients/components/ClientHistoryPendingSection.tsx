@@ -3,6 +3,7 @@ import { Plus, Trash2, NotebookPen } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { useAuth } from "@/context/AuthContext";
+import { isAdminPermission } from "@modules/auth";
 
 import { useHistoryPendingList, useCreateHistoryPendingMutation, useDeleteHistoryPendingMutation } from "../hooks/useClientHistoryPending";
 import type { ClientHistoryPendingItem } from "../types";
@@ -21,7 +22,7 @@ export function ClientHistoryPendingSection({
 }) {
   const { user } = useAuth();
   const userId = user?.id;
-  const isAdmin = Boolean(user && user.permission === 2);
+  const isAdmin = isAdminPermission(user?.permission);
 
   const listQuery = useHistoryPendingList(userId);
   const createMutation = useCreateHistoryPendingMutation(clientId);
@@ -179,4 +180,3 @@ export function ClientHistoryPendingSection({
     </section>
   );
 }
-

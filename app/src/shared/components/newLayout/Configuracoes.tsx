@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
+import { isAdminPermission } from "@modules/auth";
 import { MyOrganizationSection } from "@modules/organizations";
 import { useDeleteMePhoto, useMe, useUpdateMe, useUploadMePhoto } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
@@ -126,7 +127,7 @@ export function Configuracoes() {
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
   const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário";
   const managedOrganizationId =
-    meQuery.data?.permission === 2 && meQuery.data.organization_id
+    isAdminPermission(meQuery.data?.permission) && meQuery.data.organization_id
       ? meQuery.data.organization_id
       : null;
   const resolvedCurrentPhotoUrl = resolvePhotoUrl(currentPhotoUrl);

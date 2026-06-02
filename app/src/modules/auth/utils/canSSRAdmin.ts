@@ -1,12 +1,7 @@
 import type { GetServerSideProps, GetServerSidePropsContext, GetServerSidePropsResult } from "next";
-import { jwtDecode } from "jwt-decode";
 import { destroyCookie, parseCookies } from "nookies";
-
-interface SessionTokenPayload {
-  permission?: number;
-}
-
-const ADMIN_PERMISSION = 2;
+// @ts-expect-error Node strip-types tests require the `.ts` extension for local ESM resolution.
+import { getPermissionFromToken, isAdminPermission } from "./permissions.ts";
 
 function redirectTo(destination: string) {
   return {
@@ -19,23 +14,6 @@ function redirectTo(destination: string) {
 
 interface CanSSRAdminOptions<P> {
   onForbidden?: (ctx: GetServerSidePropsContext) => GetServerSidePropsResult<P>;
-}
-
-function getPermissionFromToken(token?: string | null): number | null {
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const payload = jwtDecode<SessionTokenPayload>(token);
-    return typeof payload.permission === "number" ? payload.permission : null;
-  } catch {
-    return null;
-  }
-}
-
-function isAdminPermission(permission?: number | null): boolean {
-  return permission === ADMIN_PERMISSION;
 }
 
 function isAuthTokenFailure(err: unknown): boolean {

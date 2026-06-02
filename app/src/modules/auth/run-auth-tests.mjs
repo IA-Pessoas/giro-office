@@ -41,8 +41,11 @@ function createSsrContext(token) {
 }
 
 await (async () => {
-  await runTest("isAdminPermission only allows permission level 2", () => {
+  await runTest("isAdminPermission allows administrative levels from 2 and above", () => {
     assert.equal(isAdminPermission(2), true);
+    assert.equal(isAdminPermission(100), true);
+    assert.equal(isAdminPermission(500), true);
+    assert.equal(isAdminPermission(999), true);
     assert.equal(isAdminPermission(1), false);
     assert.equal(isAdminPermission(0), false);
     assert.equal(isAdminPermission(null), false);
@@ -50,8 +53,10 @@ await (async () => {
 
   await runTest("canAccessAdministration accepts both permission values and user-like objects", () => {
     assert.equal(canAccessAdministration(2), true);
+    assert.equal(canAccessAdministration(100), true);
     assert.equal(canAccessAdministration(1), false);
     assert.equal(canAccessAdministration({ permission: 2 }), true);
+    assert.equal(canAccessAdministration({ permission: 999 }), true);
     assert.equal(canAccessAdministration({ permission: 1 }), false);
     assert.equal(canAccessAdministration(undefined), false);
   });
@@ -102,6 +107,13 @@ await (async () => {
   await runTest("canSSRAdmin allows admin users through", async () => {
     const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
     const result = await guard(createSsrContext(createToken({ permission: 2 })));
+
+    assert.deepEqual(result, { props: { ok: true } });
+  });
+
+  await runTest("canSSRAdmin allows high-permission admins through", async () => {
+    const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
+    const result = await guard(createSsrContext(createToken({ permission: 999 })));
 
     assert.deepEqual(result, { props: { ok: true } });
   });

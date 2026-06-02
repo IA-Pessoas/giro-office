@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { canSSRAuth } from "@modules/auth";
+import { canSSRAuth, isAdminPermission } from "@modules/auth";
 import { ClientForm } from "@modules/clients/components/ClientForm";
 import { getContabilCardState, useContabilPermissions } from "@modules/contabil";
 import {
@@ -77,7 +77,7 @@ export default function ClientDetailPage() {
   const { canViewContabil, isLoading: isContabilAccessLoading } = useContabilPermissions();
   const [formValues, setFormValues] = useState<ClientFormValues>(createInitialFormValues());
 
-  const isAdmin = user?.permission === 2;
+  const isAdmin = isAdminPermission(user?.permission);
   const client = clientQuery.data;
   const uiStatus = mapClientStatusFromApi(client?.status);
   const contabilCardState = getContabilCardState(client?.contabil, canViewContabil);
