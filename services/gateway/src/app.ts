@@ -169,12 +169,30 @@ function isJsonBodyLimitError(error: Error): boolean {
   );
 }
 
-function normalizeJsonBodyLimitError(
+function isJsonBodyParseError(error: Error): boolean {
+  const candidate = error as Error & {
+    status?: unknown;
+    statusCode?: unknown;
+    type?: unknown;
+  };
+
+  return (
+    candidate.type === "entity.parse.failed" &&
+    (candidate.status === 400 || candidate.statusCode === 400)
+  );
+}
+
+function normalizeJsonBodyError(
   error: Error,
   _request: Request,
   _response: Response,
   next: NextFunction,
 ): void {
+  if (isJsonBodyParseError(error)) {
+    next(new ServiceError(400, "JSON malformado.", error));
+    return;
+  }
+
   if (isJsonBodyLimitError(error)) {
     next(new ServiceError(413, "Corpo da requisição excede o limite permitido.", error));
     return;
@@ -212,6 +230,7 @@ function mountCorsAndParsing(app: express.Express, env: GatewayEnv): void {
   app.use(cors(corsOptions));
   app.options("*", cors(corsOptions));
   app.use(express.json({ limit: env.jsonBodyLimit ?? "1mb" }));
+  app.use(normalizeJsonBodyError);
 }
 
 function mountPublicRoutes(
@@ -349,7 +368,6 @@ function mountFallbackRoute(app: express.Express): void {
 }
 
 function mountErrorHandlers(app: express.Express, env: GatewayEnv, logger: Logger): void {
-  app.use(normalizeJsonBodyLimitError);
   app.use(buildAuditErrorCaptureMiddleware());
   app.use(
     createExpressErrorHandler({

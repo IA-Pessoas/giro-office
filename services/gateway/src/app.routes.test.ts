@@ -2128,3 +2128,39 @@ it("proxies task-service paths from the gateway", async () => {
     await stopServer(upstream);
   }
 });
+
+it("returns bad request for malformed JSON before proxying", async () => {
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { token: "ok" } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/session`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: "{",
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(400);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("JSON malformado.");
+    expect(body.code).toBe("BAD_REQUEST");
+    expect(body.requestId).toBeTruthy();
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
