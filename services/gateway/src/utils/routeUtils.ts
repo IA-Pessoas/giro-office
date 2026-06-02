@@ -1,6 +1,8 @@
 /** Paths forwarded to **user-service** (`USER_SERVICE_URL`) before the legacy fallback. */
 export function isUserServiceRoute(path: string): boolean {
   return (
+    path === "/user" ||
+    path.startsWith("/user/") ||
     path === "/session" ||
     path === "/start-config" ||
     path === "/me" ||
