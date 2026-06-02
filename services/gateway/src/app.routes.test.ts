@@ -2024,6 +2024,85 @@ it("proxies /client to the client microservice", async () => {
   }
 });
 
+it("blocks limited users without client-related module permission before proxying /client", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: {
+      atendimento: 0,
+      comercial: 0,
+      contabil: 0,
+      financeiro: 0,
+      fiscal: 0,
+      integracao: 0,
+      pessoal: 0,
+      regularize: 0,
+    },
+  });
+  let upstreamHits = 0;
+
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(403);
+    expect(body.code).toBe("FORBIDDEN");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("allows limited users with client-related module permission to proxy /client", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { integracao: 1 },
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenUrl).toBe("/client/list");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("proxies /rh to the rh microservice", async () => {
   const token = createToken({
     user_id: "user-1",
@@ -2053,6 +2132,76 @@ it("proxies /rh to the rh microservice", async () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(seenUrl).toBe("/rh/smoke");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("blocks limited users without RH module permission before proxying /rh", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { rh: 0 },
+  });
+  let upstreamHits = 0;
+
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const rhServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ rhServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/rh/requests`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(403);
+    expect(body.code).toBe("FORBIDDEN");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("allows limited users with RH module permission to proxy /rh", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { rh: 1 },
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const rhServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ rhServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/rh/requests`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenUrl).toBe("/rh/requests");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
