@@ -288,15 +288,14 @@ export default function ClientDetailPage() {
                     {deactivateClientMutation.isPending ? "Desativando..." : "Desativar cliente"}
                   </button>
 
-                  <div className="mt-auto pt-1">
-                    <SummaryItem
-                      label={client.deletion_date ? "Desativado em" : "Situação"}
-                      value={
-                        client.deletion_date
-                          ? new Date(client.deletion_date).toLocaleString("pt-BR")
-                          : "Cliente ativo"
-                      }
-                    />
+                  <div className="mt-auto grid gap-4 pt-1">
+                    <SummaryItem label="Situação" value={uiStatus} />
+                    {client.deletion_date ? (
+                      <SummaryItem
+                        label="Desativado em"
+                        value={new Date(client.deletion_date).toLocaleString("pt-BR")}
+                      />
+                    ) : null}
                   </div>
                 </div>
               </div>

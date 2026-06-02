@@ -65,6 +65,16 @@ runTest("status mapper keeps unrelated values unchanged", () => {
   assert.equal(mapClientStatusToApi("Inativo"), "Inativo");
 });
 
+runTest("status mapper converts API active and inactive values to UI labels", () => {
+  assert.equal(mapClientStatusFromApi("active"), "Ativo");
+  assert.equal(mapClientStatusFromApi("inactive"), "Inativo");
+});
+
+runTest("status mapper preserves already-normalized inactive values from mixed environments", () => {
+  assert.equal(mapClientStatusFromApi("Inativo"), "Inativo");
+  assert.equal(mapClientStatusFromApi("Ativo"), "Ativo");
+});
+
 runTest("client endpoints use only /client contract", () => {
   assert.equal(CLIENT_ENDPOINTS.list, "/client/list");
   assert.equal(CLIENT_ENDPOINTS.create, "/client");
