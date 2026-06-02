@@ -6,12 +6,13 @@ import { departmentService, type DepItem } from "@modules/departments";
 import { useFetch } from "@shared/hooks";
 import {
   MODULE_KEYS,
-  resolveAccessLevelFromAdditionalPermission,
   resolveDepartmentModuleKey,
   resolveModuleAccess,
+  resolveAccessLevelFromAdditionalPermission,
   type ModuleAccess,
   type ModuleKey,
 } from "../utils/moduleAccess";
+import { isAdminPermission } from "../utils/permissions";
 
 type ModuleAccessMap = Record<ModuleKey, ModuleAccess>;
 type AuthUser = ReturnType<typeof useAuth>["user"];
@@ -81,7 +82,7 @@ export function useModuleAccessMap(
   }, [departmentModule, moduleKeys, user?.modules, user?.permission]);
 
   const hasImmediateAccessSource = useMemo(() => {
-    if (user?.permission === 2) {
+    if (isAdminPermission(user?.permission)) {
       return true;
     }
 
@@ -98,7 +99,7 @@ export function useModuleAccessMap(
       Boolean(user?.department_id) &&
       departmentsQuery.isLoading &&
       !hasImmediateAccessSource &&
-      user?.permission !== 2,
+      !isAdminPermission(user?.permission),
     departmentsQuery,
     user,
   };

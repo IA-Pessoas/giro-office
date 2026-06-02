@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
+import { useRhPermissions } from "../hooks/useRhPermissions";
 import {
   useDeleteRhRequestMutation,
   useRhCategories,
@@ -24,7 +25,8 @@ import { RhRequestsFilters } from "./RhRequestsFilters";
 import { RhRequestsTable } from "./RhRequestsTable";
 
 const MISSING_CATEGORY_LABEL = "Categoria não encontrada";
-const MISSING_ASSIGNEE_LABEL = "Não atribuído";
+const MISSING_ASSIGNEE_LABEL = "Aguardando atribuição";
+const MISSING_REQUESTER_LABEL = "Solicitante não identificado";
 
 export function RhRequestsSection() {
   const [statusFilter, setStatusFilter] = useState<RhRequestStatus | "all">("all");
@@ -32,16 +34,16 @@ export function RhRequestsSection() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [editingRequest, setEditingRequest] = useState<RhRequest | null>(null);
-  const [requestIdPendingDelete, setRequestIdPendingDelete] = useState<string | null>(
-    null,
-  );
+  const [requestIdPendingDelete, setRequestIdPendingDelete] = useState<string | null>(null);
 
+  const { user, canManageRhRequests } = useRhPermissions("requests");
   const categoriesQuery = useRhCategories({ activeOnly: true });
-  const assignableUsersQuery = useAssignableUsers();
+  const assignableUsersQuery = useAssignableUsers({ enabled: canManageRhRequests });
   const deleteRequestMutation = useDeleteRhRequestMutation();
   const requestsQuery = useRhRequests({
     status: statusFilter === "all" ? undefined : statusFilter,
     category_id: categoryFilter || undefined,
+    requester_user_id: canManageRhRequests ? undefined : user?.id,
   });
 
   const categories = categoriesQuery.data ?? [];
@@ -51,15 +53,20 @@ export function RhRequestsSection() {
   const categoryNameById = new Map(
     categories.map((category) => [category.id, formatRhCategoryLabel(category.name)]),
   );
-  const userNameById = new Map(assignableUsers.map((user) => [user.id, user.name]));
+  const userNameById = new Map(
+    assignableUsers.map((assignableUser) => [assignableUser.id, assignableUser.name]),
+  );
 
   const rows: RhRequestRow[] = requests.map((request) => ({
     id: request.id,
     title: request.title,
     description: request.description,
+    requesterUserId: request.requester_user_id,
+    requesterUserLabel:
+      userNameById.get(request.requester_user_id) ??
+      (request.requester_user_id === user?.id ? user?.name ?? "Você" : MISSING_REQUESTER_LABEL),
     categoryId: request.category_id,
-    categoryLabel:
-      categoryNameById.get(request.category_id) ?? MISSING_CATEGORY_LABEL,
+    categoryLabel: categoryNameById.get(request.category_id) ?? MISSING_CATEGORY_LABEL,
     assignedToUserId: request.assigned_to_user_id,
     assignedToUserLabel:
       userNameById.get(request.assigned_to_user_id) ?? MISSING_ASSIGNEE_LABEL,
@@ -75,12 +82,9 @@ export function RhRequestsSection() {
     updatedAtLabel: formatRhDateTime(request.updated_at),
   }));
 
-  const isLoading =
-    categoriesQuery.isLoading ||
-    assignableUsersQuery.isLoading ||
-    requestsQuery.isLoading;
-  const error =
-    categoriesQuery.error || assignableUsersQuery.error || requestsQuery.error;
+  const isLoading = categoriesQuery.isLoading || requestsQuery.isLoading;
+  const error = categoriesQuery.error || requestsQuery.error;
+  const auxiliaryError = canManageRhRequests ? assignableUsersQuery.error : null;
   const deletingRequestId = deleteRequestMutation.variables?.id ?? null;
 
   function getCategoryLabel(categoryId: string) {
@@ -89,6 +93,14 @@ export function RhRequestsSection() {
 
   function getAssignedUserLabel(userId: string) {
     return userNameById.get(userId) ?? MISSING_ASSIGNEE_LABEL;
+  }
+
+  function getRequesterLabel(userId: string) {
+    if (userId === user?.id) {
+      return user?.name ?? "Você";
+    }
+
+    return userNameById.get(userId) ?? MISSING_REQUESTER_LABEL;
   }
 
   function handleOpenCreate() {
@@ -105,6 +117,10 @@ export function RhRequestsSection() {
   }
 
   function handleOpenEdit(requestId: string) {
+    if (!canManageRhRequests) {
+      return;
+    }
+
     const request = requests.find((candidate) => candidate.id === requestId) ?? null;
     setEditingRequest(request);
     setIsFormOpen(true);
@@ -116,6 +132,10 @@ export function RhRequestsSection() {
   }
 
   function handleRequestDelete(requestId: string) {
+    if (!canManageRhRequests) {
+      return;
+    }
+
     setRequestIdPendingDelete(requestId);
   }
 
@@ -142,10 +162,10 @@ export function RhRequestsSection() {
       }
       setRequestIdPendingDelete(null);
       toast.success("Solicitação excluída com sucesso.");
-    } catch (error) {
+    } catch (mutationError) {
       const errorMessage =
-        error instanceof Error
-          ? error.message
+        mutationError instanceof Error
+          ? mutationError.message
           : "Não foi possível excluir a solicitação.";
       toast.error(errorMessage);
     }
@@ -162,6 +182,12 @@ export function RhRequestsSection() {
         categories={categories}
         selectedStatus={statusFilter}
         selectedCategoryId={categoryFilter}
+        title={canManageRhRequests ? "Solicitações" : "Minhas solicitações"}
+        description={
+          canManageRhRequests
+            ? "Acompanhe os chamados de RH por status e categoria."
+            : "Acompanhe apenas as solicitações abertas por você."
+        }
         onStatusChange={setStatusFilter}
         onCategoryChange={setCategoryFilter}
         onOpenCreate={handleOpenCreate}
@@ -179,6 +205,12 @@ export function RhRequestsSection() {
         </div>
       ) : null}
 
+      {!isLoading && !error && auxiliaryError ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+          Não foi possível carregar os responsáveis agora.
+        </div>
+      ) : null}
+
       {!isLoading && !error && rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
           Nenhuma solicitação encontrada para os filtros selecionados.
@@ -188,6 +220,8 @@ export function RhRequestsSection() {
       {!isLoading && !error && rows.length > 0 ? (
         <RhRequestsTable
           rows={rows}
+          canManageRequests={canManageRhRequests}
+          showRequester={canManageRhRequests}
           onOpenDetail={handleOpenDetail}
           onEdit={handleOpenEdit}
           onDelete={handleRequestDelete}
@@ -199,6 +233,10 @@ export function RhRequestsSection() {
         open={isFormOpen}
         categories={categories}
         assignableUsers={assignableUsers}
+        canManageRequests={canManageRhRequests}
+        assignableUsersUnavailableMessage={
+          auxiliaryError ? "Não foi possível carregar os responsáveis agora." : null
+        }
         request={editingRequest}
         onClose={handleCloseForm}
       />
@@ -208,6 +246,8 @@ export function RhRequestsSection() {
         requestId={selectedRequestId}
         getCategoryLabel={getCategoryLabel}
         getAssignedUserLabel={getAssignedUserLabel}
+        getRequesterLabel={getRequesterLabel}
+        canManageRequest={canManageRhRequests}
         isDeleting={deleteRequestMutation.isPending}
         onClose={handleCloseDetail}
         onEdit={handleEditFromDetail}
@@ -242,8 +282,7 @@ export function RhRequestsSection() {
                     Excluir solicitação
                   </h3>
                   <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
-                    Deseja realmente excluir esta solicitação de RH? Essa ação não
-                    poderá ser desfeita.
+                    Deseja realmente excluir esta solicitação de RH? Essa ação não poderá ser desfeita.
                   </p>
                 </div>
               </div>

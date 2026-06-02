@@ -332,11 +332,11 @@ function QuestionFormDialog({
   );
 }
 
-function RhScoreQuarterGenerationPanel() {
+function RhScoreQuarterGenerationPanel({ canManageScore }: { canManageScore: boolean }) {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedQuarter, setSelectedQuarter] = useState(getDefaultRhQuarterValue);
   const quarterOptions = useMemo(() => getRhQuarterOptions(), []);
-  const assignableUsersQuery = useAssignableUsers({ enabled: true });
+  const assignableUsersQuery = useAssignableUsers({ enabled: canManageScore });
   const generateQuarterMutation = useGenerateRhScoreQuarterMutation();
 
   const assignableUsers = assignableUsersQuery.data ?? [];
@@ -442,7 +442,7 @@ function RhScoreQuarterGenerationPanel() {
   );
 }
 
-function RhScoreQuestionsTab() {
+function RhScoreQuestionsTab({ canManageScore }: { canManageScore: boolean }) {
   const [selectedType, setSelectedType] = useState<RhScoreQuestionFilter>("all");
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [isQuestionListOpen, setIsQuestionListOpen] = useState(false);
@@ -563,7 +563,7 @@ function RhScoreQuestionsTab() {
           </div>
         </section>
 
-        <RhScoreQuarterGenerationPanel />
+        <RhScoreQuarterGenerationPanel canManageScore={canManageScore} />
       </div>
       <Dialog
         open={isQuestionListOpen}
@@ -1505,8 +1505,8 @@ function RhScoreHistoryTab({ canManageScore }: { canManageScore: boolean }) {
   );
 }
 export function RhScoreSection() {
-  const { canManageRh, permissionQuery } = useRhPermissions("score");
-  const canManageScore = canManageRh;
+  const { canManageRhScore, permissionQuery } = useRhPermissions("score");
+  const canManageScore = canManageRhScore;
   const [activeTab, setActiveTab] = useState<RhScoreTab>(canManageScore ? "questions" : "pending");
 
   const hasInitializedAdminDefaultTab = useRef(false);
@@ -1570,25 +1570,24 @@ export function RhScoreSection() {
       </section>
 
       {permissionQuery.error ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
-          {getErrorMessage(
-            permissionQuery.error,
-            "Não foi possível validar as permissões do score. O backend continuar como fonte de verdade.",
-          )}
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+          {getErrorMessage(permissionQuery.error, "Não foi possível validar o acesso ao score agora.")}
         </div>
       ) : null}
 
-      {activeTab === "questions" && canManageScore ? <RhScoreQuestionsTab /> : null}
+      {activeTab === "questions" && canManageScore ? (
+        <RhScoreQuestionsTab canManageScore={canManageScore} />
+      ) : null}
 
       {activeTab === "pending" ? <RhPendingEvaluationsTab /> : null}
 
       {activeTab === "history" ? <RhScoreHistoryTab canManageScore={canManageScore} /> : null}
 
       {!canManageScore && activeTab === "questions" ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4" />
-            Ações administrativas de score estão disponíveis apenas para RH e admins.
+            Esse painel está disponível só para a gestão do RH.
           </div>
         </div>
       ) : null}

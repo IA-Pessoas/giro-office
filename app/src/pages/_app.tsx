@@ -7,6 +7,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 import '../styles/global.css'
 
+import { useAccessStoreSync } from "@modules/auth";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ChatProvider } from "@modules/chat";
 import { ChatControllerUI } from '@shared/components/ChatControllerUI';
@@ -18,6 +19,7 @@ function AppLayout({ children }) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const { user, loading } = useAuth();
   const router = useRouter();
+  useAccessStoreSync();
   const isPublicRoute =
     router.pathname === "/login" ||
     router.pathname === "/" ||

@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 
 import type { ModuleKey } from "@modules/auth";
-import { APP_ROUTE_MODULE_MAP, canAccessAdministration, useModuleAccessMap } from "@modules/auth";
+import { APP_ROUTE_MODULE_MAP, canAccessAdministration, useAccessStore } from "@modules/auth";
 import { useMe } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
@@ -89,10 +89,6 @@ function Logo({ showText }: { showText: boolean }) {
   );
 }
 
-const visibleModuleKeys = Object.values(APP_ROUTE_MODULE_MAP).filter(
-  (moduleKey): moduleKey is ModuleKey => Boolean(moduleKey),
-);
-
 const moduleCategories = [
   {
     name: "Principal",
@@ -140,9 +136,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
   const meQuery = useMe();
-  const { accessMap: moduleAccessMap, isLoading: isModuleAccessLoading } = useModuleAccessMap(
-    visibleModuleKeys,
-  );
+  const moduleAccessMap = useAccessStore((snapshot) => snapshot.accessMap);
+  const isModuleAccessLoading = useAccessStore((snapshot) => snapshot.isLoading);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);

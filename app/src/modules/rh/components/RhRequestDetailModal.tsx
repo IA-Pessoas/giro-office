@@ -15,6 +15,8 @@ interface RhRequestDetailModalProps {
   requestId: string | null;
   getCategoryLabel: (categoryId: string) => string;
   getAssignedUserLabel: (userId: string) => string;
+  getRequesterLabel: (userId: string) => string;
+  canManageRequest: boolean;
   isDeleting: boolean;
   onClose: () => void;
   onEdit: (requestId: string) => void;
@@ -26,6 +28,8 @@ export function RhRequestDetailModal({
   requestId,
   getCategoryLabel,
   getAssignedUserLabel,
+  getRequesterLabel,
+  canManageRequest,
   isDeleting,
   onClose,
   onEdit,
@@ -33,7 +37,6 @@ export function RhRequestDetailModal({
 }: RhRequestDetailModalProps) {
   const requestQuery = useRhRequest(requestId ?? undefined);
   const request = requestQuery.data;
-  const canManageRequest = Boolean(request);
 
   return (
     <Dialog
@@ -56,30 +59,34 @@ export function RhRequestDetailModal({
           >
             Fechar
           </button>
-          <button
-            type="button"
-            disabled={!canManageRequest}
-            onClick={() => {
-              if (request) {
-                onEdit(request.id);
-              }
-            }}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Editar
-          </button>
-          <button
-            type="button"
-            disabled={!canManageRequest || isDeleting}
-            onClick={() => {
-              if (request) {
-                onDelete(request.id);
-              }
-            }}
-            className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-900/20"
-          >
-            {isDeleting ? "Excluindo..." : "Excluir"}
-          </button>
+          {canManageRequest ? (
+            <>
+              <button
+                type="button"
+                disabled={!request}
+                onClick={() => {
+                  if (request) {
+                    onEdit(request.id);
+                  }
+                }}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                disabled={!request || isDeleting}
+                onClick={() => {
+                  if (request) {
+                    onDelete(request.id);
+                  }
+                }}
+                className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-900/20"
+              >
+                {isDeleting ? "Excluindo..." : "Excluir"}
+              </button>
+            </>
+          ) : null}
         </>
       }
     >
@@ -133,6 +140,15 @@ export function RhRequestDetailModal({
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Solicitante
+                </p>
+                <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                  {getRequesterLabel(request.requester_user_id)}
+                </p>
+              </div>
+
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   Categoria

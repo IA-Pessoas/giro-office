@@ -11,7 +11,7 @@ type PermissionCarrier = {
 export const ADMIN_PERMISSION = 2;
 
 export function isAdminPermission(permission?: number | null): boolean {
-  return permission === ADMIN_PERMISSION;
+  return typeof permission === "number" && permission >= ADMIN_PERMISSION;
 }
 
 export function canAccessAdministration(subject?: number | PermissionCarrier): boolean {

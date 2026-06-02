@@ -32,7 +32,7 @@ function getTodayInputValue() {
 }
 
 export function RhTimeBankSection() {
-  const { user, canManageRh: canManageTimeBank } = useRhPermissions("time-bank");
+  const { user, canManageRhTimeBank: canManageTimeBank } = useRhPermissions("time-bank");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<RhTimeBankStatusFilter>("all");
   const [dateFrom, setDateFrom] = useState(getMonthStartInputValue);
@@ -64,6 +64,7 @@ export function RhTimeBankSection() {
   );
   const assignableUsers = assignableUsersQuery.data ?? [];
   const releases = releasesQuery.data ?? [];
+  const auxiliaryError = canManageTimeBank ? assignableUsersQuery.error : null;
 
   const userNameById = useMemo(() => {
     return new Map(assignableUsers.map((assignableUser) => [assignableUser.id, assignableUser.name]));
@@ -114,10 +115,8 @@ export function RhTimeBankSection() {
     }
   }
 
-  const isLoading =
-    releasesQuery.isLoading ||
-    (canManageTimeBank && assignableUsersQuery.isLoading && !assignableUsersQuery.data);
-  const error = releasesQuery.error || (canManageTimeBank ? assignableUsersQuery.error : null);
+  const isLoading = releasesQuery.isLoading;
+  const error = releasesQuery.error;
 
   return (
     <div className="space-y-6">
@@ -152,6 +151,12 @@ export function RhTimeBankSection() {
           defaultUserId={selectedUserId}
           onClose={() => setIsCreateOpen(false)}
         />
+      ) : null}
+
+      {!isLoading && !error && auxiliaryError ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+          Não foi possível carregar a lista de colaboradores agora.
+        </div>
       ) : null}
 
       {isLoading ? (

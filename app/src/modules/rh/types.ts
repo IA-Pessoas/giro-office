@@ -60,6 +60,8 @@ export interface RhRequestRow {
   id: string;
   title: string;
   description: string;
+  requesterUserId: string;
+  requesterUserLabel: string;
   categoryId: string;
   categoryLabel: string;
   assignedToUserId: string;

@@ -65,7 +65,7 @@ function intersectsSelectedPeriod(sheet: RhTimeSheetListItem, dateFrom: string, 
 
 export function RhTimesheetsSection() {
   const router = useRouter();
-  const { user, canManageRh: canManageTimesheets } = useRhPermissions("timesheets");
+  const { user, canManageRhTimesheets: canManageTimesheets } = useRhPermissions("timesheets");
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [dateFrom, setDateFrom] = useState(getMonthStartInputValue);
@@ -106,6 +106,7 @@ export function RhTimesheetsSection() {
 
   const timeSheetsQuery = useRhTimeSheets(filters);
   const timeSheets = timeSheetsQuery.data ?? [];
+  const auxiliaryError = canManageTimesheets ? assignableUsersQuery.error : null;
 
   const filteredTimeSheets = useMemo(() => {
     return timeSheets.filter((sheet) => intersectsSelectedPeriod(sheet, dateFrom, dateTo));
@@ -136,10 +137,8 @@ export function RhTimesheetsSection() {
     setIsGenerateOpen(true);
   }
 
-  const isLoading =
-    timeSheetsQuery.isLoading ||
-    (canManageTimesheets && assignableUsersQuery.isLoading && !assignableUsersQuery.data);
-  const error = timeSheetsQuery.error || (canManageTimesheets ? assignableUsersQuery.error : null);
+  const isLoading = timeSheetsQuery.isLoading;
+  const error = timeSheetsQuery.error;
 
   return (
     <div className="space-y-6">
@@ -174,6 +173,12 @@ export function RhTimesheetsSection() {
         sheet={sheetPendingSignature}
         onClose={() => setSheetPendingSignature(null)}
       />
+
+      {!isLoading && !error && auxiliaryError ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+          Não foi possível carregar a lista de colaboradores agora.
+        </div>
+      ) : null}
 
       {isLoading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">

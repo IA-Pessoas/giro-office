@@ -79,8 +79,7 @@ function getLastBusinessDaysRange(month: string) {
   const monthStart = new Date(year, monthIndex, 1);
   const monthEnd = new Date(year, monthIndex + 1, 0);
   const today = new Date();
-  const isCurrentMonth =
-    today.getFullYear() === year && today.getMonth() === monthIndex;
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === monthIndex;
   const rangeEnd = isCurrentMonth && today < monthEnd ? today : monthEnd;
   const cursor = new Date(rangeEnd);
   let businessDaysFound = 0;
@@ -106,7 +105,7 @@ function getLastBusinessDaysRange(month: string) {
 }
 
 export function RhPointSection() {
-  const { user, canManageRh } = useRhPermissions("point");
+  const { user, canManageRhWorkday } = useRhPermissions("point");
   const [activePointTab, setActivePointTab] = useState<"point" | "timebank" | "timesheets">(
     "point",
   );
@@ -119,13 +118,14 @@ export function RhPointSection() {
   >("");
   const [selectedPointForAdjustment, setSelectedPointForAdjustment] =
     useState<RhPointListItem | null>(null);
-  const canManagePoint = canManageRh;
+  const canManagePoint = canManageRhWorkday;
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManagePoint,
   });
 
   const assignableUsers = assignableUsersQuery.data ?? [];
+  const auxiliaryError = canManagePoint ? assignableUsersQuery.error : null;
   const currentUserName = user?.name?.trim() || "Você";
   const effectiveUserId = canManagePoint ? selectedUserId || (user?.id ?? "") : user?.id ?? "";
   const hasAuthenticatedUser = Boolean(user?.id);
@@ -278,6 +278,12 @@ export function RhPointSection() {
               onAdjustmentStatusChange={setSelectedAdjustmentStatus}
             />
           </div>
+        </div>
+      ) : null}
+
+      {activePointTab === "point" && auxiliaryError ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+          Não foi possível carregar a lista de colaboradores agora.
         </div>
       ) : null}
 
