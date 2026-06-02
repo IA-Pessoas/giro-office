@@ -75,6 +75,25 @@ function buildFormState(config: RhPointConfig | null): RhPointConfigFormState {
   };
 }
 
+function getWorkDaysSummary(workDays: string[]) {
+  const labels = WORK_DAY_OPTIONS.filter((option) => workDays.includes(option.value)).map(
+    (option) => option.label,
+  );
+
+  return labels.length > 0 ? labels.join(", ") : "Nenhum dia definido";
+}
+
+function ReadOnlyValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 dark:border-gray-700 dark:bg-gray-900/30">
+      <p className="text-xs uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{value || "-"}</p>
+    </div>
+  );
+}
+
 export function RhPointConfigCard({
   config,
   isLoading,
@@ -91,16 +110,20 @@ export function RhPointConfigCard({
   }, [config?.id, selectedUserId]);
 
   const isEditingAnotherUser = canManagePoint && Boolean(selectedUserId);
-  const description = isEditingAnotherUser
-    ? `Defina a jornada de trabalho usada para calcular o ponto de ${targetUserLabel}.`
-    : "";
-  const workDaysSummary = useMemo(() => {
-    const labels = WORK_DAY_OPTIONS.filter((option) =>
-      formState.workDays.includes(option.value),
-    ).map((option) => option.label);
+  const description = canManagePoint
+    ? isEditingAnotherUser
+      ? `Defina a jornada de trabalho usada para calcular o ponto de ${targetUserLabel}.`
+      : "Defina a jornada de trabalho usada para cálculo do ponto."
+    : "Sua jornada é definida pelo RH e exibida aqui apenas para consulta.";
 
-    return labels.length > 0 ? labels.join(", ") : "Nenhum dia selecionado";
-  }, [formState.workDays]);
+  const workDaysSummary = useMemo(() => getWorkDaysSummary(formState.workDays), [formState.workDays]);
+  const readOnlyStartTime = formatTimeValue(config?.start_time);
+  const readOnlyLunchBreak = formatTimeValue(config?.lunch_break);
+  const readOnlyLunchReturn = formatTimeValue(config?.lunch_return);
+  const readOnlyEndTime = formatTimeValue(config?.end_time);
+  const readOnlyWorkDaysSummary = config
+    ? getWorkDaysSummary(parseWorkDays(config.work_days))
+    : "Aguardando definição do RH";
 
   function handleTimeChange<
     K extends "startTime" | "lunchBreak" | "lunchReturn" | "endTime",
@@ -125,6 +148,10 @@ export function RhPointConfigCard({
   }
 
   async function handleSubmit() {
+    if (!canManagePoint) {
+      return;
+    }
+
     if (
       !formState.startTime ||
       !formState.lunchBreak ||
@@ -153,9 +180,7 @@ export function RhPointConfigCard({
       toast.success("Configuração de ponto salva com sucesso.");
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Não foi possível salvar a configuração de ponto.";
+        error instanceof Error ? error.message : "Não foi possível salvar a configuração de ponto.";
       toast.error(message);
     }
   }
@@ -167,9 +192,7 @@ export function RhPointConfigCard({
           <h3 className="text-base font-semibold text-gray-900 dark:text-white">
             Jornada do colaborador
           </h3>
-          {description ? (
-            <p className="text-sm text-gray-600 dark:text-gray-400">{description}</p>
-          ) : null}
+          <p className="text-sm text-gray-600 dark:text-gray-400">{description}</p>
         </div>
         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
           {targetUserLabel}
@@ -183,102 +206,123 @@ export function RhPointConfigCard({
       ) : null}
 
       {!isLoading && !hasError && !config ? (
-        <div className="mt-4 rounded-lg border border-dashed border-amber-300 bg-amber-50 px-4 py-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-200">
-          Nenhuma jornada foi cadastrada ainda. Preenchemos uma sugestão padrão
-          para você salvar ou ajustar.
+        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-200">
+          {canManagePoint
+            ? "Nenhuma jornada foi cadastrada ainda. Preenchemos uma sugestão padrão para você salvar ou ajustar."
+            : "Sua jornada ainda não foi definida pelo RH."}
         </div>
       ) : null}
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Entrada</span>
-          <input
-            type="time"
-            value={formState.startTime}
-            onChange={(event) => handleTimeChange("startTime", event.target.value)}
-            disabled={isLoading || saveMutation.isPending}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </label>
+      {canManagePoint ? (
+        <>
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <span>Entrada</span>
+              <input
+                type="time"
+                value={formState.startTime}
+                onChange={(event) => handleTimeChange("startTime", event.target.value)}
+                disabled={isLoading || saveMutation.isPending}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+            </label>
 
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Saída almoço</span>
-          <input
-            type="time"
-            value={formState.lunchBreak}
-            onChange={(event) => handleTimeChange("lunchBreak", event.target.value)}
-            disabled={isLoading || saveMutation.isPending}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </label>
+            <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <span>Saída almoço</span>
+              <input
+                type="time"
+                value={formState.lunchBreak}
+                onChange={(event) => handleTimeChange("lunchBreak", event.target.value)}
+                disabled={isLoading || saveMutation.isPending}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+            </label>
 
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Volta almoço</span>
-          <input
-            type="time"
-            value={formState.lunchReturn}
-            onChange={(event) => handleTimeChange("lunchReturn", event.target.value)}
-            disabled={isLoading || saveMutation.isPending}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </label>
+            <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <span>Volta almoço</span>
+              <input
+                type="time"
+                value={formState.lunchReturn}
+                onChange={(event) => handleTimeChange("lunchReturn", event.target.value)}
+                disabled={isLoading || saveMutation.isPending}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+            </label>
 
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Saída</span>
-          <input
-            type="time"
-            value={formState.endTime}
-            onChange={(event) => handleTimeChange("endTime", event.target.value)}
-            disabled={isLoading || saveMutation.isPending}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </label>
-      </div>
-
-      <div className="mt-4 rounded-lg border border-dashed border-gray-300 px-4 py-4 dark:border-gray-700">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">Dias de trabalho</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">{workDaysSummary}</p>
+            <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <span>Saída</span>
+              <input
+                type="time"
+                value={formState.endTime}
+                onChange={(event) => handleTimeChange("endTime", event.target.value)}
+                disabled={isLoading || saveMutation.isPending}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+            </label>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {WORK_DAY_OPTIONS.map((option) => {
-              const checked = formState.workDays.includes(option.value);
 
-              return (
-                <label
-                  key={option.value}
-                  className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    checked
-                      ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-300"
-                      : "border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-300"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => handleWorkDayToggle(option.value)}
-                    disabled={isLoading || saveMutation.isPending}
-                    className="sr-only"
-                  />
-                  {option.label}
-                </label>
-              );
-            })}
+          <div className="mt-4 rounded-lg border border-dashed border-gray-300 px-4 py-4 dark:border-gray-700">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">Dias de trabalho</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{workDaysSummary}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {WORK_DAY_OPTIONS.map((option) => {
+                  const checked = formState.workDays.includes(option.value);
+
+                  return (
+                    <label
+                      key={option.value}
+                      className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        checked
+                          ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-300"
+                          : "border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-300"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => handleWorkDayToggle(option.value)}
+                        disabled={isLoading || saveMutation.isPending}
+                        className="sr-only"
+                      />
+                      {option.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isLoading || hasError || saveMutation.isPending}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saveMutation.isPending ? "Salvando..." : "Salvar configuração"}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <ReadOnlyValue label="Entrada" value={readOnlyStartTime} />
+            <ReadOnlyValue label="Saída almoço" value={readOnlyLunchBreak} />
+            <ReadOnlyValue label="Volta almoço" value={readOnlyLunchReturn} />
+            <ReadOnlyValue label="Saída" value={readOnlyEndTime} />
+          </div>
+
+          <div className="rounded-lg border border-dashed border-gray-300 px-4 py-4 dark:border-gray-700">
+            <p className="text-sm font-medium text-gray-900 dark:text-white">Dias de trabalho</p>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              {readOnlyWorkDaysSummary}
+            </p>
           </div>
         </div>
-      </div>
-
-      <div className="mt-4 flex justify-end">
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isLoading || hasError || saveMutation.isPending}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {saveMutation.isPending ? "Salvando..." : "Salvar configuração"}
-        </button>
-      </div>
+      )}
     </div>
   );
 }
