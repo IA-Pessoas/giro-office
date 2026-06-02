@@ -194,6 +194,9 @@ export function RhDashboardSection({
   const unsignedTimeSheetsCount =
     timeSheetsQuery.data?.filter((sheet) => !sheet.signature).length ?? 0;
   const totalTimeSheetsCount = timeSheetsQuery.data?.length ?? 0;
+  const hasSecondaryDashboardError = Boolean(
+    pendingEvaluationsQuery.error || timeSheetsQuery.error,
+  );
   const hasPendingRequests = pendingRequestsCount > 0;
   const totalPendingActions =
     pendingRequestsCount + pendingEvaluationsCount + unsignedTimeSheetsCount;
@@ -305,10 +308,13 @@ export function RhDashboardSection({
                 <span>Carregando pendências gerenciais...</span>
               </div>
             </StateBox>
-          ) : pendingEvaluationsQuery.error || timeSheetsQuery.error ? (
-            <StateBox tone="danger">Não foi possível carregar o resumo gerencial do RH.</StateBox>
           ) : (
             <div className="space-y-3.5">
+              {hasSecondaryDashboardError ? (
+                <StateBox tone="danger">
+                  Parte do resumo gerencial não pôde ser carregada. Os dados principais abaixo permanecem disponíveis.
+                </StateBox>
+              ) : null}
               <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-900/20">
                 <p className="text-xs font-medium uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
                   Ação imediata

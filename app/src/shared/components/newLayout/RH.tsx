@@ -17,15 +17,26 @@ type RhMainTab = "dashboard" | "requests" | "evaluations" | "point";
 export function RH() {
   const [activeTab, setActiveTab] = useState<RhMainTab>("dashboard");
   const [isHolidaysManagerOpen, setIsHolidaysManagerOpen] = useState(false);
-  const { canManageRh, canViewRhDashboard, permissionQuery } = useRhPermissions("rh-shell");
-  const newRequestsQuery = useRhRequests({ status: "New" });
-  const inProgressRequestsQuery = useRhRequests({ status: "In_Progress" });
+  const { canManageRh, canManageRhRequests, canViewRhDashboard, permissionQuery } =
+    useRhPermissions("rh-shell");
+  const newRequestsQuery = useRhRequests(
+    { status: "New" },
+    { enabled: canManageRhRequests },
+  );
+  const inProgressRequestsQuery = useRhRequests(
+    { status: "In_Progress" },
+    { enabled: canManageRhRequests },
+  );
 
   const pendingRequestsCount = useMemo(() => {
+    if (!canManageRhRequests) {
+      return 0;
+    }
+
     const newCount = newRequestsQuery.data?.length ?? 0;
     const inProgressCount = inProgressRequestsQuery.data?.length ?? 0;
     return newCount + inProgressCount;
-  }, [inProgressRequestsQuery.data, newRequestsQuery.data]);
+  }, [canManageRhRequests, inProgressRequestsQuery.data, newRequestsQuery.data]);
 
   useEffect(() => {
     if (!permissionQuery.isLoading && !canViewRhDashboard && activeTab === "dashboard") {
