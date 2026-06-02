@@ -456,7 +456,8 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       "/task/model/list": {
         get: {
           tags: ["TaskModel"],
-          summary: "Listar modelos (type e billing)",
+          summary: "Listar modelos",
+          description: "Lista modelos da organizacao. type e billing sao filtros opcionais.",
           security: bearer,
           parameters: [
             { name: "type", in: "query", schema: { type: "string" } },

@@ -192,16 +192,16 @@ export class TaskModelService {
   }
 
   async listModel(
-    type: string,
-    billing: string,
+    type: string | undefined,
+    billing: string | undefined,
     organizationId: string,
   ): Promise<TaskModelListItem[]> {
     try {
       const list = await prismaClient.taskModel.findMany({
         where: {
-          type,
-          billing,
           organization_id: organizationId,
+          ...(type ? { type } : {}),
+          ...(billing ? { billing } : {}),
         },
         select: TASK_MODEL_LIST_SELECT,
         orderBy: { name: "asc" },

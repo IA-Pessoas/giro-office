@@ -87,6 +87,15 @@ describe("task model routes", () => {
     expect(taskModelServiceMock.listModel).toHaveBeenCalledWith("fiscal", "Realizar", "org-1");
   });
 
+  it("GET /task/model/list lista todos os modelos quando type e billing nao sao enviados", async () => {
+    const app = createTestApp();
+
+    const res = await request(app).get("/task/model/list");
+
+    expect(res.status).toBe(200);
+    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith(undefined, undefined, "org-1");
+  });
+
   it("DELETE /task/model remove modelo", async () => {
     const app = createTestApp();
 
