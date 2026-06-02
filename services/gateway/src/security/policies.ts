@@ -1,6 +1,32 @@
 import type { AuthPolicy } from "@workspace/shared";
 
 const adminPolicy: AuthPolicy = { minPermission: 2 };
+const moduleAccessPermission = 1;
+
+const rhModulePolicy: AuthPolicy = {
+  modulePermission: {
+    module: "rh",
+    minPermission: moduleAccessPermission,
+  },
+};
+
+const clientRelatedModules = [
+  "atendimento",
+  "comercial",
+  "contabil",
+  "financeiro",
+  "fiscal",
+  "integracao",
+  "pessoal",
+  "regularize",
+] as const;
+
+const clientModulePolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: [...clientRelatedModules],
+    minPermission: moduleAccessPermission,
+  },
+};
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /user", adminPolicy],
@@ -12,6 +38,8 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
+  { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
+  { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: adminPolicy },
   { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: adminPolicy },
   { method: "GET", path: /^\/user\/(?!me$|session$|start-config$)[^/]+$/, policy: adminPolicy },
@@ -31,7 +59,8 @@ export function getRoutePolicy(method: string, path: string): AuthPolicy | null 
   }
 
   const matchedPolicy = routePolicyMatchers.find(
-    (matcher) => matcher.method === normalizedMethod && matcher.path.test(path),
+    (matcher) =>
+      (matcher.method === "ANY" || matcher.method === normalizedMethod) && matcher.path.test(path),
   );
 
   return matchedPolicy?.policy ?? null;

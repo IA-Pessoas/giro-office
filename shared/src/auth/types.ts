@@ -15,6 +15,18 @@ export interface AuthContext {
   claims: AuthIdentity;
 }
 
+export interface AuthModulePolicy {
+  module: string;
+  minPermission: number;
+}
+
+export interface AuthAnyModulePolicy {
+  modules: string[];
+  minPermission: number;
+}
+
 export interface AuthPolicy {
   minPermission?: number;
+  modulePermission?: AuthModulePolicy;
+  anyModulePermission?: AuthAnyModulePolicy;
 }
