@@ -44,17 +44,33 @@ function countByStatus(projects: ProjectListItem[], matcher: (status: string) =>
   return projects.filter((project) => matcher(project.status.toLowerCase())).length;
 }
 
-function getHighlightScore(project: ProjectListItem) {
-  const normalizedStatus = project.status.toLowerCase();
-  const statusWeight = normalizedStatus.includes("andamento")
-    ? 4
-    : normalizedStatus.includes("concl")
-      ? 2
-      : normalizedStatus.includes("paus") || normalizedStatus.includes("paralis")
-        ? 1
-        : 3;
+const PROJECT_HIGHLIGHT_STATUS_WEIGHT = {
+  paused: 1,
+  completed: 2,
+  default: 3,
+  inProgress: 4,
+} as const;
 
-  return statusWeight * 1000 + project.porcentage;
+function getProjectHighlightStatusWeight(status: string) {
+  const normalizedStatus = status.toLowerCase();
+
+  if (normalizedStatus.includes("andamento")) {
+    return PROJECT_HIGHLIGHT_STATUS_WEIGHT.inProgress;
+  }
+
+  if (normalizedStatus.includes("concl")) {
+    return PROJECT_HIGHLIGHT_STATUS_WEIGHT.completed;
+  }
+
+  if (normalizedStatus.includes("paus") || normalizedStatus.includes("paralis")) {
+    return PROJECT_HIGHLIGHT_STATUS_WEIGHT.paused;
+  }
+
+  return PROJECT_HIGHLIGHT_STATUS_WEIGHT.default;
+}
+
+function getHighlightScore(project: ProjectListItem) {
+  return getProjectHighlightStatusWeight(project.status) * 1000 + project.porcentage;
 }
 
 function isCompletedStatus(status: string) {
