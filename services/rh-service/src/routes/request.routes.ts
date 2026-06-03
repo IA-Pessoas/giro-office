@@ -16,7 +16,11 @@ import {
   requestIdParamsSchema,
   updateRequestBodySchema,
 } from "../schemas/request.schemas.js";
-import type { RequestListOptions, RequestUpdateInput } from "../services/requestService.js";
+import type {
+  RequestCreateInput,
+  RequestListOptions,
+  RequestUpdateInput,
+} from "../services/requestService.js";
 import { RequestService } from "../services/requestService.js";
 
 const router: ReturnType<typeof Router> = Router();
@@ -29,15 +33,19 @@ router.post("/", isAuthenticated, async (req: Request, res: Response, next: Next
     });
     const body = parseWithZod(createRequestBodySchema, req.body);
 
-    const result = await requestService.create({
+    const createInput: RequestCreateInput = {
       organization_id,
       requester_user_id: user_id,
       title: body.title,
       description: body.description,
       category_id: body.category_id,
-      assigned_to_user_id: body.assigned_to_user_id,
       urgency: body.urgency,
-    });
+    };
+    if (body.assigned_to_user_id !== undefined) {
+      createInput.assigned_to_user_id = body.assigned_to_user_id;
+    }
+
+    const result = await requestService.create(createInput);
 
     res.status(200).json(createSuccessResponse(result));
   } catch (err) {

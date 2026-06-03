@@ -10,7 +10,7 @@ export const createRequestBodySchema = z
     title: zNonEmptyText("title"),
     description: zNonEmptyText("description"),
     category_id: zNonEmptyText("category_id"),
-    assigned_to_user_id: zNonEmptyText("assigned_to_user_id"),
+    assigned_to_user_id: zNonEmptyText("assigned_to_user_id").optional(),
     urgency: rhRequestUrgencySchema,
   })
   .strict();

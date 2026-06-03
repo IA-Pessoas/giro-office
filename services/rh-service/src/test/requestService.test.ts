@@ -5,6 +5,9 @@ const { prismaMock } = vi.hoisted(() => ({
     rhCategory: {
       findFirst: vi.fn(),
     },
+    user: {
+      findFirst: vi.fn(),
+    },
     rhRequest: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -41,6 +44,45 @@ describe("RequestService", () => {
         urgency: "High",
       }),
     ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it("create atribui automaticamente um responsavel RH elegivel quando payload nao informa responsavel", async () => {
+    prismaMock.rhCategory.findFirst.mockResolvedValue({ id: "cat-1" });
+    prismaMock.user.findFirst.mockResolvedValue({ id: "rh-user-1" });
+    prismaMock.rhRequest.create.mockResolvedValue({
+      id: "req-1",
+      assigned_to_user_id: "rh-user-1",
+    });
+    const service = new RequestService();
+
+    const result = await service.create({
+      organization_id: "org-1",
+      requester_user_id: "user-1",
+      title: "Solicitacao",
+      description: "Descricao",
+      category_id: "cat-1",
+      urgency: "High",
+    });
+
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+      where: {
+        status: "active",
+        id: { not: "user-1" },
+        OR: [
+          { organization_id: "org-1" },
+          { organization_id: null, department: { organization_id: "org-1" } },
+        ],
+        permissions: { some: { organization_id: "org-1", rh: { gte: 1 } } },
+      },
+      orderBy: { name: "asc" },
+      select: { id: true },
+    });
+    expect(prismaMock.rhRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ assigned_to_user_id: "rh-user-1" }),
+      }),
+    );
+    expect(result).toMatchObject({ assigned_to_user_id: "rh-user-1" });
   });
 
   it("getById lança 404 quando solicitação não existe", async () => {
