@@ -17,3 +17,4 @@ packages:
   - "services/contabil-service"
   - "services/ti-service"
   - "services/certificate-service"
+  - "services/pessoal-service"

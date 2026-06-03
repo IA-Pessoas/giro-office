@@ -81,6 +81,12 @@ generator certificateServiceClient {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator pessoalServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/pessoal-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }
