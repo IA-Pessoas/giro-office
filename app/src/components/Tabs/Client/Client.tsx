@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Box, Heading, SimpleGrid, Tag } from '@shared/ui/chakraShims';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 import { IoCreate } from "react-icons/io5";
 
+import { useProjectsList } from '@modules/integracao';
 import { setupAPIClient } from '@shared/services/api';
 import type { Client, Perms } from '@modules/clients';
 
@@ -19,8 +20,8 @@ interface ClientTabProps {
 export const clientTab = ({ client, perms }: ClientTabProps) => {
     const apiClient = setupAPIClient();
     const [isDownloading, setIsDownloading] = useState(false);
-    const [projects, setProjects] = useState([]);
-    const [isLoadingPage, setIsLoadingPage] = useState(true);
+    const projectsQuery = useProjectsList({ ref: 'client', id: client.id });
+    const projects = projectsQuery.data ?? [];
 
     const renderBoolean = (value) => {
         if (value === null || value === undefined) return <Tag colorScheme="gray">N/I</Tag>;
@@ -31,26 +32,6 @@ export const clientTab = ({ client, perms }: ClientTabProps) => {
         const date = new Date(dateString + 'T00:00:00');
         return date.toLocaleDateString('pt-BR');
     };
-
-    useEffect(() => {
-        const fetchPorjects = async () => {
-            try {
-                const response = await apiClient.get('/project/projects', {
-                    params: {
-                        ref: 'client',
-                        id: client.id
-                    }
-                });
-                setProjects(response.data);
-            } catch (error) {
-                console.error("Erro ao buscar projetos:", error);
-            } finally {
-                setIsLoadingPage(false);
-            }
-        }
-
-        fetchPorjects()
-    })
 
     const handleProjetoClick = async (projectId: string) => {
         if (!projectId) {
@@ -103,7 +84,7 @@ export const clientTab = ({ client, perms }: ClientTabProps) => {
         }
     };
 
-    if (isLoadingPage) {
+    if (projectsQuery.isLoading) {
         return <LoadingSpinner />;
     }
 

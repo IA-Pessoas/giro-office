@@ -1,10 +1,10 @@
 import type { GetServerSideProps } from "next";
 
 import { canSSRAuth } from "@modules/auth";
-import { Projects } from "../../shared/components/newLayout/Projects";
+import { ProjectsWorkspace } from "@modules/integracao";
 
 export default function ProjectsPage() {
-  return <Projects />;
+  return <ProjectsWorkspace />;
 }
 
 export const getServerSideProps: GetServerSideProps = canSSRAuth(async () => {
@@ -12,4 +12,3 @@ export const getServerSideProps: GetServerSideProps = canSSRAuth(async () => {
     props: {},
   };
 });
-
