@@ -10,7 +10,7 @@ import { Router } from "express";
 import multer from "multer";
 import type { ClientRouterDeps } from "../clientRouterDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { ADMIN_PERMISSION, clientIdParamsSchema } from "../schemas/client.schemas.js";
+import { clientIdParamsSchema, isAdminPermission } from "../schemas/client.schemas.js";
 import {
   createHistoryBodySchema,
   createHistoryPendingBodySchema,
@@ -253,7 +253,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        if (request.permission !== ADMIN_PERMISSION) {
+        if (!isAdminPermission(request.permission)) {
           throw new ServiceError(403, "Usuário não tem permissão.");
         }
         const params = parseWithZod(pendingDeleteParamsSchema, request.params);

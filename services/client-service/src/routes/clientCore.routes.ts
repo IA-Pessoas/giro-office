@@ -10,10 +10,10 @@ import { Router } from "express";
 import type { ClientRouterDeps } from "../clientRouterDeps.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
-  ADMIN_PERMISSION,
   type CreateClientBody,
   clientIdParamsSchema,
   createClientBodySchema,
+  isAdminPermission,
   listClientsQuerySchema,
   updateClientBodySchema,
 } from "../schemas/client.schemas.js";
@@ -67,7 +67,7 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        if (request.permission !== ADMIN_PERMISSION) {
+        if (!isAdminPermission(request.permission)) {
           throw new ServiceError(403, "Usuário não tem permissão para desativar cliente.");
         }
         const params = parseWithZod(clientIdParamsSchema, request.params);
