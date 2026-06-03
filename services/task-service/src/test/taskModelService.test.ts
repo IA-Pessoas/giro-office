@@ -55,6 +55,26 @@ describe("TaskModelService", () => {
     });
   });
 
+  it("listModel lista todos os modelos da organizacao quando filtros nao sao informados", async () => {
+    prismaMock.taskModel.findMany.mockResolvedValue([{ id: "model-1", name: "Modelo" }]);
+    const service = new TaskModelService();
+
+    const result = await service.listModel(undefined, undefined, "org-1");
+
+    expect(result).toEqual([{ id: "model-1", name: "Modelo" }]);
+    expect(prismaMock.taskModel.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: "org-1",
+      },
+      select: {
+        id: true,
+        name: true,
+        department_id: true,
+      },
+      orderBy: { name: "asc" },
+    });
+  });
+
   it("createModel lança 403 quando usuário não tem permissão", async () => {
     prismaMock.taskModel.findFirst.mockResolvedValueOnce(null);
     prismaMock.user.findFirst.mockResolvedValue({ id: "user-1", permission: 1 });

@@ -130,21 +130,14 @@ router.get(
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      let { type, billing } = req.body;
-      if (type === undefined) {
-        type = req.query.type;
-        billing = req.query.billing;
-      }
+      const type = req.body.type ?? req.query.type;
+      const billing = req.body.billing ?? req.query.billing;
 
       const { organization_id } = requireAuthenticatedRequestContext(req);
 
-      if (!type || !billing) {
-        throw new ServiceError(400, "type e billing sÃ£o obrigatÃ³rios (body ou query).");
-      }
-
       const result = await taskModelService.listModel(
-        String(type),
-        String(billing),
+        type === undefined ? undefined : String(type),
+        billing === undefined ? undefined : String(billing),
         organization_id,
       );
 
