@@ -18,6 +18,7 @@ import type { HistoryFileStorage } from "../services/historyStorageService.js";
 const TEST_JWT_SECRET = "test-jwt-secret-for-client-service";
 const TEST_ORG_ID = "550e8400-e29b-41d4-a716-446655440000";
 const TEST_CLIENT_ID = "660e8400-e29b-41d4-a716-446655440001";
+const TEST_PENDING_ID = "770e8400-e29b-41d4-a716-446655440002";
 
 function testOrganization(overrides: Partial<OrganizationPublic> = {}): OrganizationPublic {
   return {
@@ -413,6 +414,26 @@ describe("client-service", () => {
     expect(mock.deactivate).toHaveBeenCalledWith(TEST_CLIENT_ID, TEST_ORG_ID);
   });
 
+  it("DELETE /client/:id aceita superadmin permission=999", async () => {
+    const deactivated = baseClient({
+      status: "Inativo",
+      deletion_date: "2026-01-01T00:00:00.000Z",
+    });
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      deactivate: vi.fn().mockResolvedValue(deactivated),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID, 999);
+
+    const res = await request(app)
+      .delete(`/client/${TEST_CLIENT_ID}`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(mock.deactivate).toHaveBeenCalledWith(TEST_CLIENT_ID, TEST_ORG_ID);
+  });
+
   it("POST /client/:id/activate reativa via service e devolve envelope", async () => {
     const activated = baseClient({ status: "Ativo", deletion_date: null });
     const mock: IClientService = {
@@ -486,6 +507,28 @@ describe("client-service", () => {
     expect(mock.create).toHaveBeenCalledWith(
       expect.objectContaining({ organization_id: TEST_ORG_ID }),
     );
+  });
+
+  it("DELETE /client/histories/pending/:pendingId aceita superadmin permission=999", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const prisma = {
+      clientHistoryPending: {
+        findFirst: vi.fn().mockResolvedValue({ id: TEST_PENDING_ID }),
+        delete: vi.fn().mockResolvedValue({ id: TEST_PENDING_ID }),
+      },
+    } as unknown as PrismaClient;
+    const app = buildTestApp(mock, { prisma });
+    const token = bearerToken(TEST_ORG_ID, 999);
+
+    const res = await request(app)
+      .delete(`/client/histories/pending/${TEST_PENDING_ID}`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: { ok: true } });
+    expect(prisma.clientHistoryPending.delete).toHaveBeenCalledWith({
+      where: { id: TEST_PENDING_ID },
+    });
   });
 
   it("POST /client/:id/histories rejects unsupported file MIME types", async () => {

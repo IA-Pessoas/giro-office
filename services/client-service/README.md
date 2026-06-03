@@ -20,7 +20,7 @@ Ver `src/config/env.ts`:
 
 ## Contrato HTTP (via gateway)
 
-Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id` coerente quando aplicavel. O claim opcional `permission` (numero) e usado para alinhar ao legado: **`DELETE /client/:id`** e **`DELETE /client/histories/pending/:pendingId`** exigem **`permission === 2`** (admin).
+Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id` coerente quando aplicavel. O claim opcional `permission` (numero) e usado para alinhar ao legado: **`DELETE /client/:id`** e **`DELETE /client/histories/pending/:pendingId`** exigem **`permission >= 2`** (admin).
 
 | Metodo | Caminho | Descricao |
 |--------|---------|-----------|

@@ -197,5 +197,9 @@ export const updateClientBodySchema = z
 export type CreateClientBody = z.output<typeof createClientBodySchema>;
 export type UpdateClientBody = z.output<typeof updateClientBodySchema>;
 
-/** Permissão de administrador no legado (`user.permission === 2`). */
+/** Permissao minima de administrador no legado (`user.permission >= 2`). */
 export const ADMIN_PERMISSION = 2;
+
+export function isAdminPermission(permission?: number): boolean {
+  return typeof permission === "number" && permission >= ADMIN_PERMISSION;
+}
