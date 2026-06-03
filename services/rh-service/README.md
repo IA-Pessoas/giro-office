@@ -17,6 +17,8 @@ Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`.
 - O micro expoe rotas sob o prefixo `/rh`.
 - Exemplos publicos: `GET /rh/time-bank/summary`, `GET /rh/timesheets/{id}`,
   `GET /rh/score/quarters/{id}`.
+- `POST /rh/requests` aceita criacao sem `assigned_to_user_id`; nesse caso o backend atribui automaticamente um responsavel RH elegivel antes de persistir.
+- `GET /rh/operational-users` lista colaboradores ativos da organizacao com payload minimo para seletores operacionais de RH.
 
 ## Desenvolvimento
 

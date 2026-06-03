@@ -17,6 +17,7 @@ import { buildRhServiceOpenApiSpec } from "./openapi/spec.js";
 import categoryRoutes from "./routes/category.routes.js";
 import holidayRoutes from "./routes/holiday.routes.js";
 import messageRoutes from "./routes/message.routes.js";
+import operationalUserRoutes from "./routes/operationalUser.routes.js";
 import pointRoutes from "./routes/point.routes.js";
 import pointConfigRoutes from "./routes/pointConfig.routes.js";
 import requestRoutes from "./routes/request.routes.js";
@@ -58,6 +59,7 @@ export function createApp(logger: Logger, env: RhEnv): express.Express {
   app.use("/rh/point", pointRoutes);
   app.use("/rh/point", timeClockRequestRoutes);
   app.use("/rh/categories", categoryRoutes);
+  app.use("/rh/operational-users", operationalUserRoutes);
   app.use("/rh/requests", requestRoutes);
   app.use("/rh/score/questions", scoreQuestionRoutes);
   app.use("/rh/score/quarters", scoreQuarterRoutes);

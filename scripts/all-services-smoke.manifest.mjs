@@ -1746,6 +1746,14 @@ const baseManifest = [
   }),
   op({
     service: "rh-service",
+    method: "GET",
+    path: "/rh/operational-users",
+    action: "rhOperationalUserList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
     method: "POST",
     path: "/rh/requests",
     action: "rhRequestCreate",

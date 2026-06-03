@@ -11,6 +11,7 @@ const rhMocks: {
   timeClockRequestServiceMock: MockGroup;
   categoryServiceMock: MockGroup;
   requestServiceMock: MockGroup;
+  operationalUserServiceMock: MockGroup;
   scoreQuestionServiceMock: MockGroup;
   scoreQuarterServiceMock: MockGroup;
   scoreEvaluationServiceMock: MockGroup;
@@ -48,6 +49,9 @@ const rhMocks: {
     getById: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+  },
+  operationalUserServiceMock: {
+    list: vi.fn(),
   },
   scoreQuestionServiceMock: {
     create: vi.fn(),
@@ -99,6 +103,7 @@ const {
   timeClockRequestServiceMock,
   categoryServiceMock,
   requestServiceMock,
+  operationalUserServiceMock,
   scoreQuestionServiceMock,
   scoreQuarterServiceMock,
   scoreEvaluationServiceMock,
@@ -136,6 +141,12 @@ vi.mock("../services/categoryService.js", () => ({
 vi.mock("../services/requestService.js", () => ({
   RequestService: vi.fn(function RequestService() {
     return rhMocks.requestServiceMock;
+  }),
+}));
+
+vi.mock("../services/operationalUserService.js", () => ({
+  OperationalUserService: vi.fn(function OperationalUserService() {
+    return rhMocks.operationalUserServiceMock;
   }),
 }));
 
@@ -261,6 +272,14 @@ export function resetRhRouteMocks() {
   requestServiceMock.getById.mockResolvedValue({ id: "00000000-0000-4000-8000-000000000010" });
   requestServiceMock.update.mockResolvedValue({ ok: true });
   requestServiceMock.delete.mockResolvedValue({ ok: true });
+  operationalUserServiceMock.list.mockResolvedValue([
+    {
+      id: "00000000-0000-4000-8000-000000000001",
+      name: "Usuario RH",
+      department: "RH",
+      status: "active",
+    },
+  ]);
   scoreQuestionServiceMock.create.mockResolvedValue({ ok: true });
   scoreQuestionServiceMock.update.mockResolvedValue({ ok: true });
   scoreQuestionServiceMock.list.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
@@ -318,6 +337,7 @@ export {
   categoryServiceMock,
   holidayServiceMock,
   messageServiceMock,
+  operationalUserServiceMock,
   pointConfigServiceMock,
   pointServiceMock,
   requestServiceMock,

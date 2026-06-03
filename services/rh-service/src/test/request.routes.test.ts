@@ -1,7 +1,12 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createTestApp, requestServiceMock, resetRhRouteMocks } from "./rhTestUtils.js";
+import {
+  createTestApp,
+  operationalUserServiceMock,
+  requestServiceMock,
+  resetRhRouteMocks,
+} from "./rhTestUtils.js";
 
 describe("request routes", () => {
   const itemId = "00000000-0000-4000-8000-000000000010";
@@ -18,12 +23,26 @@ describe("request routes", () => {
       title: "Solicitacao",
       description: "Descricao",
       category_id: itemId,
-      assigned_to_user_id: userId,
       urgency: "High",
     });
 
     expect(res.status).toBe(200);
-    expect(requestServiceMock.create).toHaveBeenCalledTimes(1);
+    expect(requestServiceMock.create).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      requester_user_id: userId,
+      title: "Solicitacao",
+      description: "Descricao",
+      category_id: itemId,
+      urgency: "High",
+    });
+  });
+
+  it("GET /rh/operational-users lista colaboradores elegiveis para operacao RH", async () => {
+    const app = createTestApp();
+    const res = await request(app).get("/rh/operational-users");
+
+    expect(res.status).toBe(200);
+    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);
   });
 
   it("GET /rh/requests lista solicitacoes", async () => {

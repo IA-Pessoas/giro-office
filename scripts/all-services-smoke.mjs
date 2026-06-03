@@ -3219,6 +3219,7 @@ const handlers = {
   },
 
   async rhRequestCreate(op) {
+    await ensureRhTargetUser();
     const response = await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/requests",
@@ -3226,7 +3227,6 @@ const handlers = {
         title: uniqueText("Smoke RH Request"),
         description: "Smoke request description",
         category_id: requireState("rhCategoryId"),
-        assigned_to_user_id: await ensureRhTargetUser(),
         urgency: "High",
       },
     });
@@ -3234,6 +3234,13 @@ const handlers = {
       return;
     }
     state.rhRequestId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async rhOperationalUserList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/operational-users",
+    });
   },
 
   async rhRequestList(op) {

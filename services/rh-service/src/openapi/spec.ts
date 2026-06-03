@@ -131,10 +131,9 @@ const rhRequestCreateRequestBody = createObjectRequestBody({
     title: "Solicitação de férias",
     description: "Quero solicitar férias para maio.",
     category_id: "category-uuid",
-    assigned_to_user_id: "user-uuid",
     urgency: "Medium",
   },
-  required: ["title", "description", "category_id", "assigned_to_user_id", "urgency"],
+  required: ["title", "description", "category_id", "urgency"],
   properties: {
     title: { type: "string" },
     description: { type: "string" },
@@ -403,6 +402,7 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
       { name: "Health", description: "Saude do servico" },
       { name: "Ponto", description: "Configuracao, registro e ajuste de ponto" },
       { name: "Categorias", description: "Categorias de chamados RH" },
+      { name: "OperacaoRH", description: "Dados auxiliares para operacao RH" },
       { name: "Solicitacoes", description: "Chamados e solicitacoes RH" },
       { name: "Mensagens", description: "Mensagens vinculadas aos chamados RH" },
       { name: "ScoreQuestions", description: "Perguntas de score" },
@@ -609,6 +609,16 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           ...categoryDeleteRequestBody,
           responses: {
             "200": { description: "Categoria excluida", ...successJson },
+          },
+        },
+      },
+      "/rh/operational-users": {
+        get: {
+          tags: ["OperacaoRH"],
+          summary: "Listar colaboradores ativos elegiveis para operacao RH",
+          security: bearer,
+          responses: {
+            "200": { description: "Lista de colaboradores ativos", ...successJson },
           },
         },
       },
