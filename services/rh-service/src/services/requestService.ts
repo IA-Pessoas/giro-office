@@ -17,6 +17,8 @@ const REQUEST_SELECT = {
   organization_id: true,
 } as const;
 
+const RH_OPERATION_PERMISSION = 1;
+
 export type RhRequestSnapshot = Prisma.RhRequestGetPayload<{
   select: typeof REQUEST_SELECT;
 }>;
@@ -27,7 +29,7 @@ export interface RequestCreateInput {
   title: string;
   description: string;
   category_id: string;
-  assigned_to_user_id: string;
+  assigned_to_user_id?: string;
   urgency: "Low" | "Medium" | "High";
 }
 
@@ -64,6 +66,39 @@ class RequestService {
     }
   }
 
+  private async findEligibleRhAssignee(
+    organizationId: string,
+    requesterUserId: string,
+  ): Promise<string> {
+    const assignee = await prismaClient.user.findFirst({
+      where: {
+        status: "active",
+        id: { not: requesterUserId },
+        OR: [
+          { organization_id: organizationId },
+          { organization_id: null, department: { organization_id: organizationId } },
+        ],
+        permissions: {
+          some: {
+            organization_id: organizationId,
+            rh: { gte: RH_OPERATION_PERMISSION },
+          },
+        },
+      },
+      orderBy: { name: "asc" },
+      select: { id: true },
+    });
+
+    if (!assignee) {
+      throw new ServiceError(
+        404,
+        "Nenhum responsavel de RH elegivel encontrado para atribuir a solicitacao.",
+      );
+    }
+
+    return assignee.id;
+  }
+
   private async requireCategoryInOrg(organizationId: string, categoryId: string): Promise<void> {
     const category = await prismaClient.rhCategory.findFirst({
       where: { id: categoryId, organization_id: organizationId },
@@ -81,12 +116,13 @@ class RequestService {
       const title = assertNonEmptyString(input.title, "title");
       const description = assertNonEmptyString(input.description, "description");
       const categoryId = assertNonEmptyString(input.category_id, "category_id");
-      const assignedToUserId = assertNonEmptyString(
-        input.assigned_to_user_id,
-        "assigned_to_user_id",
-      );
+      let assignedToUserId =
+        input.assigned_to_user_id !== undefined
+          ? assertNonEmptyString(input.assigned_to_user_id, "assigned_to_user_id")
+          : undefined;
 
       await this.requireCategoryInOrg(organizationId, categoryId);
+      assignedToUserId ??= await this.findEligibleRhAssignee(organizationId, requesterUserId);
       this.ensureAssigneeIsNotRequester(requesterUserId, assignedToUserId);
 
       const created = await prismaClient.rhRequest.create({
