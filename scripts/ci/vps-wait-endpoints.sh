@@ -82,6 +82,12 @@ backend_check_url() {
     ti-service)
       printf "%s\n" "http://ti-service:3040/ready"
       ;;
+    certificate-service)
+      printf "%s\n" "http://certificate-service:3041/health"
+      ;;
+    pessoal-service)
+      printf "%s\n" "http://pessoal-service:3042/health"
+      ;;
     audit-service)
       printf "%s\n" "http://audit-service:3020/ready"
       ;;
@@ -103,6 +109,8 @@ ALL_BACKEND_SERVICES=(
   regularize-service
   rh-service
   ti-service
+  certificate-service
+  pessoal-service
   audit-service
 )
 

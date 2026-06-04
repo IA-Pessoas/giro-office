@@ -20,6 +20,7 @@
 - `.env.vps.regularize-service`
 - `.env.vps.ti-service`
 - `.env.vps.certificate-service`
+- `.env.vps.pessoal-service`
 - `.env.vps.web` (Next: `NEXT_PUBLIC_API_URL` + `API_INTERNAL_URL` — ver secção CI)
 - `.env.vps.audit-service`
 
@@ -35,7 +36,7 @@
 docker compose -f docker-compose.vps.yml up -d --build
 ```
 
-6. `certificate-service` and `audit-service` are part of the default stack. Configure `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` in `.env.vps.gateway`; control whether actions are audited with `AUDIT_ENABLED` in the gateway and service `.env.vps.*` files.
+6. `certificate-service`, `pessoal-service` and `audit-service` are part of the default stack. Configure `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` and `PESSOAL_SERVICE_URL=http://pessoal-service:3042` in `.env.vps.gateway`; control whether actions are audited with `AUDIT_ENABLED` in the gateway and service `.env.vps.*` files.
 
 ## Nginx TLS
 
@@ -59,6 +60,7 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps contabil-servic
 docker compose -f docker-compose.vps.yml up -d --build --no-deps regularize-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps ti-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps certificate-service
+docker compose -f docker-compose.vps.yml up -d --build --no-deps pessoal-service
 ```
 
 The `--no-deps` flag keeps the rest of the stack running.
@@ -98,6 +100,8 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
 - Contabil service: `GET /health`
 - Regularize service: `GET /health`
 - TI service: `GET /ready`
+- Certificate service: `GET /health`
+- Pessoal service: `GET /health`
 - **Web (Next.js):** `GET /` (container escuta na porta **3000**; no host, ver portas por slot abaixo)
 
 ## CI/CD (GitHub Actions → VPS)
@@ -117,8 +121,9 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 
 | Segredo | Uso |
 |---------|-----|
-| `ENV_VPS_GATEWAY` | Inclua `REGULARIZE_SERVICE_URL=http://regularize-service:3039` e `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` para as rotas `/regularize` e `/certificate` dentro da rede Docker. |
+| `ENV_VPS_GATEWAY` | Inclua `REGULARIZE_SERVICE_URL=http://regularize-service:3039`, `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` e `PESSOAL_SERVICE_URL=http://pessoal-service:3042` para as rotas `/regularize`, `/certificate` e `/pessoal` dentro da rede Docker. |
 | `ENV_VPS_CERTIFICATE_SERVICE` | Corpo de `.env.vps.certificate-service`; alem das variaveis base do service, inclua `CERTIFICATE_STORAGE_MODE=supabase`, `CERTIFICATE_STORAGE_BUCKET`, `CERTIFICATE_FILE_MAX_SIZE_BYTES`, `CERTIFICATE_FILE_ENCRYPTION_KEY`, `CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `UPLOAD_RATE_LIMIT_MAX` e `UPLOAD_RATE_LIMIT_WINDOW_MS` para upload/download criptografado de arquivos. |
+| `ENV_VPS_PESSOAL_SERVICE` | Corpo de `.env.vps.pessoal-service`; inclua `DATABASE_URL`, `JWT_SECRET`, `AUDIT_SERVICE_URL=http://audit-service:3020`, `AUDIT_SERVICE_TOKEN`, `PESSOAL_PASSWORD_ENCRYPTION_KEY`, `PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION` e `PESSOAL_DOMAIN_AUDIT_ENABLED`. |
 | `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | URL **com namespace** (ex.: `ghcr.io/meu-org`, `docker.io/meuuser` — não use só `ghcr.io`). Push/pull normalizam em minúsculas. |
 | `ENV_VPS_*` | Igual ao manifest `scripts/ci/vps-secrets.manifest` — `.env.vps.*` copiados para a VPS em cada deploy |
 | `ENV_VPS_WEB` | Corpo do ficheiro **`.env.vps.web`**: pelo menos `NEXT_PUBLIC_API_URL=<URL pública do API para o browser>` e `API_INTERNAL_URL=http://gateway:3010` (rede Docker). O valor de `NEXT_PUBLIC_API_URL` é embutido no bundle no `docker compose build`. |
@@ -126,7 +131,7 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 | `VPS_SSH_PRIVATE_KEY` | Preferencial (chave privada PEM) |
 | `VPS_SSH_PASSWORD` | Alternativa (requer `sshpass` no runner — instalado no job) |
 
-Os serviços estáveis promovidos também exigem segredos de GitHub Environment para materializar os respetivos ficheiros ignorados na VPS: `ENV_VPS_DEPARTMENT_SERVICE`, `ENV_VPS_FISCAL_SERVICE`, `ENV_VPS_CONTABIL_SERVICE`, `ENV_VPS_REGULARIZE_SERVICE`, `ENV_VPS_TI_SERVICE` e `ENV_VPS_CERTIFICATE_SERVICE`. Não faça stage nem commit dos ficheiros reais `.env.vps.*`.
+Os serviços estáveis promovidos também exigem segredos de GitHub Environment para materializar os respetivos ficheiros ignorados na VPS: `ENV_VPS_DEPARTMENT_SERVICE`, `ENV_VPS_FISCAL_SERVICE`, `ENV_VPS_CONTABIL_SERVICE`, `ENV_VPS_REGULARIZE_SERVICE`, `ENV_VPS_TI_SERVICE`, `ENV_VPS_CERTIFICATE_SERVICE` e `ENV_VPS_PESSOAL_SERVICE`. Não faça stage nem commit dos ficheiros reais `.env.vps.*`.
 
 ### GitHub Environments (`ENV_VPS_*` por slot)
 
@@ -211,6 +216,7 @@ This VPS stack is meant for the stable microservices only:
 - `/contabil`
 - `/regularize`
 - `/ti`
+- `/pessoal`
 - `/health`
 - `/audit` when `AUDIT_ENABLED=true`
 

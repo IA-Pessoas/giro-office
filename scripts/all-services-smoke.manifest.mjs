@@ -2241,6 +2241,23 @@ const baseManifest = [
   }),
 
   op({
+    service: "pessoal-service",
+    method: "GET",
+    path: "/health",
+    action: "serviceHealth",
+    target: "direct",
+    auth: "public",
+  }),
+  op({
+    service: "pessoal-service",
+    method: "GET",
+    path: "/ready",
+    action: "serviceReady",
+    target: "direct",
+    auth: "public",
+  }),
+
+  op({
     service: "audit-service",
     method: "GET",
     path: "/health",

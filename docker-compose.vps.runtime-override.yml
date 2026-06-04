@@ -43,6 +43,10 @@ services:
         condition: service_started
       ti-service:
         condition: service_started
+      certificate-service:
+        condition: service_started
+      pessoal-service:
+        condition: service_started
       audit-service:
         condition: service_started
     healthcheck:
@@ -89,6 +93,14 @@ services:
       disable: true
 
   ti-service:
+    healthcheck:
+      disable: true
+
+  certificate-service:
+    healthcheck:
+      disable: true
+
+  pessoal-service:
     healthcheck:
       disable: true
 

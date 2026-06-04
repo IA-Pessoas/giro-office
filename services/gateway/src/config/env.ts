@@ -97,6 +97,7 @@ const gatewayEnvSchema = z
     tiServiceInternalToken: z.string().optional().default("ti-service-token"),
     certificateServiceUrl: z.string().url().default("http://localhost:3041"),
     certificateServiceInternalToken: z.string().optional().default("certificate-service-token"),
+    pessoalServiceUrl: z.string().url().default("http://localhost:3042"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -188,6 +189,7 @@ export interface GatewayEnv {
   tiServiceInternalToken: string;
   certificateServiceUrl: string;
   certificateServiceInternalToken: string;
+  pessoalServiceUrl: string;
   websocketUpstreamUrl?: string;
   publicGatewayUrl?: string;
   jwtSecret: string;
@@ -222,6 +224,7 @@ export function getGatewayEnv(): GatewayEnv {
     tiServiceInternalToken: process.env.TI_SERVICE_INTERNAL_TOKEN,
     certificateServiceUrl: process.env.CERTIFICATE_SERVICE_URL,
     certificateServiceInternalToken: process.env.CERTIFICATE_SERVICE_INTERNAL_TOKEN,
+    pessoalServiceUrl: process.env.PESSOAL_SERVICE_URL,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     publicGatewayUrl: process.env.GATEWAY_PUBLIC_URL,
     jwtSecret: process.env.JWT_SECRET,
