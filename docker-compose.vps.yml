@@ -105,6 +105,8 @@ services:
         condition: service_healthy
       certificate-service:
         condition: service_healthy
+      pessoal-service:
+        condition: service_healthy
       audit-service:
         condition: service_healthy
     healthcheck:
@@ -474,6 +476,36 @@ services:
           "node",
           "-e",
           "fetch('http://127.0.0.1:3041/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  pessoal-service:
+    <<: *service_defaults
+    image: workspace-pessoal-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/pessoal-service"
+        SERVICE_DIR: services/pessoal-service
+    env_file:
+      - .env.vps.pessoal-service
+    expose:
+      - "3042"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3042/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 30s
       timeout: 5s

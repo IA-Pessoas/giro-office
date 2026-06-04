@@ -77,7 +77,7 @@ export const serviceRegistry = [
     packagePath: "services/pessoal-service",
     defaultUrl: "http://localhost:3042",
     urlEnvKey: "PESSOAL_SERVICE_URL",
-    openapiSpecPath: null,
+    openapiSpecPath: "services/pessoal-service/src/openapi/spec.ts",
     authModes: ["public", "bearer"],
     internalTokenEnvKey: null,
     prismaOutputPath: "services/pessoal-service/src/generated/prisma",
