@@ -48,7 +48,6 @@ const pessoalServiceEnvSchema = z
       .optional()
       .default("true")
       .transform((value) => parseBoolean(value)),
-    unionNotificationCron: z.string().min(1).default("0 6 * * *"),
     allowedOrigins: z
       .string()
       .optional()
@@ -102,7 +101,6 @@ export function getPessoalServiceEnv(): PessoalServiceEnv {
     passwordEncryptionKey: process.env.PESSOAL_PASSWORD_ENCRYPTION_KEY,
     passwordEncryptionKeyVersion: process.env.PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION,
     domainAuditEnabled: process.env.PESSOAL_DOMAIN_AUDIT_ENABLED,
-    unionNotificationCron: process.env.PESSOAL_UNION_NOTIFICATION_CRON,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
     logLevel: process.env.LOG_LEVEL,
