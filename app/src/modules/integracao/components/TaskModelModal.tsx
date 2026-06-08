@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { departmentService } from '@modules/departments';
 import { setupAPIClient } from '@shared/services/api';
 import { extractUsersList } from '@modules/users/services/userService';
-import { integracaoService } from '../services/integracaoService';
+import { taskModelService } from '../services/taskModelService';
 import type { TaskModel } from '../types';
 
 // --- Chakra shims local (para remover dependência de @chakra-ui/react sem reescrever toda a UI) ---
@@ -251,17 +251,15 @@ export function TaskModelModal({ isOpen, onClose, initialData, onSave }: ModalPr
                 setLoadingData(true);
 
                 // Busca usuários e departamentos
-                const [usersRes, depsList, tasksRes] = await Promise.all([
+                const [usersRes, depsList, taskModels] = await Promise.all([
                     apiClient.get('/user/users', { params: { status: 'Ativo' } }),
                     departmentService.list({ status: 'Ativo' }),
-                    // Busca tarefas para popular o select de dependentes
-                    // Ajuste a rota se necessário, estou usando a listagem padrão
-                    apiClient.get('/task/models') 
+                    taskModelService.list(),
                 ]);
 
                 setUsers(extractUsersList(usersRes.data));
                 setDepartments(depsList);
-                setAllTasks(tasksRes.data); // Assume que retorna array com id e name
+                setAllTasks(taskModels);
 
             } catch (err) {
                 console.error("Erro ao carregar opções:", err);
@@ -276,40 +274,49 @@ export function TaskModelModal({ isOpen, onClose, initialData, onSave }: ModalPr
 
     // 2. PREENCHER FORMULÁRIO E CARREGAR DEPENDENTES
     useEffect(() => {
-        if (initialData) {
-            setFormData({
-                name: initialData.name || '',
-                department_id: initialData.department_id || '',
-                responsible_id: initialData.responsible_id || '',
-                responsible2_id: initialData.responsible2_id || '',
-                responsible3_id: initialData.responsible3_id || '',
-                observations: initialData.observations || '',
-                billing: initialData.billing || 'Não Realizar',
-                prevision: initialData.prevision || 0,
-                type: 'Projeto'
-            });
+        async function loadEditForm() {
+            if (!initialData?.id) {
+                return;
+            }
 
-            // Carregar a lista de dependentes dessa tarefa
-            fetchDependents(initialData.id);
+            try {
+                const detail = await taskModelService.detail(initialData.id);
+                setFormData({
+                    name: detail.name || '',
+                    department_id: detail.department_id || '',
+                    responsible_id: detail.responsible_id || '',
+                    responsible2_id: detail.responsible2_id || '',
+                    responsible3_id: detail.responsible3_id || '',
+                    observations: detail.observations || '',
+                    billing: detail.billing || 'Não Realizar',
+                    prevision: detail.prevision || 0,
+                    type: 'Projeto',
+                });
+                await fetchDependents(initialData.id);
+            } catch (error) {
+                console.error('Erro ao carregar modelo:', error);
+                toast.error('Erro ao carregar dados do modelo.');
+            }
+        }
 
+        if (initialData?.id) {
+            void loadEditForm();
         } else {
-            setFormData({ 
-                name: '', department_id: '', responsible_id: '', responsible2_id: '', 
-                responsible3_id: '', observations: '', billing: 'Não Realizar', prevision: 0, type: 'Projeto'
+            setFormData({
+                name: '', department_id: '', responsible_id: '', responsible2_id: '',
+                responsible3_id: '', observations: '', billing: 'Não Realizar', prevision: 0, type: 'Projeto',
             });
             setDependents([]);
         }
-        
-        // Limpa o form de novo dependente
-        setNewDep({ dependent_id: '', wait: false, observation: '' });
 
+        setNewDep({ dependent_id: '', wait: false, observation: '' });
     }, [initialData, isOpen]);
 
     // --- FUNÇÕES DE DEPENDENTES ---
 
     const fetchDependents = async (taskId: string) => {
         try {
-            const dependentsData = await integracaoService.taskModels.getDependents(taskId);
+            const dependentsData = await taskModelService.listDependents(taskId);
             setDependents(dependentsData);
         } catch (error) {
             console.error("Erro ao buscar dependentes:", error);
@@ -328,7 +335,7 @@ export function TaskModelModal({ isOpen, onClose, initialData, onSave }: ModalPr
 
         setLoadingDependents(true);
         try {
-            await integracaoService.taskModels.createDependent({
+            await taskModelService.addDependent({
                 task_model_id: initialData.id,
                 dependent_id: newDep.dependent_id,
                 wait: newDep.wait,
@@ -351,7 +358,7 @@ export function TaskModelModal({ isOpen, onClose, initialData, onSave }: ModalPr
         if (!confirm("Remover este dependente?")) return;
 
         try {
-            await integracaoService.taskModels.deleteDependent(relationId);
+            await taskModelService.deleteDependent(relationId);
 
             toast.success("Removido com sucesso!");
             if (initialData?.id) fetchDependents(initialData.id);

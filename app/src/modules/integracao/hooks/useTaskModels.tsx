@@ -1,64 +1,96 @@
-import { useState, useEffect, useCallback } from 'react';
-import { toast } from 'react-toastify';
-import { integracaoService } from '../services/integracaoService';
-import type { TaskModel, CreateTaskModelData, UpdateTaskModelData } from '../types';
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "react-toastify";
+
+import { departmentService } from "@modules/departments";
+
+import { taskModelService } from "../services/taskModelService";
+import type { CreateTaskModelData, TaskModel, UpdateTaskModelData } from "../types";
+
+function enrichTaskModelsWithDepartments(
+  models: TaskModel[],
+  departments: Array<{ id: string; name: string }>,
+): TaskModel[] {
+  const departmentById = new Map(departments.map((department) => [department.id, department]));
+
+  return models.map((model) => {
+    const department = departmentById.get(model.department_id);
+
+    return {
+      ...model,
+      ...(department
+        ? {
+            department: {
+              id: department.id,
+              name: department.name,
+            },
+          }
+        : {}),
+    };
+  });
+}
 
 export const useTaskModels = () => {
-    const [models, setModels] = useState<TaskModel[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+  const [models, setModels] = useState<TaskModel[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-    const fetchModels = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const data = await integracaoService.taskModels.list();
-            setModels(data);
-        } catch (error) {
-            console.error(error);
-            toast.error("Erro ao buscar modelos.");
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+  const fetchModels = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [list, departments] = await Promise.all([
+        taskModelService.list(),
+        departmentService.list({ status: "Ativo" }),
+      ]);
 
-    const createModel = async (data: CreateTaskModelData) => {
-        try {
-            await integracaoService.taskModels.create(data);
-            toast.success("Modelo criado com sucesso!");
-            fetchModels();
-            return true;
-        } catch (error) {
-            toast.error("Erro ao criar modelo.");
-            return false;
-        }
-    };
+      setModels(enrichTaskModelsWithDepartments(list, departments));
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao buscar modelos.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-    const updateModel = async (data: UpdateTaskModelData) => {
-        try {
-            await integracaoService.taskModels.update(data);
-            toast.success("Modelo atualizado!");
-            fetchModels();
-            return true;
-        } catch (error) {
-            toast.error("Erro ao atualizar.");
-            return false;
-        }
-    };
+  const createModel = async (data: CreateTaskModelData) => {
+    try {
+      await taskModelService.create(data);
+      toast.success("Modelo criado com sucesso!");
+      await fetchModels();
+      return true;
+    } catch (error) {
+      toast.error("Erro ao criar modelo.");
+      return false;
+    }
+  };
 
-    const deleteModel = async (id: string) => {
-        try {
-            await integracaoService.taskModels.delete(id);
-            toast.success("Removido!");
-            fetchModels();
-            return true;
-        } catch (error) {
-            toast.error("Erro ao remover.");
-            return false;
-        }
-    };
+  const updateModel = async (data: UpdateTaskModelData) => {
+    try {
+      await taskModelService.update(data);
+      toast.success("Modelo atualizado!");
+      await fetchModels();
+      return true;
+    } catch (error) {
+      toast.error("Erro ao atualizar.");
+      return false;
+    }
+  };
 
-    useEffect(() => { fetchModels(); }, [fetchModels]);
+  const deleteModel = async (id: string) => {
+    try {
+      await taskModelService.delete(id);
+      toast.success("Removido!");
+      await fetchModels();
+      return true;
+    } catch (error) {
+      toast.error("Erro ao remover.");
+      return false;
+    }
+  };
 
-    return { models, isLoading, createModel, updateModel, deleteModel, refresh: fetchModels };
+  useEffect(() => {
+    void fetchModels();
+  }, [fetchModels]);
+
+  return { models, isLoading, createModel, updateModel, deleteModel, refresh: fetchModels };
 };
 
-export type { TaskModel } from '../types';
+export type { TaskModel } from "../types";

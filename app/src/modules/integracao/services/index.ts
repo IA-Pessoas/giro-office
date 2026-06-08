@@ -1,5 +1,12 @@
-export { integracaoService } from "./integracaoService";
 export { integracaoTasksService } from "./integracaoTasksService";
+export { taskModelService } from "./taskModelService";
+export {
+  buildCreateTaskModelPayload,
+  buildDeleteTaskModelPayload,
+  buildUpdateTaskModelPayload,
+  TASK_MODEL_ENDPOINTS,
+  unwrapTaskModelList,
+} from "./taskModelService.contract";
 export {
   buildCreateIntegracaoTaskPayload,
   buildDeleteIntegracaoTaskPayload,
