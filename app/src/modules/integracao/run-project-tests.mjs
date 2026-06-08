@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 
 import {
+  buildCreateIntegracaoTaskPayload,
+  buildDeleteIntegracaoTaskPayload,
+  buildIntegracaoTaskListParams,
+  buildUpdateIntegracaoTaskPayload,
+  INTEGRACAO_TASKS_ENDPOINTS,
+  unwrapCreatedIntegracaoTask,
+  unwrapIntegracaoTaskDetail,
+  unwrapIntegracaoTaskList,
+  unwrapUpdatedIntegracaoTask,
+} from "./services/integracaoTasksService.contract.ts";
+import {
   buildCreateProjectPayload,
   buildDeleteProjectPayload,
   buildProjectListParams,
@@ -87,4 +98,100 @@ runTest("unwrapUpdatedProject accepts direct object payload", () => {
 runTest("unwrapProjectProgress extracts nested project envelope", () => {
   const progress = { porcentage: 64, status: "Em andamento" };
   assert.deepEqual(unwrapProjectProgress({ success: true, data: { project: progress } }), progress);
+});
+
+runTest("integracao tasks endpoints match task-service contract", () => {
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.crud, "/task");
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.list, "/task/list");
+});
+
+runTest("buildIntegracaoTaskListParams passes query fields literally", () => {
+  assert.deepEqual(
+    buildIntegracaoTaskListParams({
+      status: "Em Andamento",
+      ref: "CobrançaComercial",
+      ref_id: "",
+      search: "onboarding",
+      page: 2,
+      limit: 50,
+    }),
+    {
+      status: "Em Andamento",
+      ref: "CobrançaComercial",
+      ref_id: "",
+      search: "onboarding",
+      page: 2,
+      limit: 50,
+    },
+  );
+});
+
+runTest("buildCreateIntegracaoTaskPayload maps create body", () => {
+  assert.deepEqual(
+    buildCreateIntegracaoTaskPayload({
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      urgency: "Alta",
+    }),
+    {
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      observations: "",
+      urgency: "Alta",
+    },
+  );
+});
+
+runTest("buildUpdateIntegracaoTaskPayload keeps task_id", () => {
+  assert.deepEqual(
+    buildUpdateIntegracaoTaskPayload({
+      task_id: "task-1",
+      status: "Paralisado",
+    }),
+    { task_id: "task-1", status: "Paralisado" },
+  );
+});
+
+runTest("buildDeleteIntegracaoTaskPayload maps task_id body", () => {
+  assert.deepEqual(buildDeleteIntegracaoTaskPayload("task-1"), { task_id: "task-1" });
+});
+
+runTest("unwrapIntegracaoTaskList extracts data and hasMore", () => {
+  const payload = {
+    data: [
+      {
+        id: "t1",
+        name: "Tarefa",
+        status: "A Realizar",
+        billing: "Não Realizar",
+        charge_comercial: false,
+        hiring_status: null,
+        payment: null,
+        billing_description: null,
+        charge_financeiro: false,
+      },
+    ],
+    hasMore: true,
+  };
+  assert.deepEqual(unwrapIntegracaoTaskList({ success: true, data: payload }), payload);
+});
+
+runTest("unwrapIntegracaoTaskDetail extracts nested detail", () => {
+  const detail = { id: "t1", name: "Tarefa" };
+  assert.deepEqual(unwrapIntegracaoTaskDetail({ success: true, data: { detail } }), detail);
+});
+
+runTest("unwrapCreatedIntegracaoTask extracts nested create", () => {
+  const created = { id: "t1", name: "Tarefa" };
+  assert.deepEqual(unwrapCreatedIntegracaoTask({ success: true, data: { create: created } }), created);
+});
+
+runTest("unwrapUpdatedIntegracaoTask accepts direct object payload", () => {
+  const updated = { id: "t1", name: "Tarefa atualizada" };
+  assert.deepEqual(unwrapUpdatedIntegracaoTask(updated), updated);
+  assert.deepEqual(unwrapUpdatedIntegracaoTask({ success: true, data: updated }), updated);
 });

@@ -1,3 +1,19 @@
+export type {
+  CreateIntegracaoTaskBody,
+  IntegracaoTaskDetail,
+  IntegracaoTaskListItem,
+  IntegracaoTaskListParams,
+  IntegracaoTaskListResult,
+  IntegracaoTaskStatus,
+  ProspectingStatus,
+  TaskBilling,
+  UpdateIntegracaoTaskBody,
+} from "./integracaoTask";
+export {
+  INTEGRACAO_TASK_STATUS_VALUES,
+  PROSPECTING_STATUS_VALUES,
+} from "./integracaoTask";
+
 export interface TaskModel {
   id: string;
   name: string;
