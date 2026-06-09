@@ -20,7 +20,7 @@ export {
   useUpdateProjectMutation,
 } from "./hooks";
 
-export { integracaoService, projectService } from "./services";
+export { integracaoTasksService, projectService, taskModelService } from "./services";
 
 export type {
   CreateProjectData,
