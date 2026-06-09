@@ -1,13 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
 import { departmentService } from "@modules/departments";
+import { useFetch } from "@shared/hooks";
 
+import type {
+  CreateTaskModelData,
+  TaskModel,
+  UpdateTaskModelData,
+} from "../types";
+import { taskModelsListQueryKey } from "./queryKeys";
 import { taskModelService } from "../services/taskModelService";
-import type { CreateTaskModelData, TaskModel, UpdateTaskModelData } from "../types";
 
 function enrichTaskModelsWithDepartments(
-  models: TaskModel[],
+  models: Array<Pick<TaskModel, "id" | "department_id" | "name">>,
   departments: Array<{ id: string; name: string }>,
 ): TaskModel[] {
   const departmentById = new Map(departments.map((department) => [department.id, department]));
@@ -29,32 +36,39 @@ function enrichTaskModelsWithDepartments(
   });
 }
 
+async function fetchTaskModels(): Promise<TaskModel[]> {
+  const [list, departments] = await Promise.all([
+    taskModelService.list(),
+    departmentService.list({ status: "Ativo" }),
+  ]);
+
+  return enrichTaskModelsWithDepartments(list, departments);
+}
+
 export const useTaskModels = () => {
-  const [models, setModels] = useState<TaskModel[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const taskModelsList = taskModelsListQueryKey();
 
-  const fetchModels = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [list, departments] = await Promise.all([
-        taskModelService.list(),
-        departmentService.list({ status: "Ativo" }),
-      ]);
+  const taskModelsQuery = useFetch(taskModelsList, fetchTaskModels, {
+    enabled: true,
+    refetchOnWindowFocus: false,
+  });
 
-      setModels(enrichTaskModelsWithDepartments(list, departments));
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao buscar modelos.");
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    if (taskModelsQuery.isError) {
+      toast.error("Erro ao buscar modelos.", {
+        toastId: "task-models-list-error",
+      });
     }
-  }, []);
+  }, [taskModelsQuery.isError]);
 
-  const createModel = async (data: CreateTaskModelData) => {
+  const createModel = async (data: CreateTaskModelData): Promise<boolean> => {
     try {
       await taskModelService.create(data);
       toast.success("Modelo criado com sucesso!");
-      await fetchModels();
+      await queryClient.invalidateQueries({
+        queryKey: taskModelsList,
+      });
       return true;
     } catch (error) {
       toast.error("Erro ao criar modelo.");
@@ -62,11 +76,13 @@ export const useTaskModels = () => {
     }
   };
 
-  const updateModel = async (data: UpdateTaskModelData) => {
+  const updateModel = async (data: UpdateTaskModelData): Promise<boolean> => {
     try {
       await taskModelService.update(data);
       toast.success("Modelo atualizado!");
-      await fetchModels();
+      await queryClient.invalidateQueries({
+        queryKey: taskModelsList,
+      });
       return true;
     } catch (error) {
       toast.error("Erro ao atualizar.");
@@ -74,11 +90,13 @@ export const useTaskModels = () => {
     }
   };
 
-  const deleteModel = async (id: string) => {
+  const deleteModel = async (id: string): Promise<boolean> => {
     try {
       await taskModelService.delete(id);
       toast.success("Removido!");
-      await fetchModels();
+      await queryClient.invalidateQueries({
+        queryKey: taskModelsList,
+      });
       return true;
     } catch (error) {
       toast.error("Erro ao remover.");
@@ -86,11 +104,14 @@ export const useTaskModels = () => {
     }
   };
 
-  useEffect(() => {
-    void fetchModels();
-  }, [fetchModels]);
-
-  return { models, isLoading, createModel, updateModel, deleteModel, refresh: fetchModels };
+  return {
+    models: taskModelsQuery.data ?? [],
+    isLoading: taskModelsQuery.isLoading || taskModelsQuery.isRefetching,
+    createModel,
+    updateModel,
+    deleteModel,
+    refresh: taskModelsQuery.refetch,
+  };
 };
 
 export type { TaskModel } from "../types";
