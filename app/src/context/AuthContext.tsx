@@ -5,6 +5,11 @@ import Router from "next/router";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+import {
+    AUTH_COOKIE_DESTROY_OPTIONS,
+    AUTH_COOKIE_NAME,
+    getAuthCookieOptions,
+} from "@modules/auth/utils/authCookie";
 import { getModulePermissionsFromToken } from "@modules/auth/utils/sessionToken";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
@@ -47,7 +52,7 @@ export const AuthContext = createContext({} as AuthContextData);
 const SESSION_TRANSITION_MIN_DURATION_MS = 380;
 
 function clearAuthCookie() {
-    destroyCookie(null, "cw.token", { path: "/" });
+    destroyCookie(null, AUTH_COOKIE_NAME, AUTH_COOKIE_DESTROY_OPTIONS);
     delete api.defaults.headers.common.Authorization;
 }
 
@@ -189,10 +194,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 throw new Error("Invalid authentication response");
             }
 
-            setCookie(undefined, "cw.token", sessionData.token, {
-                maxAge: 60 * 60 * 24 * 7,
-                path: "/",
-            });
+            setCookie(undefined, AUTH_COOKIE_NAME, sessionData.token, getAuthCookieOptions());
 
             if (!isCurrentAuthTransition(requestVersion)) {
                 return;
