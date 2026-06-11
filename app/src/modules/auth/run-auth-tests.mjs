@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 
 import { AuthTokenError } from "../../shared/services/errors/AuthTokenError.ts";
 import { canSSRAdmin } from "./utils/canSSRAdmin.ts";
+import {
+  AUTH_COOKIE_MAX_AGE_SECONDS,
+  AUTH_COOKIE_NAME,
+  getAuthCookieOptions,
+} from "./utils/authCookie.ts";
 import { canAccessAdministration, isAdminPermission } from "./utils/permissions.ts";
 
 async function runTest(name, fn) {
@@ -145,6 +150,26 @@ await (async () => {
         destination: "/dashboard",
         permanent: false,
       },
+    });
+  });
+
+  await runTest("auth cookie options keep session cookie safe in development", () => {
+    assert.equal(AUTH_COOKIE_NAME, "cw.token");
+    assert.equal(AUTH_COOKIE_MAX_AGE_SECONDS, 60 * 60 * 24 * 7);
+    assert.deepEqual(getAuthCookieOptions("development"), {
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+      sameSite: "lax",
+      secure: false,
+    });
+  });
+
+  await runTest("auth cookie options enable secure flag in production", () => {
+    assert.deepEqual(getAuthCookieOptions("production"), {
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+      sameSite: "lax",
+      secure: true,
     });
   });
 })();
