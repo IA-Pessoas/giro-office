@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { ChevronDown, Eye, Loader2, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  Eye,
+  Loader2,
+  Pencil,
+  Plus,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { toast } from "react-toastify";
 import { Dialog } from "@shared/components";
 import {
@@ -18,6 +26,7 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [isQuestionListOpen, setIsQuestionListOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<RhScoreQuestion | null>(null);
+  const [questionPendingDelete, setQuestionPendingDelete] = useState<RhScoreQuestion | null>(null);
   const questionsQuery = useRhScoreQuestions({
     all: true,
     type: selectedType === "all" ? undefined : selectedType,
@@ -51,13 +60,26 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
     }
   }
 
-  async function handleDeleteQuestion(question: RhScoreQuestion) {
-    if (!window.confirm("Deseja realmente excluir esta pergunta de score?")) {
+  function handleRequestDeleteQuestion(question: RhScoreQuestion) {
+    setQuestionPendingDelete(question);
+  }
+
+  function handleCloseDeleteDialog() {
+    if (deleteMutation.isPending) {
+      return;
+    }
+
+    setQuestionPendingDelete(null);
+  }
+
+  async function handleConfirmDeleteQuestion() {
+    if (!questionPendingDelete) {
       return;
     }
 
     try {
-      await deleteMutation.mutateAsync({ id: question.id });
+      await deleteMutation.mutateAsync({ id: questionPendingDelete.id });
+      setQuestionPendingDelete(null);
       toast.success("Pergunta excluída com sucesso.");
     } catch (error) {
       toast.error(getErrorMessage(error, "Não foi possível excluir a pergunta."));
@@ -141,8 +163,8 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
         onOpenChange={(nextOpen) => setIsQuestionListOpen(nextOpen)}
         title="Perguntas cadastradas"
         description="Consulte, edite e gerencie as perguntas de score em um só lugar."
-        contentClassName="w-[min(94vw,1100px)]"
-        bodyClassName="space-y-5"
+        contentClassName="!w-[min(92vw,860px)]"
+        bodyClassName="space-y-4"
       >
         <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -226,7 +248,7 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDeleteQuestion(question)}
+                      onClick={() => handleRequestDeleteQuestion(question)}
                       disabled={deleteMutation.isPending}
                       className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/30"
                     >
@@ -239,6 +261,46 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
             ))}
           </div>
         )}
+      </Dialog>
+      <Dialog
+        open={Boolean(questionPendingDelete)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            handleCloseDeleteDialog();
+          }
+        }}
+        title="Excluir"
+        description="Confirmação de exclusão de pergunta de score"
+        overlayClassName="!z-[1600]"
+        contentClassName="!z-[1700] !w-[min(88vw,400px)]"
+        bodyClassName="space-y-3 !py-3"
+      >
+        <p className="text-sm leading-5 text-gray-600 dark:text-gray-300">
+          Esta ação remove a pergunta de score e não poderá ser desfeita.
+        </p>
+        {questionPendingDelete ? (
+          <p className="rounded-md bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500 dark:bg-gray-900/30 dark:text-gray-400">
+            {questionPendingDelete.question}
+          </p>
+        ) : null}
+        <div className="flex justify-start gap-2">
+          <button
+            type="button"
+            onClick={handleCloseDeleteDialog}
+            disabled={deleteMutation.isPending}
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmDeleteQuestion}
+            disabled={deleteMutation.isPending}
+            className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
+          </button>
+        </div>
       </Dialog>
       <RhScoreQuestionEditor
         open={isQuestionDialogOpen}
