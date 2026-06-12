@@ -4,7 +4,7 @@ export { RhHolidaysSection } from "./components/RhHolidaysSection";
 export { RhTimeBankSection } from "./components/RhTimeBankSection";
 export { RhTimesheetsSection } from "./components/RhTimesheetsSection";
 export { RhPointSection } from "./components/RhPointSection";
-export { RhScoreSection } from "./components/RhScoreSection";
+export { RhScoreSection } from "./components/score/RhScoreSection";
 export { useAssignableUsers } from "./hooks/useAssignableUsers";
 export { useRhRequests } from "./hooks/useRhRequests";
 export { formatRhDate, formatRhDateTime } from "./utils/rhDate";
