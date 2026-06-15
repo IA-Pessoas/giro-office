@@ -4,28 +4,61 @@ export { ProjectFormModal } from "./components/ProjectFormModal";
 export { ProjectListTable } from "./components/ProjectListTable";
 export { ProjectProgressBar } from "./components/ProjectProgressBar";
 export { ProjectsWorkspace } from "./components/ProjectsWorkspace";
+export { TaskFormModal } from "./components/TaskFormModal";
 export { TaskModelModal } from "./components/TaskModelModal";
+export { TasksWorkspace } from "./components/TasksWorkspace";
 
 export {
+  INTEGRACAO_TASKS_QUERY_KEY,
   projectDetailQueryKey,
   projectListQueryKey,
   PROJECTS_QUERY_KEY,
+  TASK_MODELS_QUERY_KEY,
+  integracaoTaskDetailQueryKey,
+  integracaoTasksListQueryKey,
+  taskModelsListQueryKey,
+  useCreateIntegracaoTaskMutation,
   useCreateProjectMutation,
+  useDeleteIntegracaoTaskMutation,
   useDeleteProjectMutation,
+  useIntegracaoTaskDetail,
+  useIntegracaoTasksList,
   useProjectDetail,
   useProjectForm,
   useProjectsList,
   useRecalculateProjectProgressMutation,
   useTaskModels,
+  useUpdateIntegracaoTaskMutation,
   useUpdateProjectMutation,
 } from "./hooks";
 
-export { integracaoTasksService, projectService, taskModelService } from "./services";
+export {
+  INTEGRACAO_TASKS_ENDPOINTS,
+  TASK_MODEL_ENDPOINTS,
+  integracaoTasksService,
+  projectService,
+  taskModelService,
+} from "./services";
+export {
+  TASK_MODEL_CONFIG_ENTRY,
+  canManageTaskModelConfig,
+} from "./navigation/taskModelConfigNavigation";
+
+export {
+  INTEGRACAO_TASK_STATUS_VALUES,
+  PROSPECTING_STATUS_VALUES,
+} from "./types";
 
 export type {
+  CreateIntegracaoTaskBody,
   CreateProjectData,
   CreateTaskModelData,
   DeleteProjectData,
+  IntegracaoTaskDetail,
+  IntegracaoTaskListItem,
+  IntegracaoTaskListParams,
+  IntegracaoTaskListResult,
+  IntegracaoTaskStatus,
   ProjectClientSummary,
   ProjectDetail,
   ProjectFormValues,
@@ -33,9 +66,12 @@ export type {
   ProjectListParams,
   ProjectProgressResponse,
   ProjectTaskSummary,
+  ProspectingStatus,
   RecalculateProjectProgressData,
   TaskDependent,
+  TaskBilling,
   TaskModel,
+  UpdateIntegracaoTaskBody,
   UpdateProjectData,
   UpdateTaskModelData,
 } from "./types";

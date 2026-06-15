@@ -32,6 +32,17 @@ import {
   unwrapProjectProgress,
   unwrapUpdatedProject,
 } from "./services/projectService.contract.ts";
+import {
+  TASK_MODEL_CONFIG_ENTRY,
+  canManageTaskModelConfig,
+} from "./navigation/taskModelConfigNavigation.ts";
+import {
+  TASK_TABLE_ACTION_BUTTON_CLASSNAME,
+  TASK_TABLE_ACTION_CELL_CLASSNAME,
+  TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME,
+  TASK_TABLE_ACTION_HEAD_CELL_CLASSNAME,
+  formatTasksFooterSummary,
+} from "./components/taskWorkspaceUi.ts";
 
 function runTest(name, fn) {
   try {
@@ -284,4 +295,31 @@ runTest("unwrapTaskModelDetail extracts nested detail", () => {
 runTest("unwrapCreatedTaskModel extracts nested create", () => {
   const created = { id: "model-1", name: "Modelo" };
   assert.deepEqual(unwrapCreatedTaskModel({ success: true, data: { create: created } }), created);
+});
+
+runTest("task model config entry is discoverable in product workflows", () => {
+  assert.equal(TASK_MODEL_CONFIG_ENTRY.href, "/configs/integracao/tasks");
+  assert.equal(TASK_MODEL_CONFIG_ENTRY.label, "Modelos de tarefas");
+  assert.equal(TASK_MODEL_CONFIG_ENTRY.shortLabel, "Modelos");
+  assert.equal(canManageTaskModelConfig(null), false);
+  assert.equal(canManageTaskModelConfig(1), false);
+  assert.equal(canManageTaskModelConfig(2), true);
+  assert.equal(canManageTaskModelConfig(3), true);
+});
+
+runTest("tasks footer summary uses natural Portuguese copy", () => {
+  assert.equal(formatTasksFooterSummary({ page: 1, count: 0 }), "Nenhuma tarefa carregada.");
+  assert.equal(formatTasksFooterSummary({ page: 1, count: 1 }), "1 tarefa carregada.");
+  assert.equal(formatTasksFooterSummary({ page: 2, count: 4 }), "4 tarefas carregadas.");
+});
+
+runTest("tasks table actions use inline square icon buttons", () => {
+  assert.equal(TASK_TABLE_ACTION_HEAD_CELL_CLASSNAME.includes("sticky"), false);
+  assert.equal(TASK_TABLE_ACTION_HEAD_CELL_CLASSNAME.includes("right-0"), false);
+  assert.equal(TASK_TABLE_ACTION_CELL_CLASSNAME.includes("sticky"), false);
+  assert.equal(TASK_TABLE_ACTION_CELL_CLASSNAME.includes("right-0"), false);
+  assert.equal(TASK_TABLE_ACTION_BUTTON_CLASSNAME.includes("h-9"), true);
+  assert.equal(TASK_TABLE_ACTION_BUTTON_CLASSNAME.includes("w-9"), true);
+  assert.equal(TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME.includes("h-9"), true);
+  assert.equal(TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME.includes("w-9"), true);
 });

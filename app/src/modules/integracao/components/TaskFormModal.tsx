@@ -1,0 +1,623 @@
+import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, FileText, LoaderCircle, Save } from "lucide-react";
+import { toast } from "react-toastify";
+
+import { useClients } from "@modules/clients";
+import { departmentService, type DepItem } from "@modules/departments";
+import { userService, type UserItem } from "@modules/users";
+import { Dialog } from "@shared/components/ui/Dialog";
+import { useFetch } from "@shared/hooks";
+
+import {
+  INTEGRACAO_TASK_STATUS_VALUES,
+  PROSPECTING_STATUS_VALUES,
+  type IntegracaoTaskDetail,
+  type IntegracaoTaskStatus,
+  type ProspectingStatus,
+  type TaskBilling,
+} from "../types";
+import { taskModelService } from "../services";
+import {
+  useCreateIntegracaoTaskMutation,
+  useIntegracaoTaskDetail,
+  useProjectsList,
+  useUpdateIntegracaoTaskMutation,
+} from "../hooks";
+import {
+  PROJECT_INPUT_CLASSNAME,
+  PROJECT_PRIMARY_BUTTON_CLASSNAME,
+  PROJECT_SECONDARY_BUTTON_CLASSNAME,
+  PROJECT_SELECT_ARROW_STYLE,
+  PROJECT_SELECT_CLASSNAME,
+} from "./projectUi";
+
+interface TaskFormModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  taskId?: string | null;
+  onSuccess?: (task: IntegracaoTaskDetail) => void;
+}
+
+interface CreateFormState {
+  client_id: string;
+  project_id: string;
+  model_id: string;
+  prospecting_status: ProspectingStatus | "";
+  observations: string;
+  urgency: string;
+}
+
+interface EditFormState {
+  name: string;
+  status: IntegracaoTaskStatus | "";
+  department_id: string;
+  observations: string;
+  billing: TaskBilling;
+  urgency: string;
+  responsible_id: string;
+  responsible2_id: string;
+  responsible3_id: string;
+  prevision_date: string;
+}
+
+const CREATE_INITIAL_STATE: CreateFormState = {
+  client_id: "",
+  project_id: "",
+  model_id: "",
+  prospecting_status: PROSPECTING_STATUS_VALUES[0],
+  observations: "",
+  urgency: "Normal",
+};
+
+const EDIT_INITIAL_STATE: EditFormState = {
+  name: "",
+  status: "",
+  department_id: "",
+  observations: "",
+  billing: "Não Realizar",
+  urgency: "",
+  responsible_id: "",
+  responsible2_id: "",
+  responsible3_id: "",
+  prevision_date: "",
+};
+
+const TASK_BILLING_OPTIONS: TaskBilling[] = ["Realizar", "Não Realizar"];
+
+function toDateInputValue(value: string | null | undefined) {
+  return value ? value.slice(0, 10) : "";
+}
+
+function getApiErrorMessage(error: unknown, fallback: string) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error &&
+    typeof (error as { response?: { data?: { error?: string; message?: string } } }).response?.data
+      ?.error === "string"
+  ) {
+    return (error as { response?: { data?: { error?: string } } }).response?.data?.error ?? fallback;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error &&
+    typeof (error as { response?: { data?: { message?: string } } }).response?.data?.message ===
+      "string"
+  ) {
+    return (error as { response?: { data?: { message?: string } } }).response?.data?.message ?? fallback;
+  }
+
+  return fallback;
+}
+
+export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFormModalProps) {
+  const isEditing = Boolean(taskId);
+  const [createValues, setCreateValues] = useState<CreateFormState>(CREATE_INITIAL_STATE);
+  const [editValues, setEditValues] = useState<EditFormState>(EDIT_INITIAL_STATE);
+
+  const clientsQuery = useClients({
+    page: 1,
+    limit: 100,
+  });
+  const projectsQuery = useProjectsList(
+    !isEditing && createValues.client_id ? { ref: "client", id: createValues.client_id } : null,
+  );
+  const taskModelsQuery = useFetch(
+    ["task-form-task-models"],
+    () => taskModelService.list({ type: "Projeto" }),
+    {
+      enabled: open && !isEditing,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const departmentsQuery = useFetch<DepItem[]>(
+    ["task-form-departments"],
+    () => departmentService.list({ status: "Ativo" }),
+    {
+      enabled: open && isEditing,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const usersQuery = useFetch<UserItem[]>(
+    ["task-form-users"],
+    () => userService.list({ status: "Ativo", take: 200 }),
+    {
+      enabled: open && isEditing,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const taskDetailQuery = useIntegracaoTaskDetail(open && taskId ? taskId : undefined);
+  const createMutation = useCreateIntegracaoTaskMutation();
+  const updateMutation = useUpdateIntegracaoTaskMutation();
+
+  const selectedClientName = useMemo(() => {
+    return (
+      clientsQuery.data?.items.find((client) => client.id === createValues.client_id)?.name ??
+      "Cliente selecionado"
+    );
+  }, [clientsQuery.data?.items, createValues.client_id]);
+
+  useEffect(() => {
+    if (!open) {
+      setCreateValues(CREATE_INITIAL_STATE);
+      setEditValues(EDIT_INITIAL_STATE);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!taskDetailQuery.data) {
+      return;
+    }
+
+    const detail = taskDetailQuery.data;
+    setEditValues({
+      name: detail.name ?? "",
+      status: INTEGRACAO_TASK_STATUS_VALUES.includes(detail.status as IntegracaoTaskStatus)
+        ? (detail.status as IntegracaoTaskStatus)
+        : "",
+      department_id: detail.department_id ?? "",
+      observations: detail.observations ?? "",
+      billing: TASK_BILLING_OPTIONS.includes(detail.billing as TaskBilling)
+        ? (detail.billing as TaskBilling)
+        : "Não Realizar",
+      urgency: detail.urgency ?? "",
+      responsible_id: detail.responsible_id ?? "",
+      responsible2_id: detail.responsible2_id ?? "",
+      responsible3_id: detail.responsible3_id ?? "",
+      prevision_date: toDateInputValue(detail.prevision_date),
+    });
+  }, [taskDetailQuery.data]);
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+  const isLoadingEditOptions =
+    isEditing && (taskDetailQuery.isLoading || departmentsQuery.isLoading || usersQuery.isLoading);
+
+  function updateCreateValue<Key extends keyof CreateFormState>(
+    field: Key,
+    value: CreateFormState[Key],
+  ) {
+    setCreateValues((currentValues) => ({
+      ...currentValues,
+      [field]: value,
+      ...(field === "client_id" ? { project_id: "" } : {}),
+    }));
+  }
+
+  function updateEditValue<Key extends keyof EditFormState>(field: Key, value: EditFormState[Key]) {
+    setEditValues((currentValues) => ({
+      ...currentValues,
+      [field]: value,
+    }));
+  }
+
+  async function handleCreateSubmit() {
+    if (
+      !createValues.client_id ||
+      !createValues.project_id ||
+      !createValues.model_id ||
+      !createValues.prospecting_status ||
+      !createValues.urgency.trim()
+    ) {
+      toast.warning("Preencha cliente, projeto, modelo, status de prospecção e urgência.");
+      return;
+    }
+
+    try {
+      const createdTask = await createMutation.mutateAsync({
+        model_id: createValues.model_id,
+        project_id: createValues.project_id,
+        client_id: createValues.client_id,
+        prospecting_status: createValues.prospecting_status,
+        observations: createValues.observations.trim(),
+        urgency: createValues.urgency.trim(),
+      });
+
+      toast.success("Tarefa criada com sucesso.");
+      onSuccess?.(createdTask);
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Não foi possível criar a tarefa."));
+    }
+  }
+
+  async function handleEditSubmit() {
+    if (!taskId) {
+      return;
+    }
+
+    if (
+      !editValues.name.trim() ||
+      !editValues.status ||
+      !editValues.department_id ||
+      !editValues.responsible_id ||
+      !editValues.urgency.trim()
+    ) {
+      toast.warning("Preencha nome, status, departamento, responsável e urgência.");
+      return;
+    }
+
+    try {
+      const updatedTask = await updateMutation.mutateAsync({
+        task_id: taskId,
+        name: editValues.name.trim(),
+        status: editValues.status,
+        department_id: editValues.department_id,
+        observations: editValues.observations.trim(),
+        billing: editValues.billing,
+        urgency: editValues.urgency.trim(),
+        responsible_id: editValues.responsible_id,
+        responsible2_id: editValues.responsible2_id || null,
+        responsible3_id: editValues.responsible3_id || null,
+        prevision_date: editValues.prevision_date || null,
+      });
+
+      toast.success("Tarefa atualizada com sucesso.");
+      onSuccess?.(updatedTask);
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Não foi possível atualizar a tarefa."));
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={isEditing ? "Editar tarefa" : "Nova tarefa"}
+      description="Formulário de tarefa de integração"
+      contentClassName="w-[min(94vw,820px)]"
+      bodyClassName="max-h-[72vh] overflow-y-auto"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
+            disabled={isSaving}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (isEditing) {
+                void handleEditSubmit();
+                return;
+              }
+
+              void handleCreateSubmit();
+            }}
+            className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
+            disabled={isSaving || isLoadingEditOptions}
+          >
+            {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {isEditing ? "Salvar alterações" : "Criar tarefa"}
+          </button>
+        </>
+      }
+    >
+      {isEditing && isLoadingEditOptions ? (
+        <div className="flex min-h-52 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+          <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+          Carregando tarefa...
+        </div>
+      ) : isEditing && (taskDetailQuery.isError || departmentsQuery.isError || usersQuery.isError) ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+          Não foi possível carregar os dados necessários para edição.
+        </div>
+      ) : isEditing ? (
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleEditSubmit();
+          }}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Nome</span>
+              <input
+                type="text"
+                value={editValues.name}
+                onChange={(event) => updateEditValue("name", event.target.value)}
+                className={PROJECT_INPUT_CLASSNAME}
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Status</span>
+              <select
+                value={editValues.status}
+                onChange={(event) =>
+                  updateEditValue("status", event.target.value as IntegracaoTaskStatus | "")
+                }
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+              >
+                <option value="">Selecione</option>
+                {INTEGRACAO_TASK_STATUS_VALUES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">
+                Departamento
+              </span>
+              <select
+                value={editValues.department_id}
+                onChange={(event) => updateEditValue("department_id", event.target.value)}
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+              >
+                <option value="">Selecione</option>
+                {(departmentsQuery.data ?? []).map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Cobrança</span>
+              <select
+                value={editValues.billing}
+                onChange={(event) => updateEditValue("billing", event.target.value as TaskBilling)}
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+              >
+                {TASK_BILLING_OPTIONS.map((billing) => (
+                  <option key={billing} value={billing}>
+                    {billing}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">
+                Responsável
+              </span>
+              <select
+                value={editValues.responsible_id}
+                onChange={(event) => updateEditValue("responsible_id", event.target.value)}
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+              >
+                <option value="">Selecione</option>
+                {(usersQuery.data ?? []).map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">
+                Responsável 2
+              </span>
+              <select
+                value={editValues.responsible2_id}
+                onChange={(event) => updateEditValue("responsible2_id", event.target.value)}
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+              >
+                <option value="">Opcional</option>
+                {(usersQuery.data ?? []).map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">
+                Responsável 3
+              </span>
+              <select
+                value={editValues.responsible3_id}
+                onChange={(event) => updateEditValue("responsible3_id", event.target.value)}
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+              >
+                <option value="">Opcional</option>
+                {(usersQuery.data ?? []).map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Previsão</span>
+              <div className="relative">
+                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="date"
+                  value={editValues.prevision_date}
+                  onChange={(event) => updateEditValue("prevision_date", event.target.value)}
+                  className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                />
+              </div>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Urgência</span>
+              <input
+                type="text"
+                value={editValues.urgency}
+                onChange={(event) => updateEditValue("urgency", event.target.value)}
+                className={PROJECT_INPUT_CLASSNAME}
+                placeholder="Ex.: Normal, Alta"
+              />
+            </label>
+          </div>
+
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-slate-700 dark:text-white">Observações</span>
+            <div className="relative">
+              <FileText className="pointer-events-none absolute left-3 top-4 h-4 w-4 text-slate-400" />
+              <textarea
+                value={editValues.observations}
+                onChange={(event) => updateEditValue("observations", event.target.value)}
+                className={`${PROJECT_INPUT_CLASSNAME} min-h-28 resize-y pl-10`}
+                placeholder="Notas operacionais da tarefa."
+              />
+            </div>
+          </label>
+        </form>
+      ) : (
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleCreateSubmit();
+          }}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Cliente</span>
+              <select
+                value={createValues.client_id}
+                onChange={(event) => updateCreateValue("client_id", event.target.value)}
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+              >
+                <option value="">Selecione um cliente</option>
+                {(clientsQuery.data?.items ?? []).map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Projeto</span>
+              <select
+                value={createValues.project_id}
+                onChange={(event) => updateCreateValue("project_id", event.target.value)}
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+                disabled={!createValues.client_id || projectsQuery.isLoading}
+              >
+                <option value="">
+                  {createValues.client_id ? "Selecione um projeto" : "Selecione o cliente primeiro"}
+                </option>
+                {(projectsQuery.data ?? []).map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+              {createValues.client_id && projectsQuery.data?.length === 0 ? (
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Nenhum projeto encontrado para {selectedClientName}.
+                </span>
+              ) : null}
+            </label>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Modelo</span>
+              <select
+                value={createValues.model_id}
+                onChange={(event) => updateCreateValue("model_id", event.target.value)}
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+                disabled={taskModelsQuery.isLoading}
+              >
+                <option value="">Selecione um modelo</option>
+                {(taskModelsQuery.data ?? []).map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-white">
+                Status de prospecção
+              </span>
+              <select
+                value={createValues.prospecting_status}
+                onChange={(event) =>
+                  updateCreateValue("prospecting_status", event.target.value as ProspectingStatus)
+                }
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+              >
+                {PROSPECTING_STATUS_VALUES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-slate-700 dark:text-white">Urgência</span>
+            <input
+              type="text"
+              value={createValues.urgency}
+              onChange={(event) => updateCreateValue("urgency", event.target.value)}
+              className={PROJECT_INPUT_CLASSNAME}
+              placeholder="Ex.: Normal, Alta"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-slate-700 dark:text-white">Observações</span>
+            <div className="relative">
+              <FileText className="pointer-events-none absolute left-3 top-4 h-4 w-4 text-slate-400" />
+              <textarea
+                value={createValues.observations}
+                onChange={(event) => updateCreateValue("observations", event.target.value)}
+                className={`${PROJECT_INPUT_CLASSNAME} min-h-28 resize-y pl-10`}
+                placeholder="Detalhes de criação da tarefa."
+              />
+            </div>
+          </label>
+        </form>
+      )}
+    </Dialog>
+  );
+}
