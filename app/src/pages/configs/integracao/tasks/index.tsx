@@ -1,12 +1,15 @@
 import React, { useState, useMemo, useRef } from 'react';
 import Head from 'next/head';
 import { IoAdd, IoPencil, IoTrash, IoSearch } from 'react-icons/io5';
-import { canSSRAuth } from '@modules/auth';
+import { canSSRAdmin, isAdminPermission } from '@modules/auth';
 import { useTaskModels, TaskModelModal, type TaskModel } from '@modules/integracao';
+import { useMe } from '@shared/hooks';
 import styles from './TaskModelsPage.module.css';
 
 export default function TaskModelsConfig() {
     const { models, isLoading, createModel, updateModel, deleteModel } = useTaskModels();
+    const meQuery = useMe();
+    const canManageTaskModels = isAdminPermission(meQuery.data?.permission);
     
     // Estados do Modal de Criação/Edição
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -22,16 +25,28 @@ export default function TaskModelsConfig() {
 
     // --- Lógica de Criação/Edição ---
     const handleOpenCreate = () => {
+        if (!canManageTaskModels) {
+            return;
+        }
+
         setSelectedModel(null);
         setIsModalOpen(true);
     };
 
     const handleOpenEdit = (model: TaskModel) => {
+        if (!canManageTaskModels) {
+            return;
+        }
+
         setSelectedModel(model);
         setIsModalOpen(true);
     };
 
     const handleSave = async (data: any) => {
+        if (!canManageTaskModels) {
+            return false;
+        }
+
         if (selectedModel) {
             return await updateModel(data);
         } else {
@@ -41,6 +56,10 @@ export default function TaskModelsConfig() {
 
     // --- Lógica de Exclusão (Novo Modal) ---
     const handleOpenDelete = (id: string) => {
+        if (!canManageTaskModels) {
+            return;
+        }
+
         setModelToDelete(id);
         setIsDeleteAlertOpen(true);
     };
@@ -51,7 +70,7 @@ export default function TaskModelsConfig() {
     };
 
     const confirmDelete = async () => {
-        if (modelToDelete) {
+        if (modelToDelete && canManageTaskModels) {
             await deleteModel(modelToDelete);
             onCloseDelete();
         }
@@ -94,10 +113,12 @@ export default function TaskModelsConfig() {
                             />
                         </div>
 
-                        <button className={styles.primaryBtn} onClick={handleOpenCreate}>
-                            <IoAdd />
-                            Nova Tarefa
-                        </button>
+                        {canManageTaskModels ? (
+                            <button className={styles.primaryBtn} onClick={handleOpenCreate}>
+                                <IoAdd />
+                                Nova Tarefa
+                            </button>
+                        ) : null}
                     </div>
                 </div>
 
@@ -130,22 +151,26 @@ export default function TaskModelsConfig() {
                                             </span>
                                         </td>
                                         <td>
-                                            <div className={styles.rowActions}>
-                                                <button 
-                                                    aria-label="Editar"
-                                                    className={styles.iconBtn}
-                                                    onClick={() => handleOpenEdit(model)}
-                                                >
-                                                    <IoPencil />
-                                                </button>
-                                                <button
-                                                    aria-label="Excluir"
-                                                    className={styles.iconBtnDanger}
-                                                    onClick={() => handleOpenDelete(model.id)}
-                                                >
-                                                    <IoTrash />
-                                                </button>
-                                            </div>
+                                            {canManageTaskModels ? (
+                                                <div className={styles.rowActions}>
+                                                    <button
+                                                        aria-label="Editar"
+                                                        className={styles.iconBtn}
+                                                        onClick={() => handleOpenEdit(model)}
+                                                    >
+                                                        <IoPencil />
+                                                    </button>
+                                                    <button
+                                                        aria-label="Excluir"
+                                                        className={styles.iconBtnDanger}
+                                                        onClick={() => handleOpenDelete(model.id)}
+                                                    >
+                                                        <IoTrash />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span className={styles.readonlyText}>Somente leitura</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -187,6 +212,6 @@ export default function TaskModelsConfig() {
     );
 }
 
-export const getServerSideProps = canSSRAuth(async (ctx) => {
+export const getServerSideProps = canSSRAdmin(async (ctx) => {
     return { props: {} };
 });

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryObserverResult } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
 import { departmentService } from "@modules/departments";
@@ -12,6 +12,15 @@ import type {
 } from "../types";
 import { taskModelsListQueryKey } from "./queryKeys";
 import { taskModelService } from "../services/taskModelService";
+
+interface UseTaskModelsResult {
+  models: TaskModel[];
+  isLoading: boolean;
+  createModel: (data: CreateTaskModelData) => Promise<boolean>;
+  updateModel: (data: UpdateTaskModelData) => Promise<boolean>;
+  deleteModel: (id: string) => Promise<boolean>;
+  refresh: () => Promise<QueryObserverResult<TaskModel[], Error>>;
+}
 
 function enrichTaskModelsWithDepartments(
   models: Array<Pick<TaskModel, "id" | "department_id" | "name">>,
@@ -45,7 +54,7 @@ async function fetchTaskModels(): Promise<TaskModel[]> {
   return enrichTaskModelsWithDepartments(list, departments);
 }
 
-export const useTaskModels = () => {
+export const useTaskModels = (): UseTaskModelsResult => {
   const queryClient = useQueryClient();
   const taskModelsList = taskModelsListQueryKey();
 
