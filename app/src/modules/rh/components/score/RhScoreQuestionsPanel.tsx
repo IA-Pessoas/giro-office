@@ -19,13 +19,16 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
   const [isQuestionListOpen, setIsQuestionListOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<RhScoreQuestion | null>(null);
   const [questionPendingDelete, setQuestionPendingDelete] = useState<RhScoreQuestion | null>(null);
+  const [deletedQuestionIds, setDeletedQuestionIds] = useState<string[]>([]);
   const questionsQuery = useRhScoreQuestions({
     all: true,
     type: selectedType === "all" ? undefined : selectedType,
   });
   const updateMutation = useUpdateRhScoreQuestionMutation();
   const deleteMutation = useDeleteRhScoreQuestionMutation();
-  const questions = questionsQuery.data ?? [];
+  const questions = (questionsQuery.data ?? []).filter(
+    (question) => !deletedQuestionIds.includes(question.id),
+  );
   const totalQuestions = questions.length;
 
   function handleNewQuestion() {
@@ -69,8 +72,13 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
       return;
     }
 
+    const deletedQuestionId = questionPendingDelete.id;
+
     try {
-      await deleteMutation.mutateAsync({ id: questionPendingDelete.id });
+      await deleteMutation.mutateAsync({ id: deletedQuestionId });
+      setDeletedQuestionIds((currentIds) =>
+        currentIds.includes(deletedQuestionId) ? currentIds : [...currentIds, deletedQuestionId],
+      );
       setQuestionPendingDelete(null);
       toast.success("Pergunta excluída com sucesso.");
     } catch (error) {
