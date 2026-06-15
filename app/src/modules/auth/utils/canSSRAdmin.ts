@@ -1,6 +1,5 @@
 import type { GetServerSideProps, GetServerSidePropsContext, GetServerSidePropsResult } from "next";
 import { destroyCookie, parseCookies } from "nookies";
-// @ts-expect-error Node strip-types tests require the `.ts` extension for local ESM resolution.
 import { getPermissionFromToken, isAdminPermission } from "./permissions.ts";
 
 function redirectTo(destination: string) {

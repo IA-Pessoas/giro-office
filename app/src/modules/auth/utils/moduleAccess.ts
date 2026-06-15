@@ -1,4 +1,3 @@
-// @ts-expect-error Node strip-types tests require the `.ts` extension for local ESM resolution.
 import { isAdminPermission } from "./permissions.ts";
 
 export const GLOBAL_ADMIN_PERMISSION = 2;
