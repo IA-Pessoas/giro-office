@@ -41,8 +41,10 @@ import {
   TASK_TABLE_ACTION_HEAD_CELL_CLASSNAME,
   TASK_TABLE_BADGE_CLASSNAME,
   TASK_TABLE_CELL_CLASSNAME,
+  TASK_TABLE_CLASSNAME,
   TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME,
   TASK_TABLE_HEAD_CELL_CLASSNAME,
+  TASK_TABLE_SCROLL_AREA_CLASSNAME,
   formatTasksFooterSummary,
 } from "./taskWorkspaceUi";
 
@@ -322,18 +324,18 @@ export function TasksWorkspace() {
       </section>
 
       <section className={`${PROJECT_PANEL_CLASSNAME} overflow-hidden`}>
-        <div className="overflow-x-auto">
-          <table className="w-[1320px] min-w-full table-fixed">
+        <div className={TASK_TABLE_SCROLL_AREA_CLASSNAME}>
+          <table className={TASK_TABLE_CLASSNAME}>
             <thead className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-950/40">
               <tr className="text-left">
-                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-56`}>Tarefa</th>
-                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-36`}>Status</th>
-                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-32`}>Cobrança</th>
-                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-28`}>Comercial</th>
-                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-28`}>Financeiro</th>
+                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-40`}>Tarefa</th>
+                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-28`}>Status</th>
+                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-28`}>Cobrança</th>
+                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-24`}>Comercial</th>
+                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-24`}>Financeiro</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-32`}>Contratação</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-32`}>Pagamento</th>
-                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-56`}>Descrição</th>
+                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-40`}>Descrição</th>
                 <th className={TASK_TABLE_ACTION_HEAD_CELL_CLASSNAME}>Ações</th>
               </tr>
             </thead>

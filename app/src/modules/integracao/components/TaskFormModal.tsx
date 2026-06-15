@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarDays, FileText, LoaderCircle, Save } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -30,6 +30,16 @@ import {
   PROJECT_SELECT_ARROW_STYLE,
   PROJECT_SELECT_CLASSNAME,
 } from "./projectUi";
+import {
+  TASK_FORM_BODY_CLASSNAME,
+  TASK_FORM_CONTENT_CLASSNAME,
+  TASK_FORM_FORM_CLASSNAME,
+  TASK_FORM_GRID_CLASSNAME,
+  TASK_FORM_LABEL_CLASSNAME,
+  TASK_FORM_TEXTAREA_CLASSNAME,
+  TASK_FORM_THREE_COLUMN_GRID_CLASSNAME,
+  getProjectSelectPlaceholder,
+} from "./taskFormModalUi";
 
 interface TaskFormModalProps {
   open: boolean;
@@ -152,13 +162,6 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
   const createMutation = useCreateIntegracaoTaskMutation();
   const updateMutation = useUpdateIntegracaoTaskMutation();
 
-  const selectedClientName = useMemo(() => {
-    return (
-      clientsQuery.data?.items.find((client) => client.id === createValues.client_id)?.name ??
-      "Cliente selecionado"
-    );
-  }, [clientsQuery.data?.items, createValues.client_id]);
-
   useEffect(() => {
     if (!open) {
       setCreateValues(CREATE_INITIAL_STATE);
@@ -193,6 +196,14 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isLoadingEditOptions =
     isEditing && (taskDetailQuery.isLoading || departmentsQuery.isLoading || usersQuery.isLoading);
+  const createProjectsCount = projectsQuery.data?.length ?? null;
+  const hasNoProjectsForSelectedClient =
+    Boolean(createValues.client_id) && !projectsQuery.isLoading && createProjectsCount === 0;
+  const projectSelectPlaceholder = getProjectSelectPlaceholder({
+    hasClient: Boolean(createValues.client_id),
+    isLoading: projectsQuery.isLoading,
+    projectCount: createProjectsCount,
+  });
 
   function updateCreateValue<Key extends keyof CreateFormState>(
     field: Key,
@@ -287,8 +298,8 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
       onOpenChange={onOpenChange}
       title={isEditing ? "Editar tarefa" : "Nova tarefa"}
       description="Formulário de tarefa de integração"
-      contentClassName="w-[min(94vw,820px)]"
-      bodyClassName="max-h-[72vh] overflow-y-auto"
+      contentClassName={TASK_FORM_CONTENT_CLASSNAME}
+      bodyClassName={TASK_FORM_BODY_CLASSNAME}
       footer={
         <>
           <button
@@ -329,14 +340,14 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
         </div>
       ) : isEditing ? (
         <form
-          className="space-y-4"
+          className={TASK_FORM_FORM_CLASSNAME}
           onSubmit={(event) => {
             event.preventDefault();
             void handleEditSubmit();
           }}
         >
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
+          <div className={TASK_FORM_GRID_CLASSNAME}>
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Nome</span>
               <input
                 type="text"
@@ -346,7 +357,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
               />
             </label>
 
-            <label className="space-y-2">
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Status</span>
               <select
                 value={editValues.status}
@@ -366,8 +377,8 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
             </label>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
+          <div className={TASK_FORM_GRID_CLASSNAME}>
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Departamento
               </span>
@@ -386,7 +397,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
               </select>
             </label>
 
-            <label className="space-y-2">
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Cobrança</span>
               <select
                 value={editValues.billing}
@@ -403,8 +414,8 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
             </label>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <label className="space-y-2">
+          <div className={TASK_FORM_THREE_COLUMN_GRID_CLASSNAME}>
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Responsável
               </span>
@@ -423,7 +434,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
               </select>
             </label>
 
-            <label className="space-y-2">
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Responsável 2
               </span>
@@ -442,7 +453,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
               </select>
             </label>
 
-            <label className="space-y-2">
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Responsável 3
               </span>
@@ -462,8 +473,8 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
             </label>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
+          <div className={TASK_FORM_GRID_CLASSNAME}>
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Previsão</span>
               <div className="relative">
                 <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -476,7 +487,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
               </div>
             </label>
 
-            <label className="space-y-2">
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Urgência</span>
               <input
                 type="text"
@@ -488,14 +499,14 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
             </label>
           </div>
 
-          <label className="space-y-2">
+          <label className={TASK_FORM_LABEL_CLASSNAME}>
             <span className="text-sm font-medium text-slate-700 dark:text-white">Observações</span>
             <div className="relative">
-              <FileText className="pointer-events-none absolute left-3 top-4 h-4 w-4 text-slate-400" />
+              <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
               <textarea
                 value={editValues.observations}
                 onChange={(event) => updateEditValue("observations", event.target.value)}
-                className={`${PROJECT_INPUT_CLASSNAME} min-h-28 resize-y pl-10`}
+                className={`${PROJECT_INPUT_CLASSNAME} ${TASK_FORM_TEXTAREA_CLASSNAME}`}
                 placeholder="Notas operacionais da tarefa."
               />
             </div>
@@ -503,14 +514,14 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
         </form>
       ) : (
         <form
-          className="space-y-4"
+          className={TASK_FORM_FORM_CLASSNAME}
           onSubmit={(event) => {
             event.preventDefault();
             void handleCreateSubmit();
           }}
         >
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
+          <div className={TASK_FORM_GRID_CLASSNAME}>
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Cliente</span>
               <select
                 value={createValues.client_id}
@@ -527,34 +538,29 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
               </select>
             </label>
 
-            <label className="space-y-2">
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Projeto</span>
               <select
                 value={createValues.project_id}
                 onChange={(event) => updateCreateValue("project_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={!createValues.client_id || projectsQuery.isLoading}
+                disabled={
+                  !createValues.client_id || projectsQuery.isLoading || hasNoProjectsForSelectedClient
+                }
               >
-                <option value="">
-                  {createValues.client_id ? "Selecione um projeto" : "Selecione o cliente primeiro"}
-                </option>
+                <option value="">{projectSelectPlaceholder}</option>
                 {(projectsQuery.data ?? []).map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
                   </option>
                 ))}
               </select>
-              {createValues.client_id && projectsQuery.data?.length === 0 ? (
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Nenhum projeto encontrado para {selectedClientName}.
-                </span>
-              ) : null}
             </label>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
+          <div className={TASK_FORM_GRID_CLASSNAME}>
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Modelo</span>
               <select
                 value={createValues.model_id}
@@ -572,7 +578,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
               </select>
             </label>
 
-            <label className="space-y-2">
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Status de prospecção
               </span>
@@ -593,7 +599,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
             </label>
           </div>
 
-          <label className="space-y-2">
+          <label className={TASK_FORM_LABEL_CLASSNAME}>
             <span className="text-sm font-medium text-slate-700 dark:text-white">Urgência</span>
             <input
               type="text"
@@ -604,14 +610,14 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
             />
           </label>
 
-          <label className="space-y-2">
+          <label className={TASK_FORM_LABEL_CLASSNAME}>
             <span className="text-sm font-medium text-slate-700 dark:text-white">Observações</span>
             <div className="relative">
-              <FileText className="pointer-events-none absolute left-3 top-4 h-4 w-4 text-slate-400" />
+              <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
               <textarea
                 value={createValues.observations}
                 onChange={(event) => updateCreateValue("observations", event.target.value)}
-                className={`${PROJECT_INPUT_CLASSNAME} min-h-28 resize-y pl-10`}
+                className={`${PROJECT_INPUT_CLASSNAME} ${TASK_FORM_TEXTAREA_CLASSNAME}`}
                 placeholder="Detalhes de criação da tarefa."
               />
             </div>

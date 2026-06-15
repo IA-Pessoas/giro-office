@@ -41,8 +41,18 @@ import {
   TASK_TABLE_ACTION_CELL_CLASSNAME,
   TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME,
   TASK_TABLE_ACTION_HEAD_CELL_CLASSNAME,
+  TASK_TABLE_CLASSNAME,
+  TASK_TABLE_SCROLL_AREA_CLASSNAME,
   formatTasksFooterSummary,
 } from "./components/taskWorkspaceUi.ts";
+import {
+  TASK_FORM_BODY_CLASSNAME,
+  TASK_FORM_CONTENT_CLASSNAME,
+  TASK_FORM_FORM_CLASSNAME,
+  TASK_FORM_GRID_CLASSNAME,
+  TASK_FORM_TEXTAREA_CLASSNAME,
+  getProjectSelectPlaceholder,
+} from "./components/taskFormModalUi.ts";
 
 function runTest(name, fn) {
   try {
@@ -322,4 +332,40 @@ runTest("tasks table actions use inline square icon buttons", () => {
   assert.equal(TASK_TABLE_ACTION_BUTTON_CLASSNAME.includes("w-9"), true);
   assert.equal(TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME.includes("h-9"), true);
   assert.equal(TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME.includes("w-9"), true);
+});
+
+runTest("task form modal uses compact layout classes", () => {
+  assert.equal(TASK_FORM_CONTENT_CLASSNAME.includes("760px"), true);
+  assert.equal(TASK_FORM_CONTENT_CLASSNAME.includes("820px"), false);
+  assert.equal(TASK_FORM_BODY_CLASSNAME.includes("max-h-[64vh]"), true);
+  assert.equal(TASK_FORM_BODY_CLASSNAME.includes("!py-3"), true);
+  assert.equal(TASK_FORM_FORM_CLASSNAME, "space-y-3");
+  assert.equal(TASK_FORM_GRID_CLASSNAME, "grid gap-3 md:grid-cols-2");
+  assert.equal(TASK_FORM_TEXTAREA_CLASSNAME.includes("min-h-20"), true);
+});
+
+runTest("project select placeholder keeps empty state inside the control", () => {
+  assert.equal(
+    getProjectSelectPlaceholder({ hasClient: false, isLoading: false, projectCount: null }),
+    "Selecione o cliente primeiro",
+  );
+  assert.equal(
+    getProjectSelectPlaceholder({ hasClient: true, isLoading: true, projectCount: null }),
+    "Carregando projetos...",
+  );
+  assert.equal(
+    getProjectSelectPlaceholder({ hasClient: true, isLoading: false, projectCount: 0 }),
+    "Nenhum projeto para este cliente",
+  );
+  assert.equal(
+    getProjectSelectPlaceholder({ hasClient: true, isLoading: false, projectCount: 2 }),
+    "Selecione um projeto",
+  );
+});
+
+runTest("tasks table uses shorter width and thin horizontal scrollbar", () => {
+  assert.equal(TASK_TABLE_CLASSNAME.includes("1320px"), false);
+  assert.equal(TASK_TABLE_CLASSNAME.includes("1120px"), true);
+  assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("overflow-x-auto"), true);
+  assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("h-1.5"), true);
 });
