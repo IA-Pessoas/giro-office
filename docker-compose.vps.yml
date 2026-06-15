@@ -41,6 +41,7 @@ services:
       dockerfile: docker/app.Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3010}
+        NEXT_PUBLIC_AUTH_COOKIE_SECURE: ${NEXT_PUBLIC_AUTH_COOKIE_SECURE:-}
         API_INTERNAL_URL: ${API_INTERNAL_URL:-http://gateway:3010}
     env_file:
       - .env.vps.web
