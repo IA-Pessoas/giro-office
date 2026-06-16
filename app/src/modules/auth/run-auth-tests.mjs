@@ -7,6 +7,7 @@ import {
   AUTH_COOKIE_NAME,
   getAuthCookieOptions,
 } from "./utils/authCookie.ts";
+import { createBearerAuthHeaders, getAuthTokenValue } from "./utils/authHeaders.ts";
 import { canAccessAdministration, isAdminPermission } from "./utils/permissions.ts";
 
 async function runTest(name, fn) {
@@ -170,6 +171,40 @@ await (async () => {
       path: "/",
       sameSite: "lax",
       secure: true,
+    });
+  });
+
+  await runTest("auth cookie options allow HTTP develop slots to disable secure flag", () => {
+    const previousValue = process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE;
+    process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE = "false";
+
+    try {
+      assert.deepEqual(getAuthCookieOptions("production"), {
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+        sameSite: "lax",
+        secure: false,
+      });
+    } finally {
+      if (previousValue === undefined) {
+        delete process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE;
+      } else {
+        process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE = previousValue;
+      }
+    }
+  });
+
+  await runTest("auth headers are omitted when token is missing", () => {
+    assert.equal(getAuthTokenValue(undefined), null);
+    assert.equal(getAuthTokenValue(""), null);
+    assert.equal(createBearerAuthHeaders(undefined), null);
+    assert.equal(createBearerAuthHeaders(""), null);
+  });
+
+  await runTest("auth headers include bearer token when token exists", () => {
+    assert.equal(getAuthTokenValue("abc.def.signature"), "abc.def.signature");
+    assert.deepEqual(createBearerAuthHeaders("abc.def.signature"), {
+      Authorization: "Bearer abc.def.signature",
     });
   });
 })();
