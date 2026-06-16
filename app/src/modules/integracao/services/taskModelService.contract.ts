@@ -7,6 +7,7 @@ import type {
   TaskModelListParams,
   UpdateTaskModelData,
 } from "../types/taskModel";
+import { unwrapServiceEnvelope } from "./envelope.contract.js";
 
 export const TASK_MODEL_ENDPOINTS = {
   crud: "/task/model",
@@ -16,14 +17,6 @@ export const TASK_MODEL_ENDPOINTS = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function unwrapTaskModelEnvelope<T>(body: unknown): T {
-  if (isRecord(body) && "data" in body) {
-    return body.data as T;
-  }
-
-  return body as T;
 }
 
 export function buildTaskModelListParams(params: TaskModelListParams = {}) {
@@ -75,11 +68,11 @@ export function buildDeleteDependentPayload(id: string) {
 }
 
 export function unwrapTaskModelList(body: unknown): TaskModelListItem[] {
-  return unwrapTaskModelEnvelope<TaskModelListItem[]>(body);
+  return unwrapServiceEnvelope(body) as TaskModelListItem[];
 }
 
 export function unwrapTaskModelDetail(body: unknown): TaskModelDetail {
-  const data = unwrapTaskModelEnvelope<{ detail?: TaskModelDetail } | TaskModelDetail>(body);
+  const data = unwrapServiceEnvelope(body) as { detail?: TaskModelDetail } | TaskModelDetail;
 
   if (isRecord(data) && "detail" in data) {
     return data.detail as TaskModelDetail;
@@ -89,7 +82,7 @@ export function unwrapTaskModelDetail(body: unknown): TaskModelDetail {
 }
 
 export function unwrapCreatedTaskModel(body: unknown): TaskModelDetail {
-  const data = unwrapTaskModelEnvelope<{ create?: TaskModelDetail } | TaskModelDetail>(body);
+  const data = unwrapServiceEnvelope(body) as { create?: TaskModelDetail } | TaskModelDetail;
 
   if (isRecord(data) && "create" in data) {
     return data.create as TaskModelDetail;
@@ -99,11 +92,11 @@ export function unwrapCreatedTaskModel(body: unknown): TaskModelDetail {
 }
 
 export function unwrapUpdatedTaskModel(body: unknown): TaskModelDetail {
-  return unwrapTaskModelEnvelope<TaskModelDetail>(body);
+  return unwrapServiceEnvelope(body) as TaskModelDetail;
 }
 
 export function unwrapTaskDependentList(body: unknown): TaskDependent[] {
-  return unwrapTaskModelEnvelope<TaskDependent[]>(body);
+  return unwrapServiceEnvelope(body) as TaskDependent[];
 }
 
 export function buildCreateDependentPayload(payload: CreateTaskDependentData) {

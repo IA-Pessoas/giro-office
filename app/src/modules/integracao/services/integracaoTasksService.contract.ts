@@ -5,6 +5,7 @@ import type {
   IntegracaoTaskListResult,
   UpdateIntegracaoTaskBody,
 } from "../types/integracaoTask";
+import { unwrapServiceEnvelope } from "./envelope.contract.js";
 
 export const INTEGRACAO_TASKS_ENDPOINTS = {
   crud: "/task",
@@ -42,23 +43,17 @@ export function buildDeleteIntegracaoTaskPayload(taskId: string) {
 }
 
 export function unwrapIntegracaoTaskList(body: unknown): IntegracaoTaskListResult {
-  return unwrapTaskEnvelope<IntegracaoTaskListResult>(body);
+  return unwrapServiceEnvelope(body) as IntegracaoTaskListResult;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function unwrapTaskEnvelope<T>(body: unknown): T {
-  if (isRecord(body) && "data" in body) {
-    return body.data as T;
-  }
-
-  return body as T;
-}
-
 export function unwrapIntegracaoTaskDetail(body: unknown): IntegracaoTaskDetail {
-  const data = unwrapTaskEnvelope<{ detail?: IntegracaoTaskDetail } | IntegracaoTaskDetail>(body);
+  const data = unwrapServiceEnvelope(body) as
+    | { detail?: IntegracaoTaskDetail }
+    | IntegracaoTaskDetail;
 
   if (isRecord(data) && "detail" in data) {
     return data.detail as IntegracaoTaskDetail;
@@ -68,7 +63,9 @@ export function unwrapIntegracaoTaskDetail(body: unknown): IntegracaoTaskDetail 
 }
 
 export function unwrapCreatedIntegracaoTask(body: unknown): IntegracaoTaskDetail {
-  const data = unwrapTaskEnvelope<{ create?: IntegracaoTaskDetail } | IntegracaoTaskDetail>(body);
+  const data = unwrapServiceEnvelope(body) as
+    | { create?: IntegracaoTaskDetail }
+    | IntegracaoTaskDetail;
 
   if (isRecord(data) && "create" in data) {
     return data.create as IntegracaoTaskDetail;
@@ -78,5 +75,5 @@ export function unwrapCreatedIntegracaoTask(body: unknown): IntegracaoTaskDetail
 }
 
 export function unwrapUpdatedIntegracaoTask(body: unknown): IntegracaoTaskDetail {
-  return unwrapTaskEnvelope<IntegracaoTaskDetail>(body);
+  return unwrapServiceEnvelope(body) as IntegracaoTaskDetail;
 }

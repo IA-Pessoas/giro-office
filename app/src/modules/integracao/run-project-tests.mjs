@@ -32,6 +32,7 @@ import {
   unwrapProjectProgress,
   unwrapUpdatedProject,
 } from "./services/projectService.contract.ts";
+import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
   TASK_MODEL_CONFIG_ENTRY,
   canManageTaskModelConfig,
@@ -135,6 +136,13 @@ runTest("unwrapProjectEnvelope handles top-level data wrapper", () => {
   const payload = [{ id: "project-1", name: "Projeto 1" }];
   assert.deepEqual(unwrapProjectEnvelope({ success: true, data: payload }), payload);
   assert.deepEqual(unwrapProjectEnvelope(payload), payload);
+});
+
+runTest("unwrapServiceEnvelope handles shared service envelopes", () => {
+  const payload = { id: "task-1", name: "Tarefa" };
+
+  assert.deepEqual(unwrapServiceEnvelope({ success: true, data: payload }), payload);
+  assert.deepEqual(unwrapServiceEnvelope(payload), payload);
 });
 
 runTest("unwrapProjectList returns the data array from list envelope", () => {
