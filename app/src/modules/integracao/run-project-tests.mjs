@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   buildCreateIntegracaoTaskPayload,
@@ -373,6 +374,17 @@ runTest("tasks table actions use inline square icon buttons", () => {
   assert.equal(TASK_TABLE_ACTION_BUTTON_CLASSNAME.includes("w-9"), true);
   assert.equal(TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME.includes("h-9"), true);
   assert.equal(TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME.includes("w-9"), true);
+});
+
+runTest("tasks delete permission follows shared admin helper", () => {
+  const source = readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8");
+
+  assert.equal(source.includes('import { isAdminPermission } from "@modules/auth";'), true);
+  assert.equal(
+    source.includes("const canDelete = isAdminPermission(meQuery.data?.permission);"),
+    true,
+  );
+  assert.equal(source.includes("const canDelete = meQuery.data?.permission === 2;"), false);
 });
 
 runTest("task form modal uses compact layout classes", () => {

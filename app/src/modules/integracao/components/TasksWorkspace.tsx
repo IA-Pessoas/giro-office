@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
+import { isAdminPermission } from "@modules/auth";
 import { useMe } from "@shared/hooks";
 
 import { INTEGRACAO_TASK_STATUS_VALUES, type IntegracaoTaskListItem } from "../types";
@@ -111,7 +112,7 @@ export function TasksWorkspace() {
 
   const tasksQuery = useIntegracaoTasksList(listParams);
   const deleteTaskMutation = useDeleteIntegracaoTaskMutation();
-  const canDelete = meQuery.data?.permission === 2;
+  const canDelete = isAdminPermission(meQuery.data?.permission);
   const canManageTaskModels = canManageTaskModelConfig(meQuery.data?.permission);
 
   useEffect(() => {
