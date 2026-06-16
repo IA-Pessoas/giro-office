@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryObserverResult } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
 import { departmentService } from "@modules/departments";
@@ -12,40 +12,31 @@ import type {
 } from "../types";
 import { taskModelsListQueryKey } from "./queryKeys";
 import { taskModelService } from "../services/taskModelService";
+import { fetchTaskModelsWithOptionalDepartments } from "./useTaskModels.helpers";
 
-function enrichTaskModelsWithDepartments(
-  models: Array<Pick<TaskModel, "id" | "department_id" | "name">>,
-  departments: Array<{ id: string; name: string }>,
-): TaskModel[] {
-  const departmentById = new Map(departments.map((department) => [department.id, department]));
-
-  return models.map((model) => {
-    const department = departmentById.get(model.department_id);
-
-    return {
-      ...model,
-      ...(department
-        ? {
-            department: {
-              id: department.id,
-              name: department.name,
-            },
-          }
-        : {}),
-    };
-  });
+interface UseTaskModelsResult {
+  models: TaskModel[];
+  isLoading: boolean;
+  createModel: (data: CreateTaskModelData) => Promise<boolean>;
+  updateModel: (data: UpdateTaskModelData) => Promise<boolean>;
+  deleteModel: (id: string) => Promise<boolean>;
+  refresh: () => Promise<QueryObserverResult<TaskModel[], Error>>;
+  isError: boolean;
 }
 
 async function fetchTaskModels(): Promise<TaskModel[]> {
-  const [list, departments] = await Promise.all([
-    taskModelService.list(),
-    departmentService.list({ status: "Ativo" }),
-  ]);
-
-  return enrichTaskModelsWithDepartments(list, departments);
+  return fetchTaskModelsWithOptionalDepartments({
+    listModels: () => taskModelService.list(),
+    listDepartments: () => departmentService.list({ status: "Ativo" }),
+    onDepartmentError: () => {
+      toast.warn("Modelos carregados sem os nomes dos departamentos.", {
+        toastId: "task-models-departments-warning",
+      });
+    },
+  });
 }
 
-export const useTaskModels = () => {
+export const useTaskModels = (): UseTaskModelsResult => {
   const queryClient = useQueryClient();
   const taskModelsList = taskModelsListQueryKey();
 
@@ -111,6 +102,7 @@ export const useTaskModels = () => {
     updateModel,
     deleteModel,
     refresh: taskModelsQuery.refetch,
+    isError: taskModelsQuery.isError,
   };
 };
 

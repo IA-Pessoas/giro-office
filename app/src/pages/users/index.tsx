@@ -12,7 +12,9 @@ import {
   UserDetailsView,
   UserFilters,
   UserList,
-  userService,
+  filterAdminUsersByStatus,
+  listAdminUsers,
+  normalizeAdminUserStatus,
   type UserItem,
   type UsersIndexPageProps,
 } from "@modules/users";
@@ -55,7 +57,8 @@ export default function Users({
   const handleFilterChange = async (status: string) => {
     setIsListLoading(true);
     try {
-      const nextUsers = await userService.list({ status });
+      const normalizedStatus = normalizeAdminUserStatus(status);
+      const nextUsers = await listAdminUsers(normalizedStatus ?? undefined);
       setUsersList(nextUsers);
       setFilterStatus(status);
       toast.success(`Filtro "${status}" aplicado.`);
@@ -144,14 +147,14 @@ export const getServerSideProps = canSSRAdmin<UsersIndexPageProps>(
       const apiClient = setupAPIClient(ctx);
       const [meResponse, usersResponse, deps] = await Promise.all([
         apiClient.get("/user/me"),
-        apiClient.get("/user/users", { params: { status: "Ativo" } }),
+        apiClient.get("/user", { params: { take: 100 } }),
         departmentService.list(undefined, ctx),
       ]);
 
       return {
         props: {
           me: meResponse.data.user,
-          users: extractUsersList(usersResponse.data),
+          users: filterAdminUsersByStatus(extractUsersList(usersResponse.data), "active"),
           deps,
         },
       };

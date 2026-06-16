@@ -5,7 +5,7 @@ import type {
   IntegracaoTaskListResult,
   UpdateIntegracaoTaskBody,
 } from "../types/integracaoTask";
-import { unwrapProjectEnvelope } from "./projectService.contract.ts";
+import { unwrapServiceEnvelope } from "./envelope.contract.js";
 
 export const INTEGRACAO_TASKS_ENDPOINTS = {
   crud: "/task",
@@ -43,7 +43,7 @@ export function buildDeleteIntegracaoTaskPayload(taskId: string) {
 }
 
 export function unwrapIntegracaoTaskList(body: unknown): IntegracaoTaskListResult {
-  return unwrapProjectEnvelope<IntegracaoTaskListResult>(body);
+  return unwrapServiceEnvelope(body) as IntegracaoTaskListResult;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -51,7 +51,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function unwrapIntegracaoTaskDetail(body: unknown): IntegracaoTaskDetail {
-  const data = unwrapProjectEnvelope<{ detail?: IntegracaoTaskDetail } | IntegracaoTaskDetail>(body);
+  const data = unwrapServiceEnvelope(body) as
+    | { detail?: IntegracaoTaskDetail }
+    | IntegracaoTaskDetail;
 
   if (isRecord(data) && "detail" in data) {
     return data.detail as IntegracaoTaskDetail;
@@ -61,7 +63,9 @@ export function unwrapIntegracaoTaskDetail(body: unknown): IntegracaoTaskDetail 
 }
 
 export function unwrapCreatedIntegracaoTask(body: unknown): IntegracaoTaskDetail {
-  const data = unwrapProjectEnvelope<{ create?: IntegracaoTaskDetail } | IntegracaoTaskDetail>(body);
+  const data = unwrapServiceEnvelope(body) as
+    | { create?: IntegracaoTaskDetail }
+    | IntegracaoTaskDetail;
 
   if (isRecord(data) && "create" in data) {
     return data.create as IntegracaoTaskDetail;
@@ -71,5 +75,5 @@ export function unwrapCreatedIntegracaoTask(body: unknown): IntegracaoTaskDetail
 }
 
 export function unwrapUpdatedIntegracaoTask(body: unknown): IntegracaoTaskDetail {
-  return unwrapProjectEnvelope<IntegracaoTaskDetail>(body);
+  return unwrapServiceEnvelope(body) as IntegracaoTaskDetail;
 }

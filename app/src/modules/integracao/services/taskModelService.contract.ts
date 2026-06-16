@@ -7,7 +7,7 @@ import type {
   TaskModelListParams,
   UpdateTaskModelData,
 } from "../types/taskModel";
-import { unwrapProjectEnvelope } from "./projectService.contract.ts";
+import { unwrapServiceEnvelope } from "./envelope.contract.js";
 
 export const TASK_MODEL_ENDPOINTS = {
   crud: "/task/model",
@@ -68,11 +68,11 @@ export function buildDeleteDependentPayload(id: string) {
 }
 
 export function unwrapTaskModelList(body: unknown): TaskModelListItem[] {
-  return unwrapProjectEnvelope<TaskModelListItem[]>(body);
+  return unwrapServiceEnvelope(body) as TaskModelListItem[];
 }
 
 export function unwrapTaskModelDetail(body: unknown): TaskModelDetail {
-  const data = unwrapProjectEnvelope<{ detail?: TaskModelDetail } | TaskModelDetail>(body);
+  const data = unwrapServiceEnvelope(body) as { detail?: TaskModelDetail } | TaskModelDetail;
 
   if (isRecord(data) && "detail" in data) {
     return data.detail as TaskModelDetail;
@@ -82,7 +82,7 @@ export function unwrapTaskModelDetail(body: unknown): TaskModelDetail {
 }
 
 export function unwrapCreatedTaskModel(body: unknown): TaskModelDetail {
-  const data = unwrapProjectEnvelope<{ create?: TaskModelDetail } | TaskModelDetail>(body);
+  const data = unwrapServiceEnvelope(body) as { create?: TaskModelDetail } | TaskModelDetail;
 
   if (isRecord(data) && "create" in data) {
     return data.create as TaskModelDetail;
@@ -92,11 +92,11 @@ export function unwrapCreatedTaskModel(body: unknown): TaskModelDetail {
 }
 
 export function unwrapUpdatedTaskModel(body: unknown): TaskModelDetail {
-  return unwrapProjectEnvelope<TaskModelDetail>(body);
+  return unwrapServiceEnvelope(body) as TaskModelDetail;
 }
 
 export function unwrapTaskDependentList(body: unknown): TaskDependent[] {
-  return unwrapProjectEnvelope<TaskDependent[]>(body);
+  return unwrapServiceEnvelope(body) as TaskDependent[];
 }
 
 export function buildCreateDependentPayload(payload: CreateTaskDependentData) {
