@@ -44,6 +44,8 @@ import {
   TASK_TABLE_CLASSNAME,
   TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME,
   TASK_TABLE_HEAD_CELL_CLASSNAME,
+  TASK_TABLE_NAME_CELL_CLASSNAME,
+  TASK_TABLE_NAME_HEAD_CELL_CLASSNAME,
   TASK_TABLE_SCROLL_AREA_CLASSNAME,
   formatTasksFooterSummary,
 } from "./taskWorkspaceUi";
@@ -57,7 +59,7 @@ const TASK_REF_OPTIONS = [
 ] as const;
 
 function formatNullable(value: string | null | undefined) {
-  return value?.trim() ? value : "Não informado";
+  return value?.trim() ? value : "—";
 }
 
 function formatBoolean(value: boolean) {
@@ -328,7 +330,7 @@ export function TasksWorkspace() {
           <table className={TASK_TABLE_CLASSNAME}>
             <thead className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-950/40">
               <tr className="text-left">
-                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-40`}>Tarefa</th>
+                <th className={TASK_TABLE_NAME_HEAD_CELL_CLASSNAME}>Tarefa</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-28`}>Status</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-28`}>Cobrança</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-24`}>Comercial</th>
@@ -365,7 +367,7 @@ export function TasksWorkspace() {
                     key={task.id}
                     className="border-b border-slate-200/80 align-top last:border-b-0 dark:border-slate-800"
                   >
-                    <td className={TASK_TABLE_CELL_CLASSNAME}>
+                    <td className={TASK_TABLE_NAME_CELL_CLASSNAME}>
                       <p className="line-clamp-2 font-semibold text-slate-900 dark:text-white" title={task.name}>
                         {task.name}
                       </p>

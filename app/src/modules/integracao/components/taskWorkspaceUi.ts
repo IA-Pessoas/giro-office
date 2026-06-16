@@ -3,6 +3,10 @@ export const TASK_TABLE_HEAD_CELL_CLASSNAME =
 
 export const TASK_TABLE_CELL_CLASSNAME = "px-3 py-3 text-sm text-slate-600 dark:text-slate-200";
 
+export const TASK_TABLE_NAME_HEAD_CELL_CLASSNAME = `${TASK_TABLE_HEAD_CELL_CLASSNAME} w-44 pl-5`;
+
+export const TASK_TABLE_NAME_CELL_CLASSNAME = `${TASK_TABLE_CELL_CLASSNAME} pl-5`;
+
 export const TASK_TABLE_BADGE_CLASSNAME =
   "inline-flex min-h-6 items-center justify-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold";
 
