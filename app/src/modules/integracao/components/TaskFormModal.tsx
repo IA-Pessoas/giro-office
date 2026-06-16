@@ -31,6 +31,7 @@ import {
   PROJECT_SELECT_CLASSNAME,
 } from "./projectUi";
 import {
+  TASK_FORM_AUXILIARY_WARNING_CLASSNAME,
   TASK_FORM_BODY_CLASSNAME,
   TASK_FORM_CONTENT_CLASSNAME,
   TASK_FORM_FORM_CLASSNAME,
@@ -38,7 +39,12 @@ import {
   TASK_FORM_LABEL_CLASSNAME,
   TASK_FORM_TEXTAREA_CLASSNAME,
   TASK_FORM_THREE_COLUMN_GRID_CLASSNAME,
+  TASK_URGENCY_OPTIONS,
+  type TaskUrgencyOption,
+  getDefaultTaskUrgency,
   getProjectSelectPlaceholder,
+  getTaskUrgencyOptions,
+  shouldBlockTaskEditForm,
 } from "./taskFormModalUi";
 
 interface TaskFormModalProps {
@@ -54,7 +60,7 @@ interface CreateFormState {
   model_id: string;
   prospecting_status: ProspectingStatus | "";
   observations: string;
-  urgency: string;
+  urgency: TaskUrgencyOption;
 }
 
 interface EditFormState {
@@ -76,7 +82,7 @@ const CREATE_INITIAL_STATE: CreateFormState = {
   model_id: "",
   prospecting_status: PROSPECTING_STATUS_VALUES[0],
   observations: "",
-  urgency: "Normal",
+  urgency: getDefaultTaskUrgency(),
 };
 
 const EDIT_INITIAL_STATE: EditFormState = {
@@ -170,7 +176,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
   }, [open]);
 
   useEffect(() => {
-    if (!taskDetailQuery.data) {
+    if (!open || !taskDetailQuery.data) {
       return;
     }
 
@@ -191,11 +197,23 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
       responsible3_id: detail.responsible3_id ?? "",
       prevision_date: toDateInputValue(detail.prevision_date),
     });
-  }, [taskDetailQuery.data]);
+  }, [open, taskDetailQuery.data]);
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isLoadingEditOptions =
-    isEditing && (taskDetailQuery.isLoading || departmentsQuery.isLoading || usersQuery.isLoading);
+  const isLoadingEditTask =
+    isEditing &&
+    shouldBlockTaskEditForm({
+      isTaskLoading: taskDetailQuery.isLoading,
+      isDepartmentsLoading: departmentsQuery.isLoading,
+      isUsersLoading: usersQuery.isLoading,
+    });
+  const hasEditAuxiliaryOptionsWarning =
+    isEditing && (departmentsQuery.isError || usersQuery.isError);
+  const departments = departmentsQuery.data ?? [];
+  const users = usersQuery.data ?? [];
+  const shouldRenderCurrentDepartmentOption =
+    Boolean(editValues.department_id) &&
+    !departments.some((department) => department.id === editValues.department_id);
   const createProjectsCount = projectsQuery.data?.length ?? null;
   const hasNoProjectsForSelectedClient =
     Boolean(createValues.client_id) && !projectsQuery.isLoading && createProjectsCount === 0;
@@ -204,6 +222,35 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
     isLoading: projectsQuery.isLoading,
     projectCount: createProjectsCount,
   });
+  const editUrgencyOptions = getTaskUrgencyOptions(editValues.urgency);
+
+  function shouldRenderCurrentUserOption(userId: string) {
+    return Boolean(userId) && !users.some((user) => user.id === userId);
+  }
+
+  function getDepartmentPlaceholder() {
+    if (departmentsQuery.isLoading) {
+      return "Carregando departamentos...";
+    }
+
+    if (departmentsQuery.isError) {
+      return "Departamentos indisponíveis";
+    }
+
+    return "Selecione";
+  }
+
+  function getUserPlaceholder(optional: boolean) {
+    if (usersQuery.isLoading) {
+      return "Carregando usuários...";
+    }
+
+    if (usersQuery.isError) {
+      return "Usuários indisponíveis";
+    }
+
+    return optional ? "Opcional" : "Selecione";
+  }
 
   function updateCreateValue<Key extends keyof CreateFormState>(
     field: Key,
@@ -229,7 +276,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
       !createValues.project_id ||
       !createValues.model_id ||
       !createValues.prospecting_status ||
-      !createValues.urgency.trim()
+      !createValues.urgency
     ) {
       toast.warning("Preencha cliente, projeto, modelo, status de prospecção e urgência.");
       return;
@@ -242,7 +289,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
         client_id: createValues.client_id,
         prospecting_status: createValues.prospecting_status,
         observations: createValues.observations.trim(),
-        urgency: createValues.urgency.trim(),
+        urgency: createValues.urgency,
       });
 
       toast.success("Tarefa criada com sucesso.");
@@ -321,7 +368,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
               void handleCreateSubmit();
             }}
             className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-            disabled={isSaving || isLoadingEditOptions}
+            disabled={isSaving || isLoadingEditTask}
           >
             {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {isEditing ? "Salvar alterações" : "Criar tarefa"}
@@ -329,14 +376,14 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
         </>
       }
     >
-      {isEditing && isLoadingEditOptions ? (
+      {isEditing && isLoadingEditTask ? (
         <div className="flex min-h-52 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
           <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
           Carregando tarefa...
         </div>
-      ) : isEditing && (taskDetailQuery.isError || departmentsQuery.isError || usersQuery.isError) ? (
+      ) : isEditing && taskDetailQuery.isError ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
-          Não foi possível carregar os dados necessários para edição.
+          Não foi possível carregar a tarefa para edição.
         </div>
       ) : isEditing ? (
         <form
@@ -346,6 +393,12 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
             void handleEditSubmit();
           }}
         >
+          {hasEditAuxiliaryOptionsWarning ? (
+            <div className={TASK_FORM_AUXILIARY_WARNING_CLASSNAME}>
+              Algumas listas de seleção não carregaram. Os dados atuais continuam no formulário.
+            </div>
+          ) : null}
+
           <div className={TASK_FORM_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Nome</span>
@@ -387,9 +440,13 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
                 onChange={(event) => updateEditValue("department_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
+                disabled={departmentsQuery.isLoading || departmentsQuery.isError}
               >
-                <option value="">Selecione</option>
-                {(departmentsQuery.data ?? []).map((department) => (
+                <option value="">{getDepartmentPlaceholder()}</option>
+                {shouldRenderCurrentDepartmentOption ? (
+                  <option value={editValues.department_id}>Departamento atual</option>
+                ) : null}
+                {departments.map((department) => (
                   <option key={department.id} value={department.id}>
                     {department.name}
                   </option>
@@ -424,9 +481,13 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
                 onChange={(event) => updateEditValue("responsible_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
+                disabled={usersQuery.isLoading || usersQuery.isError}
               >
-                <option value="">Selecione</option>
-                {(usersQuery.data ?? []).map((user) => (
+                <option value="">{getUserPlaceholder(false)}</option>
+                {shouldRenderCurrentUserOption(editValues.responsible_id) ? (
+                  <option value={editValues.responsible_id}>Responsável atual</option>
+                ) : null}
+                {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.name}
                   </option>
@@ -443,9 +504,13 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
                 onChange={(event) => updateEditValue("responsible2_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
+                disabled={usersQuery.isLoading || usersQuery.isError}
               >
-                <option value="">Opcional</option>
-                {(usersQuery.data ?? []).map((user) => (
+                <option value="">{getUserPlaceholder(true)}</option>
+                {shouldRenderCurrentUserOption(editValues.responsible2_id) ? (
+                  <option value={editValues.responsible2_id}>Responsável 2 atual</option>
+                ) : null}
+                {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.name}
                   </option>
@@ -462,9 +527,13 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
                 onChange={(event) => updateEditValue("responsible3_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
+                disabled={usersQuery.isLoading || usersQuery.isError}
               >
-                <option value="">Opcional</option>
-                {(usersQuery.data ?? []).map((user) => (
+                <option value="">{getUserPlaceholder(true)}</option>
+                {shouldRenderCurrentUserOption(editValues.responsible3_id) ? (
+                  <option value={editValues.responsible3_id}>Responsável 3 atual</option>
+                ) : null}
+                {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.name}
                   </option>
@@ -489,13 +558,19 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Urgência</span>
-              <input
-                type="text"
+              <select
                 value={editValues.urgency}
                 onChange={(event) => updateEditValue("urgency", event.target.value)}
-                className={PROJECT_INPUT_CLASSNAME}
-                placeholder="Ex.: Normal, Alta"
-              />
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+              >
+                <option value="">Selecione</option>
+                {editUrgencyOptions.map((urgency) => (
+                  <option key={urgency} value={urgency}>
+                    {urgency}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
@@ -559,9 +634,11 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
             </label>
           </div>
 
-          <div className={TASK_FORM_GRID_CLASSNAME}>
+          <div className={TASK_FORM_THREE_COLUMN_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">Modelo</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-white">
+                Modelo de tarefa
+              </span>
               <select
                 value={createValues.model_id}
                 onChange={(event) => updateCreateValue("model_id", event.target.value)}
@@ -569,7 +646,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
                 style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={taskModelsQuery.isLoading}
               >
-                <option value="">Selecione um modelo</option>
+                <option value="">Selecione um modelo de tarefa</option>
                 {(taskModelsQuery.data ?? []).map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.name}
@@ -597,18 +674,25 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
                 ))}
               </select>
             </label>
-          </div>
 
-          <label className={TASK_FORM_LABEL_CLASSNAME}>
-            <span className="text-sm font-medium text-slate-700 dark:text-white">Urgência</span>
-            <input
-              type="text"
-              value={createValues.urgency}
-              onChange={(event) => updateCreateValue("urgency", event.target.value)}
-              className={PROJECT_INPUT_CLASSNAME}
-              placeholder="Ex.: Normal, Alta"
-            />
-          </label>
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Urgência</span>
+              <select
+                value={createValues.urgency}
+                onChange={(event) =>
+                  updateCreateValue("urgency", event.target.value as TaskUrgencyOption)
+                }
+                className={PROJECT_SELECT_CLASSNAME}
+                style={PROJECT_SELECT_ARROW_STYLE}
+              >
+                {TASK_URGENCY_OPTIONS.map((urgency) => (
+                  <option key={urgency} value={urgency}>
+                    {urgency}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
           <label className={TASK_FORM_LABEL_CLASSNAME}>
             <span className="text-sm font-medium text-slate-700 dark:text-white">Observações</span>
