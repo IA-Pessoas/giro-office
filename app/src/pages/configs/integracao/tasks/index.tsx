@@ -1,217 +1,358 @@
-import React, { useState, useMemo, useRef } from 'react';
-import Head from 'next/head';
-import { IoAdd, IoPencil, IoTrash, IoSearch } from 'react-icons/io5';
-import { canSSRAdmin, isAdminPermission } from '@modules/auth';
-import { useTaskModels, TaskModelModal, type TaskModel } from '@modules/integracao';
-import { useMe } from '@shared/hooks';
-import styles from './TaskModelsPage.module.css';
+import { useMemo, useState } from "react";
+import Head from "next/head";
+import {
+  Edit3,
+  LoaderCircle,
+  Plus,
+  RefreshCcw,
+  Search,
+  Settings2,
+  ShieldAlert,
+  Trash2,
+} from "lucide-react";
+
+import { canSSRAdmin } from "@modules/auth";
+import {
+  TaskModelModal,
+  canManageTaskModelConfig,
+  useTaskModels,
+  type TaskModel,
+} from "@modules/integracao";
+import { getTaskModelDepartmentLabel, getTaskModelEmptyStateMessage } from "@modules/integracao/components/taskModelConfigUi";
+import {
+  PROJECT_COMPACT_BUTTON_CLASSNAME,
+  PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME,
+  PROJECT_INPUT_CLASSNAME,
+  PROJECT_PANEL_CLASSNAME,
+  PROJECT_PRIMARY_BUTTON_CLASSNAME,
+  PROJECT_SECONDARY_BUTTON_CLASSNAME,
+  PROJECT_SUBPANEL_CLASSNAME,
+} from "@modules/integracao/components/projectUi";
+import {
+  TASK_TABLE_ACTION_BUTTON_CLASSNAME,
+  TASK_TABLE_ACTION_CELL_CLASSNAME,
+  TASK_TABLE_ACTION_HEAD_CELL_CLASSNAME,
+  TASK_TABLE_CELL_CLASSNAME,
+  TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME,
+  TASK_TABLE_HEAD_CELL_CLASSNAME,
+} from "@modules/integracao/components/taskWorkspaceUi";
+import { Dialog } from "@shared/components/ui/Dialog";
+import { useMe } from "@shared/hooks";
 
 export default function TaskModelsConfig() {
-    const { models, isLoading, createModel, updateModel, deleteModel } = useTaskModels();
-    const meQuery = useMe();
-    const canManageTaskModels = isAdminPermission(meQuery.data?.permission);
-    
-    // Estados do Modal de Criação/Edição
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedModel, setSelectedModel] = useState<TaskModel | null>(null);
+  const {
+    models,
+    isLoading,
+    isError,
+    createModel,
+    updateModel,
+    deleteModel,
+    refresh,
+  } = useTaskModels();
+  const meQuery = useMe();
+  const canManageTaskModels = canManageTaskModelConfig(meQuery.data?.permission);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<TaskModel | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [modelToDelete, setModelToDelete] = useState<TaskModel | null>(null);
 
-    // Estados da Busca
-    const [searchTerm, setSearchTerm] = useState('');
+  const filteredModels = useMemo(() => {
+    const lowerSearch = searchTerm.trim().toLowerCase();
 
-    // Estados do Modal de Exclusão
-    const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-    const [modelToDelete, setModelToDelete] = useState<string | null>(null);
-    const cancelRef = useRef<HTMLButtonElement>(null); // Ref mantida para compatibilidade
+    if (!lowerSearch) {
+      return models;
+    }
 
-    // --- Lógica de Criação/Edição ---
-    const handleOpenCreate = () => {
-        if (!canManageTaskModels) {
-            return;
-        }
+    return models.filter((model) => {
+      const departmentLabel = getTaskModelDepartmentLabel(model).toLowerCase();
 
-        setSelectedModel(null);
-        setIsModalOpen(true);
-    };
+      return (
+        model.name.toLowerCase().includes(lowerSearch) ||
+        departmentLabel.includes(lowerSearch) ||
+        model.department_id.toLowerCase().includes(lowerSearch)
+      );
+    });
+  }, [models, searchTerm]);
 
-    const handleOpenEdit = (model: TaskModel) => {
-        if (!canManageTaskModels) {
-            return;
-        }
+  const stats = useMemo(() => {
+    const departmentsCount = new Set(models.map((model) => model.department_id)).size;
+    const unresolvedDepartments = models.filter((model) => !model.department?.name).length;
 
-        setSelectedModel(model);
-        setIsModalOpen(true);
-    };
+    return [
+      {
+        label: "Modelos",
+        value: models.length,
+        description: "Templates disponíveis para criação de tarefas de integração.",
+      },
+      {
+        label: "Departamentos",
+        value: departmentsCount,
+        description: "Áreas vinculadas aos modelos carregados.",
+      },
+      {
+        label: "Sem nome de departamento",
+        value: unresolvedDepartments,
+        description: "Modelos carregados sem enriquecimento da lista de departamentos.",
+      },
+    ];
+  }, [models]);
 
-    const handleSave = async (data: any) => {
-        if (!canManageTaskModels) {
-            return false;
-        }
+  function handleOpenCreate() {
+    if (!canManageTaskModels) {
+      return;
+    }
 
-        if (selectedModel) {
-            return await updateModel(data);
-        } else {
-            return await createModel(data);
-        }
-    };
+    setSelectedModel(null);
+    setIsModalOpen(true);
+  }
 
-    // --- Lógica de Exclusão (Novo Modal) ---
-    const handleOpenDelete = (id: string) => {
-        if (!canManageTaskModels) {
-            return;
-        }
+  function handleOpenEdit(model: TaskModel) {
+    if (!canManageTaskModels) {
+      return;
+    }
 
-        setModelToDelete(id);
-        setIsDeleteAlertOpen(true);
-    };
+    setSelectedModel(model);
+    setIsModalOpen(true);
+  }
 
-    const onCloseDelete = () => {
-        setIsDeleteAlertOpen(false);
-        setModelToDelete(null);
-    };
+  async function handleSave(data: Parameters<typeof createModel>[0] & { id?: string }) {
+    if (!canManageTaskModels) {
+      return false;
+    }
 
-    const confirmDelete = async () => {
-        if (modelToDelete && canManageTaskModels) {
-            await deleteModel(modelToDelete);
-            onCloseDelete();
-        }
-    };
+    if (selectedModel) {
+      return updateModel({ ...data, id: selectedModel.id });
+    }
 
-    // --- Lógica de Filtragem ---
-    const filteredModels = useMemo(() => {
-        const lowerSearch = searchTerm.toLowerCase();
-        return models.filter((model) => {
-            // Verifica o Nome
-            const matchName = model.name.toLowerCase().includes(lowerSearch);
-            
-            // Verifica o Tipo (Lógica visual que você usou na tabela)
-            const typeLabel = model.billing === 'Realizar' ? 'Produto' : 'Tarefa';
-            const matchType = typeLabel.toLowerCase().includes(lowerSearch);
+    return createModel(data);
+  }
 
-            // Verifica o Departamento (opcional, se quiser buscar por depto tbm)
-            const matchDept = model.department?.name?.toLowerCase().includes(lowerSearch);
+  async function confirmDelete() {
+    if (!modelToDelete || !canManageTaskModels) {
+      return;
+    }
 
-            return matchName || matchType || matchDept;
-        });
-    }, [models, searchTerm]);
+    const success = await deleteModel(modelToDelete.id);
+    if (success) {
+      setModelToDelete(null);
+    }
+  }
 
-    return (
-        <>
-            <Head><title>Modelos de Tarefa - Integração</title></Head>
-            <div className={styles.page}>
-                <div className={styles.header}>
-                    <h1 className={styles.title}>Modelos de Tarefas</h1>
-                    
-                    <div className={styles.headerActions}>
-                        <div className={styles.searchWrap}>
-                            <IoSearch className={styles.searchIcon} />
-                            <input
-                                type="text" 
-                                placeholder="Buscar por nome ou tipo..." 
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className={styles.searchInput}
-                            />
-                        </div>
+  const hasSearch = Boolean(searchTerm.trim());
+  const showEmptyState = !isLoading && filteredModels.length === 0;
 
-                        {canManageTaskModels ? (
-                            <button className={styles.primaryBtn} onClick={handleOpenCreate}>
-                                <IoAdd />
-                                Nova Tarefa
-                            </button>
-                        ) : null}
-                    </div>
-                </div>
+  return (
+    <>
+      <Head>
+        <title>Modelos de tarefas - Integração</title>
+      </Head>
 
-                <div className={styles.card}>
-                    {isLoading ? (
-                        <div className={styles.loading}>Carregando...</div>
-                    ) : filteredModels.length === 0 ? (
-                        <p className={styles.emptyText}>
-                            {searchTerm ? 'Nenhum resultado encontrado para a busca.' : 'Nenhum modelo cadastrado.'}
-                        </p>
-                    ) : (
-                        <div className={styles.tableWrap}>
-                            <table className={styles.table}>
-                                <thead>
-                                    <tr>
-                                        <th>Nome</th>
-                                        <th>Departamento</th>
-                                        <th>Tipo</th>
-                                        <th style={{ width: 100 }}>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                {filteredModels.map((model) => (
-                                    <tr key={model.id}>
-                                        <td>{model.name}</td>
-                                        <td>{model.department?.name || '-'}</td>
-                                        <td>
-                                            <span className={model.billing === 'Realizar' ? styles.badgeBlue : styles.badgeGray}>
-                                                {model.billing === 'Realizar' ? 'Produto' : 'Tarefa'}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {canManageTaskModels ? (
-                                                <div className={styles.rowActions}>
-                                                    <button
-                                                        aria-label="Editar"
-                                                        className={styles.iconBtn}
-                                                        onClick={() => handleOpenEdit(model)}
-                                                    >
-                                                        <IoPencil />
-                                                    </button>
-                                                    <button
-                                                        aria-label="Excluir"
-                                                        className={styles.iconBtnDanger}
-                                                        onClick={() => handleOpenDelete(model.id)}
-                                                    >
-                                                        <IoTrash />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <span className={styles.readonlyText}>Somente leitura</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-slate-900 dark:text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20">
+                <Settings2 className="h-6 w-6 text-white" />
+              </div>
+              Modelos de tarefas
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Configure os templates usados pela criação de tarefas da integração.
+            </p>
+          </div>
+
+          {canManageTaskModels ? (
+            <button type="button" onClick={handleOpenCreate} className={PROJECT_PRIMARY_BUTTON_CLASSNAME}>
+              <Plus className="h-4 w-4" />
+              Novo modelo
+            </button>
+          ) : null}
+        </div>
+
+        {!canManageTaskModels && !meQuery.isLoading ? (
+          <section className={`${PROJECT_PANEL_CLASSNAME} p-5`}>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900 dark:text-white">Acesso somente leitura</p>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  A criação e manutenção de modelos exige permissão administrativa.
+                </p>
+              </div>
             </div>
+          </section>
+        ) : null}
 
-            {/* Modal de Criação/Edição */}
-            <TaskModelModal 
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
-                initialData={selectedModel} 
-                onSave={handleSave} 
-            />
+        <div className="grid gap-4 md:grid-cols-3">
+          {stats.map((stat) => (
+            <section key={stat.label} className={`${PROJECT_PANEL_CLASSNAME} p-5`}>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{stat.label}</p>
+              <p className="mt-1 text-3xl font-semibold text-slate-900 dark:text-white">{stat.value}</p>
+              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{stat.description}</p>
+            </section>
+          ))}
+        </div>
 
-            {/* Modal de Confirmação de Exclusão (AlertDialog) */}
-            {isDeleteAlertOpen && (
-                <div className={styles.modalOverlay} onClick={onCloseDelete}>
-                    <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
-                        <h3 className={styles.modalTitle}>Excluir Modelo</h3>
-                        <p className={styles.modalBody}>
-                            Tem certeza que deseja excluir este modelo de tarefa? Essa ação não pode ser desfeita.
+        <section className={`${PROJECT_SUBPANEL_CLASSNAME} p-4`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <label className="min-w-0 flex-1 space-y-2">
+              <span className="block text-sm font-medium text-slate-700 dark:text-white">
+                Buscar modelo
+              </span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                  placeholder="Buscar por nome ou departamento"
+                />
+              </div>
+            </label>
+
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className={PROJECT_COMPACT_BUTTON_CLASSNAME}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCcw className="h-3.5 w-3.5" />
+              )}
+              Atualizar
+            </button>
+          </div>
+        </section>
+
+        <section className={`${PROJECT_PANEL_CLASSNAME} overflow-hidden`}>
+          <div className="overflow-x-auto">
+            <table className="min-w-full table-fixed">
+              <thead className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-950/40">
+                <tr>
+                  <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-[48%] pl-5`}>Modelo</th>
+                  <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-[32%]`}>Departamento</th>
+                  <th className={TASK_TABLE_ACTION_HEAD_CELL_CLASSNAME}>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={3} className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400">
+                      <LoaderCircle className="mr-2 inline h-4 w-4 animate-spin" />
+                      Carregando modelos...
+                    </td>
+                  </tr>
+                ) : showEmptyState ? (
+                  <tr>
+                    <td colSpan={3} className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400">
+                      {getTaskModelEmptyStateMessage({ hasSearch, isError })}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredModels.map((model) => (
+                    <tr
+                      key={model.id}
+                      className="border-b border-slate-200/80 last:border-b-0 dark:border-slate-800"
+                    >
+                      <td className={`${TASK_TABLE_CELL_CLASSNAME} pl-5`}>
+                        <p className="font-semibold text-slate-900 dark:text-white" title={model.name}>
+                          {model.name}
                         </p>
-                        <div className={styles.modalFooter}>
-                            <button ref={cancelRef} onClick={onCloseDelete} className={styles.ghostBtn}>
-                                Cancelar
+                      </td>
+                      <td className={TASK_TABLE_CELL_CLASSNAME}>
+                        {getTaskModelDepartmentLabel(model)}
+                      </td>
+                      <td className={TASK_TABLE_ACTION_CELL_CLASSNAME}>
+                        {canManageTaskModels ? (
+                          <div className="flex justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(model)}
+                              className={TASK_TABLE_ACTION_BUTTON_CLASSNAME}
+                              aria-label={`Editar modelo ${model.name}`}
+                              title="Editar modelo"
+                            >
+                              <Edit3 className="h-4 w-4" />
                             </button>
-                            <button onClick={confirmDelete} className={styles.dangerBtn}>
-                                Excluir
+                            <button
+                              type="button"
+                              onClick={() => setModelToDelete(model)}
+                              className={TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
+                              aria-label={`Excluir modelo ${model.name}`}
+                              title="Excluir modelo"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            Somente leitura
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <TaskModelModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        initialData={selectedModel}
+        onSave={handleSave}
+      />
+
+      <Dialog
+        open={Boolean(modelToDelete)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setModelToDelete(null);
+          }
+        }}
+        title="Excluir modelo"
+        description="Confirmação de exclusão de modelo de tarefa"
+        contentClassName="w-[min(92vw,460px)]"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setModelToDelete(null)}
+              className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void confirmDelete()}
+              className={PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME}
+            >
+              Excluir
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+          Tem certeza que deseja excluir o modelo
+          {" "}
+          <span className="font-semibold text-slate-900 dark:text-white">
+            {modelToDelete?.name}
+          </span>
+          ? Essa ação não pode ser desfeita.
+        </p>
+      </Dialog>
+    </>
+  );
 }
 
-export const getServerSideProps = canSSRAdmin(async (ctx) => {
-    return { props: {} };
+export const getServerSideProps = canSSRAdmin(async () => {
+  return { props: {} };
 });

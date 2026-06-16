@@ -12,6 +12,7 @@ import type {
 } from "../types";
 import { taskModelsListQueryKey } from "./queryKeys";
 import { taskModelService } from "../services/taskModelService";
+import { fetchTaskModelsWithOptionalDepartments } from "./useTaskModels.helpers";
 
 interface UseTaskModelsResult {
   models: TaskModel[];
@@ -20,38 +21,19 @@ interface UseTaskModelsResult {
   updateModel: (data: UpdateTaskModelData) => Promise<boolean>;
   deleteModel: (id: string) => Promise<boolean>;
   refresh: () => Promise<QueryObserverResult<TaskModel[], Error>>;
-}
-
-function enrichTaskModelsWithDepartments(
-  models: Array<Pick<TaskModel, "id" | "department_id" | "name">>,
-  departments: Array<{ id: string; name: string }>,
-): TaskModel[] {
-  const departmentById = new Map(departments.map((department) => [department.id, department]));
-
-  return models.map((model) => {
-    const department = departmentById.get(model.department_id);
-
-    return {
-      ...model,
-      ...(department
-        ? {
-            department: {
-              id: department.id,
-              name: department.name,
-            },
-          }
-        : {}),
-    };
-  });
+  isError: boolean;
 }
 
 async function fetchTaskModels(): Promise<TaskModel[]> {
-  const [list, departments] = await Promise.all([
-    taskModelService.list(),
-    departmentService.list({ status: "Ativo" }),
-  ]);
-
-  return enrichTaskModelsWithDepartments(list, departments);
+  return fetchTaskModelsWithOptionalDepartments({
+    listModels: () => taskModelService.list(),
+    listDepartments: () => departmentService.list({ status: "Ativo" }),
+    onDepartmentError: () => {
+      toast.warn("Modelos carregados sem os nomes dos departamentos.", {
+        toastId: "task-models-departments-warning",
+      });
+    },
+  });
 }
 
 export const useTaskModels = (): UseTaskModelsResult => {
@@ -120,6 +102,7 @@ export const useTaskModels = (): UseTaskModelsResult => {
     updateModel,
     deleteModel,
     refresh: taskModelsQuery.refetch,
+    isError: taskModelsQuery.isError,
   };
 };
 

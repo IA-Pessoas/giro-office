@@ -42,6 +42,8 @@ import {
   TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME,
   TASK_TABLE_ACTION_HEAD_CELL_CLASSNAME,
   TASK_TABLE_CLASSNAME,
+  TASK_TABLE_NAME_CELL_CLASSNAME,
+  TASK_TABLE_NAME_HEAD_CELL_CLASSNAME,
   TASK_TABLE_SCROLL_AREA_CLASSNAME,
   formatTasksFooterSummary,
 } from "./components/taskWorkspaceUi.ts";
@@ -51,12 +53,34 @@ import {
   TASK_FORM_FORM_CLASSNAME,
   TASK_FORM_GRID_CLASSNAME,
   TASK_FORM_TEXTAREA_CLASSNAME,
+  TASK_URGENCY_OPTIONS,
+  getDefaultTaskUrgency,
   getProjectSelectPlaceholder,
+  getTaskUrgencyOptions,
+  isTaskUrgency,
+  shouldBlockTaskEditForm,
 } from "./components/taskFormModalUi.ts";
+import {
+  getTaskModelDepartmentLabel,
+  getTaskModelEmptyStateMessage,
+} from "./components/taskModelConfigUi.ts";
+import {
+  fetchTaskModelsWithOptionalDepartments,
+} from "./hooks/useTaskModels.helpers.ts";
 
 function runTest(name, fn) {
   try {
     fn();
+    console.log(`PASS ${name}`);
+  } catch (error) {
+    console.error(`FAIL ${name}`);
+    throw error;
+  }
+}
+
+async function runAsyncTest(name, fn) {
+  try {
+    await fn();
     console.log(`PASS ${name}`);
   } catch (error) {
     console.error(`FAIL ${name}`);
@@ -368,4 +392,80 @@ runTest("tasks table uses shorter width and thin horizontal scrollbar", () => {
   assert.equal(TASK_TABLE_CLASSNAME.includes("1120px"), true);
   assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("overflow-x-auto"), true);
   assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("h-1.5"), true);
+});
+
+runTest("tasks table gives the task name column more breathing room", () => {
+  assert.equal(TASK_TABLE_NAME_HEAD_CELL_CLASSNAME.includes("w-44"), true);
+  assert.equal(TASK_TABLE_NAME_HEAD_CELL_CLASSNAME.includes("pl-5"), true);
+  assert.equal(TASK_TABLE_NAME_CELL_CLASSNAME.includes("pl-5"), true);
+});
+
+runTest("task urgency uses a constrained selectable set", () => {
+  assert.deepEqual(TASK_URGENCY_OPTIONS, ["Baixa", "Normal", "Alta", "Urgente"]);
+  assert.equal(getDefaultTaskUrgency(), "Normal");
+  assert.equal(isTaskUrgency("Alta"), true);
+  assert.equal(isTaskUrgency("Crítica"), false);
+  assert.deepEqual(getTaskUrgencyOptions("Fora do padrão"), [
+    "Fora do padrão",
+    "Baixa",
+    "Normal",
+    "Alta",
+    "Urgente",
+  ]);
+});
+
+runTest("task edit form only blocks while the task detail is loading", () => {
+  assert.equal(
+    shouldBlockTaskEditForm({
+      isTaskLoading: true,
+      isDepartmentsLoading: false,
+      isUsersLoading: false,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldBlockTaskEditForm({
+      isTaskLoading: false,
+      isDepartmentsLoading: true,
+      isUsersLoading: true,
+    }),
+    false,
+  );
+});
+
+runTest("task model config uses clear empty and department fallback copy", () => {
+  assert.equal(
+    getTaskModelEmptyStateMessage({ hasSearch: true, isError: false }),
+    "Nenhum modelo encontrado para a busca.",
+  );
+  assert.equal(
+    getTaskModelEmptyStateMessage({ hasSearch: false, isError: true }),
+    "Não foi possível carregar os modelos.",
+  );
+  assert.equal(getTaskModelDepartmentLabel({ department: { name: "Fiscal" } }), "Fiscal");
+  assert.equal(getTaskModelDepartmentLabel({ department_id: "dep-1" }), "Departamento não carregado");
+});
+
+await runAsyncTest("task models still load when department enrichment fails", async () => {
+  let capturedError = null;
+  const models = await fetchTaskModelsWithOptionalDepartments({
+    listModels: async () => [
+      {
+        id: "model-1",
+        name: "Revisar documentos",
+        department_id: "dep-1",
+      },
+    ],
+    listDepartments: async () => {
+      throw new Error("department service unavailable");
+    },
+    onDepartmentError: (error) => {
+      capturedError = error;
+    },
+  });
+
+  assert.equal(models.length, 1);
+  assert.equal(models[0].name, "Revisar documentos");
+  assert.equal(models[0].department, undefined);
+  assert.equal(capturedError instanceof Error, true);
 });
