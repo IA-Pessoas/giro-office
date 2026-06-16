@@ -2,7 +2,7 @@ import React from 'react';
 import Head from 'next/head';
 import { FaTasks } from 'react-icons/fa';
 import Link from 'next/link';
-import { canSSRAuth } from '@modules/auth';
+import { canSSRAdmin } from '@modules/auth';
 import styles from './IntegracaoConfigPage.module.css';
 
 export default function IntegracaoConfig() {
@@ -27,7 +27,7 @@ export default function IntegracaoConfig() {
     );
 }
 
-export const getServerSideProps = canSSRAuth(async (ctx) => {
+export const getServerSideProps = canSSRAdmin(async (ctx) => {
     // Aqui você pode adicionar verificação de permissão no lado do servidor se quiser segurança extra
     return { props: {} };
 });

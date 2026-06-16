@@ -1,45 +1,29 @@
-export interface TaskModel {
-  id: string;
-  name: string;
-  department_id: string;
-  responsible_id: string;
-  responsible2_id: string;
-  responsible3_id: string;
-  observations: string;
-  billing: string;
-  prevision: number;
-  type: "Projeto";
-  department: {
-    id: string;
-    name: string;
-  };
-}
+export type {
+  CreateIntegracaoTaskBody,
+  IntegracaoTaskDetail,
+  IntegracaoTaskListItem,
+  IntegracaoTaskListParams,
+  IntegracaoTaskListResult,
+  IntegracaoTaskStatus,
+  ProspectingStatus,
+  TaskBilling,
+  UpdateIntegracaoTaskBody,
+} from "./integracaoTask";
+export {
+  INTEGRACAO_TASK_STATUS_VALUES,
+  PROSPECTING_STATUS_VALUES,
+} from "./integracaoTask";
 
-export interface CreateTaskModelData {
-  name: string;
-  department_id: string;
-  responsible_id: string;
-  responsible2_id: string;
-  responsible3_id: string;
-  observations: string;
-  billing: string;
-  prevision: number;
-  type: "Projeto";
-}
-
-export interface UpdateTaskModelData extends Partial<CreateTaskModelData> {
-  id: string;
-}
-
-export interface TaskDependent {
-  id: string;
-  dependent_id: string;
-  wait: boolean;
-  observation: string;
-  dependent: {
-    name: string;
-  };
-}
+export type {
+  CreateTaskDependentData,
+  CreateTaskModelData,
+  TaskDependent,
+  TaskModel,
+  TaskModelDetail,
+  TaskModelListItem,
+  TaskModelListParams,
+  UpdateTaskModelData,
+} from "./taskModel";
 
 export interface ProjectListParams {
   ref: "client";
