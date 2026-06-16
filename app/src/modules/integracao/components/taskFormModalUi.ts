@@ -16,6 +16,11 @@ export const TASK_FORM_TEXTAREA_CLASSNAME = "min-h-20 resize-y pl-10";
 export const TASK_FORM_AUXILIARY_WARNING_CLASSNAME =
   "rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200";
 
+export const TASK_CREATE_REQUIRED_FIELDS_MESSAGE =
+  "Preencha cliente, projeto, modelo, status de prospecção e urgência.";
+
+export const TASK_CREATE_OBSERVATIONS_REQUIRED_MESSAGE = "Preencha as observações da tarefa.";
+
 export const TASK_URGENCY_OPTIONS = ["Baixa", "Normal", "Alta", "Urgente"] as const;
 
 export type TaskUrgencyOption = (typeof TASK_URGENCY_OPTIONS)[number];
@@ -44,6 +49,34 @@ interface ShouldBlockTaskEditFormParams {
 
 export function shouldBlockTaskEditForm(params: ShouldBlockTaskEditFormParams): boolean {
   return params.isTaskLoading;
+}
+
+interface GetTaskCreateValidationMessageParams {
+  clientId: string;
+  projectId: string;
+  modelId: string;
+  prospectingStatus: string;
+  urgency: string;
+  observations: string;
+}
+
+export function getTaskCreateValidationMessage({
+  clientId,
+  projectId,
+  modelId,
+  prospectingStatus,
+  urgency,
+  observations,
+}: GetTaskCreateValidationMessageParams): string | null {
+  if (!clientId || !projectId || !modelId || !prospectingStatus || !urgency) {
+    return TASK_CREATE_REQUIRED_FIELDS_MESSAGE;
+  }
+
+  if (!observations.trim()) {
+    return TASK_CREATE_OBSERVATIONS_REQUIRED_MESSAGE;
+  }
+
+  return null;
 }
 
 interface GetProjectSelectPlaceholderParams {

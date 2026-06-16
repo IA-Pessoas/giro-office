@@ -1,6 +1,6 @@
 import type { GetServerSideProps, GetServerSidePropsContext, GetServerSidePropsResult } from "next";
+import { jwtDecode } from "jwt-decode";
 import { destroyCookie, parseCookies } from "nookies";
-import { getPermissionFromToken, isAdminPermission } from "./permissions.ts";
 
 function redirectTo(destination: string) {
   return {
@@ -13,6 +13,29 @@ function redirectTo(destination: string) {
 
 interface CanSSRAdminOptions<P> {
   onForbidden?: (ctx: GetServerSidePropsContext) => GetServerSidePropsResult<P>;
+}
+
+interface SessionTokenPayload {
+  permission?: number;
+}
+
+const ADMIN_PERMISSION = 2;
+
+function isAdminPermission(permission?: number | null): boolean {
+  return typeof permission === "number" && permission >= ADMIN_PERMISSION;
+}
+
+function getPermissionFromToken(token?: string | null): number | null {
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const payload = jwtDecode<SessionTokenPayload>(token);
+    return typeof payload.permission === "number" ? payload.permission : null;
+  } catch {
+    return null;
+  }
 }
 
 function isAuthTokenFailure(err: unknown): boolean {

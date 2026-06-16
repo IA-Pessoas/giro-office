@@ -55,6 +55,7 @@ import {
   TASK_FORM_TEXTAREA_CLASSNAME,
   TASK_URGENCY_OPTIONS,
   getDefaultTaskUrgency,
+  getTaskCreateValidationMessage,
   getProjectSelectPlaceholder,
   getTaskUrgencyOptions,
   isTaskUrgency,
@@ -438,6 +439,23 @@ runTest("task edit form only blocks while the task detail is loading", () => {
       isUsersLoading: true,
     }),
     false,
+  );
+});
+
+runTest("task create validation requires observations before submit", () => {
+  const validValues = {
+    clientId: "client-1",
+    projectId: "project-1",
+    modelId: "model-1",
+    prospectingStatus: "Fechado",
+    urgency: "Normal",
+    observations: "Detalhes da tarefa",
+  };
+
+  assert.equal(getTaskCreateValidationMessage(validValues), null);
+  assert.equal(
+    getTaskCreateValidationMessage({ ...validValues, observations: "   " }),
+    "Preencha as observações da tarefa.",
   );
 });
 

@@ -43,6 +43,7 @@ import {
   type TaskUrgencyOption,
   getDefaultTaskUrgency,
   getProjectSelectPlaceholder,
+  getTaskCreateValidationMessage,
   getTaskUrgencyOptions,
   shouldBlockTaskEditForm,
 } from "./taskFormModalUi";
@@ -58,7 +59,7 @@ interface CreateFormState {
   client_id: string;
   project_id: string;
   model_id: string;
-  prospecting_status: ProspectingStatus | "";
+  prospecting_status: ProspectingStatus;
   observations: string;
   urgency: TaskUrgencyOption;
 }
@@ -271,14 +272,17 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
   }
 
   async function handleCreateSubmit() {
-    if (
-      !createValues.client_id ||
-      !createValues.project_id ||
-      !createValues.model_id ||
-      !createValues.prospecting_status ||
-      !createValues.urgency
-    ) {
-      toast.warning("Preencha cliente, projeto, modelo, status de prospecção e urgência.");
+    const validationMessage = getTaskCreateValidationMessage({
+      clientId: createValues.client_id,
+      projectId: createValues.project_id,
+      modelId: createValues.model_id,
+      prospectingStatus: createValues.prospecting_status,
+      urgency: createValues.urgency,
+      observations: createValues.observations,
+    });
+
+    if (validationMessage) {
+      toast.warning(validationMessage);
       return;
     }
 
@@ -703,6 +707,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
                 onChange={(event) => updateCreateValue("observations", event.target.value)}
                 className={`${PROJECT_INPUT_CLASSNAME} ${TASK_FORM_TEXTAREA_CLASSNAME}`}
                 placeholder="Detalhes de criação da tarefa."
+                required
               />
             </div>
           </label>

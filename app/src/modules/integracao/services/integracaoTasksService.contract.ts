@@ -5,7 +5,6 @@ import type {
   IntegracaoTaskListResult,
   UpdateIntegracaoTaskBody,
 } from "../types/integracaoTask";
-import { unwrapProjectEnvelope } from "./projectService.contract.ts";
 
 export const INTEGRACAO_TASKS_ENDPOINTS = {
   crud: "/task",
@@ -43,15 +42,23 @@ export function buildDeleteIntegracaoTaskPayload(taskId: string) {
 }
 
 export function unwrapIntegracaoTaskList(body: unknown): IntegracaoTaskListResult {
-  return unwrapProjectEnvelope<IntegracaoTaskListResult>(body);
+  return unwrapTaskEnvelope<IntegracaoTaskListResult>(body);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function unwrapTaskEnvelope<T>(body: unknown): T {
+  if (isRecord(body) && "data" in body) {
+    return body.data as T;
+  }
+
+  return body as T;
+}
+
 export function unwrapIntegracaoTaskDetail(body: unknown): IntegracaoTaskDetail {
-  const data = unwrapProjectEnvelope<{ detail?: IntegracaoTaskDetail } | IntegracaoTaskDetail>(body);
+  const data = unwrapTaskEnvelope<{ detail?: IntegracaoTaskDetail } | IntegracaoTaskDetail>(body);
 
   if (isRecord(data) && "detail" in data) {
     return data.detail as IntegracaoTaskDetail;
@@ -61,7 +68,7 @@ export function unwrapIntegracaoTaskDetail(body: unknown): IntegracaoTaskDetail 
 }
 
 export function unwrapCreatedIntegracaoTask(body: unknown): IntegracaoTaskDetail {
-  const data = unwrapProjectEnvelope<{ create?: IntegracaoTaskDetail } | IntegracaoTaskDetail>(body);
+  const data = unwrapTaskEnvelope<{ create?: IntegracaoTaskDetail } | IntegracaoTaskDetail>(body);
 
   if (isRecord(data) && "create" in data) {
     return data.create as IntegracaoTaskDetail;
@@ -71,5 +78,5 @@ export function unwrapCreatedIntegracaoTask(body: unknown): IntegracaoTaskDetail
 }
 
 export function unwrapUpdatedIntegracaoTask(body: unknown): IntegracaoTaskDetail {
-  return unwrapProjectEnvelope<IntegracaoTaskDetail>(body);
+  return unwrapTaskEnvelope<IntegracaoTaskDetail>(body);
 }
