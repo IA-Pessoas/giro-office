@@ -3,7 +3,7 @@ import { FileText, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
-import { userService, type UserItem } from "@modules/users";
+import { listAdminUsers, type UserItem } from "@modules/users";
 import { Dialog } from "@shared/components/ui/Dialog";
 
 import { taskModelService } from "../services/taskModelService";
@@ -125,7 +125,7 @@ export function TaskModelModal({
       setOptionsWarning(null);
 
       const [usersResult, departmentsResult, taskModelsResult] = await Promise.allSettled([
-        userService.list({ status: "Ativo", take: 200 }),
+        listAdminUsers("active"),
         departmentService.list({ status: "Ativo" }),
         taskModelService.list({ type: "Projeto" }),
       ]);

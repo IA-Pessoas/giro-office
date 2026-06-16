@@ -61,12 +61,20 @@ import {
   shouldBlockTaskEditForm,
 } from "./components/taskFormModalUi.ts";
 import {
+  TASK_MODEL_TABLE_ACTION_COLUMN_CLASSNAME,
+  TASK_MODEL_TABLE_CLASSNAME,
+  TASK_MODEL_TABLE_DEPARTMENT_COLUMN_CLASSNAME,
+  TASK_MODEL_TABLE_HEADER_ROW_CLASSNAME,
+  TASK_MODEL_TABLE_MODEL_COLUMN_CLASSNAME,
   getTaskModelDepartmentLabel,
   getTaskModelEmptyStateMessage,
 } from "./components/taskModelConfigUi.ts";
 import {
   fetchTaskModelsWithOptionalDepartments,
 } from "./hooks/useTaskModels.helpers.ts";
+import {
+  collectAdminUsersFromPages,
+} from "../users/services/adminUsersService.helpers.ts";
 
 function runTest(name, fn) {
   try {
@@ -444,6 +452,50 @@ runTest("task model config uses clear empty and department fallback copy", () =>
   );
   assert.equal(getTaskModelDepartmentLabel({ department: { name: "Fiscal" } }), "Fiscal");
   assert.equal(getTaskModelDepartmentLabel({ department_id: "dep-1" }), "Departamento não carregado");
+});
+
+runTest("task model config table locks visible column alignment", () => {
+  assert.equal(TASK_MODEL_TABLE_CLASSNAME.includes("table-fixed"), true);
+  assert.equal(TASK_MODEL_TABLE_HEADER_ROW_CLASSNAME, "text-left");
+  assert.equal(TASK_MODEL_TABLE_MODEL_COLUMN_CLASSNAME, "w-[52%]");
+  assert.equal(TASK_MODEL_TABLE_DEPARTMENT_COLUMN_CLASSNAME, "w-[32%]");
+  assert.equal(TASK_MODEL_TABLE_ACTION_COLUMN_CLASSNAME, "w-24");
+});
+
+await runAsyncTest("active users for task selects are loaded without unsupported user query params", async () => {
+  const calls = [];
+  const users = await collectAdminUsersFromPages({
+    status: "active",
+    listPage: async (params) => {
+      calls.push(params);
+      return {
+        users: [
+          {
+            id: "user-active",
+            name: "Usuario ativo",
+            login: "ativo",
+            permission: 1,
+            department_id: "dep-1",
+            status: "active",
+          },
+          {
+            id: "user-inactive",
+            name: "Usuario inativo",
+            login: "inativo",
+            permission: 1,
+            department_id: "dep-1",
+            status: "inactive",
+          },
+        ],
+        total: 2,
+        skip: 0,
+        take: 100,
+      };
+    },
+  });
+
+  assert.deepEqual(calls, [{ skip: 0, take: 100 }]);
+  assert.deepEqual(users.map((user) => user.id), ["user-active"]);
 });
 
 await runAsyncTest("task models still load when department enrichment fails", async () => {

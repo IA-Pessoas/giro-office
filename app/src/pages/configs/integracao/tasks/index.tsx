@@ -18,7 +18,15 @@ import {
   useTaskModels,
   type TaskModel,
 } from "@modules/integracao";
-import { getTaskModelDepartmentLabel, getTaskModelEmptyStateMessage } from "@modules/integracao/components/taskModelConfigUi";
+import {
+  TASK_MODEL_TABLE_ACTION_COLUMN_CLASSNAME,
+  TASK_MODEL_TABLE_CLASSNAME,
+  TASK_MODEL_TABLE_DEPARTMENT_COLUMN_CLASSNAME,
+  TASK_MODEL_TABLE_HEADER_ROW_CLASSNAME,
+  TASK_MODEL_TABLE_MODEL_COLUMN_CLASSNAME,
+  getTaskModelDepartmentLabel,
+  getTaskModelEmptyStateMessage,
+} from "@modules/integracao/components/taskModelConfigUi";
 import {
   PROJECT_COMPACT_BUTTON_CLASSNAME,
   PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME,
@@ -231,11 +239,16 @@ export default function TaskModelsConfig() {
 
         <section className={`${PROJECT_PANEL_CLASSNAME} overflow-hidden`}>
           <div className="overflow-x-auto">
-            <table className="min-w-full table-fixed">
+            <table className={TASK_MODEL_TABLE_CLASSNAME}>
+              <colgroup>
+                <col className={TASK_MODEL_TABLE_MODEL_COLUMN_CLASSNAME} />
+                <col className={TASK_MODEL_TABLE_DEPARTMENT_COLUMN_CLASSNAME} />
+                <col className={TASK_MODEL_TABLE_ACTION_COLUMN_CLASSNAME} />
+              </colgroup>
               <thead className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-950/40">
-                <tr>
-                  <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-[48%] pl-5`}>Modelo</th>
-                  <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-[32%]`}>Departamento</th>
+                <tr className={TASK_MODEL_TABLE_HEADER_ROW_CLASSNAME}>
+                  <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} pl-5`}>Modelo</th>
+                  <th className={TASK_TABLE_HEAD_CELL_CLASSNAME}>Departamento</th>
                   <th className={TASK_TABLE_ACTION_HEAD_CELL_CLASSNAME}>Ações</th>
                 </tr>
               </thead>

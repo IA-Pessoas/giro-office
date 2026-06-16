@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 
 import { useClients } from "@modules/clients";
 import { departmentService, type DepItem } from "@modules/departments";
-import { userService, type UserItem } from "@modules/users";
+import { listAdminUsers, type UserItem } from "@modules/users";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { useFetch } from "@shared/hooks";
 
@@ -158,7 +158,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
   );
   const usersQuery = useFetch<UserItem[]>(
     ["task-form-users"],
-    () => userService.list({ status: "Ativo", take: 200 }),
+    () => listAdminUsers("active"),
     {
       enabled: open && isEditing,
       refetchOnWindowFocus: false,
