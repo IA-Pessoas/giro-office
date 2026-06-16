@@ -37,6 +37,16 @@ docker compose -f docker-compose.vps.yml up -d --build
 
 6. `certificate-service` and `audit-service` are part of the default stack. Configure `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` in `.env.vps.gateway`; control whether actions are audited with `AUDIT_ENABLED` in the gateway and service `.env.vps.*` files.
 
+## Auth cookie em slots HTTP
+
+O web build aceita `NEXT_PUBLIC_AUTH_COOKIE_SECURE`.
+
+- Valor vazio ou ausente: o app usa o default seguro (`secure=true` em `NODE_ENV=production`).
+- `NEXT_PUBLIC_AUTH_COOKIE_SECURE=false`: usar somente em slots HTTP, como develop/testes sem TLS, para permitir que o browser persista `cw.token`.
+- Deploys HTTPS reais devem manter a variavel ausente/vazia ou usar `true`.
+
+Como a variavel e `NEXT_PUBLIC_*`, ela precisa estar presente no build da imagem `web`, nao apenas no runtime do container.
+
 ## Nginx TLS
 
 Nginx in this stack does not provision certificates automatically.
