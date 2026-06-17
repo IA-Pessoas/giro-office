@@ -144,7 +144,7 @@ export function RhTimesheetDetailView({
   if (!canManageRhTimesheets && detailQuery.data.user_id !== user?.id) {
     return (
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
-        Voce nao possui acesso a esta folha de ponto.
+        Você não possui acesso a esta folha de ponto.
       </div>
     );
   }

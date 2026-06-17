@@ -52,7 +52,7 @@ export function RH() {
   if (!permissionQuery.isLoading && !canUseRhSelfService) {
     return (
       <div className="mx-auto max-w-[960px] rounded-xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-        Voce nao possui acesso ao modulo RH.
+        Você não possui acesso ao módulo RH.
       </div>
     );
   }
