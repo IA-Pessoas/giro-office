@@ -17,8 +17,13 @@ type RhMainTab = "dashboard" | "requests" | "evaluations" | "point";
 export function RH() {
   const [activeTab, setActiveTab] = useState<RhMainTab>("dashboard");
   const [isHolidaysManagerOpen, setIsHolidaysManagerOpen] = useState(false);
-  const { canManageRh, canManageRhRequests, canViewRhDashboard, permissionQuery } =
-    useRhPermissions("rh-shell");
+  const {
+    canManageRh,
+    canManageRhRequests,
+    canUseRhSelfService,
+    canViewRhDashboard,
+    permissionQuery,
+  } = useRhPermissions("rh-shell");
   const newRequestsQuery = useRhRequests(
     { status: "New" },
     { enabled: canManageRhRequests },
@@ -43,6 +48,14 @@ export function RH() {
       setActiveTab("requests");
     }
   }, [activeTab, canViewRhDashboard, permissionQuery.isLoading]);
+
+  if (!permissionQuery.isLoading && !canUseRhSelfService) {
+    return (
+      <div className="mx-auto max-w-[960px] rounded-xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+        Voce nao possui acesso ao modulo RH.
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">

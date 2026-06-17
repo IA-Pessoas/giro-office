@@ -89,7 +89,7 @@ export interface CreateRhRequestPayload {
   title: string;
   description: string;
   category_id: string;
-  assigned_to_user_id: string;
+  assigned_to_user_id?: string;
   urgency: RhRequestUrgency;
 }
 

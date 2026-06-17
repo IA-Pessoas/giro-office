@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useRhTimeSheetDetail } from "../hooks/useRhCalendar";
+import { useRhPermissions } from "../hooks/useRhPermissions";
 import { formatRhDate, formatRhDateTime, formatRhTime } from "../utils/rhDate";
 
 type TimesheetDayFilter = "all" | "records" | "absent" | "incomplete";
@@ -71,6 +72,7 @@ export function RhTimesheetDetailView({
   mode = "dialog",
 }: RhTimesheetDetailViewProps) {
   const isFullPage = mode === "page";
+  const { user, canManageRhTimesheets } = useRhPermissions("timesheet-detail");
   const detailQuery = useRhTimeSheetDetail(timesheetId, enabled);
   const [dayFilter, setDayFilter] = useState<TimesheetDayFilter>(initialFilter);
 
@@ -137,6 +139,14 @@ export function RhTimesheetDetailView({
 
   if (!detailQuery.data) {
     return null;
+  }
+
+  if (!canManageRhTimesheets && detailQuery.data.user_id !== user?.id) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+        Voce nao possui acesso a esta folha de ponto.
+      </div>
+    );
   }
 
   return (
