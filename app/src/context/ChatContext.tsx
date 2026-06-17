@@ -11,6 +11,7 @@ import React, {
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
 import { parseCookies } from 'nookies';
+import { createBearerAuthHeaders } from '@modules/auth/utils/authHeaders';
 import { chatService } from '../modules/chat/services/chatService';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
@@ -55,6 +56,11 @@ export const ChatContext = createContext<ChatContextType | null>(null);
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3334';
 const MESSAGES_PER_PAGE = 30;
+
+function getChatAuthHeaders() {
+    const { 'cw.token': token } = parseCookies();
+    return createBearerAuthHeaders(token);
+}
 
 export function ChatProvider({ children }: { children: ReactNode }) {
     const { user, isAuthenticated } = useAuth(); 
@@ -283,8 +289,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         if (isAuthenticated) {
-            const { 'cw.token': token } = parseCookies();
-            fetch(`${SOCKET_URL}/chat`, { headers: { 'Authorization': `Bearer ${token}` } })
+            const authHeaders = getChatAuthHeaders();
+
+            if (!authHeaders) {
+                setChats([]);
+                return;
+            }
+
+            fetch(`${SOCKET_URL}/chat`, { headers: authHeaders })
                 .then(res => res.ok ? res.json() : [])
                 .then(data => setChats(data))
                 .catch(err => console.error("Falha ao buscar chats:", err));
@@ -359,7 +371,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         try {
             const controller = new AbortController();
             fetchControllerRef.current = controller;
-            const { 'cw.token': token } = parseCookies();
+            const authHeaders = getChatAuthHeaders();
+
+            if (!authHeaders) {
+                return;
+            }
+
             let hasMoreInLoop = true;
             let currentPageInLoop = 1;
             let messageFound = false;
@@ -367,7 +384,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
             // Carga inicial da página 1
             const initialResponse = await fetch(`${SOCKET_URL}/chat/${chat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${currentPageInLoop}`, {
-                headers: { 'Authorization': `Bearer ${token}` },
+                headers: authHeaders,
                 signal: controller.signal
             });
 
@@ -380,7 +397,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             
             while (!messageFound && hasMoreInLoop) {
                 const response = await fetch(`${SOCKET_URL}/chat/${chat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${currentPageInLoop}`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    headers: authHeaders,
                     signal: controller.signal
                 });
                 if (!response.ok) throw new Error("Falha ao buscar página.");
@@ -419,14 +436,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const currentChat = selectedChatRef.current;
         if (isFetchingMore.current || !hasMoreMessagesRef.current || !currentChat) return;
 
+        const authHeaders = getChatAuthHeaders();
+        if (!authHeaders) return;
+
         isFetchingMore.current = true;
         setIsLoadingMore(true);
         const nextPage = currentPageRef.current + 1;
 
         try {
-            const { 'cw.token': token } = parseCookies();
             const response = await fetch(`${SOCKET_URL}/chat/${currentChat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${nextPage}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: authHeaders
             });
 
             if (response.ok) {
@@ -451,9 +470,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setIsSearching(true)
 
         try {
-            const { 'cw.token': token } = parseCookies()
+            const authHeaders = getChatAuthHeaders()
+
+            if (!authHeaders) {
+                setSearchResults([])
+                setIsSearching(false)
+                return
+            }
+
             const response = await fetch(`${SOCKET_URL}/messages/search?query=${encodeURIComponent(query)}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: authHeaders
             })
 
             if (response.ok) {
@@ -606,10 +632,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setFirstUnreadId(null);
 
         // 2. Sincronização com o Backend em segundo plano
-        const { 'cw.token': token } = parseCookies();
+        const authHeaders = getChatAuthHeaders();
+        if (!authHeaders) return;
+
         fetch(`${SOCKET_URL}/chat/${chatId}/read`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: authHeaders
         });
     }, []);
     const uploadFileAndSendMessage = useCallback(async (file: File) => {
@@ -625,6 +653,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             return;
         }
 
+        const authHeaders = getChatAuthHeaders();
+        if (!authHeaders) return;
+
         setIsUploading(true);
 
         const formData = new FormData();
@@ -632,11 +663,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         formData.append('file', file);
 
         try {
-            const { 'cw.token': token } = parseCookies();
-            
             const response = await fetch(`${SOCKET_URL}/chat/media`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
+                headers: authHeaders,
                 body: formData
             });
 

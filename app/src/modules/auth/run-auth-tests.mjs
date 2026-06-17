@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import { AuthTokenError } from "../../shared/services/errors/AuthTokenError.ts";
 import { canSSRAdmin } from "./utils/canSSRAdmin.ts";
@@ -7,6 +8,7 @@ import {
   AUTH_COOKIE_NAME,
   getAuthCookieOptions,
 } from "./utils/authCookie.ts";
+import { createBearerAuthHeaders, getAuthTokenValue } from "./utils/authHeaders.ts";
 import { canAccessAdministration, isAdminPermission } from "./utils/permissions.ts";
 
 async function runTest(name, fn) {
@@ -44,6 +46,11 @@ function createSsrContext(token) {
     },
   };
 }
+
+const authContextSource = await readFile(
+  new URL("../../context/AuthContext.tsx", import.meta.url),
+  "utf8",
+);
 
 await (async () => {
   await runTest("isAdminPermission allows administrative levels from 2 and above", () => {
@@ -171,5 +178,49 @@ await (async () => {
       sameSite: "lax",
       secure: true,
     });
+  });
+
+  await runTest("auth cookie options allow HTTP develop slots to disable secure flag", () => {
+    const previousValue = process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE;
+    process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE = "false";
+
+    try {
+      assert.deepEqual(getAuthCookieOptions("production"), {
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+        sameSite: "lax",
+        secure: false,
+      });
+    } finally {
+      if (previousValue === undefined) {
+        delete process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE;
+      } else {
+        process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE = previousValue;
+      }
+    }
+  });
+
+  await runTest("auth headers are omitted when token is missing", () => {
+    assert.equal(getAuthTokenValue(undefined), null);
+    assert.equal(getAuthTokenValue(""), null);
+    assert.equal(createBearerAuthHeaders(undefined), null);
+    assert.equal(createBearerAuthHeaders(""), null);
+  });
+
+  await runTest("auth headers include bearer token when token exists", () => {
+    assert.equal(getAuthTokenValue("abc.def.signature"), "abc.def.signature");
+    assert.deepEqual(createBearerAuthHeaders("abc.def.signature"), {
+      Authorization: "Bearer abc.def.signature",
+    });
+  });
+
+  await runTest("auth diagnostics are hidden in production", () => {
+    assert.match(authContextSource, /process\.env\.NODE_ENV !== "production"/);
+    assert.match(authContextSource, /function logAuthError/);
+    assert.equal(authContextSource.includes("fullError"), false);
+    assert.equal(authContextSource.includes("URL:"), false);
+    assert.equal(authContextSource.includes('console.error("Erro de conex'), false);
+    assert.equal(authContextSource.includes('console.error("Erro do servidor'), false);
+    assert.equal(authContextSource.includes('console.error("Erro de autentica'), false);
   });
 })();

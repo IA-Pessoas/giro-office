@@ -18,8 +18,10 @@ FROM base AS build
 WORKDIR /workspace
 
 ARG NEXT_PUBLIC_API_URL=http://localhost:3010
+ARG NEXT_PUBLIC_AUTH_COOKIE_SECURE=
 ARG API_INTERNAL_URL=http://gateway:3010
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_AUTH_COOKIE_SECURE=$NEXT_PUBLIC_AUTH_COOKIE_SECURE
 ENV API_INTERNAL_URL=$API_INTERNAL_URL
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json biome.json .npmrc ./
