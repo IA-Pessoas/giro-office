@@ -99,7 +99,7 @@ export function AdminUserDetailsPanel({
 
       setUser(null);
       setFormData(null);
-      setLoadError("Nao foi possivel carregar os detalhes do usuario.");
+      setLoadError("Não foi possível carregar os detalhes do usuário.");
       console.error(error);
     } finally {
       setIsLoadingUser(false);
@@ -176,7 +176,7 @@ export function AdminUserDetailsPanel({
       setUser(updatedUser);
       setFormData(buildFormState(updatedUser));
       await onUserUpdated();
-      toast.success("Usuario atualizado com sucesso!");
+      toast.success("Usuário atualizado com sucesso!");
       await loadUser(userId);
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 403) {
@@ -184,8 +184,8 @@ export function AdminUserDetailsPanel({
         return;
       }
 
-      setSaveError("Nao foi possivel salvar as alteracoes do usuario.");
-      toast.error("Erro ao atualizar usuario.");
+      setSaveError("Não foi possível salvar as alterações do usuário.");
+      toast.error("Erro ao atualizar usuário.");
       console.error(error);
     } finally {
       setIsSaving(false);
@@ -196,9 +196,9 @@ export function AdminUserDetailsPanel({
     return (
       <div className={`flex h-full min-h-[480px] items-center justify-center ${PANEL_CLASSNAME} border-dashed p-6 text-center`}>
         <div className="space-y-2">
-          <p className={TEXT_CLASSNAME}>Nenhum usuario selecionado.</p>
+          <p className={TEXT_CLASSNAME}>Nenhum usuário selecionado.</p>
           <p className={MUTED_CLASSNAME}>
-            Selecione um usuario na lista para abrir o painel de detalhes.
+            Selecione um usuário na lista para abrir o painel de detalhes.
           </p>
         </div>
       </div>
@@ -229,7 +229,7 @@ export function AdminUserDetailsPanel({
   if (isLoadingUser || !formData) {
     return (
       <div className={`flex h-full min-h-[480px] items-center justify-center ${PANEL_CLASSNAME} border-dashed p-6 text-center`}>
-        <p className={MUTED_CLASSNAME}>Carregando detalhes do usuario...</p>
+        <p className={MUTED_CLASSNAME}>Carregando detalhes do usuário...</p>
       </div>
     );
   }
@@ -239,7 +239,7 @@ export function AdminUserDetailsPanel({
       <div className="space-y-1 pb-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{user?.name}</h2>
         <p className={MUTED_CLASSNAME}>
-          Atualize os dados do usuario selecionado usando os contratos atuais do backend.
+          Atualize os dados do usuário selecionado usando os contratos atuais do backend.
         </p>
       </div>
 
@@ -248,7 +248,7 @@ export function AdminUserDetailsPanel({
           {departmentsError ? (
             <div className={FEEDBACK_PANEL_CLASSNAME}>
               <p className={TEXT_CLASSNAME}>
-                Nao foi possivel carregar os departamentos. A edicao foi bloqueada ate a lista estar disponivel.
+                Não foi possível carregar os departamentos. A edição foi bloqueada até a lista estar disponível.
               </p>
             </div>
           ) : null}
@@ -305,7 +305,7 @@ export function AdminUserDetailsPanel({
             </div>
 
             <div className="space-y-2">
-              <label className={LABEL_CLASSNAME}>Permissao</label>
+              <label className={LABEL_CLASSNAME}>Permissão</label>
               <select
                 name="permission"
                 value={formData.permission}
@@ -314,7 +314,7 @@ export function AdminUserDetailsPanel({
                 style={SELECT_ARROW_STYLE}
               >
                 {!hasKnownPermission ? (
-                  <option value={formData.permission}>Permissao atual ({formData.permission})</option>
+                  <option value={formData.permission}>Permissão atual ({formData.permission})</option>
                 ) : null}
                 {CREATE_USER_PERMISSION_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -348,7 +348,7 @@ export function AdminUserDetailsPanel({
             <div className="space-y-1">
               <p className={LABEL_CLASSNAME}>Status atual</p>
               <p className={MUTED_CLASSNAME}>
-                Estado aplicado ao usuario selecionado.
+                Estado aplicado ao usuário selecionado.
               </p>
             </div>
             <span className="rounded-full bg-[var(--colors-brand-soft)] px-3 py-1.5 text-sm font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
@@ -361,7 +361,7 @@ export function AdminUserDetailsPanel({
       <div className="pt-6">
         <div className="flex justify-end">
           <button type="button" onClick={handleSave} className={PRIMARY_ACTION_CLASSNAME} disabled={isSaveDisabled}>
-            {isSaving ? "Salvando..." : "Salvar alteracoes"}
+            {isSaving ? "Salvando..." : "Salvar alterações"}
           </button>
         </div>
       </div>

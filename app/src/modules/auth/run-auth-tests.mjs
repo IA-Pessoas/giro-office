@@ -9,6 +9,7 @@ import {
 } from "./utils/authCookie.ts";
 import { createBearerAuthHeaders, getAuthTokenValue } from "./utils/authHeaders.ts";
 import { canAccessAdministration, isAdminPermission } from "./utils/permissions.ts";
+import { resolveRhPermissionAccess } from "../rh/hooks/rhPermissionAccess.ts";
 
 async function runTest(name, fn) {
   try {
@@ -65,6 +66,61 @@ await (async () => {
     assert.equal(canAccessAdministration({ permission: 999 }), true);
     assert.equal(canAccessAdministration({ permission: 1 }), false);
     assert.equal(canAccessAdministration(undefined), false);
+  });
+
+  await runTest("RH access treats module level 1 as self-service only", () => {
+    const access = resolveRhPermissionAccess({
+      hasUser: true,
+      permission: 1,
+      rh: 1,
+    });
+
+    assert.equal(access.canUseRhSelfService, true);
+    assert.equal(access.canManageRh, false);
+  });
+
+  await runTest("RH access does not allow self-service without explicit module access", () => {
+    const access = resolveRhPermissionAccess({
+      hasUser: true,
+      permission: 1,
+      rh: null,
+    });
+
+    assert.equal(access.canUseRhSelfService, false);
+    assert.equal(access.canManageRh, false);
+  });
+
+  await runTest("RH access treats module level 2 as management", () => {
+    const access = resolveRhPermissionAccess({
+      hasUser: true,
+      permission: 1,
+      rh: 2,
+    });
+
+    assert.equal(access.canUseRhSelfService, true);
+    assert.equal(access.canManageRh, true);
+  });
+
+  await runTest("RH access lets global admins manage RH", () => {
+    const access = resolveRhPermissionAccess({
+      hasUser: true,
+      permission: 2,
+      rh: 0,
+    });
+
+    assert.equal(access.canUseRhSelfService, true);
+    assert.equal(access.canManageRh, true);
+  });
+
+  await runTest("RH access requires explicit management module level", () => {
+    const access = resolveRhPermissionAccess({
+      hasUser: true,
+      permission: 1,
+      rh: 1,
+    });
+
+    assert.equal(access.canUseRhSelfService, true);
+    assert.equal(access.canManageRh, false);
   });
 
   await runTest("canSSRAdmin redirects unauthenticated users to login", async () => {

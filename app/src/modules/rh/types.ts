@@ -51,8 +51,10 @@ export interface RhRequest {
 export interface AssignableUser {
   id: string;
   name: string;
+  permission: number | null;
   status: string | null;
   departmentName: string | null;
+  modules: Record<string, number | null> | null;
   photoUrl: string | null;
 }
 
@@ -89,7 +91,7 @@ export interface CreateRhRequestPayload {
   title: string;
   description: string;
   category_id: string;
-  assigned_to_user_id: string;
+  assigned_to_user_id?: string;
   urgency: RhRequestUrgency;
 }
 

@@ -19,6 +19,7 @@ import {
   getRhRequestUrgencyLabel,
 } from "../utils/rhRequestUi";
 import { formatRhDateTime } from "../utils/rhDate";
+import { filterAssignableRhResponsibleUsers } from "../utils/rhAssignableUsers";
 import { RhRequestDetailModal } from "./RhRequestDetailModal";
 import { RhRequestFormModal } from "./RhRequestFormModal";
 import { RhRequestsFilters } from "./RhRequestsFilters";
@@ -48,6 +49,7 @@ export function RhRequestsSection() {
 
   const categories = categoriesQuery.data ?? [];
   const assignableUsers = assignableUsersQuery.data ?? [];
+  const assignableResponsibleUsers = filterAssignableRhResponsibleUsers(assignableUsers);
   const requests = requestsQuery.data ?? [];
 
   const categoryNameById = new Map(
@@ -232,10 +234,14 @@ export function RhRequestsSection() {
       <RhRequestFormModal
         open={isFormOpen}
         categories={categories}
-        assignableUsers={assignableUsers}
+        assignableUsers={assignableResponsibleUsers}
         canManageRequests={canManageRhRequests}
         assignableUsersUnavailableMessage={
-          auxiliaryError ? "Não foi possível carregar os responsáveis agora." : null
+          auxiliaryError
+            ? "Não foi possível carregar os responsáveis agora."
+            : canManageRhRequests && assignableResponsibleUsers.length === 0
+              ? "Nenhum responsável de RH disponível para atribuição."
+              : null
         }
         request={editingRequest}
         onClose={handleCloseForm}

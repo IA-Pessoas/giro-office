@@ -915,7 +915,7 @@ export function Administracao() {
                       Níveis da permissão por módulo
                     </p>
                     <p className={ADMIN_MUTED_CLASSNAME}>
-                      Ajuste apenas acessos complementares ao modulo principal do usuario selecionado.
+                      Ajuste apenas acessos complementares ao módulo principal do usuário selecionado.
                     </p>
                   </div>
                   <button

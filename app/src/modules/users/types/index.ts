@@ -10,6 +10,7 @@ export interface UserItem {
   type?: UserType | null;
   first_owner_flag?: boolean;
   permission_id?: string | null;
+  modules?: Record<string, number | null> | null;
   department?: {
     name: string;
     color: string;
