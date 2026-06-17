@@ -5,23 +5,12 @@ import { userService } from "@modules/users";
 
 import { RH_QUERY_KEY } from "./useRhRequests";
 import type { AssignableUser } from "../types";
+import { normalizeAssignableUserStatus } from "../utils/rhAssignableUsers";
 
 const ASSIGNABLE_USERS_PAGE_SIZE = 100;
 
 interface UseAssignableUsersOptions {
   enabled?: boolean;
-}
-
-function normalizeAssignableUserStatus(status: string | null | undefined) {
-  if (status === "active" || status === "Ativo") {
-    return "active";
-  }
-
-  if (status === "inactive" || status === "Inativo") {
-    return "inactive";
-  }
-
-  return status ?? null;
 }
 
 export function assignableUsersQueryKey() {
@@ -44,8 +33,10 @@ export function useAssignableUsers(
         .map<AssignableUser>((user) => ({
           id: user.id,
           name: user.name,
+          permission: typeof user.permission === "number" ? user.permission : null,
           status: normalizeAssignableUserStatus(user.status),
           departmentName: user.department?.name ?? null,
+          modules: user.modules ?? null,
           photoUrl: user.photo_url ?? user.photo ?? null,
         }));
     },

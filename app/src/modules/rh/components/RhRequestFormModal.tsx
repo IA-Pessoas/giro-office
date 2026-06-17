@@ -181,7 +181,7 @@ export function RhRequestFormModal({
     >
       {canManageRequests && assignableUsersUnavailableMessage ? (
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
-          Não foi possível carregar os responsáveis agora.
+          {assignableUsersUnavailableMessage}
         </div>
       ) : null}
 
@@ -224,7 +224,11 @@ export function RhRequestFormModal({
                 onChange={(event) => handleChange("assigned_to_user_id", event.target.value)}
                 className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               >
-                <option value="">Selecione</option>
+                <option value="">
+                  {assignableUsers.length === 0
+                    ? "Nenhum responsável de RH disponível"
+                    : "Selecione"}
+                </option>
                 {assignableUsers.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.name}
