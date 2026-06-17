@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { parseCookies } from 'nookies';
+import { getAuthTokenValue } from '@modules/auth/utils/authHeaders';
 
 interface SocketContextType {
     socket: Socket | null;
@@ -19,7 +20,18 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (isAuthenticated) {
             const { 'cw.token': token } = parseCookies();
-            const newSocket = io(SOCKET_URL, { auth: { token } });
+            const authToken = getAuthTokenValue(token);
+
+            if (!authToken) {
+                if (socket) {
+                    socket.close();
+                    setSocket(null);
+                }
+
+                return;
+            }
+
+            const newSocket = io(SOCKET_URL, { auth: { token: authToken } });
             setSocket(newSocket);
 
             return () => { newSocket.close(); };

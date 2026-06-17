@@ -2,7 +2,7 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { Tasks } from "../../shared/components/newLayout/Tasks";
+import { TasksWorkspace } from "@modules/integracao";
 
 export default function TasksPage() {
   return (
@@ -10,7 +10,7 @@ export default function TasksPage() {
       <Head>
         <title>Tarefas</title>
       </Head>
-      <Tasks />
+      <TasksWorkspace />
     </>
   );
 }
@@ -18,4 +18,3 @@ export default function TasksPage() {
 export const getServerSideProps = canSSRAuth(async () => {
   return { props: {} };
 });
-

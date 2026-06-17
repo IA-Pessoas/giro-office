@@ -6,6 +6,7 @@ import type {
   ProjectListParams,
   ProjectProgressResponse,
 } from "../types";
+import { unwrapServiceEnvelope } from "./envelope.contract.js";
 
 export const PROJECT_ENDPOINTS = {
   list: "/project/list",
@@ -36,11 +37,7 @@ export function buildDeleteProjectPayload(projectId: string): DeleteProjectData 
 }
 
 export function unwrapProjectEnvelope<T>(body: unknown): T {
-  if (isRecord(body) && "data" in body) {
-    return body.data as T;
-  }
-
-  return body as T;
+  return unwrapServiceEnvelope(body) as T;
 }
 
 export function unwrapProjectList(body: unknown): ProjectListItem[] {

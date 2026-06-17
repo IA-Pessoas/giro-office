@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   Bell,
   Camera,
@@ -11,6 +12,7 @@ import {
   Save,
   Settings,
   Shield,
+  SquareCheck,
   Sun,
   Trash2,
   Upload,
@@ -19,6 +21,7 @@ import {
 import { toast } from "react-toastify";
 
 import { isAdminPermission } from "@modules/auth";
+import { TASK_MODEL_CONFIG_ENTRY, canManageTaskModelConfig } from "@modules/integracao";
 import { MyOrganizationSection } from "@modules/organizations";
 import { useDeleteMePhoto, useMe, useUpdateMe, useUploadMePhoto } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
@@ -130,6 +133,7 @@ export function Configuracoes() {
     isAdminPermission(meQuery.data?.permission) && meQuery.data.organization_id
       ? meQuery.data.organization_id
       : null;
+  const canManageTaskModels = canManageTaskModelConfig(meQuery.data?.permission);
   const resolvedCurrentPhotoUrl = resolvePhotoUrl(currentPhotoUrl);
 
   const displayedAvatar = pendingPhotoPreviewUrl ?? resolvedCurrentPhotoUrl;
@@ -468,6 +472,46 @@ export function Configuracoes() {
 
         {managedOrganizationId ? (
           <MyOrganizationSection organizationId={managedOrganizationId} userEmail={currentLogin} />
+        ) : null}
+
+        {canManageTaskModels ? (
+          <section className={`${SETTINGS_PANEL_CLASSNAME} p-6 lg:p-8`}>
+            <div className="space-y-5">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <SquareCheck className="h-5 w-5 text-[var(--colors-brand-gradient-end)]" />
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    Integração
+                  </h2>
+                </div>
+                <p className={SETTINGS_MUTED_CLASSNAME}>
+                  Ajustes administrativos usados pelos fluxos de tarefas e projetos.
+                </p>
+              </div>
+
+              <Link
+                href={TASK_MODEL_CONFIG_ENTRY.href}
+                className={`${SETTINGS_SUBPANEL_CLASSNAME} flex flex-col gap-4 p-4 transition-colors hover:bg-slate-100 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--colors-brand-soft)] text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
+                    <SquareCheck className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {TASK_MODEL_CONFIG_ENTRY.label}
+                    </p>
+                    <p className={SETTINGS_MUTED_CLASSNAME}>
+                      {TASK_MODEL_CONFIG_ENTRY.description}
+                    </p>
+                  </div>
+                </div>
+                <span className="w-fit rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                  Abrir
+                </span>
+              </Link>
+            </div>
+          </section>
         ) : null}
 
         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
