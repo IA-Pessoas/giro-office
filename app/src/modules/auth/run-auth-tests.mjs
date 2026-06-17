@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import { AuthTokenError } from "../../shared/services/errors/AuthTokenError.ts";
 import { canSSRAdmin } from "./utils/canSSRAdmin.ts";
@@ -45,6 +46,11 @@ function createSsrContext(token) {
     },
   };
 }
+
+const authContextSource = await readFile(
+  new URL("../../context/AuthContext.tsx", import.meta.url),
+  "utf8",
+);
 
 await (async () => {
   await runTest("isAdminPermission allows administrative levels from 2 and above", () => {
@@ -206,5 +212,15 @@ await (async () => {
     assert.deepEqual(createBearerAuthHeaders("abc.def.signature"), {
       Authorization: "Bearer abc.def.signature",
     });
+  });
+
+  await runTest("auth diagnostics are hidden in production", () => {
+    assert.match(authContextSource, /process\.env\.NODE_ENV !== "production"/);
+    assert.match(authContextSource, /function logAuthError/);
+    assert.equal(authContextSource.includes("fullError"), false);
+    assert.equal(authContextSource.includes("URL:"), false);
+    assert.equal(authContextSource.includes('console.error("Erro de conex'), false);
+    assert.equal(authContextSource.includes('console.error("Erro do servidor'), false);
+    assert.equal(authContextSource.includes('console.error("Erro de autentica'), false);
   });
 })();
