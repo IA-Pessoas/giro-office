@@ -1,5 +1,6 @@
 import { useAuth } from "@/context/AuthContext";
-import { isAdminPermission, useAccessStore } from "@modules/auth";
+import { useAccessStore } from "@modules/auth";
+import { resolveRhPermissionAccess } from "./rhPermissionAccess";
 
 interface RhPermissionState {
   isLoading: boolean;
@@ -9,7 +10,9 @@ interface RhPermissionState {
 interface UseRhPermissionsResult {
   user: ReturnType<typeof useAuth>["user"];
   permissionQuery: RhPermissionState;
+  rhLevel: number | null;
   canAccessRhPortal: boolean;
+  canUseRhSelfService: boolean;
   canViewRhDashboard: boolean;
   isRhResponsible: boolean;
   isGlobalAdmin: boolean;
@@ -27,21 +30,26 @@ export function useRhPermissions(scope: string): UseRhPermissionsResult {
   const isLoading = useAccessStore((snapshot) => snapshot.isLoading);
   const permissionError = useAccessStore((snapshot) => snapshot.error);
   const explicitRhPermission = user?.modules?.rh;
-  const isRhResponsible = Boolean(
-    explicitRhPermission !== null &&
-      explicitRhPermission !== undefined &&
-      explicitRhPermission >= 1,
-  );
-  const isRhDepartmentUser = departmentModule === "rh";
-  const isGlobalAdmin = isAdminPermission(user?.permission);
-  const canViewRhDashboard = isRhDepartmentUser || isGlobalAdmin || isRhResponsible;
-  const canManageRh = isRhResponsible || isGlobalAdmin;
-  const canManageRhRequests = isRhDepartmentUser || isRhResponsible || isGlobalAdmin;
-  const canManageRhScore = isRhDepartmentUser || isRhResponsible || isGlobalAdmin;
-  const canManageRhTimeBank = isRhDepartmentUser || isRhResponsible || isGlobalAdmin;
-  const canManageRhTimesheets = isRhDepartmentUser || isRhResponsible || isGlobalAdmin;
+  const {
+    rhLevel,
+    isGlobalAdmin,
+    canAccessRhPortal,
+    canUseRhSelfService,
+    canManageRh,
+  } = resolveRhPermissionAccess({
+    hasUser: Boolean(user),
+    permission: user?.permission,
+    rh: explicitRhPermission,
+    departmentModule,
+  });
+  const canViewRhDashboard = canManageRh;
+  const canManageRhRequests = canManageRh;
+  const canManageRhScore = canManageRh;
+  const canManageRhTimeBank = canManageRh;
+  const canManageRhTimesheets = canManageRh;
   // Mantemos workday separado para permitir divergencia futura sem refactor transversal nas telas de ponto.
-  const canManageRhWorkday = isRhDepartmentUser || isRhResponsible || isGlobalAdmin;
+  const canManageRhWorkday = canManageRh;
+  const isRhResponsible = canManageRh;
   void scope;
 
   return {
@@ -50,7 +58,9 @@ export function useRhPermissions(scope: string): UseRhPermissionsResult {
       isLoading,
       error: permissionError,
     },
-    canAccessRhPortal: Boolean(user),
+    rhLevel,
+    canAccessRhPortal,
+    canUseRhSelfService,
     canViewRhDashboard,
     isRhResponsible,
     isGlobalAdmin,
