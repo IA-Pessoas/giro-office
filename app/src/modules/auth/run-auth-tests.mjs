@@ -73,7 +73,6 @@ await (async () => {
       hasUser: true,
       permission: 1,
       rh: 1,
-      departmentModule: null,
     });
 
     assert.equal(access.canUseRhSelfService, true);
@@ -85,7 +84,6 @@ await (async () => {
       hasUser: true,
       permission: 1,
       rh: null,
-      departmentModule: null,
     });
 
     assert.equal(access.canUseRhSelfService, false);
@@ -97,7 +95,6 @@ await (async () => {
       hasUser: true,
       permission: 1,
       rh: 2,
-      departmentModule: null,
     });
 
     assert.equal(access.canUseRhSelfService, true);
@@ -109,19 +106,17 @@ await (async () => {
       hasUser: true,
       permission: 2,
       rh: 0,
-      departmentModule: null,
     });
 
     assert.equal(access.canUseRhSelfService, true);
     assert.equal(access.canManageRh, true);
   });
 
-  await runTest("RH access does not grant management from department alone", () => {
+  await runTest("RH access requires explicit management module level", () => {
     const access = resolveRhPermissionAccess({
       hasUser: true,
       permission: 1,
       rh: 1,
-      departmentModule: "rh",
     });
 
     assert.equal(access.canUseRhSelfService, true);

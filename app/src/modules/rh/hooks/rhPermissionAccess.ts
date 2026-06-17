@@ -2,7 +2,6 @@ export interface ResolveRhPermissionAccessInput {
   hasUser: boolean;
   permission?: number | null;
   rh?: number | null;
-  departmentModule?: string | null;
 }
 
 export interface RhPermissionAccess {

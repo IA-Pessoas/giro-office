@@ -14,7 +14,7 @@ import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "@shared/components
 
 interface UserProfileProps {
   userId: string;
-  me: any; // Dados do usuario logado
+  me: any; // Dados do usuário logado
   departments: any[]; // Lista de departamentos para o Select
 }
 
@@ -42,7 +42,7 @@ export function UserProfile({ userId, me, departments }: UserProfileProps) {
           return;
         }
 
-        console.error("Erro ao carregar usuario", error);
+        console.error("Erro ao carregar usuário", error);
       } finally {
         setLoadingData(false);
       }
@@ -64,7 +64,7 @@ export function UserProfile({ userId, me, departments }: UserProfileProps) {
   return <UserFormContent user={user} me={me} departments={departments} />;
 }
 
-// Separamos o formulario para garantir que o hook useUserForm so inicie quando "user" existir
+// Separamos o formulário para garantir que o hook useUserForm só inicie quando "user" existir
 function UserFormContent({ user, me, departments }) {
   const {
     formData,
@@ -90,7 +90,7 @@ function UserFormContent({ user, me, departments }) {
         </TabsTrigger>
         <TabsTrigger value="inventario">
           <span className="inline-flex items-center gap-2">
-            <FaComputer /> Inventario
+            <FaComputer /> Inventário
           </span>
         </TabsTrigger>
       </TabsList>
@@ -100,7 +100,7 @@ function UserFormContent({ user, me, departments }) {
           <label htmlFor="photo-upload">
             <img
               src={formData.photoUrl || "/logos/lions/Grey.png"}
-              alt="Foto do usuario"
+              alt="Foto do usuário"
               className="mb-4 h-[120px] w-[120px] cursor-pointer rounded-full border-2 border-slate-200 object-cover transition-opacity hover:opacity-80"
             />
           </label>

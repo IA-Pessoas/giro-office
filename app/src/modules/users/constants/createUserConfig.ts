@@ -25,7 +25,7 @@ export const CREATE_USER_MODULE_OPTIONS = [
   { key: "contabil", label: "Contábil" },
   { key: "financeiro", label: "Financeiro" },
   { key: "fiscal", label: "Fiscal" },
-  { key: "integracao", label: "Integracao" },
+  { key: "integracao", label: "Integração" },
   { key: "marketing", label: "Marketing" },
   { key: "parcelamento", label: "Parcelamento" },
   { key: "pec", label: "PEC" },

@@ -26,7 +26,6 @@ interface UseRhPermissionsResult {
 
 export function useRhPermissions(scope: string): UseRhPermissionsResult {
   const { user } = useAuth();
-  const departmentModule = useAccessStore((snapshot) => snapshot.departmentModule);
   const isLoading = useAccessStore((snapshot) => snapshot.isLoading);
   const permissionError = useAccessStore((snapshot) => snapshot.error);
   const explicitRhPermission = user?.modules?.rh;
@@ -40,7 +39,6 @@ export function useRhPermissions(scope: string): UseRhPermissionsResult {
     hasUser: Boolean(user),
     permission: user?.permission,
     rh: explicitRhPermission,
-    departmentModule,
   });
   const canViewRhDashboard = canManageRh;
   const canManageRhRequests = canManageRh;

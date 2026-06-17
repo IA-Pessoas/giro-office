@@ -146,17 +146,17 @@ export function CreateUserModal({
     setSubmitError(null);
 
     if (!formData.name || !formData.login || !formData.password || !formData.department_id) {
-      toast.warn('Preencha todos os campos obrigatorios!');
+      toast.warn('Preencha todos os campos obrigatórios!');
       return;
     }
 
     if (organizationIdLoading) {
-      toast.info('Carregando o contexto da organizacao. Tente novamente em instantes.');
+      toast.info('Carregando o contexto da organização. Tente novamente em instantes.');
       return;
     }
 
     if (!organizationId) {
-      toast.error('Nao foi possivel identificar a organizacao do usuario logado. Recarregue a pagina e tente novamente.');
+      toast.error('Não foi possível identificar a organização do usuário logado. Recarregue a página e tente novamente.');
       return;
     }
 
@@ -180,14 +180,14 @@ export function CreateUserModal({
       };
 
       const newUser = await userService.create(payload);
-      toast.success('Usuario cadastrado com sucesso!');
+      toast.success('Usuário cadastrado com sucesso!');
       onUserCreated(newUser);
       onClose();
       setFormData(INITIAL_FORM_DATA);
       setModuleSelections(createInitialModuleSelections());
     } catch (err) {
-      setSubmitError('Nao foi possivel concluir o cadastro com os dados informados.');
-      toast.error('Erro ao cadastrar usuario.');
+      setSubmitError('Não foi possível concluir o cadastro com os dados informados.');
+      toast.error('Erro ao cadastrar usuário.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -203,8 +203,8 @@ export function CreateUserModal({
           onClose();
         }
       }}
-      title="Cadastrar Novo Usuario"
-      description="Formulario para cadastro de novo usuario"
+      title="Cadastrar Novo Usuário"
+      description="Formulário para cadastro de novo usuário"
       contentClassName="admin-users-modal flex max-h-[90vh] flex-col overflow-hidden border border-slate-200 bg-white shadow-2xl sm:max-h-[88vh] dark:border-slate-700 dark:bg-slate-900"
       bodyClassName="overflow-y-auto"
       footer={(
@@ -222,7 +222,7 @@ export function CreateUserModal({
             disabled={isLoading || isCreateBlocked}
             onClick={handleCadastrar}
           >
-            {isLoading ? 'Salvando...' : 'Criar Usuario'}
+            {isLoading ? 'Salvando...' : 'Criar Usuário'}
           </button>
         </>
       )}
@@ -237,7 +237,7 @@ export function CreateUserModal({
         {departmentsError ? (
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
             <p className="dialog-neutral-text text-sm font-medium text-slate-700 dark:text-white">
-              Nao foi possivel carregar os departamentos. O cadastro foi bloqueado ate a integracao voltar.
+              Não foi possível carregar os departamentos. O cadastro foi bloqueado até a integração voltar.
             </p>
             {onRetryDepartments ? (
               <button
@@ -258,7 +258,7 @@ export function CreateUserModal({
         ) : !organizationIdLoading && departments.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
             <p className="dialog-neutral-text text-sm font-medium text-slate-700 dark:text-white">
-              Nenhum departamento disponivel. O cadastro depende dos dados retornados pelo backend.
+              Nenhum departamento disponível. O cadastro depende dos dados retornados pelo backend.
             </p>
             {onRetryDepartments ? (
               <button
@@ -327,7 +327,7 @@ export function CreateUserModal({
               Defina apenas acessos complementares fora do departamento principal.
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              O modulo da area principal ja e concedido automaticamente pelo departamento.
+              O módulo da área principal já é concedido automaticamente pelo departamento.
             </p>
           </div>
           <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1">
@@ -343,7 +343,7 @@ export function CreateUserModal({
                     </div>
                     {isDepartmentModule ? (
                       <div className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        {moduleOption.key === 'rh' ? 'Gestao RH habilitada' : 'Acesso pelo departamento'}
+                        {moduleOption.key === 'rh' ? 'Gestão RH habilitada' : 'Acesso pelo departamento'}
                       </div>
                     ) : (
                       <select
@@ -356,13 +356,13 @@ export function CreateUserModal({
                         {moduleOption.key === 'rh' ? (
                           <>
                             <option value="none">RH pessoal</option>
-                            <option value="2">Gestao RH</option>
+                            <option value="2">Gestão RH</option>
                           </>
                         ) : (
                           <>
                             <option value="none">Sem acesso</option>
                             <option value="0">Visualizador</option>
-                            <option value="1">Usuario</option>
+                            <option value="1">Usuário</option>
                             <option value="2">Administrador</option>
                           </>
                         )}

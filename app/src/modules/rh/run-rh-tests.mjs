@@ -18,7 +18,7 @@ async function runTest(name, fn) {
 function createUser(overrides = {}) {
   return {
     id: "user-default",
-    name: "Usuario Default",
+    name: "Usuário Default",
     status: "active",
     permission: 1,
     departmentName: "Financeiro",
