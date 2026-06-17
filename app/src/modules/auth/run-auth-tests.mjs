@@ -80,6 +80,18 @@ await (async () => {
     assert.equal(access.canManageRh, false);
   });
 
+  await runTest("RH access does not allow self-service without explicit module access", () => {
+    const access = resolveRhPermissionAccess({
+      hasUser: true,
+      permission: 1,
+      rh: null,
+      departmentModule: null,
+    });
+
+    assert.equal(access.canUseRhSelfService, false);
+    assert.equal(access.canManageRh, false);
+  });
+
   await runTest("RH access treats module level 2 as management", () => {
     const access = resolveRhPermissionAccess({
       hasUser: true,

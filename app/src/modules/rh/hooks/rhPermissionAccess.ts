@@ -24,8 +24,7 @@ export function resolveRhPermissionAccess({
   const isGlobalAdmin =
     typeof permission === "number" && permission >= GLOBAL_ADMIN_PERMISSION;
   const canAccessRhPortal = Boolean(hasUser);
-  const canUseRhSelfService =
-    Boolean(hasUser) && (isGlobalAdmin || rhLevel === null || rhLevel >= 1);
+  const canUseRhSelfService = Boolean(hasUser) && (isGlobalAdmin || (rhLevel ?? 0) >= 1);
   const canManageRh = Boolean(hasUser) && (isGlobalAdmin || (rhLevel ?? 0) >= 2);
 
   return {
