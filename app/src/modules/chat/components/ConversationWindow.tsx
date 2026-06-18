@@ -157,7 +157,7 @@ const MessageBubble = ({ message, isSentByMe, chatType, isHighlighted }) => {
                 return <Text style={{ fontStyle: 'italic', color: 'red' }}>Erro ao carregar mídia</Text>;
             }
             if (message.type === 'IMAGE') {
-                return <img src={mediaUrl} alt={message.content || 'Imagem enviada'} style={{ maxWidth: '100%', maxHeight: '250px', borderRadius: '8px', cursor: 'pointer' }} onClick={() => window.open(mediaUrl, '_blank')} />;
+                return <img src={mediaUrl} alt={message.content || 'Imagem enviada'} style={{ maxWidth: '100%', maxHeight: '250px', borderRadius: '8px', cursor: 'pointer' }} onClick={() => window.open(mediaUrl, '_blank', 'noopener,noreferrer')} />;
             }
             if (message.type === 'AUDIO') {
                 return <audio controls src={mediaUrl} style={{ width: '250px' }}></audio>;
