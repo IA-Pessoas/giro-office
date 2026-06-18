@@ -37,6 +37,20 @@ export const CERTIFICATE_TAB_ACTIVE_BUTTON_CLASSNAME =
 export const CERTIFICATE_PRIMARY_BUTTON_CLASSNAME =
   "inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50";
 
+export const CERTIFICATE_SECONDARY_BUTTON_CLASSNAME =
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800";
+
+export const CERTIFICATE_FORM_MODAL_CONTENT_CLASSNAME =
+  "w-[min(92vw,760px)] [&>footer]:px-4 [&>footer]:py-3 [&>header]:px-4 [&>header]:py-3";
+
+export const CERTIFICATE_FORM_MODAL_BODY_CLASSNAME = "max-h-[64vh] overflow-y-auto !px-4 !py-3";
+
+export const CERTIFICATE_FORM_CLASSNAME = "space-y-3";
+
+export const CERTIFICATE_FORM_GRID_CLASSNAME = "grid gap-3 md:grid-cols-2 lg:grid-cols-3";
+
+export const CERTIFICATE_FORM_TEXTAREA_CLASSNAME = "min-h-20 resize-y";
+
 export const CERTIFICATE_INPUT_CLASSNAME =
   "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
 
