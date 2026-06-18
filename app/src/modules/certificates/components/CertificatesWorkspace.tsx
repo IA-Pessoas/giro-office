@@ -43,17 +43,17 @@ import {
 
 type CertificateTab = "pj" | "pf" | "notifications";
 
-type BoolFilter = "" | "true" | "false";
+type BoolFilterValue = "" | "true" | "false";
 
 type PjFilters = {
   name: string;
   cnpj: string;
   responsible: string;
   model: string;
-  clientCasteloStatus: BoolFilter;
-  clientFocusStatus: BoolFilter;
-  wasPaid: BoolFilter;
-  hasCertificate: BoolFilter;
+  clientCasteloStatus?: boolean;
+  clientFocusStatus?: boolean;
+  wasPaid?: boolean;
+  hasCertificate?: boolean;
 };
 
 type PfFilters = {
@@ -62,10 +62,10 @@ type PfFilters = {
   enterprise: string;
   cnpj: string;
   model: string;
-  clientCasteloStatus: BoolFilter;
-  clientFocusStatus: BoolFilter;
-  wasPaid: BoolFilter;
-  hasCertificate: BoolFilter;
+  clientCasteloStatus?: boolean;
+  clientFocusStatus?: boolean;
+  wasPaid?: boolean;
+  hasCertificate?: boolean;
 };
 
 type DetailTarget = {
@@ -93,12 +93,20 @@ const ZERO = 0;
 const FIRST_PAGE = DEFAULT_CERTIFICATE_PAGE;
 const PAGE_SIZE = DEFAULT_CERTIFICATE_PAGE_SIZE;
 
-function parseBooleanFilter(filter: BoolFilter): boolean | undefined {
-  if (filter === "") {
+function parseBooleanFilterValue(value: string): boolean | undefined {
+  if (value === "") {
     return undefined;
   }
 
-  return filter === "true";
+  return value === "true";
+}
+
+function booleanFilterToValue(filter: boolean | undefined): BoolFilterValue {
+  if (filter === undefined) {
+    return "";
+  }
+
+  return filter ? "true" : "false";
 }
 
 function trimValue(value: string): string {
@@ -214,10 +222,10 @@ export function CertificatesWorkspace() {
     cnpj: "",
     responsible: "",
     model: "",
-    clientCasteloStatus: "",
-    clientFocusStatus: "",
-    wasPaid: "",
-    hasCertificate: "",
+    clientCasteloStatus: undefined,
+    clientFocusStatus: undefined,
+    wasPaid: undefined,
+    hasCertificate: undefined,
   });
 
   const [pfFilters, setPfFilters] = useState<PfFilters>({
@@ -226,10 +234,10 @@ export function CertificatesWorkspace() {
     enterprise: "",
     cnpj: "",
     model: "",
-    clientCasteloStatus: "",
-    clientFocusStatus: "",
-    wasPaid: "",
-    hasCertificate: "",
+    clientCasteloStatus: undefined,
+    clientFocusStatus: undefined,
+    wasPaid: undefined,
+    hasCertificate: undefined,
   });
 
   const pjQueryParams = useMemo(
@@ -240,10 +248,10 @@ export function CertificatesWorkspace() {
       cnpj: trimValue(pjFilters.cnpj) || undefined,
       responsible: trimValue(pjFilters.responsible) || undefined,
       model: trimValue(pjFilters.model) || undefined,
-      client_castelo_status: parseBooleanFilter(pjFilters.clientCasteloStatus),
-      client_focus_status: parseBooleanFilter(pjFilters.clientFocusStatus),
-      was_paid: parseBooleanFilter(pjFilters.wasPaid),
-      has_certificate: parseBooleanFilter(pjFilters.hasCertificate),
+      client_castelo_status: pjFilters.clientCasteloStatus,
+      client_focus_status: pjFilters.clientFocusStatus,
+      was_paid: pjFilters.wasPaid,
+      has_certificate: pjFilters.hasCertificate,
     }),
     [pjFilters, pjPage],
   );
@@ -257,10 +265,10 @@ export function CertificatesWorkspace() {
       enterprise: trimValue(pfFilters.enterprise) || undefined,
       cnpj: trimValue(pfFilters.cnpj) || undefined,
       model: trimValue(pfFilters.model) || undefined,
-      client_castelo_status: parseBooleanFilter(pfFilters.clientCasteloStatus),
-      client_focus_status: parseBooleanFilter(pfFilters.clientFocusStatus),
-      was_paid: parseBooleanFilter(pfFilters.wasPaid),
-      has_certificate: parseBooleanFilter(pfFilters.hasCertificate),
+      client_castelo_status: pfFilters.clientCasteloStatus,
+      client_focus_status: pfFilters.clientFocusStatus,
+      was_paid: pfFilters.wasPaid,
+      has_certificate: pfFilters.hasCertificate,
     }),
     [pfFilters, pfPage],
   );
@@ -302,8 +310,10 @@ export function CertificatesWorkspace() {
       return;
     }
 
+    const nextItems = pjListQuery.data.data;
+
     setVisiblePjItems((current) =>
-      pjPage === FIRST_PAGE ? pjListQuery.data.data : mergeListById(current, pjListQuery.data.data),
+      pjPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
     );
   }, [pjListQuery.data, pjPage]);
 
@@ -312,8 +322,10 @@ export function CertificatesWorkspace() {
       return;
     }
 
+    const nextItems = pfListQuery.data.data;
+
     setVisiblePfItems((current) =>
-      pfPage === FIRST_PAGE ? pfListQuery.data.data : mergeListById(current, pfListQuery.data.data),
+      pfPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
     );
   }, [pfListQuery.data, pfPage]);
 
@@ -436,13 +448,13 @@ export function CertificatesWorkspace() {
       pfFilters.clientFocusStatus,
       pfFilters.wasPaid,
       pfFilters.hasCertificate,
-    ].filter(Boolean).length
+    ].filter((value) => value !== undefined).length
     : [
       pjFilters.clientCasteloStatus,
       pjFilters.clientFocusStatus,
       pjFilters.wasPaid,
       pjFilters.hasCertificate,
-    ].filter(Boolean).length;
+    ].filter((value) => value !== undefined).length;
   const advancedFilterLabel =
     activeAdvancedFilterCount > ZERO ? `Filtros (${activeAdvancedFilterCount})` : "Filtros";
 
@@ -684,11 +696,11 @@ export function CertificatesWorkspace() {
                       Status castelo
                     </span>
                     <CertificateNativeSelect
-                      value={pjFilters.clientCasteloStatus}
+                      value={booleanFilterToValue(pjFilters.clientCasteloStatus)}
                       onChange={(event) =>
                         setPjFilters((prev) => ({
                           ...prev,
-                          clientCasteloStatus: event.target.value as BoolFilter,
+                          clientCasteloStatus: parseBooleanFilterValue(event.target.value),
                         }))
                       }
                     >
@@ -706,11 +718,11 @@ export function CertificatesWorkspace() {
                       Status focus
                     </span>
                     <CertificateNativeSelect
-                      value={pjFilters.clientFocusStatus}
+                      value={booleanFilterToValue(pjFilters.clientFocusStatus)}
                       onChange={(event) =>
                         setPjFilters((prev) => ({
                           ...prev,
-                          clientFocusStatus: event.target.value as BoolFilter,
+                          clientFocusStatus: parseBooleanFilterValue(event.target.value),
                         }))
                       }
                     >
@@ -728,9 +740,9 @@ export function CertificatesWorkspace() {
                       Pago
                     </span>
                     <CertificateNativeSelect
-                      value={pjFilters.wasPaid}
+                      value={booleanFilterToValue(pjFilters.wasPaid)}
                       onChange={(event) =>
-                        setPjFilters((prev) => ({ ...prev, wasPaid: event.target.value as BoolFilter }))
+                        setPjFilters((prev) => ({ ...prev, wasPaid: parseBooleanFilterValue(event.target.value) }))
                       }
                     >
                       {BOOL_OPTIONS.map((option) => (
@@ -747,9 +759,9 @@ export function CertificatesWorkspace() {
                       Com arquivo
                     </span>
                     <CertificateNativeSelect
-                      value={pjFilters.hasCertificate}
+                      value={booleanFilterToValue(pjFilters.hasCertificate)}
                       onChange={(event) =>
-                        setPjFilters((prev) => ({ ...prev, hasCertificate: event.target.value as BoolFilter }))
+                        setPjFilters((prev) => ({ ...prev, hasCertificate: parseBooleanFilterValue(event.target.value) }))
                       }
                     >
                       {BOOL_OPTIONS.map((option) => (
@@ -842,11 +854,11 @@ export function CertificatesWorkspace() {
                       Status castelo
                     </span>
                     <CertificateNativeSelect
-                      value={pfFilters.clientCasteloStatus}
+                      value={booleanFilterToValue(pfFilters.clientCasteloStatus)}
                       onChange={(event) =>
                         setPfFilters((prev) => ({
                           ...prev,
-                          clientCasteloStatus: event.target.value as BoolFilter,
+                          clientCasteloStatus: parseBooleanFilterValue(event.target.value),
                         }))
                       }
                     >
@@ -864,11 +876,11 @@ export function CertificatesWorkspace() {
                       Status focus
                     </span>
                     <CertificateNativeSelect
-                      value={pfFilters.clientFocusStatus}
+                      value={booleanFilterToValue(pfFilters.clientFocusStatus)}
                       onChange={(event) =>
                         setPfFilters((prev) => ({
                           ...prev,
-                          clientFocusStatus: event.target.value as BoolFilter,
+                          clientFocusStatus: parseBooleanFilterValue(event.target.value),
                         }))
                       }
                     >
@@ -886,9 +898,9 @@ export function CertificatesWorkspace() {
                       Pago
                     </span>
                     <CertificateNativeSelect
-                      value={pfFilters.wasPaid}
+                      value={booleanFilterToValue(pfFilters.wasPaid)}
                       onChange={(event) =>
-                        setPfFilters((prev) => ({ ...prev, wasPaid: event.target.value as BoolFilter }))
+                        setPfFilters((prev) => ({ ...prev, wasPaid: parseBooleanFilterValue(event.target.value) }))
                       }
                     >
                       {BOOL_OPTIONS.map((option) => (
@@ -905,9 +917,9 @@ export function CertificatesWorkspace() {
                       Com arquivo
                     </span>
                     <CertificateNativeSelect
-                      value={pfFilters.hasCertificate}
+                      value={booleanFilterToValue(pfFilters.hasCertificate)}
                       onChange={(event) =>
-                        setPfFilters((prev) => ({ ...prev, hasCertificate: event.target.value as BoolFilter }))
+                        setPfFilters((prev) => ({ ...prev, hasCertificate: parseBooleanFilterValue(event.target.value) }))
                       }
                     >
                       {BOOL_OPTIONS.map((option) => (

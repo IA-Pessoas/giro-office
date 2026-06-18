@@ -51,7 +51,7 @@ export function useCertificatePjList(
     certificatePjListQueryKey(params),
     () => certificateService.listPj(params),
     {
-      enabled: options.enabled,
+      enabled: options.enabled ?? true,
       placeholderData: (previousData) => previousData,
       refetchOnWindowFocus: false,
     },
@@ -66,7 +66,7 @@ export function useCertificatePfList(
     certificatePfListQueryKey(params),
     () => certificateService.listPf(params),
     {
-      enabled: options.enabled,
+      enabled: options.enabled ?? true,
       placeholderData: (previousData) => previousData,
       refetchOnWindowFocus: false,
     },
@@ -78,7 +78,7 @@ export function useCertificateNotificationsList(
   options: CertificateQueryOptions<CertificateListPage<CertificateNotification>> = {},
 ): UseQueryResult<CertificateListPage<CertificateNotification>, Error> {
   return useFetch(certificateNotificationsQueryKey(params), () => certificateService.listNotifications(params), {
-    enabled: options.enabled,
+    enabled: options.enabled ?? true,
     placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: false,
   });
