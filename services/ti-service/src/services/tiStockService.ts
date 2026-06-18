@@ -16,7 +16,10 @@ import type {
 import { TiDepartmentResolverService } from "./tiDepartmentResolverService.js";
 import type { TiAuthContext } from "./tiRequestService.js";
 
-type StockDatabaseClient = PrismaClient | Prisma.TransactionClient;
+type StockDatabaseClient = Pick<
+  PrismaClient,
+  "categoryStock" | "entryStock" | "exitStock" | "locationStock" | "stock" | "user"
+>;
 
 export class TiStockService {
   private readonly departmentResolver: TiDepartmentResolverService;
