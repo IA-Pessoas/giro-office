@@ -357,7 +357,7 @@ function getUpdatePfPayload(
 
 function getInvalidAmountMessage(payloadAmount: number | null, original: string): string | null {
   if (original.trim() && Number.isNaN(payloadAmount)) {
-    return "Informe um valor de pagamento valido.";
+    return "Informe um valor de pagamento válido.";
   }
 
   return null;
@@ -582,7 +582,7 @@ export function CertificateForm({
         {isPj ? (
           <>
             <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-              <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Responsavel</span>
+              <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Responsável</span>
               <input
                 type="text"
                 value={formState.responsible}
