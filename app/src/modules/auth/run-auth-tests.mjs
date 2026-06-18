@@ -181,6 +181,14 @@ await (async () => {
     assert.match(appShellSource, /:\s*shouldRenderModuleAccessDenied\s*\?\s*<ModuleAccessDeniedState \/>/);
   });
 
+  await runTest("app shell keeps module navigation stable while module access is loading", () => {
+    assert.match(appShellSource, /isModuleAccessCategory:\s*true/);
+    assert.match(appShellSource, /function ModuleNavLoadingItem/);
+    assert.match(appShellSource, /shouldRenderModuleNavLoading/);
+    assert.equal(appShellSource.includes("isModuleAccessLoading) {\n      return false;"), false);
+    assert.equal(appShellSource.includes("isModuleAccessLoading) {\n          return false;"), false);
+  });
+
   await runTest("canSSRAdmin redirects unauthenticated users to login", async () => {
     const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
     const result = await guard(createSsrContext());
