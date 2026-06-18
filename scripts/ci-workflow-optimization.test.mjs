@@ -375,6 +375,14 @@ test("certificate-service is accepted by VPS selective deploy scope", async () =
   );
 });
 
+test("ti-service remains accepted by VPS selective deploy scope", async () => {
+  assert.equal(await runDeployScopeFunction("vps_validate_service_token", "ti-service"), "");
+  assert.equal(
+    await runDeployScopeFunction("vps_compose_service_args", "ti-service"),
+    "ti-service",
+  );
+});
+
 test("certificate-service is covered by VPS endpoint wait checks", async () => {
   const script = await readFile(vpsWaitEndpointsScript, "utf8");
 
