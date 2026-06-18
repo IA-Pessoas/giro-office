@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
 import {
   Bell,
@@ -44,7 +44,7 @@ import type {
 } from "@modules/certificates/types";
 
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
-import { CertificateForm, type CertificateFormHandle } from "./CertificateForm";
+import { CertificateForm } from "./CertificateForm";
 import {
   CERTIFICATE_COMPACT_BUTTON_CLASSNAME,
   CERTIFICATE_DATE_STATUS_OK_CLASSNAME,
@@ -238,7 +238,6 @@ function AccessDeniedCard() {
 
 export function CertificatesWorkspace() {
   const { access, isLoading: isModuleAccessLoading } = useModuleAccess("certificado");
-  const formRef = useRef<CertificateFormHandle>(null);
   const [activeTab, setActiveTab] = useState<CertificateTab>("pj");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("view");
   const [selected, setSelected] = useState<DetailTarget>(null);
@@ -528,6 +527,7 @@ export function CertificatesWorkspace() {
     : "Formulário de edição de certificado";
   const formSubmitLabel = isCreating ? "Criar certificado" : "Salvar alterações";
   const shouldDisableFormSubmit = formSubmitting || activeDetailIsLoading || Boolean(activeDetailErrorMessage);
+  const activeFormId = `certificate-${workspaceMode}-form`;
 
   function handleTabChange(next: CertificateTab) {
     setActiveTab(next);
@@ -638,10 +638,6 @@ export function CertificatesWorkspace() {
     }
 
     handleCancelForm();
-  }
-
-  function handleSubmitActiveForm() {
-    formRef.current?.submit();
   }
 
   async function handleSubmitCreatePj(payload: CreateCertificatePjBody) {
@@ -1413,8 +1409,8 @@ export function CertificatesWorkspace() {
               Cancelar
             </button>
             <button
-              type="button"
-              onClick={handleSubmitActiveForm}
+              type="submit"
+              form={activeFormId}
               className={CERTIFICATE_PRIMARY_BUTTON_CLASSNAME}
               disabled={shouldDisableFormSubmit}
             >
@@ -1427,7 +1423,7 @@ export function CertificatesWorkspace() {
         {workspaceMode === "createPj" ? (
           <CertificateForm
             key="create-pj"
-            ref={formRef}
+            formId={activeFormId}
             kind="pj"
             mode="create"
             isSubmitting={formSubmitting}
@@ -1438,7 +1434,7 @@ export function CertificatesWorkspace() {
         {workspaceMode === "createPf" ? (
           <CertificateForm
             key="create-pf"
-            ref={formRef}
+            formId={activeFormId}
             kind="pf"
             mode="create"
             isSubmitting={formSubmitting}
@@ -1459,7 +1455,7 @@ export function CertificatesWorkspace() {
           ) : (
             <CertificateForm
               key="edit-pj"
-              ref={formRef}
+              formId={activeFormId}
               kind="pj"
               mode="edit"
               initialData={pjDetail}
@@ -1482,7 +1478,7 @@ export function CertificatesWorkspace() {
           ) : (
             <CertificateForm
               key="edit-pf"
-              ref={formRef}
+              formId={activeFormId}
               kind="pf"
               mode="edit"
               initialData={pfDetail}
@@ -1692,4 +1688,3 @@ export function CertificatesWorkspace() {
     </div>
   );
 }
-

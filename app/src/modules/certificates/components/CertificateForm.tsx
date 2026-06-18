@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   CERTIFICATE_FORM_CLASSNAME,
@@ -59,11 +59,13 @@ type BaseCreateProps = {
   mode: "create";
   isSubmitting: boolean;
   initialData?: never;
+  formId: string;
 };
 
 type BaseEditProps = {
   mode: "edit";
   isSubmitting: boolean;
+  formId: string;
 };
 
 type PJCreateFormProps = BaseCreateProps & {
@@ -89,10 +91,6 @@ type PFEditFormProps = BaseEditProps & {
 };
 
 type CertificateFormProps = PJCreateFormProps | PFCreateFormProps | PJEditFormProps | PFEditFormProps;
-
-export type CertificateFormHandle = {
-  submit: () => void;
-};
 
 function toInputDate(value: string | null | undefined): string {
   if (!value) {
@@ -369,16 +367,14 @@ function boolToLabel(value: boolean) {
   return value ? "Sim" : "Não";
 }
 
-export const CertificateForm = forwardRef<CertificateFormHandle, CertificateFormProps>(function CertificateForm(
-  {
-    kind,
-    mode,
-    isSubmitting,
-    onSubmit,
-    initialData,
-  },
-  ref,
-) {
+export function CertificateForm({
+  kind,
+  mode,
+  isSubmitting,
+  onSubmit,
+  initialData,
+  formId,
+}: CertificateFormProps) {
   const isCreate = mode === "create";
   const isPj = kind === "pj";
   const initialState = useMemo(
@@ -530,14 +526,9 @@ export const CertificateForm = forwardRef<CertificateFormHandle, CertificateForm
     }
   }
 
-  useImperativeHandle(ref, () => ({
-    submit: () => {
-      void handleSubmit();
-    },
-  }));
-
   return (
     <form
+      id={formId}
       className={CERTIFICATE_FORM_CLASSNAME}
       onSubmit={(event) => {
         event.preventDefault();
@@ -754,7 +745,7 @@ export const CertificateForm = forwardRef<CertificateFormHandle, CertificateForm
       </section>
     </form>
   );
-});
+}
 
 export type {
   CreateFormPayload,
