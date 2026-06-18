@@ -3,6 +3,7 @@ import {
   useQueryClient,
   type UseQueryResult,
   type UseMutationResult,
+  type UseQueryOptions,
 } from "@tanstack/react-query";
 
 import { useFetch } from "@shared/hooks";
@@ -32,6 +33,11 @@ import {
   CERTIFICATE_QUERY_KEY,
 } from "./queryKeys";
 
+type CertificateQueryOptions<TData> = Pick<
+  UseQueryOptions<TData, Error, TData>,
+  "enabled"
+>;
+
 export const CERTIFICATE_PJ_LIST_DEFAULTS: CertificatePjListParams = {
   page: 1,
   page_size: 50,
@@ -39,11 +45,13 @@ export const CERTIFICATE_PJ_LIST_DEFAULTS: CertificatePjListParams = {
 
 export function useCertificatePjList(
   params: CertificatePjListParams = CERTIFICATE_PJ_LIST_DEFAULTS,
+  options: CertificateQueryOptions<CertificateListPage<CertificatePj>> = {},
 ): UseQueryResult<CertificateListPage<CertificatePj>, Error> {
   return useFetch(
     certificatePjListQueryKey(params),
     () => certificateService.listPj(params),
     {
+      enabled: options.enabled,
       placeholderData: (previousData) => previousData,
       refetchOnWindowFocus: false,
     },
@@ -52,11 +60,13 @@ export function useCertificatePjList(
 
 export function useCertificatePfList(
   params: CertificatePfListParams = CERTIFICATE_PJ_LIST_DEFAULTS,
+  options: CertificateQueryOptions<CertificateListPage<CertificatePf>> = {},
 ): UseQueryResult<CertificateListPage<CertificatePf>, Error> {
   return useFetch(
     certificatePfListQueryKey(params),
     () => certificateService.listPf(params),
     {
+      enabled: options.enabled,
       placeholderData: (previousData) => previousData,
       refetchOnWindowFocus: false,
     },
@@ -65,8 +75,10 @@ export function useCertificatePfList(
 
 export function useCertificateNotificationsList(
   params: CertificateNotificationListParams,
+  options: CertificateQueryOptions<CertificateListPage<CertificateNotification>> = {},
 ): UseQueryResult<CertificateListPage<CertificateNotification>, Error> {
   return useFetch(certificateNotificationsQueryKey(params), () => certificateService.listNotifications(params), {
+    enabled: options.enabled,
     placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: false,
   });
@@ -74,12 +86,13 @@ export function useCertificateNotificationsList(
 
 export function useCertificatePjDetail(
   id: string | undefined,
+  options: CertificateQueryOptions<CertificatePj> = {},
 ): UseQueryResult<CertificatePj, Error> {
   return useFetch(
     certificatePjDetailQueryKey(id ?? "missing"),
     () => certificateService.detailPj(id ?? ""),
     {
-      enabled: Boolean(id),
+      enabled: Boolean(id) && (options.enabled ?? true),
       refetchOnWindowFocus: false,
     },
   );
@@ -87,12 +100,13 @@ export function useCertificatePjDetail(
 
 export function useCertificatePfDetail(
   id: string | undefined,
+  options: CertificateQueryOptions<CertificatePf> = {},
 ): UseQueryResult<CertificatePf, Error> {
   return useFetch(
     certificatePfDetailQueryKey(id ?? "missing"),
     () => certificateService.detailPf(id ?? ""),
     {
-      enabled: Boolean(id),
+      enabled: Boolean(id) && (options.enabled ?? true),
       refetchOnWindowFocus: false,
     },
   );
