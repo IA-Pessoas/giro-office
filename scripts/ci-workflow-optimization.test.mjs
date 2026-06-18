@@ -382,10 +382,7 @@ test("certificate-service is covered by VPS endpoint wait checks", async () => {
     script,
     /certificate-service\)\s+printf "%s\\n" "http:\/\/certificate-service:3041\/health"/,
   );
-  assert.match(
-    script,
-    /ALL_BACKEND_SERVICES=\([\s\S]*certificate-service[\s\S]*\)/,
-  );
+  assert.match(script, /ALL_BACKEND_SERVICES=\([\s\S]*certificate-service[\s\S]*\)/);
 });
 
 test("certificate-service is covered by VPS runtime override", async () => {
