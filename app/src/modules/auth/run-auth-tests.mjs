@@ -10,6 +10,11 @@ import {
 } from "./utils/authCookie.ts";
 import { createBearerAuthHeaders, getAuthTokenValue } from "./utils/authHeaders.ts";
 import { canAccessAdministration, isAdminPermission } from "./utils/permissions.ts";
+import {
+  resolveAccessLevelFromAdditionalPermission,
+  resolveDepartmentModuleKey,
+  resolveModuleAccess,
+} from "./utils/moduleAccess.ts";
 
 async function runTest(name, fn) {
   try {
@@ -51,6 +56,10 @@ const authContextSource = await readFile(
   new URL("../../context/AuthContext.tsx", import.meta.url),
   "utf8",
 );
+const appShellSource = await readFile(
+  new URL("../../shared/components/newLayout/AppShell.tsx", import.meta.url),
+  "utf8",
+);
 
 await (async () => {
   await runTest("isAdminPermission allows administrative levels from 2 and above", () => {
@@ -71,6 +80,113 @@ await (async () => {
     assert.equal(canAccessAdministration({ permission: 999 }), true);
     assert.equal(canAccessAdministration({ permission: 1 }), false);
     assert.equal(canAccessAdministration(undefined), false);
+  });
+
+  await runTest("resolveModuleAccess grants admin access to every module", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: 2,
+        departmentModule: "regularize",
+        module: "financeiro",
+      }),
+      {
+        level: "admin",
+        canView: true,
+        canEdit: true,
+        isAdmin: true,
+        source: "admin",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess grants department access from user permission level", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: 1,
+        departmentModule: "regularize",
+        module: "regularize",
+      }),
+      {
+        level: "edit",
+        canView: true,
+        canEdit: true,
+        isAdmin: false,
+        source: "department",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess grants additional module access outside department", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: 0,
+        departmentModule: "regularize",
+        module: "financeiro",
+        additionalModulePermissions: {
+          financeiro: 1,
+        },
+      }),
+      {
+        level: "edit",
+        canView: true,
+        canEdit: true,
+        isAdmin: false,
+        source: "additional-module",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess denies modules without department or additional permission", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: 0,
+        departmentModule: "regularize",
+        module: "financeiro",
+      }),
+      {
+        level: "none",
+        canView: false,
+        canEdit: false,
+        isAdmin: false,
+        source: "none",
+      },
+    );
+  });
+
+  await runTest("module access helpers normalize aliases and additional permission levels", () => {
+    assert.equal(resolveDepartmentModuleKey("Departamento Pessoal"), "pessoal");
+    assert.equal(resolveDepartmentModuleKey("Tecnologia"), "ti");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(2), "admin");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(1), "edit");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(0), "view");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(null), "none");
+  });
+
+  await runTest("app shell uses module hook for menu visibility instead of raw access store", () => {
+    assert.match(appShellSource, /useModuleAccessMap\(MODULE_KEYS\)/);
+    assert.equal(appShellSource.includes("useAccessStore("), false);
+  });
+
+  await runTest("app shell renders an explicit forbidden state for inaccessible module routes", () => {
+    assert.match(appShellSource, /Você não tem acesso a este módulo no perfil atual\./);
+    assert.match(appShellSource, /currentModuleAccess\?\.canView === false/);
+  });
+
+  await runTest("app shell holds module route children while module access is loading", () => {
+    assert.match(
+      appShellSource,
+      /shouldRenderModuleAccessLoading\s*=\s*Boolean\(currentModuleKey\)\s*&&\s*isModuleAccessLoading/,
+    );
+    assert.match(appShellSource, /shouldRenderModuleAccessLoading\s*\?\s*<ModuleAccessLoadingState \/>/);
+    assert.match(appShellSource, /:\s*shouldRenderModuleAccessDenied\s*\?\s*<ModuleAccessDeniedState \/>/);
+  });
+
+  await runTest("app shell keeps module navigation stable while module access is loading", () => {
+    assert.match(appShellSource, /isModuleAccessCategory:\s*true/);
+    assert.match(appShellSource, /function ModuleNavLoadingItem/);
+    assert.match(appShellSource, /shouldRenderModuleNavLoading/);
+    assert.equal(appShellSource.includes("isModuleAccessLoading) {\n      return false;"), false);
+    assert.equal(appShellSource.includes("isModuleAccessLoading) {\n          return false;"), false);
   });
 
   await runTest("canSSRAdmin redirects unauthenticated users to login", async () => {

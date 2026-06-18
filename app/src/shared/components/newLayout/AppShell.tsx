@@ -6,7 +6,6 @@ import {
   Bot,
   Bell,
   Building2,
-  Briefcase,
   BriefcaseBusiness,
   Calculator,
   ChevronDown,
@@ -16,6 +15,7 @@ import {
   FileText,
   Filter,
   LayoutDashboard,
+  Loader2,
   Megaphone,
   Menu,
   Receipt,
@@ -31,8 +31,13 @@ import {
   X,
 } from "lucide-react";
 
-import type { ModuleKey } from "@modules/auth";
-import { APP_ROUTE_MODULE_MAP, canAccessAdministration, useAccessStore } from "@modules/auth";
+import {
+  APP_ROUTE_MODULE_MAP,
+  MODULE_KEYS,
+  canAccessAdministration,
+  useModuleAccessMap,
+  type ModuleKey,
+} from "@modules/auth";
 import { useMe } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
@@ -89,7 +94,20 @@ function Logo({ showText }: { showText: boolean }) {
   );
 }
 
-const moduleCategories = [
+type NavigationModule = {
+  path: string;
+  name: string;
+  icon: typeof LayoutDashboard;
+  moduleKey?: ModuleKey;
+};
+
+type NavigationCategory = {
+  name: string;
+  modules: NavigationModule[];
+  isModuleAccessCategory?: boolean;
+};
+
+const moduleCategories: NavigationCategory[] = [
   {
     name: "Principal",
     modules: [
@@ -102,6 +120,7 @@ const moduleCategories = [
   },
   {
     name: "Módulos",
+    isModuleAccessCategory: true,
     modules: [
       { path: "/comercial", name: "Comercial", icon: BriefcaseBusiness, moduleKey: "comercial" as ModuleKey },
       { path: "/marketing", name: "Marketing", icon: Megaphone, moduleKey: "marketing" as ModuleKey },
@@ -125,6 +144,103 @@ const moduleCategories = [
   },
 ];
 
+const MODULE_ACCESS_DENIED_MESSAGE = "Você não tem acesso a este módulo no perfil atual.";
+const MODULE_ACCESS_LOADING_MESSAGE = "Carregando acesso ao modulo.";
+const MODULE_NAV_LOADING_MESSAGE = "Carregando modulos";
+
+function normalizeRoutePath(routePath: string): string {
+  const pathWithoutQuery = routePath.split("?")[0]?.split("#")[0] ?? "";
+  const normalizedPath =
+    pathWithoutQuery.length > 1 ? pathWithoutQuery.replace(/\/+$/, "") : pathWithoutQuery;
+
+  return normalizedPath || "/";
+}
+
+function getModuleKeyFromRoutePath(routePath: string): ModuleKey | null {
+  const normalizedPath = normalizeRoutePath(routePath);
+  const mappedRoute = Object.entries(APP_ROUTE_MODULE_MAP).find(([modulePath]) => {
+    return normalizedPath === modulePath || normalizedPath.startsWith(`${modulePath}/`);
+  });
+
+  if (mappedRoute) {
+    const [, mappedModuleKey] = mappedRoute;
+    return mappedModuleKey ?? null;
+  }
+
+  for (const category of moduleCategories) {
+    const matchedModule = category.modules.find((module) => {
+      return normalizeRoutePath(module.path) === normalizedPath;
+    });
+
+    if (matchedModule && "moduleKey" in matchedModule) {
+      return matchedModule.moduleKey;
+    }
+  }
+
+  return null;
+}
+
+function ModuleAccessDeniedState() {
+  return (
+    <section className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center">
+      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+          <Shield className="h-6 w-6" />
+        </div>
+        <h1 className="text-xl font-semibold text-slate-950 dark:text-white">
+          Acesso indisponível
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          {MODULE_ACCESS_DENIED_MESSAGE}
+        </p>
+        <Link
+          href="/dashboard"
+          className="mt-6 inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        >
+          Voltar para o dashboard
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function ModuleAccessLoadingState() {
+  return (
+    <section
+      aria-busy="true"
+      aria-live="polite"
+      className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center"
+    >
+      <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <Loader2
+          aria-hidden="true"
+          className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-300"
+        />
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+          {MODULE_ACCESS_LOADING_MESSAGE}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function ModuleNavLoadingItem({ showText }: { showText: boolean }) {
+  return (
+    <div
+      role="status"
+      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-gray-500 dark:text-slate-400 ${
+        !showText ? "justify-center" : ""
+      }`}
+      title={!showText ? MODULE_NAV_LOADING_MESSAGE : undefined}
+    >
+      <Loader2 aria-hidden="true" className="h-5 w-5 flex-shrink-0 animate-spin" />
+      {showText ? (
+        <span className="text-sm font-medium">{MODULE_NAV_LOADING_MESSAGE}</span>
+      ) : null}
+    </div>
+  );
+}
+
 type ChatMessage = {
   id: string;
   sender: "user" | "ai";
@@ -136,8 +252,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
   const meQuery = useMe();
-  const moduleAccessMap = useAccessStore((snapshot) => snapshot.accessMap);
-  const isModuleAccessLoading = useAccessStore((snapshot) => snapshot.isLoading);
+  const { accessMap: moduleAccessMap, isLoading: isModuleAccessLoading } =
+    useModuleAccessMap(MODULE_KEYS);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -183,29 +299,71 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const displayUserPhoto = resolvePhotoUrl(meQuery.data?.photo_url ?? null);
   const displayUserInitials = getInitials(displayUserName);
   const isAdmin = canAccessAdministration(meQuery.data?.permission ?? user?.permission ?? null);
+  const currentModuleKey = getModuleKeyFromRoutePath(pathname);
+  const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
+  const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;
+  const shouldRenderModuleAccessDenied =
+    Boolean(currentModuleKey) &&
+    !isModuleAccessLoading &&
+    currentModuleAccess?.canView === false;
+
+  const canViewModuleFromPath = (modulePath: string): boolean => {
+    if (modulePath === "/departments" || modulePath === "/administracao") {
+      return isAdmin;
+    }
+
+    const moduleKey = getModuleKeyFromRoutePath(modulePath);
+
+    if (!moduleKey) {
+      return true;
+    }
+
+    if (isModuleAccessLoading) {
+      return true;
+    }
+
+    const moduleAccess = moduleAccessMap[moduleKey];
+    return Boolean(moduleAccess?.canView);
+  };
+
   const filteredModuleCategories = moduleCategories
-    .map((category) => ({
-      ...category,
-      modules: category.modules.filter((module) => {
-        if (module.path === "/departments") {
-          return isAdmin;
-        }
+    .map((category) => {
+      if (category.isModuleAccessCategory && isModuleAccessLoading) {
+        return {
+          ...category,
+          modules: [],
+        };
+      }
 
-        if (module.path === "/rh") {
-          return true;
-        }
+      return {
+        ...category,
+        modules: category.modules.filter((module) => {
+          const moduleKey =
+            ("moduleKey" in module ? module.moduleKey : undefined) ??
+            APP_ROUTE_MODULE_MAP[module.path];
+          if (!moduleKey) {
+            return canViewModuleFromPath(module.path);
+          }
 
-        const moduleKey =
-          ("moduleKey" in module ? module.moduleKey : undefined) ?? APP_ROUTE_MODULE_MAP[module.path];
+          const moduleAccess = moduleAccessMap[moduleKey];
+          if (isModuleAccessLoading) {
+            return true;
+          }
 
-        if (!moduleKey) {
-          return true;
-        }
-
-        return !isModuleAccessLoading && moduleAccessMap[moduleKey].canView;
-      }),
-    }))
-    .filter((category) => category.modules.length > 0);
+          return moduleAccess?.canView ?? false;
+        }),
+      };
+    })
+    .filter(
+      (category) =>
+        category.modules.length > 0 ||
+        (category.isModuleAccessCategory === true && isModuleAccessLoading),
+    );
+  const mainContent = shouldRenderModuleAccessLoading
+    ? <ModuleAccessLoadingState />
+    : shouldRenderModuleAccessDenied
+      ? <ModuleAccessDeniedState />
+      : children;
 
   useEffect(() => {
     setHasUserPhotoLoadError(false);
@@ -317,42 +475,51 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
 
         <nav className="p-3 space-y-6 overflow-y-auto h-[calc(100vh-4rem)]">
-          {filteredModuleCategories.map((category) => (
-            <div key={category.name}>
-              {isSidebarOpen ? (
-                <div className="px-3 mb-2">
-                  <span className="text-xs font-semibold text-black dark:text-white uppercase tracking-wider">
-                    {category.name}
-                  </span>
+          {filteredModuleCategories.map((category) => {
+            const shouldRenderModuleNavLoading =
+              category.isModuleAccessCategory === true && isModuleAccessLoading;
+
+            return (
+              <div key={category.name}>
+                {isSidebarOpen ? (
+                  <div className="px-3 mb-2">
+                    <span className="text-xs font-semibold text-black dark:text-white uppercase tracking-wider">
+                      {category.name}
+                    </span>
+                  </div>
+                ) : null}
+
+                <div className="space-y-1">
+                  {shouldRenderModuleNavLoading ? (
+                    <ModuleNavLoadingItem showText={isSidebarOpen} />
+                  ) : (
+                    category.modules.map((module) => {
+                      const Icon = module.icon;
+                      const isActive = pathname === module.path;
+
+                      return (
+                        <Link
+                          key={module.path}
+                          href={module.path}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                            isActive
+                              ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
+                              : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
+                          } ${!isSidebarOpen ? "justify-center" : ""}`}
+                          title={!isSidebarOpen ? module.name : undefined}
+                        >
+                          <Icon className="w-5 h-5 flex-shrink-0" />
+                          {isSidebarOpen ? (
+                            <span className="text-sm font-medium">{module.name}</span>
+                          ) : null}
+                        </Link>
+                      );
+                    })
+                  )}
                 </div>
-              ) : null}
-
-              <div className="space-y-1">
-                {category.modules.map((module) => {
-                  const Icon = module.icon;
-                  const isActive = pathname === module.path;
-
-                  return (
-                    <Link
-                      key={module.path}
-                      href={module.path}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                        isActive
-                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
-                          : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
-                      } ${!isSidebarOpen ? "justify-center" : ""}`}
-                      title={!isSidebarOpen ? module.name : undefined}
-                    >
-                      <Icon className="w-5 h-5 flex-shrink-0" />
-                      {isSidebarOpen ? (
-                        <span className="text-sm font-medium">{module.name}</span>
-                      ) : null}
-                    </Link>
-                  );
-                })}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
       </aside>
 
@@ -499,7 +666,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+          {mainContent}
+        </main>
       </div>
 
       {showAiChat ? (
