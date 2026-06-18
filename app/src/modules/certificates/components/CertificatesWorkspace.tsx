@@ -1,20 +1,56 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
-import { Bell, CalendarClock, Eye, Filter, RefreshCcw, Search, ShieldCheck, ShieldAlert } from "lucide-react";
+import {
+  Bell,
+  CalendarClock,
+  Copy,
+  Eye,
+  EyeOff,
+  Filter,
+  LoaderCircle,
+  Plus,
+  RefreshCcw,
+  Save,
+  Search,
+  ShieldCheck,
+  ShieldAlert,
+} from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
+import { Dialog } from "@shared/components/ui/Dialog";
 import {
   DEFAULT_CERTIFICATE_PAGE,
   DEFAULT_CERTIFICATE_PAGE_SIZE,
 } from "@modules/certificates/services/certificateService.contract";
-import { useCertificateNotificationsList, useCertificatePjDetail, useCertificatePjList, useCertificatePfDetail, useCertificatePfList } from "@modules/certificates/hooks";
-import type { CertificateNotification, CertificatePj, CertificatePf } from "@modules/certificates/types";
+import {
+  useCertificateNotificationsList,
+  useCertificatePjDetail,
+  useCertificatePjList,
+  useCertificatePfDetail,
+  useCertificatePfList,
+  useCreateCertificatePjMutation,
+  useCreateCertificatePfMutation,
+  useUpdateCertificatePjMutation,
+  useUpdateCertificatePfMutation,
+} from "@modules/certificates/hooks";
+import type {
+  CertificateNotification,
+  CertificatePj,
+  CertificatePf,
+  CreateCertificatePjBody,
+  CreateCertificatePfBody,
+  UpdateCertificatePjBody,
+  UpdateCertificatePfBody,
+} from "@modules/certificates/types";
 
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
+import { CertificateForm } from "./CertificateForm";
 import {
   CERTIFICATE_COMPACT_BUTTON_CLASSNAME,
   CERTIFICATE_DATE_STATUS_OK_CLASSNAME,
   CERTIFICATE_BADGE_CLASSNAME,
+  CERTIFICATE_FORM_MODAL_BODY_CLASSNAME,
+  CERTIFICATE_FORM_MODAL_CONTENT_CLASSNAME,
   CERTIFICATE_FILTER_LABEL_CLASSNAME,
   CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME,
   CERTIFICATE_FILTER_MENU_CLASSNAME,
@@ -22,6 +58,7 @@ import {
   CERTIFICATE_INPUT_CLASSNAME,
   CERTIFICATE_PANEL_CLASSNAME,
   CERTIFICATE_PRIMARY_BUTTON_CLASSNAME,
+  CERTIFICATE_SECONDARY_BUTTON_CLASSNAME,
   CERTIFICATE_SUBPANEL_CLASSNAME,
   CERTIFICATE_TAB_ACTIVE_BUTTON_CLASSNAME,
   CERTIFICATE_TAB_BUTTON_CLASSNAME,
@@ -42,6 +79,7 @@ import {
 } from "./certificateWorkspaceUi";
 
 type CertificateTab = "pj" | "pf" | "notifications";
+type WorkspaceMode = "view" | "createPj" | "createPf" | "editPj" | "editPf";
 
 type PjFilters = {
   name: string;
@@ -201,7 +239,9 @@ function AccessDeniedCard() {
 export function CertificatesWorkspace() {
   const { access, isLoading: isModuleAccessLoading } = useModuleAccess("certificado");
   const [activeTab, setActiveTab] = useState<CertificateTab>("pj");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("view");
   const [selected, setSelected] = useState<DetailTarget>(null);
+  const [showDetailPassword, setShowDetailPassword] = useState(false);
   const [pjPage, setPjPage] = useState(FIRST_PAGE);
   const [pfPage, setPfPage] = useState(FIRST_PAGE);
   const [notificationPage, setNotificationPage] = useState(FIRST_PAGE);
@@ -295,6 +335,10 @@ export function CertificatesWorkspace() {
     selected?.type === "pf" ? selected.id : undefined,
     { enabled: shouldFetchCertificates },
   );
+  const createPjMutation = useCreateCertificatePjMutation();
+  const createPfMutation = useCreateCertificatePfMutation();
+  const updatePjMutation = useUpdateCertificatePjMutation(selected?.type === "pj" ? selected.id : "");
+  const updatePfMutation = useUpdateCertificatePfMutation(selected?.type === "pf" ? selected.id : "");
 
   useEffect(() => {
     if (!pjListQuery.data) {
@@ -449,6 +493,15 @@ export function CertificatesWorkspace() {
   const advancedFilterLabel =
     activeAdvancedFilterCount > ZERO ? `Filtros (${activeAdvancedFilterCount})` : "Filtros";
 
+  const isCreating = workspaceMode === "createPj" || workspaceMode === "createPf";
+  const isEditing = workspaceMode === "editPj" || workspaceMode === "editPf";
+  const isFormMode = isCreating || isEditing;
+  const formSubmitting = isCreating
+    ? (workspaceMode === "createPj" ? createPjMutation.isPending : createPfMutation.isPending)
+    : isEditing
+      ? (workspaceMode === "editPj" ? updatePjMutation.isPending : updatePfMutation.isPending)
+      : false;
+
   const shouldShowDetailPanel = Boolean(selected);
   const pjDetail = pjDetailQuery.data;
   const pfDetail = pfDetailQuery.data;
@@ -462,29 +515,52 @@ export function CertificatesWorkspace() {
     : selected?.type === "pf" && pfDetailQuery.isError
       ? getCertificateErrorMessage(pfDetailQuery.error, "Não foi possível carregar o detalhe do certificado agora. Tente novamente em alguns instantes.")
       : "";
+  const formDialogTitle = workspaceMode === "createPj"
+    ? "Novo certificado PJ"
+    : workspaceMode === "createPf"
+      ? "Novo certificado PF"
+      : workspaceMode === "editPj"
+        ? "Editar certificado PJ"
+        : "Editar certificado PF";
+  const formDialogDescription = isCreating
+    ? "Formulário de criação de certificado"
+    : "Formulário de edição de certificado";
+  const formSubmitLabel = isCreating ? "Criar certificado" : "Salvar alterações";
+  const shouldDisableFormSubmit = formSubmitting || activeDetailIsLoading || Boolean(activeDetailErrorMessage);
+  const activeFormId = `certificate-${workspaceMode}-form`;
 
   function handleTabChange(next: CertificateTab) {
     setActiveTab(next);
     setSelected(null);
+    setWorkspaceMode("view");
+    setShowDetailPassword(false);
   }
 
   function handleSelectPj(pj: CertificatePj) {
     setSelected({ type: "pj", id: pj.id });
+    setWorkspaceMode("view");
+    setShowDetailPassword(false);
   }
 
   function handleSelectPf(pf: CertificatePf) {
     setSelected({ type: "pf", id: pf.id });
+    setWorkspaceMode("view");
+    setShowDetailPassword(false);
   }
 
   function handleOpenNotification(notification: CertificateNotification) {
     if (notification.type === "PJ") {
       setActiveTab("pj");
       setSelected({ type: "pj", id: notification.certificate_id });
+      setWorkspaceMode("view");
+      setShowDetailPassword(false);
       return;
     }
 
     setActiveTab("pf");
     setSelected({ type: "pf", id: notification.certificate_id });
+    setWorkspaceMode("view");
+    setShowDetailPassword(false);
   }
 
   function handleRefresh() {
@@ -492,6 +568,8 @@ export function CertificatesWorkspace() {
       setVisiblePjItems([]);
       void pjListQuery.refetch();
       setPjPage(FIRST_PAGE);
+      setWorkspaceMode("view");
+      setShowDetailPassword(false);
       return;
     }
 
@@ -499,11 +577,15 @@ export function CertificatesWorkspace() {
       setVisiblePfItems([]);
       void pfListQuery.refetch();
       setPfPage(FIRST_PAGE);
+      setWorkspaceMode("view");
+      setShowDetailPassword(false);
       return;
     }
 
     void notificationsQuery.refetch();
     setNotificationPage(FIRST_PAGE);
+    setWorkspaceMode("view");
+    setShowDetailPassword(false);
   }
 
   function handleLoadMore() {
@@ -518,6 +600,124 @@ export function CertificatesWorkspace() {
     }
 
     setNotificationPage((current) => current + 1);
+  }
+
+  function handleStartCreatePj() {
+    setSelected(null);
+    setWorkspaceMode("createPj");
+    setShowDetailPassword(false);
+  }
+
+  function handleStartCreatePf() {
+    setSelected(null);
+    setWorkspaceMode("createPf");
+    setShowDetailPassword(false);
+  }
+
+  function handleStartEditSelected() {
+    if (selected?.type === "pj") {
+      setWorkspaceMode("editPj");
+      setShowDetailPassword(false);
+      return;
+    }
+
+    if (selected?.type === "pf") {
+      setWorkspaceMode("editPf");
+      setShowDetailPassword(false);
+    }
+  }
+
+  function handleCancelForm() {
+    setWorkspaceMode("view");
+    setShowDetailPassword(false);
+  }
+
+  function handleFormOpenChange(open: boolean) {
+    if (open || formSubmitting) {
+      return;
+    }
+
+    handleCancelForm();
+  }
+
+  async function handleSubmitCreatePj(payload: CreateCertificatePjBody) {
+    const certificate = await createPjMutation.mutateAsync(payload);
+    setActiveTab("pj");
+    setSelected({ type: "pj", id: certificate.id });
+    setWorkspaceMode("view");
+    setShowDetailPassword(false);
+  }
+
+  async function handleSubmitCreatePf(payload: CreateCertificatePfBody) {
+    const certificate = await createPfMutation.mutateAsync(payload);
+    setActiveTab("pf");
+    setSelected({ type: "pf", id: certificate.id });
+    setWorkspaceMode("view");
+    setShowDetailPassword(false);
+  }
+
+  async function handleSubmitEditPj(payload: UpdateCertificatePjBody) {
+    await updatePjMutation.mutateAsync(payload);
+    setWorkspaceMode("view");
+    setShowDetailPassword(false);
+  }
+
+  async function handleSubmitEditPf(payload: UpdateCertificatePfBody) {
+    await updatePfMutation.mutateAsync(payload);
+    setWorkspaceMode("view");
+    setShowDetailPassword(false);
+  }
+
+  function handleCopyPassword(password: string) {
+    if (!password) {
+      return;
+    }
+
+    if (typeof navigator !== "undefined") {
+      void navigator.clipboard.writeText(password);
+    }
+  }
+
+  function renderPasswordBlock(value: string | null | undefined) {
+    if (!value) {
+      return (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40">
+          <p className="text-xs text-slate-500 dark:text-slate-400">Senha</p>
+          <p className="mt-1 font-semibold text-slate-900 dark:text-white">
+            Senha indisponível para seu nível de acesso
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <p className="text-xs text-slate-500 dark:text-slate-400">Senha</p>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setShowDetailPassword((prev) => !prev)}
+              className={`${CERTIFICATE_COMPACT_BUTTON_CLASSNAME} px-2 py-1 text-xs`}
+              title={showDetailPassword ? "Ocultar senha" : "Revelar senha"}
+            >
+              {showDetailPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleCopyPassword(value)}
+              className={`${CERTIFICATE_COMPACT_BUTTON_CLASSNAME} px-2 py-1 text-xs`}
+              title="Copiar senha"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+        <p className="font-semibold text-slate-900 dark:text-white break-all">
+          {showDetailPassword ? value : "********"}
+        </p>
+      </div>
+    );
   }
 
   function renderExpirationBadge(expirationDate: string | null) {
@@ -558,15 +758,39 @@ export function CertificatesWorkspace() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleRefresh}
-          className={`${CERTIFICATE_PRIMARY_BUTTON_CLASSNAME} w-fit self-start lg:self-auto`}
-          disabled={activeListIsFetching}
-        >
-          <RefreshCcw className={activeListIsFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-          Atualizar
-        </button>
+        <div className="flex flex-wrap gap-2 self-start lg:self-auto">
+          {access.canEdit && !isFormMode ? (
+            activeTab === "pj" ? (
+              <button
+                type="button"
+                onClick={handleStartCreatePj}
+                className={CERTIFICATE_PRIMARY_BUTTON_CLASSNAME}
+              >
+                <Plus className="h-4 w-4" />
+                Novo PJ
+              </button>
+            ) : activeTab === "pf" ? (
+              <button
+                type="button"
+                onClick={handleStartCreatePf}
+                className={CERTIFICATE_PRIMARY_BUTTON_CLASSNAME}
+              >
+                <Plus className="h-4 w-4" />
+                Novo PF
+              </button>
+            ) : null
+          ) : null}
+
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className={`${CERTIFICATE_COMPACT_BUTTON_CLASSNAME} w-fit`}
+            disabled={activeListIsFetching}
+          >
+            <RefreshCcw className={activeListIsFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+            Atualizar
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -1167,13 +1391,118 @@ export function CertificatesWorkspace() {
         ) : null}
       </section>
 
+      <Dialog
+        open={isFormMode}
+        onOpenChange={handleFormOpenChange}
+        title={formDialogTitle}
+        description={formDialogDescription}
+        contentClassName={CERTIFICATE_FORM_MODAL_CONTENT_CLASSNAME}
+        bodyClassName={CERTIFICATE_FORM_MODAL_BODY_CLASSNAME}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={handleCancelForm}
+              className={CERTIFICATE_SECONDARY_BUTTON_CLASSNAME}
+              disabled={formSubmitting}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form={activeFormId}
+              className={CERTIFICATE_PRIMARY_BUTTON_CLASSNAME}
+              disabled={shouldDisableFormSubmit}
+            >
+              {formSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {formSubmitLabel}
+            </button>
+          </>
+        }
+      >
+        {workspaceMode === "createPj" ? (
+          <CertificateForm
+            key="create-pj"
+            formId={activeFormId}
+            kind="pj"
+            mode="create"
+            isSubmitting={formSubmitting}
+            onSubmit={handleSubmitCreatePj}
+          />
+        ) : null}
+
+        {workspaceMode === "createPf" ? (
+          <CertificateForm
+            key="create-pf"
+            formId={activeFormId}
+            kind="pf"
+            mode="create"
+            isSubmitting={formSubmitting}
+            onSubmit={handleSubmitCreatePf}
+          />
+        ) : null}
+
+        {workspaceMode === "editPj" ? (
+          activeDetailErrorMessage ? (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
+              {activeDetailErrorMessage}
+            </div>
+          ) : activeDetailIsLoading || !pjDetail ? (
+            <div className="flex min-h-40 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+              <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+              Carregando detalhe do certificado PJ...
+            </div>
+          ) : (
+            <CertificateForm
+              key="edit-pj"
+              formId={activeFormId}
+              kind="pj"
+              mode="edit"
+              initialData={pjDetail}
+              isSubmitting={formSubmitting}
+              onSubmit={handleSubmitEditPj}
+            />
+          )
+        ) : null}
+
+        {workspaceMode === "editPf" ? (
+          activeDetailErrorMessage ? (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
+              {activeDetailErrorMessage}
+            </div>
+          ) : activeDetailIsLoading || !pfDetail ? (
+            <div className="flex min-h-40 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+              <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+              Carregando detalhe do certificado PF...
+            </div>
+          ) : (
+            <CertificateForm
+              key="edit-pf"
+              formId={activeFormId}
+              kind="pf"
+              mode="edit"
+              initialData={pfDetail}
+              isSubmitting={formSubmitting}
+              onSubmit={handleSubmitEditPf}
+            />
+          )
+        ) : null}
+      </Dialog>
+
       {shouldShowDetailPanel ? (
         <section className={`${CERTIFICATE_PANEL_CLASSNAME} space-y-4`}>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Detalhe</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Leitura somente. Edição e alteração não aparecem nesta fase.
-            </p>
+            {access.canEdit ? (
+              <button
+                type="button"
+                onClick={handleStartEditSelected}
+                className={CERTIFICATE_COMPACT_BUTTON_CLASSNAME}
+                disabled={isFormMode}
+              >
+                Editar
+              </button>
+            ) : null}
           </div>
 
           {activeDetailIsLoading ? (
@@ -1237,12 +1566,7 @@ export function CertificatesWorkspace() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Senha</p>
-                <p className="mt-1 font-semibold text-slate-900 dark:text-white">
-                  {pjDetail?.password ? "********" : "Senha indisponível para seu nível de acesso"}
-                </p>
-              </div>
+              {renderPasswordBlock(pjDetail?.password)}
 
               <div className="grid gap-3">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Observações</p>
@@ -1323,12 +1647,7 @@ export function CertificatesWorkspace() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Senha</p>
-                <p className="mt-1 font-semibold text-slate-900 dark:text-white">
-                  {pfDetail?.password ? "********" : "Senha indisponível para seu nível de acesso"}
-                </p>
-              </div>
+              {renderPasswordBlock(pfDetail?.password)}
 
               <div className="grid gap-3">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Observações</p>
