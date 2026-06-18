@@ -43,8 +43,6 @@ import {
 
 type CertificateTab = "pj" | "pf" | "notifications";
 
-type BoolFilterValue = "" | "true" | "false";
-
 type PjFilters = {
   name: string;
   cnpj: string;
@@ -100,14 +98,6 @@ function parseBooleanFilterValue(value: string): boolean | undefined {
   }
 
   return value === "true";
-}
-
-function booleanFilterToValue(filter: boolean | undefined): BoolFilterValue {
-  if (filter === undefined) {
-    return "";
-  }
-
-  return filter ? "true" : "false";
 }
 
 function trimValue(value: string): string {
@@ -697,7 +687,7 @@ export function CertificatesWorkspace() {
                       Status castelo
                     </span>
                     <CertificateNativeSelect
-                      value={booleanFilterToValue(pjFilters.clientCasteloStatus)}
+                      value={String(pjFilters.clientCasteloStatus ?? "")}
                       onChange={(event) =>
                         setPjFilters((prev) => ({
                           ...prev,
@@ -719,7 +709,7 @@ export function CertificatesWorkspace() {
                       Status focus
                     </span>
                     <CertificateNativeSelect
-                      value={booleanFilterToValue(pjFilters.clientFocusStatus)}
+                      value={String(pjFilters.clientFocusStatus ?? "")}
                       onChange={(event) =>
                         setPjFilters((prev) => ({
                           ...prev,
@@ -741,7 +731,7 @@ export function CertificatesWorkspace() {
                       Pago
                     </span>
                     <CertificateNativeSelect
-                      value={booleanFilterToValue(pjFilters.wasPaid)}
+                      value={String(pjFilters.wasPaid ?? "")}
                       onChange={(event) =>
                         setPjFilters((prev) => ({ ...prev, wasPaid: parseBooleanFilterValue(event.target.value) }))
                       }
@@ -760,7 +750,7 @@ export function CertificatesWorkspace() {
                       Com arquivo
                     </span>
                     <CertificateNativeSelect
-                      value={booleanFilterToValue(pjFilters.hasCertificate)}
+                      value={String(pjFilters.hasCertificate ?? "")}
                       onChange={(event) =>
                         setPjFilters((prev) => ({ ...prev, hasCertificate: parseBooleanFilterValue(event.target.value) }))
                       }
@@ -855,7 +845,7 @@ export function CertificatesWorkspace() {
                       Status castelo
                     </span>
                     <CertificateNativeSelect
-                      value={booleanFilterToValue(pfFilters.clientCasteloStatus)}
+                      value={String(pfFilters.clientCasteloStatus ?? "")}
                       onChange={(event) =>
                         setPfFilters((prev) => ({
                           ...prev,
@@ -877,7 +867,7 @@ export function CertificatesWorkspace() {
                       Status focus
                     </span>
                     <CertificateNativeSelect
-                      value={booleanFilterToValue(pfFilters.clientFocusStatus)}
+                      value={String(pfFilters.clientFocusStatus ?? "")}
                       onChange={(event) =>
                         setPfFilters((prev) => ({
                           ...prev,
@@ -899,7 +889,7 @@ export function CertificatesWorkspace() {
                       Pago
                     </span>
                     <CertificateNativeSelect
-                      value={booleanFilterToValue(pfFilters.wasPaid)}
+                      value={String(pfFilters.wasPaid ?? "")}
                       onChange={(event) =>
                         setPfFilters((prev) => ({ ...prev, wasPaid: parseBooleanFilterValue(event.target.value) }))
                       }
@@ -918,7 +908,7 @@ export function CertificatesWorkspace() {
                       Com arquivo
                     </span>
                     <CertificateNativeSelect
-                      value={booleanFilterToValue(pfFilters.hasCertificate)}
+                      value={String(pfFilters.hasCertificate ?? "")}
                       onChange={(event) =>
                         setPfFilters((prev) => ({ ...prev, hasCertificate: parseBooleanFilterValue(event.target.value) }))
                       }
