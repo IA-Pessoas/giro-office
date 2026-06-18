@@ -121,8 +121,10 @@ export function useUpdateCertificatePjMutation(
   return useMutation({
     mutationFn: (payload) => certificateService.updatePj(id, payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: CERTIFICATE_QUERY_KEY });
-      await queryClient.invalidateQueries({ queryKey: certificatePjDetailQueryKey(id) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CERTIFICATE_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: certificatePjDetailQueryKey(id) }),
+      ]);
     },
   });
 }
