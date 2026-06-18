@@ -14,6 +14,7 @@ export {
   unwrapCertificateUploadResult,
 } from "./services";
 export { certificateService } from "./services";
+export { CertificatesWorkspace } from "./components/CertificatesWorkspace";
 export {
   CERTIFICATE_PJ_LIST_DEFAULTS,
   CERTIFICATE_QUERY_KEY,
