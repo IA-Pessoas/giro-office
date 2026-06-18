@@ -92,6 +92,7 @@ const BOOL_OPTIONS = [
 const ZERO = 0;
 const FIRST_PAGE = DEFAULT_CERTIFICATE_PAGE;
 const PAGE_SIZE = DEFAULT_CERTIFICATE_PAGE_SIZE;
+const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 
 function parseBooleanFilterValue(value: string): boolean | undefined {
   if (value === "") {
@@ -157,7 +158,7 @@ function calcDaysUntil(date: string | null | undefined): number | null {
 
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return Math.round((normalized.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.round((normalized.getTime() - startOfToday.getTime()) / MILLISECONDS_IN_DAY);
 }
 
 function paymentAmountText(value: number | null | undefined): string {

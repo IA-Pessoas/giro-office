@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 
+const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
+
 export const CERTIFICATE_PANEL_CLASSNAME =
   "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900";
 
@@ -115,7 +117,7 @@ export function formatDaysUntilExpiration(value: string): string {
 
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const deltaDays = Math.round((date.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
+  const deltaDays = Math.round((date.getTime() - startOfToday.getTime()) / MILLISECONDS_IN_DAY);
 
   if (deltaDays < 0) {
     return `${Math.abs(deltaDays)} dias em atraso`;
@@ -148,7 +150,7 @@ export function getExpirationTone(value: string | null | undefined): {
 
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const deltaDays = Math.round((date.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
+  const deltaDays = Math.round((date.getTime() - startOfToday.getTime()) / MILLISECONDS_IN_DAY);
 
   if (deltaDays < 0) {
     return {
