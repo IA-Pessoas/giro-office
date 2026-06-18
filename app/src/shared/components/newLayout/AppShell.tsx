@@ -94,7 +94,20 @@ function Logo({ showText }: { showText: boolean }) {
   );
 }
 
-const moduleCategories = [
+type NavigationModule = {
+  path: string;
+  name: string;
+  icon: typeof LayoutDashboard;
+  moduleKey?: ModuleKey;
+};
+
+type NavigationCategory = {
+  name: string;
+  modules: NavigationModule[];
+  isModuleAccessCategory?: boolean;
+};
+
+const moduleCategories: NavigationCategory[] = [
   {
     name: "Principal",
     modules: [
@@ -107,6 +120,7 @@ const moduleCategories = [
   },
   {
     name: "Módulos",
+    isModuleAccessCategory: true,
     modules: [
       { path: "/comercial", name: "Comercial", icon: BriefcaseBusiness, moduleKey: "comercial" as ModuleKey },
       { path: "/marketing", name: "Marketing", icon: Megaphone, moduleKey: "marketing" as ModuleKey },
@@ -132,6 +146,7 @@ const moduleCategories = [
 
 const MODULE_ACCESS_DENIED_MESSAGE = "Você não tem acesso a este módulo no perfil atual.";
 const MODULE_ACCESS_LOADING_MESSAGE = "Carregando acesso ao modulo.";
+const MODULE_NAV_LOADING_MESSAGE = "Carregando modulos";
 
 function normalizeRoutePath(routePath: string): string {
   const pathWithoutQuery = routePath.split("?")[0]?.split("#")[0] ?? "";
@@ -206,6 +221,23 @@ function ModuleAccessLoadingState() {
         </span>
       </div>
     </section>
+  );
+}
+
+function ModuleNavLoadingItem({ showText }: { showText: boolean }) {
+  return (
+    <div
+      role="status"
+      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-gray-500 dark:text-slate-400 ${
+        !showText ? "justify-center" : ""
+      }`}
+      title={!showText ? MODULE_NAV_LOADING_MESSAGE : undefined}
+    >
+      <Loader2 aria-hidden="true" className="h-5 w-5 flex-shrink-0 animate-spin" />
+      {showText ? (
+        <span className="text-sm font-medium">{MODULE_NAV_LOADING_MESSAGE}</span>
+      ) : null}
+    </div>
   );
 }
 
@@ -287,7 +319,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     if (isModuleAccessLoading) {
-      return false;
+      return true;
     }
 
     const moduleAccess = moduleAccessMap[moduleKey];
@@ -295,24 +327,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const filteredModuleCategories = moduleCategories
-    .map((category) => ({
-      ...category,
-      modules: category.modules.filter((module) => {
-        const moduleKey =
-          ("moduleKey" in module ? module.moduleKey : undefined) ?? APP_ROUTE_MODULE_MAP[module.path];
-        if (!moduleKey) {
-          return canViewModuleFromPath(module.path);
-        }
+    .map((category) => {
+      if (category.isModuleAccessCategory && isModuleAccessLoading) {
+        return {
+          ...category,
+          modules: [],
+        };
+      }
 
-        const moduleAccess = moduleAccessMap[moduleKey];
-        if (isModuleAccessLoading) {
-          return false;
-        }
+      return {
+        ...category,
+        modules: category.modules.filter((module) => {
+          const moduleKey =
+            ("moduleKey" in module ? module.moduleKey : undefined) ??
+            APP_ROUTE_MODULE_MAP[module.path];
+          if (!moduleKey) {
+            return canViewModuleFromPath(module.path);
+          }
 
-        return moduleAccess?.canView ?? false;
-      }),
-    }))
-    .filter((category) => category.modules.length > 0);
+          const moduleAccess = moduleAccessMap[moduleKey];
+          if (isModuleAccessLoading) {
+            return true;
+          }
+
+          return moduleAccess?.canView ?? false;
+        }),
+      };
+    })
+    .filter(
+      (category) =>
+        category.modules.length > 0 ||
+        (category.isModuleAccessCategory === true && isModuleAccessLoading),
+    );
   const mainContent = shouldRenderModuleAccessLoading
     ? <ModuleAccessLoadingState />
     : shouldRenderModuleAccessDenied
@@ -429,42 +475,51 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
 
         <nav className="p-3 space-y-6 overflow-y-auto h-[calc(100vh-4rem)]">
-          {filteredModuleCategories.map((category) => (
-            <div key={category.name}>
-              {isSidebarOpen ? (
-                <div className="px-3 mb-2">
-                  <span className="text-xs font-semibold text-black dark:text-white uppercase tracking-wider">
-                    {category.name}
-                  </span>
+          {filteredModuleCategories.map((category) => {
+            const shouldRenderModuleNavLoading =
+              category.isModuleAccessCategory === true && isModuleAccessLoading;
+
+            return (
+              <div key={category.name}>
+                {isSidebarOpen ? (
+                  <div className="px-3 mb-2">
+                    <span className="text-xs font-semibold text-black dark:text-white uppercase tracking-wider">
+                      {category.name}
+                    </span>
+                  </div>
+                ) : null}
+
+                <div className="space-y-1">
+                  {shouldRenderModuleNavLoading ? (
+                    <ModuleNavLoadingItem showText={isSidebarOpen} />
+                  ) : (
+                    category.modules.map((module) => {
+                      const Icon = module.icon;
+                      const isActive = pathname === module.path;
+
+                      return (
+                        <Link
+                          key={module.path}
+                          href={module.path}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                            isActive
+                              ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
+                              : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
+                          } ${!isSidebarOpen ? "justify-center" : ""}`}
+                          title={!isSidebarOpen ? module.name : undefined}
+                        >
+                          <Icon className="w-5 h-5 flex-shrink-0" />
+                          {isSidebarOpen ? (
+                            <span className="text-sm font-medium">{module.name}</span>
+                          ) : null}
+                        </Link>
+                      );
+                    })
+                  )}
                 </div>
-              ) : null}
-
-              <div className="space-y-1">
-                {category.modules.map((module) => {
-                  const Icon = module.icon;
-                  const isActive = pathname === module.path;
-
-                  return (
-                    <Link
-                      key={module.path}
-                      href={module.path}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                        isActive
-                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
-                          : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
-                      } ${!isSidebarOpen ? "justify-center" : ""}`}
-                      title={!isSidebarOpen ? module.name : undefined}
-                    >
-                      <Icon className="w-5 h-5 flex-shrink-0" />
-                      {isSidebarOpen ? (
-                        <span className="text-sm font-medium">{module.name}</span>
-                      ) : null}
-                    </Link>
-                  );
-                })}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
       </aside>
 
