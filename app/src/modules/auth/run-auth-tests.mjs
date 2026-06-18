@@ -172,6 +172,15 @@ await (async () => {
     assert.match(appShellSource, /currentModuleAccess\?\.canView === false/);
   });
 
+  await runTest("app shell holds module route children while module access is loading", () => {
+    assert.match(
+      appShellSource,
+      /shouldRenderModuleAccessLoading\s*=\s*Boolean\(currentModuleKey\)\s*&&\s*isModuleAccessLoading/,
+    );
+    assert.match(appShellSource, /shouldRenderModuleAccessLoading\s*\?\s*<ModuleAccessLoadingState \/>/);
+    assert.match(appShellSource, /:\s*shouldRenderModuleAccessDenied\s*\?\s*<ModuleAccessDeniedState \/>/);
+  });
+
   await runTest("canSSRAdmin redirects unauthenticated users to login", async () => {
     const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
     const result = await guard(createSsrContext());

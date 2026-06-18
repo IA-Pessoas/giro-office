@@ -16,6 +16,7 @@ import {
   Filter,
   FileCheck,
   LayoutDashboard,
+  Loader2,
   Megaphone,
   Menu,
   Receipt,
@@ -132,6 +133,7 @@ const moduleCategories = [
 ];
 
 const MODULE_ACCESS_DENIED_MESSAGE = "Você não tem acesso a este módulo no perfil atual.";
+const MODULE_ACCESS_LOADING_MESSAGE = "Carregando acesso ao modulo.";
 
 function normalizeRoutePath(routePath: string): string {
   const pathWithoutQuery = routePath.split("?")[0]?.split("#")[0] ?? "";
@@ -184,6 +186,26 @@ function ModuleAccessDeniedState() {
         >
           Voltar para o dashboard
         </Link>
+      </div>
+    </section>
+  );
+}
+
+function ModuleAccessLoadingState() {
+  return (
+    <section
+      aria-busy="true"
+      aria-live="polite"
+      className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center"
+    >
+      <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <Loader2
+          aria-hidden="true"
+          className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-300"
+        />
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+          {MODULE_ACCESS_LOADING_MESSAGE}
+        </span>
       </div>
     </section>
   );
@@ -249,6 +271,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isAdmin = canAccessAdministration(meQuery.data?.permission ?? user?.permission ?? null);
   const currentModuleKey = getModuleKeyFromRoutePath(pathname);
   const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
+  const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;
   const shouldRenderModuleAccessDenied =
     Boolean(currentModuleKey) &&
     !isModuleAccessLoading &&
@@ -292,6 +315,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }),
     }))
     .filter((category) => category.modules.length > 0);
+  const mainContent = shouldRenderModuleAccessLoading
+    ? <ModuleAccessLoadingState />
+    : shouldRenderModuleAccessDenied
+      ? <ModuleAccessDeniedState />
+      : children;
 
   useEffect(() => {
     setHasUserPhotoLoadError(false);
@@ -586,7 +614,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-8">
-          {shouldRenderModuleAccessDenied ? <ModuleAccessDeniedState /> : children}
+          {mainContent}
         </main>
       </div>
 
