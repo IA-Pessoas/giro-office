@@ -6,7 +6,6 @@ import {
   Bot,
   Bell,
   Building2,
-  Briefcase,
   BriefcaseBusiness,
   Calculator,
   ChevronDown,
@@ -31,8 +30,13 @@ import {
   X,
 } from "lucide-react";
 
-import type { ModuleKey } from "@modules/auth";
-import { APP_ROUTE_MODULE_MAP, canAccessAdministration, useAccessStore } from "@modules/auth";
+import {
+  APP_ROUTE_MODULE_MAP,
+  MODULE_KEYS,
+  canAccessAdministration,
+  useModuleAccessMap,
+  type ModuleKey,
+} from "@modules/auth";
 import { useMe } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
@@ -125,6 +129,64 @@ const moduleCategories = [
   },
 ];
 
+const MODULE_ACCESS_DENIED_MESSAGE = "Você não tem acesso a este módulo no perfil atual.";
+
+function normalizeRoutePath(routePath: string): string {
+  const pathWithoutQuery = routePath.split("?")[0]?.split("#")[0] ?? "";
+  const normalizedPath =
+    pathWithoutQuery.length > 1 ? pathWithoutQuery.replace(/\/+$/, "") : pathWithoutQuery;
+
+  return normalizedPath || "/";
+}
+
+function getModuleKeyFromRoutePath(routePath: string): ModuleKey | null {
+  const normalizedPath = normalizeRoutePath(routePath);
+  const mappedRoute = Object.entries(APP_ROUTE_MODULE_MAP).find(([modulePath]) => {
+    return normalizedPath === modulePath || normalizedPath.startsWith(`${modulePath}/`);
+  });
+
+  if (mappedRoute) {
+    const [, mappedModuleKey] = mappedRoute;
+    return mappedModuleKey ?? null;
+  }
+
+  for (const category of moduleCategories) {
+    const matchedModule = category.modules.find((module) => {
+      return normalizeRoutePath(module.path) === normalizedPath;
+    });
+
+    if (matchedModule && "moduleKey" in matchedModule) {
+      return matchedModule.moduleKey;
+    }
+  }
+
+  return null;
+}
+
+function ModuleAccessDeniedState() {
+  return (
+    <section className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center">
+      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+          <Shield className="h-6 w-6" />
+        </div>
+        <h1 className="text-xl font-semibold text-slate-950 dark:text-white">
+          Acesso indisponível
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          {MODULE_ACCESS_DENIED_MESSAGE}
+        </p>
+        <Link
+          href="/dashboard"
+          className="mt-6 inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        >
+          Voltar para o dashboard
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 type ChatMessage = {
   id: string;
   sender: "user" | "ai";
@@ -136,8 +198,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
   const meQuery = useMe();
-  const moduleAccessMap = useAccessStore((snapshot) => snapshot.accessMap);
-  const isModuleAccessLoading = useAccessStore((snapshot) => snapshot.isLoading);
+  const { accessMap: moduleAccessMap, isLoading: isModuleAccessLoading } =
+    useModuleAccessMap(MODULE_KEYS);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -183,26 +245,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const displayUserPhoto = resolvePhotoUrl(meQuery.data?.photo_url ?? null);
   const displayUserInitials = getInitials(displayUserName);
   const isAdmin = canAccessAdministration(meQuery.data?.permission ?? user?.permission ?? null);
+  const currentModuleKey = getModuleKeyFromRoutePath(pathname);
+  const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
+  const shouldRenderModuleAccessDenied =
+    Boolean(currentModuleKey) &&
+    !isModuleAccessLoading &&
+    currentModuleAccess?.canView === false;
+
+  const canViewModuleFromPath = (modulePath: string): boolean => {
+    if (modulePath === "/departments" || modulePath === "/administracao") {
+      return isAdmin;
+    }
+
+    const moduleKey = getModuleKeyFromRoutePath(modulePath);
+
+    if (!moduleKey) {
+      return true;
+    }
+
+    if (isModuleAccessLoading) {
+      return false;
+    }
+
+    const moduleAccess = moduleAccessMap[moduleKey];
+    return Boolean(moduleAccess?.canView);
+  };
+
   const filteredModuleCategories = moduleCategories
     .map((category) => ({
       ...category,
       modules: category.modules.filter((module) => {
-        if (module.path === "/departments") {
-          return isAdmin;
-        }
-
-        if (module.path === "/rh") {
-          return true;
-        }
-
         const moduleKey =
           ("moduleKey" in module ? module.moduleKey : undefined) ?? APP_ROUTE_MODULE_MAP[module.path];
-
         if (!moduleKey) {
-          return true;
+          return canViewModuleFromPath(module.path);
         }
 
-        return !isModuleAccessLoading && moduleAccessMap[moduleKey].canView;
+        const moduleAccess = moduleAccessMap[moduleKey];
+        if (isModuleAccessLoading) {
+          return false;
+        }
+
+        return moduleAccess?.canView ?? false;
       }),
     }))
     .filter((category) => category.modules.length > 0);
@@ -499,7 +583,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+          {shouldRenderModuleAccessDenied ? <ModuleAccessDeniedState /> : children}
+        </main>
       </div>
 
       {showAiChat ? (
