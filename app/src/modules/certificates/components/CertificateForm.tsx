@@ -125,8 +125,12 @@ function hasText(value: string): boolean {
   return value.trim().length > 0;
 }
 
-function buildInitialFormState(formKind: "pj"): PjFormState;
-function buildInitialFormState(formKind: "pf"): PfFormState;
+function buildInitialFormState(formKind: "pj", initial?: CertificatePj): PjFormState;
+function buildInitialFormState(formKind: "pf", initial?: CertificatePf): PfFormState;
+function buildInitialFormState(
+  formKind: "pj" | "pf",
+  initial?: CertificatePj | CertificatePf,
+): CertificateFormState;
 function buildInitialFormState(formKind: "pj" | "pf", initial?: CertificatePj | CertificatePf): CertificateFormState {
   if (formKind === "pj") {
     const initialPj = (initial as CertificatePj | undefined) ?? null;
@@ -739,7 +743,7 @@ export const CertificateForm = forwardRef<CertificateFormHandle, CertificateForm
         </label>
 
         <label className="col-span-full space-y-2">
-          <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Observacoes</span>
+          <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Observações</span>
           <textarea
             value={formState.notes}
             onChange={(event) => updateField("notes", event.target.value)}
