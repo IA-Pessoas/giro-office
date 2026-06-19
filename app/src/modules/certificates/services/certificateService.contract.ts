@@ -29,6 +29,8 @@ export const CERTIFICATE_ENDPOINTS = {
 
 export const DEFAULT_CERTIFICATE_PAGE_SIZE = 50;
 export const DEFAULT_CERTIFICATE_PAGE = 1;
+export const CERTIFICATE_FILE_ACCEPT = ".pfx,.p12";
+export const ACCEPTED_CERTIFICATE_FILE_EXTENSIONS = [".pfx", ".p12"] as const;
 
 function hasFilterValue(value: unknown): boolean {
   if (value === undefined || value === null) {
@@ -75,6 +77,14 @@ export function buildCertificateFileFormData(file: File): FormData {
   const formData = new FormData();
   formData.append("file", file);
   return formData;
+}
+
+export function isAcceptedCertificateFileName(fileName: string): boolean {
+  const normalizedFileName = fileName.trim().toLowerCase();
+
+  return ACCEPTED_CERTIFICATE_FILE_EXTENSIONS.some((extension) =>
+    normalizedFileName.endsWith(extension),
+  );
 }
 
 export function unwrapCertificateEnvelope<T>(body: unknown): T {

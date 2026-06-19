@@ -44,6 +44,7 @@ import type {
 } from "@modules/certificates/types";
 
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
+import { CertificateFileActions } from "./CertificateFileActions";
 import { CertificateForm } from "./CertificateForm";
 import {
   CERTIFICATE_COMPACT_BUTTON_CLASSNAME,
@@ -64,6 +65,7 @@ import {
   CERTIFICATE_TAB_BUTTON_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_BUTTON_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_CELL_CLASSNAME,
+  CERTIFICATE_TABLE_ACTION_GROUP_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME,
   CERTIFICATE_TABLE_CELL_CLASSNAME,
   CERTIFICATE_TABLE_CLASSNAME,
@@ -586,6 +588,20 @@ export function CertificatesWorkspace() {
     setNotificationPage(FIRST_PAGE);
     setWorkspaceMode("view");
     setShowDetailPassword(false);
+  }
+
+  function handlePjFileActionSuccess(certificateId: string) {
+    void pjListQuery.refetch();
+    if (selected?.type === "pj" && selected.id === certificateId) {
+      void pjDetailQuery.refetch();
+    }
+  }
+
+  function handlePfFileActionSuccess(certificateId: string) {
+    void pfListQuery.refetch();
+    if (selected?.type === "pf" && selected.id === certificateId) {
+      void pfDetailQuery.refetch();
+    }
   }
 
   function handleLoadMore() {
@@ -1172,7 +1188,7 @@ export function CertificatesWorkspace() {
                   <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Modelo</th>
                   <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Vencimento</th>
                   <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Arquivo</th>
-                  <th className={CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME}>Detalhe</th>
+                  <th className={CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -1223,14 +1239,25 @@ export function CertificatesWorkspace() {
                           </span>
                         </td>
                         <td className={CERTIFICATE_TABLE_ACTION_CELL_CLASSNAME}>
-                          <button
-                            type="button"
-                            onClick={() => handleSelectPj(item)}
-                            className={CERTIFICATE_TABLE_ACTION_BUTTON_CLASSNAME}
-                            title="Ver detalhe"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
+                          <div className={CERTIFICATE_TABLE_ACTION_GROUP_CLASSNAME}>
+                            <button
+                              type="button"
+                              onClick={() => handleSelectPj(item)}
+                              className={CERTIFICATE_TABLE_ACTION_BUTTON_CLASSNAME}
+                              title="Ver detalhe"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <CertificateFileActions
+                              kind="pj"
+                              certificateId={item.id}
+                              hasCertificate={item.has_certificate}
+                              canEdit={access.canEdit}
+                              variant="inline"
+                              onUploadSuccess={() => handlePjFileActionSuccess(item.id)}
+                              onDeleteSuccess={() => handlePjFileActionSuccess(item.id)}
+                            />
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1249,7 +1276,7 @@ export function CertificatesWorkspace() {
                   <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Modelo</th>
                   <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Vencimento</th>
                   <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Arquivo</th>
-                  <th className={CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME}>Detalhe</th>
+                  <th className={CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -1300,14 +1327,25 @@ export function CertificatesWorkspace() {
                           </span>
                         </td>
                         <td className={CERTIFICATE_TABLE_ACTION_CELL_CLASSNAME}>
-                          <button
-                            type="button"
-                            onClick={() => handleSelectPf(item)}
-                            className={CERTIFICATE_TABLE_ACTION_BUTTON_CLASSNAME}
-                            title="Ver detalhe"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
+                          <div className={CERTIFICATE_TABLE_ACTION_GROUP_CLASSNAME}>
+                            <button
+                              type="button"
+                              onClick={() => handleSelectPf(item)}
+                              className={CERTIFICATE_TABLE_ACTION_BUTTON_CLASSNAME}
+                              title="Ver detalhe"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <CertificateFileActions
+                              kind="pf"
+                              certificateId={item.id}
+                              hasCertificate={item.has_certificate}
+                              canEdit={access.canEdit}
+                              variant="inline"
+                              onUploadSuccess={() => handlePfFileActionSuccess(item.id)}
+                              onDeleteSuccess={() => handlePfFileActionSuccess(item.id)}
+                            />
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1568,6 +1606,17 @@ export function CertificatesWorkspace() {
 
               {renderPasswordBlock(pjDetail?.password)}
 
+              {pjDetail ? (
+                <CertificateFileActions
+                  kind="pj"
+                  certificateId={pjDetail.id}
+                  hasCertificate={pjDetail.has_certificate}
+                  canEdit={access.canEdit}
+                  onUploadSuccess={() => handlePjFileActionSuccess(pjDetail.id)}
+                  onDeleteSuccess={() => handlePjFileActionSuccess(pjDetail.id)}
+                />
+              ) : null}
+
               <div className="grid gap-3">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Observações</p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -1648,6 +1697,17 @@ export function CertificatesWorkspace() {
               </div>
 
               {renderPasswordBlock(pfDetail?.password)}
+
+              {pfDetail ? (
+                <CertificateFileActions
+                  kind="pf"
+                  certificateId={pfDetail.id}
+                  hasCertificate={pfDetail.has_certificate}
+                  canEdit={access.canEdit}
+                  onUploadSuccess={() => handlePfFileActionSuccess(pfDetail.id)}
+                  onDeleteSuccess={() => handlePfFileActionSuccess(pfDetail.id)}
+                />
+              ) : null}
 
               <div className="grid gap-3">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Observações</p>
