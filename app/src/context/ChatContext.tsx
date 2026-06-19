@@ -56,6 +56,9 @@ export const ChatContext = createContext<ChatContextType | null>(null);
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3334';
 const MESSAGES_PER_PAGE = 30;
+const MAX_CHAT_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_CHAT_UPLOAD_MB = MAX_CHAT_UPLOAD_BYTES / (1024 * 1024);
+const CHAT_UPLOAD_SIZE_ERROR_MESSAGE = `Arquivo excede o limite de ${MAX_CHAT_UPLOAD_MB} MB.`;
 
 function getChatAuthHeaders() {
     const { 'cw.token': token } = parseCookies();
@@ -649,7 +652,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const supportedAudioTypes = ['audio/mpeg', 'audio/webm', 'audio/wav', 'audio/ogg'];
         
         if (![...supportedImageTypes, ...supportedAudioTypes].includes(file.type)) {
-            alert("Tipo de arquivo não suportado.");
+            toast.error("Tipo de arquivo nao suportado.");
+            return;
+        }
+
+        if (file.size > MAX_CHAT_UPLOAD_BYTES) {
+            toast.error(CHAT_UPLOAD_SIZE_ERROR_MESSAGE);
             return;
         }
 
@@ -684,7 +692,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         } catch (error) {
             console.error("Erro no processo de upload:", error);
-            alert("Não foi possível enviar sua mídia.");
+            toast.error("Nao foi possivel enviar sua midia.");
         } finally {
             setIsUploading(false);
         }
