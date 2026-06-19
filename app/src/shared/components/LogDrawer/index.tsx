@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AxiosError } from "axios";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { FiClock } from "react-icons/fi";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -122,64 +123,76 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
     }
   };
 
-  return (
-    <>
-      <button type="button" className={styles.trigger} onClick={handleOpen}>
-        <FiClock />
-        Histórico
-      </button>
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      setIsOpen(false);
+      return;
+    }
 
-      {isOpen && (
-        <div className={styles.overlay} onClick={() => setIsOpen(false)}>
-          <aside className={styles.drawer} onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              className={styles.closeBtn}
-              onClick={() => setIsOpen(false)}
-              aria-label="Fechar histórico"
-            >
+    void handleOpen();
+  };
+
+  return (
+    <DialogPrimitive.Root open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogPrimitive.Trigger asChild>
+        <button type="button" className={styles.trigger}>
+          <FiClock />
+          Histórico
+        </button>
+      </DialogPrimitive.Trigger>
+
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className={styles.overlay} />
+        <DialogPrimitive.Content className={styles.drawer}>
+          <DialogPrimitive.Close asChild>
+            <button type="button" className={styles.closeBtn} aria-label="Fechar histórico">
               x
             </button>
-            <div className={styles.header}>Histórico de alterações</div>
-            <div className={styles.body}>
-              {loading ? (
-                <div className={styles.spinner}>Carregando...</div>
-              ) : errorMessage ? (
-                <p className={styles.text}>{errorMessage}</p>
-              ) : logs.length === 0 ? (
-                <p className={styles.text}>Nenhuma alteração registrada.</p>
-              ) : (
-                logs.map((log) => (
-                  <div key={log.id} className={styles.logCard}>
-                    <p className={styles.logTitle}>{log.action ?? "Alteração"}</p>
-                    <p className={styles.text}>
-                      Em: {format(new Date(log.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                    </p>
-                    {log.userId ? (
-                      <p className={styles.text}>Usuário: {log.userId}</p>
-                    ) : null}
-                    <div className={styles.changes}>
-                      {log.action !== "Cadastro" && log.changes
-                        ? Object.entries(log.changes).map(([key, value]) => {
-                            const label = fieldLabels[key] || key;
-                            const from = formatValue(key, value?.from);
-                            const to = formatValue(key, value?.to);
+          </DialogPrimitive.Close>
+          <DialogPrimitive.Title className={styles.header}>
+            Histórico de alterações
+          </DialogPrimitive.Title>
+          <DialogPrimitive.Description className="sr-only">
+            Lista de alterações registradas para o item selecionado.
+          </DialogPrimitive.Description>
+          <div className={styles.body}>
+            {loading ? (
+              <div className={styles.spinner}>Carregando...</div>
+            ) : errorMessage ? (
+              <p className={styles.text}>{errorMessage}</p>
+            ) : logs.length === 0 ? (
+              <p className={styles.text}>Nenhuma alteração registrada.</p>
+            ) : (
+              logs.map((log) => (
+                <div key={log.id} className={styles.logCard}>
+                  <p className={styles.logTitle}>{log.action ?? "Alteração"}</p>
+                  <p className={styles.text}>
+                    Em: {format(new Date(log.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                  </p>
+                  {log.userId ? (
+                    <p className={styles.text}>Usuário: {log.userId}</p>
+                  ) : null}
+                  <div className={styles.changes}>
+                    {log.action !== "Cadastro" && log.changes
+                      ? Object.entries(log.changes).map(([key, value]) => {
+                          const label = fieldLabels[key] || key;
+                          const from = formatValue(key, value?.from);
+                          const to = formatValue(key, value?.to);
 
-                            return (
-                              <p key={key} className={styles.text}>
-                                <strong>{label}:</strong> De: {String(from)} → Para: {String(to)}
-                              </p>
-                            );
-                          })
-                        : null}
-                    </div>
+                          return (
+                            <p key={key} className={styles.text}>
+                              <strong>{label}:</strong> De: {String(from)} → Para: {String(to)}
+                            </p>
+                          );
+                        })
+                      : null}
                   </div>
-                ))
-              )}
-            </div>
-          </aside>
-        </div>
-      )}
-    </>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
