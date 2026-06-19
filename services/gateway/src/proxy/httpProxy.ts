@@ -36,6 +36,8 @@ interface HttpProxyOptions {
   permissionModule?: string;
 }
 
+const GLOBAL_ADMIN_PERMISSION = 2;
+
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
   "content-length",
@@ -70,6 +72,27 @@ function getConnectionHeaderTokens(request: Request): Set<string> {
   }
 
   return tokens;
+}
+
+function resolveForwardedPermission(
+  permission: number | undefined,
+  modules: Record<string, number | null> | undefined,
+  permissionModule?: string,
+): number | undefined {
+  if (!permissionModule) {
+    return permission;
+  }
+
+  const modulePermission = modules?.[permissionModule];
+  if (typeof modulePermission === "number") {
+    return modulePermission;
+  }
+
+  if (typeof permission === "number" && permission >= GLOBAL_ADMIN_PERMISSION) {
+    return GLOBAL_ADMIN_PERMISSION;
+  }
+
+  return undefined;
 }
 
 function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): Headers {
@@ -111,10 +134,11 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, request.auth.organizationId);
 
     const modules = request.auth.claims.modules as Record<string, number | null> | undefined;
-    const modulePermission =
-      options.permissionModule && modules ? modules[options.permissionModule] : undefined;
-    const forwardedPermission =
-      options.permissionModule && modules ? modulePermission : request.auth.claims.permission;
+    const forwardedPermission = resolveForwardedPermission(
+      request.auth.claims.permission,
+      modules,
+      options.permissionModule,
+    );
 
     if (typeof forwardedPermission === "number") {
       headers.set(FORWARDED_AUTH_PERMISSION_HEADER, String(forwardedPermission));
