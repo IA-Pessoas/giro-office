@@ -1283,6 +1283,75 @@ it("forwards modular certificate permission and internal token to certificate-se
   }
 });
 
+it("forwards elevated certificate permission for global admins without modular certificate permission", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+    modules: { certificado: null },
+  });
+  let seenPermission: string | undefined;
+  const certificateService = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const certificateServiceUrl = await startServer(certificateService);
+
+  const app = createApp(createEnv({ certificateServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/certificate/pj/list`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("2");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(certificateService);
+  }
+});
+
+it("does not forward certificate permission for non-admin users without modular certificate permission", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+  });
+  let seenPermission: string | undefined;
+  const certificateService = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const certificateServiceUrl = await startServer(certificateService);
+
+  const app = createApp(createEnv({ certificateServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/certificate/pj/list`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBeUndefined();
+  } finally {
+    await stopServer(gateway);
+    await stopServer(certificateService);
+  }
+});
+
 it("does not expose certificate internal notification routes through the gateway", async () => {
   const token = createToken({
     user_id: "user-1",
