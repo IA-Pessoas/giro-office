@@ -18,6 +18,16 @@ function count(pattern) {
   return source.match(pattern)?.length ?? 0;
 }
 
+function getUploadFunctionSource() {
+  const start = source.indexOf("const uploadFileAndSendMessage = useCallback");
+  const end = source.indexOf("const getSignedMediaUrl = useCallback", start);
+
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  return source.slice(start, end);
+}
+
 await runTest("presence socket listeners are registered once and cleaned with handlers", () => {
   assert.equal(count(/socket\.on\(["']user_online["']/g), 1);
   assert.equal(count(/socket\.on\(["']user_offline["']/g), 1);
@@ -60,6 +70,35 @@ await runTest("public context functions are memoized", () => {
   ]) {
     assert.match(source, new RegExp(`const ${callbackName} = useCallback\\(`));
   }
+});
+
+await runTest("chat upload has a 10 MB client-side size limit", () => {
+  assert.match(source, /const MAX_CHAT_UPLOAD_BYTES = 10 \* 1024 \* 1024;/);
+  assert.match(source, /const MAX_CHAT_UPLOAD_MB = MAX_CHAT_UPLOAD_BYTES \/ \(1024 \* 1024\);/);
+  assert.match(source, /file\.size > MAX_CHAT_UPLOAD_BYTES/);
+  assert.match(source, /toast\.error\(CHAT_UPLOAD_SIZE_ERROR_MESSAGE\)/);
+});
+
+await runTest("chat upload validates size before upload state and FormData", () => {
+  const uploadSource = getUploadFunctionSource();
+  const sizeValidationIndex = uploadSource.indexOf("file.size > MAX_CHAT_UPLOAD_BYTES");
+  const uploadStateIndex = uploadSource.indexOf("setIsUploading(true)");
+  const formDataIndex = uploadSource.indexOf("const formData = new FormData()");
+
+  assert.notEqual(sizeValidationIndex, -1);
+  assert.notEqual(uploadStateIndex, -1);
+  assert.notEqual(formDataIndex, -1);
+  assert.ok(sizeValidationIndex < uploadStateIndex);
+  assert.ok(sizeValidationIndex < formDataIndex);
+});
+
+await runTest("chat upload uses toast feedback instead of alert", () => {
+  const uploadSource = getUploadFunctionSource();
+
+  assert.equal(uploadSource.includes("alert("), false);
+  assert.match(uploadSource, /toast\.error\("Tipo de arquivo nao suportado\."\)/);
+  assert.match(uploadSource, /toast\.error\(CHAT_UPLOAD_SIZE_ERROR_MESSAGE\)/);
+  assert.match(uploadSource, /toast\.error\("Nao foi possivel enviar sua midia\."\)/);
 });
 
 await runTest("provider value is memoized with the public context type", () => {
