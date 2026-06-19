@@ -11,6 +11,12 @@ export const CERTIFICATE_SUBPANEL_CLASSNAME =
 export const CERTIFICATE_COMPACT_BUTTON_CLASSNAME =
   "inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800";
 
+export const CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME =
+  "inline-flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/50 dark:text-rose-300 dark:hover:bg-rose-950/30";
+
+export const CERTIFICATE_FILE_ACTION_PANEL_CLASSNAME =
+  "rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40";
+
 export const CERTIFICATE_FILTER_LABEL_CLASSNAME = "flex min-w-0 flex-col gap-1.5";
 
 export const CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME =
@@ -85,12 +91,18 @@ export const CERTIFICATE_TABLE_NAME_HEAD_CELL_CLASSNAME = `${CERTIFICATE_TABLE_H
 export const CERTIFICATE_TABLE_NAME_CELL_CLASSNAME = `${CERTIFICATE_TABLE_CELL_CLASSNAME}`;
 
 export const CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME =
-  "w-24 px-6 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300";
+  "w-40 px-6 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300";
 
 export const CERTIFICATE_TABLE_ACTION_CELL_CLASSNAME = "px-6 py-4 text-center align-top";
 
+export const CERTIFICATE_TABLE_ACTION_GROUP_CLASSNAME =
+  "flex items-center justify-center gap-2";
+
 export const CERTIFICATE_TABLE_ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800";
+
+export const CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME =
+  `${CERTIFICATE_TABLE_ACTION_BUTTON_CLASSNAME} border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-900/50 dark:text-rose-300 dark:hover:bg-rose-950/30`;
 
 export const CERTIFICATE_BADGE_CLASSNAME =
   "inline-flex min-h-6 items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-semibold";

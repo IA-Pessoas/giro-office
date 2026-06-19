@@ -5,6 +5,7 @@ import {
   buildCertificateListPage,
   buildCertificateListParams,
   CERTIFICATE_ENDPOINTS,
+  isAcceptedCertificateFileName,
   parseCertificateFilename,
   unwrapCertificateEnvelope,
 } from "./services/certificateService.contract.ts";
@@ -74,6 +75,14 @@ runTest("buildCertificateFileFormData sends file in multipart field", () => {
   const savedFile = formData.get("file");
   assert.ok(savedFile instanceof Blob);
   assert.equal(savedFile.size, file.size);
+});
+
+runTest("isAcceptedCertificateFileName allows only pfx and p12 files", () => {
+  assert.equal(isAcceptedCertificateFileName("cliente.pfx"), true);
+  assert.equal(isAcceptedCertificateFileName("cliente.P12"), true);
+  assert.equal(isAcceptedCertificateFileName("cliente.txt"), false);
+  assert.equal(isAcceptedCertificateFileName("cliente.pfx.txt"), false);
+  assert.equal(isAcceptedCertificateFileName(""), false);
 });
 
 runTest("parseCertificateFilename falls back when header is absent", () => {
