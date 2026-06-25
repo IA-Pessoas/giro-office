@@ -26,7 +26,7 @@ export function DetailsView({ id, link }: DetailsViewProps) {
     } else {
       setIsLoading(false);
     }
-  }, [clearLoadingTimer, id]);
+  }, [clearLoadingTimer, id, link]);
 
   useEffect(() => {
     return () => {
@@ -58,7 +58,7 @@ export function DetailsView({ id, link }: DetailsViewProps) {
       {isLoading && <Loader />}
 
       <iframe
-        key={id}
+        key={iframeSrc}
         src={iframeSrc}
         width="100%"
         height="100%"
