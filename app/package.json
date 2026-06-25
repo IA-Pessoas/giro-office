@@ -16,7 +16,7 @@
     "test:iframe": "node --experimental-strip-types src/components/Iframe/run-details-tests.mjs",
     "test:a11y-overlays": "node --experimental-strip-types src/shared/components/run-a11y-overlays-tests.mjs",
     "test:status-badge": "node --experimental-strip-types src/shared/components/run-status-badge-tests.mjs",
-    "test": "pnpm run test:auth && pnpm run test:clients && pnpm run test:contabil && pnpm run test:projects && pnpm run test:chat && pnpm run test:iframe",
+    "test": "pnpm run test:auth && pnpm run test:clients && pnpm run test:contabil && pnpm run test:projects && pnpm run test:chat && pnpm run test:iframe && pnpm run test:status-badge",
     "start": "next start",
     "migration:audit:chakra": "node scripts/audit-chakra-usage.mjs",
     "migration:validate:criteria": "node scripts/validate-acceptance-criteria.mjs",
