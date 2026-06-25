@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { GrSend } from "react-icons/gr";
 import { IoMdMic } from "react-icons/io";
@@ -269,8 +269,9 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const recordingStreamRef = useRef<MediaStream | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
-    const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const wasCancelledRef = useRef(false);
 
     const [isHovered, setIsHovered] = useState(false);
@@ -330,12 +331,44 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
         fileInputRef.current?.click();
     };
 
+    const clearRecordingTimer = useCallback(() => {
+        if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+        }
+    }, []);
+
+    const stopRecordingStream = useCallback(() => {
+        recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+        recordingStreamRef.current = null;
+    }, []);
+
+    const stopActiveRecording = useCallback((cancelled: boolean, updateState = true) => {
+        wasCancelledRef.current = cancelled;
+        clearRecordingTimer();
+
+        if (mediaRecorderRef.current?.state === "recording") {
+            mediaRecorderRef.current.stop();
+        } else {
+            mediaRecorderRef.current = null;
+            stopRecordingStream();
+        }
+
+        if (updateState) {
+            setIsRecording(false);
+        }
+    }, [clearRecordingTimer, stopRecordingStream]);
+
     const handleStartRecording = async () => {
-        wasCancelledRef.current = false; // Reseta o controle de cancelamento
+        wasCancelledRef.current = false;
+        clearRecordingTimer();
+        stopRecordingStream();
+
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                recordingStreamRef.current = stream;
+                const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
                 mediaRecorderRef.current = mediaRecorder;
                 audioChunksRef.current = [];
 
@@ -344,12 +377,15 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
                 mediaRecorder.onstop = () => {
                     // Só envia se NÃO foi cancelado
                     if (!wasCancelledRef.current) {
-                        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                        const audioFile = new File([audioBlob], `gravacao_${Date.now()}.webm`, { type: 'audio/webm' });
+                        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+                        const audioFile = new File([audioBlob], `gravacao_${Date.now()}.webm`, {
+                            type: "audio/webm",
+                        });
                         uploadFileAndSendMessage(audioFile);
                     }
                     // Limpa a stream para desligar o ícone do microfone no navegador
-                    stream.getTracks().forEach(track => track.stop());
+                    mediaRecorderRef.current = null;
+                    stopRecordingStream();
                 };
 
                 mediaRecorder.start();
@@ -368,26 +404,13 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
         }
     };
     const handleStopRecording = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-        }
+        stopActiveRecording(false);
     };
     const handleStopAndSendRecording = () => {
-        if (mediaRecorderRef.current) {
-            wasCancelledRef.current = false;
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-            clearInterval(timerIntervalRef.current!);
-        }
+        stopActiveRecording(false);
     };
     const handleCancelRecording = () => {
-        if (mediaRecorderRef.current) {
-            wasCancelledRef.current = true; // Sinaliza que foi cancelado
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-            clearInterval(timerIntervalRef.current!);
-        }
+        stopActiveRecording(true);
     };
     const handleAudioButtonClick = () => {
         if (isRecording) {
@@ -402,6 +425,12 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
         const seconds = (time % 60).toString().padStart(2, '0');
         return `${minutes}:${seconds}`;
     };
+
+    useEffect(() => {
+        return () => {
+            stopActiveRecording(true, false);
+        };
+    }, [stopActiveRecording]);
 
     useEffect(() => {
         if (textareaRef.current) {

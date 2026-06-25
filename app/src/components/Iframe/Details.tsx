@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Loader from '../../shared/components/Loader';
 import styles from './Details.module.css';
 
@@ -9,15 +9,38 @@ interface DetailsViewProps {
 
 export function DetailsView({ id, link }: DetailsViewProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearLoadingTimer = useCallback(() => {
+    if (loadingTimerRef.current) {
+      clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
+    clearLoadingTimer();
+
     if (id) {
       setIsLoading(true);
+    } else {
+      setIsLoading(false);
     }
-  }, [id]);
+  }, [clearLoadingTimer, id]);
+
+  useEffect(() => {
+    return () => {
+      clearLoadingTimer();
+    };
+  }, [clearLoadingTimer]);
 
   const handleIframeLoad = () => {
-    setTimeout(() => setIsLoading(false), 300);
+    clearLoadingTimer();
+
+    loadingTimerRef.current = setTimeout(() => {
+      setIsLoading(false);
+      loadingTimerRef.current = null;
+    }, 300);
   };
 
   if (!id) {
