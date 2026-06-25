@@ -48,3 +48,9 @@ await runTest("details view clears timeout on id changes and unmount", () => {
   assert.match(source, /loadingTimerRef\.current = null;/);
   assert.match(source, /return \(\) => \{\s*clearLoadingTimer\(\);\s*\};/s);
 });
+
+await runTest("details view reloads the iframe loading state when the iframe source changes", () => {
+  assert.match(source, /\}, \[clearLoadingTimer, id, link\]\);/);
+  assert.match(source, /const iframeSrc = `\/\$\{link\}\/\$\{id\}\?view=iframe`;/);
+  assert.match(source, /key=\{iframeSrc\}/);
+});
