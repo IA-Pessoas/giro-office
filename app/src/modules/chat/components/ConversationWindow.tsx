@@ -414,6 +414,10 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
                 }, 1000);
 
             } catch (err) {
+                mediaRecorderRef.current = null;
+                stopRecordingStream();
+                clearRecordingTimer();
+                setIsRecording(false);
                 console.error("Erro ao acessar o microfone:", err);
                 alert("Não foi possível acessar o microfone. Verifique as permissões do navegador.");
             }
