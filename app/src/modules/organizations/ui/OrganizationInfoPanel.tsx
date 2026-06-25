@@ -1,5 +1,6 @@
 import { Building2, CreditCard, Mail } from "lucide-react";
 
+import { StatusBadge } from "@shared/components/StatusBadge";
 import { resolvePhotoUrl } from "@shared/utils";
 import type { Organization } from "../types";
 import {
@@ -45,11 +46,7 @@ export function OrganizationInfoPanel({ organization, userEmail }: OrganizationI
             <p className="truncate text-xl font-semibold text-slate-900 dark:text-white">
               {organization.name}
             </p>
-            <span
-              className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusBadge.className}`}
-            >
-              {statusBadge.label}
-            </span>
+            <StatusBadge config={statusBadge} className="px-3 font-semibold" />
           </div>
         </div>
       </div>
