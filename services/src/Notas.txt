@@ -1,0 +1,30 @@
+## Ideias
+1. Cliente cadastro Único
+2. Integração - Ter mais de um projeto (nome, objetivo e %) e nele ter ligação as tarefas
+3. Colocar fluxos de cadastro para cadada modulo, usar o status como referencia, o mesmo para listagem
+4. Fazer tela de sem acesso
+5. Fazer tela de logout
+6. Ter motivo da saida do escritorio
+7. Implementar grau de complaexidade da empresa
+8. Email ao fazer o distrato
+
+## Mudanças
+1. Clientes especificos da integração serão separados
+
+## Implementações de regras a se fazer 
+[ ] Limpar cnpj no cadastro
+
+## importações desde ultima atualização em prod - ultimo comit: Beta Final Chat
+npm install nodemailer
+npm install --save-dev @types/nodemailer
+npm install dotenv
+
+## Testar no front a api de cnpj = https://publica.cnpj.ws/cnpj/
+
+# rotinas
+4 30 - alvaras vencidos
+5 - PF sem empresas ativas
+5 30 - vencimento docs pf
+6 - agenda recorrente
+6 30 - certificados vencidos
+7 - clientes saida

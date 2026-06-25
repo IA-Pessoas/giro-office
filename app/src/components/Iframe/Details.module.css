@@ -1,0 +1,21 @@
+.emptyState {
+  width: 100%;
+  height: 90vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyText {
+  color: var(--colors-blue-500, #2f406a);
+}
+
+.wrapper {
+  width: 100%;
+  height: 90vh;
+  margin-left: 0.5rem;
+  position: relative;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--colors-black) 14%, transparent);
+  box-shadow: var(--shadows-md);
+}

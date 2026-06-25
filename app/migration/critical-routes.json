@@ -1,0 +1,19 @@
+{
+  "routes": [
+    "/dashboard",
+    "/users",
+    "/users/[id]",
+    "/clients",
+    "/clients/[id]",
+    "/organizations",
+    "/configs/integracao",
+    "/configs/integracao/tasks",
+    "/triagem",
+    "/contabil",
+    "/fiscal",
+    "/regularize",
+    "/rh",
+    "/login",
+    "/me"
+  ]
+}
