@@ -22,6 +22,7 @@ import {
   DEFAULT_CERTIFICATE_PAGE,
   DEFAULT_CERTIFICATE_PAGE_SIZE,
 } from "@modules/certificates/services/certificateService.contract";
+import { MODULE_ADMIN_PERMISSION } from "@modules/auth/utils/moduleAccess";
 import {
   useCertificateNotificationsList,
   useCertificatePjDetail,
@@ -239,7 +240,7 @@ function AccessDeniedCard() {
 }
 
 export function CertificatesWorkspace() {
-  const { access, isLoading: isModuleAccessLoading } = useModuleAccess("certificado");
+  const { access, isLoading: isModuleAccessLoading, user } = useModuleAccess("certificado");
   const [activeTab, setActiveTab] = useState<CertificateTab>("pj");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("view");
   const [selected, setSelected] = useState<DetailTarget>(null);
@@ -318,6 +319,10 @@ export function CertificatesWorkspace() {
   const deferredPfQueryParams = useDeferredValue(pfQueryParams);
   const deferredNotificationsParams = useDeferredValue(notificationsParams);
   const shouldFetchCertificates = access.canView && !isModuleAccessLoading;
+  const canManageCertificateModule =
+    access.isAdmin ||
+    (typeof user?.modules?.certificado === "number" &&
+      user.modules?.certificado >= MODULE_ADMIN_PERMISSION);
 
   const pjListQuery = useCertificatePjList(deferredPjQueryParams, {
     enabled: shouldFetchCertificates && activeTab === "pj",
@@ -528,7 +533,11 @@ export function CertificatesWorkspace() {
     ? "Formulário de criação de certificado"
     : "Formulário de edição de certificado";
   const formSubmitLabel = isCreating ? "Criar certificado" : "Salvar alterações";
-  const shouldDisableFormSubmit = formSubmitting || activeDetailIsLoading || Boolean(activeDetailErrorMessage);
+  const shouldDisableFormSubmit =
+    formSubmitting ||
+    activeDetailIsLoading ||
+    Boolean(activeDetailErrorMessage) ||
+    !canManageCertificateModule;
   const activeFormId = `certificate-${workspaceMode}-form`;
 
   function handleTabChange(next: CertificateTab) {
@@ -619,18 +628,30 @@ export function CertificatesWorkspace() {
   }
 
   function handleStartCreatePj() {
+    if (!canManageCertificateModule) {
+      return;
+    }
+
     setSelected(null);
     setWorkspaceMode("createPj");
     setShowDetailPassword(false);
   }
 
   function handleStartCreatePf() {
+    if (!canManageCertificateModule) {
+      return;
+    }
+
     setSelected(null);
     setWorkspaceMode("createPf");
     setShowDetailPassword(false);
   }
 
   function handleStartEditSelected() {
+    if (!canManageCertificateModule) {
+      return;
+    }
+
     if (selected?.type === "pj") {
       setWorkspaceMode("editPj");
       setShowDetailPassword(false);
@@ -657,6 +678,10 @@ export function CertificatesWorkspace() {
   }
 
   async function handleSubmitCreatePj(payload: CreateCertificatePjBody) {
+    if (!canManageCertificateModule) {
+      return;
+    }
+
     const certificate = await createPjMutation.mutateAsync(payload);
     setActiveTab("pj");
     setSelected({ type: "pj", id: certificate.id });
@@ -665,6 +690,10 @@ export function CertificatesWorkspace() {
   }
 
   async function handleSubmitCreatePf(payload: CreateCertificatePfBody) {
+    if (!canManageCertificateModule) {
+      return;
+    }
+
     const certificate = await createPfMutation.mutateAsync(payload);
     setActiveTab("pf");
     setSelected({ type: "pf", id: certificate.id });
@@ -673,12 +702,20 @@ export function CertificatesWorkspace() {
   }
 
   async function handleSubmitEditPj(payload: UpdateCertificatePjBody) {
+    if (!canManageCertificateModule) {
+      return;
+    }
+
     await updatePjMutation.mutateAsync(payload);
     setWorkspaceMode("view");
     setShowDetailPassword(false);
   }
 
   async function handleSubmitEditPf(payload: UpdateCertificatePfBody) {
+    if (!canManageCertificateModule) {
+      return;
+    }
+
     await updatePfMutation.mutateAsync(payload);
     setWorkspaceMode("view");
     setShowDetailPassword(false);
@@ -775,7 +812,7 @@ export function CertificatesWorkspace() {
         </div>
 
         <div className="flex flex-wrap gap-2 self-start lg:self-auto">
-          {access.canEdit && !isFormMode ? (
+          {canManageCertificateModule && !isFormMode ? (
             activeTab === "pj" ? (
               <button
                 type="button"
@@ -1531,7 +1568,7 @@ export function CertificatesWorkspace() {
         <section className={`${CERTIFICATE_PANEL_CLASSNAME} space-y-4`}>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Detalhe</h2>
-            {access.canEdit ? (
+            {canManageCertificateModule ? (
               <button
                 type="button"
                 onClick={handleStartEditSelected}
