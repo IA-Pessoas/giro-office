@@ -1,0 +1,69 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const conversationWindowUrl = new URL("./components/ConversationWindow.tsx", import.meta.url);
+const source = await readFile(conversationWindowUrl, "utf8");
+
+async function runTest(name, fn) {
+  try {
+    await fn();
+    console.log(`PASS ${name}`);
+  } catch (error) {
+    console.error(`FAIL ${name}`);
+    throw error;
+  }
+}
+
+function getFunctionSource(functionName) {
+  const start = source.indexOf(`const ${functionName} =`);
+  const nextConst = source.indexOf("\n    const ", start + 1);
+  const nextUseEffect = source.indexOf("\n    useEffect", start + 1);
+  const nextReturn = source.indexOf("\n    return (", start + 1);
+  const endCandidates = [nextConst, nextUseEffect, nextReturn].filter((index) => index !== -1);
+  const end = Math.min(...endCandidates);
+
+  assert.notEqual(start, -1);
+  assert.notEqual(end, Infinity);
+
+  return source.slice(start, end);
+}
+
+await runTest("recording resources have centralized cleanup helpers", () => {
+  assert.match(source, /const timerIntervalRef = useRef<ReturnType<typeof setInterval> \| null>\(null\);/);
+  assert.match(source, /const recordingStreamRef = useRef<MediaStream \| null>\(null\);/);
+  assert.match(source, /const clearRecordingTimer = useCallback\(\(\) => \{/);
+  assert.match(source, /const stopRecordingStream = useCallback\(\(\) => \{/);
+  assert.match(source, /const stopActiveRecording = useCallback\(\(cancelled: boolean, updateState = true\) => \{/);
+});
+
+await runTest("start recording clears stale timer and stream before requesting a new stream", () => {
+  const startRecordingSource = getFunctionSource("handleStartRecording");
+  const clearTimerIndex = startRecordingSource.indexOf("clearRecordingTimer();");
+  const stopStreamIndex = startRecordingSource.indexOf("stopRecordingStream();");
+  const getUserMediaIndex = startRecordingSource.indexOf("navigator.mediaDevices.getUserMedia");
+
+  assert.notEqual(clearTimerIndex, -1);
+  assert.notEqual(stopStreamIndex, -1);
+  assert.notEqual(getUserMediaIndex, -1);
+  assert.ok(clearTimerIndex < getUserMediaIndex);
+  assert.ok(stopStreamIndex < getUserMediaIndex);
+});
+
+await runTest("manual stop paths use shared recording cleanup", () => {
+  assert.match(getFunctionSource("handleStopRecording"), /stopActiveRecording\(false\);/);
+  assert.match(getFunctionSource("handleStopAndSendRecording"), /stopActiveRecording\(false\);/);
+  assert.match(getFunctionSource("handleCancelRecording"), /stopActiveRecording\(true\);/);
+  assert.equal(source.includes("clearInterval(timerIntervalRef.current!);"), false);
+});
+
+await runTest("unmount cleanup cancels active recording without setting state", () => {
+  assert.match(source, /return \(\) => \{\s*stopActiveRecording\(true, false\);\s*\};/s);
+});
+
+await runTest("media recorder onstop always releases recorder and microphone stream", () => {
+  const startRecordingSource = getFunctionSource("handleStartRecording");
+
+  assert.match(startRecordingSource, /recordingStreamRef\.current = stream;/);
+  assert.match(startRecordingSource, /mediaRecorderRef\.current = null;/);
+  assert.match(startRecordingSource, /stopRecordingStream\(\);/);
+});
