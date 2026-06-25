@@ -273,6 +273,7 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
     const audioChunksRef = useRef<Blob[]>([]);
     const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const wasCancelledRef = useRef(false);
+    const recordingRequestIdRef = useRef(0);
 
     const [isHovered, setIsHovered] = useState(false);
     const [isActive, setIsActive] = useState(false);
@@ -338,12 +339,17 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
         }
     }, []);
 
-    const stopRecordingStream = useCallback(() => {
-        recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
-        recordingStreamRef.current = null;
+    const stopMediaStream = useCallback((stream: MediaStream | null) => {
+        stream?.getTracks().forEach((track) => track.stop());
     }, []);
 
+    const stopRecordingStream = useCallback(() => {
+        stopMediaStream(recordingStreamRef.current);
+        recordingStreamRef.current = null;
+    }, [stopMediaStream]);
+
     const stopActiveRecording = useCallback((cancelled: boolean, updateState = true) => {
+        recordingRequestIdRef.current += 1;
         wasCancelledRef.current = cancelled;
         clearRecordingTimer();
 
@@ -360,6 +366,8 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
     }, [clearRecordingTimer, stopRecordingStream]);
 
     const handleStartRecording = async () => {
+        const recordingRequestId = recordingRequestIdRef.current + 1;
+        recordingRequestIdRef.current = recordingRequestId;
         wasCancelledRef.current = false;
         clearRecordingTimer();
         stopRecordingStream();
@@ -367,6 +375,14 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (
+                    wasCancelledRef.current ||
+                    recordingRequestIdRef.current !== recordingRequestId
+                ) {
+                    stopMediaStream(stream);
+                    return;
+                }
+
                 recordingStreamRef.current = stream;
                 const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
                 mediaRecorderRef.current = mediaRecorder;

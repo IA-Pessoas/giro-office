@@ -49,6 +49,28 @@ await runTest("start recording clears stale timer and stream before requesting a
   assert.ok(stopStreamIndex < getUserMediaIndex);
 });
 
+await runTest("stale getUserMedia resolutions stop the new stream before starting a recorder", () => {
+  const startRecordingSource = getFunctionSource("handleStartRecording");
+  const stopActiveRecordingSource = getFunctionSource("stopActiveRecording");
+  const requestIdIndex = startRecordingSource.indexOf("const recordingRequestId =");
+  const getUserMediaIndex = startRecordingSource.indexOf("navigator.mediaDevices.getUserMedia");
+  const staleGuardIndex = startRecordingSource.indexOf("recordingRequestIdRef.current !== recordingRequestId");
+  const stopPendingStreamIndex = startRecordingSource.indexOf("stopMediaStream(stream);");
+  const recorderIndex = startRecordingSource.indexOf("new MediaRecorder");
+
+  assert.match(source, /const recordingRequestIdRef = useRef\(0\);/);
+  assert.match(stopActiveRecordingSource, /recordingRequestIdRef\.current \+= 1;/);
+  assert.notEqual(requestIdIndex, -1);
+  assert.notEqual(getUserMediaIndex, -1);
+  assert.notEqual(staleGuardIndex, -1);
+  assert.notEqual(stopPendingStreamIndex, -1);
+  assert.notEqual(recorderIndex, -1);
+  assert.ok(requestIdIndex < getUserMediaIndex);
+  assert.ok(getUserMediaIndex < staleGuardIndex);
+  assert.ok(staleGuardIndex < stopPendingStreamIndex);
+  assert.ok(stopPendingStreamIndex < recorderIndex);
+});
+
 await runTest("manual stop paths use shared recording cleanup", () => {
   assert.match(getFunctionSource("handleStopRecording"), /stopActiveRecording\(false\);/);
   assert.match(getFunctionSource("handleStopAndSendRecording"), /stopActiveRecording\(false\);/);
