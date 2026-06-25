@@ -89,3 +89,17 @@ await runTest("media recorder onstop always releases recorder and microphone str
   assert.match(startRecordingSource, /mediaRecorderRef\.current = null;/);
   assert.match(startRecordingSource, /stopRecordingStream\(\);/);
 });
+
+await runTest("recorder setup failures release active recording resources", () => {
+  const startRecordingSource = getFunctionSource("handleStartRecording");
+  const catchIndex = startRecordingSource.indexOf("} catch (err) {");
+
+  assert.notEqual(catchIndex, -1);
+
+  const catchSource = startRecordingSource.slice(catchIndex);
+
+  assert.match(catchSource, /mediaRecorderRef\.current = null;/);
+  assert.match(catchSource, /stopRecordingStream\(\);/);
+  assert.match(catchSource, /clearRecordingTimer\(\);/);
+  assert.match(catchSource, /setIsRecording\(false\);/);
+});
