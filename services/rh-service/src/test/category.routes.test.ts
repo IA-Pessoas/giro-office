@@ -35,6 +35,28 @@ describe("category routes", () => {
     expect(categoryServiceMock.list).toHaveBeenCalledWith(organizationId, { activeOnly: true });
   });
 
+  it("GET /rh/categories permite leitura com permissao RH pessoal", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .get("/rh/categories")
+      .set("x-auth-permission", "1")
+      .query({ activeOnly: "true" });
+
+    expect(res.status).toBe(200);
+    expect(categoryServiceMock.list).toHaveBeenCalledWith(organizationId, { activeOnly: true });
+  });
+
+  it("POST /rh/categories bloqueia escrita com permissao RH pessoal", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .post("/rh/categories")
+      .set("x-auth-permission", "1")
+      .send({ name: "Categoria" });
+
+    expect(res.status).toBe(403);
+    expect(categoryServiceMock.create).not.toHaveBeenCalled();
+  });
+
   it("DELETE /rh/categories remove categoria", async () => {
     const app = createTestApp();
     const res = await request(app).delete("/rh/categories").send({ id: itemId });

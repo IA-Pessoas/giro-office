@@ -6,6 +6,7 @@ import { createTestApp, pointServiceMock, resetRhRouteMocks } from "./rhTestUtil
 describe("point routes", () => {
   const pointId = "00000000-0000-4000-8000-000000000010";
   const organizationId = "00000000-0000-4000-8000-000000000002";
+  const userId = "00000000-0000-4000-8000-000000000001";
 
   beforeEach(() => {
     resetRhRouteMocks();
@@ -23,6 +24,23 @@ describe("point routes", () => {
       expect.objectContaining({
         date_from: expect.any(Date),
         date_to: expect.any(Date),
+      }),
+    );
+  });
+
+  it("GET /rh/point limita permissao RH pessoal aos proprios registros", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .get(
+        "/rh/point?user_id=00000000-0000-4000-8000-000000000099&date_from=2026-05-01T00:00:00.000Z",
+      )
+      .set("x-auth-permission", "1");
+
+    expect(res.status).toBe(200);
+    expect(pointServiceMock.listPoints).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({
+        user_id: userId,
       }),
     );
   });
@@ -72,5 +90,15 @@ describe("point routes", () => {
 
     expect(res.status).toBe(200);
     expect(pointServiceMock.calculateDailyHours).toHaveBeenCalledWith(pointId, organizationId);
+  });
+
+  it("POST /rh/point/:pointId/calculate bloqueia gestao com permissao RH pessoal", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .post(`/rh/point/${pointId}/calculate`)
+      .set("x-auth-permission", "1");
+
+    expect(res.status).toBe(403);
+    expect(pointServiceMock.calculateDailyHours).not.toHaveBeenCalled();
   });
 });

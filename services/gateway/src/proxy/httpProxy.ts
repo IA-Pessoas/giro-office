@@ -36,6 +36,8 @@ interface HttpProxyOptions {
   permissionModule?: string;
 }
 
+const GLOBAL_ADMIN_PERMISSION = 2;
+
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
   "content-length",
@@ -111,10 +113,15 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, request.auth.organizationId);
 
     const modules = request.auth.claims.modules as Record<string, number | null> | undefined;
+    const globalPermission = request.auth.claims.permission;
     const modulePermission =
       options.permissionModule && modules ? modules[options.permissionModule] : undefined;
     const forwardedPermission =
-      options.permissionModule && modules ? modulePermission : request.auth.claims.permission;
+      typeof globalPermission === "number" && globalPermission >= GLOBAL_ADMIN_PERMISSION
+        ? globalPermission
+        : options.permissionModule && modules
+          ? modulePermission
+          : globalPermission;
 
     if (typeof forwardedPermission === "number") {
       headers.set(FORWARDED_AUTH_PERMISSION_HEADER, String(forwardedPermission));

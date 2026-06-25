@@ -1143,7 +1143,7 @@ it("forwards modular TI permission instead of global user permission", async () 
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
-    permission: 3,
+    permission: 1,
     modules: { ti: 1 },
   });
   let seenPermission: string | undefined;
@@ -1187,7 +1187,7 @@ it("proxies certificate-service public routes mapped in the gateway", async () =
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
-    permission: 3,
+    permission: 1,
     modules: { certificado: 1 },
   });
   const seenUrls: string[] = [];
@@ -1243,7 +1243,7 @@ it("forwards modular certificate permission and internal token to certificate-se
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
-    permission: 3,
+    permission: 1,
     modules: { certificado: 1 },
   });
   let seenPermission: string | undefined;
@@ -2202,6 +2202,73 @@ it("allows limited users with RH module permission to proxy /rh", async () => {
 
     expect(response.status).toBe(200);
     expect(seenUrl).toBe("/rh/requests");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("forwards modular RH permission instead of global user permission", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { rh: 2 },
+  });
+  let seenPermission: string | undefined;
+
+  const upstream = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const rhServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ rhServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/rh/categories`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("2");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("forwards global admin permission to RH service when RH module is absent", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  let seenPermission: string | undefined;
+
+  const upstream = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const rhServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ rhServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/rh/categories`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("2");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

@@ -58,6 +58,30 @@ describe("request routes", () => {
     expect(requestServiceMock.list).toHaveBeenCalledTimes(1);
   });
 
+  it("GET /rh/requests limita permissao RH pessoal ao proprio usuario", async () => {
+    const app = createTestApp();
+    const res = await request(app).get("/rh/requests").set("x-auth-permission", "1").query({
+      requester_user_id: "00000000-0000-4000-8000-000000000099",
+      assigned_to_user_id: "00000000-0000-4000-8000-000000000098",
+      status: "New",
+    });
+
+    expect(res.status).toBe(200);
+    expect(requestServiceMock.list).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({
+        requester_user_id: userId,
+        status: "New",
+      }),
+    );
+    expect(requestServiceMock.list).not.toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({
+        requester_user_id: "00000000-0000-4000-8000-000000000099",
+      }),
+    );
+  });
+
   it("GET /rh/requests/:id detalha solicitacao", async () => {
     const app = createTestApp();
     const res = await request(app).get(`/rh/requests/${itemId}`);
@@ -72,6 +96,17 @@ describe("request routes", () => {
 
     expect(res.status).toBe(200);
     expect(requestServiceMock.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("PUT /rh/requests bloqueia gestao com permissao RH pessoal", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .put("/rh/requests")
+      .set("x-auth-permission", "1")
+      .send({ id: itemId, status: "Resolved" });
+
+    expect(res.status).toBe(403);
+    expect(requestServiceMock.update).not.toHaveBeenCalled();
   });
 
   it("DELETE /rh/requests remove solicitacao", async () => {

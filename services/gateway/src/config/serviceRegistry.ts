@@ -58,6 +58,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.rhServiceUrl,
       auditTarget: "rh-service",
       routePrefixes: [...RH_SERVICE_PREFIXES],
+      permissionModule: "rh",
     },
     {
       key: "user-service",
