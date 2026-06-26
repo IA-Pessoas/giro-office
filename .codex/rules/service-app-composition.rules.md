@@ -1,0 +1,71 @@
+﻿Fonte original: .cursor/rules/service-app-composition.mdc
+
+Metadados originais do Cursor:
+System.Object[]
+
+# Service App Composition
+
+## Responsabilidades do `app.ts`
+- `app.ts` e o ponto de montagem do servico.
+- Ele deve concentrar:
+  - middlewares globais (`cors`, `express.json`, `requestContext`, etc.)
+  - rotas de infraestrutura como `/health` e `/ready`
+  - montagem de OpenAPI/docs
+  - montagem dos routers de dominio por prefixo
+  - handler global de erros
+- Evitar colocar regras de negocio ou detalhes de resource routing diretamente no `app.ts`.
+
+## Separacao entre `app.ts` e `server.ts`
+- O padrao oficial para servicos Express do workspace e:
+  - `app.ts` para composicao da aplicacao
+  - `server.ts` para bootstrap e inicializacao do processo
+- `server.ts` deve concentrar:
+  - carregamento de env (`dotenv/config`, quando aplicavel)
+  - leitura de `env`
+  - criacao do logger
+  - criacao do servidor HTTP e `listen`
+  - logs de start e erro do servidor
+- `app.ts` nao deve:
+  - chamar `listen`
+  - criar logger de bootstrap
+  - decidir porta
+  - servir como entrypoint executavel do processo
+- Evitar `index.ts` como entrypoint quando ele mistura bootstrap e composicao da aplicacao.
+- Se existir `index.ts` em um servico Express, ele deve ser tratado como excecao temporaria ou legado a ser migrado para `server.ts`.
+
+## Montagem de routers
+- Montar routers com prefixos explicitos no `app.ts`.
+- O router de dominio deve expor apenas paths relativos ao seu mount.
+- Nao duplicar o prefixo do mount dentro do proprio arquivo de rota.
+- Exemplo correto:
+  - `app.use("/organizations", organizationRoutes)`
+  - `organizationRoutes.get("/", ...)`
+  - `organizationRoutes.get("/:id", ...)`
+
+## Routers publicos e internos
+- Quando um servico tiver contratos publicos e internos distintos, separar em routers diferentes.
+- O padrao recomendado e:
+  - router publico montado no prefixo publico do servico
+  - router interno montado sob `/internal`
+- Nao misturar rotas publicas e internas no mesmo `Router` se isso reduzir clareza de ownership ou regras de seguranca.
+- Exemplo de referencia:
+  - `app.use("/audit", createAuditPublicRouter(...))`
+  - `app.use("/internal", createAuditInternalRouter(...))`
+
+## Erros e logging
+- O handler global de erros deve ser montado por ultimo no `app.ts`.
+- `createExpressErrorHandler` deve receber:
+  - `event` coerente com o servico
+  - `fallbackMessage` claro
+  - `getContext` quando houver `userId`, `organizationId`, request metadata ou auth encaminhada
+- Preferir contexto pequeno e util para diagnostico; nao duplicar payloads inteiros sem necessidade.
+
+## OpenAPI e health
+- `/health`, `/ready` e docs sao parte da infraestrutura do servico e devem ficar visiveis no `app.ts`.
+- O contrato exposto em `app.ts` deve bater com OpenAPI e testes.
+
+## Bootstrap
+- O bootstrap/server deve criar logger de instancia e passar dependencias para `createApp` ou equivalente.
+- Evitar helpers globais de log quando o servico ja usa `createLogger`.
+- O entrypoint do pacote (`main`, `dev`, `start`) deve apontar para `server.ts` / `dist/server.js`, nao para `index.ts`, quando o servico segue esse padrao.
+
