@@ -12,6 +12,7 @@
     "test:projects": "node --experimental-strip-types src/modules/integracao/run-project-tests.mjs",
     "test:chat": "node --experimental-strip-types src/modules/chat/run-chat-context-tests.mjs",
     "test:a11y-overlays": "node --experimental-strip-types src/shared/components/run-a11y-overlays-tests.mjs",
+    "test:organization-modal": "node src/modules/organizations/run-organization-modal-smoke.mjs",
     "test": "pnpm run test:auth && pnpm run test:clients && pnpm run test:contabil && pnpm run test:projects && pnpm run test:chat",
     "start": "next start",
     "migration:audit:chakra": "node scripts/audit-chakra-usage.mjs",
@@ -56,6 +57,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.1.12",
     "@types/node": "^20",
     "@types/react": "^18",
