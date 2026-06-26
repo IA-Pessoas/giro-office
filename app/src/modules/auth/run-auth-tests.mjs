@@ -60,6 +60,10 @@ const appShellSource = await readFile(
   new URL("../../shared/components/newLayout/AppShell.tsx", import.meta.url),
   "utf8",
 );
+const administracaoSource = await readFile(
+  new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
+  "utf8",
+);
 
 await (async () => {
   await runTest("isAdminPermission allows administrative levels from 2 and above", () => {
@@ -338,5 +342,70 @@ await (async () => {
     assert.equal(authContextSource.includes('console.error("Erro de conex'), false);
     assert.equal(authContextSource.includes('console.error("Erro do servidor'), false);
     assert.equal(authContextSource.includes('console.error("Erro de autentica'), false);
+  });
+
+  await runTest("admin permission updates refresh the authenticated session when editing self", () => {
+    assert.match(authContextSource, /refreshSession:\s*\(\)\s*=>\s*Promise<UserProps \| null>/);
+    assert.match(authContextSource, /async function refreshSession\(\)/);
+    assert.match(
+      authContextSource,
+      /<AuthContext\.Provider value=\{\{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading \}\}/,
+    );
+    assert.match(administracaoSource, /const \{ user, refreshSession \} = useAuth\(\);/);
+    assert.match(
+      administracaoSource,
+      /if \(selectedPermissionUserId === user\?\.id\) \{[\s\S]*await refreshSession\(\);[\s\S]*\}/,
+    );
+    assert.match(authContextSource, /await queryClient\.invalidateQueries\(\{ queryKey: ME_QUERY_KEY \}\);/);
+    assert.equal(authContextSource.includes("queryClient.setQueryData(ME_QUERY_KEY, currentUser)"), false);
+    assert.equal(administracaoSource.includes("accessStoreActions.syncFromToken"), false);
+  });
+
+  await runTest("admin permission updates refetch permission data after save", () => {
+    assert.match(
+      administracaoSource,
+      /await queryClient\.invalidateQueries\(\{[\s\S]*queryKey:\s*\["admin", "permissions", selectedPermissionUserId\],[\s\S]*\}\);/,
+    );
+    assert.match(administracaoSource, /await refetchPermissionUsers\(\);/);
+  });
+
+  await runTest("admin create user action uses native disabled state when context is unavailable", () => {
+    assert.match(administracaoSource, /disabled=\{isCreateBlockedByDepartments\}/);
+    assert.equal(administracaoSource.includes("aria-disabled={isCreateBlockedByDepartments}"), false);
+  });
+
+  await runTest("admin dashboard uses real permission metrics", () => {
+    assert.equal(administracaoSource.includes('title: "Perfis de Acesso"'), false);
+    assert.equal(administracaoSource.includes("value: 12"), false);
+    assert.match(administracaoSource, /const managedModulesCount = useMemo\(\(\) => \{/);
+    assert.match(administracaoSource, /PERMISSION_MODULE_GROUPS\.reduce/);
+    assert.match(administracaoSource, /title: "Módulos gerenciados"/);
+    assert.match(administracaoSource, /value: managedModulesCount/);
+  });
+
+  await runTest("admin permissions list supports scoped user search", () => {
+    assert.match(
+      administracaoSource,
+      /const \[permissionSearchTerm, setPermissionSearchTerm\] = useState\(""\);/,
+    );
+    assert.match(administracaoSource, /const filteredPermissionUsers = useMemo\(\(\) => \{/);
+    assert.match(administracaoSource, /normalizeSearchText\(permissionSearchTerm\)/);
+    assert.match(administracaoSource, /filteredPermissionUsers\.length/);
+    assert.match(administracaoSource, /filteredPermissionUsers\.map/);
+    assert.match(administracaoSource, /placeholder="Buscar usuário ativo"/);
+    assert.match(
+      administracaoSource,
+      /onChange=\{\(event\) => setPermissionSearchTerm\(event\.target\.value\)\}/,
+    );
+  });
+
+  await runTest("admin permissions editor uses explicit save copy and stable saving state", () => {
+    assert.match(administracaoSource, /\{filteredPermissionUsers\.length\} de \{permissionUsers\.length\} usuário/);
+    assert.match(administracaoSource, /Salvar permissões/);
+    assert.equal(administracaoSource.includes(': "Salvar"'), false);
+    assert.match(
+      administracaoSource,
+      /<select[\s\S]*disabled=\{isSelectedPermissionOwner \|\| isSavingPermissions\}/,
+    );
   });
 })();

@@ -22,6 +22,14 @@ const taskModelsConfigSource = readFileSync(
   new URL("../../pages/configs/integracao/tasks/index.tsx", import.meta.url),
   "utf8",
 );
+const configuracoesSource = readFileSync(
+  new URL("./newLayout/Configuracoes.tsx", import.meta.url),
+  "utf8",
+);
+const myOrganizationSectionSource = readFileSync(
+  new URL("../../modules/organizations/ui/MyOrganizationSection.tsx", import.meta.url),
+  "utf8",
+);
 const legacyAiChatBackdrop = [
   'className="fixed inset-0 z-[60] bg-black/40"',
   " onClick",
@@ -94,4 +102,33 @@ runTest("Integracao task modals remain on shared Dialog", () => {
   assert.match(taskFormModalSource, /<Dialog/);
   assert.match(taskModelModalSource, /<Dialog/);
   assert.match(taskModelsConfigSource, /<Dialog/);
+});
+
+runTest("MyOrganizationSection opens organization editing in a shared Dialog", () => {
+  assert.match(myOrganizationSectionSource, /import \{ Dialog \} from "@shared\/components";/);
+  assert.match(myOrganizationSectionSource, /<Dialog[\s\S]*title="Editar organização"/);
+  assert.match(myOrganizationSectionSource, /open=\{isEditDialogOpen\}/);
+  assert.equal(myOrganizationSectionSource.includes("isEditSectionOpen ?"), false);
+});
+
+runTest("Configuracoes opens access editing in a shared Dialog", () => {
+  assert.match(configuracoesSource, /import \{ Dialog \} from "@shared\/components";/);
+  assert.match(configuracoesSource, /<Dialog[\s\S]*title="Editar dados de acesso"/);
+  assert.match(configuracoesSource, /open=\{isAccessDialogOpen\}/);
+  assert.equal(configuracoesSource.includes("isAccessSectionOpen ?"), false);
+});
+
+runTest("Configuracoes scopes the profile save action to the photo block", () => {
+  assert.equal(configuracoesSource.includes("Salvar alterações"), false);
+  assert.equal(configuracoesSource.includes("handleSaveProfile"), false);
+  assert.match(configuracoesSource, /const canSavePhoto =/);
+  assert.match(configuracoesSource, /const handleSavePhoto = async \(\) => \{/);
+  assert.match(configuracoesSource, /onClick=\{\(\) => void handleSavePhoto\(\)\}/);
+  assert.match(configuracoesSource, /disabled=\{!canSavePhoto\}/);
+  assert.match(configuracoesSource, /Salvar foto/);
+});
+
+runTest("Configuracoes access dialog uses accented permission copy", () => {
+  assert.match(configuracoesSource, /Permissão atual: \{currentPermissionLabel\}/);
+  assert.equal(configuracoesSource.includes("Permissao atual"), false);
 });
