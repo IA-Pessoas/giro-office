@@ -15,6 +15,7 @@ import {
   Code,
   FileText,
   Filter,
+  FileCheck,
   LayoutDashboard,
   Loader2,
   Megaphone,
@@ -124,6 +125,7 @@ const moduleCategories: NavigationCategory[] = [
     isModuleAccessCategory: true,
     modules: [
       { path: "/comercial", name: "Comercial", icon: BriefcaseBusiness, moduleKey: "comercial" as ModuleKey },
+      { path: "/certificados", name: "Certificados", icon: FileCheck, moduleKey: "certificado" as ModuleKey },
       { path: "/marketing", name: "Marketing", icon: Megaphone, moduleKey: "marketing" as ModuleKey },
       { path: "/regularize", name: "Regularize", icon: ShieldCheck, moduleKey: "regularize" as ModuleKey },
       { path: "/fiscal", name: "Fiscal", icon: Receipt, moduleKey: "fiscal" as ModuleKey },
