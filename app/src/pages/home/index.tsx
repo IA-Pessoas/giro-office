@@ -10,9 +10,10 @@ import { ModuleCard } from '@shared/components/ModulosCards'
 import { canSSRAuth } from '@modules/auth'
 import { setupAPIClient } from '@shared/services/api'
 
-import LogoTI from '../../../public/logos/lions/Tecnologia.png';
-import LogoIntegracao from '../../../public/logos/lions/Integracao.png';
 import { ToggleThemeButton } from '@shared/components/ToggleThemeButton';
+
+const LOGO_TECNOLOGIA_URL = "/logos/lions/Tecnologia.webp";
+const LOGO_INTEGRACAO_URL = "/logos/lions/Integracao.webp";
 
 
 interface PermsItem {
@@ -49,7 +50,7 @@ export default function Dashboard({ perm }: Props) {
         listModulesTemp.push(
           {
             name: 'Tecnologia',
-            imageUrl: LogoTI.src,
+            imageUrl: LOGO_TECNOLOGIA_URL,
             link: '/tecnologia/home/',
             color: '#823382'
           },
@@ -61,7 +62,7 @@ export default function Dashboard({ perm }: Props) {
             listModulesTemp.push(
                 {
                     name: 'Integração',
-                    imageUrl: LogoIntegracao.src,
+                    imageUrl: LOGO_INTEGRACAO_URL,
                     link: '/integracao/home/',
                     color: '#ef5a8b'
                 },
