@@ -37,7 +37,7 @@ const ADMIN_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
 
 const ADMIN_GRADIENT_BUTTON_CLASSNAME =
-  "bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)]";
+  "bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] disabled:cursor-not-allowed disabled:opacity-70";
 
 const ADMIN_ACTIVE_TAB_CLASSNAME =
   "bg-[var(--colors-brand-soft)] text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300";
@@ -111,6 +111,7 @@ export function Administracao() {
   const [isLoadingOrganizationId, setIsLoadingOrganizationId] = useState(false);
   const [userStatusFilter, setUserStatusFilter] = useState<AdminUserStatus>("active");
   const [searchTerm, setSearchTerm] = useState("");
+  const [permissionSearchTerm, setPermissionSearchTerm] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedPermissionUserId, setSelectedPermissionUserId] = useState<string | null>(null);
   const [permissionDraft, setPermissionDraft] = useState<PermissionDraft>(() =>
@@ -123,7 +124,7 @@ export function Administracao() {
   const [loadedPermissionUserId, setLoadedPermissionUserId] = useState<string | null>(null);
   const [permissionSaveError, setPermissionSaveError] = useState<string | null>(null);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const hasAdminAccess = canAccessAdministration(user);
   const queryClient = useQueryClient();
 
@@ -199,6 +200,27 @@ export function Administracao() {
     return new Map(departments.map((department) => [department.id, department.name]));
   }, [departments]);
 
+  const filteredPermissionUsers = useMemo(() => {
+    const normalizedSearch = normalizeSearchText(permissionSearchTerm);
+
+    if (!normalizedSearch) {
+      return permissionUsers;
+    }
+
+    return permissionUsers.filter((candidate) => {
+      const departmentName =
+        departmentNameById.get(candidate.department_id) ?? candidate.department?.name ?? "";
+      const searchableValues = [
+        candidate.name,
+        candidate.login,
+        departmentName,
+        getAdminUserStatusLabel(candidate.status),
+      ];
+
+      return searchableValues.some((value) => normalizeSearchText(value).includes(normalizedSearch));
+    });
+  }, [departmentNameById, permissionSearchTerm, permissionUsers]);
+
   const selectedPermissionUser = useMemo(() => {
     return permissionUsers.find((candidate) => candidate.id === selectedPermissionUserId) ?? null;
   }, [permissionUsers, selectedPermissionUserId]);
@@ -241,6 +263,10 @@ export function Administracao() {
     },
   });
 
+  const managedModulesCount = useMemo(() => {
+    return PERMISSION_MODULE_GROUPS.reduce((total, group) => total + group.keys.length, 0);
+  }, []);
+
   const dashboardCards = [
     {
       title: "Usuários ativos",
@@ -250,8 +276,8 @@ export function Administracao() {
         "bg-[var(--colors-brand-soft)] text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300",
     },
     {
-      title: "Perfis de Acesso",
-      value: 12,
+      title: "Módulos gerenciados",
+      value: managedModulesCount,
       icon: KeyRound,
       iconClassName: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
     },
@@ -504,6 +530,27 @@ export function Administracao() {
         userId: selectedPermissionUserId,
         raw,
       });
+
+      try {
+        await queryClient.invalidateQueries({
+          queryKey: ["admin", "permissions", selectedPermissionUserId],
+        });
+        await refetchPermissionUsers();
+      } catch {
+        toast.warn(
+          "Permissões salvas, mas a lista de acessos não pôde ser atualizada agora.",
+        );
+      }
+
+      if (selectedPermissionUserId === user?.id) {
+        try {
+          await refreshSession();
+        } catch {
+          toast.warn(
+            "Permissões salvas, mas a sessão local não pôde ser atualizada agora. Recarregue a página se o menu não refletir os novos acessos.",
+          );
+        }
+      }
       toast.success("Permissões atualizadas com sucesso.");
     } catch (error) {
       setPermissionSaveError(
@@ -535,10 +582,10 @@ export function Administracao() {
           </p>
         </div>
         <button
-          className={`self-end lg:self-auto w-fit flex items-center gap-2 rounded-xl px-4 py-2.5 text-white ${ADMIN_GRADIENT_BUTTON_CLASSNAME}`}
+          className={`inline-flex w-fit items-center gap-2 self-end rounded-xl px-4 py-2.5 text-sm font-semibold text-white lg:self-auto ${ADMIN_GRADIENT_BUTTON_CLASSNAME}`}
           type="button"
           onClick={handleOpenCreateModal}
-          aria-disabled={isCreateBlockedByDepartments}
+          disabled={isCreateBlockedByDepartments}
         >
           <Plus className="h-5 w-5" />
           Novo usuário
@@ -714,10 +761,7 @@ export function Administracao() {
                   ) : (
                     filteredUsers.map((candidate) => {
                       const isSelected = candidate.id === selectedUserId;
-                      const departmentName =
-                        departments.find((department) => department.id === candidate.department_id)?.name ??
-                        candidate.department?.name ??
-                        "Sem departamento";
+                      const departmentName = getDepartmentName(candidate);
 
                       return (
                         <button
@@ -789,10 +833,26 @@ export function Administracao() {
                 </div>
               ) : null}
 
+              <div className={`${ADMIN_SUBPANEL_CLASSNAME} space-y-3 p-3`}>
+                <label className={ADMIN_LABEL_CLASSNAME}>Busca</label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={permissionSearchTerm}
+                    onChange={(event) => setPermissionSearchTerm(event.target.value)}
+                    placeholder="Buscar usuário ativo"
+                    disabled={isPermissionUsersLoading || Boolean(permissionUsersError)}
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+                  />
+                </div>
+              </div>
+
               <div className="flex min-h-0 flex-1 flex-col space-y-3">
                 <div className="flex items-center justify-between">
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    {permissionUsers.length} usuário{permissionUsers.length === 1 ? "" : "s"}
+                    {filteredPermissionUsers.length} de {permissionUsers.length} usuário
+                    {permissionUsers.length === 1 ? "" : "s"}
                   </p>
                   <span className="rounded-full bg-[var(--colors-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
                     Ativo
@@ -814,8 +874,14 @@ export function Administracao() {
                     <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
                       <p className={ADMIN_TEXT_CLASSNAME}>Nenhum usuário ativo encontrado.</p>
                     </div>
+                  ) : filteredPermissionUsers.length === 0 ? (
+                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                      <p className={ADMIN_TEXT_CLASSNAME}>
+                        Nenhum usuário ativo corresponde à busca.
+                      </p>
+                    </div>
                   ) : (
-                    permissionUsers.map((candidate) => {
+                    filteredPermissionUsers.map((candidate) => {
                       const isSelected = candidate.id === selectedPermissionUserId;
 
                       return (
@@ -929,7 +995,7 @@ export function Administracao() {
                     disabled={!isDirty || isSelectedPermissionOwner || isSavingPermissions}
                   >
                     <Save className="h-4 w-4" />
-                    {isSavingPermissions ? "Salvando..." : "Salvar"}
+                    {isSavingPermissions ? "Salvando..." : "Salvar permissões"}
                   </button>
                 </div>
 
@@ -997,7 +1063,7 @@ export function Administracao() {
                                     }
                                     className={ADMIN_SELECT_CLASSNAME}
                                     style={ADMIN_SELECT_ARROW_STYLE}
-                                    disabled={isSelectedPermissionOwner}
+                                    disabled={isSelectedPermissionOwner || isSavingPermissions}
                                   >
                                     {PERMISSION_SELECT_OPTIONS.map((option) => (
                                       <option key={option.value} value={option.value}>

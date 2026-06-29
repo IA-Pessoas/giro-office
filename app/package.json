@@ -16,7 +16,9 @@
     "test:iframe": "node --experimental-strip-types src/components/Iframe/run-details-tests.mjs",
     "test:certificates": "node --experimental-strip-types src/modules/certificates/run-certificate-tests.mjs",
     "test:a11y-overlays": "node --experimental-strip-types src/shared/components/run-a11y-overlays-tests.mjs",
-    "test": "pnpm run test:auth && pnpm run test:clients && pnpm run test:contabil && pnpm run test:projects && pnpm run test:chat && pnpm run test:iframe && pnpm run test:certificates && pnpm run test:a11y-overlays && pnpm run test:status-badge",
+    "test:organization-modal": "node src/modules/organizations/run-organization-modal-smoke.mjs",
+    "test:status-badge": "node --experimental-strip-types src/shared/components/run-status-badge-tests.mjs",
+    "test": "pnpm run test:auth && pnpm run test:clients && pnpm run test:contabil && pnpm run test:projects && pnpm run test:chat && pnpm run test:iframe && pnpm run test:certificates && pnpm run test:a11y-overlays && pnpm run test:organization-modal && pnpm run test:status-badge",
     "start": "next start",
     "migration:audit:chakra": "node scripts/audit-chakra-usage.mjs",
     "migration:validate:criteria": "node scripts/validate-acceptance-criteria.mjs",
@@ -60,6 +62,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.1.12",
     "@types/node": "^20",
     "@types/react": "^18",
