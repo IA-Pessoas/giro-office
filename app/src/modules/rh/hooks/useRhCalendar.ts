@@ -66,7 +66,6 @@ export function rhTimeSheetDetailQueryKey(id?: string | null) {
 
 export function useRhHolidays(): UseQueryResult<RhHoliday[], Error> {
   return useFetch(rhHolidaysQueryKey(), () => rhCalendarService.listHolidays(), {
-    refetchOnWindowFocus: false,
   });
 }
 
@@ -77,7 +76,6 @@ export function useRhTimeBankReleases(
     rhTimeBankReleasesQueryKey(filters),
     () => rhCalendarService.listTimeBankReleases(filters),
     {
-      refetchOnWindowFocus: false,
     },
   );
 }
@@ -94,7 +92,6 @@ export function useRhTimeBankSummary(
         : rhCalendarService.getMyTimeBankSummary(),
     {
       enabled,
-      refetchOnWindowFocus: false,
     },
   );
 }
@@ -102,7 +99,6 @@ export function useRhTimeBankSummary(
 export function useRhTimeBankOverview(enabled = true): UseQueryResult<RhTimeBankOverview, Error> {
   return useFetch(rhTimeBankOverviewQueryKey(), () => rhCalendarService.getTimeBankOverview(), {
     enabled,
-    refetchOnWindowFocus: false,
   });
 }
 
@@ -115,7 +111,6 @@ export function useRhTimeSheets(
     () => rhCalendarService.listTimeSheets(filters),
     {
       enabled: options?.enabled ?? true,
-      refetchOnWindowFocus: false,
     },
   );
 }
@@ -126,7 +121,6 @@ export function useRhTimeSheetDetail(
 ): UseQueryResult<RhTimeSheetDetail, Error> {
   return useFetch(rhTimeSheetDetailQueryKey(id), () => rhCalendarService.getTimeSheetDetail(id ?? ""), {
     enabled: enabled && Boolean(id),
-    refetchOnWindowFocus: false,
   });
 }
 

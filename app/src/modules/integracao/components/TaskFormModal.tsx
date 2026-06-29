@@ -146,7 +146,6 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
     () => taskModelService.list({ type: "Projeto" }),
     {
       enabled: open && !isEditing,
-      refetchOnWindowFocus: false,
     },
   );
   const departmentsQuery = useFetch<DepItem[]>(
@@ -154,7 +153,6 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
     () => departmentService.list({ status: "Ativo" }),
     {
       enabled: open && isEditing,
-      refetchOnWindowFocus: false,
     },
   );
   const usersQuery = useFetch<UserItem[]>(
@@ -162,7 +160,6 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
     () => listAdminUsers("active"),
     {
       enabled: open && isEditing,
-      refetchOnWindowFocus: false,
     },
   );
   const taskDetailQuery = useIntegracaoTaskDetail(open && taskId ? taskId : undefined);
