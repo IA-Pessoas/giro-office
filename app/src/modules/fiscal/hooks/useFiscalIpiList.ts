@@ -16,7 +16,6 @@ export function useFiscalIpiList(
     {
       enabled: enabled && ipiCodes.length > 0,
       placeholderData: keepPreviousData,
-      refetchOnWindowFocus: false,
     },
   );
 }

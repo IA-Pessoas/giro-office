@@ -16,7 +16,6 @@ export function useFiscalIcmsList(
     {
       enabled: enabled && icmsTerms.length > 0,
       placeholderData: keepPreviousData,
-      refetchOnWindowFocus: false,
     },
   );
 }

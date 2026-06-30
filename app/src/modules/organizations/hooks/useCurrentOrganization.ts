@@ -19,7 +19,6 @@ export function useCurrentOrganization(
     {
       enabled: Boolean(organizationId),
       retry: false,
-      refetchOnWindowFocus: false,
     },
   );
 }

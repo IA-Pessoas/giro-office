@@ -58,7 +58,6 @@ export function useRhCategories(
   filters: RhCategoryListFilters = {},
 ): UseQueryResult<RhCategory[], Error> {
   return useFetch(rhCategoriesQueryKey(filters), () => rhRequestsService.listCategories(filters), {
-    refetchOnWindowFocus: false,
   });
 }
 
@@ -68,7 +67,6 @@ export function useRhRequests(
 ): UseQueryResult<RhRequest[], Error> {
   return useFetch(rhRequestsQueryKey(filters), () => rhRequestsService.listRequests(filters), {
     enabled: options?.enabled ?? true,
-    refetchOnWindowFocus: false,
   });
 }
 
@@ -78,7 +76,6 @@ export function useRhRequest(id: string | undefined): UseQueryResult<RhRequest, 
     () => rhRequestsService.getRequestById(id ?? ""),
     {
       enabled: Boolean(id),
-      refetchOnWindowFocus: false,
     },
   );
 }
@@ -93,7 +90,6 @@ export function useRhMessages(
     () => rhRequestsService.listMessages({ requestId }),
     {
       enabled: Boolean(filters?.requestId),
-      refetchOnWindowFocus: false,
     },
   );
 }

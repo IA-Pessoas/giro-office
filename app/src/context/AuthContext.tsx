@@ -41,6 +41,7 @@ interface AuthContextData {
     isAuthenticated: boolean;
     signIn: (credentials: SignInProps) => Promise<void>;
     logoutUser: () => Promise<void>;
+    refreshSession: () => Promise<UserProps | null>;
     loading: boolean;
 }
 
@@ -147,6 +148,50 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         return true;
+    }
+
+    async function refreshSession(): Promise<UserProps | null> {
+        const requestVersion = beginAuthTransition();
+        const { "cw.token": token } = parseCookies();
+
+        if (!token) {
+            clearAuthCookie();
+            setUser(null);
+            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            return null;
+        }
+
+        const fallbackModules = getModulePermissionsFromToken(token);
+
+        try {
+            const response = await api.get("/user/me");
+
+            if (!isCurrentAuthTransition(requestVersion, token)) {
+                return null;
+            }
+
+            const userData = response.data?.data;
+
+            if (!isValidAuthUser(userData)) {
+                clearAuthCookie();
+                setUser(null);
+                queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+                return null;
+            }
+
+            const currentUser = buildCurrentUser(userData, fallbackModules);
+            setUser(currentUser);
+            api.defaults.headers.common.Authorization = `Bearer ${token}`;
+            await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
+
+            return currentUser;
+        } catch (error) {
+            if (isCurrentAuthTransition(requestVersion, token)) {
+                logAuthError("Erro ao atualizar sessão:", error);
+            }
+
+            throw error;
+        }
     }
 
     useEffect(() => {
@@ -285,7 +330,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated, signIn, logoutUser, loading }}>
+        <AuthContext.Provider value={{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading }}>
             {children}
         </AuthContext.Provider>
     );
