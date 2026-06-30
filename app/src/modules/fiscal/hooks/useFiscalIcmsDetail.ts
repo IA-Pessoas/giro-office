@@ -15,7 +15,6 @@ export function useFiscalIcmsDetail(
     () => fiscalIcmsService.detail(icmsId ?? ""),
     {
       enabled: enabled && Boolean(icmsId),
-      refetchOnWindowFocus: false,
     },
   );
 }

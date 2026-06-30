@@ -9,6 +9,5 @@ export const ME_QUERY_KEY = ["me"] as const;
 export function useMe(): UseQueryResult<MeSessionUser, Error> {
   return useFetch(ME_QUERY_KEY, () => getMe(api), {
     retry: false,
-    refetchOnWindowFocus: false,
   });
 }

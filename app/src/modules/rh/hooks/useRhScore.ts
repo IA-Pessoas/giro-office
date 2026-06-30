@@ -52,14 +52,12 @@ export function useRhScoreQuestions(
     rhScoreQuestionsQueryKey(filters),
     () => rhScoreService.listQuestions(filters),
     {
-      refetchOnWindowFocus: false,
     },
   );
 }
 
 export function useRhMyScores(): UseQueryResult<RhScoreQuarter[], Error> {
   return useFetch(rhMyScoresQueryKey(), () => rhScoreService.listMyScores(), {
-    refetchOnWindowFocus: false,
   });
 }
 
@@ -69,7 +67,6 @@ export function useRhScoreDetail(id: string | undefined): UseQueryResult<RhScore
     () => rhScoreService.getScoreDetail(id ?? ""),
     {
       enabled: Boolean(id),
-      refetchOnWindowFocus: false,
     },
   );
 }
@@ -85,7 +82,6 @@ export function useRhPendingScoreEvaluations(
     () => rhScoreService.listPendingEvaluations(),
     {
       enabled: options?.enabled ?? true,
-      refetchOnWindowFocus: false,
     },
   );
 }

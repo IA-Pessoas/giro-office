@@ -51,7 +51,6 @@ export function useAssignableUsers(
     },
     {
       enabled: options?.enabled ?? true,
-      refetchOnWindowFocus: false,
     },
   );
 }

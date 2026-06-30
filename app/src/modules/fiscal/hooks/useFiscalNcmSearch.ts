@@ -17,7 +17,6 @@ export function useFiscalNcmSearch(
     {
       enabled: Boolean(normalizedCode),
       placeholderData: keepPreviousData,
-      refetchOnWindowFocus: false,
     },
   );
 }

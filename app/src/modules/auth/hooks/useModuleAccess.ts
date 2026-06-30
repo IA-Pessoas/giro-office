@@ -47,7 +47,6 @@ export function useModuleAccessMap(
     {
       enabled: Boolean(user?.department_id),
       retry: false,
-      refetchOnWindowFocus: false,
     },
   );
 
