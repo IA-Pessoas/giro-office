@@ -1451,6 +1451,8 @@ model ObrigationsPessoal {
   organization    Organization @relation(fields: [organization_id], references: [id])
   responsible     User?        @relation(fields: [responsavel_id], references: [id])
 
+  @@unique([organization_id, client_id, competence], map: "uq_pessoal_obligations_org_client_competence")
+  @@index([organization_id, competence], map: "idx_pessoal_obligations_org_competence")
   @@map("pessoal.obrigations")
 }
 

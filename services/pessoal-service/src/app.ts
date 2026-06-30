@@ -11,8 +11,21 @@ import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { PessoalServiceEnv } from "./config/env.js";
+import type { PrismaClient } from "./generated/prisma/client.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildPessoalServiceOpenApiSpec } from "./openapi/spec.js";
+import { prismaClient } from "./prisma/index.js";
+import { createLddRoutes } from "./routes/ldd.routes.js";
+import { createObligationRoutes } from "./routes/obligation.routes.js";
+import { createPayrollRoutes } from "./routes/payroll.routes.js";
+import { createSituationRoutes } from "./routes/situation.routes.js";
+import { createUnionRoutes } from "./routes/union.routes.js";
+import { LddService } from "./services/lddService.js";
+import { ObligationService } from "./services/obligationService.js";
+import { PayrollService } from "./services/payrollService.js";
+import { PessoalAuditService } from "./services/pessoalAuditService.js";
+import { SituationService } from "./services/situationService.js";
+import { UnionService } from "./services/unionService.js";
 
 function pessoalServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const out: Record<string, unknown> = {};
@@ -33,10 +46,30 @@ function pessoalServiceErrorLogContext(request: Request): Record<string, unknown
 export interface CreatePessoalAppOptions {
   env: PessoalServiceEnv;
   logger: Logger;
+  prisma?: PrismaClient;
+  auditService?: PessoalAuditService;
 }
 
-export function createPessoalApp({ env, logger }: CreatePessoalAppOptions): express.Express {
+export function createPessoalApp({
+  env,
+  logger,
+  prisma = prismaClient,
+  auditService,
+}: CreatePessoalAppOptions): express.Express {
   const app = express();
+  const domainAuditService =
+    auditService ??
+    new PessoalAuditService({
+      enabled: env.domainAuditEnabled,
+      serviceUrl: env.auditServiceUrl,
+      serviceToken: env.auditServiceToken,
+      logger,
+    });
+  const lddService = new LddService(prisma, domainAuditService);
+  const situationService = new SituationService(prisma, domainAuditService);
+  const unionService = new UnionService(prisma, domainAuditService);
+  const payrollService = new PayrollService(prisma, domainAuditService);
+  const obligationService = new ObligationService(prisma, domainAuditService);
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -62,6 +95,12 @@ export function createPessoalApp({ env, logger }: CreatePessoalAppOptions): expr
       }),
     );
   });
+
+  app.use("/pessoal/ldd", createLddRoutes(lddService));
+  app.use("/pessoal/situations", createSituationRoutes(situationService));
+  app.use("/pessoal/unions", createUnionRoutes(unionService));
+  app.use("/pessoal/payroll", createPayrollRoutes(payrollService));
+  app.use("/pessoal/obrigations", createObligationRoutes(obligationService));
 
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {
