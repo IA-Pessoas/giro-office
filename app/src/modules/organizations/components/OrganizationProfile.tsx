@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { resolvePhotoUrl } from "@shared/utils";
 import { organizationService } from '../services/organizationService';
 import type { Organization } from '../types';
 
@@ -57,6 +58,7 @@ export function OrganizationProfile({ organizationId }: OrganizationProfileProps
       default: return 'gray';
     }
   };
+  const resolvedLogoUrl = resolvePhotoUrl(organization.logo_url);
 
   return (
     <div className="p-6">
@@ -81,11 +83,17 @@ export function OrganizationProfile({ organizationId }: OrganizationProfileProps
         <section><p className="mb-1 text-sm text-slate-500">Email do Criador</p><p>{organization.email_created_by}</p></section>
         <section><p className="mb-1 text-sm text-slate-500">Plano de Assinatura</p><p>{organization.subscription_plan}</p></section>
 
-        {organization.logo_url && (
+        {resolvedLogoUrl && (
           <section>
             <p className="mb-1 text-sm text-slate-500">Logo</p>
             <div className="mt-2">
-              <img src={organization.logo_url} alt={organization.name} style={{ maxWidth: '200px', maxHeight: '200px' }} />
+              <img
+                src={resolvedLogoUrl}
+                alt={organization.name}
+                loading="lazy"
+                decoding="async"
+                className="max-h-[200px] max-w-[200px] object-contain"
+              />
             </div>
           </section>
         )}

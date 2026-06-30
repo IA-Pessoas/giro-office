@@ -269,6 +269,8 @@ const ChatListItem = ({ chat, isSelected, onSelect }) => {
                     <img 
                         src={details.photo} 
                         alt={`Foto de ${details.name}`} 
+                        loading="lazy"
+                        decoding="async"
                         style={{
                             width: '100%',
                             height: '100%',
