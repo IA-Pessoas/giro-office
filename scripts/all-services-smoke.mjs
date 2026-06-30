@@ -198,6 +198,7 @@ const state = {
   pessoalSituationId: "",
   pessoalUnionId: "",
   pessoalObligationId: "",
+  pessoalPasswordId: "",
   pessoalCompetence: "",
   tiRequestCategoryId: "",
   tiRequestId: "",
@@ -2819,6 +2820,59 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/pessoal/obrigations/competences/${requireState("pessoalCompetence")}/generate`,
+    });
+  },
+
+  async pessoalPasswordList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async pessoalPasswordCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        service_name: uniqueText("Smoke Password"),
+        login_main: "smoke-login",
+        senha_main: "smoke-password",
+        login_secondary: "smoke-login-2",
+        senha_secondary: "smoke-password-2",
+        responsavel_id: requireState("session").id,
+        notes: "Smoke password notes.",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.pessoalPasswordId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async pessoalPasswordGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/passwords/${requireState("pessoalPasswordId")}`,
+    });
+  },
+
+  async pessoalPasswordPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/passwords/${requireState("pessoalPasswordId")}`,
+      json: {
+        notes: "Smoke password notes updated.",
+        senha_main: "smoke-password-updated",
+      },
+    });
+  },
+
+  async pessoalPasswordDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/passwords/${requireState("pessoalPasswordId")}`,
     });
   },
 
