@@ -101,6 +101,8 @@ function UserFormContent({ user, me, departments }) {
             <img
               src={formData.photoUrl || "/logos/lions/Grey.png"}
               alt="Foto do usuario"
+              loading="lazy"
+              decoding="async"
               className="mb-4 h-[120px] w-[120px] cursor-pointer rounded-full border-2 border-slate-200 object-cover transition-opacity hover:opacity-80"
             />
           </label>

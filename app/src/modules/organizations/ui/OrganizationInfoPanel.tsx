@@ -34,6 +34,8 @@ export function OrganizationInfoPanel({ organization, userEmail }: OrganizationI
             <img
               src={resolvedLogoUrl}
               alt={`Logo de ${organization.name}`}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-contain p-2.5"
             />
           ) : (

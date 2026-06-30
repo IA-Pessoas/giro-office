@@ -349,6 +349,8 @@ export function Configuracoes() {
                       <img
                         src={displayedAvatar}
                         alt={`Foto de ${currentName}`}
+                        loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                         onError={() => setHasPhotoLoadError(true)}
                       />
