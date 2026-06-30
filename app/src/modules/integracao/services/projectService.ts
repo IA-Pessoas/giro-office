@@ -1,0 +1,67 @@
+import { setupAPIClient } from "@shared/services/api";
+
+import type {
+  CreateProjectData,
+  ProjectDetail,
+  ProjectListItem,
+  ProjectListParams,
+  ProjectProgressResponse,
+  UpdateProjectData,
+} from "../types";
+import {
+  buildCreateProjectPayload,
+  buildDeleteProjectPayload,
+  buildProjectListParams,
+  PROJECT_ENDPOINTS,
+  unwrapCreatedProject,
+  unwrapProjectDetail,
+  unwrapProjectList,
+  unwrapProjectProgress,
+  unwrapUpdatedProject,
+} from "./projectService.contract";
+
+export const projectService = {
+  async list(params: ProjectListParams): Promise<ProjectListItem[]> {
+    const api = setupAPIClient();
+    const response = await api.get(PROJECT_ENDPOINTS.list, {
+      params: buildProjectListParams(params),
+    });
+
+    return unwrapProjectList(response.data);
+  },
+
+  async detail(projectId: string): Promise<ProjectDetail> {
+    const api = setupAPIClient();
+    const response = await api.get(PROJECT_ENDPOINTS.crud, {
+      params: { project_id: projectId },
+    });
+
+    return unwrapProjectDetail(response.data);
+  },
+
+  async create(payload: CreateProjectData): Promise<ProjectListItem> {
+    const api = setupAPIClient();
+    const response = await api.post(PROJECT_ENDPOINTS.crud, buildCreateProjectPayload(payload));
+
+    return unwrapCreatedProject(response.data);
+  },
+
+  async update(payload: UpdateProjectData): Promise<ProjectDetail> {
+    const api = setupAPIClient();
+    const response = await api.put(PROJECT_ENDPOINTS.crud, payload);
+
+    return unwrapUpdatedProject(response.data);
+  },
+
+  async delete(projectId: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.delete(PROJECT_ENDPOINTS.crud, { data: buildDeleteProjectPayload(projectId) });
+  },
+
+  async recalculateProgress(projectId: string): Promise<ProjectProgressResponse> {
+    const api = setupAPIClient();
+    const response = await api.post(PROJECT_ENDPOINTS.progress, { project_id: projectId });
+
+    return unwrapProjectProgress(response.data);
+  },
+};
