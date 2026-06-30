@@ -10,6 +10,22 @@ const rhModulePolicy: AuthPolicy = {
   },
 };
 
+const regularizeReadPolicy: AuthPolicy = {
+  modulePermission: {
+    module: "regularize",
+    minPermission: moduleAccessPermission,
+  },
+};
+
+const regularizeMutationPermission = 2;
+
+const regularizeMutationPolicy: AuthPolicy = {
+  modulePermission: {
+    module: "regularize",
+    minPermission: regularizeMutationPermission,
+  },
+};
+
 const clientRelatedModules = [
   "atendimento",
   "comercial",
@@ -38,6 +54,14 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
+  {
+    method: "GET",
+    path: /^\/regularize\/(?:password|sites-pass-detail)(?:\/|$)/,
+    policy: regularizeMutationPolicy,
+  },
+  { method: "POST", path: /^\/regularize(?:\/|$)/, policy: regularizeMutationPolicy },
+  { method: "PUT", path: /^\/regularize(?:\/|$)/, policy: regularizeMutationPolicy },
+  { method: "GET", path: /^\/regularize(?:\/|$)/, policy: regularizeReadPolicy },
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: adminPolicy },
