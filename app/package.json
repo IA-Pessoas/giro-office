@@ -18,6 +18,7 @@
     "test:status-badge": "node --experimental-strip-types src/shared/components/run-status-badge-tests.mjs",
     "test:image-optimization": "node src/shared/run-image-optimization-tests.mjs",
     "test": "pnpm run test:auth && pnpm run test:clients && pnpm run test:contabil && pnpm run test:projects && pnpm run test:chat && pnpm run test:iframe && pnpm run test:status-badge && pnpm run test:image-optimization",
+    "images:audit": "node scripts/audit-public-images.mjs",
     "start": "next start",
     "migration:audit:chakra": "node scripts/audit-chakra-usage.mjs",
     "migration:validate:criteria": "node scripts/validate-acceptance-criteria.mjs",

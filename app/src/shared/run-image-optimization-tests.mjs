@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -112,4 +112,25 @@ await runTest("next image remote patterns are not broad", async () => {
 
   assert.equal(source.includes('hostname: "**"'), false);
   assert.equal(source.includes('hostname: "*"'), false);
+});
+
+await runTest("public logo assets respect source budget", async () => {
+  const trackedAssets = [
+    "public/logos/lions/Castelo.webp",
+    "public/logos/lions/Grey.png",
+    "public/logos/lions/Integracao.webp",
+    "public/logos/lions/Tecnologia.webp",
+  ];
+  const maxBytes = 180 * 1024;
+  const oversized = [];
+
+  for (const relativePath of trackedAssets) {
+    const info = await stat(path.join(appRoot, relativePath));
+
+    if (info.size > maxBytes) {
+      oversized.push(`${relativePath} ${info.size}`);
+    }
+  }
+
+  assert.deepEqual(oversized, []);
 });
