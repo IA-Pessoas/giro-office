@@ -29,6 +29,15 @@ const sitePasswordSelect = {
   status: true,
 } as const;
 
+const sitePasswordListSelect = {
+  id: true,
+  name: true,
+  sphere: true,
+  link: true,
+  user: true,
+  status: true,
+} as const;
+
 export class PasswordService {
   readonly #encryption: EncryptionService;
   readonly #logs: RegularizeLogService;
@@ -138,7 +147,9 @@ export class PasswordService {
       },
     });
 
-    return list as unknown as Record<string, unknown>[];
+    return (list as unknown as Record<string, unknown>[]).map((password) =>
+      this.maskPasswordListItem(password),
+    );
   }
 
   async detail(organizationId: string, id: string): Promise<Record<string, unknown>> {
@@ -177,7 +188,7 @@ export class PasswordService {
         sphere: input.body.sphere,
         link: input.body.link ?? null,
         user: input.body.user,
-        password: input.body.password,
+        password: this.#encryption.encrypt(input.body.password),
         organization_id: input.organizationId,
       },
       select: sitePasswordSelect,
@@ -192,7 +203,7 @@ export class PasswordService {
       changes: "{}",
     });
 
-    return created as unknown as Record<string, unknown>;
+    return this.maskSitePassword(created);
   }
 
   async updateSite(input: {
@@ -215,7 +226,7 @@ export class PasswordService {
         sphere: input.body.sphere,
         link: input.body.link ?? null,
         user: input.body.user,
-        password: input.body.password,
+        password: this.#encryption.encrypt(input.body.password),
         status: input.body.status,
       },
       select: sitePasswordSelect,
@@ -231,7 +242,7 @@ export class PasswordService {
       updatedData: updated as unknown as Record<string, unknown>,
     });
 
-    return updated as unknown as Record<string, unknown>;
+    return this.maskSitePassword(updated);
   }
 
   async listSites(organizationId: string, status: boolean): Promise<Record<string, unknown>[]> {
@@ -240,13 +251,13 @@ export class PasswordService {
         organization_id: organizationId,
         status,
       },
-      select: sitePasswordSelect,
+      select: sitePasswordListSelect,
       orderBy: {
         name: "asc",
       },
     });
 
-    return list as unknown as Record<string, unknown>[];
+    return list.map((site) => this.maskSitePassword(site));
   }
 
   async detailSite(organizationId: string, id: string): Promise<Record<string, unknown>> {
@@ -258,7 +269,7 @@ export class PasswordService {
       throw new ServiceError(404, "Site nao encontrado.");
     }
 
-    return detail as unknown as Record<string, unknown>;
+    return this.hydrateSitePassword(detail);
   }
 
   async ensurePasswordIsUnique(
@@ -323,5 +334,53 @@ export class PasswordService {
       login: this.#encryption.decrypt(password.login),
       password: this.#encryption.decrypt(password.password),
     };
+  }
+
+  private maskPasswordListItem(password: Record<string, unknown>): Record<string, unknown> {
+    const masked = { ...password };
+    delete masked.login;
+    delete masked.password;
+    return masked;
+  }
+
+  private hydrateSitePassword(site: {
+    id: string;
+    name: string;
+    sphere: string;
+    link: string | null;
+    user: string;
+    password: string;
+    status: boolean;
+  }): Record<string, unknown> {
+    return {
+      ...site,
+      password: this.decryptSitePassword(site.password),
+    };
+  }
+
+  private maskSitePassword(site: {
+    id: string;
+    name: string;
+    sphere: string;
+    link: string | null;
+    user: string;
+    status: boolean;
+  }): Record<string, unknown> {
+    return {
+      id: site.id,
+      name: site.name,
+      sphere: site.sphere,
+      link: site.link,
+      user: site.user,
+      status: site.status,
+    };
+  }
+
+  private decryptSitePassword(password: string): string {
+    try {
+      return this.#encryption.decrypt(password);
+    } catch {
+      return password;
+    }
   }
 }

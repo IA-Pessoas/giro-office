@@ -19,6 +19,17 @@ interface LogUpdateInput {
   updatedData: Record<string, unknown>;
 }
 
+const sensitiveLogFields = new Set(["login", "password", "user"]);
+const redactedValue = "[redigido]";
+
+function redactLogValue(key: string, value: unknown): unknown {
+  if (sensitiveLogFields.has(key)) {
+    return redactedValue;
+  }
+
+  return value;
+}
+
 export class RegularizeLogService {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -41,8 +52,8 @@ export class RegularizeLogService {
     for (const key of Object.keys(input.updatedData)) {
       if (input.oldData?.[key] !== input.updatedData[key]) {
         changes[key] = {
-          from: input.oldData?.[key],
-          to: input.updatedData[key],
+          from: redactLogValue(key, input.oldData?.[key]),
+          to: redactLogValue(key, input.updatedData[key]),
         };
       }
     }
