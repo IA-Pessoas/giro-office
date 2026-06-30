@@ -194,6 +194,11 @@ const state = {
   contabilControlCompetence: "",
   contabilResponsibleId: "",
   contabilRelationshipId: "",
+  pessoalLddId: "",
+  pessoalSituationId: "",
+  pessoalUnionId: "",
+  pessoalObligationId: "",
+  pessoalCompetence: "",
   tiRequestCategoryId: "",
   tiRequestId: "",
   tiInventoryCategoryId: "",
@@ -2613,6 +2618,207 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/contabil/relationships/${requireState("contabilRelationshipId")}`,
+    });
+  },
+
+  async pessoalLddList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async pessoalLddCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        type: "FGTS",
+        period: "Mensal",
+        due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+        balance_amount: 123.45,
+        registration_status: "Regular",
+        status: "Em aberto",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.pessoalLddId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async pessoalLddPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/ldd/${requireState("pessoalLddId")}`,
+      json: { status: "Regular" },
+    });
+  },
+
+  async pessoalLddDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/ldd/${requireState("pessoalLddId")}`,
+    });
+  },
+
+  async pessoalSituationList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async pessoalSituationCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        title: uniqueText("Smoke Situation"),
+        description: "Smoke situation description.",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.pessoalSituationId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async pessoalSituationGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/situations/${requireState("pessoalSituationId")}`,
+    });
+  },
+
+  async pessoalSituationPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/situations/${requireState("pessoalSituationId")}`,
+      json: { status: "Finalizado" },
+    });
+  },
+
+  async pessoalUnionList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async pessoalUnionCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        name: uniqueText("Smoke Union"),
+        cnpj: uniqueDigits(14),
+        base_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.pessoalUnionId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async pessoalUnionGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/unions/${requireState("pessoalUnionId")}`,
+    });
+  },
+
+  async pessoalUnionPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/unions/${requireState("pessoalUnionId")}`,
+      json: { name: uniqueText("Smoke Union Updated") },
+    });
+  },
+
+  async pessoalPayrollCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        responsible_id: requireState("session").id,
+        advance: true,
+        advance_type: "percentual",
+        advance_amount: 40,
+        info: "Smoke payroll info.",
+        previous: false,
+        onvio: true,
+        group: "A",
+        vt: true,
+        vt_value: 220,
+        vt_type: "mensal",
+        va: true,
+        assistance_fee: true,
+        union_id: requireState("pessoalUnionId"),
+        bem_mais: false,
+        bsf: true,
+        reinf: false,
+        employees: 3,
+        contact: "smoke@example.com",
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    findFirstId(response.body?.data);
+  },
+
+  async pessoalPayrollGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/payroll/${requireState("primaryClientId")}`,
+    });
+  },
+
+  async pessoalPayrollPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/payroll/${requireState("primaryClientId")}`,
+      json: { info: "Smoke payroll updated." },
+    });
+  },
+
+  async pessoalObligationCreate(op) {
+    state.pessoalCompetence ||= "2099-12";
+    const response = await httpRequest(op, {
+      expectedStatus: [200, 201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: state.pessoalCompetence,
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.pessoalObligationId =
+      pickFirst(response.body, "data.obligation.id") ?? findFirstId(response.body?.data);
+  },
+
+  async pessoalObligationGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("pessoalCompetence"),
+      },
+    });
+  },
+
+  async pessoalObligationPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/obrigations/${requireState("pessoalObligationId")}`,
+      json: { payroll: true },
+    });
+  },
+
+  async pessoalObligationGenerate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/obrigations/competences/${requireState("pessoalCompetence")}/generate`,
     });
   },
 
