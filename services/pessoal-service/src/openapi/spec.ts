@@ -62,6 +62,56 @@ const jsonRequestBody = (schema: Record<string, unknown>) =>
     },
   }) as const;
 
+const successJsonWithData = (dataSchema: Record<string, unknown>) =>
+  ({
+    content: {
+      "application/json": {
+        schema: {
+          allOf: [
+            { $ref: "#/components/schemas/SuccessEnvelope" },
+            {
+              type: "object",
+              properties: {
+                data: dataSchema,
+              },
+            },
+          ],
+        },
+      },
+    },
+  }) as const;
+
+const passwordListResponses = {
+  ...readResponses,
+  "200": {
+    description: "Lista de senhas sem campos secretos",
+    ...successJsonWithData({
+      type: "array",
+      items: { $ref: "#/components/schemas/PessoalPasswordListItem" },
+    }),
+  },
+} as const;
+
+const passwordDetailResponses = {
+  ...readResponses,
+  "200": {
+    description: "Detalhe de senha com campos secretos descriptografados",
+    ...successJsonWithData({ $ref: "#/components/schemas/PessoalPasswordDetail" }),
+  },
+} as const;
+
+const passwordMutationResponses = {
+  ...mutationResponses,
+  "200": {
+    description: "Registro de senha sem campos secretos",
+    ...successJsonWithData({ $ref: "#/components/schemas/PessoalPasswordListItem" }),
+  },
+  "201": {
+    description: "Registro de senha criado sem campos secretos",
+    ...successJsonWithData({ $ref: "#/components/schemas/PessoalPasswordListItem" }),
+  },
+} as const;
+
 export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiDocument {
   return {
     openapi: "3.0.3",
@@ -78,6 +128,10 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
       { name: "Pessoal Unions", description: "Sindicatos" },
       { name: "Pessoal Payroll", description: "Configuracao de folha" },
       { name: "Pessoal Obligations", description: "Obrigacoes mensais" },
+      {
+        name: "Pessoal Passwords",
+        description: "Registros de senha com lista sem campos secretos",
+      },
     ],
     components: {
       securitySchemes: {
@@ -97,6 +151,35 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           type: "object",
           description: "Resposta de erro padrao do workspace",
           additionalProperties: true,
+        },
+        PessoalPasswordListItem: {
+          type: "object",
+          description: "Item de senha sem campos secretos.",
+          required: ["id", "client_id", "service_name", "responsavel_id"],
+          properties: {
+            id: { type: "string", format: "uuid" },
+            client_id: { type: "string", format: "uuid" },
+            service_name: { type: "string" },
+            responsavel_id: { type: "string", format: "uuid", nullable: true },
+            responsavel: { type: "object", nullable: true, additionalProperties: true },
+          },
+        },
+        PessoalPasswordDetail: {
+          allOf: [
+            { $ref: "#/components/schemas/PessoalPasswordListItem" },
+            {
+              type: "object",
+              description: "Detalhe de senha com campos secretos descriptografados.",
+              properties: {
+                login_main: { type: "string", nullable: true },
+                senha_main: { type: "string", nullable: true },
+                login_secondary: { type: "string", nullable: true },
+                senha_secondary: { type: "string", nullable: true },
+                notes: { type: "string", nullable: true },
+                organization_id: { type: "string", format: "uuid" },
+              },
+            },
+          ],
         },
       },
     },
@@ -304,6 +387,64 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
             },
           ],
           responses: mutationResponses,
+        },
+      },
+      "/pessoal/passwords": {
+        get: {
+          tags: ["Pessoal Passwords"],
+          security: bearerSecurity,
+          summary: "Listar senhas por cliente sem campos secretos",
+          operationId: "listPessoalPasswords",
+          parameters: [queryParam("client_id", "uuid")],
+          responses: passwordListResponses,
+        },
+        post: {
+          tags: ["Pessoal Passwords"],
+          security: bearerSecurity,
+          summary: "Criar registro de senha criptografado",
+          operationId: "createPessoalPassword",
+          requestBody: jsonRequestBody({
+            type: "object",
+            required: ["client_id", "service_name"],
+            properties: {
+              client_id: { type: "string", format: "uuid" },
+              service_name: { type: "string" },
+              login_main: { type: "string", nullable: true },
+              senha_main: { type: "string", nullable: true },
+              login_secondary: { type: "string", nullable: true },
+              senha_secondary: { type: "string", nullable: true },
+              responsavel_id: { type: "string", format: "uuid", nullable: true },
+              notes: { type: "string", nullable: true },
+            },
+          }),
+          responses: passwordMutationResponses,
+        },
+      },
+      "/pessoal/passwords/{id}": {
+        get: {
+          tags: ["Pessoal Passwords"],
+          security: bearerSecurity,
+          summary: "Detalhar senha com campos secretos descriptografados",
+          operationId: "getPessoalPassword",
+          parameters: [idParam("id")],
+          responses: passwordDetailResponses,
+        },
+        patch: {
+          tags: ["Pessoal Passwords"],
+          security: bearerSecurity,
+          summary: "Atualizar registro de senha",
+          operationId: "updatePessoalPassword",
+          parameters: [idParam("id")],
+          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          responses: passwordMutationResponses,
+        },
+        delete: {
+          tags: ["Pessoal Passwords"],
+          security: bearerSecurity,
+          summary: "Remover registro de senha",
+          operationId: "deletePessoalPassword",
+          parameters: [idParam("id")],
+          responses: passwordMutationResponses,
         },
       },
     },
