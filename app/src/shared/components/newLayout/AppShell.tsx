@@ -676,6 +676,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <img
                         src={displayUserPhoto}
                         alt={`Foto de ${displayUserName}`}
+                        loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                         onError={() => setHasUserPhotoLoadError(true)}
                       />
