@@ -1,0 +1,9 @@
+## Docker
+Gerar: docker buildx build -t backend-cw .
+Gerar sem cache: docker build --no-cache -t backend-cw .
+Rodar: docker run -p 3000:3000 backend-cw
+
+
+## .env
+DATABASE_URL="postgresql://postgres:password@localhost:port/bd?schema=public"
+JWT_SECRET=
