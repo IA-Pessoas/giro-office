@@ -30,6 +30,8 @@ Definicao e defaults em [`src/config/env.ts`](src/config/env.ts):
 - URL upstream: `REGULARIZE_SERVICE_URL` (ex.: `http://localhost:3039`)
 - Prefixo publico: `/regularize`
 - Endpoints internos `/internal/*` nao devem ser expostos via gateway
+- O gateway exige modulo `regularize` para leitura, permissao `2` para mutacoes e permissao
+  `2` para endpoints de detalhe/revelacao de credenciais.
 
 Exemplos de paths publicos:
 
@@ -45,6 +47,14 @@ Exemplos de paths publicos:
 - `/regularize/licenses`
 
 Infraestrutura direto no servico: `GET /health` e, quando habilitado, `GET /docs`.
+
+## Seguranca de credenciais
+
+- Listagens de senhas e sites base nao retornam `password` em claro.
+- Senhas de cliente retornam `login` e `password` apenas no detalhe autorizado (`GET /regularize/password`).
+- Sites base retornam `password` apenas no detalhe autorizado (`GET /regularize/sites-pass-detail`).
+- Novas senhas de sites base sao persistidas criptografadas com `MTK_ENCRYPTION_KEY`.
+- Logs de atualizacao redigem campos sensiveis como `login`, `password` e `user`.
 
 ## Rotas internas
 
@@ -82,4 +92,4 @@ Cobertura do manifesto smoke:
 pnpm smoke:coverage
 ```
 
-As operacoes OpenAPI do regularize estao no manifesto smoke, mas as probes runtime nao-health ficam desabilitadas por default ate existirem handlers com fixtures. Para habilitar uma execucao runtime dessas probes, configure `REGULARIZE_SMOKE_ENABLED=true`.
+As operacoes OpenAPI do regularize estao no manifesto smoke. As probes runtime nao-health continuam gated ate existirem fixtures confiaveis. Para habilitar uma execucao runtime dessas probes, configure `REGULARIZE_SMOKE_ENABLED=true`.

@@ -8,11 +8,67 @@ interface RegularizeServiceOpenApiEnv {
   port: number;
 }
 
-function successEnvelopeContent() {
+function schemaRef(name: string): Record<string, unknown> {
+  return { $ref: `#/components/schemas/${name}` };
+}
+
+function arrayOf(items: Record<string, unknown>): Record<string, unknown> {
+  return { type: "array", items };
+}
+
+function successEnvelopeContent(dataSchema: Record<string, unknown> = {}) {
   return {
     content: {
       "application/json": {
-        schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+        schema: {
+          allOf: [
+            schemaRef("SuccessEnvelope"),
+            {
+              type: "object",
+              properties: {
+                data: dataSchema,
+              },
+            },
+          ],
+        },
+      },
+    },
+  };
+}
+
+function errorEnvelopeContent() {
+  return {
+    content: {
+      "application/json": {
+        schema: schemaRef("ErrorEnvelope"),
+      },
+    },
+  };
+}
+
+function errorResponse(description: string) {
+  return {
+    description,
+    ...errorEnvelopeContent(),
+  };
+}
+
+function credentialErrorResponses() {
+  return {
+    "400": errorResponse("Requisicao invalida"),
+    "401": errorResponse("Nao autenticado"),
+    "403": errorResponse("Acesso negado"),
+    "404": errorResponse("Recurso nao encontrado"),
+    "409": errorResponse("Conflito de credencial"),
+  };
+}
+
+function jsonRequestBody(schemaName: string) {
+  return {
+    required: true,
+    content: {
+      "application/json": {
+        schema: schemaRef(schemaName),
       },
     },
   };
@@ -60,7 +116,143 @@ export function buildRegularizeServiceOpenApiSpec(
         SuccessEnvelope: {
           type: "object",
           description: "Resposta de sucesso padrao do workspace",
-          additionalProperties: true,
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean", enum: [true] },
+            data: {},
+          },
+          additionalProperties: false,
+        },
+        ErrorEnvelope: {
+          type: "object",
+          description: "Resposta de erro padrao do workspace",
+          required: ["success", "error", "code"],
+          properties: {
+            success: { type: "boolean", enum: [false] },
+            error: { type: "string" },
+            code: { type: "string" },
+            requestId: { type: "string" },
+          },
+          additionalProperties: false,
+        },
+        Uuid: {
+          type: "string",
+          format: "uuid",
+        },
+        PasswordListItem: {
+          type: "object",
+          description: "Senha de cliente sem login ou senha em claro.",
+          required: ["id", "site_id", "site"],
+          properties: {
+            id: schemaRef("Uuid"),
+            site_id: schemaRef("Uuid"),
+            notes: { type: "string", nullable: true },
+            site: {
+              type: "object",
+              required: ["name", "link", "sphere"],
+              properties: {
+                name: { type: "string" },
+                link: { type: "string", nullable: true },
+                sphere: { type: "string" },
+              },
+              additionalProperties: false,
+            },
+          },
+          additionalProperties: false,
+        },
+        PasswordDetail: {
+          type: "object",
+          description: "Detalhe autorizado de senha de cliente.",
+          required: ["id", "client_id", "site_id", "login", "password"],
+          properties: {
+            id: schemaRef("Uuid"),
+            client_id: schemaRef("Uuid"),
+            site_id: schemaRef("Uuid"),
+            login: { type: "string" },
+            password: { type: "string" },
+            notes: { type: "string", nullable: true },
+          },
+          additionalProperties: false,
+        },
+        CreatePasswordBody: {
+          type: "object",
+          required: ["client_id", "site_id", "login", "password"],
+          properties: {
+            client_id: schemaRef("Uuid"),
+            site_id: schemaRef("Uuid"),
+            login: { type: "string", minLength: 1 },
+            password: { type: "string", minLength: 1 },
+            notes: { type: "string", nullable: true },
+          },
+          additionalProperties: false,
+        },
+        UpdatePasswordBody: {
+          type: "object",
+          required: ["id", "client_id", "site_id", "login", "password"],
+          properties: {
+            id: schemaRef("Uuid"),
+            client_id: schemaRef("Uuid"),
+            site_id: schemaRef("Uuid"),
+            login: { type: "string", minLength: 1 },
+            password: { type: "string", minLength: 1 },
+            notes: { type: "string", nullable: true },
+          },
+          additionalProperties: false,
+        },
+        SitePasswordListItem: {
+          type: "object",
+          description: "Site base sem senha em claro.",
+          required: ["id", "name", "sphere", "user", "status"],
+          properties: {
+            id: schemaRef("Uuid"),
+            name: { type: "string" },
+            sphere: { type: "string" },
+            link: { type: "string", nullable: true },
+            user: { type: "string" },
+            status: { type: "boolean" },
+          },
+          additionalProperties: false,
+        },
+        SitePasswordDetail: {
+          type: "object",
+          description: "Detalhe autorizado de site base com senha revelada.",
+          required: ["id", "name", "sphere", "user", "password", "status"],
+          properties: {
+            id: schemaRef("Uuid"),
+            name: { type: "string" },
+            sphere: { type: "string" },
+            link: { type: "string", nullable: true },
+            user: { type: "string" },
+            password: { type: "string" },
+            status: { type: "boolean" },
+          },
+          additionalProperties: false,
+        },
+        CreateSitePasswordBody: {
+          type: "object",
+          required: ["name", "sphere", "user", "password"],
+          properties: {
+            name: { type: "string", minLength: 1 },
+            sphere: { type: "string", minLength: 1 },
+            link: { type: "string", format: "uri", nullable: true },
+            user: { type: "string", minLength: 1 },
+            password: { type: "string", minLength: 1 },
+          },
+          additionalProperties: false,
+        },
+        UpdateSitePasswordBody: {
+          type: "object",
+          required: ["id", "name", "sphere", "user", "password", "status"],
+          properties: {
+            id: schemaRef("Uuid"),
+            name: { type: "string", minLength: 1 },
+            sphere: { type: "string", minLength: 1 },
+            link: { type: "string", format: "uri", nullable: true },
+            user: { type: "string", minLength: 1 },
+            password: { type: "string", minLength: 1 },
+            status: { type: "boolean" },
+          },
+          additionalProperties: false,
         },
       },
     },
@@ -90,19 +282,39 @@ export function buildRegularizeServiceOpenApiSpec(
               schema: { type: "string", format: "uuid" },
             },
           ],
-          responses: { "200": { description: "Lista de senhas", ...successEnvelopeContent() } },
+          responses: {
+            "200": {
+              description: "Lista de senhas",
+              ...successEnvelopeContent(arrayOf(schemaRef("PasswordListItem"))),
+            },
+            ...credentialErrorResponses(),
+          },
         },
         post: {
           tags: ["Passwords"],
           summary: "Criar senha",
           security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Senha criada", ...successEnvelopeContent() } },
+          requestBody: jsonRequestBody("CreatePasswordBody"),
+          responses: {
+            "201": {
+              description: "Senha criada",
+              ...successEnvelopeContent(schemaRef("PasswordDetail")),
+            },
+            ...credentialErrorResponses(),
+          },
         },
         put: {
           tags: ["Passwords"],
           summary: "Atualizar senha",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Senha atualizada", ...successEnvelopeContent() } },
+          requestBody: jsonRequestBody("UpdatePasswordBody"),
+          responses: {
+            "200": {
+              description: "Senha atualizada",
+              ...successEnvelopeContent(schemaRef("PasswordDetail")),
+            },
+            ...credentialErrorResponses(),
+          },
         },
       },
       "/regularize/password": {
@@ -113,7 +325,13 @@ export function buildRegularizeServiceOpenApiSpec(
           parameters: [
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
-          responses: { "200": { description: "Detalhe da senha", ...successEnvelopeContent() } },
+          responses: {
+            "200": {
+              description: "Detalhe da senha",
+              ...successEnvelopeContent(schemaRef("PasswordDetail")),
+            },
+            ...credentialErrorResponses(),
+          },
         },
       },
       "/regularize/sites-pass": {
@@ -124,19 +342,39 @@ export function buildRegularizeServiceOpenApiSpec(
           parameters: [
             { name: "status", in: "query", required: true, schema: { type: "boolean" } },
           ],
-          responses: { "200": { description: "Lista de sites", ...successEnvelopeContent() } },
+          responses: {
+            "200": {
+              description: "Lista de sites",
+              ...successEnvelopeContent(arrayOf(schemaRef("SitePasswordListItem"))),
+            },
+            ...credentialErrorResponses(),
+          },
         },
         post: {
           tags: ["Sites"],
           summary: "Criar site base",
           security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Site criado", ...successEnvelopeContent() } },
+          requestBody: jsonRequestBody("CreateSitePasswordBody"),
+          responses: {
+            "201": {
+              description: "Site criado",
+              ...successEnvelopeContent(schemaRef("SitePasswordListItem")),
+            },
+            ...credentialErrorResponses(),
+          },
         },
         put: {
           tags: ["Sites"],
           summary: "Atualizar site base",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Site atualizado", ...successEnvelopeContent() } },
+          requestBody: jsonRequestBody("UpdateSitePasswordBody"),
+          responses: {
+            "200": {
+              description: "Site atualizado",
+              ...successEnvelopeContent(schemaRef("SitePasswordListItem")),
+            },
+            ...credentialErrorResponses(),
+          },
         },
       },
       "/regularize/sites-pass-detail": {
@@ -147,7 +385,13 @@ export function buildRegularizeServiceOpenApiSpec(
           parameters: [
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
-          responses: { "200": { description: "Detalhe do site", ...successEnvelopeContent() } },
+          responses: {
+            "200": {
+              description: "Detalhe do site",
+              ...successEnvelopeContent(schemaRef("SitePasswordDetail")),
+            },
+            ...credentialErrorResponses(),
+          },
         },
       },
       "/regularize/pf": {
