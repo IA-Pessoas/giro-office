@@ -42,7 +42,7 @@ router.post(
 
       res.status(201).json(createSuccessResponse(result));
     } catch (err) {
-      logError("Erro ao criar vÃ­nculo integraÃ§Ã£o Regularize", { err });
+      logError("Erro ao criar vínculo integração Regularize", { err });
       next(err);
     }
   },
@@ -57,7 +57,7 @@ router.delete(
       const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
 
       if (typeof integration_id !== "string" || !integration_id) {
-        throw new ServiceError(400, "integration_id Ã© obrigatÃ³rio.");
+        throw new ServiceError(400, "integration_id é obrigatório.");
       }
 
       const result = await taskIntegrationRegularizeService.removeLink({
@@ -68,7 +68,7 @@ router.delete(
 
       res.json(createSuccessResponse(result));
     } catch (err) {
-      logError("Erro ao remover vÃ­nculo integraÃ§Ã£o Regularize", { err });
+      logError("Erro ao remover vínculo integração Regularize", { err });
       next(err);
     }
   },
@@ -85,7 +85,7 @@ router.get(
       const result = await taskIntegrationRegularizeService.list(organization_id, task_model_id);
       res.json(createSuccessResponse(result));
     } catch (err) {
-      logError("Erro ao listar vÃ­nculos integraÃ§Ã£o Regularize", { err });
+      logError("Erro ao listar vínculos integração Regularize", { err });
       next(err);
     }
   },
