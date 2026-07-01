@@ -22,6 +22,8 @@ function setGatewayEnv(overrides: NodeJS.ProcessEnv) {
   process.env.CERTIFICATE_SERVICE_INTERNAL_TOKEN =
     "secure-certificate-service-token-with-at-least-32-chars";
   process.env.GATEWAY_ALLOWED_ORIGINS = "https://app.example.com";
+  delete process.env.GATEWAY_PUBLIC_URL;
+  delete process.env.GATEWAY_JSON_BODY_LIMIT;
   Object.assign(process.env, overrides);
 }
 
