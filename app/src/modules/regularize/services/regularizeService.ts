@@ -1,10 +1,18 @@
 import { setupAPIClient } from "@shared/services/api";
 
 import type {
+  AddRegularizeGuidanceActivityPayload,
+  AddRegularizeGuidancePartnerPayload,
   CreateRegularizeClientPfPayload,
+  CreateRegularizeGuidancePayload,
+  CreateRegularizeLicensePayload,
+  CreateRegularizeMunicipalTaxPayload,
   CreateRegularizePartnerPayload,
   CreateRegularizePasswordPayload,
+  CreateRegularizeProcessPayload,
   CreateRegularizeSitePasswordPayload,
+  RemoveRegularizeGuidanceActivityPayload,
+  RemoveRegularizeGuidancePartnerPayload,
   RegularizeClientPfDetail,
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
@@ -29,8 +37,12 @@ import type {
   RegularizeSitePasswordListFilters,
   RegularizeSitePasswordListItem,
   UpdateRegularizeClientPfPayload,
+  UpdateRegularizeGuidancePayload,
+  UpdateRegularizeLicensePayload,
+  UpdateRegularizeMunicipalTaxPayload,
   UpdateRegularizePartnerPayload,
   UpdateRegularizePasswordPayload,
+  UpdateRegularizeProcessPayload,
   UpdateRegularizeSitePasswordPayload,
 } from "../types";
 import {
@@ -229,6 +241,24 @@ export const regularizeService = {
     return unwrapRegularizeEntity<RegularizeMunicipalTaxesDetail>(response.data);
   },
 
+  async createMunicipalTax(
+    payload: CreateRegularizeMunicipalTaxPayload,
+  ): Promise<RegularizeMunicipalTaxesDetail> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.municipalTaxes, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeMunicipalTaxesDetail>(response.data);
+  },
+
+  async updateMunicipalTax(
+    payload: UpdateRegularizeMunicipalTaxPayload,
+  ): Promise<RegularizeMunicipalTaxesDetail> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.municipalTaxes, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeMunicipalTaxesDetail>(response.data);
+  },
+
   async listProcesses(
     filters: RegularizeProcessListFilters,
   ): Promise<RegularizeProcessListItem[]> {
@@ -249,6 +279,24 @@ export const regularizeService = {
     return unwrapRegularizeEntity<RegularizeProcessDetail>(response.data);
   },
 
+  async createProcess(
+    payload: CreateRegularizeProcessPayload,
+  ): Promise<RegularizeProcessDetail> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.process, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeProcessDetail>(response.data);
+  },
+
+  async updateProcess(
+    payload: UpdateRegularizeProcessPayload,
+  ): Promise<RegularizeProcessDetail> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.process, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeProcessDetail>(response.data);
+  },
+
   async listGuidance(filters: RegularizeGuidanceListFilters): Promise<RegularizeGuidance[]> {
     const api = setupAPIClient();
     const response = await api.get(REGULARIZE_ENDPOINTS.guidanceList, {
@@ -265,6 +313,61 @@ export const regularizeService = {
     });
 
     return unwrapRegularizeEntity<RegularizeGuidance>(response.data);
+  },
+
+  async createGuidance(payload: CreateRegularizeGuidancePayload): Promise<RegularizeGuidance> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.guidance, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
+  },
+
+  async updateGuidance(payload: UpdateRegularizeGuidancePayload): Promise<RegularizeGuidance> {
+    const api = setupAPIClient();
+    const { process_id: _processId, ...body } = payload;
+    const response = await api.put(REGULARIZE_ENDPOINTS.guidance, body);
+
+    return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
+  },
+
+  async addGuidanceActivity(
+    payload: AddRegularizeGuidanceActivityPayload,
+  ): Promise<RegularizeGuidance> {
+    const api = setupAPIClient();
+    const { process_id: _processId, ...body } = payload;
+    const response = await api.post(REGULARIZE_ENDPOINTS.guidanceActivityAdd, body);
+
+    return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
+  },
+
+  async removeGuidanceActivity(
+    payload: RemoveRegularizeGuidanceActivityPayload,
+  ): Promise<RegularizeGuidance> {
+    const api = setupAPIClient();
+    const { process_id: _processId, ...body } = payload;
+    const response = await api.post(REGULARIZE_ENDPOINTS.guidanceActivityRemove, body);
+
+    return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
+  },
+
+  async addGuidancePartner(
+    payload: AddRegularizeGuidancePartnerPayload,
+  ): Promise<RegularizeGuidance> {
+    const api = setupAPIClient();
+    const { process_id: _processId, ...body } = payload;
+    const response = await api.post(REGULARIZE_ENDPOINTS.guidancePartnerAdd, body);
+
+    return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
+  },
+
+  async removeGuidancePartner(
+    payload: RemoveRegularizeGuidancePartnerPayload,
+  ): Promise<RegularizeGuidance> {
+    const api = setupAPIClient();
+    const { process_id: _processId, ...body } = payload;
+    const response = await api.post(REGULARIZE_ENDPOINTS.guidancePartnerRemove, body);
+
+    return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
   },
 
   async listLicenses(
@@ -285,5 +388,19 @@ export const regularizeService = {
     });
 
     return unwrapRegularizeEntity<RegularizeLicenseDetail>(response.data);
+  },
+
+  async createLicense(payload: CreateRegularizeLicensePayload): Promise<RegularizeLicenseDetail> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.license, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeLicenseDetail>(response.data);
+  },
+
+  async updateLicense(payload: UpdateRegularizeLicensePayload): Promise<RegularizeLicenseDetail> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.license, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeLicenseDetail>(response.data);
   },
 };

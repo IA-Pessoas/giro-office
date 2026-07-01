@@ -22,10 +22,30 @@ export function trimRegularizeOptionalText(value: string): string | undefined {
   return trimmed || undefined;
 }
 
+export function trimRegularizeOptionalUuid(value: string): string | undefined {
+  return trimRegularizeOptionalText(value);
+}
+
 export function trimRegularizeNullableText(value: string): string | null {
   const trimmed = value.trim();
 
   return trimmed || null;
+}
+
+export function toRegularizeOptionalNumber(value: string): number | undefined {
+  if (!value.trim()) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+export function toRegularizeRequiredNumber(value: string): number {
+  const parsed = Number(value);
+
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 export function getRegularizeMutationErrorMessage(
