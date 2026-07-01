@@ -18,6 +18,10 @@ function normalizePermissionModules(value: unknown): Record<string, number | nul
   return modules;
 }
 
+function normalizeAuthUserType(value: unknown): "owner" | "admin" | "user" | undefined {
+  return value === "owner" || value === "admin" || value === "user" ? value : undefined;
+}
+
 /**
  * Extrai e normaliza os claims do payload JWT para AuthIdentity.
  * Aceita user_id ou sub (padrão JWT) como identificador do usuário.
@@ -41,6 +45,7 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
       typeof payload.organization_id === "string" ? payload.organization_id : undefined,
     permission: typeof payload.permission === "number" ? payload.permission : undefined,
     modules: normalizePermissionModules(payload.modules),
+    type: normalizeAuthUserType(payload.type),
     name: typeof payload.name === "string" ? payload.name : undefined,
     login: typeof payload.login === "string" ? payload.login : undefined,
   };

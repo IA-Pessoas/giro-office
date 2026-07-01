@@ -59,6 +59,33 @@ describe("user routes", () => {
     });
   });
 
+  it("GET /user permite admin RH com modules.rh = 2", async () => {
+    userServiceMock.list.mockResolvedValue([{ id: "user-1" }]);
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/user")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }));
+
+    expect(res.status).toBe(200);
+    expect(userServiceMock.list).toHaveBeenCalledWith({
+      skip: 0,
+      take: 20,
+      organizationId: "a0000000-0000-4000-8000-000000000001",
+    });
+  });
+
+  it("GET /user bloqueia admin de outro modulo", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/user")
+      .set(gatewayAuthHeaders({ permission: 2, type: "admin", modules: { comercial: 2 } }));
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.list).not.toHaveBeenCalled();
+  });
+
   it("GET /user/:id retorna detalhe", async () => {
     userServiceMock.getById.mockResolvedValue({ id: "user-2" });
     const app = createTestApp();
@@ -94,6 +121,53 @@ describe("user routes", () => {
       organization_id: "a0000000-0000-4000-8000-000000000001",
       first_owner_flag: false,
     });
+  });
+
+  it("POST /user rejeita owner quando solicitante nao e owner", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user")
+      .set(gatewayAuthHeaders({ permission: 2, type: "admin", modules: { rh: 2 } }))
+      .send({
+        name: "Owner Indevido",
+        login: "owner.indevido",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 2,
+        type: "owner",
+        first_owner_flag: true,
+      });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /user permite owner quando solicitante ja e owner", async () => {
+    userServiceMock.create.mockResolvedValue({ id: "owner-2" });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user")
+      .set(gatewayAuthHeaders({ permission: 1, type: "owner" }))
+      .send({
+        name: "Novo Owner",
+        login: "novo.owner",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 2,
+        type: "owner",
+        first_owner_flag: true,
+      });
+
+    expect(res.status).toBe(201);
+    expect(userServiceMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "owner",
+        first_owner_flag: true,
+        organization_id: "a0000000-0000-4000-8000-000000000001",
+      }),
+    );
   });
 
   it("POST /user rejeita organization_id diferente da organizacao autenticada", async () => {
@@ -147,6 +221,21 @@ describe("user routes", () => {
       },
       "a0000000-0000-4000-8000-000000000001",
     );
+  });
+
+  it("PATCH /user/:id rejeita promocao para owner quando solicitante nao e owner", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-3")
+      .set(gatewayAuthHeaders({ permission: 2, type: "admin", modules: { rh: 2 } }))
+      .send({
+        type: "owner",
+        first_owner_flag: true,
+      });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
   it("PATCH /user/:id rejeita permissao de modulo TI fora do intervalo permitido", async () => {

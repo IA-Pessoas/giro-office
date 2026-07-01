@@ -1,8 +1,10 @@
 import { Readable } from "node:stream";
 
 import {
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
@@ -103,6 +105,8 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     FORWARDED_AUTH_USER_ID_HEADER,
     FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
     FORWARDED_AUTH_PERMISSION_HEADER,
+    FORWARDED_AUTH_TYPE_HEADER,
+    FORWARDED_AUTH_MODULES_HEADER,
   ]);
 
   Object.entries(request.headers).forEach(([key, value]) => {
@@ -142,6 +146,15 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
 
     if (typeof forwardedPermission === "number") {
       headers.set(FORWARDED_AUTH_PERMISSION_HEADER, String(forwardedPermission));
+    }
+
+    const authType = request.auth.claims.type;
+    if (typeof authType === "string") {
+      headers.set(FORWARDED_AUTH_TYPE_HEADER, authType);
+    }
+
+    if (modules) {
+      headers.set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify(modules));
     }
   }
 

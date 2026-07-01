@@ -1,6 +1,7 @@
 import type { AuthPolicy } from "@workspace/shared";
 
-const adminPolicy: AuthPolicy = { minPermission: 2 };
+const userManagementPolicy: AuthPolicy = { special: "manageUsers" };
+const ownerOnlyPolicy: AuthPolicy = { special: "ownerOnly" };
 const moduleAccessPermission = 1;
 
 const rhModulePolicy: AuthPolicy = {
@@ -29,8 +30,8 @@ const clientModulePolicy: AuthPolicy = {
 };
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
-  ["GET /user", adminPolicy],
-  ["POST /user", adminPolicy],
+  ["GET /user", userManagementPolicy],
+  ["POST /user", userManagementPolicy],
 ]);
 
 const routePolicyMatchers: Array<{
@@ -40,14 +41,26 @@ const routePolicyMatchers: Array<{
 }> = [
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
-  { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: adminPolicy },
-  { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: adminPolicy },
-  { method: "GET", path: /^\/user\/(?!me$|session$|start-config$)[^/]+$/, policy: adminPolicy },
-  { method: "PATCH", path: /^\/user\/(?!me$|session$|start-config$)[^/]+$/, policy: adminPolicy },
-  { method: "DELETE", path: /^\/user\/(?!me$|session$|start-config$)[^/]+$/, policy: adminPolicy },
-  { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: adminPolicy },
-  { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: adminPolicy },
-  { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: adminPolicy },
+  { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: ownerOnlyPolicy },
+  { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: ownerOnlyPolicy },
+  {
+    method: "GET",
+    path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
+    policy: userManagementPolicy,
+  },
+  {
+    method: "PATCH",
+    path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
+    policy: userManagementPolicy,
+  },
+  {
+    method: "DELETE",
+    path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
+    policy: userManagementPolicy,
+  },
+  { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
 ];
 
 export function getRoutePolicy(method: string, path: string): AuthPolicy | null {

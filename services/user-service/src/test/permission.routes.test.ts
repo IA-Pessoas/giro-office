@@ -66,6 +66,18 @@ describe("permission routes", () => {
     );
   });
 
+  it("PUT /user/permission/:userId bloqueia admin RH porque permissao ampla e owner-only", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/user/permission/user-1")
+      .set(gatewayAuthHeaders({ permission: 2, type: "admin", modules: { rh: 2 } }))
+      .send({ rh: 2 });
+
+    expect(res.status).toBe(403);
+    expect(permissionServiceMock.update).not.toHaveBeenCalled();
+  });
+
   it("bloqueia consulta e atualizacao de permissoes para nao-admin", async () => {
     const app = createTestApp();
     const headers = gatewayAuthHeaders({ permission: 1 });

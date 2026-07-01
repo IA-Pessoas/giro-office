@@ -5,8 +5,10 @@ import { Writable } from "node:stream";
 import type { CreateAuditRequestPayload } from "@workspace/shared";
 import {
   createLogger,
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
@@ -189,6 +191,7 @@ function createToken(
     user_id: string;
     organization_id: string;
     permission: number;
+    type?: "owner" | "admin" | "user";
     modules?: Record<string, number | null>;
   },
   secret = "test-secret",
@@ -285,6 +288,110 @@ it("requires admin permission for user-management routes", async () => {
   }
 });
 
+it("allows RH module admins to proxy user management routes", async () => {
+  let seenRequest = false;
+  const upstream = createServer((_request, response) => {
+    seenRequest = true;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { users: [] } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "rh-admin-1",
+    organization_id: "org-1",
+    permission: 1,
+    type: "admin",
+    modules: { rh: 2 },
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenRequest).toBe(true);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("blocks non-RH module admins from user management routes", async () => {
+  let seenRequest = false;
+  const upstream = createServer((_request, response) => {
+    seenRequest = true;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { users: [] } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "comercial-admin-1",
+    organization_id: "org-1",
+    permission: 2,
+    type: "admin",
+    modules: { comercial: 2 },
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(403);
+    expect(seenRequest).toBe(false);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("keeps permission update routes owner-only", async () => {
+  let seenRequest = false;
+  const upstream = createServer((_request, response) => {
+    seenRequest = true;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: {} }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "rh-admin-1",
+    organization_id: "org-1",
+    permission: 2,
+    type: "admin",
+    modules: { rh: 2 },
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/permission/user-1`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ rh: 2 }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(seenRequest).toBe(false);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("returns shared forbidden response when permission update is attempted without admin permission", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
@@ -323,12 +430,16 @@ it("strips client-supplied internal auth headers before proxying", async () => {
     user_id: "user-1",
     organization_id: "org-1",
     permission: 2,
+    type: "owner",
+    modules: { rh: 2 },
   });
   let seenHeaders: {
     internalToken?: string;
     userId?: string;
     organizationId?: string;
     permission?: string;
+    type?: string;
+    modules?: string;
   } = {};
 
   const upstream = createServer((request, response) => {
@@ -337,6 +448,8 @@ it("strips client-supplied internal auth headers before proxying", async () => {
       userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
       organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined,
       permission: request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined,
+      type: request.headers[FORWARDED_AUTH_TYPE_HEADER] as string | undefined,
+      modules: request.headers[FORWARDED_AUTH_MODULES_HEADER] as string | undefined,
     };
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
@@ -356,6 +469,8 @@ it("strips client-supplied internal auth headers before proxying", async () => {
         [FORWARDED_AUTH_USER_ID_HEADER]: "attacker-user",
         [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "attacker-org",
         [FORWARDED_AUTH_PERMISSION_HEADER]: "999",
+        [FORWARDED_AUTH_TYPE_HEADER]: "attacker-type",
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ rh: 0 }),
       },
     });
 
@@ -364,6 +479,8 @@ it("strips client-supplied internal auth headers before proxying", async () => {
     expect(seenHeaders.userId).toBe("user-1");
     expect(seenHeaders.organizationId).toBe("org-1");
     expect(seenHeaders.permission).toBe("2");
+    expect(seenHeaders.type).toBe("owner");
+    expect(seenHeaders.modules).toBe(JSON.stringify({ rh: 2 }));
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
