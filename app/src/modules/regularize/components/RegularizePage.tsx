@@ -16,6 +16,7 @@ import {
   Plus,
   RefreshCw,
   ShieldCheck,
+  Trash2,
   UserRound,
   UsersRound,
   XCircle,
@@ -28,8 +29,14 @@ import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBa
 import { cn } from "@shared/ui/newLayout/utils";
 
 import { RegularizeClientPfForm } from "./RegularizeClientPfForm";
+import { RegularizeGuidanceActivityForm } from "./RegularizeGuidanceActivityForm";
+import { RegularizeGuidanceForm } from "./RegularizeGuidanceForm";
+import { RegularizeGuidancePartnerForm } from "./RegularizeGuidancePartnerForm";
+import { RegularizeLicenseForm } from "./RegularizeLicenseForm";
+import { RegularizeMunicipalTaxesForm } from "./RegularizeMunicipalTaxesForm";
 import { RegularizePartnerForm } from "./RegularizePartnerForm";
 import { RegularizePasswordForm } from "./RegularizePasswordForm";
+import { RegularizeProcessForm } from "./RegularizeProcessForm";
 import { RegularizeSitePasswordForm } from "./RegularizeSitePasswordForm";
 import {
   useCreateRegularizePasswordMutation,
@@ -51,20 +58,44 @@ import {
   useUpdateRegularizePartnerMutation,
 } from "../hooks/useRegularizePeople";
 import {
+  useAddRegularizeGuidanceActivityMutation,
+  useAddRegularizeGuidancePartnerMutation,
+  useCreateRegularizeGuidanceMutation,
+  useCreateRegularizeLicenseMutation,
+  useCreateRegularizeMunicipalTaxMutation,
+  useCreateRegularizeProcessMutation,
   useRegularizeGuidance,
+  useRegularizeLicenseDetail,
   useRegularizeLicenses,
+  useRegularizeMunicipalTaxDetail,
   useRegularizeMunicipalTaxes,
   useRegularizeProcessDetail,
   useRegularizeProcesses,
+  useRemoveRegularizeGuidanceActivityMutation,
+  useRemoveRegularizeGuidancePartnerMutation,
+  useUpdateRegularizeGuidanceMutation,
+  useUpdateRegularizeLicenseMutation,
+  useUpdateRegularizeMunicipalTaxMutation,
+  useUpdateRegularizeProcessMutation,
 } from "../hooks/useRegularizeOperations";
 import type {
+  AddRegularizeGuidanceActivityPayload,
+  AddRegularizeGuidancePartnerPayload,
   CreateRegularizeClientPfPayload,
+  CreateRegularizeGuidancePayload,
+  CreateRegularizeLicensePayload,
+  CreateRegularizeMunicipalTaxPayload,
   CreateRegularizePartnerPayload,
   CreateRegularizePasswordPayload,
+  CreateRegularizeProcessPayload,
   CreateRegularizeSitePasswordPayload,
   RegularizeCapability,
   RegularizeClientPfListItem,
+  RegularizeGuidance,
+  RegularizeGuidanceEconomicActivity,
+  RegularizeGuidancePartner,
   RegularizeId,
+  RegularizeLicenseListItem,
   RegularizeMunicipalTaxesClientSummary,
   RegularizePartner,
   RegularizePasswordListItem,
@@ -72,8 +103,12 @@ import type {
   RegularizeSitePasswordListItem,
   RegularizeStatus,
   UpdateRegularizeClientPfPayload,
+  UpdateRegularizeGuidancePayload,
+  UpdateRegularizeLicensePayload,
+  UpdateRegularizeMunicipalTaxPayload,
   UpdateRegularizePartnerPayload,
   UpdateRegularizePasswordPayload,
+  UpdateRegularizeProcessPayload,
   UpdateRegularizeSitePasswordPayload,
 } from "../types";
 import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
@@ -99,7 +134,7 @@ type RegularizeTab = {
   icon: LucideIcon;
 };
 
-type RegularizeCoreFormState =
+type RegularizeFormState =
   | { type: "client-pf"; mode: "create" }
   | { type: "client-pf"; mode: "edit"; id: RegularizeId }
   | { type: "partner"; mode: "create" }
@@ -107,7 +142,17 @@ type RegularizeCoreFormState =
   | { type: "password"; mode: "create" }
   | { type: "password"; mode: "edit"; id: RegularizeId }
   | { type: "site-password"; mode: "create" }
-  | { type: "site-password"; mode: "edit"; id: RegularizeId };
+  | { type: "site-password"; mode: "edit"; id: RegularizeId }
+  | { type: "municipal-tax"; mode: "create"; clientId?: RegularizeId }
+  | { type: "municipal-tax"; mode: "edit"; id: RegularizeId; clientId?: RegularizeId }
+  | { type: "process"; mode: "create" }
+  | { type: "process"; mode: "edit"; id: RegularizeId }
+  | { type: "guidance"; mode: "create"; processId: RegularizeId }
+  | { type: "guidance"; mode: "edit"; guidance: RegularizeGuidance }
+  | { type: "guidance-activity"; guidanceId: RegularizeId; processId: RegularizeId }
+  | { type: "guidance-partner"; guidanceId: RegularizeId; processId: RegularizeId }
+  | { type: "license"; mode: "create" }
+  | { type: "license"; mode: "edit"; id: RegularizeId };
 
 type ListQuery<T> = Pick<
   UseQueryResult<T[], Error>,
@@ -185,6 +230,21 @@ function formatDate(value: string | null | undefined): string {
 
 function getProcessClientName(item: RegularizeProcessListItem): string {
   return item.clientPJ?.name ?? item.clientPF?.name ?? item.cpf_cnpj ?? "-";
+}
+
+function getMunicipalTaxId(item: RegularizeMunicipalTaxesClientSummary): RegularizeId | undefined {
+  return item.municipalTaxes?.[0]?.id;
+}
+
+function getGuidanceTitle(item: RegularizeGuidance): string {
+  return formatText(item.type ?? item.request ?? item.status, "Orientação");
+}
+
+function getGuidanceDescription(item: RegularizeGuidance): string {
+  return formatText(
+    item.description ?? item.framework_obs ?? item.comporate_purpose,
+    "Sem descrição.",
+  );
 }
 
 function hasCredentialRevealCapability(capabilities: RegularizeCapability[]): boolean {
@@ -544,7 +604,7 @@ export function RegularizePage() {
   const [selectedProcessId, setSelectedProcessId] = useState<RegularizeId>();
   const [activePasswordId, setActivePasswordId] = useState<RegularizeId>();
   const [activeSitePasswordId, setActiveSitePasswordId] = useState<RegularizeId>();
-  const [activeForm, setActiveForm] = useState<RegularizeCoreFormState | null>(null);
+  const [activeForm, setActiveForm] = useState<RegularizeFormState | null>(null);
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const canRevealCredentials = hasCredentialRevealCapability(REGULARIZE_CAPABILITIES);
@@ -565,6 +625,18 @@ export function RegularizePage() {
   const updateClientPfMutation = useUpdateRegularizeClientPfMutation();
   const createPartnerMutation = useCreateRegularizePartnerMutation();
   const updatePartnerMutation = useUpdateRegularizePartnerMutation();
+  const createMunicipalTaxMutation = useCreateRegularizeMunicipalTaxMutation();
+  const updateMunicipalTaxMutation = useUpdateRegularizeMunicipalTaxMutation();
+  const createProcessMutation = useCreateRegularizeProcessMutation();
+  const updateProcessMutation = useUpdateRegularizeProcessMutation();
+  const createGuidanceMutation = useCreateRegularizeGuidanceMutation();
+  const updateGuidanceMutation = useUpdateRegularizeGuidanceMutation();
+  const addGuidanceActivityMutation = useAddRegularizeGuidanceActivityMutation();
+  const removeGuidanceActivityMutation = useRemoveRegularizeGuidanceActivityMutation();
+  const addGuidancePartnerMutation = useAddRegularizeGuidancePartnerMutation();
+  const removeGuidancePartnerMutation = useRemoveRegularizeGuidancePartnerMutation();
+  const createLicenseMutation = useCreateRegularizeLicenseMutation();
+  const updateLicenseMutation = useUpdateRegularizeLicenseMutation();
 
   const firstCredentialClientId = clientQuery.data?.items[0]?.id;
   const firstClientPfId = pfQuery.data?.[0]?.id;
@@ -593,6 +665,16 @@ export function RegularizePage() {
   });
   const sitePasswordDetailQuery = useRegularizeSitePasswordDetail(activeSitePasswordId, {
     enabled: canRevealCredentials,
+  });
+  const activeMunicipalTaxId =
+    activeForm?.type === "municipal-tax" && activeForm.mode === "edit" ? activeForm.id : undefined;
+  const activeLicenseId =
+    activeForm?.type === "license" && activeForm.mode === "edit" ? activeForm.id : undefined;
+  const municipalTaxDetailQuery = useRegularizeMunicipalTaxDetail(activeMunicipalTaxId, {
+    enabled: activeForm?.type === "municipal-tax" && activeForm.mode === "edit",
+  });
+  const licenseDetailQuery = useRegularizeLicenseDetail(activeLicenseId, {
+    enabled: activeForm?.type === "license" && activeForm.mode === "edit",
   });
 
   useEffect(() => {
@@ -667,6 +749,36 @@ export function RegularizePage() {
     [siteQuery.data],
   );
 
+  const processOptions = useMemo<RegularizeFormOption[]>(
+    () =>
+      (processQuery.data ?? []).map((process) => ({
+        id: process.id,
+        label: process.process_type,
+        description: getProcessClientName(process),
+      })),
+    [processQuery.data],
+  );
+
+  const activeMunicipalTaxForForm =
+    activeForm?.type === "municipal-tax" && activeForm.mode === "edit"
+      ? municipalTaxDetailQuery.data ?? null
+      : null;
+  const activeMunicipalTaxDefaultClientId =
+    activeForm?.type === "municipal-tax" ? activeForm.clientId ?? clientOptions[0]?.id ?? "" : "";
+  const activeProcessForForm =
+    activeForm?.type === "process" && activeForm.mode === "edit"
+      ? processDetailQuery.data ?? null
+      : null;
+  const activeGuidanceForForm =
+    activeForm?.type === "guidance" && activeForm.mode === "edit" ? activeForm.guidance : null;
+  const activeGuidanceAction =
+    activeForm?.type === "guidance-activity" || activeForm?.type === "guidance-partner"
+      ? activeForm
+      : null;
+  const activeLicenseForForm =
+    activeForm?.type === "license" && activeForm.mode === "edit"
+      ? licenseDetailQuery.data ?? null
+      : null;
   const activeClientPfForForm =
     activeForm?.type === "client-pf" && activeForm.mode === "edit"
       ? clientPfDetailQuery.data ?? null
@@ -781,6 +893,173 @@ export function RegularizePage() {
       closeCoreForm();
     } catch (error) {
       const message = getRegularizeMutationErrorMessage(error, "Não foi possível salvar o sócio.");
+      toast.error(message);
+      throw new Error(message);
+    }
+  }
+
+  async function handleSubmitMunicipalTax(
+    payload: CreateRegularizeMunicipalTaxPayload | UpdateRegularizeMunicipalTaxPayload,
+  ) {
+    try {
+      if ("id" in payload) {
+        await updateMunicipalTaxMutation.mutateAsync(payload);
+        toast.success("Tributo atualizado com sucesso.");
+      } else {
+        await createMunicipalTaxMutation.mutateAsync(payload);
+        toast.success("Tributo criado com sucesso.");
+      }
+
+      closeCoreForm();
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(
+        error,
+        "Não foi possível salvar o tributo.",
+      );
+      toast.error(message);
+      throw new Error(message);
+    }
+  }
+
+  async function handleSubmitProcess(
+    payload: CreateRegularizeProcessPayload | UpdateRegularizeProcessPayload,
+  ) {
+    try {
+      const savedProcess =
+        "id" in payload
+          ? await updateProcessMutation.mutateAsync(payload)
+          : await createProcessMutation.mutateAsync(payload);
+
+      setSelectedProcessId(savedProcess.id);
+      toast.success("Processo salvo com sucesso.");
+      closeCoreForm();
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(
+        error,
+        "Não foi possível salvar o processo.",
+      );
+      toast.error(message);
+      throw new Error(message);
+    }
+  }
+
+  async function handleSubmitGuidance(
+    payload: CreateRegularizeGuidancePayload | UpdateRegularizeGuidancePayload,
+  ) {
+    try {
+      if ("id" in payload) {
+        await updateGuidanceMutation.mutateAsync(payload);
+        toast.success("Orientação atualizada com sucesso.");
+      } else {
+        await createGuidanceMutation.mutateAsync(payload);
+        toast.success("Orientação criada com sucesso.");
+      }
+
+      closeCoreForm();
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(
+        error,
+        "Não foi possível salvar a orientação.",
+      );
+      toast.error(message);
+      throw new Error(message);
+    }
+  }
+
+  async function handleSubmitGuidanceActivity(payload: AddRegularizeGuidanceActivityPayload) {
+    try {
+      await addGuidanceActivityMutation.mutateAsync(payload);
+      toast.success("Atividade adicionada com sucesso.");
+      closeCoreForm();
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(
+        error,
+        "Não foi possível adicionar a atividade.",
+      );
+      toast.error(message);
+      throw new Error(message);
+    }
+  }
+
+  async function handleRemoveGuidanceActivity(
+    guidanceId: RegularizeId,
+    processId: RegularizeId,
+    itemId: RegularizeId | undefined,
+  ) {
+    if (!itemId) {
+      toast.error("Atividade sem identificador para remoção.");
+      return;
+    }
+
+    try {
+      await removeGuidanceActivityMutation.mutateAsync({
+        guidance_id: guidanceId,
+        process_id: processId,
+        item_id: itemId,
+      });
+      toast.success("Atividade removida com sucesso.");
+    } catch (error) {
+      toast.error(
+        getRegularizeMutationErrorMessage(error, "Não foi possível remover a atividade."),
+      );
+    }
+  }
+
+  async function handleSubmitGuidancePartner(payload: AddRegularizeGuidancePartnerPayload) {
+    try {
+      await addGuidancePartnerMutation.mutateAsync(payload);
+      toast.success("Sócio adicionado com sucesso.");
+      closeCoreForm();
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(
+        error,
+        "Não foi possível adicionar o sócio.",
+      );
+      toast.error(message);
+      throw new Error(message);
+    }
+  }
+
+  async function handleRemoveGuidancePartner(
+    guidanceId: RegularizeId,
+    processId: RegularizeId,
+    itemId: RegularizeId | undefined,
+  ) {
+    if (!itemId) {
+      toast.error("Sócio sem identificador para remoção.");
+      return;
+    }
+
+    try {
+      await removeGuidancePartnerMutation.mutateAsync({
+        guidance_id: guidanceId,
+        process_id: processId,
+        item_id: itemId,
+      });
+      toast.success("Sócio removido com sucesso.");
+    } catch (error) {
+      toast.error(getRegularizeMutationErrorMessage(error, "Não foi possível remover o sócio."));
+    }
+  }
+
+  async function handleSubmitLicense(
+    payload: CreateRegularizeLicensePayload | UpdateRegularizeLicensePayload,
+  ) {
+    try {
+      if ("id" in payload) {
+        await updateLicenseMutation.mutateAsync(payload);
+        toast.success("Licença atualizada com sucesso.");
+      } else {
+        await createLicenseMutation.mutateAsync(payload);
+        toast.success("Licença criada com sucesso.");
+      }
+
+      closeCoreForm();
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(
+        error,
+        "Não foi possível salvar a licença.",
+      );
       toast.error(message);
       throw new Error(message);
     }
@@ -923,88 +1202,267 @@ export function RegularizePage() {
       ) : null}
 
       {activeTab === "processes" ? (
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">
-          <QueryStatePanel
-            query={processQuery}
-            emptyTitle="Nenhum processo encontrado."
-            emptyClassName="xl:col-span-2 min-h-[220px] items-center justify-center"
-          >
-            {(processRows) => (
-              <DataTable headers={["Processo", "Cliente", "Documento", "Status", ""]}>
-                {processRows.map((item) => (
-                  <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                    <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
-                    <td className="px-4 py-3">{getProcessClientName(item)}</td>
-                    <td className="px-4 py-3">{formatText(item.cpf_cnpj)}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedProcessId(item.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                        title="Ver detalhe"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </DataTable>
-            )}
-          </QueryStatePanel>
-
-          {hasProcessRows ? (
-            <DetailPanel title="Processo selecionado">
-            {processDetailQuery.isLoading ? (
-              <FieldLine label="Status" value="Carregando..." />
-            ) : processDetailQuery.data ? (
-              <>
-                <FieldLine label="Tipo" value={formatText(processDetailQuery.data.process_type)} />
-                <FieldLine
-                  label="Status"
-                  value={<StatusBadge config={getStatusBadgeConfig(processDetailQuery.data.status)} size="sm" />}
+        <section className="space-y-4">
+          <TabActionHeader
+            title="Processos"
+            description="Acompanhamento operacional dos processos do Regularize."
+            action={
+              canManageRegularizeCore ? (
+                <PrimaryActionButton
+                  icon={Plus}
+                  label="Novo processo"
+                  onClick={() => setActiveForm({ type: "process", mode: "create" })}
                 />
-                <FieldLine label="Entrada" value={formatDate(processDetailQuery.data.entry_date)} />
-                <FieldLine label="Previsto" value={formatDate(processDetailQuery.data.expected_date)} />
-                <FieldLine label="Urgência" value={formatText(processDetailQuery.data.urgency)} />
-              </>
-            ) : (
-              <FieldLine label="Status" value="Sem seleção." />
-            )}
-            <div className="pt-2">
-              <QueryStatePanel query={guidanceQuery} emptyTitle="Sem orientações.">
-                {(guidanceRows) => (
-                  <div className="space-y-2">
-                    {guidanceRows.map((item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-lg border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
-                      >
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {formatText(item.type, "Orientação")}
-                        </p>
-                        <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-slate-400">
-                          {formatText(item.description, "Sem descrição.")}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+              ) : null
+            }
+          />
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">
+            <QueryStatePanel
+              query={processQuery}
+              emptyTitle="Nenhum processo encontrado."
+              emptyClassName="xl:col-span-2 min-h-[220px] items-center justify-center"
+            >
+              {(processRows) => (
+                <DataTable headers={["Processo", "Cliente", "Documento", "Status", ""]}>
+                  {processRows.map((item) => (
+                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                      <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
+                      <td className="px-4 py-3">{getProcessClientName(item)}</td>
+                      <td className="px-4 py-3">{formatText(item.cpf_cnpj)}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <TableActionButton
+                            icon={Eye}
+                            title="Ver detalhe"
+                            onClick={() => setSelectedProcessId(item.id)}
+                          />
+                          {canManageRegularizeCore ? (
+                            <TableActionButton
+                              icon={Pencil}
+                              title="Editar processo"
+                              onClick={() => {
+                                setSelectedProcessId(item.id);
+                                setActiveForm({ type: "process", mode: "edit", id: item.id });
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </DataTable>
+              )}
+            </QueryStatePanel>
+
+            {hasProcessRows ? (
+              <DetailPanel title="Processo selecionado">
+                {processDetailQuery.isLoading ? (
+                  <FieldLine label="Status" value="Carregando..." />
+                ) : processDetailQuery.data ? (
+                  <>
+                    <FieldLine
+                      label="Tipo"
+                      value={formatText(processDetailQuery.data.process_type)}
+                    />
+                    <FieldLine
+                      label="Status"
+                      value={
+                        <StatusBadge
+                          config={getStatusBadgeConfig(processDetailQuery.data.status)}
+                          size="sm"
+                        />
+                      }
+                    />
+                    <FieldLine
+                      label="Entrada"
+                      value={formatDate(processDetailQuery.data.entry_date)}
+                    />
+                    <FieldLine
+                      label="Previsto"
+                      value={formatDate(processDetailQuery.data.expected_date)}
+                    />
+                    <FieldLine
+                      label="Urgência"
+                      value={formatText(processDetailQuery.data.urgency)}
+                    />
+                  </>
+                ) : (
+                  <FieldLine label="Status" value="Sem seleção." />
                 )}
-              </QueryStatePanel>
-            </div>
-            </DetailPanel>
-          ) : null}
+
+                {canManageRegularizeCore && currentProcessId ? (
+                  <div className="pt-2">
+                    <PrimaryActionButton
+                      icon={Plus}
+                      label="Nova orientação"
+                      onClick={() =>
+                        setActiveForm({ type: "guidance", mode: "create", processId: currentProcessId })
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                <div className="pt-2">
+                  <QueryStatePanel query={guidanceQuery} emptyTitle="Sem orientações.">
+                    {(guidanceRows) => (
+                      <div className="space-y-3">
+                        {guidanceRows.map((item) => (
+                          <div
+                            key={item.id}
+                            className="rounded-lg border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {getGuidanceTitle(item)}
+                                </p>
+                                <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-slate-400">
+                                  {getGuidanceDescription(item)}
+                                </p>
+                              </div>
+                              {canManageRegularizeCore ? (
+                                <TableActionButton
+                                  icon={Pencil}
+                                  title="Editar orientação"
+                                  onClick={() =>
+                                    setActiveForm({ type: "guidance", mode: "edit", guidance: item })
+                                  }
+                                />
+                              ) : null}
+                            </div>
+
+                            {canManageRegularizeCore ? (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <PrimaryActionButton
+                                  icon={Plus}
+                                  label="Adicionar atividade"
+                                  onClick={() =>
+                                    setActiveForm({
+                                      type: "guidance-activity",
+                                      guidanceId: item.id,
+                                      processId: item.process_id,
+                                    })
+                                  }
+                                />
+                                <PrimaryActionButton
+                                  icon={Plus}
+                                  label="Adicionar sócio"
+                                  onClick={() =>
+                                    setActiveForm({
+                                      type: "guidance-partner",
+                                      guidanceId: item.id,
+                                      processId: item.process_id,
+                                    })
+                                  }
+                                />
+                              </div>
+                            ) : null}
+
+                            {(item.economic_activities?.length ?? 0) > 0 ? (
+                              <div className="mt-3 space-y-2">
+                                <p className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-500">
+                                  Atividades
+                                </p>
+                                {item.economic_activities?.map(
+                                  (activity: RegularizeGuidanceEconomicActivity, index) => (
+                                    <div
+                                      key={activity.id ?? `${activity.code}-${index}`}
+                                      className="flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-slate-800/70"
+                                    >
+                                      <span className="min-w-0 text-gray-700 dark:text-slate-200">
+                                        {formatText(activity.code)} -{" "}
+                                        {formatText(activity.description)}
+                                      </span>
+                                      {canManageRegularizeCore ? (
+                                        <TableActionButton
+                                          disabled={!activity.id}
+                                          icon={Trash2}
+                                          title="Remover atividade"
+                                          onClick={() => {
+                                            void handleRemoveGuidanceActivity(
+                                              item.id,
+                                              item.process_id,
+                                              activity.id,
+                                            );
+                                          }}
+                                        />
+                                      ) : null}
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            ) : null}
+
+                            {(item.partners?.length ?? 0) > 0 ? (
+                              <div className="mt-3 space-y-2">
+                                <p className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-500">
+                                  Sócios
+                                </p>
+                                {item.partners?.map(
+                                  (partner: RegularizeGuidancePartner, index) => (
+                                    <div
+                                      key={partner.id ?? `${partner.name}-${index}`}
+                                      className="flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-slate-800/70"
+                                    >
+                                      <span className="min-w-0 text-gray-700 dark:text-slate-200">
+                                        {formatText(partner.name)} -{" "}
+                                        {formatText(partner.cpf ?? partner.document)}
+                                      </span>
+                                      {canManageRegularizeCore ? (
+                                        <TableActionButton
+                                          disabled={!partner.id}
+                                          icon={Trash2}
+                                          title="Remover sócio"
+                                          onClick={() => {
+                                            void handleRemoveGuidancePartner(
+                                              item.id,
+                                              item.process_id,
+                                              partner.id,
+                                            );
+                                          }}
+                                        />
+                                      ) : null}
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </QueryStatePanel>
+                </div>
+              </DetailPanel>
+            ) : null}
+          </div>
         </section>
       ) : null}
 
       {activeTab === "licenses" ? (
-        <section>
+        <section className="space-y-4">
+          <TabActionHeader
+            title="Licenças"
+            description="Alvarás, licenças e vencimentos vinculados ao fluxo operacional."
+            action={
+              canManageRegularizeCore ? (
+                <PrimaryActionButton
+                  icon={Plus}
+                  label="Nova licença"
+                  onClick={() => setActiveForm({ type: "license", mode: "create" })}
+                />
+              ) : null
+            }
+          />
+
           <QueryStatePanel query={licenseQuery} emptyTitle="Nenhuma licença encontrada.">
             {(licenseRows) => (
-              <DataTable headers={["Licença", "Protocolo", "Contato", "Status", "Vencimento"]}>
-                {licenseRows.map((item) => (
+              <DataTable headers={["Licença", "Protocolo", "Contato", "Status", "Vencimento", ""]}>
+                {licenseRows.map((item: RegularizeLicenseListItem) => (
                   <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                     <td className="px-4 py-3 font-medium">{formatText(item.type_license)}</td>
                     <td className="px-4 py-3">{formatText(item.protocol)}</td>
@@ -1013,6 +1471,19 @@ export function RegularizePage() {
                       <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
                     </td>
                     <td className="px-4 py-3">{formatDate(item.due_date)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end">
+                        {canManageRegularizeCore ? (
+                          <TableActionButton
+                            icon={Pencil}
+                            title="Editar licença"
+                            onClick={() =>
+                              setActiveForm({ type: "license", mode: "edit", id: item.id })
+                            }
+                          />
+                        ) : null}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </DataTable>
@@ -1322,36 +1793,86 @@ export function RegularizePage() {
       ) : null}
 
       {activeTab === "taxes" ? (
-        <section>
+        <section className="space-y-4">
+          <TabActionHeader
+            title="Tributos municipais"
+            description={`Controle de TFF, TLP e TLL para ${currentYear}.`}
+            action={
+              canManageRegularizeCore ? (
+                <PrimaryActionButton
+                  icon={Plus}
+                  label="Novo tributo"
+                  onClick={() =>
+                    setActiveForm({
+                      type: "municipal-tax",
+                      mode: "create",
+                      clientId: clientOptions[0]?.id,
+                    })
+                  }
+                />
+              ) : null
+            }
+          />
+
           <QueryStatePanel query={taxQuery} emptyTitle="Nenhum tributo encontrado.">
             {(taxRows) => (
-              <DataTable headers={["Cliente", "Documento", "Cidade", "Ano", "Registro"]}>
-                {taxRows.map((item: RegularizeMunicipalTaxesClientSummary) => (
-                  <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                    <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                    <td className="px-4 py-3">{formatText(item.cpf_cnpj)}</td>
-                    <td className="px-4 py-3">
-                      {item.city ? (
-                        formatText(item.city)
-                      ) : (
-                        <span className="block text-center text-gray-500 dark:text-slate-400">
-                          -
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">{currentYear}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge
-                        config={
-                          (item.municipalTaxes?.length ?? 0) > 0
-                            ? { label: "Criado", variant: "success", icon: CheckCircle2 }
-                            : { label: "Pendente", variant: "warning", icon: CalendarDays }
-                        }
-                        size="sm"
-                      />
-                    </td>
-                  </tr>
-                ))}
+              <DataTable headers={["Cliente", "Documento", "Cidade", "Ano", "Registro", ""]}>
+                {taxRows.map((item: RegularizeMunicipalTaxesClientSummary) => {
+                  const municipalTaxId = getMunicipalTaxId(item);
+
+                  return (
+                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                      <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
+                      <td className="px-4 py-3">{formatText(item.cpf_cnpj)}</td>
+                      <td className="px-4 py-3">
+                        {item.city ? (
+                          formatText(item.city)
+                        ) : (
+                          <span className="block text-center text-gray-500 dark:text-slate-400">
+                            -
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">{currentYear}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge
+                          config={
+                            municipalTaxId
+                              ? { label: "Criado", variant: "success", icon: CheckCircle2 }
+                              : { label: "Pendente", variant: "warning", icon: CalendarDays }
+                          }
+                          size="sm"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end">
+                          {canManageRegularizeCore ? (
+                            <TableActionButton
+                              icon={municipalTaxId ? Pencil : Plus}
+                              title={municipalTaxId ? "Editar tributo" : "Criar tributo"}
+                              onClick={() =>
+                                setActiveForm(
+                                  municipalTaxId
+                                    ? {
+                                        type: "municipal-tax",
+                                        mode: "edit",
+                                        id: municipalTaxId,
+                                        clientId: item.id,
+                                      }
+                                    : {
+                                        type: "municipal-tax",
+                                        mode: "create",
+                                        clientId: item.id,
+                                      },
+                                )
+                              }
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </DataTable>
             )}
           </QueryStatePanel>
@@ -1412,6 +1933,89 @@ export function RegularizePage() {
         isSubmitting={createSitePasswordMutation.isPending || updateSitePasswordMutation.isPending}
         onClose={closeCoreForm}
         onSubmit={handleSubmitSitePassword}
+      />
+
+      <RegularizeMunicipalTaxesForm
+        open={activeForm?.type === "municipal-tax"}
+        mode={activeForm?.type === "municipal-tax" ? activeForm.mode : "create"}
+        municipalTax={activeMunicipalTaxForForm}
+        defaultClientId={activeMunicipalTaxDefaultClientId}
+        clientOptions={clientOptions}
+        currentYear={currentYear}
+        isLoadingInitialValue={
+          activeForm?.type === "municipal-tax" &&
+          activeForm.mode === "edit" &&
+          municipalTaxDetailQuery.isLoading
+        }
+        isSubmitting={createMunicipalTaxMutation.isPending || updateMunicipalTaxMutation.isPending}
+        onClose={closeCoreForm}
+        onSubmit={handleSubmitMunicipalTax}
+      />
+
+      <RegularizeProcessForm
+        open={activeForm?.type === "process"}
+        mode={activeForm?.type === "process" ? activeForm.mode : "create"}
+        process={activeProcessForForm}
+        defaultClientId={clientOptions[0]?.id ?? ""}
+        clientOptions={clientOptions}
+        pfOptions={pfOptions}
+        isLoadingInitialValue={
+          activeForm?.type === "process" &&
+          activeForm.mode === "edit" &&
+          processDetailQuery.isLoading
+        }
+        isSubmitting={createProcessMutation.isPending || updateProcessMutation.isPending}
+        onClose={closeCoreForm}
+        onSubmit={handleSubmitProcess}
+      />
+
+      <RegularizeGuidanceForm
+        open={activeForm?.type === "guidance"}
+        mode={activeForm?.type === "guidance" ? activeForm.mode : "create"}
+        guidance={activeGuidanceForForm}
+        defaultProcessId={
+          activeForm?.type === "guidance" && activeForm.mode === "create"
+            ? activeForm.processId
+            : currentProcessId ?? ""
+        }
+        processOptions={processOptions}
+        isSubmitting={createGuidanceMutation.isPending || updateGuidanceMutation.isPending}
+        onClose={closeCoreForm}
+        onSubmit={handleSubmitGuidance}
+      />
+
+      <RegularizeGuidanceActivityForm
+        open={activeForm?.type === "guidance-activity"}
+        guidanceId={activeGuidanceAction?.guidanceId}
+        processId={activeGuidanceAction?.processId}
+        isSubmitting={addGuidanceActivityMutation.isPending}
+        onClose={closeCoreForm}
+        onSubmit={handleSubmitGuidanceActivity}
+      />
+
+      <RegularizeGuidancePartnerForm
+        open={activeForm?.type === "guidance-partner"}
+        guidanceId={activeGuidanceAction?.guidanceId}
+        processId={activeGuidanceAction?.processId}
+        isSubmitting={addGuidancePartnerMutation.isPending}
+        onClose={closeCoreForm}
+        onSubmit={handleSubmitGuidancePartner}
+      />
+
+      <RegularizeLicenseForm
+        open={activeForm?.type === "license"}
+        mode={activeForm?.type === "license" ? activeForm.mode : "create"}
+        license={activeLicenseForForm}
+        defaultClientId={clientOptions[0]?.id ?? ""}
+        clientOptions={clientOptions}
+        isLoadingInitialValue={
+          activeForm?.type === "license" &&
+          activeForm.mode === "edit" &&
+          licenseDetailQuery.isLoading
+        }
+        isSubmitting={createLicenseMutation.isPending || updateLicenseMutation.isPending}
+        onClose={closeCoreForm}
+        onSubmit={handleSubmitLicense}
       />
     </div>
   );
