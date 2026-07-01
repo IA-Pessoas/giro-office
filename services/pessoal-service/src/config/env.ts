@@ -16,7 +16,7 @@ const rootEnvPath = path.resolve(__dirname, "../../../../.env");
 const serviceEnvPath = path.resolve(__dirname, "../../.env");
 
 dotenv.config({ path: rootEnvPath });
-dotenv.config({ path: serviceEnvPath, override: true });
+dotenv.config({ path: serviceEnvPath, override: process.env.NODE_ENV !== "test" });
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
@@ -71,7 +71,9 @@ const pessoalServiceEnvSchema = z
     const internalServiceToken =
       internalServiceTokenEnv !== undefined && internalServiceTokenEnv !== ""
         ? internalServiceTokenEnv
-        : rest.auditServiceToken;
+        : rest.nodeEnv === "production"
+          ? undefined
+          : rest.auditServiceToken;
 
     validateProductionInternalServiceToken({
       nodeEnv: rest.nodeEnv,
@@ -85,6 +87,9 @@ const pessoalServiceEnvSchema = z
       envName: "INTERNAL_SERVICE_TOKEN",
       token: internalServiceToken,
     });
+    if (!internalServiceToken) {
+      throw new Error("pessoal-service: INTERNAL_SERVICE_TOKEN deve ser definido.");
+    }
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
       serviceName: "pessoal-service",
@@ -102,21 +107,27 @@ const pessoalServiceEnvSchema = z
 
 export type PessoalServiceEnv = z.infer<typeof pessoalServiceEnvSchema>;
 
-export function getPessoalServiceEnv(): PessoalServiceEnv {
+export function parsePessoalServiceEnv(
+  source: NodeJS.ProcessEnv | Record<string, string | undefined>,
+): PessoalServiceEnv {
   return pessoalServiceEnvSchema.parse({
-    nodeEnv: process.env.NODE_ENV,
-    port: process.env.PORT,
-    databaseUrl: process.env.DATABASE_URL,
-    jwtSecret: process.env.JWT_SECRET,
-    auditServiceUrl: process.env.AUDIT_SERVICE_URL,
-    auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
-    internalServiceTokenEnv: process.env.INTERNAL_SERVICE_TOKEN,
-    passwordEncryptionKey: process.env.PESSOAL_PASSWORD_ENCRYPTION_KEY,
-    passwordEncryptionKeyVersion: process.env.PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION,
-    domainAuditEnabled: process.env.PESSOAL_DOMAIN_AUDIT_ENABLED,
-    allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
-    enableApiDocsEnv: process.env.ENABLE_API_DOCS,
-    logLevel: process.env.LOG_LEVEL,
-    logPretty: process.env.LOG_PRETTY,
+    nodeEnv: source.NODE_ENV,
+    port: source.PORT,
+    databaseUrl: source.DATABASE_URL,
+    jwtSecret: source.JWT_SECRET,
+    auditServiceUrl: source.AUDIT_SERVICE_URL,
+    auditServiceToken: source.AUDIT_SERVICE_TOKEN,
+    internalServiceTokenEnv: source.INTERNAL_SERVICE_TOKEN,
+    passwordEncryptionKey: source.PESSOAL_PASSWORD_ENCRYPTION_KEY,
+    passwordEncryptionKeyVersion: source.PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION,
+    domainAuditEnabled: source.PESSOAL_DOMAIN_AUDIT_ENABLED,
+    allowedOrigins: source.SERVICE_ALLOWED_ORIGINS,
+    enableApiDocsEnv: source.ENABLE_API_DOCS,
+    logLevel: source.LOG_LEVEL,
+    logPretty: source.LOG_PRETTY,
   });
+}
+
+export function getPessoalServiceEnv(): PessoalServiceEnv {
+  return parsePessoalServiceEnv(process.env);
 }

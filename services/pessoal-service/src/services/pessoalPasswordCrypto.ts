@@ -18,6 +18,15 @@ export interface PessoalPasswordCrypto {
   decrypt(value: string | null | undefined): string | null;
 }
 
+export function isPessoalPasswordEncrypted(value: string): boolean {
+  try {
+    parseEncryptedPayload(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function createPessoalPasswordCrypto(options: {
   keyBase64: string;
   keyVersion: string;

@@ -34,6 +34,7 @@ const notificationIdentitySelect = {
   user_id: true,
   regarding_id: true,
   title: true,
+  reference_date: true,
 } as const;
 
 type UnionCandidate = {
@@ -49,6 +50,7 @@ type NotificationCandidate = {
   regarding_id: string;
   title: string;
   message: string;
+  reference_date: Date;
   organization_id: string;
 };
 
@@ -130,6 +132,9 @@ export class UnionNotificationService {
 
     const unionIds = [...new Set(matchingUnions.map((candidate) => candidate.regarding_id))];
     const titles = [...new Set(matchingUnions.map((candidate) => candidate.title))];
+    const referenceDates = [
+      ...new Set(matchingUnions.map((candidate) => candidate.reference_date.toISOString())),
+    ].map((date) => new Date(date));
     const existingNotifications = await this.prisma.pessoalNotification.findMany({
       where: {
         organization_id: organizationId,
@@ -137,19 +142,30 @@ export class UnionNotificationService {
         user_id: { in: userIds },
         regarding_id: { in: unionIds },
         title: { in: titles },
+        reference_date: { in: referenceDates },
       },
       select: notificationIdentitySelect,
     });
     const existingKeys = new Set(
       existingNotifications.map((notification) =>
-        getNotificationKey(notification.user_id, notification.regarding_id, notification.title),
+        getNotificationKey(
+          notification.user_id,
+          notification.regarding_id,
+          notification.title,
+          notification.reference_date,
+        ),
       ),
     );
 
     const createData: NotificationCandidate[] = [];
     for (const candidate of matchingUnions) {
       for (const userId of userIds) {
-        const key = getNotificationKey(userId, candidate.regarding_id, candidate.title);
+        const key = getNotificationKey(
+          userId,
+          candidate.regarding_id,
+          candidate.title,
+          candidate.reference_date,
+        );
         if (existingKeys.has(key)) {
           result.duplicatesSkipped += 1;
           continue;
@@ -165,7 +181,10 @@ export class UnionNotificationService {
 
     for (let index = 0; index < createData.length; index += NOTIFICATION_CREATE_CHUNK_SIZE) {
       const chunk = createData.slice(index, index + NOTIFICATION_CREATE_CHUNK_SIZE);
-      const createResult = await this.prisma.pessoalNotification.createMany({ data: chunk });
+      const createResult = await this.prisma.pessoalNotification.createMany({
+        data: chunk,
+        skipDuplicates: true,
+      });
       result.notificationsCreated += createResult.count;
     }
   }
@@ -175,8 +194,8 @@ function getMatchingUnionNotifications(
   unions: UnionCandidate[],
   now: Date,
 ): Omit<NotificationCandidate, "user_id">[] {
-  const tomorrow = addUtcDays(now, 1);
-  const monthAgoFromTomorrow = addUtcMonths(tomorrow, -1);
+  const tomorrow = startOfUtcDay(addUtcDays(now, 1));
+  const monthAgoFromTomorrow = startOfUtcDay(addUtcMonths(tomorrow, -1));
   const candidates: Omit<NotificationCandidate, "user_id">[] = [];
 
   for (const union of unions) {
@@ -190,6 +209,7 @@ function getMatchingUnionNotifications(
         regarding_id: union.id,
         title: tomorrowNotification.title,
         message: tomorrowNotification.message,
+        reference_date: tomorrow,
         organization_id: union.organization_id,
       });
     }
@@ -200,6 +220,7 @@ function getMatchingUnionNotifications(
         regarding_id: union.id,
         title: monthAgoNotification.title,
         message: monthAgoNotification.message,
+        reference_date: monthAgoFromTomorrow,
         organization_id: union.organization_id,
       });
     }
@@ -220,10 +241,19 @@ function addUtcMonths(value: Date, months: number): Date {
   return out;
 }
 
+function startOfUtcDay(value: Date): Date {
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+}
+
 function hasSameUtcMonthDay(left: Date, right: Date): boolean {
   return left.getUTCMonth() === right.getUTCMonth() && left.getUTCDate() === right.getUTCDate();
 }
 
-function getNotificationKey(userId: string, regardingId: string, title: string): string {
-  return `${userId}|${regardingId}|${title}`;
+function getNotificationKey(
+  userId: string,
+  regardingId: string,
+  title: string,
+  referenceDate: Date,
+): string {
+  return `${userId}|${regardingId}|${title}|${referenceDate.toISOString()}`;
 }

@@ -171,7 +171,7 @@ O `docker-compose.vps.yml` define `healthcheck` com `node -e fetch(...)` a cada 
 
 O `pessoal-service` expõe `POST /internal/pessoal/union-notifications/run` para execução por scheduler externo, por exemplo Supabase ou Vercel. Não há cron job dentro do processo Node do serviço.
 
-Configure `INTERNAL_SERVICE_TOKEN` em `.env.vps.pessoal-service` e envie o mesmo valor no header `x-internal-service-token` do scheduler. Se `INTERNAL_SERVICE_TOKEN` não for definido, o serviço usa `AUDIT_SERVICE_TOKEN` como fallback, mas para deploy recomenda-se manter um token explícito para rotas internas.
+Configure `INTERNAL_SERVICE_TOKEN` em `.env.vps.pessoal-service` e envie o mesmo valor no header `x-internal-service-token` do scheduler. Em produção esse token deve ser explícito e separado do `AUDIT_SERVICE_TOKEN`; o fallback para `AUDIT_SERVICE_TOKEN` fica restrito a dev/test.
 
 O deploy remoto (`vps-remote-deploy.sh`) aplica sempre:
 

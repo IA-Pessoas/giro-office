@@ -42,20 +42,29 @@ describe("password routes", () => {
     expect(response.body).toMatchObject({ success: false, code: "BAD_REQUEST" });
   });
 
-  it("detalha senha por id", async () => {
+  it("detalha senha por id com contexto completo para autorizacao e auditoria", async () => {
     const service = {
       detail: vi.fn(async () => ({ id: recordId, senha_main: "segredo" })),
     };
     const app = createRouteTestApp("/pessoal/passwords", createPasswordRoutes(service as never));
 
-    const response = await request(app).get(`/pessoal/passwords/${recordId}`).set(gatewayHeaders());
+    const response = await request(app)
+      .get(`/pessoal/passwords/${recordId}`)
+      .set(gatewayHeaders(3));
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       success: true,
       data: { id: recordId, senha_main: "segredo" },
     });
-    expect(service.detail).toHaveBeenCalledWith({ organizationId: expect.any(String) }, recordId);
+    expect(service.detail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: expect.any(String),
+        userId: expect.any(String),
+        permission: 3,
+      }),
+      recordId,
+    );
   });
 
   it("cria senha com status 201", async () => {
@@ -64,7 +73,7 @@ describe("password routes", () => {
     };
     const app = createRouteTestApp("/pessoal/passwords", createPasswordRoutes(service as never));
 
-    const response = await request(app).post("/pessoal/passwords").set(gatewayHeaders()).send({
+    const response = await request(app).post("/pessoal/passwords").set(gatewayHeaders(3)).send({
       client_id: clientId,
       service_name: "eSocial",
       login_main: "login",
@@ -86,7 +95,7 @@ describe("password routes", () => {
 
     const response = await request(app)
       .patch(`/pessoal/passwords/${recordId}`)
-      .set(gatewayHeaders())
+      .set(gatewayHeaders(3))
       .send({});
 
     expect(response.status).toBe(400);
@@ -104,7 +113,7 @@ describe("password routes", () => {
 
     const response = await request(app)
       .delete(`/pessoal/passwords/${recordId}`)
-      .set(gatewayHeaders());
+      .set(gatewayHeaders(3));
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ success: true, data: { id: recordId } });

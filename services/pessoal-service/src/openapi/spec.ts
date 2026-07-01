@@ -42,6 +42,7 @@ const mutationResponses = {
   "201": { description: "Created", ...successJson },
   "400": { description: "Bad request", ...errorJson },
   "401": { description: "Unauthorized", ...errorJson },
+  "403": { description: "Forbidden", ...errorJson },
   "404": { description: "Not found", ...errorJson },
   "409": { description: "Conflict", ...errorJson },
 } as const;
@@ -62,6 +63,182 @@ const jsonRequestBody = (schema: Record<string, unknown>) =>
       },
     },
   }) as const;
+
+const strictObjectSchema = (
+  properties: Record<string, unknown>,
+  required: string[] = [],
+): Record<string, unknown> => ({
+  type: "object",
+  additionalProperties: false,
+  ...(required.length > 0 ? { required } : {}),
+  properties,
+});
+
+const uuidSchema = { type: "string", format: "uuid" } as const;
+const textSchema = { type: "string", minLength: 1 } as const;
+const nullableTextSchema = { type: "string", minLength: 1, nullable: true } as const;
+const nullableDateSchema = { type: "string", format: "date-time", nullable: true } as const;
+const nullableNumberSchema = { type: "number", nullable: true } as const;
+const nullableBooleanSchema = { type: "boolean", nullable: true } as const;
+const competenceSchema = { type: "string", pattern: "^\\d{4}-\\d{2}$" } as const;
+
+const createLddRequestSchema = strictObjectSchema(
+  {
+    client_id: uuidSchema,
+    type: textSchema,
+    period: nullableTextSchema,
+    due_date: nullableDateSchema,
+    balance_amount: nullableNumberSchema,
+    registration_status: nullableTextSchema,
+    status: nullableTextSchema,
+  },
+  ["client_id", "type"],
+);
+
+const updateLddRequestSchema = strictObjectSchema({
+  type: textSchema,
+  period: nullableTextSchema,
+  due_date: nullableDateSchema,
+  balance_amount: nullableNumberSchema,
+  registration_status: nullableTextSchema,
+  status: nullableTextSchema,
+});
+
+const createSituationRequestSchema = strictObjectSchema(
+  {
+    client_id: uuidSchema,
+    title: textSchema,
+    description: textSchema,
+  },
+  ["client_id", "title", "description"],
+);
+
+const updateSituationRequestSchema = strictObjectSchema({
+  status: { type: "string", enum: ["Em andamento", "Finalizado"] },
+  title: textSchema,
+  description: textSchema,
+});
+
+const createUnionRequestSchema = strictObjectSchema(
+  {
+    name: textSchema,
+    cnpj: textSchema,
+    base_date: nullableDateSchema,
+  },
+  ["name", "cnpj"],
+);
+
+const updateUnionRequestSchema = strictObjectSchema({
+  name: textSchema,
+  cnpj: textSchema,
+  base_date: nullableDateSchema,
+});
+
+const createPayrollRequestSchema = strictObjectSchema(
+  {
+    client_id: uuidSchema,
+    responsible_id: { ...uuidSchema, nullable: true },
+    advance: { type: "boolean" },
+    advance_type: nullableTextSchema,
+    advance_amount: nullableNumberSchema,
+    info: textSchema,
+    previous: { type: "boolean" },
+    onvio: { type: "boolean" },
+    group: textSchema,
+    vt: { type: "boolean" },
+    vt_value: nullableNumberSchema,
+    vt_type: nullableTextSchema,
+    va: { type: "boolean" },
+    assistance_fee: { type: "boolean" },
+    union_id: { ...uuidSchema, nullable: true },
+    bem_mais: { type: "boolean" },
+    bsf: { type: "boolean" },
+    reinf: { type: "boolean" },
+    employees: { type: "integer", minimum: 0 },
+    contact: nullableTextSchema,
+  },
+  [
+    "client_id",
+    "advance",
+    "info",
+    "previous",
+    "onvio",
+    "group",
+    "vt",
+    "va",
+    "assistance_fee",
+    "bem_mais",
+    "bsf",
+    "reinf",
+    "employees",
+  ],
+);
+
+const updatePayrollRequestSchema = strictObjectSchema({
+  responsible_id: { ...uuidSchema, nullable: true },
+  advance: { type: "boolean" },
+  advance_type: nullableTextSchema,
+  advance_amount: nullableNumberSchema,
+  info: textSchema,
+  previous: { type: "boolean" },
+  onvio: { type: "boolean" },
+  group: textSchema,
+  vt: { type: "boolean" },
+  vt_value: nullableNumberSchema,
+  vt_type: nullableTextSchema,
+  va: { type: "boolean" },
+  assistance_fee: { type: "boolean" },
+  union_id: { ...uuidSchema, nullable: true },
+  bem_mais: { type: "boolean" },
+  bsf: { type: "boolean" },
+  reinf: { type: "boolean" },
+  employees: { type: "integer", minimum: 0 },
+  contact: nullableTextSchema,
+});
+
+const createObligationRequestSchema = strictObjectSchema(
+  {
+    client_id: uuidSchema,
+    competence: competenceSchema,
+  },
+  ["client_id", "competence"],
+);
+
+const updateObligationFieldRequestSchema = strictObjectSchema({
+  advance: nullableBooleanSchema,
+  payroll: nullableBooleanSchema,
+  charges: nullableBooleanSchema,
+  assistance_fee: nullableBooleanSchema,
+  responsavel_id: { ...uuidSchema, nullable: true },
+  bem_mais: nullableBooleanSchema,
+  bsf: nullableBooleanSchema,
+  va: nullableBooleanSchema,
+  vt: nullableBooleanSchema,
+});
+
+const createPasswordRequestSchema = strictObjectSchema(
+  {
+    client_id: uuidSchema,
+    service_name: textSchema,
+    login_main: nullableTextSchema,
+    senha_main: nullableTextSchema,
+    login_secondary: nullableTextSchema,
+    senha_secondary: nullableTextSchema,
+    responsavel_id: { ...uuidSchema, nullable: true },
+    notes: nullableTextSchema,
+  },
+  ["client_id", "service_name"],
+);
+
+const updatePasswordRequestSchema = strictObjectSchema({
+  service_name: textSchema,
+  login_main: nullableTextSchema,
+  senha_main: nullableTextSchema,
+  login_secondary: nullableTextSchema,
+  senha_secondary: nullableTextSchema,
+  responsavel_id: { ...uuidSchema, nullable: true },
+  notes: nullableTextSchema,
+});
 
 const successJsonWithData = (dataSchema: Record<string, unknown>) =>
   ({
@@ -96,7 +273,7 @@ const passwordListResponses = {
 const passwordDetailResponses = {
   ...readResponses,
   "200": {
-    description: "Detalhe de senha com campos secretos descriptografados",
+    description: "Detalhe de senha; campos secretos so sao retornados com permissao 3",
     ...successJsonWithData({ $ref: "#/components/schemas/PessoalPasswordDetail" }),
   },
 } as const;
@@ -228,7 +405,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           security: bearerSecurity,
           summary: "Criar LDD",
           operationId: "createPessoalLdd",
-          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          requestBody: jsonRequestBody(createLddRequestSchema),
           responses: mutationResponses,
         },
       },
@@ -239,7 +416,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Atualizar LDD",
           operationId: "updatePessoalLdd",
           parameters: [idParam("id")],
-          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          requestBody: jsonRequestBody(updateLddRequestSchema),
           responses: mutationResponses,
         },
         delete: {
@@ -265,7 +442,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           security: bearerSecurity,
           summary: "Criar situacao",
           operationId: "createPessoalSituation",
-          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          requestBody: jsonRequestBody(createSituationRequestSchema),
           responses: mutationResponses,
         },
       },
@@ -284,7 +461,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Atualizar situacao",
           operationId: "updatePessoalSituation",
           parameters: [idParam("id")],
-          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          requestBody: jsonRequestBody(updateSituationRequestSchema),
           responses: mutationResponses,
         },
       },
@@ -301,7 +478,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           security: bearerSecurity,
           summary: "Criar sindicato",
           operationId: "createPessoalUnion",
-          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          requestBody: jsonRequestBody(createUnionRequestSchema),
           responses: mutationResponses,
         },
       },
@@ -320,7 +497,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Atualizar sindicato",
           operationId: "updatePessoalUnion",
           parameters: [idParam("id")],
-          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          requestBody: jsonRequestBody(updateUnionRequestSchema),
           responses: mutationResponses,
         },
       },
@@ -330,7 +507,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           security: bearerSecurity,
           summary: "Criar configuracao de folha",
           operationId: "createPessoalPayroll",
-          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          requestBody: jsonRequestBody(createPayrollRequestSchema),
           responses: mutationResponses,
         },
       },
@@ -349,7 +526,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Atualizar configuracao de folha",
           operationId: "updatePessoalPayroll",
           parameters: [idParam("client_id")],
-          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          requestBody: jsonRequestBody(updatePayrollRequestSchema),
           responses: mutationResponses,
         },
       },
@@ -367,7 +544,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           security: bearerSecurity,
           summary: "Criar obrigacao idempotente",
           operationId: "createPessoalObligation",
-          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          requestBody: jsonRequestBody(createObligationRequestSchema),
           responses: mutationResponses,
         },
       },
@@ -378,7 +555,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Atualizar um campo da obrigacao",
           operationId: "updatePessoalObligationField",
           parameters: [idParam("id")],
-          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          requestBody: jsonRequestBody(updateObligationFieldRequestSchema),
           responses: mutationResponses,
         },
       },
@@ -413,20 +590,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           security: bearerSecurity,
           summary: "Criar registro de senha criptografado",
           operationId: "createPessoalPassword",
-          requestBody: jsonRequestBody({
-            type: "object",
-            required: ["client_id", "service_name"],
-            properties: {
-              client_id: { type: "string", format: "uuid" },
-              service_name: { type: "string" },
-              login_main: { type: "string", nullable: true },
-              senha_main: { type: "string", nullable: true },
-              login_secondary: { type: "string", nullable: true },
-              senha_secondary: { type: "string", nullable: true },
-              responsavel_id: { type: "string", format: "uuid", nullable: true },
-              notes: { type: "string", nullable: true },
-            },
-          }),
+          requestBody: jsonRequestBody(createPasswordRequestSchema),
           responses: passwordMutationResponses,
         },
       },
@@ -445,7 +609,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Atualizar registro de senha",
           operationId: "updatePessoalPassword",
           parameters: [idParam("id")],
-          requestBody: jsonRequestBody({ type: "object", additionalProperties: true }),
+          requestBody: jsonRequestBody(updatePasswordRequestSchema),
           responses: passwordMutationResponses,
         },
         delete: {
