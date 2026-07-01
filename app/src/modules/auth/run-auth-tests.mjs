@@ -442,12 +442,13 @@ await (async () => {
     assert.equal(administracaoSource.includes("accessStoreActions.syncFromToken"), false);
   });
 
-  await runTest("admin permission updates refetch permission data after save", () => {
+  await runTest("admin permission updates invalidate cached permission data after save", () => {
     assert.match(
       administracaoSource,
-      /await queryClient\.invalidateQueries\(\{[\s\S]*queryKey:\s*\["admin", "permissions", selectedPermissionUserId\],[\s\S]*\}\);/,
+      /queryClient\.invalidateQueries\(\{[\s\S]*queryKey:\s*\["admin", "permissions", selectedPermissionUserId\],[\s\S]*\}\)/,
     );
-    assert.match(administracaoSource, /await refetchPermissionUsers\(\);/);
+    assert.match(administracaoSource, /invalidateAdminUserLists\(\)/);
+    assert.equal(administracaoSource.includes("await refetchPermissionUsers();"), false);
   });
 
   await runTest("admin create user action uses native disabled state when context is unavailable", () => {

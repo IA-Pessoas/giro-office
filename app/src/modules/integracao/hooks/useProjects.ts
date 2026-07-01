@@ -27,7 +27,6 @@ export function useProjectsList(
     {
       enabled: Boolean(params?.id),
       placeholderData: (previousData) => previousData,
-      refetchOnWindowFocus: false,
     },
   );
 }
@@ -38,7 +37,6 @@ export function useProjectDetail(projectId: string | undefined): UseQueryResult<
     () => projectService.detail(projectId ?? ""),
     {
       enabled: Boolean(projectId),
-      refetchOnWindowFocus: false,
     },
   );
 }

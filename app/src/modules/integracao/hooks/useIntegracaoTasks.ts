@@ -30,7 +30,6 @@ export function useIntegracaoTasksList(
     {
       enabled: true,
       placeholderData: (previousData) => previousData,
-      refetchOnWindowFocus: false,
     },
   );
 }
@@ -41,7 +40,6 @@ export function useIntegracaoTaskDetail(taskId: string | undefined): UseQueryRes
     () => integracaoTasksService.detail(taskId ?? ""),
     {
       enabled: Boolean(taskId),
-      refetchOnWindowFocus: false,
     },
   );
 }

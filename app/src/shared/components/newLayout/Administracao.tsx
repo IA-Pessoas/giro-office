@@ -77,6 +77,10 @@ type PermissionQueryResult = {
 
 type PermissionSelectValue = (typeof PERMISSION_SELECT_OPTIONS)[number]["value"];
 
+const adminUsersRootQueryKey = ["admin-users"] as const;
+const adminUsersSummaryRootQueryKey = ["admin-users-summary"] as const;
+const adminUsersQueryKey = (status: AdminUserStatus) => [...adminUsersRootQueryKey, status] as const;
+
 function getPermissionSelectValue(value: number | null | undefined): PermissionSelectValue {
   if (value === 0 || value === 1 || value === 2) {
     return String(value) as Exclude<PermissionSelectValue, "null">;
@@ -137,19 +141,22 @@ export function Administracao() {
   const isAdministrationAccessLoading =
     !canManageOrganizationOwners && isRhAccessLoading;
   const queryClient = useQueryClient();
+  const invalidateAdminUserLists = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: adminUsersRootQueryKey }),
+      queryClient.invalidateQueries({ queryKey: adminUsersSummaryRootQueryKey }),
+    ]);
 
   const {
     data: users = [],
-    refetch: refetchUsers,
     isLoading: isUsersLoading,
     error: usersError,
   } = useFetch(
-    ["admin-users", userStatusFilter],
+    adminUsersQueryKey(userStatusFilter),
     () => listAdminUsers(userStatusFilter),
     {
       enabled: hasAdminAccess,
       retry: false,
-      refetchOnWindowFocus: false,
     },
   );
   const {
@@ -160,7 +167,6 @@ export function Administracao() {
     {
       enabled: hasAdminAccess && activeTab === "dashboard",
       retry: false,
-      refetchOnWindowFocus: false,
     },
   );
   const {
@@ -174,7 +180,6 @@ export function Administracao() {
     {
       enabled: hasAdminAccess && canManagePermissions && activeTab === "permissions",
       retry: false,
-      refetchOnWindowFocus: false,
     },
   );
   const {
@@ -189,7 +194,6 @@ export function Administracao() {
         (canManagePermissions && activeTab === "permissions") ||
         isCreateModalOpen),
     retry: false,
-    refetchOnWindowFocus: false,
   });
 
   const filteredUsers = useMemo(() => {
@@ -472,7 +476,7 @@ export function Administracao() {
   };
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);
   const handleUserCreated = (_user: UserItem) => {
-    void refetchUsers();
+    void invalidateAdminUserLists();
   };
   const handleRetryDepartments = () => {
     void refetchDepartments();
@@ -560,10 +564,12 @@ export function Administracao() {
       });
 
       try {
-        await queryClient.invalidateQueries({
-          queryKey: ["admin", "permissions", selectedPermissionUserId],
-        });
-        await refetchPermissionUsers();
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: ["admin", "permissions", selectedPermissionUserId],
+          }),
+          invalidateAdminUserLists(),
+        ]);
       } catch {
         toast.warn(
           "Permissões salvas, mas a lista de acessos não pôde ser atualizada agora.",
@@ -732,7 +738,7 @@ export function Administracao() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => void refetchUsers()}
+                    onClick={() => void invalidateAdminUserLists()}
                     className="mt-3 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                   >
                     Tentar novamente
@@ -841,7 +847,7 @@ export function Administracao() {
               userId={selectedUserId}
               departments={departments}
               departmentsError={Boolean(departmentsError)}
-              onUserUpdated={() => refetchUsers()}
+              onUserUpdated={() => invalidateAdminUserLists()}
               canManageUsers={hasAdminAccess}
             />
           </section>

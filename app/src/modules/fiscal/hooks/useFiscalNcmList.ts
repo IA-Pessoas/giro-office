@@ -16,7 +16,6 @@ export function useFiscalNcmList(
     {
       enabled: enabled && ncmCodes.length > 0,
       placeholderData: keepPreviousData,
-      refetchOnWindowFocus: false,
     },
   );
 }

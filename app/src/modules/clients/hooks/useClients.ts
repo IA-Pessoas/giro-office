@@ -52,21 +52,18 @@ export function clientPaDetailQueryKey(id: string) {
 export function useClients(filters: ClientListFilters): UseQueryResult<ClientListPage, Error> {
   return useFetch(clientListQueryKey(filters), () => clientService.list(filters), {
     placeholderData: (previousData) => previousData,
-    refetchOnWindowFocus: false,
   });
 }
 
 export function useClient(id: string | undefined): UseQueryResult<Client | null, Error> {
   return useFetch(clientDetailQueryKey(id ?? "missing"), () => clientService.getById(id ?? ""), {
     enabled: Boolean(id),
-    refetchOnWindowFocus: false,
   });
 }
 
 export function useClientPa(id: string | undefined): UseQueryResult<ClientPaResponse | null, Error> {
   return useFetch(clientPaDetailQueryKey(id ?? "missing"), () => clientService.getPaByClientId(id ?? ""), {
     enabled: Boolean(id),
-    refetchOnWindowFocus: false,
   });
 }
 

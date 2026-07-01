@@ -106,6 +106,8 @@ export function OrganizationLogoForm({
               <img
                 src={previewUrl}
                 alt={`Logo de ${organizationName}`}
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-contain p-4"
               />
             ) : (

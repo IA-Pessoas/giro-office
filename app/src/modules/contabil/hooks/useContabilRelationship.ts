@@ -37,7 +37,6 @@ export function useContabilRelationship(
     () => contabilRelationshipService.getRelationshipByClient(clientId),
     {
       enabled: (options?.enabled ?? true) && Boolean(clientId),
-      refetchOnWindowFocus: false,
     },
   );
 }

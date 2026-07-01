@@ -15,7 +15,6 @@ export function useFiscalNcmDetail(
     () => fiscalNcmService.detail(ncmId ?? ""),
     {
       enabled: enabled && Boolean(ncmId),
-      refetchOnWindowFocus: false,
     },
   );
 }

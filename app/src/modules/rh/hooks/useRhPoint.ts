@@ -83,7 +83,6 @@ export function useRhPointConfig(
       userId ? rhPointService.getPointConfigByUserId(userId) : rhPointService.getMyPointConfig(),
     {
       enabled: options?.enabled,
-      refetchOnWindowFocus: false,
     },
   );
 }
@@ -94,7 +93,6 @@ export function useRhPoints(
 ): UseQueryResult<RhPointListItem[], Error> {
   return useFetch(rhPointListQueryKey(filters), () => rhPointService.listPoints(filters), {
     enabled: options?.enabled,
-    refetchOnWindowFocus: false,
   });
 }
 
@@ -103,7 +101,6 @@ export function useRhTodayPoint(
 ): UseQueryResult<RhTodayPoint, Error> {
   return useFetch(rhTodayPointQueryKey(), () => rhPointService.getTodayPoint(), {
     enabled: options?.enabled,
-    refetchOnWindowFocus: false,
   });
 }
 
@@ -115,7 +112,6 @@ export function useRhPointSummary(filters: {
     rhPointSummaryQueryKey(filters),
     () => rhPointService.getMonthlySummary(filters),
     {
-      refetchOnWindowFocus: false,
       enabled: (options?.enabled ?? true) && Boolean(filters.month),
     },
   );
@@ -130,7 +126,6 @@ export function useRhPointAdjustmentRequests(
     () => rhPointService.listAdjustmentRequests(filters),
     {
       enabled: options?.enabled,
-      refetchOnWindowFocus: false,
     },
   );
 }

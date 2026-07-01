@@ -15,7 +15,6 @@ export function useFiscalIpiDetail(
     () => fiscalIpiService.detail(ipiId ?? ""),
     {
       enabled: enabled && Boolean(ipiId),
-      refetchOnWindowFocus: false,
     },
   );
 }

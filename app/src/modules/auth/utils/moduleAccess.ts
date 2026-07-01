@@ -47,6 +47,7 @@ export interface ResolveModuleAccessParams {
 export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/comercial": "comercial",
   "/marketing": "marketing",
+  "/certificados": "certificado",
   "/regularize": "regularize",
   "/fiscal": "fiscal",
   "/contabil": "contabil",

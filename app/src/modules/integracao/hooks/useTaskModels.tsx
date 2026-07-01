@@ -42,7 +42,6 @@ export const useTaskModels = (): UseTaskModelsResult => {
 
   const taskModelsQuery = useFetch(taskModelsList, fetchTaskModels, {
     enabled: true,
-    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {

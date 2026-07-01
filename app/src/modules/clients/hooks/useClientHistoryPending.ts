@@ -15,7 +15,6 @@ export function useHistoryPendingList(
   return useFetch(
     historyPendingQueryKey(userId),
     () => clientService.listHistoryPending(userId ? { user_id: userId } : undefined),
-    { refetchOnWindowFocus: false },
   );
 }
 
