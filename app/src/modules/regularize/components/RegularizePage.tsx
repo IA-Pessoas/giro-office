@@ -635,7 +635,6 @@ export function RegularizePage() {
     };
   }, [licenseQuery.data, pfQuery.data, processQuery.data, siteQuery.data, taxQuery.data]);
   const hasProcessRows = (processQuery.data?.length ?? 0) > 0;
-  const hasCredentialRows = (credentialQuery.data?.length ?? 0) > 0;
   const hasSiteRows = (siteQuery.data?.length ?? 0) > 0;
 
   const clientOptions = useMemo<RegularizeFormOption[]>(
@@ -1213,23 +1212,21 @@ export function RegularizePage() {
               </QueryStatePanel>
             </div>
 
-            {hasCredentialRows ? (
-              <DetailPanel title="Senha selecionada">
-                {passwordDetailQuery.isLoading ? (
-                  <FieldLine label="Status" value="Carregando..." />
-                ) : passwordDetailQuery.isError ? (
-                  <FieldLine label="Status" value="Acesso negado ou indisponível." />
-                ) : passwordDetailQuery.data ? (
-                  <>
-                    <FieldLine label="Login" value={formatText(passwordDetailQuery.data.login)} />
-                    <FieldLine label="Senha" value={formatText(passwordDetailQuery.data.password)} />
-                    <FieldLine label="Notas" value={formatText(passwordDetailQuery.data.notes)} />
-                  </>
-                ) : (
-                  <DetailEmptyState message="Sem revelação ativa." />
-                )}
-              </DetailPanel>
-            ) : null}
+            <DetailPanel title="Senha selecionada">
+              {passwordDetailQuery.isLoading ? (
+                <FieldLine label="Status" value="Carregando..." />
+              ) : passwordDetailQuery.isError ? (
+                <FieldLine label="Status" value="Acesso negado ou indisponível." />
+              ) : passwordDetailQuery.data ? (
+                <>
+                  <FieldLine label="Login" value={formatText(passwordDetailQuery.data.login)} />
+                  <FieldLine label="Senha" value={formatText(passwordDetailQuery.data.password)} />
+                  <FieldLine label="Notas" value={formatText(passwordDetailQuery.data.notes)} />
+                </>
+              ) : (
+                <DetailEmptyState message="Sem revelação ativa." />
+              )}
+            </DetailPanel>
           </div>
         </section>
       ) : null}

@@ -230,12 +230,20 @@ await runTest("regularize credential empty detail states are centered", async ()
   assert.doesNotMatch(pageSource, /<FieldLine label="Status" value="Sem revelação ativa\." \/>/);
 });
 
-await runTest("regularize empty credential lists do not render orphan detail cards", async () => {
+await runTest("regularize credential empty layouts keep intentional detail behavior", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const passwordsStart = pageSource.indexOf('{activeTab === "passwords"');
+  const sitesStart = pageSource.indexOf('{activeTab === "sites"', passwordsStart);
+  const passwordsSource = pageSource.slice(passwordsStart, sitesStart);
 
-  assert.match(pageSource, /const hasCredentialRows = \(credentialQuery\.data\?\.length \?\? 0\) > 0;/);
   assert.match(pageSource, /const hasSiteRows = \(siteQuery\.data\?\.length \?\? 0\) > 0;/);
-  assert.match(pageSource, /hasCredentialRows \? \(\s*<DetailPanel title="Senha selecionada">/);
+  assert.notEqual(passwordsStart, -1);
+  assert.notEqual(sitesStart, -1);
+  assert.match(passwordsSource, /<div className="space-y-3">/);
+  assert.match(passwordsSource, /<QueryStatePanel query=\{credentialQuery\} emptyTitle="Nenhuma senha encontrada\.">/);
+  assert.match(passwordsSource, /<DetailPanel title="Senha selecionada">/);
+  assert.doesNotMatch(passwordsSource, /hasCredentialRows \? \(/);
+  assert.doesNotMatch(passwordsSource, /emptyClassName="[^"]*xl:col-span-2[^"]*"/);
   assert.match(pageSource, /hasSiteRows \? \(\s*<DetailPanel title="Site selecionado">/);
   assert.match(pageSource, /<QueryStatePanel\s+query=\{siteQuery\}\s+emptyTitle="Nenhum site encontrado\."\s+emptyClassName="[^"]*xl:col-span-2[^"]*"/);
 });
