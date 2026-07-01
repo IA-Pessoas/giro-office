@@ -14,9 +14,32 @@ const otherOrganizationUnionId = "40000000-0000-4000-8000-000000000099";
 
 type CreatedNotification = {
   user_id: string;
+  regarding_id: string;
+  title: string;
+  reference_date: Date;
 };
 
-function createPrismaMock() {
+type ExistingNotification = {
+  user_id: string;
+  regarding_id: string;
+  title: string;
+  reference_date: Date;
+};
+
+const tomorrowReferenceDate = new Date("2026-07-01T00:00:00.000Z");
+const monthAgoReferenceDate = new Date("2026-06-01T00:00:00.000Z");
+const previousYearTomorrowReferenceDate = new Date("2025-07-01T00:00:00.000Z");
+
+function createPrismaMock(
+  existingNotifications: ExistingNotification[] = [
+    {
+      user_id: duplicateUserId,
+      regarding_id: unionId,
+      title: "Sindicato prestes a vencer",
+      reference_date: tomorrowReferenceDate,
+    },
+  ],
+) {
   return {
     unionPessoal: {
       findMany: vi.fn(async ({ select, where }) => {
@@ -76,13 +99,7 @@ function createPrismaMock() {
           return [];
         }
 
-        return [
-          {
-            user_id: duplicateUserId,
-            regarding_id: unionId,
-            title: "Sindicato prestes a vencer",
-          },
-        ];
+        return existingNotifications;
       }),
       createMany: vi.fn(async ({ data }) => ({ count: data.length })),
     },
@@ -118,6 +135,15 @@ describe("UnionNotificationService", () => {
         where: expect.objectContaining({ organization_id: otherOrganizationId }),
       }),
     );
+    expect(prisma.pessoalNotification.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          reference_date: {
+            in: expect.arrayContaining([tomorrowReferenceDate, monthAgoReferenceDate]),
+          },
+        }),
+      }),
+    );
     expect(prisma.pessoalNotification.createMany).toHaveBeenCalledTimes(1);
     expect(prisma.pessoalNotification.createMany).toHaveBeenCalledWith({
       data: [
@@ -127,6 +153,7 @@ describe("UnionNotificationService", () => {
           regarding_id: unionId,
           title: "Sindicato prestes a vencer",
           message: "Data base sera alcancada amanha.",
+          reference_date: tomorrowReferenceDate,
           organization_id: organizationId,
         },
         {
@@ -135,6 +162,7 @@ describe("UnionNotificationService", () => {
           regarding_id: monthAgoUnionId,
           title: "Sindicato vencido",
           message: "Data base foi alcancada no mes passado.",
+          reference_date: monthAgoReferenceDate,
           organization_id: organizationId,
         },
         {
@@ -143,9 +171,11 @@ describe("UnionNotificationService", () => {
           regarding_id: monthAgoUnionId,
           title: "Sindicato vencido",
           message: "Data base foi alcancada no mes passado.",
+          reference_date: monthAgoReferenceDate,
           organization_id: organizationId,
         },
       ],
+      skipDuplicates: true,
     });
     expect(
       prisma.pessoalNotification.createMany.mock.calls.flatMap(([call]) =>
@@ -157,5 +187,37 @@ describe("UnionNotificationService", () => {
         (call.data as CreatedNotification[]).map((notification) => notification.user_id),
       ),
     ).not.toContain(lowPermissionUserId);
+  });
+
+  it("permite nova notificacao anual quando so existe registro de ciclo anterior", async () => {
+    const prisma = createPrismaMock([
+      {
+        user_id: duplicateUserId,
+        regarding_id: unionId,
+        title: "Sindicato prestes a vencer",
+        reference_date: previousYearTomorrowReferenceDate,
+      },
+    ]);
+    const service = new UnionNotificationService(prisma as never);
+
+    const result = await service.runForDate({ now: new Date("2026-06-30T12:00:00.000Z") });
+
+    expect(result).toEqual({
+      organizations: 2,
+      unionsMatched: 3,
+      notificationsCreated: 4,
+      duplicatesSkipped: 0,
+    });
+    expect(
+      prisma.pessoalNotification.createMany.mock.calls
+        .flatMap(([call]) => call.data as CreatedNotification[])
+        .some(
+          (notification) =>
+            notification.user_id === duplicateUserId &&
+            notification.regarding_id === unionId &&
+            notification.title === "Sindicato prestes a vencer" &&
+            notification.reference_date.getTime() === tomorrowReferenceDate.getTime(),
+        ),
+    ).toBe(true);
   });
 });

@@ -13,7 +13,7 @@
     "typecheck": "pnpm prisma:generate && tsc --noEmit",
     "check": "biome check .",
     "start": "node dist/server.js",
-    "test": "pnpm exec vitest run",
+    "test": "pnpm exec vitest run src/test",
     "test:watch": "pnpm exec vitest"
   },
   "dependencies": {

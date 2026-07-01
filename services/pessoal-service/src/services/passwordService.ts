@@ -7,8 +7,13 @@ import type {
   UpdatePasswordBody,
 } from "../schemas/password.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
-import type { PessoalPasswordCrypto } from "./pessoalPasswordCrypto.js";
-import { omitUndefined, type PessoalAuthContext, requireUserId } from "./pessoalServiceTypes.js";
+import { isPessoalPasswordEncrypted, type PessoalPasswordCrypto } from "./pessoalPasswordCrypto.js";
+import {
+  omitUndefined,
+  type PessoalAuthContext,
+  requireMinimumPermission,
+  requireUserId,
+} from "./pessoalServiceTypes.js";
 
 const passwordListSelect = {
   id: true,
@@ -93,6 +98,7 @@ const SECRET_FIELD_NAMES = [
   "login_secondary",
   "senha_secondary",
 ] as const;
+const PESSOAL_PASSWORD_SECRET_PERMISSION = 3;
 
 export class PasswordService {
   constructor(
@@ -118,16 +124,40 @@ export class PasswordService {
   }
 
   async detail(
-    context: Pick<PessoalAuthContext, "organizationId">,
+    context: PessoalAuthContext,
     id: string,
-  ): Promise<PasswordDetailRecord> {
+  ): Promise<PasswordListRecord | PasswordDetailRecord> {
     const password = await this.findScopedPassword(context.organizationId, id);
+    if ((context.permission ?? 0) < PESSOAL_PASSWORD_SECRET_PERMISSION) {
+      return toPasswordListRecord(password);
+    }
 
-    return this.decryptPassword(password);
+    const userId = requireUserId(context);
+    const normalizedPassword = await this.encryptLegacySecrets(password);
+    const decryptedPassword = this.decryptPassword(normalizedPassword);
+
+    await this.auditService.recordChange({
+      requestId: context.requestId,
+      organizationId: context.organizationId,
+      userId,
+      permission: context.permission,
+      action: "Visualizacao",
+      referring: "pessoal.passwords",
+      referringId: id,
+      changes: {
+        revealedSecretFields: SECRET_FIELD_NAMES.filter(
+          (field) => decryptedPassword[field] !== null,
+        ),
+      },
+      path: `/pessoal/passwords/${id}`,
+    });
+
+    return decryptedPassword;
   }
 
   async create(context: PessoalAuthContext, body: CreatePasswordBody): Promise<PasswordListRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_PASSWORD_SECRET_PERMISSION);
       const userId = requireUserId(context);
       await this.ensureClient(context.organizationId, body.client_id);
       await this.ensureResponsible(context.organizationId, body.responsavel_id);
@@ -164,6 +194,7 @@ export class PasswordService {
     body: UpdatePasswordBody,
   ): Promise<PasswordListRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_PASSWORD_SECRET_PERMISSION);
       const userId = requireUserId(context);
       await this.findScopedPassword(context.organizationId, id);
       await this.ensureResponsible(context.organizationId, body.responsavel_id);
@@ -197,6 +228,7 @@ export class PasswordService {
 
   async delete(context: PessoalAuthContext, id: string): Promise<PasswordListRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_PASSWORD_SECRET_PERMISSION);
       const userId = requireUserId(context);
       const existing = await this.findScopedPassword(context.organizationId, id);
       const deleted = await this.prisma.passwordPessoal.delete({
@@ -319,6 +351,29 @@ export class PasswordService {
     }
 
     return decrypted;
+  }
+
+  private async encryptLegacySecrets(
+    password: PasswordDetailRecord,
+  ): Promise<PasswordDetailRecord> {
+    const data: Partial<PasswordSecretFields> = {};
+
+    for (const field of SECRET_FIELD_NAMES) {
+      const value = password[field];
+      if (value !== null && !isPessoalPasswordEncrypted(value)) {
+        data[field] = this.crypto.encrypt(value);
+      }
+    }
+
+    if (Object.keys(data).length === 0) {
+      return password;
+    }
+
+    return this.prisma.passwordPessoal.update({
+      where: { id: password.id },
+      data,
+      select: passwordDetailSelect,
+    });
   }
 }
 

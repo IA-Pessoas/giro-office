@@ -130,9 +130,10 @@ describe("PasswordService", () => {
 
   it("detalha senha da organizacao com campos secretos descriptografados", async () => {
     const prisma = createPrismaMock();
-    const service = new PasswordService(prisma as never, createCrypto(), createAuditMock());
+    const audit = createAuditMock();
+    const service = new PasswordService(prisma as never, createCrypto(), audit);
 
-    const result = await service.detail({ organizationId }, recordId);
+    const result = await service.detail({ organizationId, userId, permission: 3 }, recordId);
 
     expect(prisma.passwordPessoal.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -145,6 +146,74 @@ describe("PasswordService", () => {
       login_secondary: "secundario",
       senha_secondary: "senha-secundaria",
     });
+    expect(audit.recordChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Visualizacao",
+        referring: "pessoal.passwords",
+        referringId: recordId,
+        changes: {
+          revealedSecretFields: ["login_main", "senha_main", "login_secondary", "senha_secondary"],
+        },
+      }),
+    );
+  });
+
+  it("detalha senha sem campos secretos para permissao menor que 3", async () => {
+    const prisma = createPrismaMock();
+    const service = new PasswordService(prisma as never, createCrypto(), createAuditMock());
+
+    const result = await service.detail({ organizationId, userId, permission: 1 }, recordId);
+
+    expect(result).toMatchObject({
+      id: recordId,
+      client_id: clientId,
+      service_name: "Portal eSocial",
+      responsavel_id: responsibleId,
+    });
+    expect(result).not.toHaveProperty("login_main");
+    expect(result).not.toHaveProperty("senha_main");
+    expect(result).not.toHaveProperty("login_secondary");
+    expect(result).not.toHaveProperty("senha_secondary");
+    expect(prisma.passwordPessoal.update).not.toHaveBeenCalled();
+  });
+
+  it("recriptografa segredo legado em texto puro antes de retornar detalhe autorizado", async () => {
+    const prisma = createPrismaMock();
+    prisma.passwordPessoal.findFirst.mockResolvedValueOnce(
+      passwordRow({
+        login_main: "login-legado",
+        senha_main: "senha-legada",
+        login_secondary: null,
+        senha_secondary: null,
+      }),
+    );
+    prisma.passwordPessoal.update.mockImplementationOnce(async ({ data }) =>
+      passwordRow({
+        login_main: data.login_main,
+        senha_main: data.senha_main,
+        login_secondary: null,
+        senha_secondary: null,
+      }),
+    );
+    const service = new PasswordService(prisma as never, createCrypto(), createAuditMock());
+
+    const result = await service.detail({ organizationId, userId, permission: 3 }, recordId);
+
+    expect(result).toMatchObject({
+      login_main: "login-legado",
+      senha_main: "senha-legada",
+      login_secondary: null,
+      senha_secondary: null,
+    });
+    expect(prisma.passwordPessoal.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: recordId },
+        data: expect.objectContaining({
+          login_main: expect.not.stringMatching(/^login-legado$/),
+          senha_main: expect.not.stringMatching(/^senha-legada$/),
+        }),
+      }),
+    );
   });
 
   it("cria senha criptografando campos secretos e validando vinculos da organizacao", async () => {
@@ -204,12 +273,29 @@ describe("PasswordService", () => {
     );
   });
 
+  it("rejeita criacao de senha com permissao menor que 3", async () => {
+    const prisma = createPrismaMock();
+    const service = new PasswordService(prisma as never, createCrypto(), createAuditMock());
+
+    await expect(
+      service.create(
+        { organizationId, userId, permission: 2 },
+        {
+          client_id: clientId,
+          service_name: "Portal eSocial",
+          senha_main: "senha-principal",
+        },
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prisma.passwordPessoal.create).not.toHaveBeenCalled();
+  });
+
   it("atualiza senha sem vazar campos secretos na auditoria", async () => {
     const prisma = createPrismaMock();
     const audit = createAuditMock();
     const service = new PasswordService(prisma as never, createCrypto(), audit);
 
-    await service.update({ organizationId, userId }, recordId, {
+    await service.update({ organizationId, userId, permission: 3 }, recordId, {
       senha_main: "nova-senha",
       notes: "Atualizado",
     });
@@ -235,7 +321,7 @@ describe("PasswordService", () => {
     const audit = createAuditMock();
     const service = new PasswordService(prisma as never, createCrypto(), audit);
 
-    await service.delete({ organizationId, userId }, recordId);
+    await service.delete({ organizationId, userId, permission: 3 }, recordId);
 
     expect(prisma.passwordPessoal.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({

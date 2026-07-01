@@ -32,4 +32,37 @@ describe("pessoal-service OpenAPI", () => {
       { internalServiceToken: [] },
     ]);
   });
+
+  it("documenta request bodies estritos para mutacoes do dominio", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const paths = spec.paths as Record<
+      string,
+      Record<string, { requestBody?: { content?: Record<string, { schema?: unknown }> } }>
+    >;
+
+    const mutationSchemas = [
+      paths["/pessoal/ldd"]?.post?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/ldd/{id}"]?.patch?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/situations"]?.post?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/situations/{id}"]?.patch?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/unions"]?.post?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/unions/{id}"]?.patch?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/payroll"]?.post?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/payroll/{client_id}"]?.patch?.requestBody?.content?.["application/json"]
+        ?.schema,
+      paths["/pessoal/obrigations"]?.post?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/obrigations/{id}"]?.patch?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/passwords"]?.post?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/passwords/{id}"]?.patch?.requestBody?.content?.["application/json"]?.schema,
+    ] as Array<Record<string, unknown> | undefined>;
+
+    expect(mutationSchemas).not.toContain(undefined);
+    for (const schema of mutationSchemas) {
+      expect(schema).toMatchObject({
+        type: "object",
+        additionalProperties: false,
+        properties: expect.any(Object),
+      });
+    }
+  });
 });

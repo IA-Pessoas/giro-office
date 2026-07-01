@@ -453,12 +453,14 @@ model PessoalNotification {
   regarding_id    String
   title           String
   message         String
+  reference_date  DateTime     @default(now())
   create_at       DateTime     @default(now())
   read            Boolean      @default(false)
   regarding       String
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
 
+  @@unique([organization_id, user_id, regarding, regarding_id, title, reference_date], map: "uq_pessoal_notification_identity")
   @@map("notification.pessoal")
 }
 

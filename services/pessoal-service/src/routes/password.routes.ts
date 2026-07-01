@@ -28,7 +28,7 @@ export function createPasswordRoutes(service: PasswordService): Router {
 
   router.get("/:id", async (request, response, next) => {
     try {
-      const context = getPessoalOrganizationContext(request);
+      const context = getPessoalRouteContext(request);
       const params = parseWithZod(passwordIdParamsSchema, request.params);
       const result = await service.detail(context, params.id);
 

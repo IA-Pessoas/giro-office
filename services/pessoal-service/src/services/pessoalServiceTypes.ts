@@ -16,6 +16,12 @@ export function requireUserId(context: PessoalAuthContext): string {
   return userId;
 }
 
+export function requireMinimumPermission(context: PessoalAuthContext, minPermission: number): void {
+  if (typeof context.permission !== "number" || context.permission < minPermission) {
+    throw new ServiceError(403, "Permissao insuficiente para acessar o pessoal-service.");
+  }
+}
+
 export function toNullable<T>(value: T | null | undefined): T | null {
   return value === undefined ? null : value;
 }
