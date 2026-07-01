@@ -123,6 +123,33 @@ await runTest("regularize core service exposes create and update endpoints", asy
   }
 });
 
+await runTest("regularize operations service exposes create and update endpoints", async () => {
+  const serviceSource = await readModuleSource("services/regularizeService.ts");
+
+  for (const endpoint of ["municipalTaxes", "process", "guidance", "license"]) {
+    assert.match(
+      serviceSource,
+      new RegExp(`api\\.post\\(REGULARIZE_ENDPOINTS\\.${endpoint}`),
+    );
+    assert.match(
+      serviceSource,
+      new RegExp(`api\\.put\\(REGULARIZE_ENDPOINTS\\.${endpoint}`),
+    );
+  }
+
+  for (const endpoint of [
+    "guidanceActivityAdd",
+    "guidanceActivityRemove",
+    "guidancePartnerAdd",
+    "guidancePartnerRemove",
+  ]) {
+    assert.match(
+      serviceSource,
+      new RegExp(`api\\.post\\(REGULARIZE_ENDPOINTS\\.${endpoint}`),
+    );
+  }
+});
+
 await runTest("regularize core mutations stay in hooks and invalidate cache", async () => {
   for (const hookPath of [
     "hooks/useRegularizeCredentials.ts",
@@ -134,6 +161,31 @@ await runTest("regularize core mutations stay in hooks and invalidate cache", as
     assert.match(source, /useQueryClient/);
     assert.match(source, /invalidateQueries\(\{\s*queryKey: regularizeQueryKeys/);
   }
+});
+
+await runTest("regularize operations mutations stay in hooks and invalidate cache", async () => {
+  const source = await readModuleSource("hooks/useRegularizeOperations.ts");
+
+  for (const mutationName of [
+    "useCreateRegularizeMunicipalTaxMutation",
+    "useUpdateRegularizeMunicipalTaxMutation",
+    "useCreateRegularizeProcessMutation",
+    "useUpdateRegularizeProcessMutation",
+    "useCreateRegularizeGuidanceMutation",
+    "useUpdateRegularizeGuidanceMutation",
+    "useAddRegularizeGuidanceActivityMutation",
+    "useRemoveRegularizeGuidanceActivityMutation",
+    "useAddRegularizeGuidancePartnerMutation",
+    "useRemoveRegularizeGuidancePartnerMutation",
+    "useCreateRegularizeLicenseMutation",
+    "useUpdateRegularizeLicenseMutation",
+  ]) {
+    assert.match(source, new RegExp(`export function ${mutationName}`));
+  }
+
+  assert.match(source, /useMutation/);
+  assert.match(source, /useQueryClient/);
+  assert.match(source, /invalidateQueries\(\{\s*queryKey: regularizeQueryKeys/);
 });
 
 await runTest("regularize components do not own API calls or mutations", async () => {
@@ -154,6 +206,36 @@ await runTest("regularize components do not own API calls or mutations", async (
   }
 
   assert.deepEqual(offenders, []);
+});
+
+await runTest("regularize operations forms are wired in the page", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  for (const formName of [
+    "RegularizeMunicipalTaxesForm",
+    "RegularizeProcessForm",
+    "RegularizeGuidanceForm",
+    "RegularizeGuidanceActivityForm",
+    "RegularizeGuidancePartnerForm",
+    "RegularizeLicenseForm",
+  ]) {
+    assert.match(pageSource, new RegExp(`<${formName}`));
+  }
+});
+
+await runTest("regularize operational tabs expose write actions", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  for (const label of [
+    "Novo processo",
+    "Nova licença",
+    "Novo tributo",
+    "Nova orientação",
+    "Adicionar atividade",
+    "Adicionar sócio",
+  ]) {
+    assert.match(pageSource, new RegExp(`label="${label}"`));
+  }
 });
 
 await runTest("regularize core forms are wired in the page", async () => {
