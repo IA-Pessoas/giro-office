@@ -449,6 +449,7 @@ test("VPS env materialization includes certificate-service in active workflows",
 test("VPS env materialization includes pessoal-service in active workflows", async () => {
   const manifest = await readFile(vpsSecretsManifest, "utf8");
   assert.match(manifest, /^ENV_VPS_PESSOAL_SERVICE\|\.env\.vps\.pessoal-service$/m);
+  assert.match(manifest, /^# INTERNAL_SERVICE_TOKEN=<token para rotas internas e scheduler>$/m);
 
   const workflowsDir = path.join(repoRoot, ".github", "workflows");
   const workflowFiles = (await readdir(workflowsDir))
