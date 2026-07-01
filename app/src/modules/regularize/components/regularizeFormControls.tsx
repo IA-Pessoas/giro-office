@@ -76,9 +76,9 @@ export function RegularizeFormField({
 }) {
   return (
     <label className={cn("flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300", className)}>
-      <span>
-        {label}
-        {required ? <span className="text-red-500"> *</span> : null}
+      <span className="inline-flex items-center gap-1">
+        <span>{label}</span>
+        {required ? <span className="text-red-500">*</span> : null}
       </span>
       {children}
     </label>

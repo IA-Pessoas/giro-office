@@ -234,7 +234,7 @@ export function RegularizeLicenseForm({
               </RegularizeNativeSelect>
             </RegularizeFormField>
 
-            <RegularizeFormField label="Possui?">
+            <RegularizeFormField label="Possui ?">
               <RegularizeNativeSelect
                 value={formState.has ? "true" : "false"}
                 onChange={(event) => handleChange("has", event.target.value === "true")}

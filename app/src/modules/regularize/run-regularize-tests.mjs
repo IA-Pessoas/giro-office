@@ -331,6 +331,15 @@ await runTest("regularize required field errors render as sticky alerts", async 
   assert.match(controlsSource, /sticky top-0/);
 });
 
+await runTest("regularize required field markers keep label punctuation spacing clean", async () => {
+  const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
+
+  assert.match(controlsSource, /inline-flex items-center gap-1/);
+  assert.match(controlsSource, /<span>\{label\}<\/span>/);
+  assert.match(controlsSource, /<span className="text-red-500">\*<\/span>/);
+  assert.doesNotMatch(controlsSource, /> \*<\/span>/);
+});
+
 await runTest("regularize form action footers stay unseparated", async () => {
   const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
   const actionsStart = controlsSource.indexOf("export function RegularizeFormActions");
