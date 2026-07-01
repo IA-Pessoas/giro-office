@@ -1,0 +1,96 @@
+import type { ReactNode } from "react";
+import { AlertTriangle } from "lucide-react";
+
+import { cn } from "@shared/ui/newLayout/utils";
+
+export const regularizeTextFieldClassName =
+  "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:disabled:bg-gray-800";
+
+export const regularizeTextareaClassName = `${regularizeTextFieldClassName} min-h-24 resize-y`;
+
+export const regularizeSelectClassName = `${regularizeTextFieldClassName} appearance-auto`;
+
+export const regularizeSecondaryButtonClassName =
+  "rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700";
+
+export const regularizePrimaryButtonClassName =
+  "rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60";
+
+export type RegularizeFormOption = {
+  id: string;
+  label: string;
+  description?: string | null;
+};
+
+export function RegularizeFormField({
+  children,
+  className,
+  label,
+  required,
+}: {
+  children: ReactNode;
+  className?: string;
+  label: string;
+  required?: boolean;
+}) {
+  return (
+    <label className={cn("flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300", className)}>
+      <span>
+        {label}
+        {required ? <span className="text-red-500"> *</span> : null}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+export function RegularizeFormError({ message }: { message?: string | null }) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <div
+      role="alert"
+      className="sticky top-0 z-20 flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg shadow-red-950/5 dark:border-red-800/80 dark:bg-red-950/80 dark:text-red-100"
+    >
+      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/70 dark:text-red-100">
+        <AlertTriangle className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block font-semibold">Revise os campos obrigatórios</span>
+        <span className="mt-0.5 block">{message}</span>
+      </span>
+    </div>
+  );
+}
+
+export function RegularizeFormActions({
+  cancelLabel = "Cancelar",
+  isSubmitting,
+  onCancel,
+  submitLabel,
+  submittingLabel = "Salvando...",
+}: {
+  cancelLabel?: string;
+  isSubmitting: boolean;
+  onCancel: () => void;
+  submitLabel: string;
+  submittingLabel?: string;
+}) {
+  return (
+    <div className="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+      <button
+        type="button"
+        onClick={onCancel}
+        disabled={isSubmitting}
+        className={regularizeSecondaryButtonClassName}
+      >
+        {cancelLabel}
+      </button>
+      <button type="submit" disabled={isSubmitting} className={regularizePrimaryButtonClassName}>
+        {isSubmitting ? submittingLabel : submitLabel}
+      </button>
+    </div>
+  );
+}

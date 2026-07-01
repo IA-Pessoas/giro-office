@@ -4,7 +4,7 @@ export type RegularizeStatus = string | boolean;
 
 export type RegularizePartnerType = "pf" | "pj";
 
-export type RegularizeCapability = "credentials:reveal";
+export type RegularizeCapability = "credentials:reveal" | "core:write";
 
 export type RegularizeIdFilter = {
   id: RegularizeId;
@@ -62,6 +62,18 @@ export type RegularizePasswordDetail = RegularizePasswordListItem & {
   password: string;
 };
 
+export type CreateRegularizePasswordPayload = {
+  client_id: RegularizeId;
+  site_id: RegularizeId;
+  login: string;
+  password: string;
+  notes?: string | null;
+};
+
+export type UpdateRegularizePasswordPayload = CreateRegularizePasswordPayload & {
+  id: RegularizeId;
+};
+
 export type RegularizeSitePasswordListItem = {
   id: RegularizeId;
   name: string;
@@ -73,6 +85,19 @@ export type RegularizeSitePasswordListItem = {
 
 export type RegularizeSitePasswordDetail = RegularizeSitePasswordListItem & {
   password: string;
+};
+
+export type CreateRegularizeSitePasswordPayload = {
+  name: string;
+  sphere: string;
+  link?: string | null;
+  user: string;
+  password: string;
+};
+
+export type UpdateRegularizeSitePasswordPayload = CreateRegularizeSitePasswordPayload & {
+  id: RegularizeId;
+  status: boolean;
 };
 
 export type RegularizeClientPfListItem = {
@@ -106,6 +131,37 @@ export type RegularizeClientPfDetail = RegularizeClientPfListItem & {
   status?: string | null;
 };
 
+export type CreateRegularizeClientPfPayload = {
+  code: string;
+  name: string;
+  sex: string;
+  address: string;
+  city: string;
+  zip_code: string;
+  state: string;
+  profession: string;
+  father: string;
+  mother: string;
+  marital_status: string;
+  date_of_birth: string;
+  cpf: string;
+  rg: string;
+  rg_expedition?: string;
+  rg_validity?: string;
+  military_certificate?: string;
+  ctps?: string;
+  cnh?: string;
+  cnh_expedition?: string;
+  cnh_validity?: string;
+  spouse?: string;
+  notes?: string;
+  status: string;
+};
+
+export type UpdateRegularizeClientPfPayload = CreateRegularizeClientPfPayload & {
+  id: RegularizeId;
+};
+
 export type RegularizePartner = {
   id: RegularizeId;
   pj_id: RegularizeId;
@@ -113,6 +169,18 @@ export type RegularizePartner = {
   part?: number | string | null;
   entry?: string | null;
   exit?: string | null;
+};
+
+export type CreateRegularizePartnerPayload = {
+  pj_id: RegularizeId;
+  pf_id: RegularizeId;
+  part: number;
+  entry: string;
+  exit?: string;
+};
+
+export type UpdateRegularizePartnerPayload = CreateRegularizePartnerPayload & {
+  id: RegularizeId;
 };
 
 export type RegularizeMunicipalTaxesClientSummary = {

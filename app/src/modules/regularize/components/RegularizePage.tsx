@@ -12,6 +12,8 @@ import {
   FileKey2,
   Landmark,
   Loader2,
+  Pencil,
+  Plus,
   RefreshCw,
   ShieldCheck,
   UserRound,
@@ -19,20 +21,34 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "react-toastify";
 
+import { useClients } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { cn } from "@shared/ui/newLayout/utils";
 
+import { RegularizeClientPfForm } from "./RegularizeClientPfForm";
+import { RegularizePartnerForm } from "./RegularizePartnerForm";
+import { RegularizePasswordForm } from "./RegularizePasswordForm";
+import { RegularizeSitePasswordForm } from "./RegularizeSitePasswordForm";
 import {
+  useCreateRegularizePasswordMutation,
+  useCreateRegularizeSitePasswordMutation,
   useRegularizePasswordDetail,
   useRegularizePasswords,
   useRegularizeSitePasswordDetail,
   useRegularizeSitePasswords,
+  useUpdateRegularizePasswordMutation,
+  useUpdateRegularizeSitePasswordMutation,
 } from "../hooks/useRegularizeCredentials";
 import {
+  useCreateRegularizeClientPfMutation,
+  useCreateRegularizePartnerMutation,
   useRegularizeClientPfDetail,
   useRegularizeClientPfs,
   useRegularizePartners,
+  useUpdateRegularizeClientPfMutation,
+  useUpdateRegularizePartnerMutation,
 } from "../hooks/useRegularizePeople";
 import {
   useRegularizeGuidance,
@@ -42,18 +58,30 @@ import {
   useRegularizeProcesses,
 } from "../hooks/useRegularizeOperations";
 import type {
+  CreateRegularizeClientPfPayload,
+  CreateRegularizePartnerPayload,
+  CreateRegularizePasswordPayload,
+  CreateRegularizeSitePasswordPayload,
   RegularizeCapability,
   RegularizeClientPfListItem,
-  RegularizeGuidance,
   RegularizeId,
-  RegularizeLicenseListItem,
   RegularizeMunicipalTaxesClientSummary,
   RegularizePartner,
   RegularizePasswordListItem,
   RegularizeProcessListItem,
   RegularizeSitePasswordListItem,
   RegularizeStatus,
+  UpdateRegularizeClientPfPayload,
+  UpdateRegularizePartnerPayload,
+  UpdateRegularizePasswordPayload,
+  UpdateRegularizeSitePasswordPayload,
 } from "../types";
+import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
+import {
+  type RegularizeFormOption,
+  regularizePrimaryButtonClassName,
+  regularizeSelectClassName,
+} from "./regularizeFormControls";
 
 type RegularizeTabId =
   | "dashboard"
@@ -71,6 +99,16 @@ type RegularizeTab = {
   icon: LucideIcon;
 };
 
+type RegularizeCoreFormState =
+  | { type: "client-pf"; mode: "create" }
+  | { type: "client-pf"; mode: "edit"; id: RegularizeId }
+  | { type: "partner"; mode: "create" }
+  | { type: "partner"; mode: "edit"; partner: RegularizePartner }
+  | { type: "password"; mode: "create" }
+  | { type: "password"; mode: "edit"; id: RegularizeId }
+  | { type: "site-password"; mode: "create" }
+  | { type: "site-password"; mode: "edit"; id: RegularizeId };
+
 type ListQuery<T> = Pick<
   UseQueryResult<T[], Error>,
   "data" | "error" | "isError" | "isFetching" | "isLoading" | "refetch"
@@ -87,7 +125,7 @@ const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "taxes", label: "Tributos", icon: Landmark },
 ];
 
-const REGULARIZE_CAPABILITIES: RegularizeCapability[] = ["credentials:reveal"];
+const REGULARIZE_CAPABILITIES: RegularizeCapability[] = ["credentials:reveal", "core:write"];
 
 function normalizeStatus(status: RegularizeStatus | null | undefined): string {
   if (typeof status === "boolean") {
@@ -153,6 +191,86 @@ function hasCredentialRevealCapability(capabilities: RegularizeCapability[]): bo
   return capabilities.includes("credentials:reveal");
 }
 
+function hasCoreWriteCapability(capabilities: RegularizeCapability[]): boolean {
+  return capabilities.includes("core:write");
+}
+
+function formatOptionLabel(label: string, description?: string | null): string {
+  return description ? `${label}, ${description}` : label;
+}
+
+function TableActionButton({
+  disabled,
+  icon: Icon,
+  onClick,
+  title,
+}: {
+  disabled?: boolean;
+  icon: LucideIcon;
+  onClick: () => void;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+      title={title}
+    >
+      <Icon className="h-4 w-4" />
+    </button>
+  );
+}
+
+function PrimaryActionButton({
+  disabled,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  disabled?: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={regularizePrimaryButtonClassName}
+    >
+      <span className="inline-flex items-center gap-2">
+        <Icon className="h-4 w-4" />
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function TabActionHeader({
+  action,
+  description,
+  title,
+}: {
+  action?: ReactNode;
+  description: string;
+  title: string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+          {title}
+        </h2>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{description}</p>
+      </div>
+      {action ? <div className="shrink-0 sm:pb-0.5">{action}</div> : null}
+    </div>
+  );
+}
+
 function DashboardSectionCard({
   actionLabel,
   children,
@@ -170,7 +288,9 @@ function DashboardSectionCard({
     <section className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+          <h3 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">
+            {title}
+          </h3>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{description}</p>
         </div>
         {actionLabel && onAction ? (
@@ -204,7 +324,7 @@ function DashboardHeroCard({
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-violet-600 p-5 text-white shadow-sm">
       <div className="flex min-h-[180px] items-start justify-between gap-5">
         <div className="min-w-0">
-          <p className="text-sm font-semibold uppercase tracking-[0.08em] text-white/85">
+          <p className="text-base font-semibold uppercase tracking-[0.06em] text-white/85">
             {label}
           </p>
           <p className="mt-3 text-4xl font-semibold tracking-tight">{value}</p>
@@ -236,7 +356,7 @@ function MetricTile({
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
             <Icon className="h-4 w-4" />
           </div>
-          <p className="min-w-0 text-[13px] font-semibold uppercase tracking-[0.04em] text-gray-600 dark:text-gray-300">
+          <p className="min-w-0 text-sm font-semibold uppercase tracking-[0.04em] text-gray-600 dark:text-gray-300">
             {label}
           </p>
         </div>
@@ -255,10 +375,12 @@ function MetricTile({
 
 function QueryStatePanel<T>({
   children,
+  emptyClassName,
   emptyTitle,
   query,
 }: {
   children: (rows: T[]) => ReactNode;
+  emptyClassName?: string;
   emptyTitle: string;
   query: ListQuery<T>;
 }) {
@@ -302,7 +424,12 @@ function QueryStatePanel<T>({
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+      <div
+        className={cn(
+          "flex min-h-32 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400",
+          emptyClassName,
+        )}
+      >
         {emptyTitle}
       </div>
     );
@@ -348,10 +475,20 @@ function DataTable({
 
 function DetailPanel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <aside className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-950/30">
+    <aside className="flex h-full min-h-32 flex-col rounded-lg border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
       <h3 className="text-sm font-semibold text-gray-950 dark:text-white">{title}</h3>
-      <div className="mt-3 space-y-2 text-sm text-gray-600 dark:text-slate-300">{children}</div>
+      <div className="mt-3 flex flex-1 flex-col space-y-2 text-sm text-gray-600 dark:text-slate-300">
+        {children}
+      </div>
     </aside>
+  );
+}
+
+function DetailEmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-[120px] flex-1 items-center justify-center text-center text-sm font-medium text-gray-500 dark:text-slate-400">
+      {message}
+    </div>
   );
 }
 
@@ -403,21 +540,36 @@ function MaskedValue() {
 export function RegularizePage() {
   const [activeTab, setActiveTab] = useState<RegularizeTabId>("dashboard");
   const [selectedClientPfId, setSelectedClientPfId] = useState<RegularizeId>();
+  const [selectedCredentialClientId, setSelectedCredentialClientId] = useState<RegularizeId>();
   const [selectedProcessId, setSelectedProcessId] = useState<RegularizeId>();
   const [activePasswordId, setActivePasswordId] = useState<RegularizeId>();
   const [activeSitePasswordId, setActiveSitePasswordId] = useState<RegularizeId>();
+  const [activeForm, setActiveForm] = useState<RegularizeCoreFormState | null>(null);
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const canRevealCredentials = hasCredentialRevealCapability(REGULARIZE_CAPABILITIES);
+  const canManageRegularizeCore = hasCoreWriteCapability(REGULARIZE_CAPABILITIES);
 
+  const clientQuery = useClients({ status: "Ativo", page: 1, limit: 100 });
   const pfQuery = useRegularizeClientPfs({ status: "Ativo" });
   const siteQuery = useRegularizeSitePasswords({ status: true });
   const taxQuery = useRegularizeMunicipalTaxes({ year: currentYear });
   const processQuery = useRegularizeProcesses({ status: "Todos" });
   const licenseQuery = useRegularizeLicenses({ status: "Ativo" });
 
+  const createSitePasswordMutation = useCreateRegularizeSitePasswordMutation();
+  const updateSitePasswordMutation = useUpdateRegularizeSitePasswordMutation();
+  const createPasswordMutation = useCreateRegularizePasswordMutation();
+  const updatePasswordMutation = useUpdateRegularizePasswordMutation();
+  const createClientPfMutation = useCreateRegularizeClientPfMutation();
+  const updateClientPfMutation = useUpdateRegularizeClientPfMutation();
+  const createPartnerMutation = useCreateRegularizePartnerMutation();
+  const updatePartnerMutation = useUpdateRegularizePartnerMutation();
+
+  const firstCredentialClientId = clientQuery.data?.items[0]?.id;
   const firstClientPfId = pfQuery.data?.[0]?.id;
   const firstProcessId = processQuery.data?.[0]?.id;
+  const currentCredentialClientId = selectedCredentialClientId ?? firstCredentialClientId;
   const currentClientPfId = selectedClientPfId ?? firstClientPfId;
   const currentProcessId = selectedProcessId ?? firstProcessId;
 
@@ -425,7 +577,7 @@ export function RegularizePage() {
     currentClientPfId ? { type: "pf", client_id: currentClientPfId } : undefined,
   );
   const credentialQuery = useRegularizePasswords(
-    currentClientPfId ? { client_id: currentClientPfId } : undefined,
+    currentCredentialClientId ? { client_id: currentCredentialClientId } : undefined,
   );
   const guidanceQuery = useRegularizeGuidance(
     currentProcessId ? { process_id: currentProcessId } : undefined,
@@ -448,6 +600,12 @@ export function RegularizePage() {
       setSelectedClientPfId(firstClientPfId);
     }
   }, [firstClientPfId, selectedClientPfId]);
+
+  useEffect(() => {
+    if (!selectedCredentialClientId && firstCredentialClientId) {
+      setSelectedCredentialClientId(firstCredentialClientId);
+    }
+  }, [firstCredentialClientId, selectedCredentialClientId]);
 
   useEffect(() => {
     if (!selectedProcessId && firstProcessId) {
@@ -476,9 +634,57 @@ export function RegularizePage() {
       taxesTotal: taxRows.length,
     };
   }, [licenseQuery.data, pfQuery.data, processQuery.data, siteQuery.data, taxQuery.data]);
+  const hasProcessRows = (processQuery.data?.length ?? 0) > 0;
+  const hasSiteRows = (siteQuery.data?.length ?? 0) > 0;
+
+  const clientOptions = useMemo<RegularizeFormOption[]>(
+    () =>
+      (clientQuery.data?.items ?? []).map((client) => ({
+        id: client.id,
+        label: client.name || client.company_name || client.id,
+        description: client.cpf_cnpj,
+      })),
+    [clientQuery.data],
+  );
+
+  const pfOptions = useMemo<RegularizeFormOption[]>(
+    () =>
+      (pfQuery.data ?? []).map((clientPf) => ({
+        id: clientPf.id,
+        label: clientPf.name || clientPf.id,
+        description: clientPf.cpf,
+      })),
+    [pfQuery.data],
+  );
+
+  const siteOptions = useMemo<RegularizeFormOption[]>(
+    () =>
+      (siteQuery.data ?? []).map((site) => ({
+        id: site.id,
+        label: site.name,
+        description: site.sphere,
+      })),
+    [siteQuery.data],
+  );
+
+  const activeClientPfForForm =
+    activeForm?.type === "client-pf" && activeForm.mode === "edit"
+      ? clientPfDetailQuery.data ?? null
+      : null;
+  const activePasswordForForm =
+    activeForm?.type === "password" && activeForm.mode === "edit"
+      ? passwordDetailQuery.data ?? null
+      : null;
+  const activeSitePasswordForForm =
+    activeForm?.type === "site-password" && activeForm.mode === "edit"
+      ? sitePasswordDetailQuery.data ?? null
+      : null;
+  const activePartnerForForm =
+    activeForm?.type === "partner" && activeForm.mode === "edit" ? activeForm.partner : null;
 
   function handleRefreshRegularize() {
     void Promise.all([
+      clientQuery.refetch(),
       pfQuery.refetch(),
       siteQuery.refetch(),
       taxQuery.refetch(),
@@ -488,6 +694,96 @@ export function RegularizePage() {
       credentialQuery.refetch(),
       guidanceQuery.refetch(),
     ]);
+  }
+
+  function closeCoreForm() {
+    setActiveForm(null);
+  }
+
+  async function handleSubmitSitePassword(
+    payload: CreateRegularizeSitePasswordPayload | UpdateRegularizeSitePasswordPayload,
+  ) {
+    try {
+      if ("id" in payload) {
+        await updateSitePasswordMutation.mutateAsync(payload);
+        toast.success("Site atualizado com sucesso.");
+      } else {
+        await createSitePasswordMutation.mutateAsync(payload);
+        toast.success("Site criado com sucesso.");
+      }
+
+      setActiveSitePasswordId(undefined);
+      closeCoreForm();
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(error, "Não foi possível salvar o site.");
+      toast.error(message);
+      throw new Error(message);
+    }
+  }
+
+  async function handleSubmitPassword(
+    payload: CreateRegularizePasswordPayload | UpdateRegularizePasswordPayload,
+  ) {
+    try {
+      if ("id" in payload) {
+        await updatePasswordMutation.mutateAsync(payload);
+        toast.success("Senha atualizada com sucesso.");
+      } else {
+        await createPasswordMutation.mutateAsync(payload);
+        toast.success("Senha criada com sucesso.");
+      }
+
+      setSelectedCredentialClientId(payload.client_id);
+      setActivePasswordId(undefined);
+      closeCoreForm();
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(error, "Não foi possível salvar a senha.");
+      toast.error(message);
+      throw new Error(message);
+    }
+  }
+
+  async function handleSubmitClientPf(
+    payload: CreateRegularizeClientPfPayload | UpdateRegularizeClientPfPayload,
+  ) {
+    try {
+      const savedClientPf =
+        "id" in payload
+          ? await updateClientPfMutation.mutateAsync(payload)
+          : await createClientPfMutation.mutateAsync(payload);
+
+      setSelectedClientPfId(savedClientPf.id);
+      toast.success("Cliente PF salvo com sucesso.");
+      closeCoreForm();
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(
+        error,
+        "Não foi possível salvar o cliente PF.",
+      );
+      toast.error(message);
+      throw new Error(message);
+    }
+  }
+
+  async function handleSubmitPartner(
+    payload: CreateRegularizePartnerPayload | UpdateRegularizePartnerPayload,
+  ) {
+    try {
+      if ("id" in payload) {
+        await updatePartnerMutation.mutateAsync(payload);
+        toast.success("Sócio atualizado com sucesso.");
+      } else {
+        await createPartnerMutation.mutateAsync(payload);
+        toast.success("Sócio criado com sucesso.");
+      }
+
+      setSelectedClientPfId(payload.pf_id);
+      closeCoreForm();
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(error, "Não foi possível salvar o sócio.");
+      toast.error(message);
+      throw new Error(message);
+    }
   }
 
   return (
@@ -628,7 +924,11 @@ export function RegularizePage() {
 
       {activeTab === "processes" ? (
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">
-          <QueryStatePanel query={processQuery} emptyTitle="Nenhum processo encontrado.">
+          <QueryStatePanel
+            query={processQuery}
+            emptyTitle="Nenhum processo encontrado."
+            emptyClassName="xl:col-span-2 min-h-[220px] items-center justify-center"
+          >
             {(processRows) => (
               <DataTable headers={["Processo", "Cliente", "Documento", "Status", ""]}>
                 {processRows.map((item) => (
@@ -655,7 +955,8 @@ export function RegularizePage() {
             )}
           </QueryStatePanel>
 
-          <DetailPanel title="Processo selecionado">
+          {hasProcessRows ? (
+            <DetailPanel title="Processo selecionado">
             {processDetailQuery.isLoading ? (
               <FieldLine label="Status" value="Carregando..." />
             ) : processDetailQuery.data ? (
@@ -667,7 +968,7 @@ export function RegularizePage() {
                 />
                 <FieldLine label="Entrada" value={formatDate(processDetailQuery.data.entry_date)} />
                 <FieldLine label="Previsto" value={formatDate(processDetailQuery.data.expected_date)} />
-                <FieldLine label="Urgencia" value={formatText(processDetailQuery.data.urgency)} />
+                <FieldLine label="Urgência" value={formatText(processDetailQuery.data.urgency)} />
               </>
             ) : (
               <FieldLine label="Status" value="Sem seleção." />
@@ -693,7 +994,8 @@ export function RegularizePage() {
                 )}
               </QueryStatePanel>
             </div>
-          </DetailPanel>
+            </DetailPanel>
+          ) : null}
         </section>
       ) : null}
 
@@ -720,54 +1022,93 @@ export function RegularizePage() {
       ) : null}
 
       {activeTab === "pf" ? (
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
-          <QueryStatePanel query={pfQuery} emptyTitle="Nenhum cliente PF encontrado.">
-            {(pfRows) => (
-              <DataTable headers={["Código", "Nome", "CPF", ""]}>
-                {pfRows.map((item: RegularizeClientPfListItem) => (
-                  <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                    <td className="px-4 py-3">{formatText(item.code)}</td>
-                    <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                    <td className="px-4 py-3">{formatText(item.cpf)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedClientPfId(item.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                        title="Ver detalhe"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </DataTable>
-            )}
-          </QueryStatePanel>
+        <section className="space-y-4">
+          <TabActionHeader
+            title="Clientes PF"
+            description="Cadastro e manutenção de pessoas físicas usadas no Regularize."
+            action={
+              canManageRegularizeCore ? (
+                <PrimaryActionButton
+                  icon={Plus}
+                  label="Novo PF"
+                  onClick={() => setActiveForm({ type: "client-pf", mode: "create" })}
+                />
+              ) : null
+            }
+          />
 
-          <DetailPanel title="Cliente PF selecionado">
-            {clientPfDetailQuery.isLoading ? (
-              <FieldLine label="Status" value="Carregando..." />
-            ) : clientPfDetailQuery.data ? (
-              <>
-                <FieldLine label="Nome" value={formatText(clientPfDetailQuery.data.name)} />
-                <FieldLine label="CPF" value={formatText(clientPfDetailQuery.data.cpf)} />
-                <FieldLine label="Cidade" value={formatText(clientPfDetailQuery.data.city)} />
-                <FieldLine label="UF" value={formatText(clientPfDetailQuery.data.state)} />
-                <FieldLine label="Status" value={formatText(clientPfDetailQuery.data.status)} />
-              </>
-            ) : (
-              <FieldLine label="Status" value="Sem seleção." />
-            )}
-          </DetailPanel>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
+            <QueryStatePanel query={pfQuery} emptyTitle="Nenhum cliente PF encontrado.">
+              {(pfRows) => (
+                <DataTable headers={["Código", "Nome", "CPF", ""]}>
+                  {pfRows.map((item: RegularizeClientPfListItem) => (
+                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                      <td className="px-4 py-3">{formatText(item.code)}</td>
+                      <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
+                      <td className="px-4 py-3">{formatText(item.cpf)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <TableActionButton
+                            icon={Eye}
+                            title="Ver detalhe"
+                            onClick={() => setSelectedClientPfId(item.id)}
+                          />
+                          {canManageRegularizeCore ? (
+                            <TableActionButton
+                              icon={Pencil}
+                              title="Editar cliente PF"
+                              onClick={() => {
+                                setSelectedClientPfId(item.id);
+                                setActiveForm({ type: "client-pf", mode: "edit", id: item.id });
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </DataTable>
+              )}
+            </QueryStatePanel>
+
+            <DetailPanel title="Cliente PF selecionado">
+              {clientPfDetailQuery.isLoading ? (
+                <FieldLine label="Status" value="Carregando..." />
+              ) : clientPfDetailQuery.data ? (
+                <>
+                  <FieldLine label="Nome" value={formatText(clientPfDetailQuery.data.name)} />
+                  <FieldLine label="CPF" value={formatText(clientPfDetailQuery.data.cpf)} />
+                  <FieldLine label="Cidade" value={formatText(clientPfDetailQuery.data.city)} />
+                  <FieldLine label="UF" value={formatText(clientPfDetailQuery.data.state)} />
+                  <FieldLine label="Status" value={formatText(clientPfDetailQuery.data.status)} />
+                </>
+              ) : (
+                <FieldLine label="Status" value="Sem seleção." />
+              )}
+            </DetailPanel>
+          </div>
         </section>
       ) : null}
 
       {activeTab === "partners" ? (
-        <section>
+        <section className="space-y-4">
+          <TabActionHeader
+            title="Sócios"
+            description="Quadro societário vinculado aos clientes PF e PJ do Regularize."
+            action={
+              canManageRegularizeCore ? (
+                <PrimaryActionButton
+                  icon={Plus}
+                  label="Novo sócio"
+                  onClick={() => setActiveForm({ type: "partner", mode: "create" })}
+                />
+              ) : null
+            }
+          />
+
           <QueryStatePanel query={partnerQuery} emptyTitle="Nenhum sócio encontrado.">
             {(partnerRows) => (
-              <DataTable headers={["PF", "PJ", "Participação", "Entrada", "Saída"]}>
+              <DataTable headers={["PF", "PJ", "Participação", "Entrada", "Saída", ""]}>
                 {partnerRows.map((item: RegularizePartner) => (
                   <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                     <td className="px-4 py-3 font-medium">{formatText(item.pf_id).slice(0, 8)}</td>
@@ -775,6 +1116,19 @@ export function RegularizePage() {
                     <td className="px-4 py-3">{formatText(item.part)}</td>
                     <td className="px-4 py-3">{formatDate(item.entry)}</td>
                     <td className="px-4 py-3">{formatDate(item.exit)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end">
+                        {canManageRegularizeCore ? (
+                          <TableActionButton
+                            icon={Pencil}
+                            title="Editar sócio"
+                            onClick={() =>
+                              setActiveForm({ type: "partner", mode: "edit", partner: item })
+                            }
+                          />
+                        ) : null}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </DataTable>
@@ -784,99 +1138,186 @@ export function RegularizePage() {
       ) : null}
 
       {activeTab === "passwords" ? (
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
-          <QueryStatePanel query={credentialQuery} emptyTitle="Nenhuma senha encontrada.">
-            {(credentialRows) => (
-              <DataTable headers={["Site", "Escopo", "Observação", "Senha", ""]}>
-                {credentialRows.map((item: RegularizePasswordListItem) => (
-                  <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                    <td className="px-4 py-3 font-medium">{formatText(item.site?.name)}</td>
-                    <td className="px-4 py-3">{formatText(item.site?.sphere)}</td>
-                    <td className="px-4 py-3">{formatText(item.notes)}</td>
-                    <td className="px-4 py-3"><MaskedValue /></td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        disabled={!canRevealCredentials}
-                        onClick={() => setActivePasswordId(item.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                        title="Revelar senha"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </DataTable>
-            )}
-          </QueryStatePanel>
+        <section className="space-y-4">
+          <TabActionHeader
+            title="Senhas por cliente"
+            description="Credenciais vinculadas ao cliente selecionado, com reveal explícito."
+            action={
+              canManageRegularizeCore ? (
+                <PrimaryActionButton
+                  icon={Plus}
+                  label="Nova senha"
+                  onClick={() => setActiveForm({ type: "password", mode: "create" })}
+                />
+              ) : null
+            }
+          />
 
-          <DetailPanel title="Senha selecionada">
-            {passwordDetailQuery.isLoading ? (
-              <FieldLine label="Status" value="Carregando..." />
-            ) : passwordDetailQuery.isError ? (
-              <FieldLine label="Status" value="Acesso negado ou indisponível." />
-            ) : passwordDetailQuery.data ? (
-              <>
-                <FieldLine label="Login" value={formatText(passwordDetailQuery.data.login)} />
-                <FieldLine label="Senha" value={formatText(passwordDetailQuery.data.password)} />
-                <FieldLine label="Notas" value={formatText(passwordDetailQuery.data.notes)} />
-              </>
-            ) : (
-              <FieldLine label="Status" value="Sem revelação ativa." />
-            )}
-          </DetailPanel>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)] xl:items-stretch">
+            <div className="space-y-3">
+              <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                <label className="flex max-w-xl flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <span>Cliente</span>
+                  <select
+                    value={currentCredentialClientId ?? ""}
+                    onChange={(event) => setSelectedCredentialClientId(event.target.value)}
+                    className={regularizeSelectClassName}
+                  >
+                    <option value="">Selecione</option>
+                    {clientOptions.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {formatOptionLabel(client.label, client.description)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <QueryStatePanel query={credentialQuery} emptyTitle="Nenhuma senha encontrada.">
+                {(credentialRows) => (
+                  <DataTable headers={["Site", "Escopo", "Observação", "Senha", ""]}>
+                    {credentialRows.map((item: RegularizePasswordListItem) => (
+                      <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                        <td className="px-4 py-3 font-medium">{formatText(item.site?.name)}</td>
+                        <td className="px-4 py-3">{formatText(item.site?.sphere)}</td>
+                        <td className="px-4 py-3">{formatText(item.notes)}</td>
+                        <td className="px-4 py-3">
+                          <MaskedValue />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-1">
+                            <TableActionButton
+                              disabled={!canRevealCredentials}
+                              icon={Eye}
+                              title="Revelar senha"
+                              onClick={() => setActivePasswordId(item.id)}
+                            />
+                            {canManageRegularizeCore ? (
+                              <TableActionButton
+                                disabled={!canRevealCredentials}
+                                icon={Pencil}
+                                title="Editar senha"
+                                onClick={() => {
+                                  setActivePasswordId(item.id);
+                                  setActiveForm({ type: "password", mode: "edit", id: item.id });
+                                }}
+                              />
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </DataTable>
+                )}
+              </QueryStatePanel>
+            </div>
+
+            <DetailPanel title="Senha selecionada">
+              {passwordDetailQuery.isLoading ? (
+                <FieldLine label="Status" value="Carregando..." />
+              ) : passwordDetailQuery.isError ? (
+                <FieldLine label="Status" value="Acesso negado ou indisponível." />
+              ) : passwordDetailQuery.data ? (
+                <>
+                  <FieldLine label="Login" value={formatText(passwordDetailQuery.data.login)} />
+                  <FieldLine label="Senha" value={formatText(passwordDetailQuery.data.password)} />
+                  <FieldLine label="Notas" value={formatText(passwordDetailQuery.data.notes)} />
+                </>
+              ) : (
+                <DetailEmptyState message="Sem revelação ativa." />
+              )}
+            </DetailPanel>
+          </div>
         </section>
       ) : null}
 
       {activeTab === "sites" ? (
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
-          <QueryStatePanel query={siteQuery} emptyTitle="Nenhum site encontrado.">
-            {(siteRows) => (
-              <DataTable headers={["Site", "Escopo", "Usuário", "Status", ""]}>
-                {siteRows.map((item: RegularizeSitePasswordListItem) => (
-                  <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                    <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                    <td className="px-4 py-3">{formatText(item.sphere)}</td>
-                    <td className="px-4 py-3">{formatText(item.user)}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        disabled={!canRevealCredentials}
-                        onClick={() => setActiveSitePasswordId(item.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                        title="Revelar credencial"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </DataTable>
-            )}
-          </QueryStatePanel>
-
-          <DetailPanel title="Site selecionado">
-            {sitePasswordDetailQuery.isLoading ? (
-              <FieldLine label="Status" value="Carregando..." />
-            ) : sitePasswordDetailQuery.isError ? (
-              <FieldLine label="Status" value="Acesso negado ou indisponível." />
-            ) : sitePasswordDetailQuery.data ? (
-              <>
-                <FieldLine label="Usuário" value={formatText(sitePasswordDetailQuery.data.user)} />
-                <FieldLine
-                  label="Senha"
-                  value={formatText(sitePasswordDetailQuery.data.password)}
+        <section className="space-y-4">
+          <TabActionHeader
+            title="Sites base"
+            description="Portais e credenciais base usados para compor as senhas por cliente."
+            action={
+              canManageRegularizeCore ? (
+                <PrimaryActionButton
+                  icon={Plus}
+                  label="Novo site"
+                  onClick={() => setActiveForm({ type: "site-password", mode: "create" })}
                 />
-                <FieldLine label="Link" value={formatText(sitePasswordDetailQuery.data.link)} />
-              </>
-            ) : (
-              <FieldLine label="Status" value="Sem revelação ativa." />
-            )}
-          </DetailPanel>
+              ) : null
+            }
+          />
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)] xl:items-stretch">
+            <QueryStatePanel
+              query={siteQuery}
+              emptyTitle="Nenhum site encontrado."
+              emptyClassName="xl:col-span-2"
+            >
+              {(siteRows) => (
+                <DataTable headers={["Site", "Escopo", "Usuário", "Status", ""]}>
+                  {siteRows.map((item: RegularizeSitePasswordListItem) => (
+                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                      <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
+                      <td className="px-4 py-3">{formatText(item.sphere)}</td>
+                      <td className="px-4 py-3">{formatText(item.user)}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <TableActionButton
+                            disabled={!canRevealCredentials}
+                            icon={Eye}
+                            title="Revelar credencial"
+                            onClick={() => setActiveSitePasswordId(item.id)}
+                          />
+                          {canManageRegularizeCore ? (
+                            <TableActionButton
+                              disabled={!canRevealCredentials}
+                              icon={Pencil}
+                              title="Editar site"
+                              onClick={() => {
+                                setActiveSitePasswordId(item.id);
+                                setActiveForm({
+                                  type: "site-password",
+                                  mode: "edit",
+                                  id: item.id,
+                                });
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </DataTable>
+              )}
+            </QueryStatePanel>
+
+            {hasSiteRows ? (
+              <DetailPanel title="Site selecionado">
+                {sitePasswordDetailQuery.isLoading ? (
+                  <FieldLine label="Status" value="Carregando..." />
+                ) : sitePasswordDetailQuery.isError ? (
+                  <FieldLine label="Status" value="Acesso negado ou indisponível." />
+                ) : sitePasswordDetailQuery.data ? (
+                  <>
+                    <FieldLine
+                      label="Usuário"
+                      value={formatText(sitePasswordDetailQuery.data.user)}
+                    />
+                    <FieldLine
+                      label="Senha"
+                      value={formatText(sitePasswordDetailQuery.data.password)}
+                    />
+                    <FieldLine label="Link" value={formatText(sitePasswordDetailQuery.data.link)} />
+                  </>
+                ) : (
+                  <DetailEmptyState message="Sem revelação ativa." />
+                )}
+              </DetailPanel>
+            ) : null}
+          </div>
         </section>
       ) : null}
 
@@ -916,6 +1357,62 @@ export function RegularizePage() {
           </QueryStatePanel>
         </section>
       ) : null}
+
+      <RegularizeClientPfForm
+        open={activeForm?.type === "client-pf"}
+        mode={activeForm?.type === "client-pf" ? activeForm.mode : "create"}
+        clientPf={activeClientPfForForm}
+        isLoadingInitialValue={
+          activeForm?.type === "client-pf" &&
+          activeForm.mode === "edit" &&
+          clientPfDetailQuery.isLoading
+        }
+        isSubmitting={createClientPfMutation.isPending || updateClientPfMutation.isPending}
+        onClose={closeCoreForm}
+        onSubmit={handleSubmitClientPf}
+      />
+
+      <RegularizePartnerForm
+        open={activeForm?.type === "partner"}
+        partner={activePartnerForForm}
+        defaultPfId={currentClientPfId ?? ""}
+        clientOptions={clientOptions}
+        pfOptions={pfOptions}
+        isSubmitting={createPartnerMutation.isPending || updatePartnerMutation.isPending}
+        onClose={closeCoreForm}
+        onSubmit={handleSubmitPartner}
+      />
+
+      <RegularizePasswordForm
+        open={activeForm?.type === "password"}
+        mode={activeForm?.type === "password" ? activeForm.mode : "create"}
+        password={activePasswordForForm}
+        defaultClientId={currentCredentialClientId ?? ""}
+        clientOptions={clientOptions}
+        siteOptions={siteOptions}
+        isLoadingInitialValue={
+          activeForm?.type === "password" &&
+          activeForm.mode === "edit" &&
+          passwordDetailQuery.isLoading
+        }
+        isSubmitting={createPasswordMutation.isPending || updatePasswordMutation.isPending}
+        onClose={closeCoreForm}
+        onSubmit={handleSubmitPassword}
+      />
+
+      <RegularizeSitePasswordForm
+        open={activeForm?.type === "site-password"}
+        mode={activeForm?.type === "site-password" ? activeForm.mode : "create"}
+        sitePassword={activeSitePasswordForForm}
+        isLoadingInitialValue={
+          activeForm?.type === "site-password" &&
+          activeForm.mode === "edit" &&
+          sitePasswordDetailQuery.isLoading
+        }
+        isSubmitting={createSitePasswordMutation.isPending || updateSitePasswordMutation.isPending}
+        onClose={closeCoreForm}
+        onSubmit={handleSubmitSitePassword}
+      />
     </div>
   );
 }
