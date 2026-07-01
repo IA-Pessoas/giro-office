@@ -38,6 +38,7 @@ const pessoalServiceEnvSchema = z
     jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o pessoal-service."),
     auditServiceUrl: z.string().url("AUDIT_SERVICE_URL invalida.").default("http://localhost:3020"),
     auditServiceToken: z.string().min(1, "AUDIT_SERVICE_TOKEN nao definido."),
+    internalServiceTokenEnv: z.string().optional(),
     passwordEncryptionKey: z
       .string()
       .min(1, "PESSOAL_PASSWORD_ENCRYPTION_KEY nao definida.")
@@ -62,17 +63,27 @@ const pessoalServiceEnvSchema = z
       .transform((value) => parseBoolean(value)),
   })
   .transform((env) => {
-    const { enableApiDocsEnv, ...rest } = env;
+    const { enableApiDocsEnv, internalServiceTokenEnv, ...rest } = env;
     const enableApiDocs =
       enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
         ? parseBoolean(enableApiDocsEnv)
         : rest.nodeEnv !== "production";
+    const internalServiceToken =
+      internalServiceTokenEnv !== undefined && internalServiceTokenEnv !== ""
+        ? internalServiceTokenEnv
+        : rest.auditServiceToken;
 
     validateProductionInternalServiceToken({
       nodeEnv: rest.nodeEnv,
       serviceName: "pessoal-service",
       envName: "AUDIT_SERVICE_TOKEN",
       token: rest.auditServiceToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "pessoal-service",
+      envName: "INTERNAL_SERVICE_TOKEN",
+      token: internalServiceToken,
     });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
@@ -83,6 +94,7 @@ const pessoalServiceEnvSchema = z
 
     return {
       ...rest,
+      internalServiceToken,
       enableApiDocs,
       logPretty: rest.nodeEnv !== "production" && rest.logPretty,
     };
@@ -98,6 +110,7 @@ export function getPessoalServiceEnv(): PessoalServiceEnv {
     jwtSecret: process.env.JWT_SECRET,
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
+    internalServiceTokenEnv: process.env.INTERNAL_SERVICE_TOKEN,
     passwordEncryptionKey: process.env.PESSOAL_PASSWORD_ENCRYPTION_KEY,
     passwordEncryptionKeyVersion: process.env.PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION,
     domainAuditEnabled: process.env.PESSOAL_DOMAIN_AUDIT_ENABLED,

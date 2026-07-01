@@ -21,6 +21,7 @@ import { createPasswordRoutes } from "./routes/password.routes.js";
 import { createPayrollRoutes } from "./routes/payroll.routes.js";
 import { createSituationRoutes } from "./routes/situation.routes.js";
 import { createUnionRoutes } from "./routes/union.routes.js";
+import { createPessoalInternalNotificationRoutes } from "./routes/unionNotification.routes.js";
 import { LddService } from "./services/lddService.js";
 import { ObligationService } from "./services/obligationService.js";
 import { PasswordService } from "./services/passwordService.js";
@@ -31,6 +32,7 @@ import {
   type PessoalPasswordCrypto,
 } from "./services/pessoalPasswordCrypto.js";
 import { SituationService } from "./services/situationService.js";
+import { UnionNotificationService } from "./services/unionNotificationService.js";
 import { UnionService } from "./services/unionService.js";
 
 function pessoalServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -78,6 +80,7 @@ export function createPessoalApp({
   const unionService = new UnionService(prisma, domainAuditService);
   const payrollService = new PayrollService(prisma, domainAuditService);
   const obligationService = new ObligationService(prisma, domainAuditService);
+  const unionNotificationService = new UnionNotificationService(prisma);
   const pessoalPasswordCrypto =
     passwordCrypto ??
     createPessoalPasswordCrypto({
@@ -117,6 +120,13 @@ export function createPessoalApp({
   app.use("/pessoal/payroll", createPayrollRoutes(payrollService));
   app.use("/pessoal/obrigations", createObligationRoutes(obligationService));
   app.use("/pessoal/passwords", createPasswordRoutes(passwordService));
+  app.use(
+    "/internal/pessoal/union-notifications",
+    createPessoalInternalNotificationRoutes({
+      internalServiceToken: env.internalServiceToken,
+      service: unionNotificationService,
+    }),
+  );
 
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {

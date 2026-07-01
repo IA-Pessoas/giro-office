@@ -2876,6 +2876,13 @@ const handlers = {
     });
   },
 
+  async pessoalUnionNotificationsRun(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/internal/pessoal/union-notifications/run",
+    });
+  },
+
   async taskDepsList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
