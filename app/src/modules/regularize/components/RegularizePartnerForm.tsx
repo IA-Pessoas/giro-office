@@ -17,9 +17,9 @@ import {
   RegularizeFormError,
   RegularizeFormField,
   type RegularizeFormOption,
-  regularizeSelectClassName,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
+import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 
 type RegularizePartnerFormState = {
   pj_id: string;
@@ -162,10 +162,9 @@ export function RegularizePartnerForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <RegularizeFormField label="Cliente PJ" required>
-            <select
+            <RegularizeNativeSelect
               value={formState.pj_id}
               onChange={(event) => handleChange("pj_id", event.target.value)}
-              className={regularizeSelectClassName}
             >
               <option value="">Selecione</option>
               {clientOptions.map((client) => (
@@ -174,14 +173,13 @@ export function RegularizePartnerForm({
                   {client.description ? `, ${client.description}` : ""}
                 </option>
               ))}
-            </select>
+            </RegularizeNativeSelect>
           </RegularizeFormField>
 
           <RegularizeFormField label="Cliente PF" required>
-            <select
+            <RegularizeNativeSelect
               value={formState.pf_id}
               onChange={(event) => handleChange("pf_id", event.target.value)}
-              className={regularizeSelectClassName}
             >
               <option value="">Selecione</option>
               {pfOptions.map((clientPf) => (
@@ -190,7 +188,7 @@ export function RegularizePartnerForm({
                   {clientPf.description ? `, ${clientPf.description}` : ""}
                 </option>
               ))}
-            </select>
+            </RegularizeNativeSelect>
           </RegularizeFormField>
 
           <RegularizeFormField label="Participação" required>

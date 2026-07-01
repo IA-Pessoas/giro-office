@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
 
@@ -18,10 +18,10 @@ import {
   RegularizeFormError,
   RegularizeFormField,
   type RegularizeFormOption,
-  regularizeSelectClassName,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
+import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 
 type RegularizeMunicipalTaxesFormState = {
   client_id: string;
@@ -49,6 +49,22 @@ type RegularizeMunicipalTaxesFormState = {
   tll_analysis_is_done: boolean;
   tll_analysis_notes: string;
 };
+
+function getRegularizeMunicipalTaxYearOptions(currentYear: number, selectedYear: string): string[] {
+  const years = new Set<string>();
+
+  for (let year = currentYear - 2; year <= currentYear + 2; year += 1) {
+    years.add(String(year));
+  }
+
+  const normalizedSelectedYear = selectedYear.trim();
+
+  if (normalizedSelectedYear) {
+    years.add(normalizedSelectedYear);
+  }
+
+  return Array.from(years).sort((first, second) => Number(second) - Number(first));
+}
 
 function buildMunicipalTaxesFormState(
   municipalTax: RegularizeMunicipalTaxesDetail | null,
@@ -195,6 +211,10 @@ export function RegularizeMunicipalTaxesForm({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const isEditing = mode === "edit";
+  const yearOptions = useMemo(
+    () => getRegularizeMunicipalTaxYearOptions(currentYear, formState.year),
+    [currentYear, formState.year],
+  );
 
   useEffect(() => {
     if (open) {
@@ -275,10 +295,9 @@ export function RegularizeMunicipalTaxesForm({
 
           <div className="grid gap-4 md:grid-cols-3">
             <RegularizeFormField label="Cliente" required className="md:col-span-2">
-              <select
+              <RegularizeNativeSelect
                 value={formState.client_id}
                 onChange={(event) => handleChange("client_id", event.target.value)}
-                className={regularizeSelectClassName}
               >
                 <option value="">Selecione</option>
                 {clientOptions.map((client) => (
@@ -287,16 +306,20 @@ export function RegularizeMunicipalTaxesForm({
                     {client.description ? `, ${client.description}` : ""}
                   </option>
                 ))}
-              </select>
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Ano" required>
-              <input
-                type="number"
+              <RegularizeNativeSelect
                 value={formState.year}
                 onChange={(event) => handleChange("year", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
+              >
+                {yearOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
             </RegularizeFormField>
           </div>
 
@@ -368,14 +391,13 @@ export function RegularizeMunicipalTaxesForm({
                 />
               </RegularizeFormField>
               <RegularizeFormField label="Enviado?" required>
-                <select
+                <RegularizeNativeSelect
                   value={formState.tlp_is_sent}
                   onChange={(event) => handleChange("tlp_is_sent", event.target.value)}
-                  className={regularizeSelectClassName}
                 >
                   <option value="Não">Não</option>
                   <option value="Sim">Sim</option>
-                </select>
+                </RegularizeNativeSelect>
               </RegularizeFormField>
               <RegularizeBooleanField
                 label="Não enviar por e-mail"
@@ -427,14 +449,13 @@ export function RegularizeMunicipalTaxesForm({
                 />
               </RegularizeFormField>
               <RegularizeFormField label="Enviado?" required>
-                <select
+                <RegularizeNativeSelect
                   value={formState.tll_is_sent}
                   onChange={(event) => handleChange("tll_is_sent", event.target.value)}
-                  className={regularizeSelectClassName}
                 >
                   <option value="Não">Não</option>
                   <option value="Sim">Sim</option>
-                </select>
+                </RegularizeNativeSelect>
               </RegularizeFormField>
               <RegularizeBooleanField
                 label="Análise concluída"

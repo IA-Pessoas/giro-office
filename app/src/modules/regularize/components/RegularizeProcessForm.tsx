@@ -20,10 +20,13 @@ import {
   RegularizeFormError,
   RegularizeFormField,
   type RegularizeFormOption,
-  regularizeSelectClassName,
+  getRegularizePresetOptions,
+  regularizeProcessStatusOptions,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
+  regularizeUrgencyOptions,
 } from "./regularizeFormControls";
+import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 
 type RegularizeProcessClientKind = "pj" | "pf";
 
@@ -247,23 +250,21 @@ export function RegularizeProcessForm({
 
           <div className="grid gap-4 md:grid-cols-3">
             <RegularizeFormField label="Tipo de cliente" required>
-              <select
+              <RegularizeNativeSelect
                 value={formState.clientKind}
                 onChange={(event) =>
                   handleClientKindChange(event.target.value as RegularizeProcessClientKind)
                 }
-                className={regularizeSelectClassName}
               >
                 <option value="pj">PJ</option>
                 <option value="pf">PF</option>
-              </select>
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Cliente" required className="md:col-span-2">
-              <select
+              <RegularizeNativeSelect
                 value={formState.client_id}
                 onChange={(event) => handleClientChange(event.target.value)}
-                className={regularizeSelectClassName}
               >
                 <option value="">Selecione</option>
                 {currentClientOptions.map((client) => (
@@ -272,7 +273,7 @@ export function RegularizeProcessForm({
                     {client.description ? `, ${client.description}` : ""}
                   </option>
                 ))}
-              </select>
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="CPF/CNPJ" required>
@@ -292,11 +293,18 @@ export function RegularizeProcessForm({
             </RegularizeFormField>
 
             <RegularizeFormField label="Status" required>
-              <input
+              <RegularizeNativeSelect
                 value={formState.status}
                 onChange={(event) => handleChange("status", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
+              >
+                {getRegularizePresetOptions(regularizeProcessStatusOptions, formState.status).map(
+                  (status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ),
+                )}
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Entrada">
@@ -327,11 +335,19 @@ export function RegularizeProcessForm({
             </RegularizeFormField>
 
             <RegularizeFormField label="Urgência">
-              <input
+              <RegularizeNativeSelect
                 value={formState.urgency}
                 onChange={(event) => handleChange("urgency", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
+              >
+                <option value="">Sem urgência</option>
+                {getRegularizePresetOptions(regularizeUrgencyOptions, formState.urgency).map(
+                  (urgency) => (
+                    <option key={urgency} value={urgency}>
+                      {urgency}
+                    </option>
+                  ),
+                )}
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Tipo de bloqueio">

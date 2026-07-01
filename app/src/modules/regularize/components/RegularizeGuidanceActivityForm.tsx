@@ -8,10 +8,10 @@ import {
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
-  regularizeSelectClassName,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
+import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 
 type RegularizeGuidanceActivityFormState = {
   code: string;
@@ -112,14 +112,13 @@ export function RegularizeGuidanceActivityForm({
           </RegularizeFormField>
 
           <RegularizeFormField label="Tipo" required>
-            <select
+            <RegularizeNativeSelect
               value={formState.type}
               onChange={(event) => handleChange("type", event.target.value)}
-              className={regularizeSelectClassName}
             >
               <option value="Principal">Principal</option>
               <option value="Secundária">Secundária</option>
-            </select>
+            </RegularizeNativeSelect>
           </RegularizeFormField>
 
           <RegularizeFormField label="Descrição" required className="md:col-span-2">

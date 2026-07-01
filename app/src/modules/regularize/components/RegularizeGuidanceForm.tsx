@@ -18,10 +18,12 @@ import {
   RegularizeFormError,
   RegularizeFormField,
   type RegularizeFormOption,
-  regularizeSelectClassName,
+  getRegularizePresetOptions,
+  regularizeGuidanceStatusOptions,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
+import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 
 type RegularizeGuidanceFormState = {
   process_id: string;
@@ -203,11 +205,10 @@ export function RegularizeGuidanceForm({
 
         <div className="grid gap-4 md:grid-cols-3">
           <RegularizeFormField label="Processo" required className="md:col-span-2">
-            <select
+            <RegularizeNativeSelect
               value={formState.process_id}
               onChange={(event) => handleChange("process_id", event.target.value)}
               disabled={isEditing}
-              className={regularizeSelectClassName}
             >
               <option value="">Selecione</option>
               {processOptions.map((process) => (
@@ -216,15 +217,22 @@ export function RegularizeGuidanceForm({
                   {process.description ? `, ${process.description}` : ""}
                 </option>
               ))}
-            </select>
+            </RegularizeNativeSelect>
           </RegularizeFormField>
 
           <RegularizeFormField label="Status" required>
-            <input
+            <RegularizeNativeSelect
               value={formState.status}
               onChange={(event) => handleChange("status", event.target.value)}
-              className={regularizeTextFieldClassName}
-            />
+            >
+              {getRegularizePresetOptions(regularizeGuidanceStatusOptions, formState.status).map(
+                (status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ),
+              )}
+            </RegularizeNativeSelect>
           </RegularizeFormField>
 
           <RegularizeFormField label="Tipo">

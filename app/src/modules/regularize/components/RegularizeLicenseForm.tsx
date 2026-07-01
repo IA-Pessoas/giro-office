@@ -19,10 +19,13 @@ import {
   RegularizeFormError,
   RegularizeFormField,
   type RegularizeFormOption,
-  regularizeSelectClassName,
+  getRegularizePresetOptions,
+  regularizeLicenseStatusOptions,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
+  regularizeUrgencyOptions,
 } from "./regularizeFormControls";
+import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 
 type RegularizeLicenseFormState = {
   client_id: string;
@@ -217,10 +220,9 @@ export function RegularizeLicenseForm({
 
           <div className="grid gap-4 md:grid-cols-3">
             <RegularizeFormField label="Cliente" className="md:col-span-2">
-              <select
+              <RegularizeNativeSelect
                 value={formState.client_id}
                 onChange={(event) => handleChange("client_id", event.target.value)}
-                className={regularizeSelectClassName}
               >
                 <option value="">Sem cliente vinculado</option>
                 {clientOptions.map((client) => (
@@ -229,18 +231,17 @@ export function RegularizeLicenseForm({
                     {client.description ? `, ${client.description}` : ""}
                   </option>
                 ))}
-              </select>
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Possui?">
-              <select
+              <RegularizeNativeSelect
                 value={formState.has ? "true" : "false"}
                 onChange={(event) => handleChange("has", event.target.value === "true")}
-                className={regularizeSelectClassName}
               >
                 <option value="true">Sim</option>
                 <option value="false">Não</option>
-              </select>
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Licença" required>
@@ -260,11 +261,18 @@ export function RegularizeLicenseForm({
             </RegularizeFormField>
 
             <RegularizeFormField label="Status" required>
-              <input
+              <RegularizeNativeSelect
                 value={formState.status}
                 onChange={(event) => handleChange("status", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
+              >
+                {getRegularizePresetOptions(regularizeLicenseStatusOptions, formState.status).map(
+                  (status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ),
+                )}
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Entrada" required>
@@ -319,11 +327,18 @@ export function RegularizeLicenseForm({
             </RegularizeFormField>
 
             <RegularizeFormField label="Urgência" required>
-              <input
+              <RegularizeNativeSelect
                 value={formState.urgency}
                 onChange={(event) => handleChange("urgency", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
+              >
+                {getRegularizePresetOptions(regularizeUrgencyOptions, formState.urgency).map(
+                  (urgency) => (
+                    <option key={urgency} value={urgency}>
+                      {urgency}
+                    </option>
+                  ),
+                )}
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Responsável ID">

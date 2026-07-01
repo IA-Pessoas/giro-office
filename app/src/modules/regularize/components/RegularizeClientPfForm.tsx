@@ -17,9 +17,12 @@ import {
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
+  getRegularizePresetOptions,
+  regularizeClientStatusOptions,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
+import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 
 type RegularizeClientPfFormState = {
   code: string;
@@ -360,11 +363,18 @@ export function RegularizeClientPfForm({
             </RegularizeFormField>
 
             <RegularizeFormField label="Status" required>
-              <input
+              <RegularizeNativeSelect
                 value={formState.status}
                 onChange={(event) => handleChange("status", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
+              >
+                {getRegularizePresetOptions(regularizeClientStatusOptions, formState.status).map(
+                  (status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ),
+                )}
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Pai" required>
