@@ -62,18 +62,10 @@ export function useCreateRegularizeSitePasswordMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createSitePassword(payload),
-    onSuccess: async (created) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.sitePasswords({ status: true }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.sitePasswords({ status: false }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.sitePasswordDetail(created.id),
-        }),
-      ]);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: regularizeQueryKeys.credentials(),
+      });
     },
   });
 }
@@ -87,18 +79,10 @@ export function useUpdateRegularizeSitePasswordMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updateSitePassword(payload),
-    onSuccess: async (updated) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.sitePasswords({ status: true }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.sitePasswords({ status: false }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.sitePasswordDetail(updated.id),
-        }),
-      ]);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: regularizeQueryKeys.credentials(),
+      });
     },
   });
 }
@@ -127,15 +111,10 @@ export function useCreateRegularizePasswordMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createPassword(payload),
-    onSuccess: async (created, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.passwords({ client_id: payload.client_id }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.passwordDetail(created.id),
-        }),
-      ]);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: regularizeQueryKeys.credentials(),
+      });
     },
   });
 }
@@ -149,15 +128,10 @@ export function useUpdateRegularizePasswordMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updatePassword(payload),
-    onSuccess: async (updated, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.passwords({ client_id: payload.client_id }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.passwordDetail(updated.id),
-        }),
-      ]);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: regularizeQueryKeys.credentials(),
+      });
     },
   });
 }

@@ -21,7 +21,7 @@
     "test:image-optimization": "node src/shared/run-image-optimization-tests.mjs",
     "test:regularize": "node --experimental-strip-types src/modules/regularize/run-regularize-tests.mjs",
     "test:react-query-cache": "node --experimental-strip-types src/shared/run-react-query-cache-tests.mjs",
-    "test": "pnpm run test:auth && pnpm run test:clients && pnpm run test:contabil && pnpm run test:projects && pnpm run test:chat && pnpm run test:iframe && pnpm run test:certificates && pnpm run test:a11y-overlays && pnpm run test:organization-modal && pnpm run test:status-badge && pnpm run test:react-query-cache && pnpm run test:image-optimization",
+    "test": "pnpm run test:auth && pnpm run test:clients && pnpm run test:contabil && pnpm run test:projects && pnpm run test:chat && pnpm run test:iframe && pnpm run test:certificates && pnpm run test:a11y-overlays && pnpm run test:organization-modal && pnpm run test:status-badge && pnpm run test:regularize && pnpm run test:react-query-cache && pnpm run test:image-optimization",
     "images:audit": "node scripts/audit-public-images.mjs",
     "start": "next start",
     "migration:audit:chakra": "node scripts/audit-chakra-usage.mjs",

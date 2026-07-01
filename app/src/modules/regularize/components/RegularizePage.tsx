@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
+import { useModuleAccess } from "@modules/auth";
 import { useClients } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { cn } from "@shared/ui/newLayout/utils";
@@ -91,7 +92,6 @@ import type {
   CreateRegularizePasswordPayload,
   CreateRegularizeProcessPayload,
   CreateRegularizeSitePasswordPayload,
-  RegularizeCapability,
   RegularizeClientPfListItem,
   RegularizeGuidance,
   RegularizeGuidanceEconomicActivity,
@@ -171,8 +171,6 @@ const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "taxes", label: "Tributos", icon: Landmark },
 ];
 
-const REGULARIZE_CAPABILITIES: RegularizeCapability[] = ["credentials:reveal", "core:write"];
-
 function normalizeStatus(status: RegularizeStatus | null | undefined): string {
   if (typeof status === "boolean") {
     return status ? "ativo" : "inativo";
@@ -188,23 +186,31 @@ function normalizeStatus(status: RegularizeStatus | null | undefined): string {
 function getStatusBadgeConfig(status: RegularizeStatus | null | undefined): StatusBadgeConfig {
   const normalized = normalizeStatus(status);
 
+  if (typeof status === "boolean") {
+    return {
+      label: status ? "Ativo" : "Inativo",
+      variant: status ? "success" : "neutral",
+      icon: status ? CheckCircle2 : XCircle,
+    };
+  }
+
   if (normalized === "ativo" || normalized === "concluido") {
-    return { label: status ? String(status) : "Ativo", variant: "success", icon: CheckCircle2 };
+    return { label: formatText(status, "Ativo"), variant: "success", icon: CheckCircle2 };
   }
 
   if (normalized === "inativo" || normalized === "cancelado" || normalized === "encerrado") {
-    return { label: status ? String(status) : "Inativo", variant: "neutral", icon: XCircle };
+    return { label: formatText(status, "Inativo"), variant: "neutral", icon: XCircle };
   }
 
   if (normalized === "aberto" || normalized === "em andamento") {
-    return { label: status ? String(status) : "Em andamento", variant: "info", icon: Activity };
+    return { label: formatText(status, "Em andamento"), variant: "info", icon: Activity };
   }
 
   if (normalized === "pendente" || normalized === "a vencer" || normalized === "urgente") {
-    return { label: status ? String(status) : "Pendente", variant: "warning", icon: CalendarDays };
+    return { label: formatText(status, "Pendente"), variant: "warning", icon: CalendarDays };
   }
 
-  return { label: status ? String(status) : "Sem status", variant: "neutral" };
+  return { label: formatText(status, "Sem status"), variant: "neutral" };
 }
 
 function formatText(value: unknown, fallback = "-"): string {
@@ -256,14 +262,6 @@ function getGuidanceDescription(item: RegularizeGuidance): string {
     item.description ?? item.framework_obs ?? item.comporate_purpose,
     "Sem descrição.",
   );
-}
-
-function hasCredentialRevealCapability(capabilities: RegularizeCapability[]): boolean {
-  return capabilities.includes("credentials:reveal");
-}
-
-function hasCoreWriteCapability(capabilities: RegularizeCapability[]): boolean {
-  return capabilities.includes("core:write");
 }
 
 function formatOptionLabel(label: string, description?: string | null): string {
@@ -664,8 +662,9 @@ export function RegularizePage() {
   const [activeForm, setActiveForm] = useState<RegularizeFormState | null>(null);
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
-  const canRevealCredentials = hasCredentialRevealCapability(REGULARIZE_CAPABILITIES);
-  const canManageRegularizeCore = hasCoreWriteCapability(REGULARIZE_CAPABILITIES);
+  const { access: regularizeAccess } = useModuleAccess("regularize");
+  const canRevealCredentials = regularizeAccess.canEdit;
+  const canManageRegularizeCore = regularizeAccess.canEdit;
 
   const clientQuery = useClients({ status: "Ativo", page: 1, limit: 100 });
   const pfQuery = useRegularizeClientPfs({ status: "Ativo" });
@@ -717,11 +716,15 @@ export function RegularizePage() {
   const processDetailQuery = useRegularizeProcessDetail(currentProcessId, {
     enabled: activeTab === "processes",
   });
+  const isPasswordRevealContextActive =
+    activeTab === "passwords" || activeForm?.type === "password";
+  const isSitePasswordRevealContextActive =
+    activeTab === "sites" || activeForm?.type === "site-password";
   const passwordDetailQuery = useRegularizePasswordDetail(activePasswordId, {
-    enabled: canRevealCredentials,
+    enabled: canRevealCredentials && isPasswordRevealContextActive,
   });
   const sitePasswordDetailQuery = useRegularizeSitePasswordDetail(activeSitePasswordId, {
-    enabled: canRevealCredentials,
+    enabled: canRevealCredentials && isSitePasswordRevealContextActive,
   });
   const activeMunicipalTaxId =
     activeForm?.type === "municipal-tax" && activeForm.mode === "edit" ? activeForm.id : undefined;

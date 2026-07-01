@@ -4,8 +4,6 @@ export type RegularizeStatus = string | boolean;
 
 export type RegularizePartnerType = "pf" | "pj";
 
-export type RegularizeCapability = "credentials:reveal" | "core:write";
-
 export type RegularizeOptionalDate = string | undefined;
 
 export type RegularizeIdFilter = {

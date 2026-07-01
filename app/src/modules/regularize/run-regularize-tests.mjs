@@ -503,6 +503,62 @@ await runTest("regularize page uses the new module instead of the legacy mock sc
   assert.doesNotMatch(pageSource, /shared\/components\/newLayout\/Regularize/);
 });
 
+await runTest("regularize page derives write and reveal permissions from module access", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const typesSource = await readModuleSource("types.ts");
+
+  assert.match(pageSource, /import \{ useModuleAccess \} from "@modules\/auth";/);
+  assert.match(pageSource, /const \{ access: regularizeAccess \} = useModuleAccess\("regularize"\);/);
+  assert.match(pageSource, /const canRevealCredentials = regularizeAccess\.canEdit;/);
+  assert.match(pageSource, /const canManageRegularizeCore = regularizeAccess\.canEdit;/);
+  assert.match(pageSource, /enabled: canRevealCredentials && isPasswordRevealContextActive/);
+  assert.match(pageSource, /enabled: canRevealCredentials && isSitePasswordRevealContextActive/);
+  assert.doesNotMatch(pageSource, /REGULARIZE_CAPABILITIES/);
+  assert.doesNotMatch(pageSource, /hasCredentialRevealCapability/);
+  assert.doesNotMatch(pageSource, /hasCoreWriteCapability/);
+  assert.doesNotMatch(typesSource, /RegularizeCapability/);
+});
+
+await runTest("regularize boolean status labels stay user-facing", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /if \(typeof status === "boolean"\) \{/);
+  assert.match(pageSource, /label: status \? "Ativo" : "Inativo"/);
+  assert.doesNotMatch(pageSource, /label: status \? String\(status\) : "Ativo"/);
+  assert.doesNotMatch(pageSource, /label: status \? String\(status\) : "Inativo"/);
+});
+
+await runTest("regularize municipal tax yes-no values normalize booleans", async () => {
+  const municipalTaxSource = await readModuleSource(
+    "components/RegularizeMunicipalTaxesForm.tsx",
+  );
+
+  assert.match(municipalTaxSource, /function toRegularizeYesNo/);
+  assert.match(municipalTaxSource, /tlp_is_sent: toRegularizeYesNo\(municipalTax\.tlp_is_sent\)/);
+  assert.match(municipalTaxSource, /tll_is_sent: toRegularizeYesNo\(municipalTax\.tll_is_sent\)/);
+  assert.match(municipalTaxSource, /return normalized === "sim" \|\| normalized === "true" \? "Sim" : "Não";/);
+});
+
+await runTest("regularize mutations invalidate subdomain roots to avoid stale filtered lists", async () => {
+  const credentialsSource = await readModuleSource("hooks/useRegularizeCredentials.ts");
+  const peopleSource = await readModuleSource("hooks/useRegularizePeople.ts");
+  const operationsSource = await readModuleSource("hooks/useRegularizeOperations.ts");
+
+  assert.match(credentialsSource, /queryKey: regularizeQueryKeys\.credentials\(\)/);
+  assert.match(peopleSource, /queryKey: regularizeQueryKeys\.people\(\)/);
+  assert.match(operationsSource, /queryKey: regularizeQueryKeys\.operations\(\)/);
+  assert.doesNotMatch(peopleSource, /regularizeQueryKeys\.clientPfs\(\{ status: payload\.status \}\)/);
+  assert.doesNotMatch(operationsSource, /regularizeQueryKeys\.processes\(\{ status: payload\.status \}\)/);
+  assert.doesNotMatch(operationsSource, /regularizeQueryKeys\.licenses\(\{ status: payload\.status \}\)/);
+});
+
+await runTest("regularize guardrail runs in the app aggregate test script", async () => {
+  const packageSource = await readFile(join(appRoot, "package.json"), "utf8");
+  const packageJson = JSON.parse(packageSource);
+
+  assert.match(packageJson.scripts.test, /pnpm run test:regularize/);
+});
+
 await runTest("RegularizePage does not define primary mock arrays", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
 

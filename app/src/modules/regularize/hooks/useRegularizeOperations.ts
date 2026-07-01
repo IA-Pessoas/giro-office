@@ -40,6 +40,12 @@ type RegularizeReadQueryOptions = {
   enabled?: boolean;
 };
 
+function invalidateRegularizeOperations(queryClient: ReturnType<typeof useQueryClient>) {
+  return queryClient.invalidateQueries({
+    queryKey: regularizeQueryKeys.operations(),
+  });
+}
+
 export function useRegularizeMunicipalTaxes(
   filters: RegularizeMunicipalTaxesListFilters,
   options?: RegularizeReadQueryOptions,
@@ -75,16 +81,7 @@ export function useCreateRegularizeMunicipalTaxMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createMunicipalTax(payload),
-    onSuccess: async (created, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.municipalTaxes({ year: payload.year }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.municipalTaxDetail(created.id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 
@@ -97,16 +94,7 @@ export function useUpdateRegularizeMunicipalTaxMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updateMunicipalTax(payload),
-    onSuccess: async (updated, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.municipalTaxes({ year: payload.year }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.municipalTaxDetail(updated.id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 
@@ -145,19 +133,7 @@ export function useCreateRegularizeProcessMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createProcess(payload),
-    onSuccess: async (created, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.processes({ status: "Todos" }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.processes({ status: payload.status }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.processDetail(created.id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 
@@ -170,19 +146,7 @@ export function useUpdateRegularizeProcessMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updateProcess(payload),
-    onSuccess: async (updated, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.processes({ status: "Todos" }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.processes({ status: payload.status }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.processDetail(updated.id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 
@@ -223,16 +187,7 @@ export function useCreateRegularizeGuidanceMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createGuidance(payload),
-    onSuccess: async (created, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidance({ process_id: payload.process_id }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidanceDetail(created.id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 
@@ -245,18 +200,7 @@ export function useUpdateRegularizeGuidanceMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updateGuidance(payload),
-    onSuccess: async (updated, payload) => {
-      const processId = payload.process_id ?? updated.process_id;
-
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidance({ process_id: processId }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidanceDetail(updated.id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 
@@ -269,18 +213,7 @@ export function useAddRegularizeGuidanceActivityMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.addGuidanceActivity(payload),
-    onSuccess: async (updated, payload) => {
-      const processId = payload.process_id ?? updated.process_id;
-
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidance({ process_id: processId }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidanceDetail(payload.guidance_id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 
@@ -293,18 +226,7 @@ export function useRemoveRegularizeGuidanceActivityMutation(): UseMutationResult
 
   return useMutation({
     mutationFn: (payload) => regularizeService.removeGuidanceActivity(payload),
-    onSuccess: async (updated, payload) => {
-      const processId = payload.process_id ?? updated.process_id;
-
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidance({ process_id: processId }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidanceDetail(payload.guidance_id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 
@@ -317,18 +239,7 @@ export function useAddRegularizeGuidancePartnerMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.addGuidancePartner(payload),
-    onSuccess: async (updated, payload) => {
-      const processId = payload.process_id ?? updated.process_id;
-
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidance({ process_id: processId }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidanceDetail(payload.guidance_id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 
@@ -341,18 +252,7 @@ export function useRemoveRegularizeGuidancePartnerMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.removeGuidancePartner(payload),
-    onSuccess: async (updated, payload) => {
-      const processId = payload.process_id ?? updated.process_id;
-
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidance({ process_id: processId }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.guidanceDetail(payload.guidance_id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 
@@ -378,19 +278,7 @@ export function useCreateRegularizeLicenseMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createLicense(payload),
-    onSuccess: async (created, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.licenses({ status: "Ativo" }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.licenses({ status: payload.status }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.licenseDetail(created.id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 
@@ -403,19 +291,7 @@ export function useUpdateRegularizeLicenseMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updateLicense(payload),
-    onSuccess: async (updated, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.licenses({ status: "Ativo" }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.licenses({ status: payload.status }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.licenseDetail(updated.id),
-        }),
-      ]);
-    },
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
 

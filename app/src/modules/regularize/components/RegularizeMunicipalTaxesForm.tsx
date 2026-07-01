@@ -66,6 +66,20 @@ function getRegularizeMunicipalTaxYearOptions(currentYear: number, selectedYear:
   return Array.from(years).sort((first, second) => Number(second) - Number(first));
 }
 
+function toRegularizeYesNo(value: boolean | string | null | undefined): "Sim" | "Não" {
+  if (typeof value === "boolean") {
+    return value ? "Sim" : "Não";
+  }
+
+  const normalized = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+  return normalized === "sim" || normalized === "true" ? "Sim" : "Não";
+}
+
 function buildMunicipalTaxesFormState(
   municipalTax: RegularizeMunicipalTaxesDetail | null,
   defaultClientId: string,
@@ -113,14 +127,14 @@ function buildMunicipalTaxesFormState(
     tlp_is_applicable: Boolean(municipalTax.tlp_is_applicable),
     tlp_amount: String(municipalTax.tlp_amount ?? 0),
     tlp_notes: municipalTax.tlp_notes ?? "",
-    tlp_is_sent: String(municipalTax.tlp_is_sent ?? "Não"),
+    tlp_is_sent: toRegularizeYesNo(municipalTax.tlp_is_sent),
     tlp_sent_date: toRegularizeInputDate(municipalTax.tlp_sent_date),
     tlp_due_date: toRegularizeInputDate(municipalTax.tlp_due_date),
     tlp_not_email: Boolean(municipalTax.tlp_not_email),
     tll_is_applicable: Boolean(municipalTax.tll_is_applicable),
     tll_amount: String(municipalTax.tll_amount ?? 0),
     tll_notes: municipalTax.tll_notes ?? "",
-    tll_is_sent: String(municipalTax.tll_is_sent ?? "Não"),
+    tll_is_sent: toRegularizeYesNo(municipalTax.tll_is_sent),
     tll_sent_date: toRegularizeInputDate(municipalTax.tll_sent_date),
     tll_due_date: toRegularizeInputDate(municipalTax.tll_due_date),
     tll_analysis_is_done: Boolean(municipalTax.tll_analysis_is_done),

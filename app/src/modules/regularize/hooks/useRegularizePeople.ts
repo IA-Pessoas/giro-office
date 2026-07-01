@@ -61,15 +61,10 @@ export function useCreateRegularizeClientPfMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createClientPf(payload),
-    onSuccess: async (created, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.clientPfs({ status: payload.status }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.clientPfDetail(created.id),
-        }),
-      ]);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: regularizeQueryKeys.people(),
+      });
     },
   });
 }
@@ -83,15 +78,10 @@ export function useUpdateRegularizeClientPfMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updateClientPf(payload),
-    onSuccess: async (updated, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.clientPfs({ status: payload.status }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.clientPfDetail(updated.id),
-        }),
-      ]);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: regularizeQueryKeys.people(),
+      });
     },
   });
 }
@@ -120,18 +110,10 @@ export function useCreateRegularizePartnerMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createPartner(payload),
-    onSuccess: async (created, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.partners({ type: "pf", client_id: payload.pf_id }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.partners({ type: "pj", client_id: payload.pj_id }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.partnerDetail(created.id),
-        }),
-      ]);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: regularizeQueryKeys.people(),
+      });
     },
   });
 }
@@ -145,18 +127,10 @@ export function useUpdateRegularizePartnerMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updatePartner(payload),
-    onSuccess: async (updated, payload) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.partners({ type: "pf", client_id: payload.pf_id }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.partners({ type: "pj", client_id: payload.pj_id }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: regularizeQueryKeys.partnerDetail(updated.id),
-        }),
-      ]);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: regularizeQueryKeys.people(),
+      });
     },
   });
 }
