@@ -1,6 +1,10 @@
 import { setupAPIClient } from "@shared/services/api";
 
 import type {
+  CreateRegularizeClientPfPayload,
+  CreateRegularizePartnerPayload,
+  CreateRegularizePasswordPayload,
+  CreateRegularizeSitePasswordPayload,
   RegularizeClientPfDetail,
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
@@ -24,6 +28,10 @@ import type {
   RegularizeSitePasswordDetail,
   RegularizeSitePasswordListFilters,
   RegularizeSitePasswordListItem,
+  UpdateRegularizeClientPfPayload,
+  UpdateRegularizePartnerPayload,
+  UpdateRegularizePasswordPayload,
+  UpdateRegularizeSitePasswordPayload,
 } from "../types";
 import {
   buildRegularizeClientPfListParams,
@@ -73,6 +81,24 @@ export const regularizeService = {
     return unwrapRegularizeEntity<RegularizePasswordDetail>(response.data);
   },
 
+  async createPassword(
+    payload: CreateRegularizePasswordPayload,
+  ): Promise<RegularizePasswordDetail> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.passwords, payload);
+
+    return unwrapRegularizeEnvelope<RegularizePasswordDetail>(response.data);
+  },
+
+  async updatePassword(
+    payload: UpdateRegularizePasswordPayload,
+  ): Promise<RegularizePasswordDetail> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.passwords, payload);
+
+    return unwrapRegularizeEnvelope<RegularizePasswordDetail>(response.data);
+  },
+
   async listSitePasswords(
     filters: RegularizeSitePasswordListFilters,
   ): Promise<RegularizeSitePasswordListItem[]> {
@@ -95,6 +121,24 @@ export const regularizeService = {
     return unwrapRegularizeEntity<RegularizeSitePasswordDetail>(response.data);
   },
 
+  async createSitePassword(
+    payload: CreateRegularizeSitePasswordPayload,
+  ): Promise<RegularizeSitePasswordDetail> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.sitesPass, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeSitePasswordDetail>(response.data);
+  },
+
+  async updateSitePassword(
+    payload: UpdateRegularizeSitePasswordPayload,
+  ): Promise<RegularizeSitePasswordDetail> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.sitesPass, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeSitePasswordDetail>(response.data);
+  },
+
   async listClientPfs(
     filters: RegularizeClientPfListFilters,
   ): Promise<RegularizeClientPfListItem[]> {
@@ -115,6 +159,24 @@ export const regularizeService = {
     return unwrapRegularizeEntity<RegularizeClientPfDetail>(response.data);
   },
 
+  async createClientPf(
+    payload: CreateRegularizeClientPfPayload,
+  ): Promise<RegularizeClientPfDetail> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.pf, payload);
+
+    return unwrapRegularizeEntity<RegularizeClientPfDetail>(response.data, "create");
+  },
+
+  async updateClientPf(
+    payload: UpdateRegularizeClientPfPayload,
+  ): Promise<RegularizeClientPfDetail> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.pf, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeClientPfDetail>(response.data);
+  },
+
   async listPartners(filters: RegularizePartnerListFilters): Promise<RegularizePartner[]> {
     const api = setupAPIClient();
     const response = await api.get(REGULARIZE_ENDPOINTS.partners, {
@@ -131,6 +193,20 @@ export const regularizeService = {
     });
 
     return unwrapRegularizeEntity<RegularizePartner>(response.data);
+  },
+
+  async createPartner(payload: CreateRegularizePartnerPayload): Promise<RegularizePartner> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.partners, payload);
+
+    return unwrapRegularizeEntity<RegularizePartner>(response.data, "create");
+  },
+
+  async updatePartner(payload: UpdateRegularizePartnerPayload): Promise<RegularizePartner> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.partners, payload);
+
+    return unwrapRegularizeEnvelope<RegularizePartner>(response.data);
   },
 
   async listMunicipalTaxes(
