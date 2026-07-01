@@ -8,7 +8,11 @@ import {
   CREATE_USER_MODULE_OPTIONS,
   CREATE_USER_PERMISSION_OPTIONS,
 } from '../constants/createUserConfig';
-import type { AdminCreateUserData, UserItem, UserPermission, UserType } from '../types';
+import type { UserItem, UserPermission } from '../types';
+import {
+  buildAdminCreateUserPayload,
+  type CreateUserFormState,
+} from '../utils/createUserPayload';
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -21,20 +25,16 @@ interface CreateUserModalProps {
   organizationId?: string;
   organizationIdLoading?: boolean;
   invitedBy?: string;
+  canCreateOrganizationOwner?: boolean;
 }
 
-const INITIAL_FORM_DATA: {
-  name: string;
-  login: string;
-  password: string;
-  department_id: string;
-  permission: UserPermission;
-} = {
+const INITIAL_FORM_DATA: CreateUserFormState = {
   name: '',
   login: '',
   password: '',
   department_id: '',
-  permission: 0,
+  departmentPermission: 0,
+  isOrganizationOwner: false,
 };
 
 type ModuleKey = (typeof CREATE_USER_MODULE_OPTIONS)[number]['key'];
@@ -75,40 +75,19 @@ function createInitialModuleSelections(): ModuleSelectionState {
   }, {} as ModuleSelectionState);
 }
 
-function buildModulesPayload(
-  moduleSelections: ModuleSelectionState,
-  departmentModuleKey?: ModuleKey | null,
-) {
-  return Object.entries(moduleSelections).reduce<Record<string, number | null>>((acc, [key, config]) => {
-    if (key === departmentModuleKey) {
-      return acc;
-    }
-
-    if (config.enabled) {
-      acc[key] = config.level;
-    }
-    return acc;
-  }, {});
-}
-
-function getUserTypeFromPermission(permission: UserPermission): UserType {
-  switch (permission) {
-    case 1:
-      return 'admin';
-    case 2:
-      return 'owner';
-    case 0:
-    default:
-      return 'user';
-  }
-}
-
 function getModuleSelectValue(selection: ModuleSelectionState[ModuleKey]): ModuleSelectValue {
   if (!selection.enabled) {
     return 'none';
   }
 
   return String(selection.level) as Exclude<ModuleSelectValue, 'none'>;
+}
+
+function getPermissionLabel(permission: UserPermission): string {
+  return (
+    CREATE_USER_PERMISSION_OPTIONS.find((option) => option.value === permission)?.label ??
+    'Acesso pelo departamento'
+  );
 }
 
 export function CreateUserModal({
@@ -122,6 +101,7 @@ export function CreateUserModal({
   organizationId,
   organizationIdLoading = false,
   invitedBy,
+  canCreateOrganizationOwner = false,
 }: CreateUserModalProps) {
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [moduleSelections, setModuleSelections] = useState<ModuleSelectionState>(createInitialModuleSelections);
@@ -139,13 +119,33 @@ export function CreateUserModal({
     () => resolveDepartmentModuleKey(selectedDepartmentName),
     [selectedDepartmentName],
   );
+  const effectiveIsOrganizationOwner =
+    canCreateOrganizationOwner && formData.isOrganizationOwner;
+  const departmentPermissionLabel = getPermissionLabel(formData.departmentPermission);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setSubmitError(null);
+    setFormData((prev) => {
+      if (name === 'departmentPermission') {
+        return {
+          ...prev,
+          departmentPermission: Number(value) as UserPermission,
+        };
+      }
+
+      return {
+        ...prev,
+        [name]: value,
+      };
+    });
+  };
+
+  const handleOrganizationOwnerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSubmitError(null);
     setFormData((prev) => ({
       ...prev,
-      [name]: name === 'permission' ? Number(value) as UserPermission : value,
+      isOrganizationOwner: canCreateOrganizationOwner && e.target.checked,
     }));
   };
 
@@ -182,20 +182,14 @@ export function CreateUserModal({
 
     try {
       const { userService } = await import('../services/userService');
-      const type = getUserTypeFromPermission(formData.permission);
-      const modules = buildModulesPayload(moduleSelections, departmentModuleKey);
-      const payload: AdminCreateUserData = {
-        name: formData.name,
-        login: formData.login,
-        password: formData.password,
-        department_id: formData.department_id,
-        permission: formData.permission,
-        organization_id: organizationId,
-        type,
-        status: 'active',
-        ...(type !== 'owner' && Object.keys(modules).length > 0 ? { modules } : {}),
-        ...(invitedBy ? { invited_by: invitedBy } : {}),
-      };
+      const payload = buildAdminCreateUserPayload({
+        formData,
+        moduleSelections,
+        departmentModuleKey,
+        organizationId,
+        invitedBy,
+        canCreateOrganizationOwner,
+      });
 
       const newUser = await userService.create(payload);
       toast.success('Usuario cadastrado com sucesso!');
@@ -290,51 +284,71 @@ export function CreateUserModal({
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="md:col-span-3">
-            <label htmlFor="user-name" className={FIELD_LABEL_CLASSNAME}>Nome</label>
-            <input id="user-name" name="name" value={formData.name} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="md:col-span-3">
+              <label htmlFor="user-name" className={FIELD_LABEL_CLASSNAME}>Nome</label>
+              <input id="user-name" name="name" value={formData.name} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="user-login" className={FIELD_LABEL_CLASSNAME}>Login</label>
+              <input id="user-login" name="login" value={formData.login} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+            </div>
+            <div className="md:col-span-1">
+              <label htmlFor="user-password" className={FIELD_LABEL_CLASSNAME}>Senha</label>
+              <input id="user-password" type="password" name="password" value={formData.password} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+            </div>
           </div>
-          <div className="md:col-span-2">
-            <label htmlFor="user-login" className={FIELD_LABEL_CLASSNAME}>Login</label>
-            <input id="user-login" name="login" value={formData.login} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
-          </div>
-          <div className="md:col-span-1">
-            <label htmlFor="user-password" className={FIELD_LABEL_CLASSNAME}>Senha</label>
-            <input id="user-password" type="password" name="password" value={formData.password} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
-          </div>
-          <div className="md:col-span-2">
-            <label htmlFor="user-department" className={FIELD_LABEL_CLASSNAME}>Departamento</label>
-            <select
-              id="user-department"
-              name="department_id"
-              value={formData.department_id}
-              onChange={handleInputChange}
-              className={SELECT_FIELD_CLASSNAME}
-              style={SELECT_ARROW_STYLE}
-              disabled={departmentsLoading || departmentsError || departments.length === 0}
-              required
-            >
-              <option value="">Selecione um departamento</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>{department.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="user-permission" className={FIELD_LABEL_CLASSNAME}>Permissão</label>
-            <select
-              id="user-permission"
-              name="permission"
-              value={formData.permission}
-              onChange={handleInputChange}
-              className={SELECT_FIELD_CLASSNAME}
-              style={SELECT_ARROW_STYLE}
-            >
-              {CREATE_USER_PERMISSION_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+
+          <div className={`grid grid-cols-1 gap-4 ${canCreateOrganizationOwner ? 'md:grid-cols-[minmax(0,1fr)_196px_160px]' : 'md:grid-cols-[minmax(0,1fr)_220px]'}`}>
+            <div>
+              <label htmlFor="user-department" className={FIELD_LABEL_CLASSNAME}>Departamento</label>
+              <select
+                id="user-department"
+                name="department_id"
+                value={formData.department_id}
+                onChange={handleInputChange}
+                className={SELECT_FIELD_CLASSNAME}
+                style={SELECT_ARROW_STYLE}
+                disabled={departmentsLoading || departmentsError || departments.length === 0}
+                required
+              >
+                <option value="">Selecione um departamento</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>{department.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="user-permission" className={FIELD_LABEL_CLASSNAME}>Permissao</label>
+              <select
+                id="user-permission"
+                name="departmentPermission"
+                value={formData.departmentPermission}
+                onChange={handleInputChange}
+                className={SELECT_FIELD_CLASSNAME}
+                style={SELECT_ARROW_STYLE}
+              >
+                {CREATE_USER_PERMISSION_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            {canCreateOrganizationOwner ? (
+              <div className="flex h-full flex-col justify-end">
+                <div className="flex h-[42px] items-center justify-center gap-3">
+                  <label htmlFor="user-owner-scope" className={`${FIELD_LABEL_CLASSNAME} mb-0`}>Adm. global</label>
+                  <input
+                    id="user-owner-scope"
+                    type="checkbox"
+                    checked={effectiveIsOrganizationOwner}
+                    onChange={handleOrganizationOwnerChange}
+                    aria-label="Administrador global"
+                    className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-blue-600 accent-[var(--colors-brand-gradient-end)] outline-none transition-all focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/30"
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -345,7 +359,7 @@ export function CreateUserModal({
               Defina apenas acessos complementares fora do departamento principal.
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              O modulo da area principal ja e concedido automaticamente pelo departamento.
+              O modulo da area principal recebe a permissao definida no departamento.
             </p>
           </div>
           <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1">
@@ -361,13 +375,13 @@ export function CreateUserModal({
                     </div>
                     {isDepartmentModule ? (
                       <div className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        Acesso pelo departamento
+                        {`Departamento: ${departmentPermissionLabel}`}
                       </div>
                     ) : (
                       <select
                         value={getModuleSelectValue(selection)}
                         onChange={(e) => handleModuleLevelChange(moduleOption.key, e.target.value as ModuleSelectValue)}
-                        disabled={formData.permission === 2}
+                        disabled={effectiveIsOrganizationOwner}
                         className={`${SELECT_FIELD_CLASSNAME} h-10 px-3 text-sm`}
                         style={SELECT_ARROW_STYLE}
                       >

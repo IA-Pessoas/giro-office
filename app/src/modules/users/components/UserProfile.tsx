@@ -1,12 +1,12 @@
 // src/components/users/UserProfile.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
 import { useRouter } from "next/router";
 import { LuFolder } from "react-icons/lu";
 import { FaComputer } from "react-icons/fa6";
 import { IoCreate } from "react-icons/io5";
 
-import { canAccessAdministration } from "@modules/auth";
+import { canCreateUsers, resolveDepartmentModuleKey } from "@modules/auth";
 import { useUserForm } from "../hooks/useUserForm";
 import LogDrawer from "@shared/components/LogDrawer";
 import { LoadingSpinner } from "@shared/components/LoadingSpinner";
@@ -22,7 +22,11 @@ export function UserProfile({ userId, me, departments }: UserProfileProps) {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [loadingData, setLoadingData] = useState(true);
-  const hasAdminAccess = canAccessAdministration(me);
+  const meDepartmentModule = useMemo(() => {
+    const departmentName = departments.find((department) => department.id === me?.department_id)?.name;
+    return resolveDepartmentModuleKey(departmentName ?? null);
+  }, [departments, me?.department_id]);
+  const hasAdminAccess = canCreateUsers(me, { departmentModule: meDepartmentModule });
 
   useEffect(() => {
     if (!hasAdminAccess) {

@@ -391,8 +391,8 @@ await (async () => {
     );
   });
 
-  await runTest("resolveModuleAccess always unlocks global admins", () => {
-    assert.deepEqual(resolveModuleAccess({ module: "contabil", userPermission: 2 }), {
+  await runTest("resolveModuleAccess unlocks global admins only when owner scope is explicit", () => {
+    assert.deepEqual(resolveModuleAccess({ module: "contabil", isGlobalAdmin: true }), {
       level: "admin",
       canView: true,
       canEdit: true,

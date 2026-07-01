@@ -12,7 +12,7 @@ import {
   type ModuleAccess,
   type ModuleKey,
 } from "../utils/moduleAccess";
-import { isAdminPermission } from "../utils/permissions";
+import { isOrganizationOwner } from "../utils/permissions";
 
 type ModuleAccessMap = Record<ModuleKey, ModuleAccess>;
 type AuthUser = ReturnType<typeof useAuth>["user"];
@@ -65,6 +65,7 @@ export function useModuleAccessMap(
     () => resolveDepartmentModuleKey(departmentName),
     [departmentName],
   );
+  const isGlobalAdmin = isOrganizationOwner(user);
 
   const accessMap = useMemo(() => {
     const nextMap = createEmptyModuleAccessMap();
@@ -75,21 +76,22 @@ export function useModuleAccessMap(
         departmentModule,
         module: moduleKey,
         additionalModulePermissions: user?.modules ?? null,
+        isGlobalAdmin,
       });
     }
 
     return nextMap;
-  }, [departmentModule, moduleKeys, user?.modules, user?.permission]);
+  }, [departmentModule, isGlobalAdmin, moduleKeys, user?.modules, user?.permission]);
 
   const hasImmediateAccessSource = useMemo(() => {
-    if (isAdminPermission(user?.permission)) {
+    if (isGlobalAdmin) {
       return true;
     }
 
     return moduleKeys.some((moduleKey) => {
       return resolveAccessLevelFromAdditionalPermission(user?.modules?.[moduleKey]) !== "none";
     });
-  }, [moduleKeys, user?.modules, user?.permission]);
+  }, [isGlobalAdmin, moduleKeys, user?.modules]);
 
   return {
     accessMap,
@@ -99,7 +101,7 @@ export function useModuleAccessMap(
       Boolean(user?.department_id) &&
       departmentsQuery.isLoading &&
       !hasImmediateAccessSource &&
-      !isAdminPermission(user?.permission),
+      !isGlobalAdmin,
     departmentsQuery,
     user,
   };

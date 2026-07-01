@@ -9,7 +9,13 @@ import {
   getAuthCookieOptions,
 } from "./utils/authCookie.ts";
 import { createBearerAuthHeaders, getAuthTokenValue } from "./utils/authHeaders.ts";
-import { canAccessAdministration, isAdminPermission } from "./utils/permissions.ts";
+import {
+  canAccessAdministration,
+  canCreateOrganizationOwner,
+  canCreateUsers,
+  isAdminPermission,
+  isOrganizationOwner,
+} from "./utils/permissions.ts";
 import {
   resolveAccessLevelFromAdditionalPermission,
   resolveDepartmentModuleKey,
@@ -76,22 +82,67 @@ await (async () => {
     assert.equal(isAdminPermission(null), false);
   });
 
-  await runTest("canAccessAdministration accepts both permission values and user-like objects", () => {
+  await runTest("administration access allows owners and RH admins only", () => {
     assert.equal(canAccessAdministration(2), true);
     assert.equal(canAccessAdministration(100), true);
     assert.equal(canAccessAdministration(1), false);
+    assert.equal(canAccessAdministration({ permission: 2, type: "owner" }), true);
+    assert.equal(canAccessAdministration({ permission: 2, type: "admin" }), false);
+    assert.equal(canAccessAdministration({ permission: 2, type: "admin", modules: { rh: 2 } }), true);
+    assert.equal(canAccessAdministration({ permission: 2, type: "admin", modules: { comercial: 2 } }), false);
+    assert.equal(canAccessAdministration({ permission: 2, type: "admin" }, { departmentModule: "rh" }), true);
+    assert.equal(canAccessAdministration({ permission: 1, type: "admin" }, { departmentModule: "rh" }), false);
+    assert.equal(canAccessAdministration({ permission: 2, type: "admin" }, { rhAccess: { isAdmin: true } }), true);
+    assert.equal(canAccessAdministration({ permission: 2, type: "user" }), false);
+    assert.equal(canAccessAdministration({ permission: 999, type: null }), true);
     assert.equal(canAccessAdministration({ permission: 2 }), true);
-    assert.equal(canAccessAdministration({ permission: 999 }), true);
     assert.equal(canAccessAdministration({ permission: 1 }), false);
     assert.equal(canAccessAdministration(undefined), false);
   });
 
-  await runTest("resolveModuleAccess grants admin access to every module", () => {
+  await runTest("user creation and organization owner creation use different gates", () => {
+    assert.equal(canCreateUsers({ permission: 2, type: "owner" }), true);
+    assert.equal(canCreateUsers({ permission: 2, type: "admin", modules: { rh: 2 } }), true);
+    assert.equal(canCreateUsers({ permission: 2, type: "admin" }, { departmentModule: "rh" }), true);
+    assert.equal(canCreateUsers({ permission: 2, type: "admin", modules: { rh: 1 } }), false);
+    assert.equal(canCreateUsers({ permission: 2, type: "admin", modules: { comercial: 2 } }), false);
+    assert.equal(canCreateOrganizationOwner({ permission: 2, type: "owner" }), true);
+    assert.equal(canCreateOrganizationOwner({ permission: 2, type: "admin", modules: { rh: 2 } }), false);
+    assert.equal(canCreateOrganizationOwner({ permission: 999, type: null }), true);
+  });
+
+  await runTest("isOrganizationOwner accepts explicit owners and numeric legacy fallback", () => {
+    assert.equal(isOrganizationOwner({ permission: 2, type: "owner" }), true);
+    assert.equal(isOrganizationOwner({ permission: 2, type: "admin" }), false);
+    assert.equal(isOrganizationOwner({ permission: 2, type: null }), true);
+    assert.equal(isOrganizationOwner(2), true);
+    assert.equal(isOrganizationOwner(1), false);
+  });
+
+  await runTest("resolveModuleAccess does not turn department admin into global admin", () => {
     assert.deepEqual(
       resolveModuleAccess({
         userPermission: 2,
         departmentModule: "regularize",
         module: "financeiro",
+      }),
+      {
+        level: "none",
+        canView: false,
+        canEdit: false,
+        isAdmin: false,
+        source: "none",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess grants global admin only when owner scope is explicit", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: 0,
+        departmentModule: "regularize",
+        module: "financeiro",
+        isGlobalAdmin: true,
       }),
       {
         level: "admin",
@@ -115,6 +166,26 @@ await (async () => {
         canView: true,
         canEdit: true,
         isAdmin: false,
+        source: "department",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess honors explicit department module permission", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: 1,
+        departmentModule: "rh",
+        module: "rh",
+        additionalModulePermissions: {
+          rh: 2,
+        },
+      }),
+      {
+        level: "admin",
+        canView: true,
+        canEdit: true,
+        isAdmin: true,
         source: "department",
       },
     );
@@ -169,6 +240,9 @@ await (async () => {
   await runTest("app shell uses module hook for menu visibility instead of raw access store", () => {
     assert.match(appShellSource, /useModuleAccessMap\(MODULE_KEYS\)/);
     assert.equal(appShellSource.includes("useAccessStore("), false);
+    assert.match(appShellSource, /const accessUser = meQuery\.data \?\? user/);
+    assert.match(appShellSource, /canAccessAdministration\(accessUser,\s*\{\s*rhAccess\s*\}\)/);
+    assert.match(appShellSource, /const rhAccess = moduleAccessMap\.rh/);
   });
 
   await runTest("app shell renders an explicit forbidden state for inaccessible module routes", () => {
@@ -239,6 +313,13 @@ await (async () => {
   await runTest("canSSRAdmin allows admin users through", async () => {
     const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
     const result = await guard(createSsrContext(createToken({ permission: 2 })));
+
+    assert.deepEqual(result, { props: { ok: true } });
+  });
+
+  await runTest("canSSRAdmin allows RH module admins through", async () => {
+    const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
+    const result = await guard(createSsrContext(createToken({ permission: 1, modules: { rh: 2 } })));
 
     assert.deepEqual(result, { props: { ok: true } });
   });

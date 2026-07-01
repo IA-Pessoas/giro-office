@@ -36,6 +36,7 @@ import {
   APP_ROUTE_MODULE_MAP,
   MODULE_KEYS,
   canAccessAdministration,
+  canCreateOrganizationOwner,
   useModuleAccessMap,
   type ModuleKey,
 } from "@modules/auth";
@@ -303,7 +304,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const displayUserLogin = user?.email ?? user?.login ?? meQuery.data?.login ?? "";
   const displayUserPhoto = resolvePhotoUrl(meQuery.data?.photo_url ?? null);
   const displayUserInitials = getInitials(displayUserName);
-  const isAdmin = canAccessAdministration(meQuery.data?.permission ?? user?.permission ?? null);
+  const accessUser = meQuery.data ?? user;
+  const rhAccess = moduleAccessMap.rh;
+  const canManageOrganization = canCreateOrganizationOwner(accessUser);
+  const canManageUsers = canAccessAdministration(accessUser, { rhAccess });
+  const isAdministrationAccessLoading =
+    !canManageOrganization && isModuleAccessLoading;
   const currentModuleKey = getModuleKeyFromRoutePath(pathname);
   const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
   const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;
@@ -313,8 +319,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     currentModuleAccess?.canView === false;
 
   const canViewModuleFromPath = (modulePath: string): boolean => {
-    if (modulePath === "/departments" || modulePath === "/administracao") {
-      return isAdmin;
+    if (modulePath === "/departments") {
+      return canManageOrganization;
+    }
+
+    if (modulePath === "/administracao") {
+      if (isAdministrationAccessLoading) {
+        return true;
+      }
+
+      return canManageUsers;
     }
 
     const moduleKey = getModuleKeyFromRoutePath(modulePath);

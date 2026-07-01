@@ -14,4 +14,10 @@ export {
   type ModuleAccess,
   type ModuleKey,
 } from "./utils/moduleAccess";
-export { canAccessAdministration, isAdminPermission } from "./utils/permissions";
+export {
+  canAccessAdministration,
+  canCreateOrganizationOwner,
+  canCreateUsers,
+  isAdminPermission,
+  isOrganizationOwner,
+} from "./utils/permissions";

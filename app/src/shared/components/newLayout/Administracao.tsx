@@ -7,7 +7,12 @@ import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { AdminUserDetailsPanel, CreateUserModal, type UserItem } from "@modules/users";
-import { canAccessAdministration, resolveDepartmentModuleKey } from "@modules/auth";
+import {
+  canAccessAdministration,
+  canCreateOrganizationOwner,
+  resolveDepartmentModuleKey,
+  useModuleAccess,
+} from "@modules/auth";
 import {
   PERMISSION_MODULE_GROUPS,
   PERMISSION_SELECT_OPTIONS,
@@ -125,7 +130,12 @@ export function Administracao() {
   const [permissionSaveError, setPermissionSaveError] = useState<string | null>(null);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
   const { user, refreshSession } = useAuth();
-  const hasAdminAccess = canAccessAdministration(user);
+  const { access: rhAccess, isLoading: isRhAccessLoading } = useModuleAccess("rh");
+  const canManageOrganizationOwners = canCreateOrganizationOwner(user);
+  const hasAdminAccess = canAccessAdministration(user, { rhAccess });
+  const canManagePermissions = canManageOrganizationOwners;
+  const isAdministrationAccessLoading =
+    !canManageOrganizationOwners && isRhAccessLoading;
   const queryClient = useQueryClient();
 
   const {
@@ -162,7 +172,7 @@ export function Administracao() {
     ["admin-users-summary", "permissions-active"],
     () => listAdminUsers("active"),
     {
-      enabled: hasAdminAccess && activeTab === "permissions",
+      enabled: hasAdminAccess && canManagePermissions && activeTab === "permissions",
       retry: false,
       refetchOnWindowFocus: false,
     },
@@ -173,7 +183,11 @@ export function Administracao() {
     isLoading: isDepartmentsLoading,
     refetch: refetchDepartments,
   } = useFetch<DepItem[]>(["admin-departments"], () => departmentService.list(), {
-    enabled: hasAdminAccess && (activeTab === "users" || activeTab === "permissions" || isCreateModalOpen),
+    enabled:
+      hasAdminAccess &&
+      (activeTab === "users" ||
+        (canManagePermissions && activeTab === "permissions") ||
+        isCreateModalOpen),
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -250,7 +264,11 @@ export function Administracao() {
 
   const permissionQuery = useQuery<PermissionQueryResult>({
     queryKey: ["admin", "permissions", selectedPermissionUserId],
-    enabled: hasAdminAccess && activeTab === "permissions" && !!selectedPermissionUserId,
+    enabled:
+      hasAdminAccess &&
+      canManagePermissions &&
+      activeTab === "permissions" &&
+      !!selectedPermissionUserId,
     retry: false,
     queryFn: async ({ queryKey, signal }) => {
       const [, , userId] = queryKey as [string, string, string];
@@ -288,10 +306,20 @@ export function Administracao() {
       return;
     }
 
+    if (isAdministrationAccessLoading) {
+      return;
+    }
+
     if (!hasAdminAccess) {
       void router.replace("/dashboard");
     }
-  }, [hasAdminAccess, router, user]);
+  }, [hasAdminAccess, isAdministrationAccessLoading, router, user]);
+
+  useEffect(() => {
+    if (activeTab === "permissions" && !canManagePermissions) {
+      setActiveTab("users");
+    }
+  }, [activeTab, canManagePermissions]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -561,9 +589,25 @@ export function Administracao() {
     }
   };
 
+  if (isAdministrationAccessLoading) {
+    return (
+      <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
+        <p className={ADMIN_TEXT_CLASSNAME}>Carregando acesso de administracao.</p>
+      </div>
+    );
+  }
+
   if (!hasAdminAccess) {
     return null;
   }
+
+  const adminTabs = [
+    { key: "dashboard", label: "Dashboard", icon: BarChart3 },
+    { key: "users", label: "Usuarios", icon: Users },
+    ...(canManagePermissions
+      ? [{ key: "permissions", label: "Permissoes", icon: Lock }]
+      : []),
+  ] as const;
 
   return (
     <div className="space-y-6">
@@ -594,11 +638,7 @@ export function Administracao() {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center gap-1 overflow-x-auto">
-          {[
-            { key: "dashboard", label: "Dashboard", icon: BarChart3 },
-            { key: "users", label: "Usuários", icon: Users },
-            { key: "permissions", label: "Permissões", icon: Lock },
-          ].map((tab) => {
+          {adminTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
 
@@ -802,6 +842,7 @@ export function Administracao() {
               departments={departments}
               departmentsError={Boolean(departmentsError)}
               onUserUpdated={() => refetchUsers()}
+              canManageUsers={hasAdminAccess}
             />
           </section>
         </div>
@@ -1097,6 +1138,7 @@ export function Administracao() {
         organizationId={organizationId}
         organizationIdLoading={isLoadingOrganizationId}
         invitedBy={user?.id}
+        canCreateOrganizationOwner={canManageOrganizationOwners}
       />
     </div>
   );
