@@ -27,6 +27,7 @@ import { toast } from "react-toastify";
 import { useClients } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { cn } from "@shared/ui/newLayout/utils";
+import { formatCPF_CNPJ } from "@shared/utils/formatters";
 
 import { RegularizeClientPfForm } from "./RegularizeClientPfForm";
 import { RegularizeGuidanceActivityForm } from "./RegularizeGuidanceActivityForm";
@@ -34,6 +35,7 @@ import { RegularizeGuidanceForm } from "./RegularizeGuidanceForm";
 import { RegularizeGuidancePartnerForm } from "./RegularizeGuidancePartnerForm";
 import { RegularizeLicenseForm } from "./RegularizeLicenseForm";
 import { RegularizeMunicipalTaxesForm } from "./RegularizeMunicipalTaxesForm";
+import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import { RegularizePartnerForm } from "./RegularizePartnerForm";
 import { RegularizePasswordForm } from "./RegularizePasswordForm";
 import { RegularizeProcessForm } from "./RegularizeProcessForm";
@@ -115,7 +117,6 @@ import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
 import {
   type RegularizeFormOption,
   regularizePrimaryButtonClassName,
-  regularizeSelectClassName,
 } from "./regularizeFormControls";
 
 type RegularizeTabId =
@@ -214,6 +215,16 @@ function formatText(value: unknown, fallback = "-"): string {
   return String(value);
 }
 
+function formatDocument(value: string | null | undefined): string {
+  return formatText(formatCPF_CNPJ(value), "-");
+}
+
+function formatDocumentDescription(value: string | null | undefined): string | undefined {
+  const formatted = formatDocument(value);
+
+  return formatted === "-" ? undefined : formatted;
+}
+
 function formatDate(value: string | null | undefined): string {
   if (!value) {
     return "-";
@@ -229,7 +240,7 @@ function formatDate(value: string | null | undefined): string {
 }
 
 function getProcessClientName(item: RegularizeProcessListItem): string {
-  return item.clientPJ?.name ?? item.clientPF?.name ?? item.cpf_cnpj ?? "-";
+  return item.clientPJ?.name ?? item.clientPF?.name ?? formatDocument(item.cpf_cnpj);
 }
 
 function getMunicipalTaxId(item: RegularizeMunicipalTaxesClientSummary): RegularizeId | undefined {
@@ -275,10 +286,47 @@ function TableActionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+      className={cn(
+        "inline-flex h-8 w-8 items-center justify-center rounded-lg",
+        "text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900",
+        "disabled:cursor-not-allowed disabled:opacity-40",
+        "dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white",
+      )}
       title={title}
     >
       <Icon className="h-4 w-4" />
+    </button>
+  );
+}
+
+function TableTextActionButton({
+  disabled,
+  icon: Icon,
+  label,
+  onClick,
+  title,
+}: {
+  disabled?: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold",
+        "border border-blue-500/35 text-blue-600 transition-colors hover:bg-blue-50",
+        "disabled:cursor-not-allowed disabled:opacity-40",
+        "dark:border-blue-400/35 dark:text-blue-300 dark:hover:bg-blue-500/10",
+      )}
+      title={title}
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <span>{label}</span>
     </button>
   );
 }
@@ -301,10 +349,8 @@ function PrimaryActionButton({
       onClick={onClick}
       className={regularizePrimaryButtonClassName}
     >
-      <span className="inline-flex items-center gap-2">
-        <Icon className="h-4 w-4" />
-        {label}
-      </span>
+      <Icon className="h-4 w-4 shrink-0" />
+      <span>{label}</span>
     </button>
   );
 }
@@ -520,11 +566,22 @@ function DataTable({
       <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
         <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-slate-800/60 dark:text-slate-400">
           <tr>
-            {headers.map((header) => (
-              <th key={header} scope="col" className="px-4 py-3 text-left font-semibold">
-                {header}
-              </th>
-            ))}
+            {headers.map((header) => {
+              const shouldCenterHeader = header === "" || header === "Ação";
+
+              return (
+                <th
+                  key={header}
+                  scope="col"
+                  className={cn(
+                    "px-4 py-3 font-semibold",
+                    shouldCenterHeader ? "text-center" : "text-left",
+                  )}
+                >
+                  {header}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-slate-800">{children}</tbody>
@@ -724,7 +781,7 @@ export function RegularizePage() {
       (clientQuery.data?.items ?? []).map((client) => ({
         id: client.id,
         label: client.name || client.company_name || client.id,
-        description: client.cpf_cnpj,
+        description: formatDocumentDescription(client.cpf_cnpj),
       })),
     [clientQuery.data],
   );
@@ -734,7 +791,7 @@ export function RegularizePage() {
       (pfQuery.data ?? []).map((clientPf) => ({
         id: clientPf.id,
         label: clientPf.name || clientPf.id,
-        description: clientPf.cpf,
+        description: formatDocumentDescription(clientPf.cpf),
       })),
     [pfQuery.data],
   );
@@ -1166,7 +1223,7 @@ export function RegularizePage() {
                       <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                         <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
                         <td className="px-4 py-3">{getProcessClientName(item)}</td>
-                        <td className="px-4 py-3">{formatText(item.cpf_cnpj)}</td>
+                        <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
                         <td className="px-4 py-3">
                           <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
                         </td>
@@ -1229,7 +1286,7 @@ export function RegularizePage() {
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
                       <td className="px-4 py-3">{getProcessClientName(item)}</td>
-                      <td className="px-4 py-3">{formatText(item.cpf_cnpj)}</td>
+                      <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
                       <td className="px-4 py-3">
                         <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
                       </td>
@@ -1410,7 +1467,7 @@ export function RegularizePage() {
                                     >
                                       <span className="min-w-0 text-gray-700 dark:text-slate-200">
                                         {formatText(partner.name)} -{" "}
-                                        {formatText(partner.cpf ?? partner.document)}
+                                        {formatDocument(partner.cpf ?? partner.document)}
                                       </span>
                                       {canManageRegularizeCore ? (
                                         <TableActionButton
@@ -1516,7 +1573,7 @@ export function RegularizePage() {
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3">{formatText(item.code)}</td>
                       <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                      <td className="px-4 py-3">{formatText(item.cpf)}</td>
+                      <td className="px-4 py-3">{formatDocument(item.cpf)}</td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
                           <TableActionButton
@@ -1548,7 +1605,7 @@ export function RegularizePage() {
               ) : clientPfDetailQuery.data ? (
                 <>
                   <FieldLine label="Nome" value={formatText(clientPfDetailQuery.data.name)} />
-                  <FieldLine label="CPF" value={formatText(clientPfDetailQuery.data.cpf)} />
+                  <FieldLine label="CPF" value={formatDocument(clientPfDetailQuery.data.cpf)} />
                   <FieldLine label="Cidade" value={formatText(clientPfDetailQuery.data.city)} />
                   <FieldLine label="UF" value={formatText(clientPfDetailQuery.data.state)} />
                   <FieldLine label="Status" value={formatText(clientPfDetailQuery.data.status)} />
@@ -1627,12 +1684,11 @@ export function RegularizePage() {
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)] xl:items-stretch">
             <div className="space-y-3">
               <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-                <label className="flex max-w-xl flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <label className="flex w-full flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
                   <span>Cliente</span>
-                  <select
+                  <RegularizeNativeSelect
                     value={currentCredentialClientId ?? ""}
                     onChange={(event) => setSelectedCredentialClientId(event.target.value)}
-                    className={regularizeSelectClassName}
                   >
                     <option value="">Selecione</option>
                     {clientOptions.map((client) => (
@@ -1640,11 +1696,15 @@ export function RegularizePage() {
                         {formatOptionLabel(client.label, client.description)}
                       </option>
                     ))}
-                  </select>
+                  </RegularizeNativeSelect>
                 </label>
               </div>
 
-              <QueryStatePanel query={credentialQuery} emptyTitle="Nenhuma senha encontrada.">
+              <QueryStatePanel
+                query={credentialQuery}
+                emptyTitle="Nenhuma senha encontrada."
+                emptyClassName="min-h-24 py-5"
+              >
                 {(credentialRows) => (
                   <DataTable headers={["Site", "Escopo", "Observação", "Senha", ""]}>
                     {credentialRows.map((item: RegularizePasswordListItem) => (
@@ -1816,14 +1876,14 @@ export function RegularizePage() {
 
           <QueryStatePanel query={taxQuery} emptyTitle="Nenhum tributo encontrado.">
             {(taxRows) => (
-              <DataTable headers={["Cliente", "Documento", "Cidade", "Ano", "Registro", ""]}>
+              <DataTable headers={["Cliente", "Documento", "Cidade", "Ano", "Registro", "Ação"]}>
                 {taxRows.map((item: RegularizeMunicipalTaxesClientSummary) => {
                   const municipalTaxId = getMunicipalTaxId(item);
 
                   return (
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                      <td className="px-4 py-3">{formatText(item.cpf_cnpj)}</td>
+                      <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
                       <td className="px-4 py-3">
                         {item.city ? (
                           formatText(item.city)
@@ -1844,12 +1904,13 @@ export function RegularizePage() {
                           size="sm"
                         />
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end">
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex justify-center">
                           {canManageRegularizeCore ? (
-                            <TableActionButton
-                              icon={municipalTaxId ? Pencil : Plus}
-                              title={municipalTaxId ? "Editar tributo" : "Criar tributo"}
+                            <TableTextActionButton
+                              icon={Pencil}
+                              title="Editar tributo"
+                              label="Editar"
                               onClick={() =>
                                 setActiveForm(
                                   municipalTaxId
