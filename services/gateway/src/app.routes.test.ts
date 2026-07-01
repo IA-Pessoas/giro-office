@@ -898,7 +898,7 @@ it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", 
   }
 });
 
-it("does not expose certificate internal notification routes in the aggregated OpenAPI JSON", async () => {
+it("does not expose service internal notification routes in the aggregated OpenAPI JSON", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
   const baseUrl = await startServer(server);
@@ -911,6 +911,7 @@ it("does not expose certificate internal notification routes in the aggregated O
 
     expect(response.status).toBe(200);
     expect(body.paths["/internal/notifications/run"]).toBe(undefined);
+    expect(body.paths["/internal/pessoal/union-notifications/run"]).toBe(undefined);
   } finally {
     await stopServer(server);
   }

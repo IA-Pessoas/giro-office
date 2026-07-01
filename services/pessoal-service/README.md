@@ -14,6 +14,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `JWT_SECRET`
 - `AUDIT_SERVICE_URL`
 - `AUDIT_SERVICE_TOKEN`
+- `INTERNAL_SERVICE_TOKEN` (opcional; usa `AUDIT_SERVICE_TOKEN` como fallback)
 - `PESSOAL_PASSWORD_ENCRYPTION_KEY`
 - `PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION`
 - `PESSOAL_DOMAIN_AUDIT_ENABLED`
@@ -33,6 +34,13 @@ Exemplos de paths publicos planejados:
 - `/pessoal/payroll`
 - `/pessoal/obrigations`
 - `/pessoal/passwords`
+
+## Rotinas internas
+
+- `POST /internal/pessoal/union-notifications/run`
+
+O servico nao agenda cron no processo Node. A rotina de notificacoes de sindicatos deve ser
+acionada por um scheduler externo, como Supabase/Vercel, usando `x-internal-service-token`.
 
 ## Desenvolvimento
 

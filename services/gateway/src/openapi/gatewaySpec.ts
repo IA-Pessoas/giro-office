@@ -157,7 +157,9 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
         buildPessoalServiceOpenApiSpec({
           port: getPortFromUrl(env.pessoalServiceUrl),
         } as never),
-      includePath: (path) => path !== "/health" && path !== "/ready",
+      includePath: (path) =>
+        path !== "/health" && path !== "/ready" && !path.startsWith("/internal/"),
+      isInternalPath: (path) => path.startsWith("/internal/"),
     },
     {
       key: "audit-service",

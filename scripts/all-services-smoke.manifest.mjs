@@ -2454,6 +2454,28 @@ const baseManifest = [
     target: "gateway",
     auth: "bearer",
   }),
+  op({
+    service: "pessoal-service",
+    method: "POST",
+    path: "/internal/pessoal/union-notifications/run",
+    action: "pessoalUnionNotificationsRunInvalidToken",
+    handlerAction: "pessoalUnionNotificationsRun",
+    target: "direct",
+    auth: "public",
+    specOperation: false,
+    expectationKind: "bad",
+    expectedStatus: [403],
+    expectedLabel: "invalid internal token",
+    negativeCase: "internalToken403",
+  }),
+  op({
+    service: "pessoal-service",
+    method: "POST",
+    path: "/internal/pessoal/union-notifications/run",
+    action: "pessoalUnionNotificationsRun",
+    target: "direct",
+    auth: "internal-token",
+  }),
 
   op({
     service: "audit-service",

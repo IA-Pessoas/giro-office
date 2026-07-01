@@ -19,6 +19,7 @@ const errorJson = {
 } as const;
 
 const bearerSecurity = [{ bearerAuth: [] }];
+const internalSecurity = [{ internalServiceToken: [] }];
 
 const idParam = (name: string) =>
   ({
@@ -132,6 +133,10 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
         name: "Pessoal Passwords",
         description: "Registros de senha com lista sem campos secretos",
       },
+      {
+        name: "Pessoal Internal",
+        description: "Rotas internas para schedulers e integracoes servico-a-servico",
+      },
     ],
     components: {
       securitySchemes: {
@@ -139,6 +144,11 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
+        },
+        internalServiceToken: {
+          type: "apiKey",
+          in: "header",
+          name: "x-internal-service-token",
         },
       },
       schemas: {
@@ -445,6 +455,37 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           operationId: "deletePessoalPassword",
           parameters: [idParam("id")],
           responses: passwordMutationResponses,
+        },
+      },
+      "/internal/pessoal/union-notifications/run": {
+        post: {
+          tags: ["Pessoal Internal"],
+          security: internalSecurity,
+          summary: "Executar rotina interna de notificacoes de sindicatos",
+          operationId: "runPessoalUnionNotifications",
+          responses: {
+            "200": {
+              description: "OK",
+              ...successJsonWithData({
+                type: "object",
+                required: [
+                  "organizations",
+                  "unionsMatched",
+                  "notificationsCreated",
+                  "duplicatesSkipped",
+                ],
+                properties: {
+                  organizations: { type: "integer", minimum: 0 },
+                  unionsMatched: { type: "integer", minimum: 0 },
+                  notificationsCreated: { type: "integer", minimum: 0 },
+                  duplicatesSkipped: { type: "integer", minimum: 0 },
+                },
+              }),
+            },
+            "401": { description: "Unauthorized", ...errorJson },
+            "403": { description: "Forbidden", ...errorJson },
+            "500": { description: "Internal error", ...errorJson },
+          },
         },
       },
     },
