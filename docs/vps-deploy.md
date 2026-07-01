@@ -123,7 +123,7 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 |---------|-----|
 | `ENV_VPS_GATEWAY` | Inclua `REGULARIZE_SERVICE_URL=http://regularize-service:3039`, `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` e `PESSOAL_SERVICE_URL=http://pessoal-service:3042` para as rotas `/regularize`, `/certificate` e `/pessoal` dentro da rede Docker. |
 | `ENV_VPS_CERTIFICATE_SERVICE` | Corpo de `.env.vps.certificate-service`; alem das variaveis base do service, inclua `CERTIFICATE_STORAGE_MODE=supabase`, `CERTIFICATE_STORAGE_BUCKET`, `CERTIFICATE_FILE_MAX_SIZE_BYTES`, `CERTIFICATE_FILE_ENCRYPTION_KEY`, `CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `UPLOAD_RATE_LIMIT_MAX` e `UPLOAD_RATE_LIMIT_WINDOW_MS` para upload/download criptografado de arquivos. |
-| `ENV_VPS_PESSOAL_SERVICE` | Corpo de `.env.vps.pessoal-service`; inclua `DATABASE_URL`, `JWT_SECRET`, `AUDIT_SERVICE_URL=http://audit-service:3020`, `AUDIT_SERVICE_TOKEN`, `PESSOAL_PASSWORD_ENCRYPTION_KEY`, `PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION` e `PESSOAL_DOMAIN_AUDIT_ENABLED`. |
+| `ENV_VPS_PESSOAL_SERVICE` | Corpo de `.env.vps.pessoal-service`; inclua `DATABASE_URL`, `JWT_SECRET`, `AUDIT_SERVICE_URL=http://audit-service:3020`, `AUDIT_SERVICE_TOKEN`, `INTERNAL_SERVICE_TOKEN`, `PESSOAL_PASSWORD_ENCRYPTION_KEY`, `PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION` e `PESSOAL_DOMAIN_AUDIT_ENABLED`. |
 | `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | URL **com namespace** (ex.: `ghcr.io/meu-org`, `docker.io/meuuser` — não use só `ghcr.io`). Push/pull normalizam em minúsculas. |
 | `ENV_VPS_*` | Igual ao manifest `scripts/ci/vps-secrets.manifest` — `.env.vps.*` copiados para a VPS em cada deploy |
 | `ENV_VPS_WEB` | Corpo do ficheiro **`.env.vps.web`**: pelo menos `NEXT_PUBLIC_API_URL=<URL pública do API para o browser>` e `API_INTERNAL_URL=http://gateway:3010` (rede Docker). O valor de `NEXT_PUBLIC_API_URL` é embutido no bundle no `docker compose build`. |
@@ -166,6 +166,12 @@ Workflows que **não** definem `environment` (ex.: `test-cicd.yml` em branch de 
 ### Healthchecks (VPS persistente vs CI/DAST)
 
 O `docker-compose.vps.yml` define `healthcheck` com `node -e fetch(...)` a cada 30s. Isso é útil para `docker compose up --wait` em DAST/local (`scripts/ci/dast-local-stack.sh`), mas na VPS persistente gera muitos `runc exec` e sobrecarrega o `dockerd`.
+
+### Rotinas internas do pessoal-service
+
+O `pessoal-service` expõe `POST /internal/pessoal/union-notifications/run` para execução por scheduler externo, por exemplo Supabase ou Vercel. Não há cron job dentro do processo Node do serviço.
+
+Configure `INTERNAL_SERVICE_TOKEN` em `.env.vps.pessoal-service` e envie o mesmo valor no header `x-internal-service-token` do scheduler. Se `INTERNAL_SERVICE_TOKEN` não for definido, o serviço usa `AUDIT_SERVICE_TOKEN` como fallback, mas para deploy recomenda-se manter um token explícito para rotas internas.
 
 O deploy remoto (`vps-remote-deploy.sh`) aplica sempre:
 
