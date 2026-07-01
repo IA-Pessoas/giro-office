@@ -17,10 +17,10 @@ import {
   RegularizeFormError,
   RegularizeFormField,
   type RegularizeFormOption,
-  regularizeSelectClassName,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
+import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 
 type RegularizePasswordFormState = {
   client_id: string;
@@ -178,10 +178,9 @@ export function RegularizePasswordForm({
 
           <div className="grid gap-4 md:grid-cols-2">
             <RegularizeFormField label="Cliente" required>
-              <select
+              <RegularizeNativeSelect
                 value={formState.client_id}
                 onChange={(event) => handleChange("client_id", event.target.value)}
-                className={regularizeSelectClassName}
               >
                 <option value="">Selecione</option>
                 {clientOptions.map((client) => (
@@ -190,14 +189,13 @@ export function RegularizePasswordForm({
                     {client.description ? `, ${client.description}` : ""}
                   </option>
                 ))}
-              </select>
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Site" required>
-              <select
+              <RegularizeNativeSelect
                 value={formState.site_id}
                 onChange={(event) => handleChange("site_id", event.target.value)}
-                className={regularizeSelectClassName}
               >
                 <option value="">Selecione</option>
                 {siteOptions.map((site) => (
@@ -205,7 +203,7 @@ export function RegularizePasswordForm({
                     {site.label}
                   </option>
                 ))}
-              </select>
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Login" required>

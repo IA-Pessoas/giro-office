@@ -8,13 +8,54 @@ export const regularizeTextFieldClassName =
 
 export const regularizeTextareaClassName = `${regularizeTextFieldClassName} min-h-24 resize-y`;
 
-export const regularizeSelectClassName = `${regularizeTextFieldClassName} appearance-auto`;
+export const regularizeSelectClassName = `${regularizeTextFieldClassName} appearance-none bg-[length:14px] bg-[position:right_0.95rem_center] bg-no-repeat pr-11`;
 
 export const regularizeSecondaryButtonClassName =
   "rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700";
 
 export const regularizePrimaryButtonClassName =
-  "rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60";
+
+export const regularizeClientStatusOptions = ["Ativo", "Inativo"] as const;
+
+export const regularizeProcessStatusOptions = [
+  "Aberto",
+  "Em andamento",
+  "Pendente",
+  "Concluído",
+  "Cancelado",
+] as const;
+
+export const regularizeGuidanceStatusOptions = [
+  "Em andamento",
+  "Pendente",
+  "Concluído",
+  "Cancelado",
+] as const;
+
+export const regularizeLicenseStatusOptions = [
+  "Ativo",
+  "Pendente",
+  "A vencer",
+  "Vencido",
+  "Inativo",
+  "Cancelado",
+] as const;
+
+export const regularizeUrgencyOptions = ["Baixa", "Média", "Alta", "Urgente"] as const;
+
+export function getRegularizePresetOptions(
+  options: readonly string[],
+  currentValue?: string | null,
+): string[] {
+  const normalizedValue = currentValue?.trim();
+
+  if (!normalizedValue || options.includes(normalizedValue)) {
+    return [...options];
+  }
+
+  return [...options, normalizedValue];
+}
 
 export type RegularizeFormOption = {
   id: string;
@@ -35,9 +76,9 @@ export function RegularizeFormField({
 }) {
   return (
     <label className={cn("flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300", className)}>
-      <span>
-        {label}
-        {required ? <span className="text-red-500"> *</span> : null}
+      <span className="inline-flex items-center gap-1">
+        <span>{label}</span>
+        {required ? <span className="text-red-500">*</span> : null}
       </span>
       {children}
     </label>
@@ -79,7 +120,7 @@ export function RegularizeFormActions({
   submittingLabel?: string;
 }) {
   return (
-    <div className="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+    <div className="flex justify-end gap-2 pt-2">
       <button
         type="button"
         onClick={onCancel}

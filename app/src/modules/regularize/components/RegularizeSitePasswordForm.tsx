@@ -16,9 +16,9 @@ import {
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
-  regularizeSelectClassName,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
+import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 
 type RegularizeSitePasswordFormState = {
   name: string;
@@ -213,14 +213,13 @@ export function RegularizeSitePasswordForm({
 
             {isEditing ? (
               <RegularizeFormField label="Status">
-                <select
+                <RegularizeNativeSelect
                   value={formState.status ? "true" : "false"}
                   onChange={(event) => handleChange("status", event.target.value === "true")}
-                  className={regularizeSelectClassName}
                 >
                   <option value="true">Ativo</option>
                   <option value="false">Inativo</option>
-                </select>
+                </RegularizeNativeSelect>
               </RegularizeFormField>
             ) : null}
           </div>

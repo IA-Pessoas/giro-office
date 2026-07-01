@@ -6,6 +6,8 @@ export type RegularizePartnerType = "pf" | "pj";
 
 export type RegularizeCapability = "credentials:reveal" | "core:write";
 
+export type RegularizeOptionalDate = string | undefined;
+
 export type RegularizeIdFilter = {
   id: RegularizeId;
 };
@@ -220,6 +222,37 @@ export type RegularizeMunicipalTaxesDetail = {
   tll_analysis_notes?: string | null;
 };
 
+export type CreateRegularizeMunicipalTaxPayload = {
+  client_id: RegularizeId;
+  year: number;
+  tff_is_applicable: boolean;
+  tff_amount: number;
+  tff_notes?: string | null;
+  tff_analysis_is_done: boolean;
+  tff_analysis_notes?: string | null;
+  tff_sent_date?: RegularizeOptionalDate;
+  tff_due_date?: RegularizeOptionalDate;
+  tlp_is_applicable: boolean;
+  tlp_amount: number;
+  tlp_notes?: string | null;
+  tlp_is_sent: string;
+  tlp_sent_date?: RegularizeOptionalDate;
+  tlp_due_date?: RegularizeOptionalDate;
+  tlp_not_email: boolean;
+  tll_is_applicable: boolean;
+  tll_amount: number;
+  tll_notes?: string | null;
+  tll_is_sent: string;
+  tll_sent_date?: RegularizeOptionalDate;
+  tll_due_date?: RegularizeOptionalDate;
+  tll_analysis_is_done: boolean;
+  tll_analysis_notes?: string | null;
+};
+
+export type UpdateRegularizeMunicipalTaxPayload = CreateRegularizeMunicipalTaxPayload & {
+  id: RegularizeId;
+};
+
 export type RegularizeProcessClientSummary = {
   name?: string | null;
   cpf?: string | null;
@@ -251,17 +284,44 @@ export type RegularizeProcessDetail = RegularizeProcessListItem & {
   task_id?: RegularizeId | null;
 };
 
+export type CreateRegularizeProcessPayload = {
+  client_pj_id?: RegularizeId;
+  client_pf_id?: RegularizeId;
+  cpf_cnpj: string;
+  process_type: string;
+  description: string;
+  entry_date?: RegularizeOptionalDate;
+  completion_date?: RegularizeOptionalDate;
+  expected_date?: RegularizeOptionalDate;
+  status: string;
+  observation?: string | null;
+  responsible1_id?: RegularizeId;
+  responsible2_id?: RegularizeId;
+  responsible3_id?: RegularizeId;
+  locking_type?: string | null;
+  urgency?: string | null;
+  task_id?: RegularizeId;
+};
+
+export type UpdateRegularizeProcessPayload = CreateRegularizeProcessPayload & {
+  id: RegularizeId;
+};
+
 export type RegularizeGuidanceEconomicActivity = {
   id?: RegularizeId;
   code?: string | null;
   description?: string | null;
+  type?: string | null;
   [key: string]: unknown;
 };
 
 export type RegularizeGuidancePartner = {
   id?: RegularizeId;
   name?: string | null;
+  cpf?: string | null;
   document?: string | null;
+  role?: string | null;
+  share?: number | string | null;
   [key: string]: unknown;
 };
 
@@ -270,11 +330,85 @@ export type RegularizeGuidance = {
   process_id: RegularizeId;
   description?: string | null;
   type?: string | null;
+  request?: string | null;
+  framework_obs?: string | null;
+  legal_nature?: string | null;
+  company_name?: string | null;
+  trade_name?: string | null;
+  cpf_cnpj?: string | null;
+  share_capital?: number | string | null;
+  iptu?: string | null;
+  address?: string | null;
+  comporate_purpose?: string | null;
+  carryng?: string | null;
+  regime?: string | null;
+  legal_representative?: string | null;
   status?: string | null;
   economic_activities?: RegularizeGuidanceEconomicActivity[] | null;
   partners?: RegularizeGuidancePartner[] | null;
   [key: string]: unknown;
 };
+
+export type RegularizeGuidanceEconomicActivityPayload = {
+  code: string;
+  description: string;
+  type: string;
+};
+
+export type RegularizeGuidancePartnerPayload = {
+  name: string;
+  cpf: string;
+  role?: string;
+  share?: number;
+};
+
+export type CreateRegularizeGuidancePayload = {
+  process_id: RegularizeId;
+  type?: string;
+  request?: string;
+  framework_obs?: string;
+  legal_nature?: string;
+  company_name?: string;
+  trade_name?: string;
+  cpf_cnpj?: string;
+  share_capital?: number;
+  iptu?: string;
+  address?: string;
+  comporate_purpose?: string;
+  carryng?: string;
+  regime?: string;
+  legal_representative?: string;
+  status: string;
+  economic_activities?: RegularizeGuidanceEconomicActivityPayload[];
+  partners?: RegularizeGuidancePartnerPayload[];
+};
+
+export type UpdateRegularizeGuidancePayload = Partial<
+  Omit<CreateRegularizeGuidancePayload, "process_id" | "economic_activities" | "partners">
+> & {
+  id: RegularizeId;
+  process_id?: RegularizeId;
+};
+
+export type AddRegularizeGuidanceActivityPayload = {
+  guidance_id: RegularizeId;
+  process_id?: RegularizeId;
+  activity: RegularizeGuidanceEconomicActivityPayload;
+};
+
+export type RemoveRegularizeGuidanceActivityPayload = {
+  guidance_id: RegularizeId;
+  process_id?: RegularizeId;
+  item_id: RegularizeId;
+};
+
+export type AddRegularizeGuidancePartnerPayload = {
+  guidance_id: RegularizeId;
+  process_id?: RegularizeId;
+  partner: RegularizeGuidancePartnerPayload;
+};
+
+export type RemoveRegularizeGuidancePartnerPayload = RemoveRegularizeGuidanceActivityPayload;
 
 export type RegularizeLicenseListItem = {
   id: RegularizeId;
@@ -298,4 +432,26 @@ export type RegularizeLicenseListItem = {
 export type RegularizeLicenseDetail = RegularizeLicenseListItem & {
   client?: { name?: string | null } | null;
   responsible?: { name?: string | null } | null;
+};
+
+export type CreateRegularizeLicensePayload = {
+  client_id?: RegularizeId;
+  has: boolean;
+  type_license: string;
+  entry_date: string;
+  protocol: string;
+  responsible_id?: RegularizeId;
+  status: string;
+  date_last_consultation?: RegularizeOptionalDate;
+  current_situation: string;
+  contact: string;
+  observation?: string | null;
+  urgency: string;
+  type: string;
+  due_date?: RegularizeOptionalDate;
+  task_id?: RegularizeId;
+};
+
+export type UpdateRegularizeLicensePayload = CreateRegularizeLicensePayload & {
+  id: RegularizeId;
 };

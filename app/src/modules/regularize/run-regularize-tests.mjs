@@ -123,6 +123,33 @@ await runTest("regularize core service exposes create and update endpoints", asy
   }
 });
 
+await runTest("regularize operations service exposes create and update endpoints", async () => {
+  const serviceSource = await readModuleSource("services/regularizeService.ts");
+
+  for (const endpoint of ["municipalTaxes", "process", "guidance", "license"]) {
+    assert.match(
+      serviceSource,
+      new RegExp(`api\\.post\\(REGULARIZE_ENDPOINTS\\.${endpoint}`),
+    );
+    assert.match(
+      serviceSource,
+      new RegExp(`api\\.put\\(REGULARIZE_ENDPOINTS\\.${endpoint}`),
+    );
+  }
+
+  for (const endpoint of [
+    "guidanceActivityAdd",
+    "guidanceActivityRemove",
+    "guidancePartnerAdd",
+    "guidancePartnerRemove",
+  ]) {
+    assert.match(
+      serviceSource,
+      new RegExp(`api\\.post\\(REGULARIZE_ENDPOINTS\\.${endpoint}`),
+    );
+  }
+});
+
 await runTest("regularize core mutations stay in hooks and invalidate cache", async () => {
   for (const hookPath of [
     "hooks/useRegularizeCredentials.ts",
@@ -134,6 +161,31 @@ await runTest("regularize core mutations stay in hooks and invalidate cache", as
     assert.match(source, /useQueryClient/);
     assert.match(source, /invalidateQueries\(\{\s*queryKey: regularizeQueryKeys/);
   }
+});
+
+await runTest("regularize operations mutations stay in hooks and invalidate cache", async () => {
+  const source = await readModuleSource("hooks/useRegularizeOperations.ts");
+
+  for (const mutationName of [
+    "useCreateRegularizeMunicipalTaxMutation",
+    "useUpdateRegularizeMunicipalTaxMutation",
+    "useCreateRegularizeProcessMutation",
+    "useUpdateRegularizeProcessMutation",
+    "useCreateRegularizeGuidanceMutation",
+    "useUpdateRegularizeGuidanceMutation",
+    "useAddRegularizeGuidanceActivityMutation",
+    "useRemoveRegularizeGuidanceActivityMutation",
+    "useAddRegularizeGuidancePartnerMutation",
+    "useRemoveRegularizeGuidancePartnerMutation",
+    "useCreateRegularizeLicenseMutation",
+    "useUpdateRegularizeLicenseMutation",
+  ]) {
+    assert.match(source, new RegExp(`export function ${mutationName}`));
+  }
+
+  assert.match(source, /useMutation/);
+  assert.match(source, /useQueryClient/);
+  assert.match(source, /invalidateQueries\(\{\s*queryKey: regularizeQueryKeys/);
 });
 
 await runTest("regularize components do not own API calls or mutations", async () => {
@@ -154,6 +206,63 @@ await runTest("regularize components do not own API calls or mutations", async (
   }
 
   assert.deepEqual(offenders, []);
+});
+
+await runTest("regularize operations forms are wired in the page", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  for (const formName of [
+    "RegularizeMunicipalTaxesForm",
+    "RegularizeProcessForm",
+    "RegularizeGuidanceForm",
+    "RegularizeGuidanceActivityForm",
+    "RegularizeGuidancePartnerForm",
+    "RegularizeLicenseForm",
+  ]) {
+    assert.match(pageSource, new RegExp(`<${formName}`));
+  }
+});
+
+await runTest("regularize operational tabs expose write actions", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  for (const label of [
+    "Novo processo",
+    "Nova licença",
+    "Novo tributo",
+    "Nova orientação",
+    "Adicionar atividade",
+    "Adicionar sócio",
+  ]) {
+    assert.match(pageSource, new RegExp(`label="${label}"`));
+  }
+});
+
+await runTest("regularize municipal tax keeps row actions visible and centered", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const taxTableStart = pageSource.indexOf(
+    'DataTable headers={["Cliente", "Documento", "Cidade", "Ano", "Registro"',
+  );
+  const taxTableEnd = pageSource.indexOf("</DataTable>", taxTableStart);
+  const taxTableSource = pageSource.slice(taxTableStart, taxTableEnd);
+
+  assert.match(pageSource, /headers\.map\(\(header\) =>/);
+  assert.match(pageSource, /header === "" \|\| header === "Ação"/);
+  assert.match(
+    pageSource,
+    /DataTable headers=\{\["Cliente", "Documento", "Cidade", "Ano", "Registro", "Ação"\]\}/,
+  );
+  assert.match(pageSource, /label="Novo tributo"/);
+  assert.match(taxTableSource, /TableTextActionButton/);
+  assert.match(taxTableSource, /title="Editar tributo"/);
+  assert.match(taxTableSource, /label="Editar"/);
+  assert.match(taxTableSource, /mode: "edit"/);
+  assert.match(taxTableSource, /mode: "create"/);
+  assert.match(taxTableSource, /<td className="px-4 py-3 text-center">/);
+  assert.match(taxTableSource, /<div className="flex justify-center">/);
+  assert.doesNotMatch(taxTableSource, /<span className="text-sm text-gray-400 dark:text-slate-500">-<\/span>/);
+  assert.doesNotMatch(taxTableSource, /Cadastrar/);
+  assert.doesNotMatch(taxTableSource, /Criar tributo/);
 });
 
 await runTest("regularize core forms are wired in the page", async () => {
@@ -189,6 +298,32 @@ await runTest("regularize process empty state is centered across the process vie
   assert.match(pageSource, /emptyClassName="[^"]*items-center[^"]*justify-center[^"]*"/);
 });
 
+await runTest("regularize client documents are consistently formatted", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const rawDocumentMatches = pageSource.match(/formatText\(item\.cpf_cnpj\)/g) ?? [];
+  const formattedDocumentMatches = pageSource.match(/formatDocument\(item\.cpf_cnpj\)/g) ?? [];
+
+  assert.match(pageSource, /import \{ formatCPF_CNPJ \} from "@shared\/utils\/formatters";/);
+  assert.match(pageSource, /function formatDocument/);
+  assert.match(pageSource, /function formatDocumentDescription/);
+  assert.deepEqual(rawDocumentMatches, []);
+  assert.ok(formattedDocumentMatches.length >= 3);
+  assert.doesNotMatch(pageSource, /description: client\.cpf_cnpj/);
+  assert.doesNotMatch(pageSource, /description: clientPf\.cpf/);
+  assert.match(pageSource, /description: formatDocumentDescription\(client\.cpf_cnpj\)/);
+  assert.match(pageSource, /description: formatDocumentDescription\(clientPf\.cpf\)/);
+  assert.match(
+    pageSource,
+    /return item\.clientPJ\?\.name \?\? item\.clientPF\?\.name \?\? formatDocument\(item\.cpf_cnpj\);/,
+  );
+  assert.doesNotMatch(pageSource, /formatText\(partner\.cpf \?\? partner\.document\)/);
+  assert.doesNotMatch(pageSource, /formatText\(item\.cpf\)/);
+  assert.doesNotMatch(pageSource, /formatText\(clientPfDetailQuery\.data\.cpf\)/);
+  assert.match(pageSource, /formatDocument\(partner\.cpf \?\? partner\.document\)/);
+  assert.match(pageSource, /formatDocument\(item\.cpf\)/);
+  assert.match(pageSource, /formatDocument\(clientPfDetailQuery\.data\.cpf\)/);
+});
+
 await runTest("regularize required field errors render as sticky alerts", async () => {
   const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
 
@@ -196,11 +331,119 @@ await runTest("regularize required field errors render as sticky alerts", async 
   assert.match(controlsSource, /sticky top-0/);
 });
 
+await runTest("regularize required field markers keep label punctuation spacing clean", async () => {
+  const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
+
+  assert.match(controlsSource, /inline-flex items-center gap-1/);
+  assert.match(controlsSource, /<span>\{label\}<\/span>/);
+  assert.match(controlsSource, /<span className="text-red-500">\*<\/span>/);
+  assert.doesNotMatch(controlsSource, /> \*<\/span>/);
+});
+
+await runTest("regularize form action footers stay unseparated", async () => {
+  const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
+  const actionsStart = controlsSource.indexOf("export function RegularizeFormActions");
+  const actionsSource = controlsSource.slice(actionsStart);
+
+  assert.match(actionsSource, /className="flex justify-end gap-2 pt-2"/);
+  assert.doesNotMatch(actionsSource, /border-t/);
+  assert.doesNotMatch(actionsSource, /dark:border/);
+});
+
+await runTest("regularize selects use the shared native select arrow", async () => {
+  const files = await collectSourceFiles(join(moduleRoot, "components"));
+  const rawSelectOffenders = [];
+
+  for (const file of files) {
+    const relativePath = relative(appRoot, file).replaceAll("\\", "/");
+
+    if (relativePath === `${moduleRootRelative}/components/RegularizeNativeSelect.tsx`) {
+      continue;
+    }
+
+    const source = await readFile(file, "utf8");
+
+    if (source.includes("<select")) {
+      rawSelectOffenders.push(relativePath);
+    }
+  }
+
+  const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
+  const nativeSelectSource = await readModuleSource("components/RegularizeNativeSelect.tsx");
+
+  assert.deepEqual(rawSelectOffenders, []);
+  assert.match(controlsSource, /appearance-none/);
+  assert.match(controlsSource, /bg-\[position:right_0\.95rem_center\]/);
+  assert.match(nativeSelectSource, /regularizeSelectArrowStyle/);
+  assert.match(nativeSelectSource, /backgroundImage/);
+});
+
+await runTest("regularize finite status and urgency fields use native selects", async () => {
+  const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
+  const clientPfSource = await readModuleSource("components/RegularizeClientPfForm.tsx");
+  const processSource = await readModuleSource("components/RegularizeProcessForm.tsx");
+  const guidanceSource = await readModuleSource("components/RegularizeGuidanceForm.tsx");
+  const licenseSource = await readModuleSource("components/RegularizeLicenseForm.tsx");
+
+  for (const optionExport of [
+    "regularizeClientStatusOptions",
+    "regularizeProcessStatusOptions",
+    "regularizeGuidanceStatusOptions",
+    "regularizeLicenseStatusOptions",
+    "regularizeUrgencyOptions",
+    "getRegularizePresetOptions",
+  ]) {
+    assert.match(controlsSource, new RegExp(`export .*${optionExport}`));
+  }
+
+  assert.match(clientPfSource, /regularizeClientStatusOptions/);
+  assert.match(clientPfSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
+  assert.match(processSource, /regularizeProcessStatusOptions/);
+  assert.match(processSource, /regularizeUrgencyOptions/);
+  assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
+  assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.urgency\}/);
+  assert.match(guidanceSource, /regularizeGuidanceStatusOptions/);
+  assert.match(guidanceSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
+  assert.match(licenseSource, /regularizeLicenseStatusOptions/);
+  assert.match(licenseSource, /regularizeUrgencyOptions/);
+  assert.match(licenseSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
+  assert.match(licenseSource, /<RegularizeNativeSelect\s+value=\{formState\.urgency\}/);
+});
+
+await runTest("regularize municipal tax year uses the shared native select", async () => {
+  const municipalTaxSource = await readModuleSource("components/RegularizeMunicipalTaxesForm.tsx");
+  const yearFieldStart = municipalTaxSource.indexOf('<RegularizeFormField label="Ano" required>');
+  const yearFieldEnd = municipalTaxSource.indexOf("</RegularizeFormField>", yearFieldStart);
+  const yearFieldSource = municipalTaxSource.slice(yearFieldStart, yearFieldEnd);
+
+  assert.match(municipalTaxSource, /function getRegularizeMunicipalTaxYearOptions/);
+  assert.match(yearFieldSource, /<RegularizeNativeSelect\s+value=\{formState\.year\}/);
+  assert.match(yearFieldSource, /handleChange\("year", event\.target\.value\)/);
+  assert.match(yearFieldSource, /yearOptions\.map/);
+  assert.doesNotMatch(yearFieldSource, /type="number"/);
+  assert.doesNotMatch(yearFieldSource, /regularizeTextFieldClassName/);
+});
+
 await runTest("regularize tab actions align with the lower edge of tab headers", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
 
   assert.match(pageSource, /sm:items-end/);
   assert.doesNotMatch(pageSource, /sm:items-start sm:justify-between/);
+});
+
+await runTest("regularize primary CRUD action buttons center icon and label", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
+  const actionButtonStart = pageSource.indexOf("function PrimaryActionButton");
+  const actionButtonEnd = pageSource.indexOf("function TabActionHeader", actionButtonStart);
+  const actionButtonSource = pageSource.slice(actionButtonStart, actionButtonEnd);
+
+  assert.match(controlsSource, /inline-flex items-center justify-center gap-2/);
+  assert.match(controlsSource, /px-4 py-2 text-sm font-medium/);
+  assert.doesNotMatch(controlsSource, /leading-none/);
+  assert.match(actionButtonSource, /<Icon className="h-4 w-4 shrink-0" \/>/);
+  assert.match(actionButtonSource, /<span>\{label\}<\/span>/);
+  assert.doesNotMatch(actionButtonSource, /<span className="inline-flex items-center gap-2">/);
 });
 
 await runTest("regularize credential detail panels stretch with their grids", async () => {
@@ -240,7 +483,12 @@ await runTest("regularize credential empty layouts keep intentional detail behav
   assert.notEqual(passwordsStart, -1);
   assert.notEqual(sitesStart, -1);
   assert.match(passwordsSource, /<div className="space-y-3">/);
-  assert.match(passwordsSource, /<QueryStatePanel query=\{credentialQuery\} emptyTitle="Nenhuma senha encontrada\.">/);
+  assert.match(passwordsSource, /<label className="flex w-full flex-col/);
+  assert.doesNotMatch(passwordsSource, /<label className="[^"]*max-w-/);
+  assert.match(
+    passwordsSource,
+    /<QueryStatePanel\s+query=\{credentialQuery\}\s+emptyTitle="Nenhuma senha encontrada\."\s+emptyClassName="min-h-24 py-5"\s*>/,
+  );
   assert.match(passwordsSource, /<DetailPanel title="Senha selecionada">/);
   assert.doesNotMatch(passwordsSource, /hasCredentialRows \? \(/);
   assert.doesNotMatch(passwordsSource, /emptyClassName="[^"]*xl:col-span-2[^"]*"/);
