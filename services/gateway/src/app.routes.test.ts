@@ -170,6 +170,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     tiServiceInternalToken: "ti-service-token",
     certificateServiceUrl: "http://127.0.0.1:3041",
     certificateServiceInternalToken: "certificate-service-token",
+    pessoalServiceUrl: "http://127.0.0.1:3042",
 
     jwtSecret: "test-secret",
     logLevel: "silent",
@@ -785,6 +786,7 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     const response = await fetch(`${baseUrl}/openapi.json`);
     const body = (await response.json()) as {
       openapi: string;
+      info: { description?: string };
       servers?: Array<{ url: string }>;
       paths: Record<string, unknown>;
     };
@@ -792,6 +794,7 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(response.status).toBe(200);
     expect(body.openapi).toBe("3.0.3");
     expect(body.servers?.[0]?.url).toBe(baseUrl);
+    expect(body.info.description).toContain("pessoal-service");
     expect(body.paths["/user"]).toBeTruthy();
     expect(body.paths["/task/list"]).toBeTruthy();
     expect(body.paths["/project/list"]).toBeTruthy();
@@ -807,6 +810,8 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/certificate/pf/{id}/file"]).toBeTruthy();
     expect(body.paths["/certificate/notifications"]).toBeTruthy();
     expect(body.paths["/audit/requests"]).toBeTruthy();
+    expect(body.paths["/pessoal/health"]).toBeUndefined();
+    expect(body.paths["/pessoal/ready"]).toBeUndefined();
   } finally {
     await stopServer(server);
   }
@@ -893,7 +898,7 @@ it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", 
   }
 });
 
-it("does not expose certificate internal notification routes in the aggregated OpenAPI JSON", async () => {
+it("does not expose service internal notification routes in the aggregated OpenAPI JSON", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
   const baseUrl = await startServer(server);
@@ -906,6 +911,7 @@ it("does not expose certificate internal notification routes in the aggregated O
 
     expect(response.status).toBe(200);
     expect(body.paths["/internal/notifications/run"]).toBe(undefined);
+    expect(body.paths["/internal/pessoal/union-notifications/run"]).toBe(undefined);
   } finally {
     await stopServer(server);
   }
@@ -1236,6 +1242,48 @@ it("proxies certificate-service public routes mapped in the gateway", async () =
   } finally {
     await stopServer(gateway);
     await stopServer(certificateService);
+  }
+});
+
+it("proxies pessoal-service routes mapped in the gateway", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 3,
+    modules: { pessoal: 1 },
+  });
+  const seenUrls: string[] = [];
+  const pessoalService = createServer((request, response) => {
+    seenUrls.push(request.url ?? "");
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: { service: "pessoal-service", path: request.url },
+      }),
+    );
+  });
+  const pessoalServiceUrl = await startServer(pessoalService);
+
+  const app = createApp(createEnv({ pessoalServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/pessoal/health-proxy-test`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrls).toEqual(["/pessoal/health-proxy-test"]);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(pessoalService);
   }
 });
 
@@ -1704,6 +1752,51 @@ it("records certificate-service route targets when audit is enabled", async () =
     await waitForRecords(auditService.records, 1);
 
     expect(auditService.records[0]?.metadata?.routeTarget).toBe("certificate-service");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+    await stopServer(auditService.server);
+  }
+});
+
+it("records pessoal-service route targets when audit is enabled", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 3,
+    modules: { pessoal: 1 },
+  });
+  const auditService = await startAuditIngestServer();
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ ok: true }));
+  });
+  const pessoalServiceUrl = await startServer(upstream);
+
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      pessoalServiceUrl,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/pessoal/health-proxy-test`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+
+    await waitForRecords(auditService.records, 1);
+
+    expect(auditService.records[0]?.metadata?.routeTarget).toBe("pessoal-service");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -2271,6 +2364,104 @@ it("allows limited users with RH module permission to proxy /rh", async () => {
 
     expect(response.status).toBe(200);
     expect(seenUrl).toBe("/rh/requests");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("requires authentication before proxying /pessoal", async () => {
+  let upstreamHits = 0;
+
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const pessoalServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ pessoalServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/pessoal/unions`);
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(401);
+    expect(body.code).toBe("UNAUTHORIZED");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("blocks limited users without pessoal module permission before proxying /pessoal", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { pessoal: 0 },
+  });
+  let upstreamHits = 0;
+
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const pessoalServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ pessoalServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/pessoal/unions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(403);
+    expect(body.code).toBe("FORBIDDEN");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("allows limited users with pessoal module permission to proxy /pessoal", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { pessoal: 1 },
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const pessoalServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ pessoalServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/pessoal/unions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenUrl).toBe("/pessoal/unions");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

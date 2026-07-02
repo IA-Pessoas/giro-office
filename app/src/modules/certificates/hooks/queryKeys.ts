@@ -35,7 +35,6 @@ export function certificatePjListQueryKey(filters: {
     boolToQueryValue(filters.has_certificate),
   ] as const;
 }
-
 export function certificatePfListQueryKey(filters: {
   page?: number;
   page_size?: number;
@@ -86,4 +85,3 @@ export function certificateNotificationsQueryKey(params: { page?: number; page_s
     params.page_size ?? 50,
   ] as const;
 }
-

@@ -81,6 +81,12 @@ generator certificateServiceClient {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator pessoalServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/pessoal-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -447,12 +453,14 @@ model PessoalNotification {
   regarding_id    String
   title           String
   message         String
+  reference_date  DateTime     @default(now())
   create_at       DateTime     @default(now())
   read            Boolean      @default(false)
   regarding       String
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
 
+  @@unique([organization_id, user_id, regarding, regarding_id, title, reference_date], map: "uq_pessoal_notification_identity")
   @@map("notification.pessoal")
 }
 
@@ -1445,6 +1453,8 @@ model ObrigationsPessoal {
   organization    Organization @relation(fields: [organization_id], references: [id])
   responsible     User?        @relation(fields: [responsavel_id], references: [id])
 
+  @@unique([organization_id, client_id, competence], map: "uq_pessoal_obligations_org_client_competence")
+  @@index([organization_id, competence], map: "idx_pessoal_obligations_org_competence")
   @@map("pessoal.obrigations")
 }
 

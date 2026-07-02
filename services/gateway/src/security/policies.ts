@@ -10,6 +10,13 @@ const rhModulePolicy: AuthPolicy = {
   },
 };
 
+const pessoalModulePolicy: AuthPolicy = {
+  modulePermission: {
+    module: "pessoal",
+    minPermission: moduleAccessPermission,
+  },
+};
+
 const clientRelatedModules = [
   "atendimento",
   "comercial",
@@ -39,6 +46,7 @@ const routePolicyMatchers: Array<{
   policy: AuthPolicy;
 }> = [
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
+  { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: adminPolicy },
   { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: adminPolicy },

@@ -24,6 +24,8 @@ const TI_SERVICE_PREFIXES = ["/ti"] as const;
 
 const CERTIFICATE_SERVICE_PREFIXES = ["/certificate"] as const;
 
+const PESSOAL_SERVICE_PREFIXES = ["/pessoal"] as const;
+
 function getNormalizedPath(path: string): string {
   try {
     return new URL(path, "http://localhost").pathname;
@@ -122,6 +124,13 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       routePrefixes: [...CERTIFICATE_SERVICE_PREFIXES],
       internalServiceToken: env.certificateServiceInternalToken,
       permissionModule: "certificado",
+    },
+    {
+      key: "pessoal-service",
+      targetUrl: env.pessoalServiceUrl,
+      auditTarget: "pessoal-service",
+      routePrefixes: [...PESSOAL_SERVICE_PREFIXES],
+      permissionModule: "pessoal",
     },
   ];
 }
