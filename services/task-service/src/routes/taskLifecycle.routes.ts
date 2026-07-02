@@ -57,7 +57,7 @@ router.put(
 
       res.json(createSuccessResponse(result));
     } catch (err) {
-      logError("Erro na rota de aprovaÃ§Ã£o de conclusÃ£o de tarefa", { err });
+      logError("Erro na rota de aprovação de conclusão de tarefa", { err });
       next(err);
     }
   },

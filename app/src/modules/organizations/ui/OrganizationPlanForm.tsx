@@ -32,7 +32,7 @@ export function OrganizationPlanForm({
   onSave,
 }: OrganizationPlanFormProps) {
   return (
-    <div className={`${ORGANIZATION_SUBPANEL_CLASSNAME} space-y-4 p-5`}>
+    <div className={`${ORGANIZATION_SUBPANEL_CLASSNAME} space-y-3 p-4 sm:space-y-4 sm:p-5`}>
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <BadgeCheck className="h-4 w-4 text-[var(--colors-brand-gradient-end)]" />
@@ -41,15 +41,15 @@ export function OrganizationPlanForm({
         <p className={ORGANIZATION_MUTED_CLASSNAME}>Atualize o plano exibido.</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-4">
           <p className={ORGANIZATION_MUTED_CLASSNAME}>Plano atual</p>
           <p className="mt-1 text-base font-semibold text-slate-900 dark:text-white">
             {getOrganizationPlanLabel(currentPlan)}
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-4">
           <p className={ORGANIZATION_MUTED_CLASSNAME}>Novo plano</p>
           <p className="mt-1 text-base font-semibold text-slate-900 dark:text-white">
             {getOrganizationPlanLabel(planDraft)}
@@ -79,7 +79,7 @@ export function OrganizationPlanForm({
       <button
         type="button"
         onClick={onSave}
-        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-70"
+        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-70 sm:w-fit"
         disabled={!canSave}
       >
         <Save className={`h-4 w-4 ${isSaving ? "animate-pulse" : ""}`} />

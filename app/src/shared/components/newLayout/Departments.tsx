@@ -58,7 +58,6 @@ export function Departments() {
     () => departmentService.list(getStatusFilterValue(status)),
     {
       retry: false,
-      refetchOnWindowFocus: false,
     },
   );
 

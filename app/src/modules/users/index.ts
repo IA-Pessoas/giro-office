@@ -8,6 +8,12 @@ export { AdminUserDetailsPanel } from './components/AdminUserDetailsPanel';
 export { useUserForm } from './hooks/useUserForm';
 
 export { userService } from './services/userService';
+export {
+  filterAdminUsersByStatus,
+  listAdminUsers,
+  normalizeAdminUserStatus,
+} from './services/adminUsersService';
 
 export type { UserItem, CreateUserData, UpdateUserData } from './types';
+export type { AdminUserStatus } from './services/adminUsersService';
 export type { AdminUserSession, UserDetailsPageProps, UsersIndexPageProps } from './types/pageProps';

@@ -37,7 +37,6 @@ export function useContabilResponsible(
     () => contabilResponsibleService.getResponsibleByClient(clientId),
     {
       enabled: (options?.enabled ?? true) && Boolean(clientId),
-      refetchOnWindowFocus: false,
     },
   );
 }

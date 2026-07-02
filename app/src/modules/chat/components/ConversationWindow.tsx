@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { GrSend } from "react-icons/gr";
 import { IoMdMic } from "react-icons/io";
@@ -157,7 +157,21 @@ const MessageBubble = ({ message, isSentByMe, chatType, isHighlighted }) => {
                 return <Text style={{ fontStyle: 'italic', color: 'red' }}>Erro ao carregar mídia</Text>;
             }
             if (message.type === 'IMAGE') {
-                return <img src={mediaUrl} alt={message.content || 'Imagem enviada'} style={{ maxWidth: '100%', maxHeight: '250px', borderRadius: '8px', cursor: 'pointer' }} onClick={() => window.open(mediaUrl, '_blank')} />;
+                return (
+                    <img
+                        src={mediaUrl}
+                        alt={message.content || 'Imagem enviada'}
+                        loading="lazy"
+                        decoding="async"
+                        style={{
+                            maxWidth: '100%',
+                            maxHeight: '250px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                        }}
+                        onClick={() => window.open(mediaUrl, '_blank', 'noopener,noreferrer')}
+                    />
+                );
             }
             if (message.type === 'AUDIO') {
                 return <audio controls src={mediaUrl} style={{ width: '250px' }}></audio>;
@@ -269,9 +283,11 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const recordingStreamRef = useRef<MediaStream | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
-    const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const wasCancelledRef = useRef(false);
+    const recordingRequestIdRef = useRef(0);
 
     const [isHovered, setIsHovered] = useState(false);
     const [isActive, setIsActive] = useState(false);
@@ -330,12 +346,59 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
         fileInputRef.current?.click();
     };
 
+    const clearRecordingTimer = useCallback(() => {
+        if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+        }
+    }, []);
+
+    const stopMediaStream = useCallback((stream: MediaStream | null) => {
+        stream?.getTracks().forEach((track) => track.stop());
+    }, []);
+
+    const stopRecordingStream = useCallback(() => {
+        stopMediaStream(recordingStreamRef.current);
+        recordingStreamRef.current = null;
+    }, [stopMediaStream]);
+
+    const stopActiveRecording = useCallback((cancelled: boolean, updateState = true) => {
+        recordingRequestIdRef.current += 1;
+        wasCancelledRef.current = cancelled;
+        clearRecordingTimer();
+
+        if (mediaRecorderRef.current?.state === "recording") {
+            mediaRecorderRef.current.stop();
+        } else {
+            mediaRecorderRef.current = null;
+            stopRecordingStream();
+        }
+
+        if (updateState) {
+            setIsRecording(false);
+        }
+    }, [clearRecordingTimer, stopRecordingStream]);
+
     const handleStartRecording = async () => {
-        wasCancelledRef.current = false; // Reseta o controle de cancelamento
+        const recordingRequestId = recordingRequestIdRef.current + 1;
+        recordingRequestIdRef.current = recordingRequestId;
+        wasCancelledRef.current = false;
+        clearRecordingTimer();
+        stopRecordingStream();
+
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                if (
+                    wasCancelledRef.current ||
+                    recordingRequestIdRef.current !== recordingRequestId
+                ) {
+                    stopMediaStream(stream);
+                    return;
+                }
+
+                recordingStreamRef.current = stream;
+                const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
                 mediaRecorderRef.current = mediaRecorder;
                 audioChunksRef.current = [];
 
@@ -344,12 +407,15 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
                 mediaRecorder.onstop = () => {
                     // Só envia se NÃO foi cancelado
                     if (!wasCancelledRef.current) {
-                        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                        const audioFile = new File([audioBlob], `gravacao_${Date.now()}.webm`, { type: 'audio/webm' });
+                        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+                        const audioFile = new File([audioBlob], `gravacao_${Date.now()}.webm`, {
+                            type: "audio/webm",
+                        });
                         uploadFileAndSendMessage(audioFile);
                     }
                     // Limpa a stream para desligar o ícone do microfone no navegador
-                    stream.getTracks().forEach(track => track.stop());
+                    mediaRecorderRef.current = null;
+                    stopRecordingStream();
                 };
 
                 mediaRecorder.start();
@@ -362,32 +428,23 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
                 }, 1000);
 
             } catch (err) {
+                mediaRecorderRef.current = null;
+                stopRecordingStream();
+                clearRecordingTimer();
+                setIsRecording(false);
                 console.error("Erro ao acessar o microfone:", err);
                 alert("Não foi possível acessar o microfone. Verifique as permissões do navegador.");
             }
         }
     };
     const handleStopRecording = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-        }
+        stopActiveRecording(false);
     };
     const handleStopAndSendRecording = () => {
-        if (mediaRecorderRef.current) {
-            wasCancelledRef.current = false;
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-            clearInterval(timerIntervalRef.current!);
-        }
+        stopActiveRecording(false);
     };
     const handleCancelRecording = () => {
-        if (mediaRecorderRef.current) {
-            wasCancelledRef.current = true; // Sinaliza que foi cancelado
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-            clearInterval(timerIntervalRef.current!);
-        }
+        stopActiveRecording(true);
     };
     const handleAudioButtonClick = () => {
         if (isRecording) {
@@ -402,6 +459,12 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
         const seconds = (time % 60).toString().padStart(2, '0');
         return `${minutes}:${seconds}`;
     };
+
+    useEffect(() => {
+        return () => {
+            stopActiveRecording(true, false);
+        };
+    }, [stopActiveRecording]);
 
     useEffect(() => {
         if (textareaRef.current) {
@@ -535,6 +598,7 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
                                 <img
                                     src={URL.createObjectURL(imageToPreview)}
                                     alt="Pré-visualização"
+                                    decoding="async"
                                     style={{ 
                                         maxWidth: '100%',
                                         maxHeight: '400px',

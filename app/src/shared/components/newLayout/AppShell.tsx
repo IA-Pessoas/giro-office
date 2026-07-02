@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   BadgeDollarSign,
   Bot,
   Bell,
   Building2,
-  Briefcase,
   BriefcaseBusiness,
   Calculator,
   ChevronDown,
@@ -15,7 +15,9 @@ import {
   Code,
   FileText,
   Filter,
+  FileCheck,
   LayoutDashboard,
+  Loader2,
   Megaphone,
   Menu,
   Receipt,
@@ -31,8 +33,13 @@ import {
   X,
 } from "lucide-react";
 
-import type { ModuleKey } from "@modules/auth";
-import { APP_ROUTE_MODULE_MAP, canAccessAdministration, useAccessStore } from "@modules/auth";
+import {
+  APP_ROUTE_MODULE_MAP,
+  MODULE_KEYS,
+  canAccessAdministration,
+  useModuleAccessMap,
+  type ModuleKey,
+} from "@modules/auth";
 import { useMe } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
@@ -89,7 +96,20 @@ function Logo({ showText }: { showText: boolean }) {
   );
 }
 
-const moduleCategories = [
+type NavigationModule = {
+  path: string;
+  name: string;
+  icon: typeof LayoutDashboard;
+  moduleKey?: ModuleKey;
+};
+
+type NavigationCategory = {
+  name: string;
+  modules: NavigationModule[];
+  isModuleAccessCategory?: boolean;
+};
+
+const moduleCategories: NavigationCategory[] = [
   {
     name: "Principal",
     modules: [
@@ -102,8 +122,10 @@ const moduleCategories = [
   },
   {
     name: "Módulos",
+    isModuleAccessCategory: true,
     modules: [
       { path: "/comercial", name: "Comercial", icon: BriefcaseBusiness, moduleKey: "comercial" as ModuleKey },
+      { path: "/certificados", name: "Certificados", icon: FileCheck, moduleKey: "certificado" as ModuleKey },
       { path: "/marketing", name: "Marketing", icon: Megaphone, moduleKey: "marketing" as ModuleKey },
       { path: "/regularize", name: "Regularize", icon: ShieldCheck, moduleKey: "regularize" as ModuleKey },
       { path: "/fiscal", name: "Fiscal", icon: Receipt, moduleKey: "fiscal" as ModuleKey },
@@ -125,6 +147,106 @@ const moduleCategories = [
   },
 ];
 
+const MODULE_ACCESS_DENIED_MESSAGE = "Você não tem acesso a este módulo no perfil atual.";
+const MODULE_ACCESS_LOADING_MESSAGE = "Carregando acesso ao modulo.";
+const MODULE_NAV_LOADING_MESSAGE = "Carregando modulos";
+const NOTIFICATIONS_PANEL_ID = "app-shell-notifications-panel";
+const USER_MENU_PANEL_ID = "app-shell-user-menu";
+const AI_CHAT_DIALOG_DESCRIPTION_ID = "app-shell-ai-chat-description";
+
+function normalizeRoutePath(routePath: string): string {
+  const pathWithoutQuery = routePath.split("?")[0]?.split("#")[0] ?? "";
+  const normalizedPath =
+    pathWithoutQuery.length > 1 ? pathWithoutQuery.replace(/\/+$/, "") : pathWithoutQuery;
+
+  return normalizedPath || "/";
+}
+
+function getModuleKeyFromRoutePath(routePath: string): ModuleKey | null {
+  const normalizedPath = normalizeRoutePath(routePath);
+  const mappedRoute = Object.entries(APP_ROUTE_MODULE_MAP).find(([modulePath]) => {
+    return normalizedPath === modulePath || normalizedPath.startsWith(`${modulePath}/`);
+  });
+
+  if (mappedRoute) {
+    const [, mappedModuleKey] = mappedRoute;
+    return mappedModuleKey ?? null;
+  }
+
+  for (const category of moduleCategories) {
+    const matchedModule = category.modules.find((module) => {
+      return normalizeRoutePath(module.path) === normalizedPath;
+    });
+
+    if (matchedModule && "moduleKey" in matchedModule) {
+      return matchedModule.moduleKey;
+    }
+  }
+
+  return null;
+}
+
+function ModuleAccessDeniedState() {
+  return (
+    <section className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center">
+      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+          <Shield className="h-6 w-6" />
+        </div>
+        <h1 className="text-xl font-semibold text-slate-950 dark:text-white">
+          Acesso indisponível
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          {MODULE_ACCESS_DENIED_MESSAGE}
+        </p>
+        <Link
+          href="/dashboard"
+          className="mt-6 inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        >
+          Voltar para o dashboard
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function ModuleAccessLoadingState() {
+  return (
+    <section
+      aria-busy="true"
+      aria-live="polite"
+      className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center"
+    >
+      <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <Loader2
+          aria-hidden="true"
+          className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-300"
+        />
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+          {MODULE_ACCESS_LOADING_MESSAGE}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function ModuleNavLoadingItem({ showText }: { showText: boolean }) {
+  return (
+    <div
+      role="status"
+      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-gray-500 dark:text-slate-400 ${
+        !showText ? "justify-center" : ""
+      }`}
+      title={!showText ? MODULE_NAV_LOADING_MESSAGE : undefined}
+    >
+      <Loader2 aria-hidden="true" className="h-5 w-5 flex-shrink-0 animate-spin" />
+      {showText ? (
+        <span className="text-sm font-medium">{MODULE_NAV_LOADING_MESSAGE}</span>
+      ) : null}
+    </div>
+  );
+}
+
 type ChatMessage = {
   id: string;
   sender: "user" | "ai";
@@ -136,8 +258,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
   const meQuery = useMe();
-  const moduleAccessMap = useAccessStore((snapshot) => snapshot.accessMap);
-  const isModuleAccessLoading = useAccessStore((snapshot) => snapshot.isLoading);
+  const { accessMap: moduleAccessMap, isLoading: isModuleAccessLoading } =
+    useModuleAccessMap(MODULE_KEYS);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -176,6 +298,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const aiChatTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const pathname = router.asPath.split("?")[0] ?? "";
   const displayUserName = user?.name ?? meQuery.data?.name ?? "Admin";
@@ -183,29 +306,71 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const displayUserPhoto = resolvePhotoUrl(meQuery.data?.photo_url ?? null);
   const displayUserInitials = getInitials(displayUserName);
   const isAdmin = canAccessAdministration(meQuery.data?.permission ?? user?.permission ?? null);
+  const currentModuleKey = getModuleKeyFromRoutePath(pathname);
+  const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
+  const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;
+  const shouldRenderModuleAccessDenied =
+    Boolean(currentModuleKey) &&
+    !isModuleAccessLoading &&
+    currentModuleAccess?.canView === false;
+
+  const canViewModuleFromPath = (modulePath: string): boolean => {
+    if (modulePath === "/departments" || modulePath === "/administracao") {
+      return isAdmin;
+    }
+
+    const moduleKey = getModuleKeyFromRoutePath(modulePath);
+
+    if (!moduleKey) {
+      return true;
+    }
+
+    if (isModuleAccessLoading) {
+      return true;
+    }
+
+    const moduleAccess = moduleAccessMap[moduleKey];
+    return Boolean(moduleAccess?.canView);
+  };
+
   const filteredModuleCategories = moduleCategories
-    .map((category) => ({
-      ...category,
-      modules: category.modules.filter((module) => {
-        if (module.path === "/departments") {
-          return isAdmin;
-        }
+    .map((category) => {
+      if (category.isModuleAccessCategory && isModuleAccessLoading) {
+        return {
+          ...category,
+          modules: [],
+        };
+      }
 
-        if (module.path === "/rh") {
-          return true;
-        }
+      return {
+        ...category,
+        modules: category.modules.filter((module) => {
+          const moduleKey =
+            ("moduleKey" in module ? module.moduleKey : undefined) ??
+            APP_ROUTE_MODULE_MAP[module.path];
+          if (!moduleKey) {
+            return canViewModuleFromPath(module.path);
+          }
 
-        const moduleKey =
-          ("moduleKey" in module ? module.moduleKey : undefined) ?? APP_ROUTE_MODULE_MAP[module.path];
+          const moduleAccess = moduleAccessMap[moduleKey];
+          if (isModuleAccessLoading) {
+            return true;
+          }
 
-        if (!moduleKey) {
-          return true;
-        }
-
-        return !isModuleAccessLoading && moduleAccessMap[moduleKey].canView;
-      }),
-    }))
-    .filter((category) => category.modules.length > 0);
+          return moduleAccess?.canView ?? false;
+        }),
+      };
+    })
+    .filter(
+      (category) =>
+        category.modules.length > 0 ||
+        (category.isModuleAccessCategory === true && isModuleAccessLoading),
+    );
+  const mainContent = shouldRenderModuleAccessLoading
+    ? <ModuleAccessLoadingState />
+    : shouldRenderModuleAccessDenied
+      ? <ModuleAccessDeniedState />
+      : children;
 
   useEffect(() => {
     setHasUserPhotoLoadError(false);
@@ -221,7 +386,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       minute: "2-digit",
     });
 
-  const sendChatMessage = (rawText: string) => {
+  const openAiChat = (trigger?: HTMLButtonElement | null) => {
+    if (trigger !== undefined) {
+      aiChatTriggerRef.current = trigger;
+    }
+
+    setShowAiChat(true);
+  };
+
+  const sendChatMessage = (rawText: string, trigger?: HTMLButtonElement | null) => {
     const text = rawText.trim();
     if (!text) {
       return;
@@ -241,11 +414,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
 
     setChatMessages((prev) => [...prev, userMsg, aiMsg]);
-    setShowAiChat(true);
+    openAiChat(trigger);
   };
 
-  const handleHeaderAiSubmit = () => {
-    sendChatMessage(aiQuery);
+  const handleHeaderAiSubmit = (trigger?: HTMLButtonElement | null) => {
+    sendChatMessage(aiQuery, trigger);
     setAiQuery("");
   };
 
@@ -271,6 +444,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (isMobileMenuOpen) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isMobileMenuOpen]);
+
+  useEffect(() => {
+    if (!showNotifications && !showUserMenu && !showAiChat) {
+      return;
+    }
+
+    function handleAppShellOverlayKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      if (showAiChat) {
+        setShowAiChat(false);
+        return;
+      }
+
+      if (showUserMenu) {
+        setShowUserMenu(false);
+        return;
+      }
+
+      setShowNotifications(false);
+    }
+
+    document.addEventListener("keydown", handleAppShellOverlayKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleAppShellOverlayKeyDown);
+    };
+  }, [showAiChat, showNotifications, showUserMenu]);
 
   useEffect(() => {
     if (!showAiChat) {
@@ -317,42 +520,51 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
 
         <nav className="p-3 space-y-6 overflow-y-auto h-[calc(100vh-4rem)]">
-          {filteredModuleCategories.map((category) => (
-            <div key={category.name}>
-              {isSidebarOpen ? (
-                <div className="px-3 mb-2">
-                  <span className="text-xs font-semibold text-black dark:text-white uppercase tracking-wider">
-                    {category.name}
-                  </span>
+          {filteredModuleCategories.map((category) => {
+            const shouldRenderModuleNavLoading =
+              category.isModuleAccessCategory === true && isModuleAccessLoading;
+
+            return (
+              <div key={category.name}>
+                {isSidebarOpen ? (
+                  <div className="px-3 mb-2">
+                    <span className="text-xs font-semibold text-black dark:text-white uppercase tracking-wider">
+                      {category.name}
+                    </span>
+                  </div>
+                ) : null}
+
+                <div className="space-y-1">
+                  {shouldRenderModuleNavLoading ? (
+                    <ModuleNavLoadingItem showText={isSidebarOpen} />
+                  ) : (
+                    category.modules.map((module) => {
+                      const Icon = module.icon;
+                      const isActive = pathname === module.path;
+
+                      return (
+                        <Link
+                          key={module.path}
+                          href={module.path}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                            isActive
+                              ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
+                              : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
+                          } ${!isSidebarOpen ? "justify-center" : ""}`}
+                          title={!isSidebarOpen ? module.name : undefined}
+                        >
+                          <Icon className="w-5 h-5 flex-shrink-0" />
+                          {isSidebarOpen ? (
+                            <span className="text-sm font-medium">{module.name}</span>
+                          ) : null}
+                        </Link>
+                      );
+                    })
+                  )}
                 </div>
-              ) : null}
-
-              <div className="space-y-1">
-                {category.modules.map((module) => {
-                  const Icon = module.icon;
-                  const isActive = pathname === module.path;
-
-                  return (
-                    <Link
-                      key={module.path}
-                      href={module.path}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                        isActive
-                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
-                          : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
-                      } ${!isSidebarOpen ? "justify-center" : ""}`}
-                      title={!isSidebarOpen ? module.name : undefined}
-                    >
-                      <Icon className="w-5 h-5 flex-shrink-0" />
-                      {isSidebarOpen ? (
-                        <span className="text-sm font-medium">{module.name}</span>
-                      ) : null}
-                    </Link>
-                  );
-                })}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
       </aside>
 
@@ -375,11 +587,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className="w-full pl-9 pr-10 py-2 rounded-xl border border-gray-200 dark:border-slate-800 bg-white/70 dark:bg-slate-800/60 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 />
                 <button
-                  onClick={() => {
+                  onClick={(event) => {
                     if (aiQuery.trim()) {
-                      handleHeaderAiSubmit();
+                      handleHeaderAiSubmit(event.currentTarget);
                     } else {
-                      setShowAiChat(true);
+                      openAiChat(event.currentTarget);
                     }
                   }}
                   type="button"
@@ -396,6 +608,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 onClick={() => setShowNotifications((v) => !v)}
                 className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 type="button"
+                aria-expanded={showNotifications}
+                aria-controls={NOTIFICATIONS_PANEL_ID}
+                aria-label="Abrir notificações"
               >
                 <Bell className="w-5 h-5 text-gray-600 dark:text-slate-300" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
@@ -403,8 +618,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
               {showNotifications ? (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-                  <div className="absolute right-6 top-16 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                  <div
+                    aria-hidden="true"
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowNotifications(false)}
+                  />
+                  <div
+                    id={NOTIFICATIONS_PANEL_ID}
+                    className="absolute right-6 top-16 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
+                  >
                     <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notificações</h3>
                       <button
@@ -445,12 +667,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   onClick={() => setShowUserMenu((v) => !v)}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                   type="button"
+                  aria-expanded={showUserMenu}
+                  aria-controls={USER_MENU_PANEL_ID}
+                  aria-haspopup="menu"
                 >
                   <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-500 to-blue-600">
                     {displayUserPhoto && !hasUserPhotoLoadError ? (
                       <img
                         src={displayUserPhoto}
                         alt={`Foto de ${displayUserName}`}
+                        loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                         onError={() => setHasUserPhotoLoadError(true)}
                       />
@@ -466,8 +693,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                 {showUserMenu ? (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
-                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50">
+                    <div
+                      aria-hidden="true"
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowUserMenu(false)}
+                    />
+                    <div
+                      id={USER_MENU_PANEL_ID}
+                      role="menu"
+                      className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50"
+                    >
                       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
                           {displayUserName}
@@ -478,6 +713,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         href="/configuracoes"
                         className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
                         onClick={() => setShowUserMenu(false)}
+                        role="menuitem"
                       >
                         <Settings className="w-4 h-4" />
                         Configurações
@@ -487,6 +723,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           onClick={handleLogout}
                           className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                           type="button"
+                          role="menuitem"
                         >
                           Sair
                         </button>
@@ -499,25 +736,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+          {mainContent}
+        </main>
       </div>
 
-      {showAiChat ? (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => setShowAiChat(false)} />
-          <div className="fixed z-[70] right-4 bottom-4 w-[420px] max-w-[calc(100vw-2rem)] h-[70vh] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <DialogPrimitive.Root open={showAiChat} onOpenChange={setShowAiChat}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/40" />
+          <DialogPrimitive.Content
+            aria-describedby={AI_CHAT_DIALOG_DESCRIPTION_ID}
+            className="fixed z-[70] right-4 bottom-4 w-[420px] max-w-[calc(100vw-2rem)] h-[70vh] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden focus:outline-none"
+            onCloseAutoFocus={(event) => {
+              if (!aiChatTriggerRef.current) {
+                return;
+              }
+
+              event.preventDefault();
+              aiChatTriggerRef.current.focus();
+            }}
+          >
             <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bot className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Assistente IA</h3>
+                <DialogPrimitive.Title className="text-sm font-semibold text-gray-900 dark:text-white">
+                  Assistente IA
+                </DialogPrimitive.Title>
+                <DialogPrimitive.Description
+                  id={AI_CHAT_DIALOG_DESCRIPTION_ID}
+                  className="sr-only"
+                >
+                  Chat do Assistente IA com histórico de mensagens e campo de texto para envio.
+                </DialogPrimitive.Description>
               </div>
-              <button
-                onClick={() => setShowAiChat(false)}
-                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-                type="button"
-              >
-                <X className="w-4 h-4 text-gray-500 dark:text-slate-400" />
-              </button>
+              <DialogPrimitive.Close asChild>
+                <button
+                  className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                  type="button"
+                  aria-label="Fechar Assistente IA"
+                >
+                  <X className="w-4 h-4 text-gray-500 dark:text-slate-400" />
+                </button>
+              </DialogPrimitive.Close>
             </div>
 
             <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-slate-950/40">
@@ -577,9 +837,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
             </div>
-          </div>
-        </>
-      ) : null}
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
     </div>
   );
 }

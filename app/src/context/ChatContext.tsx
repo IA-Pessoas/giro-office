@@ -1,7 +1,17 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import React, {
+    createContext,
+    ReactNode,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
 import { parseCookies } from 'nookies';
+import { createBearerAuthHeaders } from '@modules/auth/utils/authHeaders';
 import { chatService } from '../modules/chat/services/chatService';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
@@ -46,6 +56,14 @@ export const ChatContext = createContext<ChatContextType | null>(null);
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3334';
 const MESSAGES_PER_PAGE = 30;
+const MAX_CHAT_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_CHAT_UPLOAD_MB = MAX_CHAT_UPLOAD_BYTES / (1024 * 1024);
+const CHAT_UPLOAD_SIZE_ERROR_MESSAGE = `Arquivo excede o limite de ${MAX_CHAT_UPLOAD_MB} MB.`;
+
+function getChatAuthHeaders() {
+    const { 'cw.token': token } = parseCookies();
+    return createBearerAuthHeaders(token);
+}
 
 export function ChatProvider({ children }: { children: ReactNode }) {
     const { user, isAuthenticated } = useAuth(); 
@@ -69,6 +87,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
     const selectedChatRef = useRef(selectedChat);
+    const userRef = useRef(user);
+    const chatsRef = useRef(chats);
+    const messagesRef = useRef(messages);
+    const isSearchingRef = useRef(isSearching);
+    const currentPageRef = useRef(currentPage);
+    const hasMoreMessagesRef = useRef(hasMoreMessages);
     const isFetchingMore = useRef(false);
     const fetchControllerRef = useRef<AbortController | null>(null);
 
@@ -77,9 +101,32 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }, [selectedChat]);
 
     useEffect(() => {
+        userRef.current = user;
+    }, [user]);
+
+    useEffect(() => {
+        chatsRef.current = chats;
+    }, [chats]);
+
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
+
+    useEffect(() => {
+        isSearchingRef.current = isSearching;
+    }, [isSearching]);
+
+    useEffect(() => {
+        currentPageRef.current = currentPage;
+    }, [currentPage]);
+
+    useEffect(() => {
+        hasMoreMessagesRef.current = hasMoreMessages;
+    }, [hasMoreMessages]);
+
+    useEffect(() => {
         if (!socket) return;
 
-        // Listener para receber a LISTA COMPLETA de usuários online ao conectar
         const handleUpdateOnlineList = (onlineIds: string[]) => {
             setOnlineUserIds(new Set(onlineIds));
         };
@@ -109,8 +156,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         };
 
         const handleNewMessage = (newMessage: Message) => {
+            const currentUser = userRef.current;
+            if (!currentUser) return;
             // Se a mensagem é do usuário logado (o "eco"), substitui a temporária
-            if (newMessage.sender_id === user.id) {
+            if (newMessage.sender_id === currentUser.id) {
                 setMessages(prev =>
                     prev.map(msg =>
                         msg.id.startsWith('temp_') && msg.content === newMessage.content
@@ -124,8 +173,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                     setMessages(prev => [...prev, newMessage]);
                     setScrollToBottomTrigger(prev => prev + 1);
                 }
-                if (newMessage.sender_id !== user.id) {
-                    const targetChat = chats.find(c => c.id === newMessage.chat_id);
+                if (newMessage.sender_id !== currentUser.id) {
+                    const targetChat = chatsRef.current.find(c => c.id === newMessage.chat_id);
                     const chatName = targetChat?.type === 'GROUP' ? targetChat.name : newMessage.sender.name;
 
                     // CHAMA A FUNÇÃO DE NOTIFICAÇÃO
@@ -141,11 +190,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                         ...targetChat,
                         messages: [newMessage],
                         participants: targetChat.participants.map(p =>
-                            p.user.id === user.id ? { ...p, unreadCount: (p.unreadCount || 0) + 1 } : p
+                            p.user.id === currentUser.id ? { ...p, unreadCount: (p.unreadCount || 0) + 1 } : p
                         )
                     };
                     const otherChats = prev.filter(c => c.id !== newMessage.chat_id);
-                    updateAndReorderChats(updatedChat);
                     return [updatedChat, ...otherChats];
                 });
             }
@@ -240,40 +288,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             // socket.off('memberRemoved', handleParticipantUpdate);
             // socket.off('memberRoleUpdated', handleParticipantUpdate);
         };
-    }, [socket, user, selectedChat]);
+    }, [socket]);
 
     useEffect(() => {
         if (isAuthenticated) {
-            const { 'cw.token': token } = parseCookies();
-            fetch(`${SOCKET_URL}/chat`, { headers: { 'Authorization': `Bearer ${token}` } })
+            const authHeaders = getChatAuthHeaders();
+
+            if (!authHeaders) {
+                setChats([]);
+                return;
+            }
+
+            fetch(`${SOCKET_URL}/chat`, { headers: authHeaders })
                 .then(res => res.ok ? res.json() : [])
                 .then(data => setChats(data))
                 .catch(err => console.error("Falha ao buscar chats:", err));
         }
     }, [isAuthenticated]);
-
-    useEffect(() => {
-        if (!socket) return;
-
-        // Listener para quando um usuário entra online
-        socket.on('user_online', ({ user_id }: { user_id: string }) => {
-            setOnlineUserIds(prev => new Set(prev).add(user_id));
-        });
-
-        // Listener para quando um usuário fica offline
-        socket.on('user_offline', ({ user_id }: { user_id: string }) => {
-            setOnlineUserIds(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(user_id);
-                return newSet;
-            });
-        });
-
-        return () => {
-            socket.off('user_online');
-            socket.off('user_offline');
-        };
-    }, [socket]);
 
     useEffect(() => {
         if (!user) {
@@ -307,7 +338,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
     }, []);
     
-    const selectChat = async (chat: Chat | null, targetMessageId?: string) => {
+    const selectChat = useCallback(async (chat: Chat | null, targetMessageId?: string) => {
         fetchControllerRef.current?.abort();
 
         // if (isSearching) clearSearch();
@@ -324,30 +355,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        if (isSearching) {
+        if (isSearchingRef.current) {
             clearSearch();
         }
 
         setMessages([]);
         
-        const myParticipation = chat.participants.find(p => p.user.id === user?.id);
+        const currentUser = userRef.current;
+        const myParticipation = currentUser
+            ? chat.participants.find(p => p.user.id === currentUser.id)
+            : undefined;
         if (myParticipation && myParticipation.unreadCount > 0) {
             markChatAsRead(chat.id);
-        }
-
-        if (myParticipation && myParticipation.unreadCount > 0) {
-            const { 'cw.token': token } = parseCookies();
-            fetch(`${SOCKET_URL}/chat/${chat.id}/read`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            setChats(prevChats => prevChats.map(c => 
-                c.id === chat.id 
-                    ? { ...c, participants: c.participants.map(p => 
-                        p.user.id === user?.id ? { ...p, unreadCount: 0 } : p
-                      ) }
-                    : c
-            ));
         }
 
         let initialData;
@@ -355,7 +374,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         try {
             const controller = new AbortController();
             fetchControllerRef.current = controller;
-            const { 'cw.token': token } = parseCookies();
+            const authHeaders = getChatAuthHeaders();
+
+            if (!authHeaders) {
+                return;
+            }
+
             let hasMoreInLoop = true;
             let currentPageInLoop = 1;
             let messageFound = false;
@@ -363,7 +387,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
             // Carga inicial da página 1
             const initialResponse = await fetch(`${SOCKET_URL}/chat/${chat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${currentPageInLoop}`, {
-                headers: { 'Authorization': `Bearer ${token}` },
+                headers: authHeaders,
                 signal: controller.signal
             });
 
@@ -376,7 +400,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             
             while (!messageFound && hasMoreInLoop) {
                 const response = await fetch(`${SOCKET_URL}/chat/${chat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${currentPageInLoop}`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    headers: authHeaders,
                     signal: controller.signal
                 });
                 if (!response.ok) throw new Error("Falha ao buscar página.");
@@ -407,27 +431,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 setScrollToBottomTrigger(prev => prev + 1);
             }
         } catch (error) {
-            if (error.name !== 'AbortError') console.error("Erro em selectChat:", error);
+            if (!(error instanceof Error) || error.name !== 'AbortError') console.error("Erro em selectChat:", error);
         }
-    };
+    }, []);
 
-    const fetchMoreMessages = async () => {
-        if (isFetchingMore.current || !hasMoreMessages || !selectedChat) return;
+    const fetchMoreMessages = useCallback(async () => {
+        const currentChat = selectedChatRef.current;
+        if (isFetchingMore.current || !hasMoreMessagesRef.current || !currentChat) return;
+
+        const authHeaders = getChatAuthHeaders();
+        if (!authHeaders) return;
 
         isFetchingMore.current = true;
         setIsLoadingMore(true);
-        const nextPage = currentPage + 1;
+        const nextPage = currentPageRef.current + 1;
 
         try {
-            const { 'cw.token': token } = parseCookies();
-            const response = await fetch(`${SOCKET_URL}/chat/${selectedChat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${nextPage}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const response = await fetch(`${SOCKET_URL}/chat/${currentChat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${nextPage}`, {
+                headers: authHeaders
             });
 
             if (response.ok) {
                 const data = await response.json();
                 if (data.messages.length > 0) {
-                    const existingMessageIds = new Set(messages.map(msg => msg.id));
+                    const existingMessageIds = new Set(messagesRef.current.map(msg => msg.id));
                     const uniqueNewMessages = data.messages.reverse().filter(msg => !existingMessageIds.has(msg.id));
                     setMessages(prevMessages => [...uniqueNewMessages.reverse(), ...prevMessages]);
                     setCurrentPage(nextPage);
@@ -440,15 +467,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             setIsLoadingMore(false);
             isFetchingMore.current = false;
         }
-    };
+    }, []);
     
-    const searchMessages = async (query: string) => {
+    const searchMessages = useCallback(async (query: string) => {
         setIsSearching(true)
 
         try {
-            const { 'cw.token': token } = parseCookies()
+            const authHeaders = getChatAuthHeaders()
+
+            if (!authHeaders) {
+                setSearchResults([])
+                setIsSearching(false)
+                return
+            }
+
             const response = await fetch(`${SOCKET_URL}/messages/search?query=${encodeURIComponent(query)}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: authHeaders
             })
 
             if (response.ok) {
@@ -459,23 +493,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             console.error('Erro ao buscar mensagens:', error)
             setSearchResults([])
         } 
-    }
+    }, []);
     
-    const clearSearch = () => {
+    const clearSearch = useCallback(() => {
         setIsSearching(false);
         setSearchResults([]);
-    };
+    }, []);
 
-    const fetchAllUsers = async (): Promise<User[]> => {
+    const fetchAllUsers = useCallback(async (): Promise<User[]> => {
         try {
             return await chatService.fetchContacts();
         } catch (error) {
             console.error("Erro ao buscar usuários:", error);
             return [];
         }
-    };
+    }, []);
     
-    const createDirectChat = async (partnerId: string) => {
+    const createDirectChat = useCallback(async (partnerId: string) => {
         try {
             const newChat = await chatService.createDirectChat({ partnerId });
 
@@ -488,9 +522,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error("Erro ao criar chat direto:", error);
         }
-    }
+    }, [selectChat, socket]);
 
-    const createGroupChat = async (name: string, memberIds: string[]) => {
+    const createGroupChat = useCallback(async (name: string, memberIds: string[]) => {
         try {
             const newGroup = await chatService.createGroupChat({ name, memberIds });
 
@@ -503,8 +537,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error("Erro ao criar grupo:", error);
         }
-    }
-    const updateGroupDetails = async (chatId: string, data: { name: string; photo?: File }) => {
+    }, [selectChat, socket]);
+    const updateGroupDetails = useCallback(async (chatId: string, data: { name?: string; photo?: File }) => {
         try {
             setIsUploading(true);
             await chatService.updateGroupDetails(chatId, data);
@@ -515,7 +549,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         } finally {
             setIsUploading(false);
         }
-    };
+    }, []);
 
     // 3. Adicione o novo listener ao useEffect do socket
     useEffect(() => {
@@ -538,8 +572,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         };
     }, [socket]);
     
-    const sendMessage = (payload: { content: string, fileUrl?: string, type?: 'TEXT' | 'IMAGE' | 'AUDIO' }) => {
-        if (!socket || !selectedChat || !user) return;
+    const sendMessage = useCallback((payload: { content: string, fileUrl?: string, type?: 'TEXT' | 'IMAGE' | 'AUDIO' }) => {
+        const currentChat = selectedChatRef.current;
+        const currentUser = userRef.current;
+        if (!socket || !currentChat || !currentUser) return;
 
         const tempMessage: Message = {
             id: `temp_${Date.now()}`,
@@ -547,11 +583,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             fileUrl: payload.fileUrl,
             type: payload.type || 'TEXT',
             createdAt: new Date().toISOString(),
-            chat_id: selectedChat.id,
-            sender_id: user.id,
+            chat_id: currentChat.id,
+            sender_id: currentUser.id,
             sender: {
-                id: user.id,
-                name: user.name,
+                id: currentUser.id,
+                name: currentUser.name,
             },
         };
 
@@ -559,33 +595,36 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setScrollToBottomTrigger(prev => prev + 1);
 
         setChats(prev => {
-            const otherChats = prev.filter(c => c.id !== selectedChat.id);
-            const updatedChat = { ...selectedChat, messages: [tempMessage] };
+            const otherChats = prev.filter(c => c.id !== currentChat.id);
+            const updatedChat = { ...currentChat, messages: [tempMessage] };
             return [updatedChat, ...otherChats];
         });
 
         socket.emit('sendMessage', {
-            chat_id: selectedChat.id,
+            chat_id: currentChat.id,
             ...payload
         });
-    };
-    const deleteMessage = (messageId: string) => {
+    }, [socket]);
+    const deleteMessage = useCallback((messageId: string) => {
         if (socket) socket.emit('deleteMessage', { messageId });
-    };
-    const editMessage = (messageId: string, newContent: string) => {
+    }, [socket]);
+    const editMessage = useCallback((messageId: string, newContent: string) => {
         if (socket) {
             socket.emit('editMessage', { messageId, newContent });
             setEditingMessage(null);
         }
-    };
+    }, [socket]);
 
-    const markChatAsRead = (chatId: string) => {
+    const markChatAsRead = useCallback((chatId: string) => {
+        const currentUser = userRef.current;
+        if (!currentUser) return;
+
         // 1. Atualização Otimista da UI: zera o contador imediatamente
         setChats(prevChats =>
             prevChats.map(chat => {
                 if (chat.id === chatId) {
                     const myNewParticipation = chat.participants.map(p =>
-                        p.user.id === user?.id ? { ...p, unreadCount: 0 } : p
+                        p.user.id === currentUser.id ? { ...p, unreadCount: 0 } : p
                     );
                     return { ...chat, myUnreadCount: 0, participants: myNewParticipation };
                 }
@@ -596,35 +635,45 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setFirstUnreadId(null);
 
         // 2. Sincronização com o Backend em segundo plano
-        const { 'cw.token': token } = parseCookies();
-        fetch(`${SOCKET_URL}/api/chat/${chatId}/read`, {
+        const authHeaders = getChatAuthHeaders();
+        if (!authHeaders) return;
+
+        fetch(`${SOCKET_URL}/chat/${chatId}/read`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: authHeaders
         });
-    };
-    const uploadFileAndSendMessage = async (file: File) => {
-        if (!selectedChat || !user) return;
+    }, []);
+    const uploadFileAndSendMessage = useCallback(async (file: File) => {
+        const currentChat = selectedChatRef.current;
+        const currentUser = userRef.current;
+        if (!currentChat || !currentUser) return;
 
         const supportedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         const supportedAudioTypes = ['audio/mpeg', 'audio/webm', 'audio/wav', 'audio/ogg'];
         
         if (![...supportedImageTypes, ...supportedAudioTypes].includes(file.type)) {
-            alert("Tipo de arquivo não suportado.");
+            toast.error("Tipo de arquivo nao suportado.");
             return;
         }
+
+        if (file.size > MAX_CHAT_UPLOAD_BYTES) {
+            toast.error(CHAT_UPLOAD_SIZE_ERROR_MESSAGE);
+            return;
+        }
+
+        const authHeaders = getChatAuthHeaders();
+        if (!authHeaders) return;
 
         setIsUploading(true);
 
         const formData = new FormData();
-        formData.append('chat_id', selectedChat.id);
+        formData.append('chat_id', currentChat.id);
         formData.append('file', file);
 
         try {
-            const { 'cw.token': token } = parseCookies();
-            
             const response = await fetch(`${SOCKET_URL}/chat/media`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
+                headers: authHeaders,
                 body: formData
             });
 
@@ -643,14 +692,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         } catch (error) {
             console.error("Erro no processo de upload:", error);
-            alert("Não foi possível enviar sua mídia.");
+            toast.error("Nao foi possivel enviar sua midia.");
         } finally {
             setIsUploading(false);
         }
-    };
-    const getSignedMediaUrl = async (filePath: string): Promise<string | null> => {
+    }, [sendMessage]);
+    const getSignedMediaUrl = useCallback(async (filePath: string): Promise<string | null> => {
         return await chatService.getSignedMediaUrl(filePath);
-    };
+    }, []);
 
     const updateUnreadBadge = (currentChats: Chat[]) => {
         if (!user) return;
@@ -684,46 +733,99 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const startEditingMessage = (message: Message) => setEditingMessage(message);
-    const cancelEditingMessage = () => setEditingMessage(null);
+    const startEditingMessage = useCallback((message: Message) => setEditingMessage(message), []);
+    const cancelEditingMessage = useCallback(() => setEditingMessage(null), []);
 
-    const addMembersToGroup = async (chatId: string, userIdsToAdd: string[]) => {
+    const addMembersToGroup = useCallback(async (chatId: string, userIdsToAdd: string[]) => {
         try {
             await chatService.addMembersToGroup(chatId, userIdsToAdd);
             toast.success("Adicionado com sucesso!")
         } catch (error) { console.error("Erro ao adicionar membros:", error); }
-    };
+    }, []);
 
-    const removeMemberFromGroup = async (chatId: string, userIdToRemove: string) => {
+    const removeMemberFromGroup = useCallback(async (chatId: string, userIdToRemove: string) => {
         try {
             await chatService.removeMemberFromGroup(chatId, userIdToRemove);
             toast.success("Removido com sucesso!")
         } catch (error) { console.error("Erro ao remover participante:", error); }
-    };
+    }, []);
 
-    const updateMemberRole = async (chatId: string, targetUserId: string, role: 'ADMIN' | 'MEMBER') => {
+    const updateMemberRole = useCallback(async (chatId: string, targetUserId: string, role: 'ADMIN' | 'MEMBER') => {
         try {
             await chatService.updateMemberRole(chatId, targetUserId, role);
             toast.success("Atualizado com sucesso!")
         } catch (error) { console.error("Erro ao atualizar permissão:", error); }
-    };
-    const updateAndReorderChats = (updatedChat: Chat) => {
-        setChats(prevChats => {
-            // Remove a versão antiga do chat da lista
-            const otherChats = prevChats.filter(c => c.id !== updatedChat.id);
-            // Adiciona a nova versão no início do array
-            return [updatedChat, ...otherChats];
-        });
-    };
+    }, []);
 
-    const value = { 
-        chats, selectedChat, messages, highlightedMessageId, currentPage, selectChat, 
-        sendMessage, searchMessages, searchResults, clearSearch, isSearching, 
-        fetchMoreMessages, hasMoreMessages, isLoadingMore, scrollToBottomTrigger, fetchAllUsers,
-        createDirectChat, createGroupChat, onlineUserIds, firstUnreadId, totalUnreadCount,
-        uploadFileAndSendMessage, isUploading, getSignedMediaUrl,editingMessage, startEditingMessage, cancelEditingMessage, 
-        editMessage, deleteMessage, updateGroupDetails, removeMemberFromGroup, updateMemberRole, addMembersToGroup 
-    };
+    const value = useMemo<ChatContextType>(() => ({
+        chats,
+        selectedChat,
+        messages,
+        highlightedMessageId,
+        currentPage,
+        selectChat,
+        sendMessage,
+        searchMessages,
+        searchResults,
+        clearSearch,
+        isSearching,
+        fetchMoreMessages,
+        hasMoreMessages,
+        isLoadingMore,
+        scrollToBottomTrigger,
+        fetchAllUsers,
+        createDirectChat,
+        createGroupChat,
+        onlineUserIds,
+        firstUnreadId,
+        totalUnreadCount,
+        uploadFileAndSendMessage,
+        isUploading,
+        getSignedMediaUrl,
+        editingMessage,
+        startEditingMessage,
+        cancelEditingMessage,
+        editMessage,
+        deleteMessage,
+        updateGroupDetails,
+        removeMemberFromGroup,
+        updateMemberRole,
+        addMembersToGroup,
+    }), [
+        chats,
+        selectedChat,
+        messages,
+        highlightedMessageId,
+        currentPage,
+        selectChat,
+        sendMessage,
+        searchMessages,
+        searchResults,
+        clearSearch,
+        isSearching,
+        fetchMoreMessages,
+        hasMoreMessages,
+        isLoadingMore,
+        scrollToBottomTrigger,
+        fetchAllUsers,
+        createDirectChat,
+        createGroupChat,
+        onlineUserIds,
+        firstUnreadId,
+        totalUnreadCount,
+        uploadFileAndSendMessage,
+        isUploading,
+        getSignedMediaUrl,
+        editingMessage,
+        startEditingMessage,
+        cancelEditingMessage,
+        editMessage,
+        deleteMessage,
+        updateGroupDetails,
+        removeMemberFromGroup,
+        updateMemberRole,
+        addMembersToGroup,
+    ]);
 
     return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }

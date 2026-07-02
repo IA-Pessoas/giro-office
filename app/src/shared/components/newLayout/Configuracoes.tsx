@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   Bell,
   Camera,
-  ChevronDown,
-  ChevronUp,
   KeyRound,
   LoaderCircle,
   Moon,
@@ -11,6 +10,7 @@ import {
   Save,
   Settings,
   Shield,
+  SquareCheck,
   Sun,
   Trash2,
   Upload,
@@ -19,7 +19,9 @@ import {
 import { toast } from "react-toastify";
 
 import { isAdminPermission } from "@modules/auth";
+import { TASK_MODEL_CONFIG_ENTRY, canManageTaskModelConfig } from "@modules/integracao";
 import { MyOrganizationSection } from "@modules/organizations";
+import { Dialog } from "@shared/components";
 import { useDeleteMePhoto, useMe, useUpdateMe, useUploadMePhoto } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
 
@@ -89,7 +91,7 @@ export function Configuracoes() {
   const deletePhotoMutation = useDeleteMePhoto();
 
   const [isDark, setIsDark] = useState(false);
-  const [isAccessSectionOpen, setIsAccessSectionOpen] = useState(false);
+  const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
@@ -130,6 +132,7 @@ export function Configuracoes() {
     isAdminPermission(meQuery.data?.permission) && meQuery.data.organization_id
       ? meQuery.data.organization_id
       : null;
+  const canManageTaskModels = canManageTaskModelConfig(meQuery.data?.permission);
   const resolvedCurrentPhotoUrl = resolvePhotoUrl(currentPhotoUrl);
 
   const displayedAvatar = pendingPhotoPreviewUrl ?? resolvedCurrentPhotoUrl;
@@ -138,18 +141,19 @@ export function Configuracoes() {
     [currentName, name],
   );
 
-  const hasPendingProfileChanges =
-    Boolean(meQuery.data) &&
-    (name.trim() !== currentName || password.trim().length > 0 || pendingPhotoFile !== null);
+  const hasPendingPhotoChanges = pendingPhotoFile !== null;
+  const hasPendingAccessChanges =
+    Boolean(meQuery.data) && (name.trim() !== currentName || password.trim().length > 0);
 
   const isSaving =
     updateMeMutation.isPending || uploadPhotoMutation.isPending || deletePhotoMutation.isPending;
 
-  const canSave =
+  const canSavePhoto = Boolean(meQuery.data) && !isSaving && hasPendingPhotoChanges;
+  const canSaveAccessData =
     Boolean(meQuery.data) &&
     !isSaving &&
     name.trim().length > 0 &&
-    hasPendingProfileChanges;
+    hasPendingAccessChanges;
 
   useEffect(() => {
     setHasPhotoLoadError(false);
@@ -206,8 +210,21 @@ export function Configuracoes() {
     setPendingPhotoPreviewUrl(URL.createObjectURL(selectedFile));
   };
 
-  const handleSaveProfile = async () => {
-    if (!meQuery.data) {
+  const resetAccessDraft = () => {
+    setName(currentName);
+    setPassword("");
+  };
+
+  const handleAccessDialogOpenChange = (open: boolean) => {
+    setIsAccessDialogOpen(open);
+
+    if (!open && !isSaving) {
+      resetAccessDraft();
+    }
+  };
+
+  const handleSaveAccessData = async () => {
+    if (!meQuery.data || !canSaveAccessData) {
       return;
     }
 
@@ -219,21 +236,14 @@ export function Configuracoes() {
     }
 
     try {
-      if (trimmedName !== currentName || password.trim().length > 0) {
-        await updateMeMutation.mutateAsync({
-          name: trimmedName,
-          ...(password.trim() ? { password: password.trim() } : {}),
-        });
-      }
-
-      if (pendingPhotoFile) {
-        await uploadPhotoMutation.mutateAsync(pendingPhotoFile);
-        clearPendingPhoto();
-      }
-
+      await updateMeMutation.mutateAsync({
+        name: trimmedName,
+        ...(password.trim() ? { password: password.trim() } : {}),
+      });
       setPassword("");
+      setIsAccessDialogOpen(false);
     } catch {
-      // Toasts are handled by the mutation hooks.
+      // Toasts are handled by the mutation hook.
     }
   };
 
@@ -249,6 +259,19 @@ export function Configuracoes() {
 
     try {
       await deletePhotoMutation.mutateAsync();
+    } catch {
+      // Toasts are handled by the mutation hook.
+    }
+  };
+
+  const handleSavePhoto = async () => {
+    if (!meQuery.data || !pendingPhotoFile) {
+      return;
+    }
+
+    try {
+      await uploadPhotoMutation.mutateAsync(pendingPhotoFile);
+      clearPendingPhoto();
     } catch {
       // Toasts are handled by the mutation hook.
     }
@@ -314,16 +337,6 @@ export function Configuracoes() {
             Gerencie seu perfil e as preferências visuais da aplicação.
           </p>
         </div>
-
-        <button
-          type="button"
-          onClick={() => void handleSaveProfile()}
-          className={`inline-flex w-fit items-center gap-2 self-end rounded-xl px-4 py-2.5 text-sm font-semibold text-white lg:self-auto ${SETTINGS_GRADIENT_BUTTON_CLASSNAME}`}
-          disabled={!canSave}
-        >
-          {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          {isSaving ? "Salvando..." : "Salvar alterações"}
-        </button>
       </div>
 
       <div className="space-y-6">
@@ -345,6 +358,8 @@ export function Configuracoes() {
                       <img
                         src={displayedAvatar}
                         alt={`Foto de ${currentName}`}
+                        loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                         onError={() => setHasPhotoLoadError(true)}
                       />
@@ -361,18 +376,11 @@ export function Configuracoes() {
                         <p className="truncate text-base font-semibold text-slate-900 dark:text-white">
                           {currentName}
                         </p>
-                        {!isAccessSectionOpen ? (
-                          <span className="inline-flex w-fit rounded-full bg-[var(--colors-brand-soft)] px-3 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
-                            {currentPermissionLabel}
-                          </span>
-                        ) : null}
+                        <span className="inline-flex w-fit rounded-full bg-[var(--colors-brand-soft)] px-3 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
+                          {currentPermissionLabel}
+                        </span>
                       </div>
                       <p className={`truncate ${SETTINGS_MUTED_CLASSNAME}`}>{currentLogin}</p>
-                      {isAccessSectionOpen ? (
-                        <p className="text-sm font-medium text-[var(--colors-brand-gradient-end)] dark:text-blue-300">
-                          {currentPermissionLabel}
-                        </p>
-                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -396,6 +404,22 @@ export function Configuracoes() {
                     {pendingPhotoFile ? "Trocar foto" : "Escolher foto"}
                   </button>
 
+                  {pendingPhotoFile ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleSavePhoto()}
+                      className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white ${SETTINGS_GRADIENT_BUTTON_CLASSNAME}`}
+                      disabled={!canSavePhoto}
+                    >
+                      {uploadPhotoMutation.isPending ? (
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      {uploadPhotoMutation.isPending ? "Salvando..." : "Salvar foto"}
+                    </button>
+                  ) : null}
+
                   {(pendingPhotoFile || currentPhotoUrl) ? (
                     <button
                       type="button"
@@ -410,16 +434,11 @@ export function Configuracoes() {
 
                   <button
                     type="button"
-                    onClick={() => setIsAccessSectionOpen((currentValue) => !currentValue)}
+                    onClick={() => setIsAccessDialogOpen(true)}
                     className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <KeyRound className="h-4 w-4" />
                     Editar dados de acesso
-                    {isAccessSectionOpen ? (
-                      <ChevronUp className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
-                    )}
                   </button>
                 </div>
               </div>
@@ -428,46 +447,134 @@ export function Configuracoes() {
                 JPEG, PNG ou WebP. máx. 5 MB
               </p>
 
-              {isAccessSectionOpen ? (
-                <div className="grid gap-4 border-t border-slate-200 pt-5 dark:border-slate-700 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <label className={SETTINGS_LABEL_CLASSNAME} htmlFor="settings-name">
-                      Nome
-                    </label>
-                    <input
-                      id="settings-name"
-                      type="text"
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      placeholder="Digite o nome exibido no sistema"
-                      className={SETTINGS_INPUT_CLASSNAME}
+              <Dialog
+                open={isAccessDialogOpen}
+                onOpenChange={handleAccessDialogOpenChange}
+                title="Editar dados de acesso"
+                description="Atualize o nome exibido e a senha da sua conta."
+                contentClassName="flex max-h-[92dvh] w-[min(94vw,560px)] flex-col overflow-hidden border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+                bodyClassName="max-h-[calc(92dvh-4.5rem)] overflow-y-auto !px-4 !py-4 sm:!px-5"
+                footer={
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleAccessDialogOpenChange(false)}
+                      className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                       disabled={isSaving}
-                    />
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveAccessData()}
+                      className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white ${SETTINGS_GRADIENT_BUTTON_CLASSNAME}`}
+                      disabled={!canSaveAccessData}
+                    >
+                      {updateMeMutation.isPending ? (
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      {updateMeMutation.isPending ? "Salvando..." : "Salvar dados"}
+                    </button>
+                  </>
+                }
+              >
+                <div className="space-y-5">
+                  <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--colors-brand-soft)] text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
+                      <KeyRound className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                        {currentLogin}
+                      </p>
+                      <p className={SETTINGS_MUTED_CLASSNAME}>
+                        Permissão atual: {currentPermissionLabel}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
-                    <label className={SETTINGS_LABEL_CLASSNAME} htmlFor="settings-password">
-                      Nova senha
-                    </label>
-                    <input
-                      id="settings-password"
-                      type="password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      placeholder="Deixe em branco para manter a senha atual"
-                      autoComplete="new-password"
-                      className={SETTINGS_INPUT_CLASSNAME}
-                      disabled={isSaving}
-                    />
+                  <div className="grid gap-4">
+                    <div className="space-y-2">
+                      <label className={SETTINGS_LABEL_CLASSNAME} htmlFor="settings-access-name">
+                        Nome
+                      </label>
+                      <input
+                        id="settings-access-name"
+                        type="text"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        placeholder="Digite o nome exibido no sistema"
+                        className={SETTINGS_INPUT_CLASSNAME}
+                        disabled={isSaving}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className={SETTINGS_LABEL_CLASSNAME} htmlFor="settings-access-password">
+                        Nova senha
+                      </label>
+                      <input
+                        id="settings-access-password"
+                        type="password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        placeholder="Deixe em branco para manter a senha atual"
+                        autoComplete="new-password"
+                        className={SETTINGS_INPUT_CLASSNAME}
+                        disabled={isSaving}
+                      />
+                    </div>
                   </div>
                 </div>
-              ) : null}
+              </Dialog>
             </div>
           </div>
         </section>
 
         {managedOrganizationId ? (
           <MyOrganizationSection organizationId={managedOrganizationId} userEmail={currentLogin} />
+        ) : null}
+
+        {canManageTaskModels ? (
+          <section className={`${SETTINGS_PANEL_CLASSNAME} p-6 lg:p-8`}>
+            <div className="space-y-5">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <SquareCheck className="h-5 w-5 text-[var(--colors-brand-gradient-end)]" />
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    Integração
+                  </h2>
+                </div>
+                <p className={SETTINGS_MUTED_CLASSNAME}>
+                  Ajustes administrativos usados pelos fluxos de tarefas e projetos.
+                </p>
+              </div>
+
+              <Link
+                href={TASK_MODEL_CONFIG_ENTRY.href}
+                className={`${SETTINGS_SUBPANEL_CLASSNAME} flex flex-col gap-4 p-4 transition-colors hover:bg-slate-100 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--colors-brand-soft)] text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
+                    <SquareCheck className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {TASK_MODEL_CONFIG_ENTRY.label}
+                    </p>
+                    <p className={SETTINGS_MUTED_CLASSNAME}>
+                      {TASK_MODEL_CONFIG_ENTRY.description}
+                    </p>
+                  </div>
+                </div>
+                <span className="w-fit rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                  Abrir
+                </span>
+              </Link>
+            </div>
+          </section>
         ) : null}
 
         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">

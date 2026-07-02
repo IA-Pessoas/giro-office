@@ -121,6 +121,7 @@ async function dryRunBuildxPush(scope) {
       STAGING_DOCKER_TAG: "abc1234",
       VPS_PUSH_SERVICES: scope,
       NEXT_PUBLIC_API_URL: "https://api.example.test",
+      NEXT_PUBLIC_AUTH_COOKIE_SECURE: "false",
       API_INTERNAL_URL: "http://gateway:3010",
       CI_DRY_RUN: "1",
     },
@@ -194,6 +195,7 @@ test("compose-vps-buildx-push plans cached web build with Next.js build args", a
   const output = await dryRunBuildxPush("web");
   assert.match(output, /--file docker\/app\.Dockerfile/);
   assert.match(output, /--build-arg NEXT_PUBLIC_API_URL=https:\/\/api\.example\.test/);
+  assert.match(output, /--build-arg NEXT_PUBLIC_AUTH_COOKIE_SECURE=false/);
   assert.match(output, /--build-arg API_INTERNAL_URL=http:\/\/gateway:3010/);
   assert.match(
     output,
@@ -245,7 +247,12 @@ const pullByTagScript = path.join(
 );
 const remoteDeployScript = path.join(repoRoot, "scripts", "ci", "vps-remote-deploy.sh");
 const composeVpsFile = path.join(repoRoot, "docker-compose.vps.yml");
+const composeVpsRuntimeOverrideFile = path.join(
+  repoRoot,
+  "docker-compose.vps.runtime-override.yml",
+);
 const vpsSecretsManifest = path.join(repoRoot, "scripts", "ci", "vps-secrets.manifest");
+const vpsWaitEndpointsScript = path.join(repoRoot, "scripts", "ci", "vps-wait-endpoints.sh");
 
 async function writeExecutable(filePath, contents) {
   await writeFile(filePath, contents, "utf8");
@@ -390,6 +397,50 @@ test("pessoal-service is part of the default VPS compose stack", async () => {
   assert.match(pessoalBlock, /expose:[\s\S]*- "3042"/);
   assert.match(pessoalBlock, /fetch\('http:\/\/127\.0\.0\.1:3042\/health'\)/);
   assert.match(gatewayBlock, /depends_on:[\s\S]*pessoal-service:[\s\S]*condition: service_healthy/);
+});
+
+test("certificate-service is accepted by VPS selective deploy scope", async () => {
+  assert.equal(
+    await runDeployScopeFunction("vps_validate_service_token", "certificate-service"),
+    "",
+  );
+  assert.equal(
+    await runDeployScopeFunction("vps_compose_service_args", "certificate-service"),
+    "certificate-service",
+  );
+});
+
+test("ti-service remains accepted by VPS selective deploy scope", async () => {
+  assert.equal(await runDeployScopeFunction("vps_validate_service_token", "ti-service"), "");
+  assert.equal(
+    await runDeployScopeFunction("vps_compose_service_args", "ti-service"),
+    "ti-service",
+  );
+});
+
+test("certificate-service is covered by VPS endpoint wait checks", async () => {
+  const script = await readFile(vpsWaitEndpointsScript, "utf8");
+
+  assert.match(
+    script,
+    /certificate-service\)\s+printf "%s\\n" "http:\/\/certificate-service:3041\/health"/,
+  );
+  assert.match(script, /ALL_BACKEND_SERVICES=\([\s\S]*certificate-service[\s\S]*\)/);
+});
+
+test("certificate-service is covered by VPS runtime override", async () => {
+  const runtimeOverrideContents = await readFile(composeVpsRuntimeOverrideFile, "utf8");
+  const gatewayBlock = extractComposeServiceBlock(runtimeOverrideContents, "gateway");
+  const certificateBlock = extractComposeServiceBlock(
+    runtimeOverrideContents,
+    "certificate-service",
+  );
+
+  assert.match(
+    gatewayBlock,
+    /depends_on:[\s\S]*certificate-service:[\s\S]*condition: service_started/,
+  );
+  assert.match(certificateBlock, /healthcheck:[\s\S]*disable: true/);
 });
 
 test("VPS env materialization includes audit-service in active workflows", async () => {

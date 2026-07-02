@@ -1,8 +1,20 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import { AuthTokenError } from "../../shared/services/errors/AuthTokenError.ts";
 import { canSSRAdmin } from "./utils/canSSRAdmin.ts";
+import {
+  AUTH_COOKIE_MAX_AGE_SECONDS,
+  AUTH_COOKIE_NAME,
+  getAuthCookieOptions,
+} from "./utils/authCookie.ts";
+import { createBearerAuthHeaders, getAuthTokenValue } from "./utils/authHeaders.ts";
 import { canAccessAdministration, isAdminPermission } from "./utils/permissions.ts";
+import {
+  resolveAccessLevelFromAdditionalPermission,
+  resolveDepartmentModuleKey,
+  resolveModuleAccess,
+} from "./utils/moduleAccess.ts";
 
 async function runTest(name, fn) {
   try {
@@ -40,6 +52,19 @@ function createSsrContext(token) {
   };
 }
 
+const authContextSource = await readFile(
+  new URL("../../context/AuthContext.tsx", import.meta.url),
+  "utf8",
+);
+const appShellSource = await readFile(
+  new URL("../../shared/components/newLayout/AppShell.tsx", import.meta.url),
+  "utf8",
+);
+const administracaoSource = await readFile(
+  new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
+  "utf8",
+);
+
 await (async () => {
   await runTest("isAdminPermission allows administrative levels from 2 and above", () => {
     assert.equal(isAdminPermission(2), true);
@@ -59,6 +84,113 @@ await (async () => {
     assert.equal(canAccessAdministration({ permission: 999 }), true);
     assert.equal(canAccessAdministration({ permission: 1 }), false);
     assert.equal(canAccessAdministration(undefined), false);
+  });
+
+  await runTest("resolveModuleAccess grants admin access to every module", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: 2,
+        departmentModule: "regularize",
+        module: "financeiro",
+      }),
+      {
+        level: "admin",
+        canView: true,
+        canEdit: true,
+        isAdmin: true,
+        source: "admin",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess grants department access from user permission level", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: 1,
+        departmentModule: "regularize",
+        module: "regularize",
+      }),
+      {
+        level: "edit",
+        canView: true,
+        canEdit: true,
+        isAdmin: false,
+        source: "department",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess grants additional module access outside department", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: 0,
+        departmentModule: "regularize",
+        module: "financeiro",
+        additionalModulePermissions: {
+          financeiro: 1,
+        },
+      }),
+      {
+        level: "edit",
+        canView: true,
+        canEdit: true,
+        isAdmin: false,
+        source: "additional-module",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess denies modules without department or additional permission", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: 0,
+        departmentModule: "regularize",
+        module: "financeiro",
+      }),
+      {
+        level: "none",
+        canView: false,
+        canEdit: false,
+        isAdmin: false,
+        source: "none",
+      },
+    );
+  });
+
+  await runTest("module access helpers normalize aliases and additional permission levels", () => {
+    assert.equal(resolveDepartmentModuleKey("Departamento Pessoal"), "pessoal");
+    assert.equal(resolveDepartmentModuleKey("Tecnologia"), "ti");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(2), "admin");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(1), "edit");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(0), "view");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(null), "none");
+  });
+
+  await runTest("app shell uses module hook for menu visibility instead of raw access store", () => {
+    assert.match(appShellSource, /useModuleAccessMap\(MODULE_KEYS\)/);
+    assert.equal(appShellSource.includes("useAccessStore("), false);
+  });
+
+  await runTest("app shell renders an explicit forbidden state for inaccessible module routes", () => {
+    assert.match(appShellSource, /Você não tem acesso a este módulo no perfil atual\./);
+    assert.match(appShellSource, /currentModuleAccess\?\.canView === false/);
+  });
+
+  await runTest("app shell holds module route children while module access is loading", () => {
+    assert.match(
+      appShellSource,
+      /shouldRenderModuleAccessLoading\s*=\s*Boolean\(currentModuleKey\)\s*&&\s*isModuleAccessLoading/,
+    );
+    assert.match(appShellSource, /shouldRenderModuleAccessLoading\s*\?\s*<ModuleAccessLoadingState \/>/);
+    assert.match(appShellSource, /:\s*shouldRenderModuleAccessDenied\s*\?\s*<ModuleAccessDeniedState \/>/);
+  });
+
+  await runTest("app shell keeps module navigation stable while module access is loading", () => {
+    assert.match(appShellSource, /isModuleAccessCategory:\s*true/);
+    assert.match(appShellSource, /function ModuleNavLoadingItem/);
+    assert.match(appShellSource, /shouldRenderModuleNavLoading/);
+    assert.equal(appShellSource.includes("isModuleAccessLoading) {\n      return false;"), false);
+    assert.equal(appShellSource.includes("isModuleAccessLoading) {\n          return false;"), false);
   });
 
   await runTest("canSSRAdmin redirects unauthenticated users to login", async () => {
@@ -146,5 +278,134 @@ await (async () => {
         permanent: false,
       },
     });
+  });
+
+  await runTest("auth cookie options keep session cookie safe in development", () => {
+    assert.equal(AUTH_COOKIE_NAME, "cw.token");
+    assert.equal(AUTH_COOKIE_MAX_AGE_SECONDS, 60 * 60 * 24 * 7);
+    assert.deepEqual(getAuthCookieOptions("development"), {
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+      sameSite: "lax",
+      secure: false,
+    });
+  });
+
+  await runTest("auth cookie options enable secure flag in production", () => {
+    assert.deepEqual(getAuthCookieOptions("production"), {
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+      sameSite: "lax",
+      secure: true,
+    });
+  });
+
+  await runTest("auth cookie options allow HTTP develop slots to disable secure flag", () => {
+    const previousValue = process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE;
+    process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE = "false";
+
+    try {
+      assert.deepEqual(getAuthCookieOptions("production"), {
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+        sameSite: "lax",
+        secure: false,
+      });
+    } finally {
+      if (previousValue === undefined) {
+        delete process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE;
+      } else {
+        process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE = previousValue;
+      }
+    }
+  });
+
+  await runTest("auth headers are omitted when token is missing", () => {
+    assert.equal(getAuthTokenValue(undefined), null);
+    assert.equal(getAuthTokenValue(""), null);
+    assert.equal(createBearerAuthHeaders(undefined), null);
+    assert.equal(createBearerAuthHeaders(""), null);
+  });
+
+  await runTest("auth headers include bearer token when token exists", () => {
+    assert.equal(getAuthTokenValue("abc.def.signature"), "abc.def.signature");
+    assert.deepEqual(createBearerAuthHeaders("abc.def.signature"), {
+      Authorization: "Bearer abc.def.signature",
+    });
+  });
+
+  await runTest("auth diagnostics are hidden in production", () => {
+    assert.match(authContextSource, /process\.env\.NODE_ENV !== "production"/);
+    assert.match(authContextSource, /function logAuthError/);
+    assert.equal(authContextSource.includes("fullError"), false);
+    assert.equal(authContextSource.includes("URL:"), false);
+    assert.equal(authContextSource.includes('console.error("Erro de conex'), false);
+    assert.equal(authContextSource.includes('console.error("Erro do servidor'), false);
+    assert.equal(authContextSource.includes('console.error("Erro de autentica'), false);
+  });
+
+  await runTest("admin permission updates refresh the authenticated session when editing self", () => {
+    assert.match(authContextSource, /refreshSession:\s*\(\)\s*=>\s*Promise<UserProps \| null>/);
+    assert.match(authContextSource, /async function refreshSession\(\)/);
+    assert.match(
+      authContextSource,
+      /<AuthContext\.Provider value=\{\{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading \}\}/,
+    );
+    assert.match(administracaoSource, /const \{ user, refreshSession \} = useAuth\(\);/);
+    assert.match(
+      administracaoSource,
+      /if \(selectedPermissionUserId === user\?\.id\) \{[\s\S]*await refreshSession\(\);[\s\S]*\}/,
+    );
+    assert.match(authContextSource, /await queryClient\.invalidateQueries\(\{ queryKey: ME_QUERY_KEY \}\);/);
+    assert.equal(authContextSource.includes("queryClient.setQueryData(ME_QUERY_KEY, currentUser)"), false);
+    assert.equal(administracaoSource.includes("accessStoreActions.syncFromToken"), false);
+  });
+
+  await runTest("admin permission updates refetch permission data after save", () => {
+    assert.match(
+      administracaoSource,
+      /await queryClient\.invalidateQueries\(\{[\s\S]*queryKey:\s*\["admin", "permissions", selectedPermissionUserId\],[\s\S]*\}\);/,
+    );
+    assert.match(administracaoSource, /await refetchPermissionUsers\(\);/);
+  });
+
+  await runTest("admin create user action uses native disabled state when context is unavailable", () => {
+    assert.match(administracaoSource, /disabled=\{isCreateBlockedByDepartments\}/);
+    assert.equal(administracaoSource.includes("aria-disabled={isCreateBlockedByDepartments}"), false);
+  });
+
+  await runTest("admin dashboard uses real permission metrics", () => {
+    assert.equal(administracaoSource.includes('title: "Perfis de Acesso"'), false);
+    assert.equal(administracaoSource.includes("value: 12"), false);
+    assert.match(administracaoSource, /const managedModulesCount = useMemo\(\(\) => \{/);
+    assert.match(administracaoSource, /PERMISSION_MODULE_GROUPS\.reduce/);
+    assert.match(administracaoSource, /title: "Módulos gerenciados"/);
+    assert.match(administracaoSource, /value: managedModulesCount/);
+  });
+
+  await runTest("admin permissions list supports scoped user search", () => {
+    assert.match(
+      administracaoSource,
+      /const \[permissionSearchTerm, setPermissionSearchTerm\] = useState\(""\);/,
+    );
+    assert.match(administracaoSource, /const filteredPermissionUsers = useMemo\(\(\) => \{/);
+    assert.match(administracaoSource, /normalizeSearchText\(permissionSearchTerm\)/);
+    assert.match(administracaoSource, /filteredPermissionUsers\.length/);
+    assert.match(administracaoSource, /filteredPermissionUsers\.map/);
+    assert.match(administracaoSource, /placeholder="Buscar usuário ativo"/);
+    assert.match(
+      administracaoSource,
+      /onChange=\{\(event\) => setPermissionSearchTerm\(event\.target\.value\)\}/,
+    );
+  });
+
+  await runTest("admin permissions editor uses explicit save copy and stable saving state", () => {
+    assert.match(administracaoSource, /\{filteredPermissionUsers\.length\} de \{permissionUsers\.length\} usuário/);
+    assert.match(administracaoSource, /Salvar permissões/);
+    assert.equal(administracaoSource.includes(': "Salvar"'), false);
+    assert.match(
+      administracaoSource,
+      /<select[\s\S]*disabled=\{isSelectedPermissionOwner \|\| isSavingPermissions\}/,
+    );
   });
 })();

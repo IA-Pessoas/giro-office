@@ -1,6 +1,3 @@
-// @ts-expect-error Node strip-types tests require the `.ts` extension for local ESM resolution.
-import { isAdminPermission } from "./permissions.ts";
-
 export const GLOBAL_ADMIN_PERMISSION = 2;
 export const MODULE_VIEW_PERMISSION = 0;
 export const MODULE_EDIT_PERMISSION = 1;
@@ -49,6 +46,7 @@ export interface ResolveModuleAccessParams {
 export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/comercial": "comercial",
   "/marketing": "marketing",
+  "/certificados": "certificado",
   "/regularize": "regularize",
   "/fiscal": "fiscal",
   "/contabil": "contabil",
@@ -111,7 +109,7 @@ function normalizeDepartmentName(value?: string | null): string {
 }
 
 function resolveAccessLevelFromGlobalPermission(permission?: number | null): AccessLevel {
-  if (isAdminPermission(permission)) {
+  if (typeof permission === "number" && permission >= GLOBAL_ADMIN_PERMISSION) {
     return "admin";
   }
 
@@ -160,7 +158,7 @@ export function resolveModuleAccess({
   module,
   additionalModulePermissions,
 }: ResolveModuleAccessParams): ModuleAccess {
-  if (isAdminPermission(userPermission)) {
+  if (typeof userPermission === "number" && userPermission >= GLOBAL_ADMIN_PERMISSION) {
     return createModuleAccess("admin", "admin");
   }
 

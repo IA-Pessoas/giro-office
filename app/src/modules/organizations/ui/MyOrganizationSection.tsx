@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Building2, ChevronDown, ChevronUp, LoaderCircle, Sparkles } from "lucide-react";
+import { Building2, LoaderCircle, Sparkles } from "lucide-react";
 
+import { Dialog } from "@shared/components";
 import { useCurrentOrganization } from "../hooks/useCurrentOrganization";
 import {
   useUpdateOrganizationLogo,
@@ -28,7 +29,7 @@ export function MyOrganizationSection({ organizationId, userEmail }: MyOrganizat
   const organizationQuery = useCurrentOrganization(organizationId);
   const updateOrganizationLogoMutation = useUpdateOrganizationLogo();
   const updateOrganizationPlanMutation = useUpdateOrganizationPlan();
-  const [isEditSectionOpen, setIsEditSectionOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [logoDraft, setLogoDraft] = useState("");
   const [planDraft, setPlanDraft] = useState<OrganizationPlanOption>("trial");
 
@@ -109,6 +110,15 @@ export function MyOrganizationSection({ organizationId, userEmail }: MyOrganizat
     }
   };
 
+  const handleEditDialogOpenChange = (open: boolean) => {
+    setIsEditDialogOpen(open);
+
+    if (!open) {
+      setLogoDraft(serverDrafts.logoDraft);
+      setPlanDraft(serverDrafts.planDraft);
+    }
+  };
+
   return (
     <section className={`${ORGANIZATION_PANEL_CLASSNAME} p-6 lg:p-8`}>
       <div className="space-y-6">
@@ -123,16 +133,11 @@ export function MyOrganizationSection({ organizationId, userEmail }: MyOrganizat
 
           <button
             type="button"
-            onClick={() => setIsEditSectionOpen((currentValue) => !currentValue)}
+            onClick={() => setIsEditDialogOpen(true)}
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 lg:w-fit"
           >
             <Sparkles className="h-4 w-4 text-[var(--colors-brand-gradient-end)]" />
-            {isEditSectionOpen ? "Ocultar edição" : "Editar organização"}
-            {isEditSectionOpen ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
+            Editar organização
           </button>
         </div>
 
@@ -170,22 +175,32 @@ export function MyOrganizationSection({ organizationId, userEmail }: MyOrganizat
 
             <OrganizationInfoPanel organization={organizationQuery.data} userEmail={userEmail} />
 
-            {isEditSectionOpen ? (
-              <div className="space-y-4 border-t border-slate-200 pt-5 dark:border-slate-700">
+            <Dialog
+              open={isEditDialogOpen}
+              onOpenChange={handleEditDialogOpenChange}
+              title="Editar organização"
+              description="Atualize logo e plano da organização."
+              contentClassName="flex max-h-[92dvh] w-[min(94vw,820px)] flex-col overflow-hidden border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 lg:max-h-none"
+              bodyClassName="max-h-[calc(92dvh-4.5rem)] overflow-y-auto !px-4 !py-3 sm:!px-5 sm:!py-4 lg:max-h-none lg:overflow-visible"
+            >
+              <div className="space-y-4">
                 <div className="space-y-1">
-                  <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-                    Edição da organização
-                  </h3>
-                  <p className={ORGANIZATION_MUTED_CLASSNAME}>Atualize logo e plano.</p>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    Dados editáveis da organização
+                  </p>
+                  <p className={ORGANIZATION_MUTED_CLASSNAME}>
+                    Ajuste a identidade visual e o plano exibido para a organização atual.
+                  </p>
                 </div>
 
-                <div className="grid gap-5 xl:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-[minmax(260px,0.95fr)_minmax(280px,1.05fr)]">
                   <OrganizationLogoForm
                     organizationName={organizationQuery.data.name}
                     logoDraft={logoDraft}
                     logoUrl={organizationQuery.data.logo_url}
                     isSaving={isSavingLogo}
                     canSave={canSaveLogo}
+                    editorVariant="inline"
                     onLogoDraftChange={setLogoDraft}
                     onSave={handleSaveLogo}
                     onRemove={handleRemoveLogo}
@@ -201,7 +216,7 @@ export function MyOrganizationSection({ organizationId, userEmail }: MyOrganizat
                   />
                 </div>
               </div>
-            ) : null}
+            </Dialog>
           </div>
         ) : null}
       </div>

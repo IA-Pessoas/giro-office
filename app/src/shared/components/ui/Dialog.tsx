@@ -9,6 +9,7 @@ interface DialogProps {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
+  overlayClassName?: string;
   contentClassName?: string;
   bodyClassName?: string;
 }
@@ -20,13 +21,16 @@ export function Dialog({
   description = "Dialog content",
   children,
   footer,
+  overlayClassName = "",
   contentClassName = "",
   bodyClassName = "",
 }: DialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm" />
+        <DialogPrimitive.Overlay
+          className={`fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm ${overlayClassName}`}
+        />
         <DialogPrimitive.Content
           className={`fixed left-1/2 top-1/2 z-[1500] w-[min(92vw,680px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark] ${contentClassName}`}
         >

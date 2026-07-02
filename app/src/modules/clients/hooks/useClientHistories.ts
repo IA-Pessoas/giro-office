@@ -12,7 +12,6 @@ export function clientHistoriesQueryKey(clientId: string) {
 export function useClientHistories(clientId: string | undefined): UseQueryResult<ClientHistoryItem[], Error> {
   return useFetch(clientHistoriesQueryKey(clientId ?? "missing"), () => clientService.listHistories(clientId ?? ""), {
     enabled: Boolean(clientId),
-    refetchOnWindowFocus: false,
   });
 }
 

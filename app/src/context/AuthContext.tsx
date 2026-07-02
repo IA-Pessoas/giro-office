@@ -5,6 +5,11 @@ import Router from "next/router";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+import {
+    AUTH_COOKIE_DESTROY_OPTIONS,
+    AUTH_COOKIE_NAME,
+    getAuthCookieOptions,
+} from "@modules/auth/utils/authCookie";
 import { getModulePermissionsFromToken } from "@modules/auth/utils/sessionToken";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
@@ -36,6 +41,7 @@ interface AuthContextData {
     isAuthenticated: boolean;
     signIn: (credentials: SignInProps) => Promise<void>;
     logoutUser: () => Promise<void>;
+    refreshSession: () => Promise<UserProps | null>;
     loading: boolean;
 }
 
@@ -45,9 +51,23 @@ type AuthProviderProps = {
 
 export const AuthContext = createContext({} as AuthContextData);
 const SESSION_TRANSITION_MIN_DURATION_MS = 380;
+const AUTH_DIAGNOSTIC_LOGS_ENABLED = process.env.NODE_ENV !== "production";
+
+function logAuthError(message: string, details?: unknown) {
+    if (!AUTH_DIAGNOSTIC_LOGS_ENABLED) {
+        return;
+    }
+
+    if (details === undefined) {
+        console.error(message);
+        return;
+    }
+
+    console.error(message, details);
+}
 
 function clearAuthCookie() {
-    destroyCookie(null, "cw.token", { path: "/" });
+    destroyCookie(null, AUTH_COOKIE_NAME, AUTH_COOKIE_DESTROY_OPTIONS);
     delete api.defaults.headers.common.Authorization;
 }
 
@@ -101,7 +121,7 @@ export function signOut() {
         clearAuthCookie();
         Router.push("/login");
     } catch (error) {
-        console.log("Erro ao deslogar");
+        logAuthError("Erro ao deslogar", error);
     }
 }
 
@@ -128,6 +148,50 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         return true;
+    }
+
+    async function refreshSession(): Promise<UserProps | null> {
+        const requestVersion = beginAuthTransition();
+        const { "cw.token": token } = parseCookies();
+
+        if (!token) {
+            clearAuthCookie();
+            setUser(null);
+            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            return null;
+        }
+
+        const fallbackModules = getModulePermissionsFromToken(token);
+
+        try {
+            const response = await api.get("/user/me");
+
+            if (!isCurrentAuthTransition(requestVersion, token)) {
+                return null;
+            }
+
+            const userData = response.data?.data;
+
+            if (!isValidAuthUser(userData)) {
+                clearAuthCookie();
+                setUser(null);
+                queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+                return null;
+            }
+
+            const currentUser = buildCurrentUser(userData, fallbackModules);
+            setUser(currentUser);
+            api.defaults.headers.common.Authorization = `Bearer ${token}`;
+            await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
+
+            return currentUser;
+        } catch (error) {
+            if (isCurrentAuthTransition(requestVersion, token)) {
+                logAuthError("Erro ao atualizar sessão:", error);
+            }
+
+            throw error;
+        }
     }
 
     useEffect(() => {
@@ -157,7 +221,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     return;
                 }
 
-                console.error("Erro ao verificar token:", error);
+                logAuthError("Erro ao verificar token:", error);
                 clearAuthCookie();
                 setUser(null);
                 queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
@@ -189,10 +253,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 throw new Error("Invalid authentication response");
             }
 
-            setCookie(undefined, "cw.token", sessionData.token, {
-                maxAge: 60 * 60 * 24 * 7,
-                path: "/",
-            });
+            setCookie(undefined, AUTH_COOKIE_NAME, sessionData.token, getAuthCookieOptions());
 
             if (!isCurrentAuthTransition(requestVersion)) {
                 return;
@@ -212,20 +273,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
 
             if (error.code === "ECONNREFUSED" || error.code === "ERR_NETWORK" || !error.response) {
-                const url = process.env.NEXT_PUBLIC_API_URL || "não definida";
-                toast.error(`Erro de conexão! URL: ${url}. Verifique se o servidor está rodando.`);
-                console.error("Erro de conexão:", {
+                const url = process.env.NEXT_PUBLIC_API_URL || "nao definida";
+                toast.error("Erro de conexao! Verifique se o servidor esta rodando.");
+                logAuthError("Erro de conexao no login:", {
                     code: error.code,
                     message: error.message,
                     url,
-                    fullError: error,
                 });
                 throw error;
             }
 
             if (error.response?.status >= 500) {
                 toast.error(`Erro no servidor (${error.response.status})! Tente novamente.`);
-                console.error("Erro do servidor:", error.response?.data || error.message);
+                logAuthError("Erro do servidor:", error.response?.data || error.message);
                 throw error;
             }
 
@@ -235,12 +295,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     error.response?.data?.message ||
                     "Usuário e/ou senha incorretos!";
                 toast.error(errorMessage);
-                console.error("Erro de autenticação:", error.response?.data);
+                logAuthError("Erro de autenticacao:", error.response?.data);
                 throw error;
             }
 
             toast.error(error.response?.data?.error || error.message || "Erro ao fazer login!");
-            console.error("Erro ao entrar:", error);
+            logAuthError("Erro ao entrar:", error);
             throw error;
         }
     }
@@ -256,7 +316,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             await Router.push("/login");
         } catch (err) {
             toast.error("Erro ao sair!");
-            console.log("ERRO AO SAIR", err);
+            logAuthError("Erro ao sair:", err);
         }
     }
 
@@ -270,7 +330,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated, signIn, logoutUser, loading }}>
+        <AuthContext.Provider value={{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading }}>
             {children}
         </AuthContext.Provider>
     );
