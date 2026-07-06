@@ -451,6 +451,14 @@ await (async () => {
     assert.equal(administracaoSource.includes("await refetchPermissionUsers();"), false);
   });
 
+  await runTest("admin permissions tab is available to RH module admins", () => {
+    assert.match(administracaoSource, /const canManagePermissions = hasAdminAccess;/);
+    assert.equal(
+      administracaoSource.includes("const canManagePermissions = canManageOrganizationOwners;"),
+      false,
+    );
+  });
+
   await runTest("admin create user action uses native disabled state when context is unavailable", () => {
     assert.match(administracaoSource, /disabled=\{isCreateBlockedByDepartments\}/);
     assert.equal(administracaoSource.includes("aria-disabled={isCreateBlockedByDepartments}"), false);
