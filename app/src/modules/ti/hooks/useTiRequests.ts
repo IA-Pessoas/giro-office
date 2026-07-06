@@ -1,4 +1,9 @@
-import type { UseQueryResult } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 
 import { useFetch } from "@shared/hooks";
 
@@ -8,10 +13,47 @@ import type {
   TiListFilters,
   TiReadQueryOptions,
   TiRequest,
+  TiRequestAssignPayload,
   TiRequestCategory,
+  TiRequestCategoryPayload,
   TiRequestMessage,
+  TiRequestMessagePayload,
+  TiRequestPayload,
+  TiRequestStatusPayload,
 } from "../types";
 import { tiQueryKeys } from "./queryKeys";
+
+type TiRequestMutationVariables = {
+  id: TiId;
+  payload: TiRequestPayload;
+};
+
+type TiRequestAssignVariables = {
+  id: TiId;
+  payload: TiRequestAssignPayload;
+};
+
+type TiRequestStatusVariables = {
+  id: TiId;
+  payload: TiRequestStatusPayload;
+};
+
+type TiRequestMessageVariables = {
+  id: TiId;
+  payload: TiRequestMessagePayload;
+};
+
+type TiRequestCategoryMutationVariables = {
+  id: TiId;
+  payload: TiRequestCategoryPayload;
+};
+
+function invalidateTiRequests(queryClient: ReturnType<typeof useQueryClient>) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: tiQueryKeys.requests.all() }),
+    queryClient.invalidateQueries({ queryKey: tiQueryKeys.dashboard() }),
+  ]);
+}
 
 export function useTiRequests(
   filters?: TiListFilters,
@@ -57,4 +99,115 @@ export function useTiRequestCategories(
     () => tiRequestsService.listCategories(filters),
     options,
   );
+}
+
+export function useCreateTiRequest(): UseMutationResult<TiRequest, Error, TiRequestPayload> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => tiRequestsService.create(payload),
+    onSuccess: () => invalidateTiRequests(queryClient),
+  });
+}
+
+export function useUpdateTiRequest(): UseMutationResult<
+  TiRequest,
+  Error,
+  TiRequestMutationVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => tiRequestsService.update(id, payload),
+    onSuccess: (_request, variables) =>
+      Promise.all([
+        invalidateTiRequests(queryClient),
+        queryClient.invalidateQueries({
+          queryKey: tiQueryKeys.requests.detail(variables.id),
+        }),
+      ]),
+  });
+}
+
+export function useAssignTiRequest(): UseMutationResult<
+  TiRequest,
+  Error,
+  TiRequestAssignVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => tiRequestsService.assign(id, payload),
+    onSuccess: (_request, variables) =>
+      Promise.all([
+        invalidateTiRequests(queryClient),
+        queryClient.invalidateQueries({
+          queryKey: tiQueryKeys.requests.detail(variables.id),
+        }),
+      ]),
+  });
+}
+
+export function useUpdateTiRequestStatus(): UseMutationResult<
+  TiRequest,
+  Error,
+  TiRequestStatusVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => tiRequestsService.updateStatus(id, payload),
+    onSuccess: (_request, variables) =>
+      Promise.all([
+        invalidateTiRequests(queryClient),
+        queryClient.invalidateQueries({
+          queryKey: tiQueryKeys.requests.detail(variables.id),
+        }),
+      ]),
+  });
+}
+
+export function useCreateTiRequestMessage(): UseMutationResult<
+  TiRequestMessage,
+  Error,
+  TiRequestMessageVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => tiRequestsService.createMessage(id, payload),
+    onSuccess: (_message, variables) =>
+      Promise.all([
+        invalidateTiRequests(queryClient),
+        queryClient.invalidateQueries({
+          queryKey: tiQueryKeys.requests.messages(variables.id),
+        }),
+      ]),
+  });
+}
+
+export function useCreateTiRequestCategory(): UseMutationResult<
+  TiRequestCategory,
+  Error,
+  TiRequestCategoryPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => tiRequestsService.createCategory(payload),
+    onSuccess: () => invalidateTiRequests(queryClient),
+  });
+}
+
+export function useUpdateTiRequestCategory(): UseMutationResult<
+  TiRequestCategory,
+  Error,
+  TiRequestCategoryMutationVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => tiRequestsService.updateCategory(id, payload),
+    onSuccess: () => invalidateTiRequests(queryClient),
+  });
 }

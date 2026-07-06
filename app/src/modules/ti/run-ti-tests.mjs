@@ -196,7 +196,7 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.match(pageSource, /overflow-x-auto/);
   assert.match(pageSource, /scrollbar-width:thin/);
   assert.match(pageSource, /scrollbar-thumb.*blue-600/);
-  assert.match(pageSource, /flex min-w-max items-center justify-center gap-1 md:min-w-full/);
+  assert.match(pageSource, /flex min-w-max items-center justify-center gap-1 pl-7 md:min-w-full/);
   assert.match(pageSource, /px-4 py-2\.5/);
   assert.doesNotMatch(pageSource, /md:flex-1/);
   assert.match(pageSource, /shrink-0 items-center justify-center/);
@@ -204,4 +204,105 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.match(pageSource, /from-blue-500 to-blue-600/);
   assert.match(pageSource, /bg-blue-100 text-blue-700/);
   assert.doesNotMatch(`${pageSource}\n${workspaceUiSource}`, /indigo-/);
+});
+
+await runTest("ti requests hooks expose mutations and invalidate requests plus dashboard caches", async () => {
+  const hookSource = await readModuleSource("hooks/useTiRequests.ts");
+
+  for (const hookName of [
+    "useCreateTiRequest",
+    "useUpdateTiRequest",
+    "useAssignTiRequest",
+    "useUpdateTiRequestStatus",
+    "useCreateTiRequestMessage",
+    "useCreateTiRequestCategory",
+    "useUpdateTiRequestCategory",
+  ]) {
+    assert.match(hookSource, new RegExp(`function ${hookName}\\(`));
+  }
+
+  assert.match(hookSource, /useMutation/);
+  assert.match(hookSource, /useQueryClient/);
+  assert.match(hookSource, /invalidateQueries\(\{\s*queryKey: tiQueryKeys\.requests\.all\(\)/);
+  assert.match(hookSource, /invalidateQueries\(\{\s*queryKey: tiQueryKeys\.dashboard\(\)/);
+});
+
+await runTest("ti requests tab consumes live hooks instead of rendering only an empty stub", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(tabSource, /useTiRequests\(/);
+  assert.match(tabSource, /useTiRequestCategories\(/);
+  assert.match(tabSource, /useTiRequestMessages\(/);
+  assert.match(tabSource, /useCreateTiRequest/);
+  assert.match(tabSource, /useUpdateTiRequestStatus/);
+  assert.match(tabSource, /useCreateTiRequestMessage/);
+  assert.match(tabSource, /TiEmptyState/);
+  assert.match(tabSource, /isLoading|isFetching/);
+  assert.match(tabSource, /isError/);
+  assert.doesNotMatch(tabSource, /const\s+(requests|messages|categories)\s*=\s*\[/);
+});
+
+await runTest("ti requests creation opens in a dialog and leaves filters spanning the workspace", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(tabSource, /import \{ Dialog \} from "@shared\/components";/);
+  assert.match(tabSource, /const \[isCreateDialogOpen, setIsCreateDialogOpen\] = useState\(false\)/);
+  assert.match(tabSource, /open=\{isCreateDialogOpen\}/);
+  assert.match(tabSource, /title="Novo chamado"/);
+  assert.match(tabSource, /contentClassName="w-\[min\(94vw,860px\)\]"/);
+  assert.match(tabSource, /md:grid-cols-\[minmax\(320px,1fr\)_180px_220px\]/);
+  assert.match(tabSource, /lg:grid-cols-\[minmax\(420px,1fr\)_180px_220px\]/);
+  assert.match(tabSource, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(320px,420px\)\]/);
+  assert.doesNotMatch(tabSource, /isCreateFormOpen/);
+  assert.doesNotMatch(tabSource, /Fechar formul/);
+});
+
+await runTest("ti requests tab exposes request category management actions", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(tabSource, /useCreateTiRequestCategory/);
+  assert.match(tabSource, /useUpdateTiRequestCategory/);
+  assert.match(tabSource, /const \[isCategoryDialogOpen, setIsCategoryDialogOpen\] = useState\(false\)/);
+  assert.match(tabSource, /label="Categorias"/);
+  assert.match(tabSource, /title="Categorias de chamados"/);
+  assert.match(tabSource, /Adicionar categoria/);
+  assert.match(tabSource, /Criar categoria/);
+  assert.match(tabSource, /Inativar/);
+  assert.match(tabSource, /Ativar/);
+  assert.match(tabSource, /createCategoryMutation\.mutateAsync/);
+  assert.match(tabSource, /updateCategoryMutation\.mutateAsync/);
+  assert.match(tabSource, /active: !isCategoryActive\(category\)/);
+  assert.doesNotMatch(tabSource, /Nova categoria/);
+  assert.doesNotMatch(tabSource, /Editar categoria/);
+  assert.doesNotMatch(tabSource, /Salvar categoria/);
+  assert.doesNotMatch(tabSource, /handleStartEditCategory/);
+  assert.doesNotMatch(tabSource, /editingCategoryId/);
+  assert.doesNotMatch(
+    tabSource,
+    /<p className="text-xs text-slate-500 dark:text-slate-400">\s*{category\.id}\s*<\/p>/,
+  );
+});
+
+await runTest("ti native select uses a centered chevron instead of the browser default arrow", async () => {
+  const selectSource = await readModuleSource("components/TiNativeSelect.tsx");
+
+  assert.match(selectSource, /ChevronDown/);
+  assert.match(selectSource, /appearance-none/);
+  assert.match(selectSource, /pr-10/);
+  assert.match(selectSource, /pointer-events-none/);
+  assert.match(selectSource, /absolute right-3 top-1\/2/);
+  assert.match(selectSource, /-translate-y-1\/2/);
+  assert.match(selectSource, /aria-hidden="true"/);
+});
+
+await runTest("ti dashboard tab consumes the consolidated backend summary", async () => {
+  const tabSource = await readModuleSource("components/TiDashboardTab.tsx");
+
+  assert.match(tabSource, /useTiDashboard\(/);
+  assert.match(tabSource, /requests_open/);
+  assert.match(tabSource, /inventory_total/);
+  assert.match(tabSource, /stock_low_count/);
+  assert.match(tabSource, /robots_active/);
+  assert.match(tabSource, /isLoading|isFetching/);
+  assert.match(tabSource, /isError/);
 });
