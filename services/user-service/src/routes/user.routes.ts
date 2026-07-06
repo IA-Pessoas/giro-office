@@ -32,21 +32,74 @@ function requireUserAuth(request: Request) {
   });
 }
 
-function requireAdminUserAuth(request: Request) {
+function isOwnerRequest(request: Request): boolean {
+  if (request.user_type === "owner") {
+    return true;
+  }
+
+  return (
+    request.user_type === undefined &&
+    typeof request.permission === "number" &&
+    request.permission >= ADMIN_PERMISSION
+  );
+}
+
+function hasRhAdminPermission(request: Request): boolean {
+  const rhPermission = request.modules?.rh;
+  return typeof rhPermission === "number" && rhPermission >= ADMIN_PERMISSION;
+}
+
+function requireManageUsersAuth(request: Request) {
   const auth = requireUserAuth(request);
-  if (typeof auth.permission !== "number" || auth.permission < ADMIN_PERMISSION) {
-    throw new ServiceError(403, "Usuário não tem permissão.");
+  if (!isOwnerRequest(request) && !hasRhAdminPermission(request)) {
+    throw new ServiceError(403, "Usuario nao tem permissao para gerenciar usuarios.");
   }
   return auth;
 }
 
-function requireAdminUserAuthMiddleware(
+function isOwnerMutationPayload(body: {
+  type?: string | null;
+  first_owner_flag?: boolean;
+}): boolean {
+  return body.type === "owner" || body.first_owner_flag === true;
+}
+
+function requiresOwnerForCreatePayload(body: {
+  permission?: number;
+  type?: string | null;
+  first_owner_flag?: boolean;
+  modules?: Record<string, number | null>;
+}): boolean {
+  return (
+    isOwnerMutationPayload(body) ||
+    (typeof body.permission === "number" && body.permission >= ADMIN_PERMISSION)
+  );
+}
+
+function requiresOwnerForUpdatePayload(body: {
+  permission?: number;
+  type?: string | null;
+  first_owner_flag?: boolean;
+  modules?: Record<string, number | null>;
+}): boolean {
+  return isOwnerMutationPayload(body) || body.permission !== undefined || body.type !== undefined;
+}
+
+function requireOwnerUserAuth(request: Request) {
+  const auth = requireUserAuth(request);
+  if (!isOwnerRequest(request)) {
+    throw new ServiceError(403, "Apenas owners podem alterar escopo ou permissoes de usuario.");
+  }
+  return auth;
+}
+
+function requireManageUsersAuthMiddleware(
   request: Request,
   _response: Response,
   next: NextFunction,
 ): void {
   try {
-    requireAdminUserAuth(request);
+    requireManageUsersAuth(request);
     next();
   } catch (err) {
     next(err);
@@ -58,7 +111,7 @@ router.get(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireAdminUserAuth(request);
+      const auth = requireManageUsersAuth(request);
       const { skip, take } = parseWithZod(listUsersQuerySchema, request.query);
       const result = await userService.list({ skip, take, organizationId: auth.organization_id });
 
@@ -75,7 +128,7 @@ router.get(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireAdminUserAuth(request);
+      const auth = requireManageUsersAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
       const user = await userService.getById(id, auth.organization_id);
       const publicPhotoUrl = storageService.readUserPhoto(user.photo_url);
@@ -97,7 +150,7 @@ router.get(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireAdminUserAuth(request);
+      const auth = requireManageUsersAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
       const user = await userService.getById(id, auth.organization_id);
 
@@ -114,8 +167,12 @@ router.post(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireAdminUserAuth(request);
+      const auth = requireManageUsersAuth(request);
       const body = parseWithZod(createUserBodySchema, request.body);
+      if (requiresOwnerForCreatePayload(body)) {
+        requireOwnerUserAuth(request);
+      }
+
       if (body.organization_id !== undefined && body.organization_id !== auth.organization_id) {
         throw new ServiceError(403, "Organização da requisição não confere.");
       }
@@ -139,9 +196,12 @@ router.patch(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireAdminUserAuth(request);
+      const auth = requireManageUsersAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
       const body = parseWithZod(updateUserBodySchema, request.body);
+      if (requiresOwnerForUpdatePayload(body)) {
+        requireOwnerUserAuth(request);
+      }
 
       const user = await userService.update(id, body, auth.organization_id);
 
@@ -156,11 +216,11 @@ router.patch(
 router.post(
   "/:id/photo",
   isAuthenticated,
-  requireAdminUserAuthMiddleware,
+  requireManageUsersAuthMiddleware,
   upload.single("file"),
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireAdminUserAuth(request);
+      const auth = requireManageUsersAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
 
       if (!request.file) {
@@ -184,7 +244,7 @@ router.delete(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireAdminUserAuth(request);
+      const auth = requireManageUsersAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
 
       await storageService.deleteUserPhoto(id);
@@ -203,7 +263,7 @@ router.delete(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireAdminUserAuth(request);
+      const auth = requireManageUsersAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
 
       await userService.delete(id, auth.organization_id);

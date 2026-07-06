@@ -8,8 +8,35 @@ export function hasRequiredPermission(context: AuthContext, minPermission: numbe
   );
 }
 
+function isExplicitOwner(context: AuthContext): boolean {
+  return context.claims.type === "owner";
+}
+
+function isLegacyGlobalAdmin(context: AuthContext): boolean {
+  return (
+    context.claims.type === undefined && hasRequiredPermission(context, GLOBAL_ADMIN_PERMISSION)
+  );
+}
+
 function hasGlobalAdminPermission(context: AuthContext): boolean {
-  return hasRequiredPermission(context, GLOBAL_ADMIN_PERMISSION);
+  return isExplicitOwner(context) || isLegacyGlobalAdmin(context);
+}
+
+function hasExplicitModulePermission(
+  context: AuthContext,
+  module: string,
+  minPermission: number,
+): boolean {
+  const modulePermission = context.claims.modules?.[module];
+  return typeof modulePermission === "number" && modulePermission >= minPermission;
+}
+
+function canManageUsers(context: AuthContext): boolean {
+  return (
+    isExplicitOwner(context) ||
+    isLegacyGlobalAdmin(context) ||
+    hasExplicitModulePermission(context, "rh", GLOBAL_ADMIN_PERMISSION)
+  );
 }
 
 function hasRequiredModulePermission(
@@ -21,8 +48,7 @@ function hasRequiredModulePermission(
     return true;
   }
 
-  const modulePermission = context.claims.modules?.[module];
-  return typeof modulePermission === "number" && modulePermission >= minPermission;
+  return hasExplicitModulePermission(context, module, minPermission);
 }
 
 function hasAnyRequiredModulePermission(
@@ -38,6 +64,14 @@ function hasAnyRequiredModulePermission(
 }
 
 export function canAccessRoute(context: AuthContext, policy: AuthPolicy): boolean {
+  if (policy.special === "ownerOnly") {
+    return isExplicitOwner(context) || isLegacyGlobalAdmin(context);
+  }
+
+  if (policy.special === "manageUsers" && !canManageUsers(context)) {
+    return false;
+  }
+
   if (
     typeof policy.minPermission === "number" &&
     !hasRequiredPermission(context, policy.minPermission)
