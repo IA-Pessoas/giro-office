@@ -257,6 +257,39 @@ await runTest("ti requests creation opens in a dialog and leaves filters spannin
   assert.doesNotMatch(tabSource, /Fechar formul/);
 });
 
+await runTest("ti requests payloads follow the backend request schema", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+  const typeSource = await readModuleSource("types/requests.ts");
+
+  for (const expectedToken of [
+    "urgency",
+    "Low",
+    "Medium",
+    "High",
+    "Critical",
+    "New",
+    "In_Progress",
+    "Waiting",
+    "Resolved",
+    "Closed",
+  ]) {
+    assert.match(tabSource, new RegExp(expectedToken));
+  }
+
+  assert.match(typeSource, /urgency\?: string/);
+  assert.doesNotMatch(typeSource, /priority\?:/);
+  assert.doesNotMatch(tabSource, /REQUEST_PRIORITY_OPTIONS/);
+  assert.doesNotMatch(tabSource, /priority:/);
+  assert.doesNotMatch(tabSource, /name="priority"/);
+  assert.doesNotMatch(tabSource, /Prioridade/);
+  assert.doesNotMatch(tabSource, /value: "open"/);
+  assert.doesNotMatch(tabSource, /value: "in_progress"/);
+  assert.doesNotMatch(tabSource, /value: "resolved"/);
+  assert.doesNotMatch(tabSource, /value: "closed"/);
+  assert.doesNotMatch(tabSource, /category_id: requestDraft\.category_id \|\| null/);
+  assert.doesNotMatch(tabSource, /description: requestDraft\.description\.trim\(\) \|\| null/);
+});
+
 await runTest("ti requests tab exposes request category management actions", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 

@@ -10,7 +10,7 @@ export interface TiRequest {
   assigned_to_name?: string | null;
   requester_name?: string | null;
   category_name?: string | null;
-  priority?: string | null;
+  urgency?: string | null;
   status?: TiStatus;
   created_at?: string;
   updated_at?: string;
@@ -40,7 +40,7 @@ export interface TiRequestPayload {
   title?: string;
   description?: string | null;
   category_id?: TiId | null;
-  priority?: string | null;
+  urgency?: string | null;
   status?: string | null;
   [key: string]: unknown;
 }

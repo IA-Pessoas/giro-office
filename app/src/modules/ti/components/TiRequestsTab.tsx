@@ -39,17 +39,18 @@ import {
 
 const REQUEST_STATUS_OPTIONS = [
   { value: "", label: "Todos" },
-  { value: "open", label: "Aberto" },
-  { value: "in_progress", label: "Em atendimento" },
-  { value: "resolved", label: "Resolvido" },
-  { value: "closed", label: "Fechado" },
+  { value: "New", label: "Novo" },
+  { value: "In_Progress", label: "Em atendimento" },
+  { value: "Waiting", label: "Aguardando" },
+  { value: "Resolved", label: "Resolvido" },
+  { value: "Closed", label: "Fechado" },
 ] as const;
 
-const REQUEST_PRIORITY_OPTIONS = [
-  { value: "low", label: "Baixa" },
-  { value: "medium", label: "Média" },
-  { value: "high", label: "Alta" },
-  { value: "critical", label: "Crítica" },
+const REQUEST_URGENCY_OPTIONS = [
+  { value: "Low", label: "Baixa" },
+  { value: "Medium", label: "Média" },
+  { value: "High", label: "Alta" },
+  { value: "Critical", label: "Crítica" },
 ] as const;
 
 const REQUEST_STATUS_ACTIONS = REQUEST_STATUS_OPTIONS.filter((option) => option.value);
@@ -58,7 +59,7 @@ type RequestDraft = {
   title: string;
   description: string;
   category_id: string;
-  priority: string;
+  urgency: string;
 };
 
 type CategoryDraft = {
@@ -69,7 +70,7 @@ const INITIAL_REQUEST_DRAFT: RequestDraft = {
   title: "",
   description: "",
   category_id: "",
-  priority: "medium",
+  urgency: "Medium",
 };
 
 const INITIAL_CATEGORY_DRAFT: CategoryDraft = {
@@ -121,27 +122,29 @@ function getStatusBadgeConfig(status: unknown): StatusBadgeConfig {
   const normalizedStatus = typeof status === "string" ? status : "";
 
   switch (normalizedStatus) {
-    case "open":
-      return { label: "Aberto", variant: "info" };
-    case "in_progress":
+    case "New":
+      return { label: "Novo", variant: "info" };
+    case "In_Progress":
       return { label: "Em atendimento", variant: "warning" };
-    case "resolved":
+    case "Waiting":
+      return { label: "Aguardando", variant: "warning" };
+    case "Resolved":
       return { label: "Resolvido", variant: "success" };
-    case "closed":
+    case "Closed":
       return { label: "Fechado", variant: "neutral" };
     default:
       return { label: normalizedStatus || "Sem status", variant: "neutral" };
   }
 }
 
-function getPriorityLabel(priority: unknown): string {
-  const option = REQUEST_PRIORITY_OPTIONS.find((item) => item.value === priority);
+function getUrgencyLabel(urgency: unknown): string {
+  const option = REQUEST_URGENCY_OPTIONS.find((item) => item.value === urgency);
 
   if (option) {
     return option.label;
   }
 
-  return typeof priority === "string" && priority ? priority : "-";
+  return typeof urgency === "string" && urgency ? urgency : "-";
 }
 
 function getRequestTitle(request: TiRequest): string {
@@ -314,12 +317,22 @@ export function TiRequestsTab() {
       return;
     }
 
+    if (!requestDraft.category_id) {
+      setCreateFormError("Selecione uma categoria para criar o chamado.");
+      return;
+    }
+
+    if (!requestDraft.description.trim()) {
+      setCreateFormError("Informe uma descrição para criar o chamado.");
+      return;
+    }
+
     try {
       const createdRequest = await createRequestMutation.mutateAsync({
         title: requestDraft.title.trim(),
-        description: requestDraft.description.trim() || null,
-        category_id: requestDraft.category_id || null,
-        priority: requestDraft.priority,
+        description: requestDraft.description.trim(),
+        category_id: requestDraft.category_id,
+        urgency: requestDraft.urgency,
       });
 
       setSelectedRequestId(createdRequest.id);
@@ -361,6 +374,9 @@ export function TiRequestsTab() {
 
     const formData = new FormData(event.currentTarget);
     const title = formData.get("title")?.toString().trim() ?? "";
+    const description = formData.get("description")?.toString().trim() ?? "";
+    const categoryId = formData.get("category_id")?.toString() ?? "";
+    const urgency = formData.get("urgency")?.toString() ?? "";
 
     if (!title) {
       setActionError("Informe um título para salvar o chamado.");
@@ -372,9 +388,9 @@ export function TiRequestsTab() {
         id: activeRequestId,
         payload: {
           title,
-          description: formData.get("description")?.toString().trim() || null,
-          category_id: formData.get("category_id")?.toString() || null,
-          priority: formData.get("priority")?.toString() || null,
+          ...(description ? { description } : {}),
+          ...(categoryId ? { category_id: categoryId } : {}),
+          ...(urgency ? { urgency } : {}),
         },
       });
     } catch (error) {
@@ -622,13 +638,13 @@ export function TiRequestsTab() {
               }
             />
             <TiNativeSelect
-              label="Prioridade"
-              value={requestDraft.priority}
-              options={REQUEST_PRIORITY_OPTIONS}
+              label="Urgência"
+              value={requestDraft.urgency}
+              options={REQUEST_URGENCY_OPTIONS}
               onChange={(event) =>
                 setRequestDraft((currentDraft) => ({
                   ...currentDraft,
-                  priority: event.target.value,
+                  urgency: event.target.value,
                 }))
               }
             />
@@ -742,7 +758,7 @@ export function TiRequestsTab() {
                     <tr>
                       <th className="px-4 py-3">Chamado</th>
                       <th className="px-4 py-3">Categoria</th>
-                      <th className="px-4 py-3">Prioridade</th>
+                      <th className="px-4 py-3">Urgência</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Criado em</th>
                     </tr>
@@ -773,7 +789,7 @@ export function TiRequestsTab() {
                             {getCategoryLabel(request, categoriesById)}
                           </td>
                           <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                            {getPriorityLabel(request.priority)}
+                            {getUrgencyLabel(request.urgency)}
                           </td>
                           <td className="px-4 py-3">
                             <StatusBadge config={getStatusBadgeConfig(request.status)} size="sm" />
@@ -848,9 +864,9 @@ export function TiRequestsTab() {
                       </dd>
                     </div>
                     <div>
-                      <dt className={tiLabelClassName}>Prioridade</dt>
+                      <dt className={tiLabelClassName}>Urgência</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
-                        {getPriorityLabel(activeRequest.priority)}
+                        {getUrgencyLabel(activeRequest.urgency)}
                       </dd>
                     </div>
                     <div>
@@ -882,10 +898,10 @@ export function TiRequestsTab() {
                         options={createCategoryOptions}
                       />
                       <TiNativeSelect
-                        name="priority"
-                        label="Prioridade"
-                        defaultValue={String(activeRequest.priority ?? "medium")}
-                        options={REQUEST_PRIORITY_OPTIONS}
+                        name="urgency"
+                        label="Urgência"
+                        defaultValue={String(activeRequest.urgency ?? "Medium")}
+                        options={REQUEST_URGENCY_OPTIONS}
                       />
                       <label className="flex min-w-0 flex-col gap-2 sm:col-span-2">
                         <span className={tiLabelClassName}>Descrição</span>
