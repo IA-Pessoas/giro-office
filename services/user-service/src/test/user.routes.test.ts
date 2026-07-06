@@ -123,6 +123,33 @@ describe("user routes", () => {
     });
   });
 
+  it("POST /user permite admin RH criar usuario departamental sem escopo global", async () => {
+    userServiceMock.create.mockResolvedValue({ id: "user-3" });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }))
+      .send({
+        name: "Novo Usuario",
+        login: "novo.usuario.rh",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 1,
+        type: "admin",
+      });
+
+    expect(res.status).toBe(201);
+    expect(userServiceMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        login: "novo.usuario.rh",
+        permission: 1,
+        type: "admin",
+        organization_id: "a0000000-0000-4000-8000-000000000001",
+      }),
+    );
+  });
+
   it("POST /user rejeita owner quando solicitante nao e owner", async () => {
     const app = createTestApp();
 
@@ -137,6 +164,45 @@ describe("user routes", () => {
         permission: 2,
         type: "owner",
         first_owner_flag: true,
+      });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /user rejeita permission 2 quando solicitante e admin RH", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }))
+      .send({
+        name: "Admin Indevido",
+        login: "admin.indevido",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 2,
+        type: "admin",
+      });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /user rejeita modules quando solicitante e admin RH", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }))
+      .send({
+        name: "Modulo Indevido",
+        login: "modulo.indevido",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 1,
+        type: "admin",
+        modules: { comercial: 2 },
       });
 
     expect(res.status).toBe(403);
@@ -232,6 +298,48 @@ describe("user routes", () => {
       .send({
         type: "owner",
         first_owner_flag: true,
+      });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /user/:id rejeita alteracao de permission quando solicitante e admin RH", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-3")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }))
+      .send({
+        permission: 1,
+      });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /user/:id rejeita alteracao de type quando solicitante e admin RH", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-3")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }))
+      .send({
+        type: "admin",
+      });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /user/:id rejeita modules quando solicitante e admin RH", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-3")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }))
+      .send({
+        modules: { comercial: 1 },
       });
 
     expect(res.status).toBe(403);

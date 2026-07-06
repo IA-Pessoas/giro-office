@@ -64,10 +64,37 @@ function isOwnerMutationPayload(body: {
   return body.type === "owner" || body.first_owner_flag === true;
 }
 
+function requiresOwnerForCreatePayload(body: {
+  permission?: number;
+  type?: string | null;
+  first_owner_flag?: boolean;
+  modules?: Record<string, number | null>;
+}): boolean {
+  return (
+    isOwnerMutationPayload(body) ||
+    body.modules !== undefined ||
+    (typeof body.permission === "number" && body.permission >= ADMIN_PERMISSION)
+  );
+}
+
+function requiresOwnerForUpdatePayload(body: {
+  permission?: number;
+  type?: string | null;
+  first_owner_flag?: boolean;
+  modules?: Record<string, number | null>;
+}): boolean {
+  return (
+    isOwnerMutationPayload(body) ||
+    body.modules !== undefined ||
+    body.permission !== undefined ||
+    body.type !== undefined
+  );
+}
+
 function requireOwnerUserAuth(request: Request) {
   const auth = requireUserAuth(request);
   if (!isOwnerRequest(request)) {
-    throw new ServiceError(403, "Apenas owners podem criar administradores globais.");
+    throw new ServiceError(403, "Apenas owners podem alterar escopo ou permissoes de usuario.");
   }
   return auth;
 }
@@ -148,7 +175,7 @@ router.post(
     try {
       const auth = requireManageUsersAuth(request);
       const body = parseWithZod(createUserBodySchema, request.body);
-      if (isOwnerMutationPayload(body)) {
+      if (requiresOwnerForCreatePayload(body)) {
         requireOwnerUserAuth(request);
       }
 
@@ -178,7 +205,7 @@ router.patch(
       const auth = requireManageUsersAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
       const body = parseWithZod(updateUserBodySchema, request.body);
-      if (isOwnerMutationPayload(body)) {
+      if (requiresOwnerForUpdatePayload(body)) {
         requireOwnerUserAuth(request);
       }
 

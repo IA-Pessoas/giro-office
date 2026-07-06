@@ -63,6 +63,35 @@ test("manageUsers bloqueia admin de outro modulo", () => {
   );
 });
 
+test("manageUsers permite admin global legado sem type", () => {
+  assert.equal(
+    canAccessRoute(
+      authContext({
+        user_id: "legacy-admin-1",
+        organization_id: "org-1",
+        permission: 2,
+      }),
+      manageUsersPolicy,
+    ),
+    true,
+  );
+});
+
+test("manageUsers bloqueia admin explicito sem permissao RH", () => {
+  assert.equal(
+    canAccessRoute(
+      authContext({
+        user_id: "typed-admin-1",
+        organization_id: "org-1",
+        permission: 2,
+        type: "admin",
+      }),
+      manageUsersPolicy,
+    ),
+    false,
+  );
+});
+
 test("ownerOnly nao permite admin RH", () => {
   assert.equal(
     canAccessRoute(
@@ -72,6 +101,35 @@ test("ownerOnly nao permite admin RH", () => {
         permission: 1,
         type: "admin",
         modules: { rh: 2 },
+      }),
+      ownerOnlyPolicy,
+    ),
+    false,
+  );
+});
+
+test("ownerOnly permite admin global legado sem type", () => {
+  assert.equal(
+    canAccessRoute(
+      authContext({
+        user_id: "legacy-admin-1",
+        organization_id: "org-1",
+        permission: 2,
+      }),
+      ownerOnlyPolicy,
+    ),
+    true,
+  );
+});
+
+test("ownerOnly bloqueia admin explicito com permission 2", () => {
+  assert.equal(
+    canAccessRoute(
+      authContext({
+        user_id: "typed-admin-1",
+        organization_id: "org-1",
+        permission: 2,
+        type: "admin",
       }),
       ownerOnlyPolicy,
     ),
