@@ -1,0 +1,70 @@
+import type { TiId, TiStatus } from "./common";
+
+export interface TiRequest {
+  id: TiId;
+  title?: string;
+  description?: string | null;
+  category_id?: TiId | null;
+  requester_id?: TiId | null;
+  assigned_to_id?: TiId | null;
+  assigned_to_name?: string | null;
+  requester_name?: string | null;
+  category_name?: string | null;
+  priority?: string | null;
+  status?: TiStatus;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+}
+
+export interface TiRequestCategory {
+  id: TiId;
+  name?: string;
+  active?: boolean | null;
+  description?: string | null;
+  status?: TiStatus | boolean;
+  [key: string]: unknown;
+}
+
+export interface TiRequestMessage {
+  id: TiId;
+  request_id?: TiId;
+  author_id?: TiId | null;
+  author_name?: string | null;
+  message?: string;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+export interface TiRequestPayload {
+  title?: string;
+  description?: string | null;
+  category_id?: TiId | null;
+  priority?: string | null;
+  status?: string | null;
+  [key: string]: unknown;
+}
+
+export interface TiRequestAssignPayload {
+  assigned_to_id?: TiId | null;
+  user_id?: TiId | null;
+  [key: string]: unknown;
+}
+
+export interface TiRequestStatusPayload {
+  status: string;
+  [key: string]: unknown;
+}
+
+export interface TiRequestMessagePayload {
+  message: string;
+  [key: string]: unknown;
+}
+
+export interface TiRequestCategoryPayload {
+  name?: string;
+  active?: boolean | null;
+  description?: string | null;
+  status?: string | boolean | null;
+  [key: string]: unknown;
+}
