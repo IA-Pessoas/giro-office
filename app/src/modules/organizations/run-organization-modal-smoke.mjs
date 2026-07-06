@@ -23,7 +23,7 @@ const smokeUser = {
   department_id: "department-admin",
   photo_url: null,
   organization_id: "org-smoke",
-  type: "admin",
+  type: "owner",
 };
 
 function getSmokeOrganization() {
@@ -112,6 +112,7 @@ async function assertOrganizationModal(viewport) {
       value: createToken({
         id: smokeUser.id,
         permission: smokeUser.permission,
+        type: smokeUser.type,
         modules: {},
       }),
       url: baseUrl,

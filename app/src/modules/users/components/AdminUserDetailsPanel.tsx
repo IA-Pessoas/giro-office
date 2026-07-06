@@ -15,6 +15,7 @@ interface AdminUserDetailsPanelProps {
   departments: ReadonlyArray<{ id: string; name: string }>;
   departmentsError: boolean;
   onUserUpdated: () => Promise<unknown> | unknown;
+  canManageUsers?: boolean;
 }
 
 const FIELD_CLASSNAME =
@@ -68,10 +69,11 @@ export function AdminUserDetailsPanel({
   departments,
   departmentsError,
   onUserUpdated,
+  canManageUsers,
 }: AdminUserDetailsPanelProps) {
   const router = useRouter();
   const { user: currentUser } = useAuth();
-  const hasAdminAccess = canAccessAdministration(currentUser);
+  const hasAdminAccess = canManageUsers ?? canAccessAdministration(currentUser);
   const [user, setUser] = useState<UserItem | null>(null);
   const [formData, setFormData] = useState<FormState | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(false);

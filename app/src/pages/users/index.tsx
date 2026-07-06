@@ -5,7 +5,12 @@ import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 import { FaUsers } from "react-icons/fa";
 
-import { canAccessAdministration, canSSRAdmin } from "@modules/auth";
+import {
+  canCreateOrganizationOwner,
+  canCreateUsers,
+  canSSRAdmin,
+  resolveDepartmentModuleKey,
+} from "@modules/auth";
 import { departmentService } from "@modules/departments";
 import {
   CreateUserModal,
@@ -35,7 +40,12 @@ export default function Users({
   const [filterStatus, setFilterStatus] = useState("Ativo");
   const [isListLoading, setIsListLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const hasAdminAccess = canAccessAdministration(me);
+  const meDepartmentModule = useMemo(() => {
+    const departmentName = deps.find((department) => department.id === me?.department_id)?.name;
+    return resolveDepartmentModuleKey(departmentName ?? null);
+  }, [deps, me?.department_id]);
+  const hasAdminAccess = canCreateUsers(me, { departmentModule: meDepartmentModule });
+  const canManageOrganizationOwners = canCreateOrganizationOwner(me);
 
   const onModalOpen = () => setIsModalOpen(true);
   const onModalClose = () => setIsModalOpen(false);
@@ -136,6 +146,7 @@ export default function Users({
         onClose={onModalClose}
         onUserCreated={handleUserCreated}
         departments={deps}
+        canCreateOrganizationOwner={canManageOrganizationOwners}
       />
     </>
   );
