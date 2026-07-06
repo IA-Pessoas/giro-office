@@ -355,7 +355,7 @@ it("blocks non-RH module admins from user management routes", async () => {
   }
 });
 
-it("keeps permission update routes owner-only", async () => {
+it("allows RH module admins to proxy permission update routes", async () => {
   let seenRequest = false;
   const upstream = createServer((_request, response) => {
     seenRequest = true;
@@ -385,8 +385,8 @@ it("keeps permission update routes owner-only", async () => {
       body: JSON.stringify({ rh: 2 }),
     });
 
-    expect(response.status).toBe(403);
-    expect(seenRequest).toBe(false);
+    expect(response.status).toBe(200);
+    expect(seenRequest).toBe(true);
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

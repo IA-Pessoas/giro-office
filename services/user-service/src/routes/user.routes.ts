@@ -64,14 +64,6 @@ function isOwnerMutationPayload(body: {
   return body.type === "owner" || body.first_owner_flag === true;
 }
 
-function hasOnlyRhModuleScope(modules: Record<string, number | null> | undefined): boolean {
-  if (!modules) {
-    return true;
-  }
-
-  return Object.keys(modules).every((module) => module === "rh");
-}
-
 function requiresOwnerForCreatePayload(body: {
   permission?: number;
   type?: string | null;
@@ -80,7 +72,6 @@ function requiresOwnerForCreatePayload(body: {
 }): boolean {
   return (
     isOwnerMutationPayload(body) ||
-    !hasOnlyRhModuleScope(body.modules) ||
     (typeof body.permission === "number" && body.permission >= ADMIN_PERMISSION)
   );
 }
@@ -91,12 +82,7 @@ function requiresOwnerForUpdatePayload(body: {
   first_owner_flag?: boolean;
   modules?: Record<string, number | null>;
 }): boolean {
-  return (
-    isOwnerMutationPayload(body) ||
-    body.modules !== undefined ||
-    body.permission !== undefined ||
-    body.type !== undefined
-  );
+  return isOwnerMutationPayload(body) || body.permission !== undefined || body.type !== undefined;
 }
 
 function requireOwnerUserAuth(request: Request) {

@@ -1,7 +1,6 @@
 import type { AuthPolicy } from "@workspace/shared";
 
 const userManagementPolicy: AuthPolicy = { special: "manageUsers" };
-const ownerOnlyPolicy: AuthPolicy = { special: "ownerOnly" };
 const moduleAccessPermission = 1;
 
 const rhModulePolicy: AuthPolicy = {
@@ -49,8 +48,8 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
-  { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: ownerOnlyPolicy },
-  { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: ownerOnlyPolicy },
+  { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },
+  { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },
   {
     method: "GET",
     path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,

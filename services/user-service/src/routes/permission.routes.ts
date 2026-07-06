@@ -27,17 +27,27 @@ function requirePermissionAuth(request: Request) {
   });
 }
 
-function requireOwnerPermissionAuth(request: Request) {
-  const auth = requirePermissionAuth(request);
-  const isOwner =
+function isOwnerRequest(request: Request): boolean {
+  return (
     request.user_type === "owner" ||
     (request.user_type === undefined &&
-      typeof auth.permission === "number" &&
-      auth.permission >= ADMIN_PERMISSION);
+      typeof request.permission === "number" &&
+      request.permission >= ADMIN_PERMISSION)
+  );
+}
 
-  if (!isOwner) {
-    throw new ServiceError(403, "Apenas owners podem alterar permissoes globais.");
+function hasRhAdminPermission(request: Request): boolean {
+  const rhPermission = request.modules?.rh;
+  return typeof rhPermission === "number" && rhPermission >= ADMIN_PERMISSION;
+}
+
+function requireManagePermissionAuth(request: Request) {
+  const auth = requirePermissionAuth(request);
+
+  if (!isOwnerRequest(request) && !hasRhAdminPermission(request)) {
+    throw new ServiceError(403, "Usuario nao tem permissao para gerenciar permissoes.");
   }
+
   return auth;
 }
 
@@ -46,7 +56,7 @@ router.get(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireOwnerPermissionAuth(request);
+      const auth = requireManagePermissionAuth(request);
       const { userId } = parseWithZod(permissionUserIdParamsSchema, request.params);
       const { modulo } = parseWithZod(permissionQuerySchema, request.query);
 
@@ -65,7 +75,7 @@ router.put(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireOwnerPermissionAuth(request);
+      const auth = requireManagePermissionAuth(request);
       const { userId } = parseWithZod(permissionUserIdParamsSchema, request.params);
       const modules = parseWithZod(updatePermissionBodySchema, request.body) as Record<
         string,
