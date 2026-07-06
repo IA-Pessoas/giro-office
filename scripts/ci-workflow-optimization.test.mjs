@@ -93,6 +93,13 @@ test("detect-changed-vps-services emits certificate-service for certificate chan
   );
 });
 
+test("detect-changed-vps-services emits pessoal-service for pessoal changes", async () => {
+  assert.equal(
+    await detectChangedServices("services/pessoal-service/src/routes/pessoal.routes.ts"),
+    "pessoal-service",
+  );
+});
+
 test("detect-changed-vps-services emits web for app changes", async () => {
   assert.equal(await detectChangedServices("app/src/app/page.tsx"), "web");
 });
@@ -171,6 +178,19 @@ test("compose-vps-buildx-push plans cached service build for certificate-service
   assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/certificate-service:abc1234/);
 });
 
+test("compose-vps-buildx-push plans cached service build for pessoal-service", async () => {
+  const output = await dryRunBuildxPush("pessoal-service");
+  assert.match(output, /docker buildx build/);
+  assert.match(output, /--file docker\/service\.Dockerfile/);
+  assert.match(output, /--build-arg WORKSPACE_PACKAGE=@workspace\/pessoal-service/);
+  assert.match(output, /--build-arg SERVICE_DIR=services\/pessoal-service/);
+  assert.match(
+    output,
+    /--cache-from type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-pessoal-service:buildcache/,
+  );
+  assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/pessoal-service:abc1234/);
+});
+
 test("compose-vps-buildx-push plans cached web build with Next.js build args", async () => {
   const output = await dryRunBuildxPush("web");
   assert.match(output, /--file docker\/app\.Dockerfile/);
@@ -214,8 +234,8 @@ test("vps-deploy-scope resolves service list as selective", async () => {
 test("vps-deploy-scope emits compose args only for selective scope", async () => {
   assert.equal(await runDeployScopeFunction("vps_compose_service_args", "ALL"), "");
   assert.equal(
-    await runDeployScopeFunction("vps_compose_service_args", "gateway client-service"),
-    "gateway\nclient-service",
+    await runDeployScopeFunction("vps_compose_service_args", "gateway pessoal-service"),
+    "gateway\npessoal-service",
   );
 });
 
@@ -364,6 +384,21 @@ test("certificate-service is part of the default VPS compose stack", async () =>
   );
 });
 
+test("pessoal-service is part of the default VPS compose stack", async () => {
+  const composeContents = await readFile(composeVpsFile, "utf8");
+  const pessoalBlock = extractComposeServiceBlock(composeContents, "pessoal-service");
+  const gatewayBlock = extractComposeServiceBlock(composeContents, "gateway");
+
+  assert.doesNotMatch(pessoalBlock, /^\s+profiles:/m);
+  assert.match(pessoalBlock, /image: workspace-pessoal-service:\$\{WORKSPACE_VPS_IMAGE_TAG:-vps\}/);
+  assert.match(pessoalBlock, /WORKSPACE_PACKAGE: "@workspace\/pessoal-service"/);
+  assert.match(pessoalBlock, /SERVICE_DIR: services\/pessoal-service/);
+  assert.match(pessoalBlock, /env_file:[\s\S]*\.env\.vps\.pessoal-service/);
+  assert.match(pessoalBlock, /expose:[\s\S]*- "3042"/);
+  assert.match(pessoalBlock, /fetch\('http:\/\/127\.0\.0\.1:3042\/health'\)/);
+  assert.match(gatewayBlock, /depends_on:[\s\S]*pessoal-service:[\s\S]*condition: service_healthy/);
+});
+
 test("certificate-service is accepted by VPS selective deploy scope", async () => {
   assert.equal(
     await runDeployScopeFunction("vps_validate_service_token", "certificate-service"),
@@ -457,6 +492,34 @@ test("VPS env materialization includes certificate-service in active workflows",
         envWindow,
         /^\s+ENV_VPS_CERTIFICATE_SERVICE:\s+\$\{\{ secrets\.ENV_VPS_CERTIFICATE_SERVICE \}\}/m,
         `${path.relative(repoRoot, workflowFile)} materialize step at line ${index + 1} should map ENV_VPS_CERTIFICATE_SERVICE`,
+      );
+    }
+  }
+});
+
+test("VPS env materialization includes pessoal-service in active workflows", async () => {
+  const manifest = await readFile(vpsSecretsManifest, "utf8");
+  assert.match(manifest, /^ENV_VPS_PESSOAL_SERVICE\|\.env\.vps\.pessoal-service$/m);
+  assert.match(manifest, /^# INTERNAL_SERVICE_TOKEN=<token para rotas internas e scheduler>$/m);
+
+  const workflowsDir = path.join(repoRoot, ".github", "workflows");
+  const workflowFiles = (await readdir(workflowsDir))
+    .filter((file) => file.endsWith(".yml"))
+    .map((file) => path.join(workflowsDir, file));
+
+  for (const workflowFile of workflowFiles) {
+    const contents = await readFile(workflowFile, "utf8");
+    const lines = contents.split(/\r?\n/);
+    for (const [index, line] of lines.entries()) {
+      if (!/^\s*run:\s+bash scripts\/ci\/materialize-vps-env\.sh\s*$/.test(line)) {
+        continue;
+      }
+
+      const envWindow = lines.slice(Math.max(0, index - 30), index).join("\n");
+      assert.match(
+        envWindow,
+        /^\s+ENV_VPS_PESSOAL_SERVICE:\s+\$\{\{ secrets\.ENV_VPS_PESSOAL_SERVICE \}\}/m,
+        `${path.relative(repoRoot, workflowFile)} materialize step at line ${index + 1} should map ENV_VPS_PESSOAL_SERVICE`,
       );
     }
   }

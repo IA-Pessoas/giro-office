@@ -27,6 +27,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `REGULARIZE_SERVICE_URL`
 - `TI_SERVICE_URL`, `TI_SERVICE_INTERNAL_TOKEN`
 - `CERTIFICATE_SERVICE_URL`, `CERTIFICATE_SERVICE_INTERNAL_TOKEN`
+- `PESSOAL_SERVICE_URL`
 - `WEBSOCKET_UPSTREAM_URL`
 
 ## Upstreams
@@ -45,6 +46,7 @@ O gateway encaminha estes prefixos para os servicos configurados no env:
 - `/regularize` -> `REGULARIZE_SERVICE_URL`
 - `/ti` -> `TI_SERVICE_URL`
 - `/certificate` -> `CERTIFICATE_SERVICE_URL`
+- `/pessoal` -> `PESSOAL_SERVICE_URL`
 
 Para servicos que validam contexto autenticado encaminhado internamente, o gateway injeta tokens internos por upstream:
 
