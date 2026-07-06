@@ -1,12 +1,9 @@
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const appUrl = new URL("../../", import.meta.url);
-const appRootPath =
-  appUrl.pathname.startsWith("/") && /^[A-Za-z]:/.test(appUrl.pathname.slice(1))
-    ? appUrl.pathname.slice(1)
-    : appUrl.pathname;
+const appRootPath = fileURLToPath(new URL("../../", import.meta.url));
 const srcRootPath = join(appRootPath, "src");
 const appSource = await readFile(join(srcRootPath, "pages", "_app.tsx"), "utf8");
 const administracaoSource = await readFile(

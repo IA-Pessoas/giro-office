@@ -53,7 +53,6 @@ export function useCertificatePjList(
     {
       enabled: options.enabled ?? true,
       placeholderData: (previousData) => previousData,
-      refetchOnWindowFocus: false,
     },
   );
 }
@@ -68,7 +67,6 @@ export function useCertificatePfList(
     {
       enabled: options.enabled ?? true,
       placeholderData: (previousData) => previousData,
-      refetchOnWindowFocus: false,
     },
   );
 }
@@ -80,7 +78,6 @@ export function useCertificateNotificationsList(
   return useFetch(certificateNotificationsQueryKey(params), () => certificateService.listNotifications(params), {
     enabled: options.enabled ?? true,
     placeholderData: (previousData) => previousData,
-    refetchOnWindowFocus: false,
   });
 }
 
@@ -93,7 +90,6 @@ export function useCertificatePjDetail(
     () => certificateService.detailPj(id ?? ""),
     {
       enabled: Boolean(id) && (options.enabled ?? true),
-      refetchOnWindowFocus: false,
     },
   );
 }
@@ -107,7 +103,6 @@ export function useCertificatePfDetail(
     () => certificateService.detailPf(id ?? ""),
     {
       enabled: Boolean(id) && (options.enabled ?? true),
-      refetchOnWindowFocus: false,
     },
   );
 }

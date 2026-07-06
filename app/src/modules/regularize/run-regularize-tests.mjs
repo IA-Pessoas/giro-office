@@ -1,12 +1,9 @@
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const moduleUrl = new URL("./", import.meta.url);
-const moduleRoot =
-  moduleUrl.pathname.startsWith("/") && /^[A-Za-z]:/.test(moduleUrl.pathname.slice(1))
-    ? moduleUrl.pathname.slice(1)
-    : moduleUrl.pathname;
+const moduleRoot = fileURLToPath(new URL("./", import.meta.url));
 const appRoot = join(moduleRoot, "../../..");
 const moduleRootRelative = "src/modules/regularize";
 

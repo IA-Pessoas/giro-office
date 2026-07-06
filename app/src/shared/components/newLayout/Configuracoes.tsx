@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { isAdminPermission } from "@modules/auth";
+import { canCreateOrganizationOwner } from "@modules/auth";
 import { TASK_MODEL_CONFIG_ENTRY, canManageTaskModelConfig } from "@modules/integracao";
 import { MyOrganizationSection } from "@modules/organizations";
 import { Dialog } from "@shared/components";
@@ -129,7 +129,7 @@ export function Configuracoes() {
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
   const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário";
   const managedOrganizationId =
-    isAdminPermission(meQuery.data?.permission) && meQuery.data.organization_id
+    canCreateOrganizationOwner(meQuery.data) && meQuery.data.organization_id
       ? meQuery.data.organization_id
       : null;
   const canManageTaskModels = canManageTaskModelConfig(meQuery.data?.permission);
