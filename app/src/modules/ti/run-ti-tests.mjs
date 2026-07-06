@@ -193,4 +193,9 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.doesNotMatch(pageSource, /Edicao liberada/);
   assert.doesNotMatch(pageSource, /description:\s*"/);
   assert.doesNotMatch(pageSource, /grid-cols-2.*xl:grid-cols-8/);
+  assert.doesNotMatch(pageSource, /overflow-x-auto/);
+  assert.match(pageSource, /flex flex-wrap items-center justify-center gap-1/);
+  assert.match(pageSource, /from-blue-500 to-blue-600/);
+  assert.match(pageSource, /bg-blue-100 text-blue-700/);
+  assert.doesNotMatch(`${pageSource}\n${workspaceUiSource}`, /indigo-/);
 });
