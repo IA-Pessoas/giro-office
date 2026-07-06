@@ -155,7 +155,7 @@ export function TiPage() {
             className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800"
           >
             <div className="overflow-x-hidden">
-              <div role="tablist" className="flex flex-wrap items-center justify-center gap-1">
+              <div role="tablist" className="flex items-center justify-center gap-1">
                 {TI_TABS.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -169,7 +169,7 @@ export function TiPage() {
                       aria-selected={isActive}
                       aria-controls={`ti-panel-${tab.id}`}
                       className={cn(
-                        "inline-flex shrink-0 items-center rounded-lg px-5 py-2.5 font-medium transition-all",
+                        "inline-flex min-w-0 flex-1 items-center justify-center rounded-lg px-3 py-2.5 font-medium transition-all lg:px-5",
                         isActive
                           ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                           : "text-gray-600 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800",
@@ -178,7 +178,7 @@ export function TiPage() {
                       tabIndex={isActive ? 0 : -1}
                     >
                       <Icon className="mr-2 h-4 w-4" />
-                      <span>{tab.label}</span>
+                      <span className="truncate">{tab.label}</span>
                     </button>
                   );
                 })}
