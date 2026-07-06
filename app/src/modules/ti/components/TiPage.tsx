@@ -154,8 +154,8 @@ export function TiPage() {
             aria-label="Abas de Tecnologia"
             className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800"
           >
-            <div className="overflow-x-hidden">
-              <div role="tablist" className="flex items-center justify-center gap-1">
+            <div className="overflow-x-auto pb-1 [scrollbar-color:rgb(148_163_184)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/80 dark:[scrollbar-color:rgb(96_165_250)_transparent] dark:[&::-webkit-scrollbar-thumb]:bg-blue-400/70">
+              <div role="tablist" className="flex min-w-max items-center justify-center gap-1 md:min-w-full">
                 {TI_TABS.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -169,7 +169,7 @@ export function TiPage() {
                       aria-selected={isActive}
                       aria-controls={`ti-panel-${tab.id}`}
                       className={cn(
-                        "inline-flex min-w-0 flex-1 items-center justify-center rounded-lg px-3 py-2.5 font-medium transition-all lg:px-5",
+                        "inline-flex shrink-0 items-center justify-center rounded-lg px-5 py-2.5 font-medium transition-all md:flex-1",
                         isActive
                           ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                           : "text-gray-600 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800",
@@ -178,7 +178,7 @@ export function TiPage() {
                       tabIndex={isActive ? 0 : -1}
                     >
                       <Icon className="mr-2 h-4 w-4" />
-                      <span className="truncate">{tab.label}</span>
+                      <span>{tab.label}</span>
                     </button>
                   );
                 })}
