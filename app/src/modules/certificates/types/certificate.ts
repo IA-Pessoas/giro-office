@@ -55,7 +55,6 @@ export interface CertificatePj {
   has_certificate: boolean;
   organization_id: string;
 }
-
 export interface CertificatePf {
   id: string;
   client_castelo_status: boolean;
@@ -139,4 +138,3 @@ export interface CertificateNotification {
   date: string;
   organization_id: string;
 }
-

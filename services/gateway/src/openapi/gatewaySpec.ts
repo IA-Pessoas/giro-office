@@ -7,6 +7,7 @@ import { buildContabilServiceOpenApiSpec } from "../../../contabil-service/src/o
 import { buildDepartmentServiceOpenApiSpec } from "../../../department-service/src/openapi/spec.js";
 import { buildFiscalServiceOpenApiSpec } from "../../../fiscal-service/src/openapi/spec.js";
 import { buildOrganizationServiceOpenApiSpec } from "../../../organization-service/src/openapi/spec.js";
+import { buildPessoalServiceOpenApiSpec } from "../../../pessoal-service/src/openapi/spec.js";
 import { buildProjectServiceOpenApiSpec } from "../../../project-service/src/openapi/spec.js";
 import { buildRegularizeServiceOpenApiSpec } from "../../../regularize-service/src/openapi/spec.js";
 import { buildRhServiceOpenApiSpec } from "../../../rh-service/src/openapi/spec.js";
@@ -144,6 +145,17 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       buildSpec: () =>
         buildCertificateServiceOpenApiSpec({
           port: getPortFromUrl(env.certificateServiceUrl),
+        } as never),
+      includePath: (path) =>
+        path !== "/health" && path !== "/ready" && !path.startsWith("/internal/"),
+      isInternalPath: (path) => path.startsWith("/internal/"),
+    },
+    {
+      key: "pessoal-service",
+      label: "Pessoal Service",
+      buildSpec: () =>
+        buildPessoalServiceOpenApiSpec({
+          port: getPortFromUrl(env.pessoalServiceUrl),
         } as never),
       includePath: (path) =>
         path !== "/health" && path !== "/ready" && !path.startsWith("/internal/"),
@@ -478,7 +490,7 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
       title: "office-gateway",
       version: "1.0.0",
       description:
-        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service, fiscal-service, contabil-service, ti-service, certificate-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
+        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service, fiscal-service, contabil-service, ti-service, certificate-service, pessoal-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
     },
     servers: [{ url: "http://localhost" }],
     tags: [
