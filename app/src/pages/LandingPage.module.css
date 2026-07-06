@@ -1,0 +1,13 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0f172a;
+}
+
+.title {
+  font-size: 30px;
+  color: #ffffff;
+  margin: 0;
+}
