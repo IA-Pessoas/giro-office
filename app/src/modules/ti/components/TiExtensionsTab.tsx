@@ -1,19 +1,18 @@
-import { Phone, Plus } from "lucide-react";
+import { Phone } from "lucide-react";
 
-import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
+import { TiEmptyState, TiPanel, TiSectionHeader } from "./tiFormControls";
 
 export function TiExtensionsTab() {
   return (
     <TiPanel className="space-y-5">
       <TiSectionHeader
         title="Ramais"
-        description="Cadastro e manutencao dos ramais de Tecnologia."
-        action={<TiIconAction icon={Plus} label="Novo ramal" variant="primary" disabled />}
+        description="Consulte e mantenha a lista de telefones internos."
       />
       <TiEmptyState
         icon={Phone}
-        title="Ramais prontos para cadastro real"
-        description="A base deixa o contrato e a aba preparados para a tela funcional sem adicionar registros artificiais."
+        title="Nenhum ramal cadastrado"
+        description="Os ramais do time aparecem aqui depois do cadastro."
       />
     </TiPanel>
   );
