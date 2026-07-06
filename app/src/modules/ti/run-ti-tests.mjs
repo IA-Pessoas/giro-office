@@ -196,8 +196,9 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.match(pageSource, /overflow-x-auto/);
   assert.match(pageSource, /scrollbar-width:thin/);
   assert.match(pageSource, /scrollbar-thumb.*blue-600/);
-  assert.match(pageSource, /flex min-w-max items-center justify-center gap-2 md:min-w-full/);
-  assert.match(pageSource, /px-6 py-2\.5/);
+  assert.match(pageSource, /flex min-w-max items-center justify-center gap-1 md:min-w-full/);
+  assert.match(pageSource, /px-4 py-2\.5/);
+  assert.doesNotMatch(pageSource, /md:flex-1/);
   assert.match(pageSource, /shrink-0 items-center justify-center/);
   assert.doesNotMatch(pageSource, /truncate/);
   assert.match(pageSource, /from-blue-500 to-blue-600/);
