@@ -137,6 +137,7 @@ describe("user routes", () => {
         department_id: "dep-1",
         permission: 1,
         type: "admin",
+        modules: { rh: 2 },
       });
 
     expect(res.status).toBe(201);
@@ -145,6 +146,7 @@ describe("user routes", () => {
         login: "novo.usuario.rh",
         permission: 1,
         type: "admin",
+        modules: { rh: 2 },
         organization_id: "a0000000-0000-4000-8000-000000000001",
       }),
     );

@@ -64,6 +64,14 @@ function isOwnerMutationPayload(body: {
   return body.type === "owner" || body.first_owner_flag === true;
 }
 
+function hasOnlyRhModuleScope(modules: Record<string, number | null> | undefined): boolean {
+  if (!modules) {
+    return true;
+  }
+
+  return Object.keys(modules).every((module) => module === "rh");
+}
+
 function requiresOwnerForCreatePayload(body: {
   permission?: number;
   type?: string | null;
@@ -72,7 +80,7 @@ function requiresOwnerForCreatePayload(body: {
 }): boolean {
   return (
     isOwnerMutationPayload(body) ||
-    body.modules !== undefined ||
+    !hasOnlyRhModuleScope(body.modules) ||
     (typeof body.permission === "number" && body.permission >= ADMIN_PERMISSION)
   );
 }
