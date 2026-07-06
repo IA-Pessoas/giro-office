@@ -181,3 +181,16 @@ await runTest("ti visible copy stays product-facing and avoids implementation ha
 
   assert.deepEqual(offenders, []);
 });
+
+await runTest("ti shell follows the existing regularize-style page and tab pattern", async () => {
+  const pageSource = await readModuleSource("components/TiPage.tsx");
+  const workspaceUiSource = await readModuleSource("components/tiWorkspaceUi.ts");
+
+  assert.match(workspaceUiSource, /max-w-\[1600px\]/);
+  assert.match(pageSource, /role="tablist"/);
+  assert.match(pageSource, /aria-selected=\{isActive\}/);
+  assert.doesNotMatch(pageSource, /Modulo TI/);
+  assert.doesNotMatch(pageSource, /Edicao liberada/);
+  assert.doesNotMatch(pageSource, /description:\s*"/);
+  assert.doesNotMatch(pageSource, /grid-cols-2.*xl:grid-cols-8/);
+});

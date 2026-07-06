@@ -1,5 +1,5 @@
 export const tiWorkspaceShellClassName =
-  "min-h-screen bg-slate-50 px-4 py-6 text-slate-950 dark:bg-slate-950 dark:text-slate-100 sm:px-6 lg:px-8";
+  "mx-auto max-w-[1600px] space-y-6";
 
 export const tiWorkspaceContentClassName = "mx-auto flex w-full max-w-7xl flex-col gap-5";
 
