@@ -1,19 +1,18 @@
-import { PackageSearch, Plus } from "lucide-react";
+import { PackageSearch } from "lucide-react";
 
-import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
+import { TiEmptyState, TiPanel, TiSectionHeader } from "./tiFormControls";
 
 export function TiStockTab() {
   return (
     <TiPanel className="space-y-5">
       <TiSectionHeader
         title="Estoque"
-        description="Itens de estoque filtrados pelo departamento Tecnologia, entradas, saidas, categorias e locais."
-        action={<TiIconAction icon={Plus} label="Novo item" variant="primary" disabled />}
+        description="Controle itens, entradas, saidas, categorias, locais e niveis minimos."
       />
       <TiEmptyState
         icon={PackageSearch}
-        title="Estoque reservado para conexao"
-        description="A fundacao separa itens, movimentacoes, categorias e locais para reduzir conflito entre os PRs."
+        title="Nenhum item em estoque"
+        description="Itens consumiveis e movimentacoes de Tecnologia aparecem aqui quando cadastrados."
       />
     </TiPanel>
   );

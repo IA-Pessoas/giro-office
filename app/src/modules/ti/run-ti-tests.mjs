@@ -166,3 +166,18 @@ await runTest("ti page remains a shell without embedded primary mock datasets", 
   );
   assert.doesNotMatch(pageSource, /api\.(get|post|patch|put|delete)\(/);
 });
+
+await runTest("ti visible copy stays product-facing and avoids implementation handoff terms", async () => {
+  const files = await collectSourceFiles(join(moduleRoot, "components"));
+  const offenders = [];
+
+  for (const file of files) {
+    const source = await readFile(file, "utf8");
+
+    if (/(endpoint|\/ti\/|PR de|fundacao|hooks e services|sem dados artificiais)/i.test(source)) {
+      offenders.push(relative(appRoot, file).replaceAll("\\", "/"));
+    }
+  }
+
+  assert.deepEqual(offenders, []);
+});

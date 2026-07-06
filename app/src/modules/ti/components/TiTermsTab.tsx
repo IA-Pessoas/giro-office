@@ -1,19 +1,18 @@
-import { FileCheck2, Plus } from "lucide-react";
+import { FileCheck2 } from "lucide-react";
 
-import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
+import { TiEmptyState, TiPanel, TiSectionHeader } from "./tiFormControls";
 
 export function TiTermsTab() {
   return (
     <TiPanel className="space-y-5">
       <TiSectionHeader
         title="Termos"
-        description="Termos de responsabilidade, assinatura e vinculo com ativos de inventario."
-        action={<TiIconAction icon={Plus} label="Gerar termo" variant="primary" disabled />}
+        description="Acompanhe termos de responsabilidade, assinatura e vinculo com ativos."
       />
       <TiEmptyState
         icon={FileCheck2}
-        title="Termos preparados para o fluxo de assinatura"
-        description="Os endpoints de listagem, detalhe, atualizacao e assinatura ja estao isolados no service de termos."
+        title="Nenhum termo gerado"
+        description="Os termos assinados ou pendentes ficam disponiveis nesta area."
       />
     </TiPanel>
   );

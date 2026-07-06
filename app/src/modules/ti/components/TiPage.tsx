@@ -25,7 +25,11 @@ import { TiRequestsTab } from "./TiRequestsTab";
 import { TiRobotsTab } from "./TiRobotsTab";
 import { TiStockTab } from "./TiStockTab";
 import { TiTermsTab } from "./TiTermsTab";
-import { tiPanelClassName, tiWorkspaceContentClassName, tiWorkspaceShellClassName } from "./tiWorkspaceUi";
+import {
+  tiPanelClassName,
+  tiWorkspaceContentClassName,
+  tiWorkspaceShellClassName,
+} from "./tiWorkspaceUi";
 
 type TiTabId =
   | "dashboard"
@@ -141,9 +145,9 @@ export function TiPage() {
   return (
     <main className={tiWorkspaceShellClassName}>
       <div className={tiWorkspaceContentClassName}>
-        <header className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:flex-row lg:items-center lg:justify-between">
+        <header className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-950/20">
               <MonitorCog className="h-6 w-6" />
             </div>
             <div className="min-w-0 space-y-1">
@@ -152,12 +156,12 @@ export function TiPage() {
               </p>
               <h1 className="text-2xl font-semibold text-slate-950 dark:text-white">Tecnologia</h1>
               <p className="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                Operacao de chamados, inventario, estoque, credenciais, ramais, termos e automacoes
-                usando os endpoints /ti.
+                Atendimento, ativos, estoque, acessos, ramais, termos e automacoes em um unico
+                espaco de trabalho.
               </p>
             </div>
           </div>
-          <div className="rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-500 dark:border-slate-800 dark:text-slate-400">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-500 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300">
             {access.canEdit ? "Edicao liberada" : "Somente leitura"}
           </div>
         </header>
@@ -168,7 +172,7 @@ export function TiPage() {
         {!isModuleAccessLoading && access.canView ? (
           <>
             <nav
-              className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-4 xl:grid-cols-8"
+              className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-4 xl:grid-cols-8"
               aria-label="Abas de Tecnologia"
             >
               {TI_TABS.map((tab) => {
@@ -180,10 +184,10 @@ export function TiPage() {
                     key={tab.id}
                     type="button"
                     className={cn(
-                      "flex min-h-[76px] min-w-0 flex-col items-start justify-between rounded-md border px-3 py-2 text-left text-sm transition",
+                      "flex min-h-[72px] min-w-0 flex-col items-start justify-between rounded-lg border px-3 py-2 text-left text-sm transition",
                       isActive
-                        ? "border-slate-900 bg-slate-900 text-white shadow-sm dark:border-slate-100 dark:bg-slate-100 dark:text-slate-950"
-                        : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 dark:text-slate-300 dark:hover:border-slate-800 dark:hover:bg-slate-800",
+                        ? "border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200"
+                        : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-800/70",
                     )}
                     onClick={() => setActiveTab(tab.id)}
                     title={tab.label}
@@ -193,7 +197,7 @@ export function TiPage() {
                     <span
                       className={cn(
                         "mt-1 w-full truncate text-xs",
-                        isActive ? "text-white/70 dark:text-slate-700" : "text-slate-400",
+                        isActive ? "text-indigo-600/80 dark:text-indigo-200/70" : "text-slate-400",
                       )}
                     >
                       {tab.description}
