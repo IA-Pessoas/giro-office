@@ -59,7 +59,7 @@ const TI_TABS: TiTabConfig[] = [
   },
   {
     id: "inventory",
-    label: "Inventario",
+    label: "Inventário",
     icon: Boxes,
     panel: TiInventoryTab,
   },
@@ -89,7 +89,7 @@ const TI_TABS: TiTabConfig[] = [
   },
   {
     id: "robots",
-    label: "Robos",
+    label: "Robôs",
     icon: Bot,
     panel: TiRobotsTab,
   },
@@ -103,9 +103,9 @@ function TiAccessDenied() {
           <ShieldAlert className="h-5 w-5" />
         </div>
         <div className="space-y-1">
-          <h2 className="text-base font-semibold">Acesso negado ao modulo de Tecnologia</h2>
+          <h2 className="text-base font-semibold">Acesso negado ao módulo de Tecnologia</h2>
           <p className="text-sm leading-6 text-amber-800 dark:text-amber-200">
-            Seu perfil atual nao possui permissao de visualizacao para esta area.
+            Seu perfil atual não possui permissão de visualização para esta área.
           </p>
         </div>
       </div>
@@ -117,7 +117,7 @@ function TiLoadingState() {
   return (
     <section className={cn(tiPanelClassName, "flex items-center gap-3 text-slate-600 dark:text-slate-300")}>
       <Loader2 className="h-5 w-5 animate-spin" />
-      <span className="text-sm font-medium">Carregando modulo de Tecnologia...</span>
+      <span className="text-sm font-medium">Carregando módulo de Tecnologia...</span>
     </section>
   );
 }
@@ -134,13 +134,13 @@ export function TiPage() {
       <header className="flex items-center justify-between gap-4">
         <div>
           <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
               <MonitorCog className="h-6 w-6 text-white" />
             </div>
             Tecnologia
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Chamados, ativos, estoque, acessos e automacoes em um unico fluxo.
+            Chamados, ativos, estoque, acessos e automações em um único fluxo.
           </p>
         </div>
       </header>
@@ -154,8 +154,8 @@ export function TiPage() {
             aria-label="Abas de Tecnologia"
             className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800"
           >
-            <div className="overflow-x-auto">
-              <div role="tablist" className="flex min-w-max items-center justify-center gap-1 md:min-w-full">
+            <div className="overflow-x-hidden">
+              <div role="tablist" className="flex flex-wrap items-center justify-center gap-1">
                 {TI_TABS.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -171,7 +171,7 @@ export function TiPage() {
                       className={cn(
                         "inline-flex shrink-0 items-center rounded-lg px-5 py-2.5 font-medium transition-all",
                         isActive
-                          ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                           : "text-gray-600 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800",
                       )}
                       onClick={() => setActiveTab(tab.id)}
