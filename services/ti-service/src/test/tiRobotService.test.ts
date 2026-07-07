@@ -7,7 +7,7 @@ import { TiRobotService } from "../services/tiRobotService.js";
 const context = {
   organizationId: "10000000-0000-4000-8000-000000000001",
   userId: "00000000-0000-4000-8000-000000000001",
-  permission: 3,
+  permission: 2,
 };
 
 const robotId = "90000000-0000-4000-8000-000000000001";

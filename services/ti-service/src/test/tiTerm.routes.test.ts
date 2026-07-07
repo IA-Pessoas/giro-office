@@ -16,6 +16,9 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const departmentId = "20000000-0000-4000-8000-000000000001";
 const termId = "30000000-0000-4000-8000-000000000001";
+const otherUserId = "90000000-0000-4000-8000-000000000001";
+const TI_REQUESTER_PERMISSION = 1;
+const TI_ADMIN_PERMISSION = 2;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -58,7 +61,7 @@ describe("ti term routes", () => {
   it("POST /ti/terms creates a term", async () => {
     const response = await request(createTestApp(createPrismaMock()))
       .post("/ti/terms")
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({
         date: "2026-05-19",
         user_id: userId,
@@ -86,7 +89,31 @@ describe("ti term routes", () => {
   it("PATCH /ti/terms/:id/sign signs a term", async () => {
     const response = await request(createTestApp(createPrismaMock()))
       .patch(`/ti/terms/${termId}/sign`)
-      .set(gatewayHeaders(1))
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
+      .send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: termId,
+        reason: "Termo assinado pelo usuario.",
+      },
+    });
+  });
+
+  it("PATCH /ti/terms/:id/sign allows admin level 2 to sign another user's term", async () => {
+    const prisma = createPrismaMock();
+    vi.mocked(prisma.termTecnologia.findFirst).mockResolvedValueOnce({
+      id: termId,
+      user_id: otherUserId,
+      organization_id: organizationId,
+      reason: null,
+    } as never);
+
+    const response = await request(createTestApp(prisma))
+      .patch(`/ti/terms/${termId}/sign`)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({});
 
     expect(response.status).toBe(200);

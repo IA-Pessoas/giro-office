@@ -14,6 +14,8 @@ import { createTestApp } from "./tiServiceTestUtils.js";
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const locationId = "30000000-0000-4000-8000-000000000001";
+const TI_REQUESTER_PERMISSION = 1;
+const TI_ADMIN_PERMISSION = 2;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -28,7 +30,7 @@ describe("ti inventory location routes", () => {
   it("GET /ti/inventory-locations/list lists locations", async () => {
     const response = await request(createTestApp())
       .get("/ti/inventory-locations/list")
-      .set(gatewayHeaders(1));
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ success: true, data: [] });
@@ -37,7 +39,7 @@ describe("ti inventory location routes", () => {
   it("POST /ti/inventory-locations requires admin permission", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory-locations")
-      .set(gatewayHeaders(2))
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
       .send({ name: "Almoxarifado TI" });
 
     expect(response.status).toBe(403);
@@ -51,7 +53,7 @@ describe("ti inventory location routes", () => {
   it("POST /ti/inventory-locations validates body", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory-locations")
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ name: "" });
 
     expect(response.status).toBe(400);
@@ -65,7 +67,7 @@ describe("ti inventory location routes", () => {
   it("PATCH /ti/inventory-locations/:id updates location", async () => {
     const response = await request(createTestApp())
       .patch(`/ti/inventory-locations/${locationId}`)
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ active: false });
 
     expect(response.status).toBe(200);

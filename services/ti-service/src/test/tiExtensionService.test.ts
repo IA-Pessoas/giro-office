@@ -10,7 +10,7 @@ const userId = "00000000-0000-4000-8000-000000000001";
 const context = {
   organizationId,
   userId,
-  permission: 3,
+  permission: 2,
 };
 
 describe("TiExtensionService", () => {

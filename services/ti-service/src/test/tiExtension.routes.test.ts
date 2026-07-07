@@ -13,6 +13,8 @@ import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
+const TI_REQUESTER_PERMISSION = 1;
+const TI_ADMIN_PERMISSION = 2;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -50,7 +52,7 @@ describe("ti extension routes", () => {
   it("POST /ti/extensions creates an extension", async () => {
     const response = await request(createTestApp(createExtensionPrismaMock() as never))
       .post("/ti/extensions")
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({
         user_id: userId,
         number: "1234",
@@ -67,10 +69,10 @@ describe("ti extension routes", () => {
     });
   });
 
-  it("POST /ti/extensions requires permission 3", async () => {
+  it("POST /ti/extensions requires admin permission", async () => {
     const response = await request(createTestApp(createExtensionPrismaMock() as never))
       .post("/ti/extensions")
-      .set(gatewayHeaders(1))
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
       .send({
         user_id: userId,
         number: "1234",

@@ -15,6 +15,8 @@ import { createTestApp } from "./tiServiceTestUtils.js";
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const passwordId = "40000000-0000-4000-8000-000000000001";
+const TI_REQUESTER_PERMISSION = 1;
+const TI_ADMIN_PERMISSION = 2;
 const encryption = new EncryptionService("MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=");
 
 function gatewayHeaders(permission: number): Record<string, string> {
@@ -63,7 +65,7 @@ describe("ti password routes", () => {
   it("GET /ti/passwords/list nao retorna password", async () => {
     const response = await request(createTestApp(createPasswordPrismaMock()))
       .get("/ti/passwords/list")
-      .set(gatewayHeaders(1));
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -80,10 +82,10 @@ describe("ti password routes", () => {
     expect(response.body.data[0]).not.toHaveProperty("password");
   });
 
-  it("GET /ti/passwords/:id com permissao 1 nao retorna password", async () => {
+  it("GET /ti/passwords/:id com permissao solicitante nao retorna password", async () => {
     const response = await request(createTestApp(createPasswordPrismaMock()))
       .get(`/ti/passwords/${passwordId}`)
-      .set(gatewayHeaders(1));
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -98,10 +100,10 @@ describe("ti password routes", () => {
     expect(response.body.data).not.toHaveProperty("password");
   });
 
-  it("GET /ti/passwords/:id com permissao 3 retorna password", async () => {
+  it("GET /ti/passwords/:id com permissao administrativa 2 retorna password", async () => {
     const response = await request(createTestApp(createPasswordPrismaMock()))
       .get(`/ti/passwords/${passwordId}`)
-      .set(gatewayHeaders(3));
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({

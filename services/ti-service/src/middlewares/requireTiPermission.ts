@@ -4,7 +4,7 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 export enum TiPermissionLevel {
   Requester = 1,
   Technician = 2,
-  Admin = 3,
+  Admin = 2,
 }
 
 export function requireTiPermission(minPermission: TiPermissionLevel): RequestHandler {

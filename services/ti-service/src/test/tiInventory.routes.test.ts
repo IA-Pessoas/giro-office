@@ -16,6 +16,8 @@ const userId = "00000000-0000-4000-8000-000000000001";
 const categoryId = "20000000-0000-4000-8000-000000000001";
 const locationId = "30000000-0000-4000-8000-000000000001";
 const assetId = "40000000-0000-4000-8000-000000000001";
+const TI_REQUESTER_PERMISSION = 1;
+const TI_ADMIN_PERMISSION = 2;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -30,7 +32,7 @@ describe("ti inventory routes", () => {
   it("POST /ti/inventory creates an asset", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory")
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({
         asset_code: "NB-001",
         category_id: categoryId,
@@ -50,10 +52,10 @@ describe("ti inventory routes", () => {
     });
   });
 
-  it("POST /ti/inventory requires permission 3", async () => {
+  it("POST /ti/inventory requires admin permission", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory")
-      .set(gatewayHeaders(1))
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
       .send({
         asset_code: "NB-001",
         category_id: categoryId,
@@ -70,7 +72,7 @@ describe("ti inventory routes", () => {
   it("POST /ti/inventory validates asset_code", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory")
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({
         asset_code: "",
         category_id: categoryId,
@@ -87,7 +89,7 @@ describe("ti inventory routes", () => {
   it("PATCH /ti/inventory/:id/assign-user assigns an asset", async () => {
     const response = await request(createTestApp())
       .patch(`/ti/inventory/${assetId}/assign-user`)
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ user_id: userId });
 
     expect(response.status).toBe(200);
@@ -104,7 +106,7 @@ describe("ti inventory routes", () => {
   it("PATCH /ti/inventory/:id/return returns an asset", async () => {
     const response = await request(createTestApp())
       .patch(`/ti/inventory/${assetId}/return`)
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ notes: "Devolvido sem avarias." });
 
     expect(response.status).toBe(200);
@@ -121,7 +123,7 @@ describe("ti inventory routes", () => {
   it("POST /ti/inventory-categories creates a category", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory-categories")
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ name: "Notebooks", tag: "NB" });
 
     expect(response.status).toBe(201);
@@ -139,7 +141,7 @@ describe("ti inventory routes", () => {
   it("POST /ti/inventory-locations creates a location", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory-locations")
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ name: "Almoxarifado TI" });
 
     expect(response.status).toBe(201);

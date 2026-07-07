@@ -1,6 +1,7 @@
 import { type EncryptionService, error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
   CreateTiPasswordBody,
@@ -80,7 +81,7 @@ export class TiPasswordService {
       throw new ServiceError(404, "Senha de TI nao encontrada.");
     }
 
-    if (context.permission < 3) {
+    if (context.permission < TiPermissionLevel.Admin) {
       return withoutPassword(password);
     }
 

@@ -8,11 +8,12 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const departmentId = "20000000-0000-4000-8000-000000000001";
 const termId = "30000000-0000-4000-8000-000000000001";
+const TI_ADMIN_PERMISSION = 2;
 
 const context = {
   organizationId,
   userId,
-  permission: 3,
+  permission: TI_ADMIN_PERMISSION,
 };
 
 describe("TiTermService", () => {
@@ -91,6 +92,7 @@ describe("TiTermService", () => {
         findFirst: vi.fn(async ({ where }) => ({
           id: where.id,
           organization_id: where.organization_id,
+          user_id: userId,
           reason: null,
         })),
         update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
@@ -125,5 +127,27 @@ describe("TiTermService", () => {
       message: "Permissao insuficiente para assinar termo de outro usuario.",
     });
     expect(prisma.termTecnologia.update).not.toHaveBeenCalled();
+  });
+
+  it("allows admin level 2 signing another user's term", async () => {
+    const prisma = {
+      termTecnologia: {
+        findFirst: vi.fn(async ({ where }) => ({
+          id: where.id,
+          organization_id: where.organization_id,
+          user_id: "90000000-0000-4000-8000-000000000001",
+          reason: null,
+        })),
+        update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+      },
+    };
+    const service = new TiTermService(prisma as never);
+
+    const result = await service.sign(context, termId, {});
+
+    expect(result).toMatchObject({
+      id: termId,
+      reason: "Termo assinado pelo usuario.",
+    });
   });
 });

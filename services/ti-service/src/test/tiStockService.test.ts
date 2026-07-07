@@ -8,7 +8,7 @@ import { TiStockService } from "../services/tiStockService.js";
 const context = {
   organizationId: "10000000-0000-4000-8000-000000000001",
   userId: "00000000-0000-4000-8000-000000000001",
-  permission: 3,
+  permission: 2,
 };
 
 const departmentId = "50000000-0000-4000-8000-000000000001";
