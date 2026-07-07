@@ -8,11 +8,12 @@ import { TiPasswordService } from "../services/tiPasswordService.js";
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const passwordId = "40000000-0000-4000-8000-000000000001";
+const TI_ADMIN_PERMISSION = 2;
 
 const context = {
   organizationId,
   userId,
-  permission: 3,
+  permission: TI_ADMIN_PERMISSION,
 };
 const encryption = new EncryptionService("MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=");
 
@@ -65,7 +66,7 @@ describe("TiPasswordService", () => {
     });
   });
 
-  it("getById omite password para permissao menor que 3", async () => {
+  it("getById omite password para permissao menor que admin", async () => {
     const prisma = {
       passwordTecnologia: {
         findFirst: vi.fn(async () => passwordRecord()),
@@ -82,7 +83,7 @@ describe("TiPasswordService", () => {
     expect(result).toMatchObject({ id: passwordId, local: "VPN" });
   });
 
-  it("getById retorna password para permissao 3", async () => {
+  it("getById retorna password para permissao administrativa 2", async () => {
     const prisma = {
       passwordTecnologia: {
         findFirst: vi.fn(async () => passwordRecord()),

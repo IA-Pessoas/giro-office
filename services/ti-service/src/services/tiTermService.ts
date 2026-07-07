@@ -1,6 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
   CreateTiTermBody,
@@ -124,7 +125,7 @@ export class TiTermService {
     try {
       const term = (await this.getById(context, id)) as TermRecord;
 
-      if (context.permission < 3 && term.user_id !== context.userId) {
+      if (context.permission < TiPermissionLevel.Admin && term.user_id !== context.userId) {
         throw new ServiceError(403, "Permissao insuficiente para assinar termo de outro usuario.");
       }
 

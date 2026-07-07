@@ -15,6 +15,8 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const categoryId = "20000000-0000-4000-8000-000000000001";
 const requestId = "30000000-0000-4000-8000-000000000001";
+const TI_REQUESTER_PERMISSION = 1;
+const TI_ADMIN_PERMISSION = 2;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -29,7 +31,7 @@ describe("ti request routes", () => {
   it("POST /ti/requests creates a request", async () => {
     const response = await request(createTestApp())
       .post("/ti/requests")
-      .set(gatewayHeaders(2))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({
         title: "Notebook nao liga",
         description: "Equipamento nao inicia.",
@@ -67,7 +69,7 @@ describe("ti request routes", () => {
   it("PATCH /ti/requests/:id/assign requires admin permission", async () => {
     const response = await request(createTestApp())
       .patch(`/ti/requests/${requestId}/assign`)
-      .set(gatewayHeaders(2))
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
       .send({ assigned_to_id: userId });
 
     expect(response.status).toBe(403);
@@ -78,10 +80,26 @@ describe("ti request routes", () => {
     });
   });
 
+  it("PATCH /ti/requests/:id/assign accepts admin level 2", async () => {
+    const response = await request(createTestApp())
+      .patch(`/ti/requests/${requestId}/assign`)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({ assigned_to_id: userId });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: requestId,
+        assigned_to_id: userId,
+      },
+    });
+  });
+
   it("POST /ti/requests validates body", async () => {
     const response = await request(createTestApp())
       .post("/ti/requests")
-      .set(gatewayHeaders(2))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({
         title: "",
         description: "Equipamento nao inicia.",
@@ -98,7 +116,7 @@ describe("ti request routes", () => {
   it("POST /ti/requests/:id/messages creates a message", async () => {
     const response = await request(createTestApp())
       .post(`/ti/requests/${requestId}/messages`)
-      .set(gatewayHeaders(1))
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
       .send({ message: "Estou verificando o chamado." });
 
     expect(response.status).toBe(201);

@@ -2,20 +2,26 @@ import "./envBootstrap.js";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import { TiRequestService } from "../services/tiRequestService.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const otherUserId = "00000000-0000-4000-8000-000000000002";
 const categoryId = "20000000-0000-4000-8000-000000000001";
+const TI_ADMIN_PERMISSION = 2;
 
 const context = {
   organizationId,
   userId,
-  permission: 3,
+  permission: TI_ADMIN_PERMISSION,
 };
 
 describe("TiRequestService", () => {
+  it("documents admin TI permission as level 2", () => {
+    expect(TiPermissionLevel.Admin).toBe(TI_ADMIN_PERMISSION);
+  });
+
   it("list applies bounded offset pagination", async () => {
     const prisma = {
       tIRequest: {
@@ -150,7 +156,9 @@ describe("TiRequestService", () => {
     const service = new TiRequestService(prisma as never);
 
     await expect(
-      service.updateStatus({ ...context, permission: 2 }, "req-1", { status: "In_Progress" }),
+      service.updateStatus({ ...context, permission: TiPermissionLevel.Requester }, "req-1", {
+        status: "In_Progress",
+      }),
     ).rejects.toMatchObject({
       statusCode: 403,
       message: "Permissao insuficiente para esta transicao.",
@@ -166,14 +174,16 @@ describe("TiRequestService", () => {
     const service = new TiRequestService(prisma as never);
 
     await expect(
-      service.updateStatus({ ...context, permission: 2 }, "req-1", { status: "In_Progress" }),
+      service.updateStatus({ ...context, permission: TiPermissionLevel.Requester }, "req-1", {
+        status: "In_Progress",
+      }),
     ).rejects.toMatchObject({
       statusCode: 403,
       message: "Permissao insuficiente para esta transicao.",
     });
   });
 
-  it("allows admin to reopen resolved request", async () => {
+  it("allows admin level 2 to reopen resolved request", async () => {
     const prisma = {
       tIRequest: {
         findFirst: vi.fn(async () => ({ id: "req-1", status: "Resolved" })),

@@ -14,6 +14,8 @@ import { createTestApp } from "./tiServiceTestUtils.js";
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const categoryId = "20000000-0000-4000-8000-000000000001";
+const TI_REQUESTER_PERMISSION = 1;
+const TI_ADMIN_PERMISSION = 2;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -28,7 +30,7 @@ describe("ti inventory category routes", () => {
   it("GET /ti/inventory-categories/list lists categories", async () => {
     const response = await request(createTestApp())
       .get("/ti/inventory-categories/list")
-      .set(gatewayHeaders(1));
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ success: true, data: [] });
@@ -37,7 +39,7 @@ describe("ti inventory category routes", () => {
   it("POST /ti/inventory-categories requires admin permission", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory-categories")
-      .set(gatewayHeaders(2))
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
       .send({ name: "Notebook" });
 
     expect(response.status).toBe(403);
@@ -51,7 +53,7 @@ describe("ti inventory category routes", () => {
   it("POST /ti/inventory-categories validates body", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory-categories")
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ name: "" });
 
     expect(response.status).toBe(400);
@@ -65,7 +67,7 @@ describe("ti inventory category routes", () => {
   it("PATCH /ti/inventory-categories/:id updates category", async () => {
     const response = await request(createTestApp())
       .patch(`/ti/inventory-categories/${categoryId}`)
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ active: false });
 
     expect(response.status).toBe(200);

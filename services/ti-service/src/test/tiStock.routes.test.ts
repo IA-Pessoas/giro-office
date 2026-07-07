@@ -16,6 +16,8 @@ const userId = "00000000-0000-4000-8000-000000000001";
 const categoryId = "60000000-0000-4000-8000-000000000001";
 const locationId = "70000000-0000-4000-8000-000000000001";
 const stockId = "80000000-0000-4000-8000-000000000001";
+const TI_REQUESTER_PERMISSION = 1;
+const TI_ADMIN_PERMISSION = 2;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -30,7 +32,7 @@ describe("ti stock routes", () => {
   it("GET /ti/stock/items/list lists stock items", async () => {
     const response = await request(createTestApp())
       .get("/ti/stock/items/list")
-      .set(gatewayHeaders(1));
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -39,10 +41,10 @@ describe("ti stock routes", () => {
     });
   });
 
-  it("POST /ti/stock/items creates a stock item with permission 3", async () => {
+  it("POST /ti/stock/items creates a stock item with admin level 2", async () => {
     const response = await request(createTestApp())
       .post("/ti/stock/items")
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({
         name: "Notebook",
         category_id: categoryId,
@@ -64,10 +66,10 @@ describe("ti stock routes", () => {
     });
   });
 
-  it("POST /ti/stock/items requires permission 3", async () => {
+  it("POST /ti/stock/items requires admin permission", async () => {
     const response = await request(createTestApp())
       .post("/ti/stock/items")
-      .set(gatewayHeaders(1))
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
       .send({
         name: "Notebook",
         category_id: categoryId,
@@ -86,7 +88,7 @@ describe("ti stock routes", () => {
   it("POST /ti/stock/items/:id/entries creates an entry", async () => {
     const response = await request(createTestApp())
       .post(`/ti/stock/items/${stockId}/entries`)
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ quantity: 4 });
 
     expect(response.status).toBe(201);
@@ -102,7 +104,7 @@ describe("ti stock routes", () => {
   it("PATCH /ti/stock/items/:id rejects direct quantity changes", async () => {
     const response = await request(createTestApp())
       .patch(`/ti/stock/items/${stockId}`)
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ quantity: 10 });
 
     expect(response.status).toBe(400);
@@ -115,7 +117,7 @@ describe("ti stock routes", () => {
   it("POST /ti/stock/items/:id/exits creates an exit", async () => {
     const response = await request(createTestApp())
       .post(`/ti/stock/items/${stockId}/exits`)
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({
         quantity: 2,
         requester_id: userId,
@@ -134,7 +136,7 @@ describe("ti stock routes", () => {
   it("POST /ti/stock/items/:id/exits returns 409 when balance is insufficient", async () => {
     const response = await request(createTestApp())
       .post(`/ti/stock/items/${stockId}/exits`)
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({
         quantity: 20,
         requester_id: userId,
@@ -151,7 +153,7 @@ describe("ti stock routes", () => {
   it("POST /ti/stock/categories creates a stock category", async () => {
     const response = await request(createTestApp())
       .post("/ti/stock/categories")
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ name: "Perifericos" });
 
     expect(response.status).toBe(201);
@@ -168,7 +170,7 @@ describe("ti stock routes", () => {
   it("POST /ti/stock/locations creates a stock location", async () => {
     const response = await request(createTestApp())
       .post("/ti/stock/locations")
-      .set(gatewayHeaders(3))
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ name: "Almoxarifado TI", floor: 2 });
 
     expect(response.status).toBe(201);

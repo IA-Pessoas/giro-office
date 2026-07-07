@@ -1221,13 +1221,15 @@ it("proxies rh-service routes mapped in the gateway", async () => {
   }
 });
 
-it("proxies ti-service routes mapped in the gateway", async () => {
+it("proxies ti-service routes mapped in the gateway for global admin level 2", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
-    permission: 3,
+    permission: 2,
   });
+  let seenPermission: string | undefined;
   const tiService = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
     response.end(
@@ -1256,6 +1258,7 @@ it("proxies ti-service routes mapped in the gateway", async () => {
       success: true,
       data: { service: "ti-service", path: "/ti/requests/list" },
     });
+    expect(seenPermission).toBe("2");
   } finally {
     await stopServer(gateway);
     await stopServer(tiService);
@@ -1266,8 +1269,8 @@ it("forwards modular TI permission instead of global user permission", async () 
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
-    permission: 3,
-    modules: { ti: 1 },
+    permission: 1,
+    modules: { ti: 2 },
   });
   let seenPermission: string | undefined;
   let seenInternalToken: string | undefined;
@@ -1298,7 +1301,7 @@ it("forwards modular TI permission instead of global user permission", async () 
     });
 
     expect(response.status).toBe(200);
-    expect(seenPermission).toBe("1");
+    expect(seenPermission).toBe("2");
     expect(seenInternalToken).toBe("ti-service-token");
   } finally {
     await stopServer(gateway);
@@ -1791,7 +1794,7 @@ it("records ti-service route targets when audit is enabled", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
-    permission: 3,
+    permission: 2,
   });
   const auditService = await startAuditIngestServer();
   const upstream = createServer((_request, response) => {
