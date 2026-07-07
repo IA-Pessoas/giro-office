@@ -1,0 +1,244 @@
+﻿# TEMPORARIAMENTE DESATIVADO: workflow de CI/CD comentado para nao executar por enquanto.
+# Develop: qualidade em todo PR/push; em push na branch `develop` â†’ build/push registry + deploy na VPS
+# (slot `/opt/workspace-develop`, projeto `workspace-develop`).
+#
+# Segredos (registry + env + SSH): ver scripts/ci/vps-secrets.manifest e comentÃ¡rios em staging-cicd.yml.
+
+# name: Develop CI
+
+# on:
+#   push:
+#     branches:
+#       - develop
+#   pull_request:
+#     types: [opened, synchronize, reopened, ready_for_review]
+#     branches:
+#       - develop
+#   workflow_dispatch:
+
+# concurrency:
+#   group: develop-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ github.sha }}
+#   cancel-in-progress: true
+
+# permissions:
+#   contents: read
+
+# jobs:
+#   quality:
+#     name: Qualidade (Biome, typecheck, testes)
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 30
+#     env:
+#       DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci_ci_typecheck?schema=public
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - uses: pnpm/action-setup@v4
+#         with:
+#           version: 9.15.0
+
+#       - uses: actions/setup-node@v4
+#         with:
+#           node-version: "22"
+#           cache: pnpm
+
+#       - name: Instalar dependÃªncias
+#         run: pnpm install --frozen-lockfile
+
+#       - name: Auditoria de dependÃªncias
+#         run: pnpm audit:ci
+
+#       - name: Harness de serviÃ§os
+#         run: pnpm harness:test
+
+#       - name: Cobertura smoke/OpenAPI
+#         run: pnpm smoke:coverage
+
+#       - name: SeguranÃ§a Docker Compose
+#         run: pnpm security:compose
+
+#       - name: Biome check
+#         run: pnpm check
+
+#       - name: Typecheck
+#         run: pnpm typecheck
+
+#       - name: Testes
+#         run: pnpm test
+
+#   build-and-push:
+#     name: Build e push registry (push develop)
+#     needs: quality
+#     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+#     runs-on: ubuntu-latest
+#     environment: develop
+#     timeout-minutes: 45
+#     outputs:
+#       pull_services: ${{ steps.scope.outputs.pull_services }}
+#       push_services: ${{ steps.scope.outputs.push_services }}
+#     env:
+#       DOCKER_BUILDKIT: 1
+#       COMPOSE_DOCKER_CLI_BUILD: 1
+#     steps:
+#       - uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0
+
+#       - id: scope
+#         name: Detect changed services (incremental)
+#         run: |
+#           set -eo pipefail
+#           DET="$(bash scripts/ci/detect-changed-vps-services.sh "${{ github.event.before }}" "${{ github.sha }}")"
+#           echo "detected=$DET"
+#           echo "detected=$DET" >> "$GITHUB_OUTPUT"
+#           if [[ "$DET" == "ALL" ]]; then
+#             echo "pull_services=ALL" >> "$GITHUB_OUTPUT"
+#             echo "push_services=ALL" >> "$GITHUB_OUTPUT"
+#           elif [[ "$DET" == "NONE" ]]; then
+#             echo "pull_services=NONE" >> "$GITHUB_OUTPUT"
+#             echo "push_services=NONE" >> "$GITHUB_OUTPUT"
+#           else
+#             ws="$(echo "$DET" | tr ' ' '\n' | grep -v '^reverse-proxy$' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+#             if [[ -z "$ws" ]]; then
+#               echo "pull_services=NONE" >> "$GITHUB_OUTPUT"
+#               echo "push_services=NONE" >> "$GITHUB_OUTPUT"
+#             else
+#               echo "pull_services=$ws" >> "$GITHUB_OUTPUT"
+#               echo "push_services=$ws" >> "$GITHUB_OUTPUT"
+#             fi
+#           fi
+
+#       - id: reg
+#         name: Registro Docker configurado?
+#         env:
+#           R: ${{ secrets.DOCKER_REGISTRY_URL }}
+#         run: |
+#           if [ -n "$R" ]; then
+#             echo "has=true" >> "$GITHUB_OUTPUT"
+#           else
+#             echo "has=false" >> "$GITHUB_OUTPUT"
+#           fi
+
+#       - name: Exige registry para deploy na VPS
+#         if: steps.reg.outputs.has != 'true' && steps.scope.outputs.push_services != 'NONE'
+#         run: |
+#           echo "::error::Configure DOCKER_REGISTRY_URL (e credenciais) para build/push e deploy na VPS."
+#           exit 1
+
+#       - uses: docker/setup-buildx-action@v3
+#         if: steps.scope.outputs.push_services != 'NONE'
+
+#       - name: Materializar .env.vps.* a partir dos segredos
+#         if: steps.scope.outputs.push_services != 'NONE'
+#         env:
+#           ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+#           ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+#           ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+#           ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+#           ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+#           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+#           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+#           ENV_VPS_DEPARTMENT_SERVICE: ${{ secrets.ENV_VPS_DEPARTMENT_SERVICE }}
+#           ENV_VPS_FISCAL_SERVICE: ${{ secrets.ENV_VPS_FISCAL_SERVICE }}
+#           ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
+#           ENV_VPS_REGULARIZE_SERVICE: ${{ secrets.ENV_VPS_REGULARIZE_SERVICE }}
+#           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+#           ENV_VPS_TI_SERVICE: ${{ secrets.ENV_VPS_TI_SERVICE }}
+#           ENV_VPS_CERTIFICATE_SERVICE: ${{ secrets.ENV_VPS_CERTIFICATE_SERVICE }}
+#           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
+#           ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
+#         run: bash scripts/ci/materialize-vps-env.sh
+
+#       - name: Login no registry
+#         if: steps.scope.outputs.push_services != 'NONE'
+#         uses: docker/login-action@v3
+#         with:
+#           registry: ${{ secrets.DOCKER_REGISTRY_URL }}
+#           username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+#           password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+
+#       - name: "Liberar espaÃ§o no runner (SO)"
+#         if: steps.scope.outputs.push_services == 'ALL'
+#         uses: jlumbroso/free-disk-space@v1.3.1
+#         with:
+#           tool-cache: true
+#           android: true
+#           dotnet: true
+#           haskell: true
+#           large-packages: true
+#           swap-storage: true
+
+#       - name: "Liberar espaÃ§o no runner (Docker)"
+#         if: steps.scope.outputs.push_services == 'ALL'
+#         run: |
+#           set -euxo pipefail
+#           docker system df || true
+#           docker builder prune -af || true
+#           docker system prune -af || true
+#           docker system df || true
+
+#       - name: Build e push imagens Docker com cache Buildx
+#         if: steps.scope.outputs.push_services != 'NONE'
+#         env:
+#           DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+#           STAGING_DOCKER_TAG: ${{ github.sha }}
+#           VPS_PUSH_SERVICES: ${{ steps.scope.outputs.push_services }}
+#         run: |
+#           set -eo pipefail
+#           set -a
+          # shellcheck disable=SC1091
+#           . ./.env.vps.web
+#           set +a
+#           bash scripts/ci/compose-vps-buildx-push.sh
+
+#   vps-deploy:
+#     name: Deploy na VPS â€” slot develop (SSH)
+#     needs: build-and-push
+#     if: github.event_name == 'push' && github.ref == 'refs/heads/develop' && needs.build-and-push.outputs.pull_services != 'NONE'
+#     runs-on: ubuntu-latest
+#     environment: develop
+#     timeout-minutes: 30
+#     env:
+#       VPS_HOST: ${{ secrets.VPS_HOST }}
+#       VPS_USER: ${{ secrets.VPS_USER }}
+#       VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+#       VPS_SSH_PASSWORD: ${{ secrets.VPS_SSH_PASSWORD }}
+#       DEPLOY_PATH: /data/workspace-develop
+#       DEPLOY_SLOT: develop
+#       COMPOSE_PROJECT: workspace-develop
+#       GITHUB_SHA: ${{ github.sha }}
+#       DOCKER_IMAGE_TAG: ${{ github.sha }}
+#       VPS_PULL_SERVICES: ${{ needs.build-and-push.outputs.pull_services }}
+#       WORKSPACE_VPS_IMAGE_TAG: vps-develop
+#       DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+#       DOCKER_REGISTRY_USERNAME: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+#       DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - name: Materializar .env.vps.* para cÃ³pia SCP
+#         env:
+#           ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+#           ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+#           ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+#           ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+#           ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+#           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+#           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+#           ENV_VPS_DEPARTMENT_SERVICE: ${{ secrets.ENV_VPS_DEPARTMENT_SERVICE }}
+#           ENV_VPS_FISCAL_SERVICE: ${{ secrets.ENV_VPS_FISCAL_SERVICE }}
+#           ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
+#           ENV_VPS_REGULARIZE_SERVICE: ${{ secrets.ENV_VPS_REGULARIZE_SERVICE }}
+#           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+#           ENV_VPS_TI_SERVICE: ${{ secrets.ENV_VPS_TI_SERVICE }}
+#           ENV_VPS_CERTIFICATE_SERVICE: ${{ secrets.ENV_VPS_CERTIFICATE_SERVICE }}
+#           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
+#           ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
+#         run: bash scripts/ci/materialize-vps-env.sh
+
+#       - name: Instalar sshpass (opcional, deploy por senha SSH)
+#         if: env.VPS_SSH_PRIVATE_KEY == '' && env.VPS_SSH_PASSWORD != ''
+#         run: sudo apt-get update && sudo apt-get install -y sshpass
+
+#       - name: Deploy remoto (logs da VPS no output do step)
+#         run: bash scripts/ci/run-vps-deploy-from-github.sh

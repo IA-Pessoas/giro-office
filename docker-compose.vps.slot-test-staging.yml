@@ -1,0 +1,13 @@
+# Portas do slot de **teste** staging (`workspace-teste-staging`, branch `test/deploy-staging`).
+# Staging real usa só o compose base (8085 / 3010).
+# `!override`: evita publicar em paralelo 8085/3010 do compose base.
+services:
+  reverse-proxy:
+    ports: !override
+      - "8088:80"
+  gateway:
+    ports: !override
+      - "3012:3010"
+  web:
+    ports: !override
+      - "3003:3000"
