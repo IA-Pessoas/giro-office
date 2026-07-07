@@ -9,6 +9,12 @@ export const tiPanelClassName =
 export const tiMutedPanelClassName =
   "rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-900/60";
 
+export const tiDialogSectionClassName =
+  "rounded-md border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-950/5 dark:border-slate-700/80 dark:bg-slate-900/90 dark:ring-white/5";
+
+export const tiDialogSubsectionClassName =
+  "rounded-md border border-slate-200/80 bg-slate-50 p-3 ring-1 ring-slate-950/5 dark:border-slate-800 dark:bg-slate-950/45 dark:ring-white/5";
+
 export const tiPrimaryButtonClassName =
   "inline-flex h-10 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-blue-600 dark:hover:bg-blue-500";
 

@@ -7,7 +7,6 @@ import {
   Send,
   Tags,
   Ticket,
-  UserPlus,
 } from "lucide-react";
 
 import { Dialog } from "@shared/components";
@@ -15,7 +14,6 @@ import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBa
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
-  useAssignTiRequest,
   useCreateTiRequest,
   useCreateTiRequestCategory,
   useCreateTiRequestMessage,
@@ -32,6 +30,8 @@ import { TiNativeSelect } from "./TiNativeSelect";
 import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
 import {
   tiInputClassName,
+  tiDialogSectionClassName,
+  tiDialogSubsectionClassName,
   tiLabelClassName,
   tiPrimaryButtonClassName,
   tiSecondaryButtonClassName,
@@ -53,7 +53,7 @@ const REQUEST_URGENCY_OPTIONS = [
   { value: "Critical", label: "Crítica" },
 ] as const;
 
-const REQUEST_STATUS_ACTIONS = REQUEST_STATUS_OPTIONS.filter((option) => option.value);
+const REQUEST_STATUS_UPDATE_OPTIONS = REQUEST_STATUS_OPTIONS.filter((option) => option.value);
 
 type RequestDraft = {
   title: string;
@@ -197,11 +197,11 @@ export function TiRequestsTab() {
   const [selectedRequestId, setSelectedRequestId] = useState<TiId | undefined>();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [requestDraft, setRequestDraft] = useState<RequestDraft>(INITIAL_REQUEST_DRAFT);
   const [categoryDraft, setCategoryDraft] = useState<CategoryDraft>(INITIAL_CATEGORY_DRAFT);
   const [createFormError, setCreateFormError] = useState<string | null>(null);
   const [categoryFormError, setCategoryFormError] = useState<string | null>(null);
-  const [assignedUserId, setAssignedUserId] = useState("");
   const [messageDraft, setMessageDraft] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -209,7 +209,7 @@ export function TiRequestsTab() {
   const categoriesQuery = useTiRequestCategories();
   const requests = requestsQuery.data ?? [];
   const selectedRequest = requests.find((request) => request.id === selectedRequestId);
-  const activeRequestId = selectedRequestId ?? requests[0]?.id;
+  const activeRequestId = selectedRequestId;
   const requestDetailQuery = useTiRequest(activeRequestId);
   const messagesQuery = useTiRequestMessages(activeRequestId);
   const activeRequest = requestDetailQuery.data ?? selectedRequest;
@@ -218,7 +218,6 @@ export function TiRequestsTab() {
 
   const createRequestMutation = useCreateTiRequest();
   const updateRequestMutation = useUpdateTiRequest();
-  const assignRequestMutation = useAssignTiRequest();
   const updateStatusMutation = useUpdateTiRequestStatus();
   const createMessageMutation = useCreateTiRequestMessage();
   const createCategoryMutation = useCreateTiRequestCategory();
@@ -256,7 +255,6 @@ export function TiRequestsTab() {
   const isSaving =
     createRequestMutation.isPending ||
     updateRequestMutation.isPending ||
-    assignRequestMutation.isPending ||
     updateStatusMutation.isPending ||
     createMessageMutation.isPending;
   const isCategorySaving = createCategoryMutation.isPending || updateCategoryMutation.isPending;
@@ -336,31 +334,10 @@ export function TiRequestsTab() {
       });
 
       setSelectedRequestId(createdRequest.id);
+      setIsDetailDialogOpen(true);
       handleCloseCreateDialog();
     } catch (error) {
       setCreateFormError(getErrorMessage(error));
-    }
-  }
-
-  async function handleAssignRequest(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setActionError(null);
-
-    if (!activeRequestId || !assignedUserId.trim()) {
-      setActionError("Informe o usuário responsável.");
-      return;
-    }
-
-    try {
-      await assignRequestMutation.mutateAsync({
-        id: activeRequestId,
-        payload: {
-          assigned_to_id: assignedUserId.trim(),
-        },
-      });
-      setAssignedUserId("");
-    } catch (error) {
-      setActionError(getErrorMessage(error));
     }
   }
 
@@ -401,7 +378,7 @@ export function TiRequestsTab() {
   async function handleUpdateStatus(status: string) {
     setActionError(null);
 
-    if (!activeRequestId) {
+    if (!activeRequestId || !status || activeRequest?.status === status) {
       return;
     }
 
@@ -724,7 +701,7 @@ export function TiRequestsTab() {
             />
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+      <div className="space-y-4">
         <div className="space-y-4">
           {requestsQuery.isError ? (
             <TiEmptyState
@@ -774,7 +751,11 @@ export function TiRequestsTab() {
                             "cursor-pointer transition hover:bg-slate-50 dark:hover:bg-slate-800/70",
                             isSelected ? "bg-blue-50 dark:bg-blue-950/30" : null,
                           )}
-                          onClick={() => setSelectedRequestId(request.id)}
+                          onClick={() => {
+                            setSelectedRequestId(request.id);
+                            setActionError(null);
+                            setIsDetailDialogOpen(true);
+                          }}
                         >
                           <td className="min-w-64 px-4 py-3">
                             <span className="block font-medium text-slate-950 dark:text-white">
@@ -807,23 +788,28 @@ export function TiRequestsTab() {
           ) : null}
         </div>
 
-        <aside className={cn("space-y-4", !activeRequestId ? "lg:self-end" : null)}>
+        <Dialog
+          open={isDetailDialogOpen}
+          onOpenChange={(nextOpen) => {
+            setIsDetailDialogOpen(nextOpen);
+            if (!nextOpen) {
+              setActionError(null);
+            }
+          }}
+          title={activeRequest ? getRequestTitle(activeRequest) : "Detalhe do chamado"}
+          description="Detalhe, conversas e ações do atendimento."
+          contentClassName="w-[min(94vw,920px)] overflow-hidden border-slate-300 shadow-2xl dark:border-slate-700"
+          bodyClassName="max-h-[72vh] overflow-y-auto bg-slate-100/70 dark:bg-slate-950/50"
+        >
+          <div className="space-y-4">
           {actionError ? (
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
               {actionError}
             </div>
           ) : null}
 
-          {!activeRequestId ? (
-            <TiEmptyState
-              icon={MessageSquare}
-              title="Selecione um chamado"
-              description="O detalhe, as conversas e as ações do atendimento aparecem neste painel."
-            />
-          ) : null}
-
           {activeRequestId ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div className={tiDialogSectionClassName}>
               {isDetailLoading ? (
                 <p className="text-sm text-slate-600 dark:text-slate-300">Carregando detalhe...</p>
               ) : null}
@@ -835,41 +821,38 @@ export function TiRequestsTab() {
               ) : null}
 
               {activeRequest ? (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="text-lg font-semibold text-slate-950 dark:text-white">
-                        {getRequestTitle(activeRequest)}
-                      </h3>
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start justify-end gap-3 sm:order-2">
                       <StatusBadge config={getStatusBadgeConfig(activeRequest.status)} size="sm" />
                     </div>
-                    <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    <p className="text-sm leading-6 text-slate-600 dark:text-slate-300 sm:order-1">
                       {activeRequest.description ??
                         getStringField(activeRequest, ["body", "details"], "Sem descrição.")}
                     </p>
                   </div>
 
-                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                    <div>
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
                       <dt className={tiLabelClassName}>Categoria</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
                         {getCategoryLabel(activeRequest, categoriesById)}
                       </dd>
                     </div>
-                    <div>
-                      <dt className={tiLabelClassName}>Responsavel</dt>
+                    <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
+                      <dt className={tiLabelClassName}>Responsável</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
                         {activeRequest.assigned_to_name ??
                           getStringField(activeRequest, ["assigned_to", "responsible"], "Sem responsável")}
                       </dd>
                     </div>
-                    <div>
+                    <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
                       <dt className={tiLabelClassName}>Urgência</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
                         {getUrgencyLabel(activeRequest.urgency)}
                       </dd>
                     </div>
-                    <div>
+                    <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
                       <dt className={tiLabelClassName}>Atualizado em</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
                         {formatDate(activeRequest.updated_at)}
@@ -879,12 +862,12 @@ export function TiRequestsTab() {
 
                   <form
                     key={`edit-${activeRequest.id}`}
-                    className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40"
+                    className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800"
                     onSubmit={handleUpdateRequest}
                   >
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="flex min-w-0 flex-col gap-2 sm:col-span-2">
-                        <span className={tiLabelClassName}>Editar título</span>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                      <label className="flex min-w-0 flex-1 flex-col gap-2">
+                        <span className={tiLabelClassName}>Editar chamado</span>
                         <input
                           name="title"
                           className={tiInputClassName}
@@ -896,71 +879,45 @@ export function TiRequestsTab() {
                         label="Categoria"
                         defaultValue={String(activeRequest.category_id ?? "")}
                         options={createCategoryOptions}
+                        className="lg:w-44"
                       />
                       <TiNativeSelect
                         name="urgency"
                         label="Urgência"
                         defaultValue={String(activeRequest.urgency ?? "Medium")}
                         options={REQUEST_URGENCY_OPTIONS}
+                        className="lg:w-36"
                       />
-                      <label className="flex min-w-0 flex-col gap-2 sm:col-span-2">
-                        <span className={tiLabelClassName}>Descrição</span>
-                        <textarea
-                          name="description"
-                          className={cn(tiInputClassName, "h-auto min-h-24 py-2")}
-                          defaultValue={
-                            activeRequest.description ??
-                            getStringField(activeRequest, ["body", "details"], "")
-                          }
-                        />
-                      </label>
+                      <TiNativeSelect
+                        label="Status do chamado"
+                        value={String(activeRequest.status ?? "")}
+                        options={REQUEST_STATUS_UPDATE_OPTIONS}
+                        disabled={isSaving}
+                        className="lg:w-44"
+                        onChange={(event) => handleUpdateStatus(event.target.value)}
+                      />
                     </div>
-                    <button
-                      type="submit"
-                      className={tiSecondaryButtonClassName}
-                      disabled={updateRequestMutation.isPending}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>{updateRequestMutation.isPending ? "Salvando..." : "Salvar edição"}</span>
-                    </button>
-                  </form>
-
-                  <div className="space-y-2">
-                    <span className={tiLabelClassName}>Atualizar status</span>
-                    <div className="flex flex-wrap gap-2">
-                      {REQUEST_STATUS_ACTIONS.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                          disabled={isSaving || activeRequest.status === option.value}
-                          onClick={() => handleUpdateStatus(option.value)}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <form className="space-y-2" onSubmit={handleAssignRequest}>
                     <label className="flex min-w-0 flex-col gap-2">
-                      <span className={tiLabelClassName}>Atribuir responsável</span>
-                      <input
-                        className={tiInputClassName}
-                        value={assignedUserId}
-                        placeholder="ID do usuário"
-                        onChange={(event) => setAssignedUserId(event.target.value)}
+                      <span className={tiLabelClassName}>Descrição</span>
+                      <textarea
+                        name="description"
+                        className={cn(tiInputClassName, "h-auto min-h-16 py-2")}
+                        defaultValue={
+                          activeRequest.description ??
+                          getStringField(activeRequest, ["body", "details"], "")
+                        }
                       />
                     </label>
-                    <button
-                      type="submit"
-                      className={tiSecondaryButtonClassName}
-                      disabled={assignRequestMutation.isPending}
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      <span>{assignRequestMutation.isPending ? "Atribuindo..." : "Atribuir"}</span>
-                    </button>
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        className={tiSecondaryButtonClassName}
+                        disabled={updateRequestMutation.isPending}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>{updateRequestMutation.isPending ? "Salvando..." : "Salvar"}</span>
+                      </button>
+                    </div>
                   </form>
                 </div>
               ) : null}
@@ -968,7 +925,7 @@ export function TiRequestsTab() {
           ) : null}
 
           {activeRequestId ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div className={tiDialogSectionClassName}>
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h3 className="text-base font-semibold text-slate-950 dark:text-white">Mensagens</h3>
                 <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-300" />
@@ -994,7 +951,7 @@ export function TiRequestsTab() {
                 {(messagesQuery.data ?? []).map((message) => (
                   <div
                     key={message.id}
-                    className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40"
+                    className={tiDialogSubsectionClassName}
                   >
                     <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <span>{message.author_name ?? getStringField(message, ["author"], "Autor")}</span>
@@ -1011,7 +968,7 @@ export function TiRequestsTab() {
                 <label className="flex min-w-0 flex-col gap-2">
                   <span className={tiLabelClassName}>Nova mensagem</span>
                   <textarea
-                    className={cn(tiInputClassName, "h-auto min-h-24 py-2")}
+                    className={cn(tiInputClassName, "h-auto min-h-20 py-2")}
                     value={messageDraft}
                     placeholder="Escreva uma atualização para o chamado."
                     onChange={(event) => setMessageDraft(event.target.value)}
@@ -1028,7 +985,8 @@ export function TiRequestsTab() {
               </form>
             </div>
           ) : null}
-        </aside>
+          </div>
+        </Dialog>
       </div>
     </TiPanel>
   );

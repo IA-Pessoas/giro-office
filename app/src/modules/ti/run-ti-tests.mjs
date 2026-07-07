@@ -252,9 +252,54 @@ await runTest("ti requests creation opens in a dialog and leaves filters spannin
   assert.match(tabSource, /contentClassName="w-\[min\(94vw,860px\)\]"/);
   assert.match(tabSource, /md:grid-cols-\[minmax\(320px,1fr\)_180px_220px\]/);
   assert.match(tabSource, /lg:grid-cols-\[minmax\(420px,1fr\)_180px_220px\]/);
-  assert.match(tabSource, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(320px,420px\)\]/);
+  assert.match(tabSource, /<div className="space-y-4">/);
   assert.doesNotMatch(tabSource, /isCreateFormOpen/);
   assert.doesNotMatch(tabSource, /Fechar formul/);
+});
+
+await runTest("ti request detail opens in a dialog instead of a stretched side panel", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+  const workspaceUiSource = await readModuleSource("components/tiWorkspaceUi.ts");
+
+  assert.match(tabSource, /const \[isDetailDialogOpen, setIsDetailDialogOpen\] = useState\(false\)/);
+  assert.match(tabSource, /open=\{isDetailDialogOpen\}/);
+  assert.match(tabSource, /title=\{activeRequest \? getRequestTitle\(activeRequest\) : "Detalhe do chamado"\}/);
+  assert.match(tabSource, /contentClassName="w-\[min\(94vw,920px\)\][^"]*border-slate-300/);
+  assert.match(tabSource, /tiDialogSectionClassName/);
+  assert.match(tabSource, /tiDialogSubsectionClassName/);
+  assert.match(workspaceUiSource, /ring-slate-950\/5/);
+  assert.match(workspaceUiSource, /dark:ring-white\/5/);
+  assert.match(tabSource, /setIsDetailDialogOpen\(true\)/);
+  assert.doesNotMatch(tabSource, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(320px,420px\)\]/);
+  assert.doesNotMatch(tabSource, /title="Selecione um chamado"/);
+});
+
+await runTest("ti request detail keeps secondary actions compact", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.doesNotMatch(tabSource, /<details/);
+  assert.doesNotMatch(tabSource, /<summary/);
+  assert.match(tabSource, /Editar chamado/);
+  assert.match(tabSource, /Status do chamado/);
+  assert.match(tabSource, /onChange=\{\(event\) => handleUpdateStatus\(event\.target\.value\)\}/);
+  assert.match(tabSource, /lg:grid-cols-4/);
+  assert.match(tabSource, /border-t border-slate-200 pt-3/);
+  assert.match(tabSource, /min-h-16/);
+  assert.doesNotMatch(tabSource, /REQUEST_STATUS_ACTIONS\.map/);
+  assert.doesNotMatch(tabSource, /Atualiza o fluxo do atendimento/);
+  assert.doesNotMatch(tabSource, /Expandir/);
+  assert.doesNotMatch(tabSource, /Editar t.tulo/);
+});
+
+await runTest("ti request detail does not fetch admin users for assignment automatically", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.doesNotMatch(tabSource, /useTiAssignableUsers/);
+  assert.doesNotMatch(tabSource, /assignableUserOptions/);
+  assert.doesNotMatch(tabSource, /Atribuir à equipe de TI/);
+  assert.doesNotMatch(tabSource, /listAdminUsers/);
+  assert.doesNotMatch(tabSource, /placeholder="ID do usuário"/);
+  assert.doesNotMatch(tabSource, /assignedUserId/);
 });
 
 await runTest("ti requests payloads follow the backend request schema", async () => {
