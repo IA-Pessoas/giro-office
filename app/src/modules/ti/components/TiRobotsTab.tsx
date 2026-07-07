@@ -1,19 +1,734 @@
-import { Bot } from "lucide-react";
+import { useMemo, useState, type FormEvent } from "react";
+import {
+  Bot,
+  CheckCircle2,
+  Clock3,
+  History,
+  Loader2,
+  Pencil,
+  PlayCircle,
+  Plus,
+  RefreshCw,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 
-import { TiEmptyState, TiPanel, TiSectionHeader } from "./tiFormControls";
+import { Dialog } from "@shared/components";
+import { cn } from "@shared/ui/newLayout/utils";
+
+import {
+  useCreateTiRobot,
+  useCreateTiRobotRun,
+  useTiRobot,
+  useTiRobotRuns,
+  useTiRobots,
+  useUpdateTiRobot,
+} from "../hooks";
+import type {
+  TiId,
+  TiListFilters,
+  TiRobot,
+  TiRobotPayload,
+  TiRobotRun,
+  TiRobotRunPayload,
+} from "../types";
+import { TiNativeSelect } from "./TiNativeSelect";
+import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
+import {
+  tiInputClassName,
+  tiLabelClassName,
+  tiPrimaryButtonClassName,
+  tiSecondaryButtonClassName,
+} from "./tiWorkspaceUi";
+
+const ROBOT_STATUS_OPTIONS = [
+  { value: "", label: "Todos os status" },
+  { value: "active", label: "Ativo" },
+  { value: "inactive", label: "Inativo" },
+  { value: "maintenance", label: "Manutenção" },
+] as const;
+
+const ROBOT_FORM_STATUS_OPTIONS = ROBOT_STATUS_OPTIONS.filter((option) => option.value);
+
+const ROBOT_RUN_STATUS_OPTIONS = [
+  { value: "success", label: "Sucesso" },
+  { value: "failed", label: "Falha" },
+  { value: "running", label: "Em execução" },
+] as const;
+
+type RobotDraft = {
+  name: string;
+  description: string;
+  status: string;
+  ownerId: string;
+  schedule: string;
+};
+
+type RunDraft = {
+  status: string;
+  output: string;
+  errorMessage: string;
+};
+
+type AutomationMetric = {
+  label: string;
+  value: number;
+  helper: string;
+  icon: LucideIcon;
+};
+
+const INITIAL_ROBOT_DRAFT: RobotDraft = {
+  name: "",
+  description: "",
+  status: "active",
+  ownerId: "",
+  schedule: "",
+};
+
+const INITIAL_RUN_DRAFT: RunDraft = {
+  status: "success",
+  output: "",
+  errorMessage: "",
+};
+
+function getStringField(source: Record<string, unknown> | undefined, fields: string[], fallback = "") {
+  if (!source) {
+    return fallback;
+  }
+
+  for (const field of fields) {
+    const value = source[field];
+
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+
+    if (typeof value === "number") {
+      return String(value);
+    }
+  }
+
+  return fallback;
+}
+
+function getRobotName(robot: TiRobot | undefined) {
+  return robot?.name ?? getStringField(robot, ["title", "label"], "Robô sem nome");
+}
+
+function getStatusLabel(status: unknown) {
+  const statusText = typeof status === "boolean" ? (status ? "active" : "inactive") : String(status ?? "");
+  const normalizedStatus = statusText.toLowerCase();
+  const option = [...ROBOT_FORM_STATUS_OPTIONS, ...ROBOT_RUN_STATUS_OPTIONS].find(
+    (item) => item.value === normalizedStatus,
+  );
+
+  return option?.label ?? (statusText || "Sem status");
+}
+
+function isRobotActive(robot: TiRobot) {
+  if (typeof robot.status === "boolean") {
+    return robot.status;
+  }
+
+  return ["active", "enabled", "running"].includes(String(robot.status ?? "").toLowerCase());
+}
+
+function isFailedRun(run: TiRobotRun) {
+  const status = String(run.status ?? "").toLowerCase();
+
+  return ["failed", "failure", "error"].includes(status) || Boolean(run.error_message);
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) {
+    return "Não informado";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (error && typeof error === "object" && "response" in error) {
+    const response = (error as { response?: { data?: { message?: string } } }).response;
+
+    if (response?.data?.message) {
+      return response.data.message;
+    }
+  }
+
+  return "Não foi possível concluir a ação.";
+}
+
+function buildRobotPayload(draft: RobotDraft): TiRobotPayload {
+  return {
+    name: draft.name.trim(),
+    description: draft.description.trim() || null,
+    status: draft.status,
+    owner_id: draft.ownerId.trim() || null,
+    schedule: draft.schedule.trim() || null,
+  };
+}
+
+function buildRunPayload(draft: RunDraft): TiRobotRunPayload {
+  return {
+    status: draft.status,
+    output: draft.output.trim() || null,
+    error_message: draft.errorMessage.trim() || null,
+  };
+}
+
+function createRobotDraft(robot?: TiRobot): RobotDraft {
+  return {
+    name: getRobotName(robot) === "Robô sem nome" ? "" : getRobotName(robot),
+    description: robot?.description ?? getStringField(robot, ["details", "summary"]),
+    status: String(robot?.status ?? "active"),
+    ownerId: String(robot?.owner_id ?? ""),
+    schedule: robot?.schedule ?? getStringField(robot, ["cron", "frequency"]),
+  };
+}
 
 export function TiRobotsTab() {
+  const [filters, setFilters] = useState<TiListFilters>({});
+  const [activeRobotId, setActiveRobotId] = useState<TiId | undefined>();
+  const [isRobotDialogOpen, setIsRobotDialogOpen] = useState(false);
+  const [isRunDialogOpen, setIsRunDialogOpen] = useState(false);
+  const [editingRobot, setEditingRobot] = useState<TiRobot | undefined>();
+  const [robotDraft, setRobotDraft] = useState<RobotDraft>(INITIAL_ROBOT_DRAFT);
+  const [runDraft, setRunDraft] = useState<RunDraft>(INITIAL_RUN_DRAFT);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const robotsQuery = useTiRobots(filters);
+  const robots = robotsQuery.data ?? [];
+  const selectedRobot = robots.find((robot) => String(robot.id) === String(activeRobotId));
+  const selectedRobotId = activeRobotId ?? robots[0]?.id;
+  const robotDetailQuery = useTiRobot(selectedRobotId);
+  const runsQuery = useTiRobotRuns(selectedRobotId);
+  const activeRobot = robotDetailQuery.data ?? selectedRobot ?? robots[0];
+
+  const createRobotMutation = useCreateTiRobot();
+  const updateRobotMutation = useUpdateTiRobot();
+  const createRunMutation = useCreateTiRobotRun();
+
+  const isRobotSaving = createRobotMutation.isPending || updateRobotMutation.isPending;
+  const isRunSaving = createRunMutation.isPending;
+
+  const visibleRuns = useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
+  const activeRobotsCount = useMemo(() => robots.filter(isRobotActive).length, [robots]);
+  const failedRunsCount = useMemo(() => visibleRuns.filter(isFailedRun).length, [visibleRuns]);
+  const automationMetrics = useMemo<AutomationMetric[]>(
+    () => [
+      {
+        label: "Robôs ativos",
+        value: activeRobotsCount,
+        helper: "Disponíveis na lista atual",
+        icon: Bot,
+      },
+      {
+        label: "Execuções do robô",
+        value: visibleRuns.length,
+        helper: activeRobot ? "Histórico do item selecionado" : "Selecione um robô",
+        icon: History,
+      },
+      {
+        label: "Falhas do robô",
+        value: failedRunsCount,
+        helper: runsQuery.isLoading ? "Carregando histórico" : "Erros no histórico selecionado",
+        icon: TriangleAlert,
+      },
+    ],
+    [activeRobot, activeRobotsCount, failedRunsCount, runsQuery.isLoading, visibleRuns.length],
+  );
+
+  function handleSearchChange(value: string) {
+    setFilters((current) => ({
+      ...current,
+      search: value,
+    }));
+  }
+
+  function handleStatusChange(value: string) {
+    setFilters((current) => ({
+      ...current,
+      status: value,
+    }));
+  }
+
+  function openCreateDialog() {
+    setEditingRobot(undefined);
+    setRobotDraft(INITIAL_ROBOT_DRAFT);
+    setFormError(null);
+    setIsRobotDialogOpen(true);
+  }
+
+  function openEditDialog(robot: TiRobot) {
+    setEditingRobot(robot);
+    setRobotDraft(createRobotDraft(robot));
+    setFormError(null);
+    setIsRobotDialogOpen(true);
+  }
+
+  function openRunDialog() {
+    setRunDraft(INITIAL_RUN_DRAFT);
+    setFormError(null);
+    setActionError(null);
+    setIsRunDialogOpen(true);
+  }
+
+  async function handleSaveRobot(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError(null);
+
+    if (!robotDraft.name.trim()) {
+      setFormError("Informe o nome do robô.");
+      return;
+    }
+
+    try {
+      const payload = buildRobotPayload(robotDraft);
+      const savedRobot = editingRobot
+        ? await updateRobotMutation.mutateAsync({ id: editingRobot.id, payload })
+        : await createRobotMutation.mutateAsync(payload);
+
+      setActiveRobotId(savedRobot.id);
+      setIsRobotDialogOpen(false);
+    } catch (error) {
+      setFormError(getErrorMessage(error));
+    }
+  }
+
+  async function handleCreateRun(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError(null);
+    setActionError(null);
+
+    if (!selectedRobotId) {
+      setFormError("Selecione um robô antes de registrar a execução.");
+      return;
+    }
+
+    try {
+      await createRunMutation.mutateAsync({
+        id: selectedRobotId,
+        payload: buildRunPayload(runDraft),
+      });
+      setIsRunDialogOpen(false);
+    } catch (error) {
+      setFormError(getErrorMessage(error));
+      setActionError(getErrorMessage(error));
+    }
+  }
+
   return (
     <TiPanel className="space-y-5">
       <TiSectionHeader
-        title="Robos"
-        description="Acompanhe automacoes, rotinas agendadas e historico de execucao."
+        title="Robôs"
+        description="Acompanhe automações, rotinas agendadas e histórico de execução."
+        action={<TiIconAction icon={Plus} label="Novo robô" variant="primary" onClick={openCreateDialog} />}
       />
-      <TiEmptyState
-        icon={Bot}
-        title="Nenhum robo cadastrado"
-        description="As automacoes do time de Tecnologia aparecem aqui com seus ultimos resultados."
-      />
+
+      <div className="grid gap-3 md:grid-cols-[minmax(280px,1fr)_180px]">
+        <label className="flex min-w-0 flex-col gap-2">
+          <span className={tiLabelClassName}>Busca</span>
+          <input
+            className={tiInputClassName}
+            placeholder="Nome, responsável ou rotina"
+            value={String(filters.search ?? "")}
+            onChange={(event) => handleSearchChange(event.target.value)}
+          />
+        </label>
+        <TiNativeSelect
+          label="Status"
+          value={String(filters.status ?? "")}
+          options={ROBOT_STATUS_OPTIONS}
+          onChange={(event) => handleStatusChange(event.target.value)}
+        />
+      </div>
+
+      {!robotsQuery.isLoading && !robotsQuery.isError ? (
+        <div className="grid gap-3 md:grid-cols-3">
+          {automationMetrics.map((metric) => {
+            const Icon = metric.icon;
+
+            return (
+              <div
+                key={metric.label}
+                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-400">
+                      {metric.label}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold tracking-normal text-slate-950 dark:text-white">
+                      {metric.value}
+                    </p>
+                  </div>
+                  <span className="rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                </div>
+                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{metric.helper}</p>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {robotsQuery.isError ? (
+        <TiEmptyState
+          icon={RefreshCw}
+          title="Não foi possível carregar robôs"
+          description="Tente novamente ou revise as permissões do seu perfil."
+          action={
+            <button type="button" className={tiSecondaryButtonClassName} onClick={() => robotsQuery.refetch()}>
+              <RefreshCw className="h-4 w-4" />
+              <span>Tentar novamente</span>
+            </button>
+          }
+        />
+      ) : null}
+
+      {robotsQuery.isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Carregando robôs...</span>
+        </div>
+      ) : null}
+
+      {!robotsQuery.isLoading && !robotsQuery.isError && robots.length === 0 ? (
+        <TiEmptyState
+          icon={Bot}
+          title="Nenhum robô cadastrado"
+          description="As automações do time de Tecnologia aparecem aqui com seus últimos resultados."
+          action={<TiIconAction icon={Plus} label="Novo robô" variant="primary" onClick={openCreateDialog} />}
+        />
+      ) : null}
+
+      {robots.length > 0 ? (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+          <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-normal text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">Robô</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Última execução</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
+                  {robots.map((robot) => {
+                    const isActive = String(robot.id) === String(selectedRobotId);
+
+                    return (
+                      <tr
+                        key={robot.id}
+                        className={cn(
+                          "cursor-pointer transition hover:bg-slate-50 dark:hover:bg-slate-800/70",
+                          isActive ? "bg-blue-50 dark:bg-blue-950/30" : null,
+                        )}
+                        onClick={() => {
+                          setActiveRobotId(robot.id);
+                          setActionError(null);
+                        }}
+                      >
+                        <td className="min-w-56 px-4 py-3">
+                          <span className="block font-medium text-slate-950 dark:text-white">
+                            {getRobotName(robot)}
+                          </span>
+                          <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                            {robot.owner_name ?? getStringField(robot, ["owner", "responsible"], "Sem responsável")}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                          {getStatusLabel(robot.status)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                          {formatDate(robot.last_run_at)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <aside className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+            {actionError ? (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
+                {actionError}
+              </div>
+            ) : null}
+
+            {activeRobot ? (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-semibold text-slate-950 dark:text-white">
+                      {getRobotName(activeRobot)}
+                    </h3>
+                    <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                      {activeRobot.description ?? getStringField(activeRobot, ["details"], "Sem descrição.")}
+                    </p>
+                  </div>
+                  {robotDetailQuery.isLoading ? (
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-500" />
+                  ) : null}
+                </div>
+
+                {robotDetailQuery.isError ? (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                    Não foi possível atualizar o detalhe deste robô.
+                  </div>
+                ) : null}
+
+                <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className={tiLabelClassName}>Status</dt>
+                    <dd className="mt-1 text-slate-700 dark:text-slate-200">
+                      {getStatusLabel(activeRobot.status)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className={tiLabelClassName}>Agenda</dt>
+                    <dd className="mt-1 text-slate-700 dark:text-slate-200">
+                      {activeRobot.schedule ?? getStringField(activeRobot, ["cron", "frequency"], "Não informada")}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className={tiLabelClassName}>Responsável</dt>
+                    <dd className="mt-1 text-slate-700 dark:text-slate-200">
+                      {activeRobot.owner_name ?? getStringField(activeRobot, ["owner", "responsible"], "Sem responsável")}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className={tiLabelClassName}>Última execução</dt>
+                    <dd className="mt-1 text-slate-700 dark:text-slate-200">
+                      {formatDate(activeRobot.last_run_at)}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={tiSecondaryButtonClassName}
+                    onClick={() => openEditDialog(activeRobot)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    <span>Editar robô</span>
+                  </button>
+                  <button type="button" className={tiPrimaryButtonClassName} onClick={openRunDialog}>
+                    <PlayCircle className="h-4 w-4" />
+                    <span>Registrar execução</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+                  <div className="flex items-center justify-between gap-3">
+                    <h4 className="text-sm font-semibold text-slate-950 dark:text-white">
+                      Histórico de execuções
+                    </h4>
+                    <History className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+                  </div>
+
+                  {runsQuery.isLoading ? (
+                    <p className="text-sm text-slate-600 dark:text-slate-300">Carregando execuções...</p>
+                  ) : null}
+
+                  {runsQuery.isError ? (
+                    <p className="text-sm text-red-600 dark:text-red-300">
+                      Não foi possível carregar as execuções.
+                    </p>
+                  ) : null}
+
+                  {!runsQuery.isLoading && !runsQuery.isError && visibleRuns.length === 0 ? (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Nenhuma execução registrada para este robô.
+                    </p>
+                  ) : null}
+
+                  {visibleRuns.map((run) => (
+                    <div
+                      key={run.id}
+                      className="rounded-md border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="font-medium text-slate-950 dark:text-white">
+                          {getStatusLabel(run.status)}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {formatDate(run.finished_at ?? run.started_at)}
+                        </span>
+                      </div>
+                      <p className="line-clamp-3 text-slate-600 dark:text-slate-300">
+                        {run.error_message ?? run.output ?? "Sem retorno registrado."}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </aside>
+        </div>
+      ) : null}
+
+      <Dialog
+        open={isRobotDialogOpen}
+        onOpenChange={setIsRobotDialogOpen}
+        title={editingRobot ? "Editar robô" : "Novo robô"}
+        description="Formulário de robô"
+        contentClassName="w-[min(92vw,720px)]"
+        bodyClassName="max-h-[72vh] space-y-4 overflow-y-auto"
+      >
+        <form className="space-y-4" onSubmit={handleSaveRobot}>
+          {formError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
+              {formError}
+            </div>
+          ) : null}
+
+          <label className="flex min-w-0 flex-col gap-2">
+            <span className={tiLabelClassName}>Nome</span>
+            <input
+              className={tiInputClassName}
+              value={robotDraft.name}
+              onChange={(event) => setRobotDraft((draft) => ({ ...draft, name: event.target.value }))}
+            />
+          </label>
+
+          <label className="flex min-w-0 flex-col gap-2">
+            <span className={tiLabelClassName}>Descrição</span>
+            <textarea
+              className={cn(tiInputClassName, "h-auto min-h-24 py-2")}
+              value={robotDraft.description}
+              onChange={(event) =>
+                setRobotDraft((draft) => ({ ...draft, description: event.target.value }))
+              }
+            />
+          </label>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <TiNativeSelect
+              label="Status"
+              value={robotDraft.status}
+              options={ROBOT_FORM_STATUS_OPTIONS}
+              onChange={(event) =>
+                setRobotDraft((draft) => ({ ...draft, status: event.target.value }))
+              }
+            />
+            <label className="flex min-w-0 flex-col gap-2">
+              <span className={tiLabelClassName}>Responsável</span>
+              <input
+                className={tiInputClassName}
+                value={robotDraft.ownerId}
+                placeholder="ID do usuário"
+                onChange={(event) =>
+                  setRobotDraft((draft) => ({ ...draft, ownerId: event.target.value }))
+                }
+              />
+            </label>
+            <label className="flex min-w-0 flex-col gap-2">
+              <span className={tiLabelClassName}>Agenda</span>
+              <input
+                className={tiInputClassName}
+                value={robotDraft.schedule}
+                placeholder="Diária, semanal ou cron"
+                onChange={(event) =>
+                  setRobotDraft((draft) => ({ ...draft, schedule: event.target.value }))
+                }
+              />
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className={tiSecondaryButtonClassName}
+              onClick={() => setIsRobotDialogOpen(false)}
+            >
+              Cancelar
+            </button>
+            <button type="submit" className={tiPrimaryButtonClassName} disabled={isRobotSaving}>
+              {isRobotSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              <span>{isRobotSaving ? "Salvando..." : "Salvar"}</span>
+            </button>
+          </div>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={isRunDialogOpen}
+        onOpenChange={setIsRunDialogOpen}
+        title="Registrar execução"
+        description="Registro de execução de robô"
+        contentClassName="w-[min(92vw,640px)]"
+        bodyClassName="space-y-4"
+      >
+        <form className="space-y-4" onSubmit={handleCreateRun}>
+          {formError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
+              {formError}
+            </div>
+          ) : null}
+
+          <TiNativeSelect
+            label="Resultado"
+            value={runDraft.status}
+            options={ROBOT_RUN_STATUS_OPTIONS}
+            onChange={(event) => setRunDraft((draft) => ({ ...draft, status: event.target.value }))}
+          />
+
+          <label className="flex min-w-0 flex-col gap-2">
+            <span className={tiLabelClassName}>Retorno</span>
+            <textarea
+              className={cn(tiInputClassName, "h-auto min-h-24 py-2")}
+              value={runDraft.output}
+              onChange={(event) => setRunDraft((draft) => ({ ...draft, output: event.target.value }))}
+            />
+          </label>
+
+          <label className="flex min-w-0 flex-col gap-2">
+            <span className={tiLabelClassName}>Erro</span>
+            <textarea
+              className={cn(tiInputClassName, "h-auto min-h-20 py-2")}
+              value={runDraft.errorMessage}
+              onChange={(event) =>
+                setRunDraft((draft) => ({ ...draft, errorMessage: event.target.value }))
+              }
+            />
+          </label>
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className={tiSecondaryButtonClassName}
+              onClick={() => setIsRunDialogOpen(false)}
+            >
+              Cancelar
+            </button>
+            <button type="submit" className={tiPrimaryButtonClassName} disabled={isRunSaving}>
+              {isRunSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clock3 className="h-4 w-4" />}
+              <span>{isRunSaving ? "Registrando..." : "Registrar"}</span>
+            </button>
+          </div>
+        </form>
+      </Dialog>
     </TiPanel>
   );
 }

@@ -11,7 +11,8 @@ type TiNativeSelectOption = {
   disabled?: boolean;
 };
 
-export interface TiNativeSelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+export interface TiNativeSelectProps
+  extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "style"> {
   label?: string;
   helperText?: string;
   options?: readonly TiNativeSelectOption[];

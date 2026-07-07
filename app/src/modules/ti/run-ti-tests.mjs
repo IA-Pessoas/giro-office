@@ -386,10 +386,12 @@ await runTest("ti native select uses a centered chevron instead of the browser d
   assert.match(selectSource, /ChevronDown/);
   assert.match(selectSource, /appearance-none/);
   assert.match(selectSource, /pr-10/);
+  assert.match(selectSource, /relative/);
   assert.match(selectSource, /pointer-events-none/);
   assert.match(selectSource, /absolute right-3 top-1\/2/);
   assert.match(selectSource, /-translate-y-1\/2/);
   assert.match(selectSource, /aria-hidden="true"/);
+  assert.match(selectSource, /Omit<SelectHTMLAttributes<HTMLSelectElement>, "style">/);
 });
 
 await runTest("ti dashboard tab consumes the consolidated backend summary", async () => {
@@ -409,4 +411,73 @@ await runTest("ti dashboard tab consumes the consolidated backend summary", asyn
   assert.doesNotMatch(tabSource, /inventory_total/);
   assert.match(tabSource, /isLoading|isFetching/);
   assert.match(tabSource, /isError/);
+});
+
+await runTest("ti robots hooks expose write flows and invalidate robots plus dashboard caches", async () => {
+  const hookSource = await readModuleSource("hooks/useTiRobots.ts");
+  const serviceSource = await readModuleSource("services/tiRobotsService.ts");
+  const typeSource = await readModuleSource("types/robots.ts");
+
+  for (const serviceMethod of [
+    "listRobots",
+    "createRobot",
+    "getRobotById",
+    "updateRobot",
+    "createRobotRun",
+    "listRobotRuns",
+  ]) {
+    assert.match(serviceSource, new RegExp(`${serviceMethod}\\s*\\(`));
+  }
+
+  assert.match(typeSource, /interface TiRobotPayload/);
+  assert.match(typeSource, /interface TiRobotRunPayload/);
+  assert.match(hookSource, /useMutation/);
+  assert.match(hookSource, /useQueryClient/);
+
+  for (const hookName of ["useCreateTiRobot", "useUpdateTiRobot", "useCreateTiRobotRun"]) {
+    assert.match(hookSource, new RegExp(`function\\s+${hookName}\\s*\\(`));
+  }
+
+  assert.match(hookSource, /queryClient\.invalidateQueries\(\{\s*queryKey:\s*tiQueryKeys\.robots\.all\(\)/);
+  assert.match(hookSource, /queryClient\.invalidateQueries\(\{\s*queryKey:\s*tiQueryKeys\.dashboard\(\)/);
+});
+
+await runTest("ti robots tab exposes operational list detail forms and run action", async () => {
+  const tabSource = await readModuleSource("components/TiRobotsTab.tsx");
+
+  assert.match(tabSource, /useTiRobots/);
+  assert.match(tabSource, /useTiRobot\(/);
+  assert.match(tabSource, /useTiRobotRuns/);
+  assert.match(tabSource, /useCreateTiRobot/);
+  assert.match(tabSource, /useUpdateTiRobot/);
+  assert.match(tabSource, /useCreateTiRobotRun/);
+  assert.match(tabSource, /Novo robô/);
+  assert.match(tabSource, /Editar robô/);
+  assert.match(tabSource, /Registrar execução/);
+  assert.match(tabSource, /Dialog/);
+  assert.match(tabSource, /TiNativeSelect/);
+  assert.match(tabSource, /activeRobotId/);
+  assert.match(tabSource, /actionError/);
+  assert.match(tabSource, /robotsQuery\.isError/);
+  assert.match(tabSource, /runsQuery\.isError/);
+  assert.match(tabSource, /mutateAsync/);
+  assert.doesNotMatch(tabSource, /api\.(get|post|patch|put|delete)\(/);
+});
+
+await runTest("ti automation metrics stay inside the robots tab for this PR", async () => {
+  const tabSource = await readModuleSource("components/TiRobotsTab.tsx");
+  const dashboardSource = await readModuleSource("components/TiDashboardTab.tsx");
+  const dashboardTypeSource = await readModuleSource("types/dashboard.ts");
+
+  assert.match(tabSource, /automationMetrics/);
+  assert.match(tabSource, /Robôs ativos/);
+  assert.match(tabSource, /Execuções do robô/);
+  assert.match(tabSource, /Falhas do robô/);
+  assert.match(tabSource, /isRobotActive/);
+  assert.match(tabSource, /isFailedRun/);
+  assert.doesNotMatch(dashboardSource, /robot_runs_recent/);
+  assert.doesNotMatch(dashboardSource, /robot_runs_failed/);
+  assert.doesNotMatch(dashboardTypeSource, /robot_runs_recent\?: number/);
+  assert.doesNotMatch(dashboardTypeSource, /robot_runs_failed\?: number/);
+  assert.doesNotMatch(dashboardSource, /api\.(get|post|patch|put|delete)\(/);
 });
