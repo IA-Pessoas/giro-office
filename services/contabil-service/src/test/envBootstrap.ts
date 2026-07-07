@@ -1,0 +1,5 @@
+/**
+ * Garante variáveis exigidas por `getContabilServiceEnv` / Prisma antes de importar módulos de produção nos testes.
+ */
+process.env.DATABASE_URL ??= "postgresql://postgres:postgres@127.0.0.1:5432/postgres";
+process.env.JWT_SECRET ??= "unit-test-jwt-secret-32-chars-minimum!";
