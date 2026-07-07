@@ -59,6 +59,22 @@ describe("user routes", () => {
     });
   });
 
+  it("GET /user permite admin RH com permissao modular", async () => {
+    userServiceMock.list.mockResolvedValue([{ id: "user-1" }]);
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/user")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }));
+
+    expect(res.status).toBe(200);
+    expect(userServiceMock.list).toHaveBeenCalledWith({
+      skip: 0,
+      take: 20,
+      organizationId: "a0000000-0000-4000-8000-000000000001",
+    });
+  });
+
   it("GET /user/:id retorna detalhe", async () => {
     userServiceMock.getById.mockResolvedValue({ id: "user-2" });
     const app = createTestApp();
@@ -112,6 +128,54 @@ describe("user routes", () => {
     expect(userServiceMock.create).not.toHaveBeenCalled();
   });
 
+  it("POST /user rejeita owner quando solicitante nao e owner", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }))
+      .send({
+        name: "Owner Indevido",
+        login: "owner.indevido",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 2,
+        type: "owner",
+        first_owner_flag: true,
+      });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /user permite admin RH criar admin departamental sem owner", async () => {
+    userServiceMock.create.mockResolvedValue({ id: "user-4" });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }))
+      .send({
+        name: "Admin Contabil",
+        login: "admin.contabil",
+        password: "secret",
+        department_id: "dep-contabil",
+        permission: 2,
+        type: "admin",
+        modules: { financeiro: 1 },
+      });
+
+    expect(res.status).toBe(201);
+    expect(userServiceMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        login: "admin.contabil",
+        permission: 2,
+        type: "admin",
+        modules: { financeiro: 1 },
+      }),
+    );
+  });
+
   it("POST /user rejeita permissao de modulo TI fora do intervalo permitido", async () => {
     const app = createTestApp();
 
@@ -144,6 +208,29 @@ describe("user routes", () => {
       "user-3",
       {
         name: "Usuario Atualizado",
+      },
+      "a0000000-0000-4000-8000-000000000001",
+    );
+  });
+
+  it("PATCH /user/:id permite admin RH alterar acesso sem promover owner", async () => {
+    userServiceMock.update.mockResolvedValue({ id: "user-3" });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-3")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }))
+      .send({
+        permission: 1,
+        type: "user",
+      });
+
+    expect(res.status).toBe(200);
+    expect(userServiceMock.update).toHaveBeenCalledWith(
+      "user-3",
+      {
+        permission: 1,
+        type: "user",
       },
       "a0000000-0000-4000-8000-000000000001",
     );

@@ -64,6 +64,7 @@ describe("AuthService", () => {
       login: "admin",
       password: "hash",
       permission: 2,
+      type: "admin",
       department_id: "dep-1",
       organization_id: "org-1",
       department: { organization_id: "org-1" },
@@ -100,6 +101,7 @@ describe("AuthService", () => {
       name: "Admin",
       login: "admin",
       permission: 2,
+      type: "admin",
       modules: {
         atendimento: null,
         certificado: null,
@@ -125,6 +127,7 @@ describe("AuthService", () => {
     expect(jwtMock.sign).toHaveBeenCalledWith(
       expect.objectContaining({
         permission: 2,
+        type: "admin",
         modules: expect.objectContaining({ ti: 2 }),
       }),
       "jwt-secret",

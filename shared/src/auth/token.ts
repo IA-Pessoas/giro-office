@@ -1,6 +1,6 @@
 import jwt, { type JwtPayload } from "jsonwebtoken";
 
-import type { AuthContext, AuthIdentity } from "./types.js";
+import type { AuthContext, AuthIdentity, AuthUserType } from "./types.js";
 
 function normalizePermissionModules(value: unknown): Record<string, number | null> | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -16,6 +16,10 @@ function normalizePermissionModules(value: unknown): Record<string, number | nul
   }
 
   return modules;
+}
+
+function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
+  return value === "owner" || value === "admin" || value === "user" ? value : undefined;
 }
 
 /**
@@ -41,6 +45,7 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
       typeof payload.organization_id === "string" ? payload.organization_id : undefined,
     permission: typeof payload.permission === "number" ? payload.permission : undefined,
     modules: normalizePermissionModules(payload.modules),
+    type: normalizeAuthUserType(payload.type),
     name: typeof payload.name === "string" ? payload.name : undefined,
     login: typeof payload.login === "string" ? payload.login : undefined,
   };

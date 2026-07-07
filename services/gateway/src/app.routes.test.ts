@@ -5,8 +5,10 @@ import { Writable } from "node:stream";
 import type { CreateAuditRequestPayload } from "@workspace/shared";
 import {
   createLogger,
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
@@ -190,6 +192,7 @@ function createToken(
     user_id: string;
     organization_id: string;
     permission: number;
+    type?: "owner" | "admin" | "user";
     modules?: Record<string, number | null>;
   },
   secret = "test-secret",
@@ -281,6 +284,83 @@ it("requires admin permission for user-management routes", async () => {
       expect(body.success).toBe(false);
       expect(body.code).toBe("FORBIDDEN");
     }
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("allows RH module admins to proxy user-management routes", async () => {
+  let seenHeaders: {
+    userId?: string;
+    organizationId?: string;
+    permission?: string;
+    type?: string;
+    modules?: string;
+  } = {};
+
+  const upstream = createServer((request, response) => {
+    seenHeaders = {
+      userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
+      organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined,
+      permission: request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined,
+      type: request.headers[FORWARDED_AUTH_TYPE_HEADER] as string | undefined,
+      modules: request.headers[FORWARDED_AUTH_MODULES_HEADER] as string | undefined,
+    };
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { users: [] } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "rh-admin",
+    organization_id: "org-1",
+    permission: 1,
+    type: "admin",
+    modules: { rh: 2 },
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenHeaders.userId).toBe("rh-admin");
+    expect(seenHeaders.organizationId).toBe("org-1");
+    expect(seenHeaders.permission).toBe("1");
+    expect(seenHeaders.type).toBe("admin");
+    expect(JSON.parse(seenHeaders.modules ?? "{}")).toMatchObject({ rh: 2 });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("blocks explicit admin without RH module from user-management routes", async () => {
+  const app = createApp(createEnv(), createTestLogger());
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+  const token = createToken({
+    user_id: "dept-admin",
+    organization_id: "org-1",
+    permission: 2,
+    type: "admin",
+    modules: { contabil: 2 },
+  });
+
+  try {
+    const response = await fetch(`${baseUrl}/user`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(403);
   } finally {
     await stopServer(server);
   }

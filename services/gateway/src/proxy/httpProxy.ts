@@ -1,8 +1,10 @@
 import { Readable } from "node:stream";
 
 import {
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
@@ -77,6 +79,7 @@ function getConnectionHeaderTokens(request: Request): Set<string> {
 function resolveForwardedPermission(
   permission: number | undefined,
   modules: Record<string, number | null> | undefined,
+  type: unknown,
   permissionModule?: string,
 ): number | undefined {
   if (!permissionModule) {
@@ -88,7 +91,14 @@ function resolveForwardedPermission(
     return modulePermission;
   }
 
-  if (typeof permission === "number" && permission >= GLOBAL_ADMIN_PERMISSION) {
+  const isExplicitOwner = type === "owner";
+  const isLegacyGlobalAdmin = type === undefined && typeof permission === "number";
+
+  if (
+    (isExplicitOwner || isLegacyGlobalAdmin) &&
+    typeof permission === "number" &&
+    permission >= GLOBAL_ADMIN_PERMISSION
+  ) {
     return GLOBAL_ADMIN_PERMISSION;
   }
 
@@ -103,6 +113,8 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     FORWARDED_AUTH_USER_ID_HEADER,
     FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
     FORWARDED_AUTH_PERMISSION_HEADER,
+    FORWARDED_AUTH_TYPE_HEADER,
+    FORWARDED_AUTH_MODULES_HEADER,
   ]);
 
   Object.entries(request.headers).forEach(([key, value]) => {
@@ -137,11 +149,21 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     const forwardedPermission = resolveForwardedPermission(
       request.auth.claims.permission,
       modules,
+      request.auth.claims.type,
       options.permissionModule,
     );
 
     if (typeof forwardedPermission === "number") {
       headers.set(FORWARDED_AUTH_PERMISSION_HEADER, String(forwardedPermission));
+    }
+
+    const authType = request.auth.claims.type;
+    if (typeof authType === "string") {
+      headers.set(FORWARDED_AUTH_TYPE_HEADER, authType);
+    }
+
+    if (modules) {
+      headers.set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify(modules));
     }
   }
 

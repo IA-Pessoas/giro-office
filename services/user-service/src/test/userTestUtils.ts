@@ -1,6 +1,8 @@
 import {
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
@@ -110,6 +112,8 @@ export function gatewayAuthHeaders(overrides?: {
   userId?: string;
   organizationId?: string;
   permission?: number;
+  type?: "owner" | "admin" | "user";
+  modules?: Record<string, number | null>;
 }): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
@@ -117,6 +121,10 @@ export function gatewayAuthHeaders(overrides?: {
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]:
       overrides?.organizationId ?? DEFAULT_TEST_ORGANIZATION_ID,
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(overrides?.permission ?? 2),
+    ...(overrides?.type ? { [FORWARDED_AUTH_TYPE_HEADER]: overrides.type } : {}),
+    ...(overrides?.modules
+      ? { [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify(overrides.modules) }
+      : {}),
   };
 }
 

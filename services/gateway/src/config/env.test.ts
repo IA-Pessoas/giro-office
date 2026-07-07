@@ -15,6 +15,8 @@ function restoreEnv() {
 
 function setGatewayEnv(overrides: NodeJS.ProcessEnv) {
   restoreEnv();
+  delete process.env.GATEWAY_PUBLIC_URL;
+  delete process.env.GATEWAY_JSON_BODY_LIMIT;
   process.env.JWT_SECRET = "test-secret";
   process.env.NODE_ENV = "production";
   process.env.AUDIT_SERVICE_TOKEN = "secure-internal-token-with-at-least-32-chars";

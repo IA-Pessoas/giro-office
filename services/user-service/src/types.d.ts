@@ -18,6 +18,8 @@ declare global {
       user_id: string;
       organization_id: string;
       permission?: number;
+      user_type?: "owner" | "admin" | "user";
+      modules?: Record<string, number | null>;
       requestId?: string;
       file?: Multer.File;
     }

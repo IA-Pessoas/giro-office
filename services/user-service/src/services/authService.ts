@@ -1,4 +1,4 @@
-import { ServiceError } from "@workspace/shared";
+import { type AuthUserType, ServiceError } from "@workspace/shared";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -49,11 +49,16 @@ const MODULE_PERMISSION_KEYS: ModulePermissionKey[] = [
   "wiki",
 ];
 
+function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
+  return value === "owner" || value === "admin" || value === "user" ? value : undefined;
+}
+
 export interface LoginResult {
   id: string;
   name: string;
   login: string;
   permission: number;
+  type?: AuthUserType;
   modules: ModulePermissions;
   department_id: string;
   organization_id: string;
@@ -102,6 +107,7 @@ class AuthService {
       acc[key] = permissionRecord?.[key] ?? null;
       return acc;
     }, {} as ModulePermissions);
+    const type = normalizeAuthUserType(user.type);
 
     const token = jwt.sign(
       {
@@ -110,6 +116,7 @@ class AuthService {
         name: user.name,
         login: user.login,
         permission: user.permission,
+        type,
         modules,
       },
       jwtSecret,
@@ -124,6 +131,7 @@ class AuthService {
       name: user.name,
       login: user.login,
       permission: user.permission,
+      type,
       modules,
       department_id: user.department_id,
       organization_id: organizationId,
