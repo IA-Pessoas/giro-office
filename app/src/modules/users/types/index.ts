@@ -71,6 +71,8 @@ export interface UpdateUserData {
   name?: string;
   password?: string;
   permission?: number;
+  type?: UserType;
+  modules?: Record<string, number | null>;
   department_id?: string;
   status?: string;
   file?: File;

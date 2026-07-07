@@ -8,7 +8,8 @@ import { useAuth } from "@/context/AuthContext";
 import { CREATE_USER_PERMISSION_OPTIONS } from "../constants/createUserConfig";
 import { ADMIN_USER_STATUS_LABELS, type AdminUserStatus, normalizeAdminUserStatus } from "../services/adminUsersService";
 import { userService } from "../services/userService";
-import type { UpdateUserData, UserItem } from "../types";
+import type { UpdateUserData, UserItem, UserPermission } from "../types";
+import { buildAdminUpdateUserAccessPayload } from "../utils/createUserPayload";
 
 interface AdminUserDetailsPanelProps {
   userId: string | null;
@@ -50,6 +51,7 @@ interface FormState {
   department_id: string;
   permission: string;
   status: AdminUserStatus;
+  isOrganizationOwner: boolean;
 }
 
 function buildFormState(user: UserItem): FormState {
@@ -60,6 +62,7 @@ function buildFormState(user: UserItem): FormState {
     department_id: user.department_id ?? "",
     permission: String(user.permission ?? 0),
     status: normalizeAdminUserStatus(user.status) ?? "active",
+    isOrganizationOwner: user.type === "owner",
   };
 }
 
@@ -72,6 +75,7 @@ export function AdminUserDetailsPanel({
   const router = useRouter();
   const { user: currentUser } = useAuth();
   const hasAdminAccess = canAccessAdministration(currentUser);
+  const canManageOrganizationOwner = currentUser?.type === "owner";
   const [user, setUser] = useState<UserItem | null>(null);
   const [formData, setFormData] = useState<FormState | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
@@ -142,6 +146,10 @@ export function AdminUserDetailsPanel({
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
+    const nextValue =
+      event.target instanceof HTMLInputElement && event.target.type === "checkbox"
+        ? event.target.checked
+        : value;
 
     setFormData((currentFormData) => {
       if (!currentFormData) {
@@ -150,7 +158,8 @@ export function AdminUserDetailsPanel({
 
       return {
         ...currentFormData,
-        [name]: value,
+        [name]: nextValue,
+        ...(name === "isOrganizationOwner" && nextValue === true ? { permission: "2" } : {}),
       };
     });
   };
@@ -163,10 +172,20 @@ export function AdminUserDetailsPanel({
     setIsSaving(true);
     setSaveError(null);
 
+    const selectedPermission = Number(formData.permission) as UserPermission;
+    const isExistingOrganizationOwner = user?.type === "owner";
+    const shouldSendAccessFields = canManageOrganizationOwner || !isExistingOrganizationOwner;
+    const accessPayload = shouldSendAccessFields
+      ? buildAdminUpdateUserAccessPayload(
+          selectedPermission,
+          canManageOrganizationOwner && formData.isOrganizationOwner,
+        )
+      : {};
+
     const payload: UpdateUserData = {
       name: formData.name,
       department_id: formData.department_id,
-      permission: Number(formData.permission),
+      ...accessPayload,
       status: formData.status,
       ...(formData.password.trim() ? { password: formData.password } : {}),
     };
@@ -312,6 +331,7 @@ export function AdminUserDetailsPanel({
                 onChange={handleInputChange}
                 className={SELECT_FIELD_CLASSNAME}
                 style={SELECT_ARROW_STYLE}
+                disabled={formData.isOrganizationOwner}
               >
                 {!hasKnownPermission ? (
                   <option value={formData.permission}>Permissao atual ({formData.permission})</option>
@@ -322,6 +342,18 @@ export function AdminUserDetailsPanel({
                   </option>
                 ))}
               </select>
+              {canManageOrganizationOwner ? (
+                <label className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    name="isOrganizationOwner"
+                    checked={formData.isOrganizationOwner}
+                    onChange={handleInputChange}
+                    className="h-4 w-4 rounded border-slate-300 text-[var(--colors-brand-gradient-end)] focus:ring-[var(--colors-brand-gradient-start)]"
+                  />
+                  Adm. global
+                </label>
+              ) : null}
             </div>
 
             <div className="space-y-2 md:col-span-2">

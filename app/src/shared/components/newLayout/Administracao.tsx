@@ -1101,6 +1101,7 @@ export function Administracao() {
         organizationId={organizationId}
         organizationIdLoading={isLoadingOrganizationId}
         invitedBy={user?.id}
+        canCreateOrganizationOwner={user?.type === "owner"}
       />
     </div>
   );

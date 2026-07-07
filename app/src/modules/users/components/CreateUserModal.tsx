@@ -8,7 +8,8 @@ import {
   CREATE_USER_MODULE_OPTIONS,
   CREATE_USER_PERMISSION_OPTIONS,
 } from '../constants/createUserConfig';
-import type { AdminCreateUserData, UserItem, UserPermission, UserType } from '../types';
+import type { UserItem, UserPermission } from '../types';
+import { buildAdminCreateUserPayload } from '../utils/createUserPayload';
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface CreateUserModalProps {
   organizationId?: string;
   organizationIdLoading?: boolean;
   invitedBy?: string;
+  canCreateOrganizationOwner?: boolean;
 }
 
 const INITIAL_FORM_DATA: {
@@ -75,34 +77,6 @@ function createInitialModuleSelections(): ModuleSelectionState {
   }, {} as ModuleSelectionState);
 }
 
-function buildModulesPayload(
-  moduleSelections: ModuleSelectionState,
-  departmentModuleKey?: ModuleKey | null,
-) {
-  return Object.entries(moduleSelections).reduce<Record<string, number | null>>((acc, [key, config]) => {
-    if (key === departmentModuleKey) {
-      return acc;
-    }
-
-    if (config.enabled) {
-      acc[key] = config.level;
-    }
-    return acc;
-  }, {});
-}
-
-function getUserTypeFromPermission(permission: UserPermission): UserType {
-  switch (permission) {
-    case 1:
-      return 'admin';
-    case 2:
-      return 'owner';
-    case 0:
-    default:
-      return 'user';
-  }
-}
-
 function getModuleSelectValue(selection: ModuleSelectionState[ModuleKey]): ModuleSelectValue {
   if (!selection.enabled) {
     return 'none';
@@ -122,9 +96,11 @@ export function CreateUserModal({
   organizationId,
   organizationIdLoading = false,
   invitedBy,
+  canCreateOrganizationOwner = false,
 }: CreateUserModalProps) {
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [moduleSelections, setModuleSelections] = useState<ModuleSelectionState>(createInitialModuleSelections);
+  const [isOrganizationOwner, setIsOrganizationOwner] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const isCreateBlocked = departmentsLoading || departmentsError || departments.length === 0 || organizationIdLoading || !organizationId;
@@ -139,6 +115,8 @@ export function CreateUserModal({
     () => resolveDepartmentModuleKey(selectedDepartmentName),
     [selectedDepartmentName],
   );
+  const canMarkOrganizationOwner = canCreateOrganizationOwner === true;
+  const effectiveIsOrganizationOwner = canMarkOrganizationOwner && isOrganizationOwner;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -147,6 +125,20 @@ export function CreateUserModal({
       ...prev,
       [name]: name === 'permission' ? Number(value) as UserPermission : value,
     }));
+  };
+
+  const handleOrganizationOwnerChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = event.target.checked;
+
+    setSubmitError(null);
+    setIsOrganizationOwner(checked);
+
+    if (checked) {
+      setFormData((prev) => ({
+        ...prev,
+        permission: 2,
+      }));
+    }
   };
 
   const handleModuleLevelChange = (moduleKey: ModuleKey, value: ModuleSelectValue) => {
@@ -158,6 +150,12 @@ export function CreateUserModal({
         level: value === 'none' ? 0 : Number(value) as 0 | 1 | 2,
       },
     }));
+  };
+
+  const handleCloseModal = () => {
+    setSubmitError(null);
+    setIsOrganizationOwner(false);
+    onClose();
   };
 
   const handleCadastrar = async () => {
@@ -182,20 +180,18 @@ export function CreateUserModal({
 
     try {
       const { userService } = await import('../services/userService');
-      const type = getUserTypeFromPermission(formData.permission);
-      const modules = buildModulesPayload(moduleSelections, departmentModuleKey);
-      const payload: AdminCreateUserData = {
+      const payload = buildAdminCreateUserPayload({
         name: formData.name,
         login: formData.login,
         password: formData.password,
         department_id: formData.department_id,
         permission: formData.permission,
-        organization_id: organizationId,
-        type,
-        status: 'active',
-        ...(type !== 'owner' && Object.keys(modules).length > 0 ? { modules } : {}),
-        ...(invitedBy ? { invited_by: invitedBy } : {}),
-      };
+        organizationId,
+        isOrganizationOwner: effectiveIsOrganizationOwner,
+        moduleSelections,
+        departmentModuleKey,
+        invitedBy,
+      });
 
       const newUser = await userService.create(payload);
       toast.success('Usuario cadastrado com sucesso!');
@@ -203,6 +199,7 @@ export function CreateUserModal({
       onClose();
       setFormData(INITIAL_FORM_DATA);
       setModuleSelections(createInitialModuleSelections());
+      setIsOrganizationOwner(false);
     } catch (err) {
       setSubmitError('Nao foi possivel concluir o cadastro com os dados informados.');
       toast.error('Erro ao cadastrar usuario.');
@@ -217,8 +214,7 @@ export function CreateUserModal({
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
-          setSubmitError(null);
-          onClose();
+          handleCloseModal();
         }
       }}
       title="Cadastrar Novo Usuario"
@@ -230,7 +226,7 @@ export function CreateUserModal({
           <button
             type="button"
             className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            onClick={onClose}
+            onClick={handleCloseModal}
           >
             Cancelar
           </button>
@@ -330,11 +326,23 @@ export function CreateUserModal({
               onChange={handleInputChange}
               className={SELECT_FIELD_CLASSNAME}
               style={SELECT_ARROW_STYLE}
+              disabled={effectiveIsOrganizationOwner}
             >
               {CREATE_USER_PERMISSION_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
+            {canMarkOrganizationOwner ? (
+              <label className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={isOrganizationOwner}
+                  onChange={handleOrganizationOwnerChange}
+                  className="h-4 w-4 rounded border-slate-300 text-[var(--colors-brand-gradient-end)] focus:ring-[var(--colors-brand-gradient-start)]"
+                />
+                Adm. global
+              </label>
+            ) : null}
           </div>
         </div>
 
@@ -367,7 +375,7 @@ export function CreateUserModal({
                       <select
                         value={getModuleSelectValue(selection)}
                         onChange={(e) => handleModuleLevelChange(moduleOption.key, e.target.value as ModuleSelectValue)}
-                        disabled={formData.permission === 2}
+                        disabled={effectiveIsOrganizationOwner || formData.permission === 2}
                         className={`${SELECT_FIELD_CLASSNAME} h-10 px-3 text-sm`}
                         style={SELECT_ARROW_STYLE}
                       >

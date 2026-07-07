@@ -143,6 +143,8 @@ export const userService = {
     if (data.name !== undefined) payload.name = data.name;
     if (data.password !== undefined) payload.password = data.password;
     if (data.permission !== undefined) payload.permission = data.permission;
+    if (data.type !== undefined) payload.type = data.type;
+    if (data.modules !== undefined) payload.modules = data.modules;
     if (data.department_id !== undefined) payload.department_id = data.department_id;
     if (data.status !== undefined) payload.status = data.status;
 
