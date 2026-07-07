@@ -152,11 +152,58 @@ describe("UserService", () => {
 
     expect(prismaMock.department.findFirst).toHaveBeenCalledWith({
       where: { id: "dep-1", organization_id: "org-1" },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     expect(permissionServiceMock.create).toHaveBeenCalledWith("user-1", "org-1");
     expect(permissionServiceMock.update).toHaveBeenCalledWith("user-1", { fiscal: 1 }, "org-1");
     expect(result).toMatchObject({ id: "user-1", permission_id: "permission-1" });
+  });
+
+  it("create normaliza admin departamental para permissao modular do departamento", async () => {
+    bcryptMock.hash.mockResolvedValue("hashed");
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-contabil", name: "Contabil" });
+    prismaMock.user.create.mockResolvedValue({
+      id: "user-admin-contabil",
+      name: "Admin Contabil",
+      login: "admin.contabil",
+      permission: 1,
+      status: "active",
+      department_id: "dep-contabil",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: "org-1",
+      type: "admin",
+      first_owner_flag: false,
+      permission_id: null,
+    });
+    permissionServiceMock.create.mockResolvedValue({ id: "permission-1" });
+    prismaMock.user.update.mockResolvedValue({});
+    const service = new UserService();
+
+    await service.create({
+      name: "Admin Contabil",
+      login: "admin.contabil",
+      password: "secret",
+      department_id: "dep-contabil",
+      permission: 2,
+      organization_id: "org-1",
+      type: "admin",
+      modules: { financeiro: 1 },
+    });
+
+    expect(prismaMock.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          permission: 1,
+          type: "admin",
+        }),
+      }),
+    );
+    expect(permissionServiceMock.update).toHaveBeenCalledWith(
+      "user-admin-contabil",
+      { financeiro: 1, contabil: 2 },
+      "org-1",
+    );
   });
 
   it("create de owner concede permissao maxima para o modulo TI", async () => {
@@ -238,5 +285,41 @@ describe("UserService", () => {
       }),
     );
     expect(prismaMock.user.update).toHaveBeenCalled();
+  });
+
+  it("update ao rebaixar para usuario limpa permissoes modulares antigas", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      permission_id: "permission-1",
+      department_id: "dep-rh",
+      type: "admin",
+    });
+    prismaMock.user.update.mockResolvedValue({
+      id: "user-1",
+      name: "Usuario",
+      permission: 1,
+      type: "user",
+    });
+    const service = new UserService();
+
+    await service.update("user-1", { permission: 1, type: "user" }, "org-1");
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          permission: 1,
+          type: "user",
+        }),
+      }),
+    );
+    expect(permissionServiceMock.update).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({
+        rh: null,
+        ti: null,
+        contabil: null,
+      }),
+      "org-1",
+    );
   });
 });

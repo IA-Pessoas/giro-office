@@ -18,6 +18,10 @@ function normalizeHeaderValue(value: string | string[] | undefined): string | un
   return Array.isArray(value) ? value[0] : value;
 }
 
+function normalizeUserType(value: string | undefined): "owner" | "admin" | "user" | undefined {
+  return value === "owner" || value === "admin" || value === "user" ? value : undefined;
+}
+
 function parseForwardedModules(
   value: string | undefined,
 ): Record<string, number | null> | undefined {
@@ -42,10 +46,6 @@ function parseForwardedModules(
   } catch {
     return undefined;
   }
-}
-
-function normalizeUserType(value: string | undefined): "owner" | "admin" | "user" | undefined {
-  return value === "owner" || value === "admin" || value === "user" ? value : undefined;
 }
 
 export function isAuthenticated(request: Request, _response: Response, next: NextFunction): void {

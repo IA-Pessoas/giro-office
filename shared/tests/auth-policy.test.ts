@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { canAccessRoute } from "../src/auth/policy.js";
-import type { AuthContext, AuthPolicy } from "../src/auth/types.js";
+import { canAccessRoute } from "../src/auth/policy.ts";
+import type { AuthContext, AuthPolicy } from "../src/auth/types.ts";
 
 function authContext(claims: AuthContext["claims"]): AuthContext {
   return {
-    token: "test-token",
+    token: "token",
     userId: claims.user_id,
     organizationId: claims.organization_id ?? "org-1",
     claims,
@@ -31,11 +31,11 @@ test("manageUsers permite owner explicito", () => {
   );
 });
 
-test("manageUsers permite admin RH por permissao modular explicita", () => {
+test("manageUsers permite admin RH por permissao modular", () => {
   assert.equal(
     canAccessRoute(
       authContext({
-        user_id: "rh-admin-1",
+        user_id: "rh-admin",
         organization_id: "org-1",
         permission: 1,
         type: "admin",
@@ -130,6 +130,7 @@ test("ownerOnly bloqueia admin explicito com permission 2", () => {
         organization_id: "org-1",
         permission: 2,
         type: "admin",
+        modules: { contabil: 2 },
       }),
       ownerOnlyPolicy,
     ),

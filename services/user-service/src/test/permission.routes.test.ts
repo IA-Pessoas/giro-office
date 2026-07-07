@@ -48,6 +48,27 @@ describe("permission routes", () => {
     );
   });
 
+  it("PUT /user/permission/:userId permite admin RH por permissao modular", async () => {
+    permissionServiceMock.update.mockResolvedValue({ financeiro: 1 });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/user/permission/user-3")
+      .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 2 } }))
+      .send({
+        financeiro: 1,
+      });
+
+    expect(res.status).toBe(200);
+    expect(permissionServiceMock.update).toHaveBeenCalledWith(
+      "user-3",
+      {
+        financeiro: 1,
+      },
+      "a0000000-0000-4000-8000-000000000001",
+    );
+  });
+
   it("PUT /user/permission/:userId preserva null ao revogar permissao de TI", async () => {
     permissionServiceMock.update.mockResolvedValue({ ti: null });
     const app = createTestApp();
