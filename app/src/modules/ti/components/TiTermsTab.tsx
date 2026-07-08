@@ -171,6 +171,11 @@ export function TiTermsTab() {
   const updateTermMutation = useUpdateTiTermMutation();
   const signTermMutation = useSignTiTermMutation();
 
+  const assetsById = useMemo(
+    () => new Map((assetsQuery.data ?? []).map((asset) => [String(asset.id), asset])),
+    [assetsQuery.data],
+  );
+
   const assetOptions = useMemo(
     () => [
       { value: "", label: "Todos" },
@@ -192,7 +197,7 @@ export function TiTermsTab() {
       return getText(term.inventory.name);
     }
 
-    return getText((assetsQuery.data ?? []).find((asset) => String(asset.id) === String(id))?.name);
+    return getText(assetsById.get(String(id))?.name);
   }
 
   function closeDialog() {

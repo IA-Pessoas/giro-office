@@ -143,6 +143,16 @@ function getStatusTone(status: unknown): "neutral" | "success" | "warning" | "da
   return "neutral";
 }
 
+function getCatalogStatus(
+  item?: { status?: unknown; is_active?: boolean | null } | null,
+): unknown {
+  if (!item) {
+    return undefined;
+  }
+
+  return item.status ?? item.is_active;
+}
+
 function getAssetTitle(asset: TiInventoryAsset): string {
   return getText(asset.name ?? asset.code ?? asset.patrimony_code, "Ativo sem nome");
 }
@@ -203,6 +213,16 @@ export function TiInventoryTab() {
   const createLocationMutation = useCreateTiInventoryLocationMutation();
   const updateLocationMutation = useUpdateTiInventoryLocationMutation();
 
+  const categoriesById = useMemo(
+    () => new Map((categoriesQuery.data ?? []).map((category) => [String(category.id), category])),
+    [categoriesQuery.data],
+  );
+
+  const locationsById = useMemo(
+    () => new Map((locationsQuery.data ?? []).map((location) => [String(location.id), location])),
+    [locationsQuery.data],
+  );
+
   const categoryOptions = useMemo(
     () => [
       { value: "", label: "Todas" },
@@ -231,15 +251,11 @@ export function TiInventoryTab() {
   const selectedAsset = selectedAssetQuery.data ?? selectedListAsset;
 
   function getCategoryName(id: unknown): string {
-    return getText(
-      (categoriesQuery.data ?? []).find((category) => String(category.id) === String(id))?.name,
-    );
+    return getText(categoriesById.get(String(id))?.name);
   }
 
   function getLocationName(id: unknown): string {
-    return getText(
-      (locationsQuery.data ?? []).find((location) => String(location.id) === String(id))?.name,
-    );
+    return getText(locationsById.get(String(id))?.name);
   }
 
   function closeDialog() {
@@ -356,11 +372,14 @@ export function TiInventoryTab() {
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
+    const categoryForm = event.currentTarget;
+    const formData = new FormData(categoryForm);
+    const activeStatus = getFormText(formData, "status");
     const payload = compactPayload({
       name: getFormText(formData, "name"),
       description: getFormText(formData, "description"),
-      status: getFormText(formData, "status"),
+      status: activeStatus,
+      is_active: activeStatus ? activeStatus === "active" : undefined,
     });
 
     try {
@@ -373,7 +392,7 @@ export function TiInventoryTab() {
       }
 
       setEditingCategory(null);
-      event.currentTarget.reset();
+      categoryForm.reset();
     } catch (error) {
       setDialogError(getMutationErrorMessage(error));
     }
@@ -386,11 +405,14 @@ export function TiInventoryTab() {
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
+    const locationForm = event.currentTarget;
+    const formData = new FormData(locationForm);
+    const activeStatus = getFormText(formData, "status");
     const payload = compactPayload({
       name: getFormText(formData, "name"),
       description: getFormText(formData, "description"),
-      status: getFormText(formData, "status"),
+      status: activeStatus,
+      is_active: activeStatus ? activeStatus === "active" : undefined,
     });
 
     try {
@@ -403,7 +425,7 @@ export function TiInventoryTab() {
       }
 
       setEditingLocation(null);
-      event.currentTarget.reset();
+      locationForm.reset();
     } catch (error) {
       setDialogError(getMutationErrorMessage(error));
     }
@@ -784,7 +806,7 @@ export function TiInventoryTab() {
               key={editingCategory ? `category-status-${editingCategory.id}` : "category-status-new"}
               label="Status"
               name="status"
-              defaultValue={normalizeStatus(editingCategory?.status || "active")}
+              defaultValue={normalizeStatus(getCatalogStatus(editingCategory) ?? "active")}
               options={ACTIVE_STATUS_OPTIONS}
             />
             <div className="flex items-end gap-2">
@@ -816,8 +838,8 @@ export function TiInventoryTab() {
                     </td>
                     <td className="px-4 py-3">{getText(category.description)}</td>
                     <td className="px-4 py-3">
-                      <TiStatusPill tone={getStatusTone(category.status)}>
-                        {formatStatus(category.status)}
+                      <TiStatusPill tone={getStatusTone(getCatalogStatus(category))}>
+                        {formatStatus(getCatalogStatus(category))}
                       </TiStatusPill>
                     </td>
                     <td className="px-4 py-3">
@@ -873,7 +895,7 @@ export function TiInventoryTab() {
               key={editingLocation ? `location-status-${editingLocation.id}` : "location-status-new"}
               label="Status"
               name="status"
-              defaultValue={normalizeStatus(editingLocation?.status || "active")}
+              defaultValue={normalizeStatus(getCatalogStatus(editingLocation) ?? "active")}
               options={ACTIVE_STATUS_OPTIONS}
             />
             <div className="flex items-end gap-2">
@@ -905,8 +927,8 @@ export function TiInventoryTab() {
                     </td>
                     <td className="px-4 py-3">{getText(location.description)}</td>
                     <td className="px-4 py-3">
-                      <TiStatusPill tone={getStatusTone(location.status)}>
-                        {formatStatus(location.status)}
+                      <TiStatusPill tone={getStatusTone(getCatalogStatus(location))}>
+                        {formatStatus(getCatalogStatus(location))}
                       </TiStatusPill>
                     </td>
                     <td className="px-4 py-3">

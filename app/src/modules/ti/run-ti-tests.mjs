@@ -500,3 +500,37 @@ await runTest("ti terms tab exposes term create, edit, detail and signing action
   assert.match(source, /useTiInventory\(/);
   assert.match(source, /confirm\(/);
 });
+
+await runTest("ti inventory category and location forms keep a stable form reference", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.doesNotMatch(source, /event\.currentTarget\.reset\(\)/);
+  assert.match(source, /const\s+categoryForm\s*=\s*event\.currentTarget/);
+  assert.match(source, /categoryForm\.reset\(\)/);
+  assert.match(source, /const\s+locationForm\s*=\s*event\.currentTarget/);
+  assert.match(source, /locationForm\.reset\(\)/);
+});
+
+await runTest("ti inventory category and location status supports is_active fallback", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.match(source, /item\.status\s*\?\?\s*item\.is_active/);
+  assert.match(source, /getCatalogStatus\(category\)/);
+  assert.match(source, /getCatalogStatus\(location\)/);
+  assert.match(source, /getCatalogStatus\(editingCategory\)/);
+  assert.match(source, /getCatalogStatus\(editingLocation\)/);
+});
+
+await runTest("ti inventory and terms lookup labels use memoized maps", async () => {
+  const inventorySource = await readModuleSource("components/TiInventoryTab.tsx");
+  const termsSource = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.match(inventorySource, /categoriesById/);
+  assert.match(inventorySource, /locationsById/);
+  assert.match(inventorySource, /new Map/);
+  assert.match(termsSource, /assetsById/);
+  assert.match(termsSource, /new Map/);
+  assert.doesNotMatch(inventorySource, /\(categoriesQuery\.data \?\? \[\]\)\.find/);
+  assert.doesNotMatch(inventorySource, /\(locationsQuery\.data \?\? \[\]\)\.find/);
+  assert.doesNotMatch(termsSource, /\(assetsQuery\.data \?\? \[\]\)\.find/);
+});
