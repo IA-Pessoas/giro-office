@@ -457,11 +457,25 @@ await runTest("ti robots tab exposes operational list detail forms and run actio
   assert.match(tabSource, /Dialog/);
   assert.match(tabSource, /TiNativeSelect/);
   assert.match(tabSource, /activeRobotId/);
+  assert.match(tabSource, /const selectedRobotId = selectedRobot\?\.id \?\? robots\[0\]\?\.id/);
+  assert.match(tabSource, /handleRobotRowKeyDown/);
+  assert.match(tabSource, /role="button"/);
+  assert.match(tabSource, /tabIndex=\{0\}/);
+  assert.match(tabSource, /aria-selected=\{isActive\}/);
   assert.match(tabSource, /actionError/);
   assert.match(tabSource, /robotsQuery\.isError/);
   assert.match(tabSource, /runsQuery\.isError/);
   assert.match(tabSource, /mutateAsync/);
   assert.doesNotMatch(tabSource, /api\.(get|post|patch|put|delete)\(/);
+});
+
+await runTest("ti robots filters normalize empty values before query state", async () => {
+  const tabSource = await readModuleSource("components/TiRobotsTab.tsx");
+
+  assert.match(tabSource, /function normalizeRobotFilters/);
+  assert.match(tabSource, /const normalizedFilters = useMemo\(\(\) => normalizeRobotFilters\(filters\), \[filters\]\)/);
+  assert.match(tabSource, /useTiRobots\(normalizedFilters\)/);
+  assert.match(tabSource, /value !== ""/);
 });
 
 await runTest("ti automation metrics stay inside the robots tab for this PR", async () => {

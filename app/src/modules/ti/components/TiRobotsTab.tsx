@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import {
   Bot,
   CheckCircle2,
@@ -125,6 +125,14 @@ function getStatusLabel(status: unknown) {
   return option?.label ?? (statusText || "Sem status");
 }
 
+function normalizeRobotFilters(filters: TiListFilters): TiListFilters | undefined {
+  const normalizedFilters = Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== ""),
+  ) as TiListFilters;
+
+  return Object.keys(normalizedFilters).length > 0 ? normalizedFilters : undefined;
+}
+
 function isRobotActive(robot: TiRobot) {
   if (typeof robot.status === "boolean") {
     return robot.status;
@@ -211,10 +219,11 @@ export function TiRobotsTab() {
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const robotsQuery = useTiRobots(filters);
+  const normalizedFilters = useMemo(() => normalizeRobotFilters(filters), [filters]);
+  const robotsQuery = useTiRobots(normalizedFilters);
   const robots = robotsQuery.data ?? [];
   const selectedRobot = robots.find((robot) => String(robot.id) === String(activeRobotId));
-  const selectedRobotId = activeRobotId ?? robots[0]?.id;
+  const selectedRobotId = selectedRobot?.id ?? robots[0]?.id;
   const robotDetailQuery = useTiRobot(selectedRobotId);
   const runsQuery = useTiRobotRuns(selectedRobotId);
   const activeRobot = robotDetailQuery.data ?? selectedRobot ?? robots[0];
@@ -265,6 +274,20 @@ export function TiRobotsTab() {
       ...current,
       status: value,
     }));
+  }
+
+  function selectRobot(robotId: TiId) {
+    setActiveRobotId(robotId);
+    setActionError(null);
+  }
+
+  function handleRobotRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, robotId: TiId) {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    selectRobot(robotId);
   }
 
   function openCreateDialog() {
@@ -438,13 +461,17 @@ export function TiRobotsTab() {
                       <tr
                         key={robot.id}
                         className={cn(
-                          "cursor-pointer transition hover:bg-slate-50 dark:hover:bg-slate-800/70",
+                          "cursor-pointer transition hover:bg-slate-50 focus-visible:outline-none",
+                          "focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+                          "focus-visible:ring-offset-white dark:hover:bg-slate-800/70",
+                          "dark:focus-visible:ring-offset-slate-900",
                           isActive ? "bg-blue-50 dark:bg-blue-950/30" : null,
                         )}
-                        onClick={() => {
-                          setActiveRobotId(robot.id);
-                          setActionError(null);
-                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-selected={isActive}
+                        onClick={() => selectRobot(robot.id)}
+                        onKeyDown={(event) => handleRobotRowKeyDown(event, robot.id)}
                       >
                         <td className="min-w-56 px-4 py-3">
                           <span className="block font-medium text-slate-950 dark:text-white">
