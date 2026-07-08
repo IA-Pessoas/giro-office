@@ -167,6 +167,120 @@ await runTest("ti page remains a shell without embedded primary mock datasets", 
   assert.doesNotMatch(pageSource, /api\.(get|post|patch|put|delete)\(/);
 });
 
+await runTest("ti stock hooks expose mutations and invalidate stock plus dashboard caches", async () => {
+  const hookSource = await readModuleSource("hooks/useTiStock.ts");
+  const serviceSource = await readModuleSource("services/tiStockService.ts");
+
+  for (const method of [
+    "listStockItems",
+    "createStockItem",
+    "getStockItemById",
+    "updateStockItem",
+    "createStockEntry",
+    "createStockExit",
+    "listStockCategories",
+    "createStockCategory",
+    "updateStockCategory",
+    "listStockLocations",
+    "createStockLocation",
+    "updateStockLocation",
+  ]) {
+    assert.match(serviceSource, new RegExp(`async\\s+${method}\\s*\\(`));
+  }
+
+  for (const mutation of [
+    "useCreateTiStockItemMutation",
+    "useUpdateTiStockItemMutation",
+    "useCreateTiStockEntryMutation",
+    "useCreateTiStockExitMutation",
+    "useCreateTiStockCategoryMutation",
+    "useUpdateTiStockCategoryMutation",
+    "useCreateTiStockLocationMutation",
+    "useUpdateTiStockLocationMutation",
+  ]) {
+    assert.match(hookSource, new RegExp(`export function ${mutation}`));
+  }
+
+  assert.match(hookSource, /useMutation/);
+  assert.match(hookSource, /useQueryClient/);
+  assert.match(hookSource, /tiQueryKeys\.stock\.all\(\)/);
+  assert.match(hookSource, /tiQueryKeys\.dashboard\(\)/);
+});
+
+await runTest("ti stock tab renders operational item, movement, category and location workflows", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+
+  for (const token of [
+    "useTiStockItems",
+    "useTiStockItem",
+    "useCreateTiStockItemMutation",
+    "useUpdateTiStockItemMutation",
+    "useCreateTiStockEntryMutation",
+    "useCreateTiStockExitMutation",
+    "useCreateTiStockCategoryMutation",
+    "useCreateTiStockLocationMutation",
+    "window.confirm",
+    "Entrada",
+    "Saida",
+    "Categorias",
+    "Locais",
+  ]) {
+    assert.match(tabSource, new RegExp(token.replaceAll(".", "\\.")));
+  }
+
+  assert.doesNotMatch(tabSource, /<TiEmptyState/);
+});
+
+await runTest("ti password contracts separate list data from explicit reveal detail", async () => {
+  const typesSource = await readModuleSource("types/passwords.ts");
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+
+  assert.match(typesSource, /export interface TiPasswordListItem/);
+  assert.match(typesSource, /export interface TiPasswordDetail/);
+
+  const listInterfaceStart = typesSource.indexOf("export interface TiPasswordListItem");
+  const detailInterfaceStart = typesSource.indexOf("export interface TiPasswordDetail");
+  const listInterfaceSource = typesSource.slice(listInterfaceStart, detailInterfaceStart);
+
+  assert.doesNotMatch(listInterfaceSource, /\bpassword\??:/);
+  assert.match(hookSource, /export function useTiPasswordReveal/);
+  assert.match(hookSource, /enabled:\s*Boolean\(id\)\s*&&\s*Boolean\(canReveal\)/);
+});
+
+await runTest("ti passwords tab never renders secrets in list and reveals only by explicit action", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /const \[revealPasswordId, setRevealPasswordId\]/);
+  assert.match(
+    tabSource,
+    /useTiPasswordReveal\(\s*revealPasswordId,\s*Boolean\(revealPasswordId\)\s*&&\s*canRevealPasswords/,
+  );
+  assert.match(tabSource, /<MaskedSecret\s*\/>/);
+  assert.match(tabSource, /setRevealPasswordId\(item\.id\)/);
+  assert.match(tabSource, /setRevealPasswordId\(null\)/);
+  assert.doesNotMatch(tabSource, /\.map\(\(item[^]*?item\.password[^]*?\)\)/);
+  assert.doesNotMatch(tabSource, /passwordRows[^]*?\.password/);
+});
+
+await runTest("ti extension hooks and tab expose ramal mutations", async () => {
+  const hookSource = await readModuleSource("hooks/useTiExtensions.ts");
+  const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
+
+  for (const mutation of [
+    "useCreateTiExtensionMutation",
+    "useUpdateTiExtensionMutation",
+  ]) {
+    assert.match(hookSource, new RegExp(`export function ${mutation}`));
+    assert.match(tabSource, new RegExp(mutation));
+  }
+
+  assert.match(hookSource, /useMutation/);
+  assert.match(hookSource, /tiQueryKeys\.extensions\.all\(\)/);
+  assert.match(tabSource, /useTiExtensions/);
+  assert.match(tabSource, /useTiExtension/);
+  assert.doesNotMatch(tabSource, /<TiEmptyState/);
+});
+
 await runTest("ti visible copy stays product-facing and avoids implementation handoff terms", async () => {
   const files = await collectSourceFiles(join(moduleRoot, "components"));
   const offenders = [];
