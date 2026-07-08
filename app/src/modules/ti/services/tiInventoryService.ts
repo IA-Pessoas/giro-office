@@ -22,7 +22,7 @@ import {
 } from "./tiService.contract";
 
 export const tiInventoryService = {
-  async list(filters?: TiListFilters): Promise<TiInventoryAsset[]> {
+  async listInventory(filters?: TiListFilters): Promise<TiInventoryAsset[]> {
     const response = await api.get(TI_ENDPOINTS.inventory.list, {
       params: buildTiListParams(filters),
     });
@@ -30,7 +30,7 @@ export const tiInventoryService = {
     return unwrapTiList<TiInventoryAsset>(response.data);
   },
 
-  async create(payload: TiInventoryPayload): Promise<TiInventoryAsset> {
+  async createInventoryAsset(payload: TiInventoryPayload): Promise<TiInventoryAsset> {
     const response = await api.post<TiEnvelope<TiInventoryAsset>>(
       TI_ENDPOINTS.inventory.base,
       payload,
@@ -39,7 +39,7 @@ export const tiInventoryService = {
     return unwrapTiEnvelope<TiInventoryAsset>(response.data);
   },
 
-  async getById(id: TiId): Promise<TiInventoryAsset> {
+  async getInventoryAssetById(id: TiId): Promise<TiInventoryAsset> {
     const response = await api.get<TiEnvelope<TiInventoryAsset>>(
       buildTiPath(TI_ENDPOINTS.inventory.detail, id),
     );
@@ -47,7 +47,7 @@ export const tiInventoryService = {
     return unwrapTiEnvelope<TiInventoryAsset>(response.data);
   },
 
-  async update(id: TiId, payload: TiInventoryPayload): Promise<TiInventoryAsset> {
+  async updateInventoryAsset(id: TiId, payload: TiInventoryPayload): Promise<TiInventoryAsset> {
     const response = await api.patch<TiEnvelope<TiInventoryAsset>>(
       buildTiPath(TI_ENDPOINTS.inventory.detail, id),
       payload,
@@ -56,7 +56,10 @@ export const tiInventoryService = {
     return unwrapTiEnvelope<TiInventoryAsset>(response.data);
   },
 
-  async assignUser(id: TiId, payload: TiInventoryAssignUserPayload): Promise<TiInventoryAsset> {
+  async assignInventoryAssetUser(
+    id: TiId,
+    payload: TiInventoryAssignUserPayload,
+  ): Promise<TiInventoryAsset> {
     const response = await api.patch<TiEnvelope<TiInventoryAsset>>(
       buildTiPath(TI_ENDPOINTS.inventory.assignUser, id),
       payload,
@@ -65,7 +68,10 @@ export const tiInventoryService = {
     return unwrapTiEnvelope<TiInventoryAsset>(response.data);
   },
 
-  async returnAsset(id: TiId, payload: TiInventoryReturnPayload = {}): Promise<TiInventoryAsset> {
+  async returnInventoryAsset(
+    id: TiId,
+    payload: TiInventoryReturnPayload = {},
+  ): Promise<TiInventoryAsset> {
     const response = await api.patch<TiEnvelope<TiInventoryAsset>>(
       buildTiPath(TI_ENDPOINTS.inventory.returnAsset, id),
       payload,
@@ -74,7 +80,7 @@ export const tiInventoryService = {
     return unwrapTiEnvelope<TiInventoryAsset>(response.data);
   },
 
-  async listCategories(filters?: TiListFilters): Promise<TiInventoryCategory[]> {
+  async listInventoryCategories(filters?: TiListFilters): Promise<TiInventoryCategory[]> {
     const response = await api.get(TI_ENDPOINTS.inventoryCategories.list, {
       params: buildTiListParams(filters),
     });
@@ -82,7 +88,7 @@ export const tiInventoryService = {
     return unwrapTiList<TiInventoryCategory>(response.data);
   },
 
-  async createCategory(payload: TiInventoryCategoryPayload): Promise<TiInventoryCategory> {
+  async createInventoryCategory(payload: TiInventoryCategoryPayload): Promise<TiInventoryCategory> {
     const response = await api.post<TiEnvelope<TiInventoryCategory>>(
       TI_ENDPOINTS.inventoryCategories.base,
       payload,
@@ -91,7 +97,7 @@ export const tiInventoryService = {
     return unwrapTiEnvelope<TiInventoryCategory>(response.data);
   },
 
-  async updateCategory(
+  async updateInventoryCategory(
     id: TiId,
     payload: TiInventoryCategoryPayload,
   ): Promise<TiInventoryCategory> {
@@ -103,7 +109,7 @@ export const tiInventoryService = {
     return unwrapTiEnvelope<TiInventoryCategory>(response.data);
   },
 
-  async listLocations(filters?: TiListFilters): Promise<TiInventoryLocation[]> {
+  async listInventoryLocations(filters?: TiListFilters): Promise<TiInventoryLocation[]> {
     const response = await api.get(TI_ENDPOINTS.inventoryLocations.list, {
       params: buildTiListParams(filters),
     });
@@ -111,7 +117,7 @@ export const tiInventoryService = {
     return unwrapTiList<TiInventoryLocation>(response.data);
   },
 
-  async createLocation(payload: TiInventoryLocationPayload): Promise<TiInventoryLocation> {
+  async createInventoryLocation(payload: TiInventoryLocationPayload): Promise<TiInventoryLocation> {
     const response = await api.post<TiEnvelope<TiInventoryLocation>>(
       TI_ENDPOINTS.inventoryLocations.base,
       payload,
@@ -120,7 +126,7 @@ export const tiInventoryService = {
     return unwrapTiEnvelope<TiInventoryLocation>(response.data);
   },
 
-  async updateLocation(
+  async updateInventoryLocation(
     id: TiId,
     payload: TiInventoryLocationPayload,
   ): Promise<TiInventoryLocation> {
