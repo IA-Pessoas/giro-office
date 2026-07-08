@@ -262,6 +262,20 @@ await runTest("ti passwords tab never renders secrets in list and reveals only b
   assert.doesNotMatch(tabSource, /passwordRows[^]*?\.password/);
 });
 
+await runTest("ti password reveal clears sensitive detail cache when hidden", async () => {
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(hookSource, /export function useClearTiPasswordRevealCache/);
+  assert.match(
+    hookSource,
+    /removeQueries\(\{\s*queryKey:\s*tiQueryKeys\.passwords\.detail\(id\),\s*exact:\s*true,?\s*\}\)/,
+  );
+  assert.match(tabSource, /const clearPasswordRevealCache = useClearTiPasswordRevealCache\(\)/);
+  assert.match(tabSource, /clearPasswordRevealCache\(revealPasswordId\)/);
+  assert.match(tabSource, /setRevealPasswordId\(null\)/);
+});
+
 await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   const hookSource = await readModuleSource("hooks/useTiExtensions.ts");
   const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");

@@ -22,6 +22,7 @@ import { cn } from "@shared/ui/newLayout/utils";
 
 import {
   useCreateTiPasswordMutation,
+  useClearTiPasswordRevealCache,
   useTiPasswordReveal,
   useTiPasswords,
   useUpdateTiPasswordMutation,
@@ -246,6 +247,7 @@ export function TiPasswordsTab() {
     Boolean(revealPasswordId) && canRevealPasswords,
   );
   const assignableUsersQuery = useAssignableUsers({ enabled: canManagePasswords });
+  const clearPasswordRevealCache = useClearTiPasswordRevealCache();
   const createPasswordMutation = useCreateTiPasswordMutation();
   const updatePasswordMutation = useUpdateTiPasswordMutation();
 
@@ -282,6 +284,7 @@ export function TiPasswordsTab() {
   }
 
   function closeReveal() {
+    clearPasswordRevealCache(revealPasswordId);
     setRevealPasswordId(null);
   }
 
@@ -365,6 +368,7 @@ export function TiPasswordsTab() {
 
       setEditingPassword(null);
       setPasswordForm(initialPasswordFormState);
+      clearPasswordRevealCache(revealPasswordId);
       setRevealPasswordId(null);
     } catch (error) {
       toast.error(getMutationErrorMessage(error, "Nao foi possivel salvar a senha."));
@@ -436,7 +440,10 @@ export function TiPasswordsTab() {
                             type="button"
                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                             disabled={!canRevealPasswords}
-                            onClick={() => setRevealPasswordId(item.id)}
+                            onClick={() => {
+                              clearPasswordRevealCache(revealPasswordId);
+                              setRevealPasswordId(item.id);
+                            }}
                             title="Revelar senha"
                           >
                             <Eye className="h-4 w-4" />

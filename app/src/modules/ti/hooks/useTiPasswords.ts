@@ -57,6 +57,18 @@ export function useTiPasswordReveal(
   );
 }
 
+export function useClearTiPasswordRevealCache(): (id?: TiId | null) => void {
+  const queryClient = useQueryClient();
+
+  return (id) => {
+    if (!id) {
+      return;
+    }
+
+    queryClient.removeQueries({ queryKey: tiQueryKeys.passwords.detail(id), exact: true });
+  };
+}
+
 export function useCreateTiPasswordMutation(): UseMutationResult<
   TiPasswordListItem,
   Error,
