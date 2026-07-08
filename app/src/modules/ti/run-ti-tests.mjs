@@ -410,3 +410,93 @@ await runTest("ti dashboard tab consumes the consolidated backend summary", asyn
   assert.match(tabSource, /isLoading|isFetching/);
   assert.match(tabSource, /isError/);
 });
+
+await runTest("ti inventory and terms expose PR4 mutations through hooks", async () => {
+  const inventoryHooksSource = await readModuleSource("hooks/useTiInventory.ts");
+  const termsHooksSource = await readModuleSource("hooks/useTiTerms.ts");
+
+  for (const expected of [
+    "useCreateTiInventoryAssetMutation",
+    "useUpdateTiInventoryAssetMutation",
+    "useAssignTiInventoryAssetUserMutation",
+    "useReturnTiInventoryAssetMutation",
+    "useCreateTiInventoryCategoryMutation",
+    "useUpdateTiInventoryCategoryMutation",
+    "useCreateTiInventoryLocationMutation",
+    "useUpdateTiInventoryLocationMutation",
+  ]) {
+    assert.match(inventoryHooksSource, new RegExp(`function\\s+${expected}`));
+  }
+
+  for (const expected of [
+    "useCreateTiTermMutation",
+    "useUpdateTiTermMutation",
+    "useSignTiTermMutation",
+  ]) {
+    assert.match(termsHooksSource, new RegExp(`function\\s+${expected}`));
+  }
+
+  assert.match(inventoryHooksSource, /useMutation/);
+  assert.match(inventoryHooksSource, /useQueryClient/);
+  assert.match(inventoryHooksSource, /tiQueryKeys\.inventory\.all\(\)/);
+  assert.match(inventoryHooksSource, /tiQueryKeys\.dashboard\(\)/);
+  assert.match(termsHooksSource, /useMutation/);
+  assert.match(termsHooksSource, /useQueryClient/);
+  assert.match(termsHooksSource, /tiQueryKeys\.terms\.all\(\)/);
+  assert.match(termsHooksSource, /tiQueryKeys\.inventory\.all\(\)/);
+  assert.match(termsHooksSource, /tiQueryKeys\.dashboard\(\)/);
+});
+
+await runTest("ti inventory and terms tabs use shared controls for filters and dialogs", async () => {
+  for (const tabPath of ["components/TiInventoryTab.tsx", "components/TiTermsTab.tsx"]) {
+    const source = await readModuleSource(tabPath);
+
+    assert.match(source, /TiNativeSelect/);
+    assert.match(source, /Dialog/);
+    assert.doesNotMatch(source, /<select\b/);
+    assert.doesNotMatch(source, /style=\{/);
+  }
+});
+
+await runTest("ti inventory tab exposes assets, categories, locations, assignment and return actions", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+  const controlsSource = await readModuleSource("components/tiFormControls.tsx");
+
+  for (const expected of [
+    "Novo ativo",
+    "Categorias",
+    "Locais",
+    "Atribuir usuario",
+    "Registrar devolucao",
+  ]) {
+    assert.match(source, new RegExp(expected));
+  }
+
+  assert.match(`${source}\n${controlsSource}`, /Tentar novamente/);
+
+  assert.match(source, /useTiInventory\(/);
+  assert.match(source, /useTiInventoryAsset\(/);
+  assert.match(source, /useTiInventoryCategories\(/);
+  assert.match(source, /useTiInventoryLocations\(/);
+  assert.match(source, /confirm\(/);
+});
+
+await runTest("ti terms tab exposes term create, edit, detail and signing actions", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+  const controlsSource = await readModuleSource("components/tiFormControls.tsx");
+
+  for (const expected of [
+    "Novo termo",
+    "Assinar termo",
+    "Editar termo",
+  ]) {
+    assert.match(source, new RegExp(expected));
+  }
+
+  assert.match(`${source}\n${controlsSource}`, /Tentar novamente/);
+
+  assert.match(source, /useTiTerms\(/);
+  assert.match(source, /useTiTerm\(/);
+  assert.match(source, /useTiInventory\(/);
+  assert.match(source, /confirm\(/);
+});
