@@ -74,6 +74,13 @@ const ROBOT_ACTIVE_FORM_OPTIONS = [
   { value: "false", label: "Inativo" },
 ] as const;
 
+const ROBOT_SCHEDULE_OPTIONS = [
+  { value: "", label: "Sem rotina automática" },
+  { value: "0 2 * * *", label: "Diariamente às 02:00" },
+  { value: "0 8 * * 1", label: "Segundas às 08:00" },
+  { value: "0 8 1 * *", label: "Mensalmente no dia 1 às 08:00" },
+] as const;
+
 const ROBOT_RUN_STATUS_OPTIONS = [
   { value: "success", label: "Sucesso" },
   { value: "failed", label: "Falha" },
@@ -93,7 +100,6 @@ type RobotDraft = {
 type RunDraft = {
   status: string;
   message: string;
-  metadataJson: string;
 };
 
 type AutomationMetric = {
@@ -115,7 +121,6 @@ const INITIAL_ROBOT_DRAFT: RobotDraft = {
 const INITIAL_RUN_DRAFT: RunDraft = {
   status: "success",
   message: "",
-  metadataJson: "",
 };
 
 function getStringField(source: Record<string, unknown> | undefined, fields: string[], fallback = "") {
@@ -189,28 +194,60 @@ function getRunMessage(run: TiRobotRun) {
   return getStringField(run, ["message", "output", "error_message"], "Sem retorno registrado.");
 }
 
+function getWeekdayLabel(value: string) {
+  return (
+    {
+      "0": "domingo",
+      "1": "segunda",
+      "2": "terça",
+      "3": "quarta",
+      "4": "quinta",
+      "5": "sexta",
+      "6": "sábado",
+    }[value] ?? "dia configurado"
+  );
+}
+
 function formatSchedule(value: string | null | undefined) {
   const schedule = value?.trim();
 
   if (!schedule) {
-    return "Sem agendamento";
+    return "Sem rotina automática";
+  }
+
+  const scheduleOption = ROBOT_SCHEDULE_OPTIONS.find((option) => option.value === schedule);
+
+  if (scheduleOption) {
+    return scheduleOption.label;
   }
 
   const [minute, hour, day, month, weekday] = schedule.split(/\s+/);
+  const hasTime = /^\d{1,2}$/.test(minute ?? "") && /^\d{1,2}$/.test(hour ?? "");
+  const time = hasTime ? `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}` : "";
 
-  if (
-    minute &&
-    hour &&
-    day === "*" &&
-    month === "*" &&
-    weekday === "*" &&
-    /^\d{1,2}$/.test(minute) &&
-    /^\d{1,2}$/.test(hour)
-  ) {
-    return `Diariamente às ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  if (hasTime && day === "*" && month === "*" && weekday === "*") {
+    return `Diariamente às ${time}`;
   }
 
-  return schedule;
+  if (hasTime && day === "*" && month === "*" && /^\d$/.test(weekday ?? "")) {
+    return `${getWeekdayLabel(weekday ?? "")} às ${time}`;
+  }
+
+  if (hasTime && /^\d{1,2}$/.test(day ?? "") && month === "*" && weekday === "*") {
+    return `Mensalmente no dia ${day} às ${time}`;
+  }
+
+  return "Agendamento personalizado";
+}
+
+function getRobotScheduleOptions(value: string) {
+  const schedule = value.trim();
+
+  if (!schedule || ROBOT_SCHEDULE_OPTIONS.some((option) => option.value === schedule)) {
+    return ROBOT_SCHEDULE_OPTIONS;
+  }
+
+  return [...ROBOT_SCHEDULE_OPTIONS, { value: schedule, label: formatSchedule(schedule) }];
 }
 
 function formatDate(value: string | null | undefined) {
@@ -257,33 +294,10 @@ function buildRobotPayload(draft: RobotDraft): TiRobotPayload {
   };
 }
 
-function parseRunMetadataJson(value: string): Record<string, unknown> | undefined {
-  const metadataText = value.trim();
-
-  if (!metadataText) {
-    return undefined;
-  }
-
-  let parsed: unknown;
-
-  try {
-    parsed = JSON.parse(metadataText) as unknown;
-  } catch {
-    throw new Error("Informe metadados em JSON válido.");
-  }
-
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Informe metadados como um objeto JSON.");
-  }
-
-  return parsed as Record<string, unknown>;
-}
-
 function buildRunPayload(draft: RunDraft): TiRobotRunPayload {
   return {
     status: draft.status,
     message: draft.message.trim() || undefined,
-    metadata_json: parseRunMetadataJson(draft.metadataJson),
   };
 }
 
@@ -656,7 +670,7 @@ export function TiRobotsTab() {
                     </dd>
                   </div>
                   <div>
-                    <dt className={tiLabelClassName}>Agendamento</dt>
+                    <dt className={tiLabelClassName}>Rotina automática</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
                       {formatSchedule(activeRobot.schedule ?? getStringField(activeRobot, ["cron", "frequency"]))}
                     </dd>
@@ -753,7 +767,7 @@ export function TiRobotsTab() {
         title={editingRobot ? "Editar robô" : "Novo robô"}
         description="Formulário de robô"
         contentClassName="w-[min(92vw,720px)]"
-        bodyClassName="max-h-[72vh] space-y-4 overflow-y-auto"
+        bodyClassName="space-y-4"
       >
         <form className="space-y-4" onSubmit={handleSaveRobot}>
           {formError ? (
@@ -807,17 +821,14 @@ export function TiRobotsTab() {
                 setRobotDraft((draft) => ({ ...draft, active: event.target.value === "true" }))
               }
             />
-            <label className="flex min-w-0 flex-col gap-2">
-              <span className={tiLabelClassName}>Agendamento</span>
-              <input
-                className={tiInputClassName}
-                value={robotDraft.schedule}
-                placeholder="Cron ou frequência"
-                onChange={(event) =>
-                  setRobotDraft((draft) => ({ ...draft, schedule: event.target.value }))
-                }
-              />
-            </label>
+            <TiNativeSelect
+              label="Rotina automática"
+              value={robotDraft.schedule}
+              options={getRobotScheduleOptions(robotDraft.schedule)}
+              onChange={(event) =>
+                setRobotDraft((draft) => ({ ...draft, schedule: event.target.value }))
+              }
+            />
           </div>
 
           <div className="flex justify-end gap-2">
@@ -841,7 +852,7 @@ export function TiRobotsTab() {
         onOpenChange={setIsRunDialogOpen}
         title="Registrar execução"
         description="Registro de execução de robô"
-        contentClassName="w-[min(92vw,640px)]"
+        contentClassName="w-[min(92vw,560px)]"
         bodyClassName="space-y-4"
       >
         <form className="space-y-4" onSubmit={handleCreateRun}>
@@ -861,21 +872,9 @@ export function TiRobotsTab() {
           <label className="flex min-w-0 flex-col gap-2">
             <span className={tiLabelClassName}>Mensagem</span>
             <textarea
-              className={cn(tiInputClassName, "h-auto min-h-24 py-2")}
+              className={cn(tiInputClassName, "h-auto min-h-20 py-2")}
               value={runDraft.message}
               onChange={(event) => setRunDraft((draft) => ({ ...draft, message: event.target.value }))}
-            />
-          </label>
-
-          <label className="flex min-w-0 flex-col gap-2">
-            <span className={tiLabelClassName}>Metadados JSON</span>
-            <textarea
-              className={cn(tiInputClassName, "h-auto min-h-20 py-2")}
-              value={runDraft.metadataJson}
-              placeholder='{"durationMs": 2300}'
-              onChange={(event) =>
-                setRunDraft((draft) => ({ ...draft, metadataJson: event.target.value }))
-              }
             />
           </label>
 
