@@ -154,8 +154,8 @@ export function TiPage() {
             aria-label="Abas de Tecnologia"
             className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800"
           >
-            <div className="overflow-x-auto pb-1 [scrollbar-color:rgb(71_85_105)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/85 dark:[scrollbar-color:rgb(37_99_235)_transparent] dark:[&::-webkit-scrollbar-thumb]:bg-blue-600/85">
-              <div role="tablist" className="flex min-w-max items-center justify-center gap-1 md:min-w-full">
+            <div className="overflow-x-auto px-2 pb-1 [scrollbar-color:rgb(71_85_105)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/85 dark:[scrollbar-color:rgb(37_99_235)_transparent] dark:[&::-webkit-scrollbar-thumb]:bg-blue-600/85">
+              <div role="tablist" className="flex min-w-max items-center justify-center gap-1 pl-7 md:min-w-full">
                 {TI_TABS.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
