@@ -17,22 +17,49 @@ interface CanSSRAdminOptions<P> {
 
 interface SessionTokenPayload {
   permission?: number;
+  modules?: Record<string, unknown>;
 }
 
 const ADMIN_PERMISSION = 2;
 
-function isAdminPermission(permission?: number | null): boolean {
-  return typeof permission === "number" && permission >= ADMIN_PERMISSION;
+function hasAdminAccess(subject: {
+  permission?: number | null;
+  modules?: Record<string, number | null> | null;
+} | null): boolean {
+  return (
+    (typeof subject?.permission === "number" && subject.permission >= ADMIN_PERMISSION) ||
+    subject?.modules?.rh === ADMIN_PERMISSION
+  );
 }
 
-function getPermissionFromToken(token?: string | null): number | null {
+function normalizeModuleValue(value: unknown): number | null {
+  return value === 0 || value === 1 || value === 2 ? value : null;
+}
+
+function getAccessSubjectFromToken(
+  token?: string | null,
+): { permission: number | null; modules: Record<string, number | null> | null } | null {
   if (!token) {
     return null;
   }
 
   try {
     const payload = jwtDecode<SessionTokenPayload>(token);
-    return typeof payload.permission === "number" ? payload.permission : null;
+    const modules =
+      payload.modules && typeof payload.modules === "object"
+        ? Object.entries(payload.modules).reduce<Record<string, number | null>>(
+            (acc, [moduleKey, value]) => {
+              acc[moduleKey] = normalizeModuleValue(value);
+              return acc;
+            },
+            {},
+          )
+        : null;
+
+    return {
+      permission: typeof payload.permission === "number" ? payload.permission : null,
+      modules,
+    };
   } catch {
     return null;
   }
@@ -75,8 +102,8 @@ export function canSSRAdmin<P>(
       return redirectTo("/login");
     }
 
-    const permission = getPermissionFromToken(token);
-    if (!isAdminPermission(permission)) {
+    const accessSubject = getAccessSubjectFromToken(token);
+    if (!hasAdminAccess(accessSubject)) {
       return options?.onForbidden?.(ctx) ?? redirectTo("/dashboard");
     }
 

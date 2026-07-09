@@ -17,7 +17,7 @@ export interface UserItem {
 }
 
 export type UserType = "user" | "admin" | "owner";
-export type UserPermission = 0 | 1 | 2;
+export type UserPermission = -1 | 0 | 1 | 2;
 
 export type KnownPermissionModuleKey =
   | "atendimento"

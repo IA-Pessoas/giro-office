@@ -6,6 +6,7 @@ interface SessionTokenPayload {
 
 type PermissionCarrier = {
   permission?: number | null;
+  modules?: Record<string, number | null> | null;
 } | null | undefined;
 
 export const ADMIN_PERMISSION = 2;
@@ -23,7 +24,7 @@ export function canAccessAdministration(subject?: number | PermissionCarrier): b
     return isAdminPermission(subject);
   }
 
-  return isAdminPermission(subject.permission);
+  return isAdminPermission(subject.permission) || subject.modules?.rh === ADMIN_PERMISSION;
 }
 
 export function getPermissionFromToken(token?: string | null): number | null {

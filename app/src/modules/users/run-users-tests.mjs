@@ -1,11 +1,19 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   buildAdminCreateUserPayload,
+  buildDepartmentPermissionSyncPayload,
   buildAdminUpdateUserAccessPayload,
   getEffectivePermission,
   getUserTypeFromPermission,
+  needsDepartmentPermissionSync,
 } from "./utils/createUserPayload.ts";
+
+const administracaoSource = readFileSync(
+  new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
+  "utf8",
+);
 
 function runTest(name, fn) {
   try {
@@ -116,4 +124,75 @@ runTest("update access payload keeps permission 2 as admin unless owner flag is 
     permission: 2,
     type: "owner",
   });
+});
+
+runTest("department permission sync payload mirrors the department module level", () => {
+  const modules = {
+    rh: 1,
+    ti: 2,
+    financeiro: null,
+  };
+
+  assert.deepEqual(buildDepartmentPermissionSyncPayload("rh", modules), {
+    permission: 1,
+    type: "user",
+    modules,
+  });
+
+  assert.deepEqual(buildDepartmentPermissionSyncPayload("ti", { ...modules, ti: 2 }), {
+    permission: 2,
+    type: "admin",
+    modules: { ...modules, ti: 2 },
+  });
+
+  assert.deepEqual(buildDepartmentPermissionSyncPayload("financeiro", modules), {
+    permission: -1,
+    type: "user",
+    modules,
+  });
+});
+
+runTest("department permission sync payload uses denied permission for no access", () => {
+  const modules = {
+    rh: null,
+    ti: 1,
+  };
+
+  assert.deepEqual(buildDepartmentPermissionSyncPayload("rh", modules), {
+    permission: -1,
+    type: "user",
+    modules,
+  });
+});
+
+runTest("department permission sync detects stale global user access", () => {
+  const modules = { rh: 1 };
+
+  assert.equal(
+    needsDepartmentPermissionSync("rh", modules, { permission: 2, type: "admin" }),
+    true,
+  );
+  assert.equal(
+    needsDepartmentPermissionSync("rh", modules, { permission: 1, type: "user" }),
+    false,
+  );
+  assert.equal(
+    needsDepartmentPermissionSync("rh", { rh: 2 }, { permission: 1, type: "user" }),
+    true,
+  );
+  assert.equal(needsDepartmentPermissionSync(null, modules, { permission: 2, type: "admin" }), false);
+});
+
+runTest("department module remains editable in permissions tab", () => {
+  assert.match(
+    administracaoSource,
+    /const isDepartmentModule = selectedPermissionDepartmentModule === moduleKey;/,
+  );
+  assert.match(administracaoSource, /buildDepartmentPermissionSyncPayload/);
+  assert.match(administracaoSource, /needsDepartmentPermissionSync/);
+  assert.match(administracaoSource, /userService\.update\(\s*selectedPermissionUserId/s);
+  assert.doesNotMatch(
+    administracaoSource,
+    /isDepartmentModule \? \(\s*<div/s,
+  );
 });

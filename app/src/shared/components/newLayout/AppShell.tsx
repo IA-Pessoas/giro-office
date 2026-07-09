@@ -305,7 +305,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const displayUserLogin = user?.email ?? user?.login ?? meQuery.data?.login ?? "";
   const displayUserPhoto = resolvePhotoUrl(meQuery.data?.photo_url ?? null);
   const displayUserInitials = getInitials(displayUserName);
-  const isAdmin = canAccessAdministration(meQuery.data?.permission ?? user?.permission ?? null);
+  const isAdmin = canAccessAdministration(meQuery.data ?? user);
   const currentModuleKey = getModuleKeyFromRoutePath(pathname);
   const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
   const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;

@@ -92,3 +92,38 @@ export function buildAdminUpdateUserAccessPayload(
     type: getUserTypeFromPermission(permission, isOrganizationOwner),
   };
 }
+
+export function buildDepartmentPermissionSyncPayload(
+  departmentModuleKey: string,
+  modules: Record<string, number | null>,
+): Pick<UpdateUserData, "permission" | "type" | "modules"> {
+  const departmentModuleLevel = modules[departmentModuleKey];
+  let permission: UserPermission = 0;
+
+  if (departmentModuleLevel === null) {
+    permission = -1;
+  } else if (departmentModuleLevel === 2) {
+    permission = 2;
+  } else if (departmentModuleLevel === 1) {
+    permission = 1;
+  }
+
+  return {
+    ...buildAdminUpdateUserAccessPayload(permission),
+    modules,
+  };
+}
+
+export function needsDepartmentPermissionSync(
+  departmentModuleKey: string | null | undefined,
+  modules: Record<string, number | null>,
+  user: Pick<UpdateUserData, "permission" | "type"> | null | undefined,
+): boolean {
+  if (!departmentModuleKey || !user) {
+    return false;
+  }
+
+  const syncPayload = buildDepartmentPermissionSyncPayload(departmentModuleKey, modules);
+
+  return user.permission !== syncPayload.permission || user.type !== syncPayload.type;
+}

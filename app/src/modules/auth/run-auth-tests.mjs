@@ -64,6 +64,10 @@ const administracaoSource = await readFile(
   new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
   "utf8",
 );
+const rhPermissionsSource = await readFile(
+  new URL("../rh/hooks/useRhPermissions.ts", import.meta.url),
+  "utf8",
+);
 
 await (async () => {
   await runTest("isAdminPermission allows administrative levels from 2 and above", () => {
@@ -83,7 +87,13 @@ await (async () => {
     assert.equal(canAccessAdministration({ permission: 2 }), true);
     assert.equal(canAccessAdministration({ permission: 999 }), true);
     assert.equal(canAccessAdministration({ permission: 1 }), false);
+    assert.equal(canAccessAdministration({ permission: 1, modules: { rh: 2 } }), true);
+    assert.equal(canAccessAdministration({ permission: 1, modules: { rh: 1 } }), false);
     assert.equal(canAccessAdministration(undefined), false);
+  });
+
+  await runTest("app shell checks full user access for administration navigation", () => {
+    assert.match(appShellSource, /canAccessAdministration\(meQuery\.data \?\? user\)/);
   });
 
   await runTest("resolveModuleAccess grants admin access to every module", () => {
@@ -114,6 +124,44 @@ await (async () => {
         level: "edit",
         canView: true,
         canEdit: true,
+        isAdmin: false,
+        source: "department",
+      },
+    );
+  });
+
+  await runTest("resolveModuleAccess allows denied department permission to remove the module", () => {
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: -1,
+        departmentModule: "rh",
+        module: "rh",
+        additionalModulePermissions: {
+          rh: null,
+        },
+      }),
+      {
+        level: "none",
+        canView: false,
+        canEdit: false,
+        isAdmin: false,
+        source: "department",
+      },
+    );
+
+    assert.deepEqual(
+      resolveModuleAccess({
+        userPermission: 0,
+        departmentModule: "rh",
+        module: "rh",
+        additionalModulePermissions: {
+          rh: null,
+        },
+      }),
+      {
+        level: "view",
+        canView: true,
+        canEdit: false,
         isAdmin: false,
         source: "department",
       },
@@ -239,6 +287,13 @@ await (async () => {
   await runTest("canSSRAdmin allows admin users through", async () => {
     const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
     const result = await guard(createSsrContext(createToken({ permission: 2 })));
+
+    assert.deepEqual(result, { props: { ok: true } });
+  });
+
+  await runTest("canSSRAdmin allows RH module admins through", async () => {
+    const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
+    const result = await guard(createSsrContext(createToken({ permission: 1, modules: { rh: 2 } })));
 
     assert.deepEqual(result, { props: { ok: true } });
   });
@@ -407,5 +462,10 @@ await (async () => {
       administracaoSource,
       /<select[\s\S]*disabled=\{isSelectedPermissionOwner \|\| isSavingPermissions\}/,
     );
+  });
+  await runTest("RH module user permission does not grant administrative dashboard", () => {
+    assert.doesNotMatch(rhPermissionsSource, /explicitRhPermission[\s\S]*>=\s*1/);
+    assert.match(rhPermissionsSource, /canViewRhDashboard\s*=\s*canManageRh/);
+    assert.match(rhPermissionsSource, /canManageRh\s*=\s*hasRhAdminPermission \|\| isGlobalAdmin/);
   });
 })();
