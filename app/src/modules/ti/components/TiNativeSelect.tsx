@@ -1,4 +1,5 @@
 import type { SelectHTMLAttributes } from "react";
+import { ChevronDown } from "lucide-react";
 
 import { cn } from "@shared/ui/newLayout/utils";
 
@@ -27,14 +28,20 @@ export function TiNativeSelect({
   return (
     <label className="flex min-w-0 flex-col gap-2">
       {label ? <span className={tiLabelClassName}>{label}</span> : null}
-      <select className={cn(tiInputClassName, className)} {...props}>
-        {options?.map((option) => (
-          <option key={option.value} value={option.value} disabled={option.disabled}>
-            {option.label}
-          </option>
-        ))}
-        {children}
-      </select>
+      <span className="relative block min-w-0">
+        <select className={cn(tiInputClassName, "appearance-none pr-10", className)} {...props}>
+          {options?.map((option) => (
+            <option key={option.value} value={option.value} disabled={option.disabled}>
+              {option.label}
+            </option>
+          ))}
+          {children}
+        </select>
+        <ChevronDown
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400"
+        />
+      </span>
       {helperText ? (
         <span className="text-xs leading-5 text-slate-500 dark:text-slate-400">{helperText}</span>
       ) : null}
