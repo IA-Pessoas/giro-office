@@ -189,6 +189,30 @@ function getRunMessage(run: TiRobotRun) {
   return getStringField(run, ["message", "output", "error_message"], "Sem retorno registrado.");
 }
 
+function formatSchedule(value: string | null | undefined) {
+  const schedule = value?.trim();
+
+  if (!schedule) {
+    return "Sem agendamento";
+  }
+
+  const [minute, hour, day, month, weekday] = schedule.split(/\s+/);
+
+  if (
+    minute &&
+    hour &&
+    day === "*" &&
+    month === "*" &&
+    weekday === "*" &&
+    /^\d{1,2}$/.test(minute) &&
+    /^\d{1,2}$/.test(hour)
+  ) {
+    return `Diariamente às ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  }
+
+  return schedule;
+}
+
 function formatDate(value: string | null | undefined) {
   if (!value) {
     return "Não informado";
@@ -591,17 +615,17 @@ export function TiRobotsTab() {
         }}
         title={activeRobot ? getRobotName(activeRobot) : "Detalhe do robô"}
         description="Detalhe, execução e histórico da automação."
-        contentClassName="w-[min(94vw,900px)] overflow-hidden border-slate-300 shadow-2xl dark:border-slate-700"
-        bodyClassName="max-h-[72vh] space-y-4 overflow-y-auto bg-slate-100/70 dark:bg-slate-950/50"
+        contentClassName="w-[min(92vw,760px)] overflow-hidden border-slate-300 shadow-2xl dark:border-slate-700"
+        bodyClassName="max-h-[66vh] space-y-3 overflow-y-auto bg-slate-100/70 !px-4 !py-3 dark:bg-slate-950/50"
       >
         {actionError ? (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
+          <div className="mx-auto max-w-2xl rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
             {actionError}
           </div>
         ) : null}
 
         {selectedRobotId ? (
-          <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div className="mx-auto max-w-2xl space-y-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="text-lg font-semibold text-slate-950 dark:text-white">
@@ -632,9 +656,9 @@ export function TiRobotsTab() {
                     </dd>
                   </div>
                   <div>
-                    <dt className={tiLabelClassName}>Agenda</dt>
+                    <dt className={tiLabelClassName}>Agendamento</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
-                      {activeRobot.schedule ?? getStringField(activeRobot, ["cron", "frequency"], "Não informada")}
+                      {formatSchedule(activeRobot.schedule ?? getStringField(activeRobot, ["cron", "frequency"]))}
                     </dd>
                   </div>
                   <div>
@@ -657,7 +681,7 @@ export function TiRobotsTab() {
                   </div>
                 </dl>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                   <button
                     type="button"
                     className={tiSecondaryButtonClassName}
@@ -677,7 +701,7 @@ export function TiRobotsTab() {
         ) : null}
 
         {selectedRobotId ? (
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div className="mx-auto max-w-2xl space-y-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:p-4">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-semibold text-slate-950 dark:text-white">
                 Histórico de execuções
@@ -784,11 +808,11 @@ export function TiRobotsTab() {
               }
             />
             <label className="flex min-w-0 flex-col gap-2">
-              <span className={tiLabelClassName}>Agenda</span>
+              <span className={tiLabelClassName}>Agendamento</span>
               <input
                 className={tiInputClassName}
                 value={robotDraft.schedule}
-                placeholder="Diária, semanal ou cron"
+                placeholder="Cron ou frequência"
                 onChange={(event) =>
                   setRobotDraft((draft) => ({ ...draft, schedule: event.target.value }))
                 }

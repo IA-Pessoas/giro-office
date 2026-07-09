@@ -478,6 +478,12 @@ await runTest("ti robots tab exposes operational list detail forms and run actio
   assert.match(tabSource, /setIsDetailDialogOpen\(true\)/);
   assert.match(tabSource, /open=\{isDetailDialogOpen\}/);
   assert.match(tabSource, /title=\{activeRobot \? getRobotName\(activeRobot\) : "Detalhe do robô"\}/);
+  assert.match(tabSource, /contentClassName="w-\[min\(92vw,760px\)\]/);
+  assert.match(tabSource, /bodyClassName="max-h-\[66vh\]/);
+  assert.match(tabSource, /mx-auto max-w-2xl/);
+  assert.match(tabSource, /function formatSchedule/);
+  assert.match(tabSource, /Agendamento/);
+  assert.doesNotMatch(tabSource, />Agenda<\//);
   assert.doesNotMatch(tabSource, /robots\[0\]\?\.id/);
   assert.doesNotMatch(tabSource, /<aside/);
   assert.doesNotMatch(tabSource, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(320px,420px\)\]/);
