@@ -74,13 +74,6 @@ const ROBOT_ACTIVE_FORM_OPTIONS = [
   { value: "false", label: "Inativo" },
 ] as const;
 
-const ROBOT_SCHEDULE_OPTIONS = [
-  { value: "", label: "Sem rotina automática" },
-  { value: "0 2 * * *", label: "Diariamente às 02:00" },
-  { value: "0 8 * * 1", label: "Segundas às 08:00" },
-  { value: "0 8 1 * *", label: "Mensalmente no dia 1 às 08:00" },
-] as const;
-
 const ROBOT_RUN_STATUS_OPTIONS = [
   { value: "success", label: "Sucesso" },
   { value: "failed", label: "Falha" },
@@ -100,6 +93,7 @@ type RobotDraft = {
 type RunDraft = {
   status: string;
   message: string;
+  durationMs: string;
 };
 
 type AutomationMetric = {
@@ -121,6 +115,7 @@ const INITIAL_ROBOT_DRAFT: RobotDraft = {
 const INITIAL_RUN_DRAFT: RunDraft = {
   status: "success",
   message: "",
+  durationMs: "",
 };
 
 function getStringField(source: Record<string, unknown> | undefined, fields: string[], fallback = "") {
@@ -212,13 +207,7 @@ function formatSchedule(value: string | null | undefined) {
   const schedule = value?.trim();
 
   if (!schedule) {
-    return "Sem rotina automática";
-  }
-
-  const scheduleOption = ROBOT_SCHEDULE_OPTIONS.find((option) => option.value === schedule);
-
-  if (scheduleOption) {
-    return scheduleOption.label;
+    return "Sem agendamento";
   }
 
   const [minute, hour, day, month, weekday] = schedule.split(/\s+/);
@@ -237,17 +226,7 @@ function formatSchedule(value: string | null | undefined) {
     return `Mensalmente no dia ${day} às ${time}`;
   }
 
-  return "Agendamento personalizado";
-}
-
-function getRobotScheduleOptions(value: string) {
-  const schedule = value.trim();
-
-  if (!schedule || ROBOT_SCHEDULE_OPTIONS.some((option) => option.value === schedule)) {
-    return ROBOT_SCHEDULE_OPTIONS;
-  }
-
-  return [...ROBOT_SCHEDULE_OPTIONS, { value: schedule, label: formatSchedule(schedule) }];
+  return schedule;
 }
 
 function formatDate(value: string | null | undefined) {
@@ -294,10 +273,27 @@ function buildRobotPayload(draft: RobotDraft): TiRobotPayload {
   };
 }
 
+function buildRunMetadata(draft: RunDraft): Record<string, unknown> | undefined {
+  const durationText = draft.durationMs.trim();
+
+  if (!durationText) {
+    return undefined;
+  }
+
+  const durationMs = Number(durationText);
+
+  if (!Number.isFinite(durationMs) || durationMs < 0) {
+    throw new Error("Informe a duração em milissegundos.");
+  }
+
+  return { durationMs };
+}
+
 function buildRunPayload(draft: RunDraft): TiRobotRunPayload {
   return {
     status: draft.status,
     message: draft.message.trim() || undefined,
+    metadata_json: buildRunMetadata(draft),
   };
 }
 
@@ -630,7 +626,7 @@ export function TiRobotsTab() {
         title={activeRobot ? getRobotName(activeRobot) : "Detalhe do robô"}
         description="Detalhe, execução e histórico da automação."
         contentClassName="w-[min(92vw,760px)] overflow-hidden border-slate-300 shadow-2xl dark:border-slate-700"
-        bodyClassName="max-h-[66vh] space-y-3 overflow-y-auto bg-slate-100/70 !px-4 !py-3 dark:bg-slate-950/50"
+        bodyClassName="space-y-3 bg-slate-100/70 !px-4 !py-3 dark:bg-slate-950/50"
       >
         {actionError ? (
           <div className="mx-auto max-w-2xl rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
@@ -670,7 +666,7 @@ export function TiRobotsTab() {
                     </dd>
                   </div>
                   <div>
-                    <dt className={tiLabelClassName}>Rotina automática</dt>
+                    <dt className={tiLabelClassName}>Agendamento</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
                       {formatSchedule(activeRobot.schedule ?? getStringField(activeRobot, ["cron", "frequency"]))}
                     </dd>
@@ -821,14 +817,17 @@ export function TiRobotsTab() {
                 setRobotDraft((draft) => ({ ...draft, active: event.target.value === "true" }))
               }
             />
-            <TiNativeSelect
-              label="Rotina automática"
-              value={robotDraft.schedule}
-              options={getRobotScheduleOptions(robotDraft.schedule)}
-              onChange={(event) =>
-                setRobotDraft((draft) => ({ ...draft, schedule: event.target.value }))
-              }
-            />
+            <label className="flex min-w-0 flex-col gap-2">
+              <span className={tiLabelClassName}>Agendamento</span>
+              <input
+                className={tiInputClassName}
+                value={robotDraft.schedule}
+                placeholder="Diário 02:00, sob demanda ou conforme operação"
+                onChange={(event) =>
+                  setRobotDraft((draft) => ({ ...draft, schedule: event.target.value }))
+                }
+              />
+            </label>
           </div>
 
           <div className="flex justify-end gap-2">
@@ -862,12 +861,30 @@ export function TiRobotsTab() {
             </div>
           ) : null}
 
-          <TiNativeSelect
-            label="Resultado"
-            value={runDraft.status}
-            options={ROBOT_RUN_STATUS_OPTIONS}
-            onChange={(event) => setRunDraft((draft) => ({ ...draft, status: event.target.value }))}
-          />
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px]">
+            <TiNativeSelect
+              label="Resultado"
+              value={runDraft.status}
+              options={ROBOT_RUN_STATUS_OPTIONS}
+              onChange={(event) =>
+                setRunDraft((draft) => ({ ...draft, status: event.target.value }))
+              }
+            />
+            <label className="flex min-w-0 flex-col gap-2">
+              <span className={tiLabelClassName}>Duração (ms)</span>
+              <input
+                className={tiInputClassName}
+                type="number"
+                min="0"
+                step="1"
+                inputMode="numeric"
+                value={runDraft.durationMs}
+                onChange={(event) =>
+                  setRunDraft((draft) => ({ ...draft, durationMs: event.target.value }))
+                }
+              />
+            </label>
+          </div>
 
           <label className="flex min-w-0 flex-col gap-2">
             <span className={tiLabelClassName}>Mensagem</span>
