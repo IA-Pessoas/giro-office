@@ -473,7 +473,14 @@ await runTest("ti robots tab exposes operational list detail forms and run actio
   assert.doesNotMatch(tabSource, /output: draft/);
   assert.doesNotMatch(tabSource, /error_message: draft/);
   assert.match(tabSource, /activeRobotId/);
-  assert.match(tabSource, /const selectedRobotId = selectedRobot\?\.id \?\? robots\[0\]\?\.id/);
+  assert.match(tabSource, /const selectedRobotId = activeRobotId/);
+  assert.match(tabSource, /const \[isDetailDialogOpen, setIsDetailDialogOpen\] = useState\(false\)/);
+  assert.match(tabSource, /setIsDetailDialogOpen\(true\)/);
+  assert.match(tabSource, /open=\{isDetailDialogOpen\}/);
+  assert.match(tabSource, /title=\{activeRobot \? getRobotName\(activeRobot\) : "Detalhe do robô"\}/);
+  assert.doesNotMatch(tabSource, /robots\[0\]\?\.id/);
+  assert.doesNotMatch(tabSource, /<aside/);
+  assert.doesNotMatch(tabSource, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(320px,420px\)\]/);
   assert.match(tabSource, /handleRobotRowKeyDown/);
   assert.match(tabSource, /role="button"/);
   assert.match(tabSource, /tabIndex=\{0\}/);

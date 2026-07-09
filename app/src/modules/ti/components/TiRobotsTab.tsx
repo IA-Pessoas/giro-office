@@ -278,6 +278,7 @@ export function TiRobotsTab() {
   const [filters, setFilters] = useState<TiListFilters>({});
   const [activeRobotId, setActiveRobotId] = useState<TiId | undefined>();
   const [isRobotDialogOpen, setIsRobotDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isRunDialogOpen, setIsRunDialogOpen] = useState(false);
   const [editingRobot, setEditingRobot] = useState<TiRobot | undefined>();
   const [robotDraft, setRobotDraft] = useState<RobotDraft>(INITIAL_ROBOT_DRAFT);
@@ -289,10 +290,10 @@ export function TiRobotsTab() {
   const robotsQuery = useTiRobots(normalizedFilters);
   const robots = robotsQuery.data ?? [];
   const selectedRobot = robots.find((robot) => String(robot.id) === String(activeRobotId));
-  const selectedRobotId = selectedRobot?.id ?? robots[0]?.id;
+  const selectedRobotId = activeRobotId;
   const robotDetailQuery = useTiRobot(selectedRobotId);
   const runsQuery = useTiRobotRuns(selectedRobotId);
-  const activeRobot = robotDetailQuery.data ?? selectedRobot ?? robots[0];
+  const activeRobot = robotDetailQuery.data ?? selectedRobot;
 
   const createRobotMutation = useCreateTiRobot();
   const updateRobotMutation = useUpdateTiRobot();
@@ -315,7 +316,7 @@ export function TiRobotsTab() {
       {
         label: "Execuções do robô",
         value: visibleRuns.length,
-        helper: activeRobot ? "Histórico do item selecionado" : "Selecione um robô",
+        helper: activeRobot ? "Histórico do item selecionado" : "Abra um robô",
         icon: History,
       },
       {
@@ -352,6 +353,7 @@ export function TiRobotsTab() {
   function selectRobot(robotId: TiId) {
     setActiveRobotId(robotId);
     setActionError(null);
+    setIsDetailDialogOpen(true);
   }
 
   function handleRobotRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, robotId: TiId) {
@@ -406,6 +408,7 @@ export function TiRobotsTab() {
 
       setActiveRobotId(savedRobot.id);
       setIsRobotDialogOpen(false);
+      setIsDetailDialogOpen(true);
     } catch (error) {
       setFormError(getErrorMessage(error));
     }
@@ -523,7 +526,7 @@ export function TiRobotsTab() {
       ) : null}
 
       {robots.length > 0 ? (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+        <div className="space-y-0">
           <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
@@ -575,36 +578,52 @@ export function TiRobotsTab() {
               </table>
             </div>
           </div>
+        </div>
+      ) : null}
 
-          <aside className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
-            {actionError ? (
-              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
-                {actionError}
+      <Dialog
+        open={isDetailDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setIsDetailDialogOpen(nextOpen);
+          if (!nextOpen) {
+            setActionError(null);
+          }
+        }}
+        title={activeRobot ? getRobotName(activeRobot) : "Detalhe do robô"}
+        description="Detalhe, execução e histórico da automação."
+        contentClassName="w-[min(94vw,900px)] overflow-hidden border-slate-300 shadow-2xl dark:border-slate-700"
+        bodyClassName="max-h-[72vh] space-y-4 overflow-y-auto bg-slate-100/70 dark:bg-slate-950/50"
+      >
+        {actionError ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
+            {actionError}
+          </div>
+        ) : null}
+
+        {selectedRobotId ? (
+          <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold text-slate-950 dark:text-white">
+                  {activeRobot ? getRobotName(activeRobot) : "Carregando robô"}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {activeRobot?.description ?? getStringField(activeRobot, ["details"], "Sem descrição.")}
+                </p>
+              </div>
+              {robotDetailQuery.isLoading ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-500" />
+              ) : null}
+            </div>
+
+            {robotDetailQuery.isError ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                Não foi possível atualizar o detalhe deste robô.
               </div>
             ) : null}
 
             {activeRobot ? (
               <>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="text-lg font-semibold text-slate-950 dark:text-white">
-                      {getRobotName(activeRobot)}
-                    </h3>
-                    <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                      {activeRobot.description ?? getStringField(activeRobot, ["details"], "Sem descrição.")}
-                    </p>
-                  </div>
-                  {robotDetailQuery.isLoading ? (
-                    <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-500" />
-                  ) : null}
-                </div>
-
-                {robotDetailQuery.isError ? (
-                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
-                    Não foi possível atualizar o detalhe deste robô.
-                  </div>
-                ) : null}
-
                 <dl className="grid gap-3 text-sm sm:grid-cols-2">
                   <div>
                     <dt className={tiLabelClassName}>Status</dt>
@@ -652,55 +671,57 @@ export function TiRobotsTab() {
                     <span>Registrar execução</span>
                   </button>
                 </div>
-
-                <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-                  <div className="flex items-center justify-between gap-3">
-                    <h4 className="text-sm font-semibold text-slate-950 dark:text-white">
-                      Histórico de execuções
-                    </h4>
-                    <History className="h-4 w-4 text-blue-600 dark:text-blue-300" />
-                  </div>
-
-                  {runsQuery.isLoading ? (
-                    <p className="text-sm text-slate-600 dark:text-slate-300">Carregando execuções...</p>
-                  ) : null}
-
-                  {runsQuery.isError ? (
-                    <p className="text-sm text-red-600 dark:text-red-300">
-                      Não foi possível carregar as execuções.
-                    </p>
-                  ) : null}
-
-                  {!runsQuery.isLoading && !runsQuery.isError && visibleRuns.length === 0 ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Nenhuma execução registrada para este robô.
-                    </p>
-                  ) : null}
-
-                  {visibleRuns.map((run) => (
-                    <div
-                      key={run.id}
-                      className="rounded-md border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
-                    >
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="font-medium text-slate-950 dark:text-white">
-                          {getStatusLabel(run.status)}
-                        </span>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                          {formatDate(run.finished_at ?? run.started_at)}
-                        </span>
-                      </div>
-                      <p className="line-clamp-3 text-slate-600 dark:text-slate-300">
-                        {getRunMessage(run)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
               </>
             ) : null}
-          </aside>
-        </div>
-      ) : null}
+          </div>
+        ) : null}
+
+        {selectedRobotId ? (
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold text-slate-950 dark:text-white">
+                Histórico de execuções
+              </h4>
+              <History className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+            </div>
+
+            {runsQuery.isLoading ? (
+              <p className="text-sm text-slate-600 dark:text-slate-300">Carregando execuções...</p>
+            ) : null}
+
+            {runsQuery.isError ? (
+              <p className="text-sm text-red-600 dark:text-red-300">
+                Não foi possível carregar as execuções.
+              </p>
+            ) : null}
+
+            {!runsQuery.isLoading && !runsQuery.isError && visibleRuns.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Nenhuma execução registrada para este robô.
+              </p>
+            ) : null}
+
+            {visibleRuns.map((run) => (
+              <div
+                key={run.id}
+                className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40"
+              >
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="font-medium text-slate-950 dark:text-white">
+                    {getStatusLabel(run.status)}
+                  </span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    {formatDate(run.finished_at ?? run.started_at)}
+                  </span>
+                </div>
+                <p className="line-clamp-3 text-slate-600 dark:text-slate-300">
+                  {getRunMessage(run)}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </Dialog>
 
       <Dialog
         open={isRobotDialogOpen}
