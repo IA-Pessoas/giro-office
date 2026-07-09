@@ -7,9 +7,11 @@ import {
   Send,
   Tags,
   Ticket,
+  UserCheck,
 } from "lucide-react";
 
 import { Dialog } from "@shared/components";
+import { useAuth } from "@/context/AuthContext";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { cn } from "@shared/ui/newLayout/utils";
 
@@ -17,6 +19,7 @@ import {
   useCreateTiRequest,
   useCreateTiRequestCategory,
   useCreateTiRequestMessage,
+  useAssignTiRequest,
   useTiRequest,
   useTiRequestCategories,
   useTiRequestMessages,
@@ -99,6 +102,32 @@ function getStringField(record: Record<string, unknown>, keys: string[], fallbac
   }
 
   return fallback;
+}
+
+function getRelatedUserName(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+
+  for (const key of ["full_name", "name", "login", "email"]) {
+    const field = record[key];
+
+    if (typeof field === "string" && field.trim()) {
+      return field;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeSearchText(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 }
 
 function formatDate(value: unknown): string {
@@ -192,8 +221,62 @@ function getCategoryLabel(
   return "-";
 }
 
+function getRequesterLabel(
+  request: TiRequest,
+  currentUser?: { id?: string; name?: string } | null,
+): string {
+  if (request.requester_name) {
+    return request.requester_name;
+  }
+
+  const requesterName = getRelatedUserName(request.requester);
+
+  if (requesterName) {
+    return requesterName;
+  }
+
+  if (
+    currentUser?.id &&
+    request.requester_id !== undefined &&
+    request.requester_id !== null &&
+    String(request.requester_id) === currentUser.id
+  ) {
+    return currentUser.name || "Você";
+  }
+
+  return getStringField(request, ["created_by"], "Sem solicitante");
+}
+
+function getAssigneeLabel(request: TiRequest): string {
+  if (request.assigned_to_name) {
+    return request.assigned_to_name;
+  }
+
+  const assigneeName = getRelatedUserName(request.assigned_to);
+
+  if (assigneeName) {
+    return assigneeName;
+  }
+
+  if (request.assigned_to_id !== undefined && request.assigned_to_id !== null) {
+    return "Responsável atribuído";
+  }
+
+  return "Sem responsável";
+}
+
+function hasAssignee(request: TiRequest): boolean {
+  return (
+    Boolean(request.assigned_to_name) ||
+    Boolean(getRelatedUserName(request.assigned_to)) ||
+    (request.assigned_to_id !== undefined && request.assigned_to_id !== null)
+  );
+}
+
 export function TiRequestsTab() {
-  const [filters, setFilters] = useState<TiListFilters>({ search: "", status: "" });
+  const { user: currentUser } = useAuth();
+  const [filters, setFilters] = useState<TiListFilters>({ status: "" });
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedRequestId, setSelectedRequestId] = useState<TiId | undefined>();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
@@ -205,7 +288,8 @@ export function TiRequestsTab() {
   const [messageDraft, setMessageDraft] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const requestsQuery = useTiRequests(filters);
+  const requestFilters = useMemo(() => filters, [filters]);
+  const requestsQuery = useTiRequests(requestFilters);
   const categoriesQuery = useTiRequestCategories();
   const requests = requestsQuery.data ?? [];
   const selectedRequest = requests.find((request) => request.id === selectedRequestId);
@@ -218,6 +302,7 @@ export function TiRequestsTab() {
 
   const createRequestMutation = useCreateTiRequest();
   const updateRequestMutation = useUpdateTiRequest();
+  const assignRequestMutation = useAssignTiRequest();
   const updateStatusMutation = useUpdateTiRequestStatus();
   const createMessageMutation = useCreateTiRequestMessage();
   const createCategoryMutation = useCreateTiRequestCategory();
@@ -228,6 +313,27 @@ export function TiRequestsTab() {
       categories.map((category) => [String(category.id), category] as const),
     );
   }, [categories]);
+
+  const filteredRequests = useMemo(() => {
+    const normalizedSearchTerm = normalizeSearchText(searchTerm);
+
+    if (!normalizedSearchTerm) {
+      return requests;
+    }
+
+    return requests.filter((request) => {
+      const searchableText = [
+        getRequestTitle(request),
+        request.description,
+        getCategoryLabel(request, categoriesById),
+        getRequesterLabel(request, currentUser),
+      ]
+        .map(normalizeSearchText)
+        .join(" ");
+
+      return searchableText.includes(normalizedSearchTerm);
+    });
+  }, [categoriesById, currentUser, requests, searchTerm]);
 
   const categoryOptions = useMemo(() => {
     return [
@@ -255,6 +361,7 @@ export function TiRequestsTab() {
   const isSaving =
     createRequestMutation.isPending ||
     updateRequestMutation.isPending ||
+    assignRequestMutation.isPending ||
     updateStatusMutation.isPending ||
     createMessageMutation.isPending;
   const isCategorySaving = createCategoryMutation.isPending || updateCategoryMutation.isPending;
@@ -386,6 +493,28 @@ export function TiRequestsTab() {
       await updateStatusMutation.mutateAsync({
         id: activeRequestId,
         payload: { status },
+      });
+    } catch (error) {
+      setActionError(getErrorMessage(error));
+    }
+  }
+
+  async function handleAssignToMe() {
+    setActionError(null);
+
+    if (!activeRequestId) {
+      return;
+    }
+
+    if (!currentUser?.id) {
+      setActionError("Não foi possível identificar o usuário atual.");
+      return;
+    }
+
+    try {
+      await assignRequestMutation.mutateAsync({
+        id: activeRequestId,
+        payload: { assigned_to_id: currentUser.id },
       });
     } catch (error) {
       setActionError(getErrorMessage(error));
@@ -588,6 +717,12 @@ export function TiRequestsTab() {
           ) : null}
 
           <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/40 md:col-span-2">
+              <span className={tiLabelClassName}>Solicitante</span>
+              <p className="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {currentUser?.name ?? "Usuário atual"}
+              </p>
+            </div>
             <label className="flex min-w-0 flex-col gap-2 md:col-span-2">
               <span className={tiLabelClassName}>Título</span>
               <input
@@ -667,14 +802,9 @@ export function TiRequestsTab() {
               <span className={tiLabelClassName}>Busca</span>
               <input
                 className={tiInputClassName}
-                value={String(filters.search ?? "")}
+                value={searchTerm}
                 placeholder="Título, solicitante ou descrição"
-                onChange={(event) =>
-                  setFilters((currentFilters) => ({
-                    ...currentFilters,
-                    search: event.target.value,
-                  }))
-                }
+                onChange={(event) => setSearchTerm(event.target.value)}
               />
             </label>
             <TiNativeSelect
@@ -719,7 +849,7 @@ export function TiRequestsTab() {
             />
           ) : null}
 
-          {!isRequestsLoading && !requestsQuery.isError && requests.length === 0 ? (
+          {!isRequestsLoading && !requestsQuery.isError && filteredRequests.length === 0 ? (
             <TiEmptyState
               icon={Ticket}
               title="Nenhum chamado encontrado"
@@ -727,7 +857,7 @@ export function TiRequestsTab() {
             />
           ) : null}
 
-          {!isRequestsLoading && !requestsQuery.isError && requests.length > 0 ? (
+          {!isRequestsLoading && !requestsQuery.isError && filteredRequests.length > 0 ? (
             <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
@@ -741,7 +871,7 @@ export function TiRequestsTab() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
-                    {requests.map((request) => {
+                    {filteredRequests.map((request) => {
                       const isSelected = request.id === activeRequestId;
 
                       return (
@@ -762,8 +892,7 @@ export function TiRequestsTab() {
                               {getRequestTitle(request)}
                             </span>
                             <span className="text-xs text-slate-500 dark:text-slate-400">
-                              {request.requester_name ??
-                                getStringField(request, ["requester", "created_by"], "Sem solicitante")}
+                              {getRequesterLabel(request, currentUser)}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
@@ -832,7 +961,7 @@ export function TiRequestsTab() {
                     </p>
                   </div>
 
-                  <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
                       <dt className={tiLabelClassName}>Categoria</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
@@ -840,10 +969,31 @@ export function TiRequestsTab() {
                       </dd>
                     </div>
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
-                      <dt className={tiLabelClassName}>Responsável</dt>
+                      <dt className={tiLabelClassName}>Solicitante</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
-                        {activeRequest.assigned_to_name ??
-                          getStringField(activeRequest, ["assigned_to", "responsible"], "Sem responsável")}
+                        {getRequesterLabel(activeRequest, currentUser)}
+                      </dd>
+                    </div>
+                    <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
+                      <dt className={tiLabelClassName}>Responsável</dt>
+                      <dd className="mt-1 flex flex-col items-start gap-2 text-slate-700 dark:text-slate-200">
+                        <span>{getAssigneeLabel(activeRequest)}</span>
+                        {!hasAssignee(activeRequest) ? (
+                          <button
+                            type="button"
+                            className={cn(
+                              tiSecondaryButtonClassName,
+                              "h-8 min-w-[104px] justify-center px-3 text-xs whitespace-nowrap",
+                            )}
+                            disabled={assignRequestMutation.isPending || !currentUser?.id}
+                            onClick={handleAssignToMe}
+                          >
+                            <UserCheck className="h-3.5 w-3.5" />
+                            <span>
+                              {assignRequestMutation.isPending ? "Assumindo..." : "Assumir"}
+                            </span>
+                          </button>
+                        ) : null}
                       </dd>
                     </div>
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">

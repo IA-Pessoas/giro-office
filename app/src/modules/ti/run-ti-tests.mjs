@@ -282,7 +282,7 @@ await runTest("ti request detail keeps secondary actions compact", async () => {
   assert.match(tabSource, /Editar chamado/);
   assert.match(tabSource, /Status do chamado/);
   assert.match(tabSource, /onChange=\{\(event\) => handleUpdateStatus\(event\.target\.value\)\}/);
-  assert.match(tabSource, /lg:grid-cols-4/);
+  assert.match(tabSource, /lg:grid-cols-5/);
   assert.match(tabSource, /border-t border-slate-200 pt-3/);
   assert.match(tabSource, /min-h-16/);
   assert.doesNotMatch(tabSource, /REQUEST_STATUS_ACTIONS\.map/);
@@ -294,6 +294,11 @@ await runTest("ti request detail keeps secondary actions compact", async () => {
 await runTest("ti request detail does not fetch admin users for assignment automatically", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 
+  assert.match(tabSource, /useAssignTiRequest/);
+  assert.match(tabSource, /handleAssignToMe/);
+  assert.match(tabSource, /"Assumir"/);
+  assert.doesNotMatch(tabSource, /Assumir chamado/);
+  assert.match(tabSource, /assigned_to_id: currentUser\.id/);
   assert.doesNotMatch(tabSource, /useTiAssignableUsers/);
   assert.doesNotMatch(tabSource, /assignableUserOptions/);
   assert.doesNotMatch(tabSource, /Atribuir à equipe de TI/);
@@ -333,6 +338,20 @@ await runTest("ti requests payloads follow the backend request schema", async ()
   assert.doesNotMatch(tabSource, /value: "closed"/);
   assert.doesNotMatch(tabSource, /category_id: requestDraft\.category_id \|\| null/);
   assert.doesNotMatch(tabSource, /description: requestDraft\.description\.trim\(\) \|\| null/);
+});
+
+await runTest("ti requests tab keeps text search local and renders requester labels", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(tabSource, /const \[searchTerm, setSearchTerm\] = useState\(""\)/);
+  assert.match(tabSource, /const requestFilters = useMemo/);
+  assert.match(tabSource, /const filteredRequests = useMemo/);
+  assert.match(tabSource, /useTiRequests\(requestFilters\)/);
+  assert.match(tabSource, /getRequesterLabel/);
+  assert.match(tabSource, /Solicitante/);
+  assert.match(tabSource, /currentUser/);
+  assert.doesNotMatch(tabSource, /useState<TiListFilters>\(\{ search:/);
+  assert.doesNotMatch(tabSource, /search: event\.target\.value/);
 });
 
 await runTest("ti requests tab exposes request category management actions", async () => {
@@ -375,12 +394,19 @@ await runTest("ti native select uses a centered chevron instead of the browser d
 
 await runTest("ti dashboard tab consumes the consolidated backend summary", async () => {
   const tabSource = await readModuleSource("components/TiDashboardTab.tsx");
+  const dashboardTypesSource = await readModuleSource("types/dashboard.ts");
 
   assert.match(tabSource, /useTiDashboard\(/);
-  assert.match(tabSource, /requests_open/);
-  assert.match(tabSource, /inventory_total/);
-  assert.match(tabSource, /stock_low_count/);
-  assert.match(tabSource, /robots_active/);
+  assert.match(tabSource, /openRequests/);
+  assert.match(tabSource, /criticalRequests/);
+  assert.match(tabSource, /resolvedLastSevenDays/);
+  assert.match(tabSource, /inventoryAssets/);
+  assert.match(tabSource, /lowStockItems/);
+  assert.match(tabSource, /activeRobots/);
+  assert.match(dashboardTypesSource, /openRequests: number/);
+  assert.match(dashboardTypesSource, /inventoryAssets: number/);
+  assert.doesNotMatch(tabSource, /requests_open/);
+  assert.doesNotMatch(tabSource, /inventory_total/);
   assert.match(tabSource, /isLoading|isFetching/);
   assert.match(tabSource, /isError/);
 });

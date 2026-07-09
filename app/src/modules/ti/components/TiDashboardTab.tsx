@@ -160,9 +160,9 @@ export function TiDashboardTab() {
   const summary = dashboardQuery.data;
   const isLoading = dashboardQuery.isLoading || dashboardQuery.isFetching;
   const isEmpty = !summary || Object.keys(summary).length === 0;
-  const openRequests = Number(summary?.requests_open ?? 0);
-  const inProgressRequests = Number(summary?.requests_in_progress ?? 0);
-  const closedRequests = Number(summary?.requests_closed ?? 0);
+  const openRequests = Number(summary?.openRequests ?? 0);
+  const criticalRequests = Number(summary?.criticalRequests ?? 0);
+  const resolvedLastSevenDays = Number(summary?.resolvedLastSevenDays ?? 0);
 
   if (isLoading) {
     return (
@@ -211,17 +211,17 @@ export function TiDashboardTab() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
           <MetricTile
             icon={Ticket}
-            label="Em atendimento"
-            value={formatMetric(summary?.requests_in_progress)}
-            supporting={`${closedRequests.toLocaleString("pt-BR")} chamados fechados`}
+            label="Críticos"
+            value={formatMetric(summary?.criticalRequests)}
+            supporting={`${resolvedLastSevenDays.toLocaleString("pt-BR")} resolvidos em 7 dias`}
           />
-          <MetricTile icon={Boxes} label="Ativos" value={formatMetric(summary?.inventory_total)} />
+          <MetricTile icon={Boxes} label="Ativos" value={formatMetric(summary?.inventoryAssets)} />
           <MetricTile
             icon={PackageSearch}
             label="Estoque crítico"
-            value={formatMetric(summary?.stock_low_count)}
+            value={formatMetric(summary?.lowStockItems)}
           />
-          <MetricTile icon={Bot} label="Robôs ativos" value={formatMetric(summary?.robots_active)} />
+          <MetricTile icon={Bot} label="Robôs ativos" value={formatMetric(summary?.activeRobots)} />
         </div>
       </div>
 
@@ -234,13 +234,13 @@ export function TiDashboardTab() {
             <DashboardSummaryRow icon={Ticket} label="Abertos" value={formatMetric(openRequests)} />
             <DashboardSummaryRow
               icon={BarChart3}
-              label="Em atendimento"
-              value={formatMetric(inProgressRequests)}
+              label="Críticos"
+              value={formatMetric(criticalRequests)}
             />
             <DashboardSummaryRow
               icon={ClipboardList}
-              label="Fechados"
-              value={formatMetric(closedRequests)}
+              label="Resolvidos em 7 dias"
+              value={formatMetric(resolvedLastSevenDays)}
             />
           </div>
         </DashboardSectionCard>
@@ -253,17 +253,17 @@ export function TiDashboardTab() {
             <DashboardSummaryRow
               icon={Boxes}
               label="Ativos"
-              value={formatMetric(summary?.inventory_total)}
+              value={formatMetric(summary?.inventoryAssets)}
             />
             <DashboardSummaryRow
               icon={PackageSearch}
               label="Estoque"
-              value={formatMetric(summary?.stock_low_count)}
+              value={formatMetric(summary?.lowStockItems)}
             />
             <DashboardSummaryRow
               icon={Bot}
               label="Robôs"
-              value={formatMetric(summary?.robots_active)}
+              value={formatMetric(summary?.activeRobots)}
             />
           </div>
         </DashboardSectionCard>
