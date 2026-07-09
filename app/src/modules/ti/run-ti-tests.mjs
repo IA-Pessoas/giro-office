@@ -431,6 +431,13 @@ await runTest("ti robots hooks expose write flows and invalidate robots plus das
 
   assert.match(typeSource, /interface TiRobotPayload/);
   assert.match(typeSource, /interface TiRobotRunPayload/);
+  assert.match(typeSource, /type\?: TiRobotType \| string/);
+  assert.match(typeSource, /active\?: boolean/);
+  assert.match(typeSource, /message\?: string/);
+  assert.match(typeSource, /metadata_json\?: Record<string, unknown>/);
+  assert.doesNotMatch(typeSource, /owner_id\?: TiId \| null/);
+  assert.doesNotMatch(typeSource, /output\?: string \| null/);
+  assert.doesNotMatch(typeSource, /error_message\?: string \| null/);
   assert.match(hookSource, /useMutation/);
   assert.match(hookSource, /useQueryClient/);
 
@@ -456,6 +463,15 @@ await runTest("ti robots tab exposes operational list detail forms and run actio
   assert.match(tabSource, /Registrar execução/);
   assert.match(tabSource, /Dialog/);
   assert.match(tabSource, /TiNativeSelect/);
+  assert.match(tabSource, /ROBOT_TYPE_OPTIONS/);
+  assert.match(tabSource, /ROBOT_ACTIVE_FILTER_OPTIONS/);
+  assert.match(tabSource, /type: draft\.type/);
+  assert.match(tabSource, /active: draft\.active/);
+  assert.match(tabSource, /message: draft\.message\.trim\(\)/);
+  assert.match(tabSource, /metadata_json/);
+  assert.doesNotMatch(tabSource, /owner_id: draft/);
+  assert.doesNotMatch(tabSource, /output: draft/);
+  assert.doesNotMatch(tabSource, /error_message: draft/);
   assert.match(tabSource, /activeRobotId/);
   assert.match(tabSource, /const selectedRobotId = selectedRobot\?\.id \?\? robots\[0\]\?\.id/);
   assert.match(tabSource, /handleRobotRowKeyDown/);
@@ -475,6 +491,9 @@ await runTest("ti robots filters normalize empty values before query state", asy
   assert.match(tabSource, /function normalizeRobotFilters/);
   assert.match(tabSource, /const normalizedFilters = useMemo\(\(\) => normalizeRobotFilters\(filters\), \[filters\]\)/);
   assert.match(tabSource, /useTiRobots\(normalizedFilters\)/);
+  assert.match(tabSource, /type: value/);
+  assert.match(tabSource, /active: value/);
+  assert.doesNotMatch(tabSource, /search: value/);
   assert.match(tabSource, /value !== ""/);
 });
 

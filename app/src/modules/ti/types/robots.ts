@@ -1,13 +1,15 @@
 import type { TiId, TiStatus } from "./common";
 
+export type TiRobotType = "Backup" | "Relatorio" | "Integracao" | "Manutencao" | "Monitoramento";
+
 export interface TiRobot {
   id: TiId;
   name?: string;
   title?: string | null;
   description?: string | null;
+  type?: TiRobotType | string;
   status?: TiStatus | boolean;
-  owner_id?: TiId | null;
-  owner_name?: string | null;
+  active?: boolean;
   schedule?: string | null;
   last_status?: TiStatus | null;
   last_run_at?: string | null;
@@ -25,25 +27,25 @@ export interface TiRobotRun {
   started_at?: string | null;
   finished_at?: string | null;
   duration_ms?: number | null;
-  output?: string | null;
-  error_message?: string | null;
+  message?: string | null;
+  metadata_json?: Record<string, unknown> | null;
   [key: string]: unknown;
 }
 
 export interface TiRobotPayload {
   name?: string;
   description?: string | null;
+  type?: TiRobotType | string;
   status?: string;
-  owner_id?: TiId | null;
+  active?: boolean;
   schedule?: string | null;
   [key: string]: unknown;
 }
 
 export interface TiRobotRunPayload {
   status?: string;
-  output?: string | null;
-  error_message?: string | null;
-  started_at?: string | null;
+  message?: string;
+  metadata_json?: Record<string, unknown>;
   finished_at?: string | null;
   [key: string]: unknown;
 }

@@ -31,6 +31,7 @@ import type {
   TiRobotPayload,
   TiRobotRun,
   TiRobotRunPayload,
+  TiRobotType,
 } from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
 import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
@@ -45,29 +46,54 @@ const ROBOT_STATUS_OPTIONS = [
   { value: "", label: "Todos os status" },
   { value: "active", label: "Ativo" },
   { value: "inactive", label: "Inativo" },
-  { value: "maintenance", label: "Manutenção" },
+  { value: "running", label: "Em execução" },
+  { value: "failed", label: "Falha" },
 ] as const;
 
 const ROBOT_FORM_STATUS_OPTIONS = ROBOT_STATUS_OPTIONS.filter((option) => option.value);
+
+const ROBOT_TYPE_OPTIONS = [
+  { value: "", label: "Todos os tipos" },
+  { value: "Backup", label: "Backup" },
+  { value: "Relatorio", label: "Relatório" },
+  { value: "Integracao", label: "Integração" },
+  { value: "Manutencao", label: "Manutenção" },
+  { value: "Monitoramento", label: "Monitoramento" },
+] as const;
+
+const ROBOT_FORM_TYPE_OPTIONS = ROBOT_TYPE_OPTIONS.filter((option) => option.value);
+
+const ROBOT_ACTIVE_FILTER_OPTIONS = [
+  { value: "", label: "Todos" },
+  { value: "true", label: "Ativos" },
+  { value: "false", label: "Inativos" },
+] as const;
+
+const ROBOT_ACTIVE_FORM_OPTIONS = [
+  { value: "true", label: "Ativo" },
+  { value: "false", label: "Inativo" },
+] as const;
 
 const ROBOT_RUN_STATUS_OPTIONS = [
   { value: "success", label: "Sucesso" },
   { value: "failed", label: "Falha" },
   { value: "running", label: "Em execução" },
+  { value: "cancelled", label: "Cancelada" },
 ] as const;
 
 type RobotDraft = {
   name: string;
   description: string;
+  type: TiRobotType | string;
   status: string;
-  ownerId: string;
+  active: boolean;
   schedule: string;
 };
 
 type RunDraft = {
   status: string;
-  output: string;
-  errorMessage: string;
+  message: string;
+  metadataJson: string;
 };
 
 type AutomationMetric = {
@@ -80,15 +106,16 @@ type AutomationMetric = {
 const INITIAL_ROBOT_DRAFT: RobotDraft = {
   name: "",
   description: "",
+  type: "Monitoramento",
   status: "active",
-  ownerId: "",
+  active: true,
   schedule: "",
 };
 
 const INITIAL_RUN_DRAFT: RunDraft = {
   status: "success",
-  output: "",
-  errorMessage: "",
+  message: "",
+  metadataJson: "",
 };
 
 function getStringField(source: Record<string, unknown> | undefined, fields: string[], fallback = "") {
@@ -125,6 +152,13 @@ function getStatusLabel(status: unknown) {
   return option?.label ?? (statusText || "Sem status");
 }
 
+function getRobotTypeLabel(type: unknown) {
+  const typeText = String(type ?? "");
+  const option = ROBOT_TYPE_OPTIONS.find((item) => item.value === typeText);
+
+  return option?.label ?? (typeText || "Sem tipo");
+}
+
 function normalizeRobotFilters(filters: TiListFilters): TiListFilters | undefined {
   const normalizedFilters = Object.fromEntries(
     Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== ""),
@@ -134,6 +168,10 @@ function normalizeRobotFilters(filters: TiListFilters): TiListFilters | undefine
 }
 
 function isRobotActive(robot: TiRobot) {
+  if (typeof robot.active === "boolean") {
+    return robot.active;
+  }
+
   if (typeof robot.status === "boolean") {
     return robot.status;
   }
@@ -144,7 +182,11 @@ function isRobotActive(robot: TiRobot) {
 function isFailedRun(run: TiRobotRun) {
   const status = String(run.status ?? "").toLowerCase();
 
-  return ["failed", "failure", "error"].includes(status) || Boolean(run.error_message);
+  return ["failed", "failure", "error"].includes(status);
+}
+
+function getRunMessage(run: TiRobotRun) {
+  return getStringField(run, ["message", "output", "error_message"], "Sem retorno registrado.");
 }
 
 function formatDate(value: string | null | undefined) {
@@ -184,17 +226,40 @@ function buildRobotPayload(draft: RobotDraft): TiRobotPayload {
   return {
     name: draft.name.trim(),
     description: draft.description.trim() || null,
+    type: draft.type,
     status: draft.status,
-    owner_id: draft.ownerId.trim() || null,
+    active: draft.active,
     schedule: draft.schedule.trim() || null,
   };
+}
+
+function parseRunMetadataJson(value: string): Record<string, unknown> | undefined {
+  const metadataText = value.trim();
+
+  if (!metadataText) {
+    return undefined;
+  }
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(metadataText) as unknown;
+  } catch {
+    throw new Error("Informe metadados em JSON válido.");
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Informe metadados como um objeto JSON.");
+  }
+
+  return parsed as Record<string, unknown>;
 }
 
 function buildRunPayload(draft: RunDraft): TiRobotRunPayload {
   return {
     status: draft.status,
-    output: draft.output.trim() || null,
-    error_message: draft.errorMessage.trim() || null,
+    message: draft.message.trim() || undefined,
+    metadata_json: parseRunMetadataJson(draft.metadataJson),
   };
 }
 
@@ -202,8 +267,9 @@ function createRobotDraft(robot?: TiRobot): RobotDraft {
   return {
     name: getRobotName(robot) === "Robô sem nome" ? "" : getRobotName(robot),
     description: robot?.description ?? getStringField(robot, ["details", "summary"]),
+    type: String(robot?.type ?? "Monitoramento"),
     status: String(robot?.status ?? "active"),
-    ownerId: String(robot?.owner_id ?? ""),
+    active: typeof robot?.active === "boolean" ? robot.active : String(robot?.status ?? "active") !== "inactive",
     schedule: robot?.schedule ?? getStringField(robot, ["cron", "frequency"]),
   };
 }
@@ -262,10 +328,10 @@ export function TiRobotsTab() {
     [activeRobot, activeRobotsCount, failedRunsCount, runsQuery.isLoading, visibleRuns.length],
   );
 
-  function handleSearchChange(value: string) {
+  function handleTypeChange(value: string) {
     setFilters((current) => ({
       ...current,
-      search: value,
+      type: value,
     }));
   }
 
@@ -273,6 +339,13 @@ export function TiRobotsTab() {
     setFilters((current) => ({
       ...current,
       status: value,
+    }));
+  }
+
+  function handleActiveChange(value: string) {
+    setFilters((current) => ({
+      ...current,
+      active: value,
     }));
   }
 
@@ -320,6 +393,11 @@ export function TiRobotsTab() {
       return;
     }
 
+    if (!robotDraft.type) {
+      setFormError("Informe o tipo do robô.");
+      return;
+    }
+
     try {
       const payload = buildRobotPayload(robotDraft);
       const savedRobot = editingRobot
@@ -363,21 +441,24 @@ export function TiRobotsTab() {
         action={<TiIconAction icon={Plus} label="Novo robô" variant="primary" onClick={openCreateDialog} />}
       />
 
-      <div className="grid gap-3 md:grid-cols-[minmax(280px,1fr)_180px]">
-        <label className="flex min-w-0 flex-col gap-2">
-          <span className={tiLabelClassName}>Busca</span>
-          <input
-            className={tiInputClassName}
-            placeholder="Nome, responsável ou rotina"
-            value={String(filters.search ?? "")}
-            onChange={(event) => handleSearchChange(event.target.value)}
-          />
-        </label>
+      <div className="grid gap-3 md:grid-cols-3">
+        <TiNativeSelect
+          label="Tipo"
+          value={String(filters.type ?? "")}
+          options={ROBOT_TYPE_OPTIONS}
+          onChange={(event) => handleTypeChange(event.target.value)}
+        />
         <TiNativeSelect
           label="Status"
           value={String(filters.status ?? "")}
           options={ROBOT_STATUS_OPTIONS}
           onChange={(event) => handleStatusChange(event.target.value)}
+        />
+        <TiNativeSelect
+          label="Ativo"
+          value={String(filters.active ?? "")}
+          options={ROBOT_ACTIVE_FILTER_OPTIONS}
+          onChange={(event) => handleActiveChange(event.target.value)}
         />
       </div>
 
@@ -478,7 +559,7 @@ export function TiRobotsTab() {
                             {getRobotName(robot)}
                           </span>
                           <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-                            {robot.owner_name ?? getStringField(robot, ["owner", "responsible"], "Sem responsável")}
+                            {getRobotTypeLabel(robot.type)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
@@ -538,9 +619,15 @@ export function TiRobotsTab() {
                     </dd>
                   </div>
                   <div>
-                    <dt className={tiLabelClassName}>Responsável</dt>
+                    <dt className={tiLabelClassName}>Tipo</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
-                      {activeRobot.owner_name ?? getStringField(activeRobot, ["owner", "responsible"], "Sem responsável")}
+                      {getRobotTypeLabel(activeRobot.type)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className={tiLabelClassName}>Ativo</dt>
+                    <dd className="mt-1 text-slate-700 dark:text-slate-200">
+                      {isRobotActive(activeRobot) ? "Sim" : "Não"}
                     </dd>
                   </div>
                   <div>
@@ -604,7 +691,7 @@ export function TiRobotsTab() {
                         </span>
                       </div>
                       <p className="line-clamp-3 text-slate-600 dark:text-slate-300">
-                        {run.error_message ?? run.output ?? "Sem retorno registrado."}
+                        {getRunMessage(run)}
                       </p>
                     </div>
                   ))}
@@ -650,7 +737,15 @@ export function TiRobotsTab() {
             />
           </label>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TiNativeSelect
+              label="Tipo"
+              value={robotDraft.type}
+              options={ROBOT_FORM_TYPE_OPTIONS}
+              onChange={(event) =>
+                setRobotDraft((draft) => ({ ...draft, type: event.target.value }))
+              }
+            />
             <TiNativeSelect
               label="Status"
               value={robotDraft.status}
@@ -659,17 +754,14 @@ export function TiRobotsTab() {
                 setRobotDraft((draft) => ({ ...draft, status: event.target.value }))
               }
             />
-            <label className="flex min-w-0 flex-col gap-2">
-              <span className={tiLabelClassName}>Responsável</span>
-              <input
-                className={tiInputClassName}
-                value={robotDraft.ownerId}
-                placeholder="ID do usuário"
-                onChange={(event) =>
-                  setRobotDraft((draft) => ({ ...draft, ownerId: event.target.value }))
-                }
-              />
-            </label>
+            <TiNativeSelect
+              label="Ativo"
+              value={String(robotDraft.active)}
+              options={ROBOT_ACTIVE_FORM_OPTIONS}
+              onChange={(event) =>
+                setRobotDraft((draft) => ({ ...draft, active: event.target.value === "true" }))
+              }
+            />
             <label className="flex min-w-0 flex-col gap-2">
               <span className={tiLabelClassName}>Agenda</span>
               <input
@@ -722,21 +814,22 @@ export function TiRobotsTab() {
           />
 
           <label className="flex min-w-0 flex-col gap-2">
-            <span className={tiLabelClassName}>Retorno</span>
+            <span className={tiLabelClassName}>Mensagem</span>
             <textarea
               className={cn(tiInputClassName, "h-auto min-h-24 py-2")}
-              value={runDraft.output}
-              onChange={(event) => setRunDraft((draft) => ({ ...draft, output: event.target.value }))}
+              value={runDraft.message}
+              onChange={(event) => setRunDraft((draft) => ({ ...draft, message: event.target.value }))}
             />
           </label>
 
           <label className="flex min-w-0 flex-col gap-2">
-            <span className={tiLabelClassName}>Erro</span>
+            <span className={tiLabelClassName}>Metadados JSON</span>
             <textarea
               className={cn(tiInputClassName, "h-auto min-h-20 py-2")}
-              value={runDraft.errorMessage}
+              value={runDraft.metadataJson}
+              placeholder='{"durationMs": 2300}'
               onChange={(event) =>
-                setRunDraft((draft) => ({ ...draft, errorMessage: event.target.value }))
+                setRunDraft((draft) => ({ ...draft, metadataJson: event.target.value }))
               }
             />
           </label>
