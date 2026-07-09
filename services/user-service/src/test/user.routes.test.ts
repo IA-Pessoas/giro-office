@@ -172,7 +172,8 @@ describe("user routes", () => {
     expect(userServiceMock.create).not.toHaveBeenCalled();
   });
 
-  it("POST /user rejeita permission 2 quando solicitante e admin RH", async () => {
+  it("POST /user permite permission 2 quando solicitante e admin RH sem promover owner", async () => {
+    userServiceMock.create.mockResolvedValue({ id: "user-admin-rh" });
     const app = createTestApp();
 
     const res = await request(app)
@@ -187,8 +188,14 @@ describe("user routes", () => {
         type: "admin",
       });
 
-    expect(res.status).toBe(403);
-    expect(userServiceMock.create).not.toHaveBeenCalled();
+    expect(res.status).toBe(201);
+    expect(userServiceMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        login: "admin.indevido",
+        permission: 2,
+        type: "admin",
+      }),
+    );
   });
 
   it("POST /user permite admin RH definir permissoes em outros modulos", async () => {

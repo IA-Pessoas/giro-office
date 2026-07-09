@@ -1,6 +1,8 @@
 import { useAuth } from "@/context/AuthContext";
 import { isAdminPermission, useAccessStore } from "@modules/auth";
 
+const RH_ADMIN_PERMISSION = 2;
+
 interface RhPermissionState {
   isLoading: boolean;
   error: Error | null;
@@ -23,25 +25,24 @@ interface UseRhPermissionsResult {
 
 export function useRhPermissions(scope: string): UseRhPermissionsResult {
   const { user } = useAuth();
-  const departmentModule = useAccessStore((snapshot) => snapshot.departmentModule);
   const isLoading = useAccessStore((snapshot) => snapshot.isLoading);
   const permissionError = useAccessStore((snapshot) => snapshot.error);
   const explicitRhPermission = user?.modules?.rh;
-  const isRhResponsible = Boolean(
+  const hasRhAdminPermission = Boolean(
     explicitRhPermission !== null &&
       explicitRhPermission !== undefined &&
-      explicitRhPermission >= 1,
+      explicitRhPermission >= RH_ADMIN_PERMISSION,
   );
-  const isRhDepartmentUser = departmentModule === "rh";
   const isGlobalAdmin = isAdminPermission(user?.permission);
-  const canViewRhDashboard = isRhDepartmentUser || isGlobalAdmin || isRhResponsible;
-  const canManageRh = isRhResponsible || isGlobalAdmin;
-  const canManageRhRequests = isRhDepartmentUser || isRhResponsible || isGlobalAdmin;
-  const canManageRhScore = isRhDepartmentUser || isRhResponsible || isGlobalAdmin;
-  const canManageRhTimeBank = isRhDepartmentUser || isRhResponsible || isGlobalAdmin;
-  const canManageRhTimesheets = isRhDepartmentUser || isRhResponsible || isGlobalAdmin;
+  const isRhResponsible = hasRhAdminPermission;
+  const canManageRh = hasRhAdminPermission || isGlobalAdmin;
+  const canViewRhDashboard = canManageRh;
+  const canManageRhRequests = canManageRh;
+  const canManageRhScore = canManageRh;
+  const canManageRhTimeBank = canManageRh;
+  const canManageRhTimesheets = canManageRh;
   // Mantemos workday separado para permitir divergencia futura sem refactor transversal nas telas de ponto.
-  const canManageRhWorkday = isRhDepartmentUser || isRhResponsible || isGlobalAdmin;
+  const canManageRhWorkday = canManageRh;
   void scope;
 
   return {

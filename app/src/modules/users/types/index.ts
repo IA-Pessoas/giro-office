@@ -17,7 +17,7 @@ export interface UserItem {
 }
 
 export type UserType = "user" | "admin" | "owner";
-export type UserPermission = 0 | 1 | 2;
+export type UserPermission = -1 | 0 | 1 | 2;
 
 export type KnownPermissionModuleKey =
   | "atendimento"
@@ -71,7 +71,9 @@ export interface UpdateUserData {
   name?: string;
   password?: string;
   permission?: number;
+  type?: UserType;
   department_id?: string;
   status?: string;
   file?: File;
+  modules?: Record<string, number | null>;
 }
