@@ -123,7 +123,7 @@ function formatDate(value: unknown): string {
 }
 
 function getTermTitle(term: TiTerm): string {
-  return getText(term.title ?? term.description, "Termo sem titulo");
+  return getText(term.title ?? term.description, "Termo sem título");
 }
 
 function getAssetTitle(asset: TiInventoryAsset): string {
@@ -139,7 +139,7 @@ function getMutationErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Nao foi possivel concluir a acao.";
+  return "Não foi possível concluir a ação.";
 }
 
 export function TiTermsTab() {
@@ -282,7 +282,7 @@ export function TiTermsTab() {
     <TiPanel className="space-y-5">
       <TiSectionHeader
         title="Termos"
-        description="Acompanhe termos de responsabilidade, assinatura e vinculo com ativos."
+        description="Acompanhe termos de responsabilidade, assinatura e vínculo com ativos."
         action={
           canManage ? (
             <TiIconAction
@@ -300,7 +300,7 @@ export function TiTermsTab() {
           label="Busca"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Titulo, usuario ou ativo"
+          placeholder="Título, usuário ou ativo"
         />
         <TiNativeSelect
           label="Status"
@@ -323,7 +323,7 @@ export function TiTermsTab() {
             <TiEmptyState
               icon={FileCheck2}
               title="Nenhum termo gerado"
-              description="Os termos assinados ou pendentes ficam disponiveis nesta area."
+              description="Os termos assinados ou pendentes ficam disponíveis nesta área."
               action={
                 canManage ? (
                   <TiIconAction
@@ -338,7 +338,7 @@ export function TiTermsTab() {
           }
         >
           {(terms) => (
-            <TiDataTable headers={["Termo", "Ativo", "Usuario", "Assinatura", "Status", ""]}>
+            <TiDataTable headers={["Termo", "Ativo", "Usuário", "Assinatura", "Status", ""]}>
               {terms.map((term) => {
                 const isSelected = String(term.id) === String(selectedTermId);
 
@@ -405,7 +405,7 @@ export function TiTermsTab() {
             <TiFieldLine label="Status" value="Carregando..." />
           ) : selectedTermQuery.isError ? (
             <TiInlineNotice tone="danger">
-              {selectedTermQuery.error?.message ?? "Nao foi possivel carregar o detalhe."}
+              {selectedTermQuery.error?.message ?? "Não foi possível carregar o detalhe."}
             </TiInlineNotice>
           ) : selectedTerm ? (
             <>
@@ -414,7 +414,7 @@ export function TiTermsTab() {
                 label="Ativo"
                 value={getAssetName(selectedTerm.inventory_id ?? selectedTerm.asset_id, selectedTerm)}
               />
-              <TiFieldLine label="Usuario" value={getTermUser(selectedTerm)} />
+              <TiFieldLine label="Usuário" value={getTermUser(selectedTerm)} />
               <TiFieldLine label="Criado em" value={formatDate(selectedTerm.created_at)} />
               <TiFieldLine label="Assinado em" value={formatDate(selectedTerm.signed_at)} />
               <TiFieldLine
@@ -453,7 +453,7 @@ export function TiTermsTab() {
           {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
           <div className="grid gap-3 md:grid-cols-2">
             <TiTextField
-              label="Titulo"
+              label="Título"
               name="title"
               required
               defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.title, "") : ""}
@@ -479,12 +479,12 @@ export function TiTermsTab() {
               options={assetOptions}
             />
             <TiTextField
-              label="ID do usuario"
+              label="ID do usuário"
               name="user_id"
               defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.user_id, "") : ""}
             />
             <TiTextField
-              label="Nome do usuario"
+              label="Nome do usuário"
               name="user_name"
               defaultValue={
                 dialogState?.type === "term"
@@ -493,7 +493,7 @@ export function TiTermsTab() {
               }
             />
             <TiTextField
-              label="Descricao"
+              label="Descrição"
               name="description"
               defaultValue={
                 dialogState?.type === "term" ? getText(dialogState.term?.description, "") : ""
@@ -501,7 +501,7 @@ export function TiTermsTab() {
             />
           </div>
           <TiTextarea
-            label="Conteudo"
+            label="Conteúdo"
             name="content"
             defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.content, "") : ""}
           />
@@ -538,10 +538,10 @@ export function TiTermsTab() {
         <form className="space-y-4" onSubmit={handleSubmitSign}>
           {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
           <TiInlineNotice tone="warning">
-            A assinatura sera registrada apos a confirmacao.
+            A assinatura será registrada após a confirmação.
           </TiInlineNotice>
           <TiTextField label="Nome do assinante" name="signer_name" />
-          <TiTextarea label="Observacao" name="notes" />
+          <TiTextarea label="Observação" name="notes" />
           <div className="flex justify-end gap-2">
             <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
               Cancelar

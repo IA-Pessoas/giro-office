@@ -6,13 +6,13 @@ export function TiRobotsTab() {
   return (
     <TiPanel className="space-y-5">
       <TiSectionHeader
-        title="Robos"
-        description="Acompanhe automacoes, rotinas agendadas e historico de execucao."
+        title="Robôs"
+        description="Acompanhe automações, rotinas agendadas e histórico de execução."
       />
       <TiEmptyState
         icon={Bot}
-        title="Nenhum robo cadastrado"
-        description="As automacoes do time de Tecnologia aparecem aqui com seus ultimos resultados."
+        title="Nenhum robô cadastrado"
+        description="As automações do time de Tecnologia aparecem aqui com seus últimos resultados."
       />
     </TiPanel>
   );

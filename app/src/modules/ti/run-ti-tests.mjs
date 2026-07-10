@@ -466,8 +466,8 @@ await runTest("ti inventory tab exposes assets, categories, locations, assignmen
     "Novo ativo",
     "Categorias",
     "Locais",
-    "Atribuir usuario",
-    "Registrar devolucao",
+    "Atribuir usuário",
+    "Registrar devolução",
   ]) {
     assert.match(source, new RegExp(expected));
   }
@@ -533,4 +533,65 @@ await runTest("ti inventory and terms lookup labels use memoized maps", async ()
   assert.doesNotMatch(inventorySource, /\(categoriesQuery\.data \?\? \[\]\)\.find/);
   assert.doesNotMatch(inventorySource, /\(locationsQuery\.data \?\? \[\]\)\.find/);
   assert.doesNotMatch(termsSource, /\(assetsQuery\.data \?\? \[\]\)\.find/);
+});
+
+await runTest("ti visible copy keeps Portuguese accents and punctuation consistent", async () => {
+  const files = [
+    "components/TiDashboardTab.tsx",
+    "components/TiExtensionsTab.tsx",
+    "components/TiInventoryTab.tsx",
+    "components/TiPasswordsTab.tsx",
+    "components/TiRobotsTab.tsx",
+    "components/TiStockTab.tsx",
+    "components/TiTermsTab.tsx",
+  ];
+  const forbiddenSnippets = [
+    "\"--\"",
+    "Carregando dados...",
+    "Não foi possível carregar.",
+    "Nenhum indicador encontrado.",
+    "Robos",
+    "robo cadastrado",
+    "automacoes",
+    "historico",
+    "execucao",
+    "ultimos",
+    "saidas",
+    "niveis minimos",
+    "consumiveis",
+    "movimentacoes",
+    "nesta area",
+    "Nao foi",
+    "possivel",
+    "acao",
+    "atribuicao",
+    "devolucao",
+    "usuarios",
+    "responsaveis",
+    "Codigo",
+    "Responsavel",
+    "usuario",
+    "Observacao",
+    "Descricao",
+    "Gestao",
+    "confirmacao",
+    "sera",
+    "apos",
+    "Titulo",
+    "vinculo",
+    "disponiveis",
+    "Conteudo",
+  ];
+
+  for (const file of files) {
+    const source = await readModuleSource(file);
+
+    for (const snippet of forbiddenSnippets) {
+      assert.equal(
+        source.includes(snippet),
+        false,
+        `${file} should not include unpolished copy: ${snippet}`,
+      );
+    }
+  }
 });

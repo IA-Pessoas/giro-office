@@ -12,7 +12,7 @@ export function TiPasswordsTab() {
       <TiEmptyState
         icon={KeyRound}
         title="Nenhuma senha cadastrada"
-        description="As credenciais autorizadas para seu perfil aparecem nesta area."
+        description="As credenciais autorizadas para seu perfil aparecem nesta área."
       />
     </TiPanel>
   );

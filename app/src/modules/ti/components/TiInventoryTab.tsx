@@ -52,9 +52,9 @@ type InventoryDialogState =
 
 const INVENTORY_STATUS_OPTIONS = [
   { value: "", label: "Todos" },
-  { value: "available", label: "Disponivel" },
-  { value: "assigned", label: "Atribuido" },
-  { value: "maintenance", label: "Manutencao" },
+  { value: "available", label: "Disponível" },
+  { value: "assigned", label: "Atribuído" },
+  { value: "maintenance", label: "Manutenção" },
   { value: "retired", label: "Baixado" },
 ];
 
@@ -95,15 +95,15 @@ function formatStatus(status: unknown): string {
   const normalized = normalizeStatus(status);
 
   if (normalized === "available") {
-    return "Disponivel";
+    return "Disponível";
   }
 
   if (normalized === "assigned") {
-    return "Atribuido";
+    return "Atribuído";
   }
 
   if (normalized === "maintenance") {
-    return "Manutencao";
+    return "Manutenção";
   }
 
   if (normalized === "retired") {
@@ -172,7 +172,7 @@ function getMutationErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Nao foi possivel concluir a acao.";
+  return "Não foi possível concluir a ação.";
 }
 
 export function TiInventoryTab() {
@@ -316,7 +316,7 @@ export function TiInventoryTab() {
     const formData = new FormData(event.currentTarget);
     const userId = getFormText(formData, "assigned_user_id");
 
-    if (!confirm("Confirmar atribuicao deste ativo?")) {
+    if (!confirm("Confirmar atribuição deste ativo?")) {
       return;
     }
 
@@ -344,7 +344,7 @@ export function TiInventoryTab() {
       return;
     }
 
-    if (!confirm("Confirmar devolucao deste ativo?")) {
+    if (!confirm("Confirmar devolução deste ativo?")) {
       return;
     }
 
@@ -440,8 +440,8 @@ export function TiInventoryTab() {
   return (
     <TiPanel className="space-y-5">
       <TiSectionHeader
-        title="Inventario"
-        description="Controle ativos, categorias, locais, usuarios responsaveis e devolucoes."
+        title="Inventário"
+        description="Controle ativos, categorias, locais, usuários responsáveis e devoluções."
         action={
           canManage ? (
             <div className="flex flex-wrap gap-2">
@@ -471,7 +471,7 @@ export function TiInventoryTab() {
           label="Busca"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Nome, codigo ou serial"
+          placeholder="Nome, código ou serial"
         />
         <TiNativeSelect
           label="Status"
@@ -515,7 +515,7 @@ export function TiInventoryTab() {
           }
         >
           {(assets) => (
-            <TiDataTable headers={["Ativo", "Categoria", "Local", "Responsavel", "Status", ""]}>
+            <TiDataTable headers={["Ativo", "Categoria", "Local", "Responsável", "Status", ""]}>
               {assets.map((asset) => {
                 const isSelected = String(asset.id) === String(selectedAssetId);
 
@@ -587,15 +587,15 @@ export function TiInventoryTab() {
             <TiFieldLine label="Status" value="Carregando..." />
           ) : selectedAssetQuery.isError ? (
             <TiInlineNotice tone="danger">
-              {selectedAssetQuery.error?.message ?? "Nao foi possivel carregar o detalhe."}
+              {selectedAssetQuery.error?.message ?? "Não foi possível carregar o detalhe."}
             </TiInlineNotice>
           ) : selectedAsset ? (
             <>
               <TiFieldLine label="Ativo" value={getAssetTitle(selectedAsset)} />
-              <TiFieldLine label="Codigo" value={getAssetCode(selectedAsset)} />
+              <TiFieldLine label="Código" value={getAssetCode(selectedAsset)} />
               <TiFieldLine label="Categoria" value={getCategoryName(selectedAsset.category_id)} />
               <TiFieldLine label="Local" value={getLocationName(selectedAsset.location_id)} />
-              <TiFieldLine label="Responsavel" value={getAssignedUser(selectedAsset)} />
+              <TiFieldLine label="Responsável" value={getAssignedUser(selectedAsset)} />
               <TiFieldLine
                 label="Status"
                 value={
@@ -640,7 +640,7 @@ export function TiInventoryTab() {
               defaultValue={dialogState?.type === "asset" ? dialogState.asset?.name ?? "" : ""}
             />
             <TiTextField
-              label="Codigo"
+              label="Código"
               name="code"
               defaultValue={dialogState?.type === "asset" ? getText(dialogState.asset?.code, "") : ""}
             />
@@ -715,16 +715,16 @@ export function TiInventoryTab() {
             closeDialog();
           }
         }}
-        title="Atribuir usuario"
-        description="Atribuicao de responsavel pelo ativo."
+        title="Atribuir usuário"
+        description="Atribuição de responsável pelo ativo."
       >
         <form className="space-y-4" onSubmit={handleSubmitAssign}>
           {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
           <TiInlineNotice tone="warning">
-            A atribuicao sera registrada no ativo selecionado apos a confirmacao.
+            A atribuição será registrada no ativo selecionado após a confirmação.
           </TiInlineNotice>
-          <TiTextField label="ID do usuario" name="assigned_user_id" required />
-          <TiTextarea label="Observacao" name="notes" />
+          <TiTextField label="ID do usuário" name="assigned_user_id" required />
+          <TiTextarea label="Observação" name="notes" />
           <div className="flex justify-end gap-2">
             <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
               Cancelar
@@ -732,7 +732,7 @@ export function TiInventoryTab() {
             <TiIconAction
               icon={UserPlus}
               type="submit"
-              label={assignUserMutation.isPending ? "Atribuindo..." : "Atribuir usuario"}
+              label={assignUserMutation.isPending ? "Atribuindo..." : "Atribuir usuário"}
               variant="primary"
               disabled={assignUserMutation.isPending || !canManage}
             />
@@ -747,15 +747,15 @@ export function TiInventoryTab() {
             closeDialog();
           }
         }}
-        title="Registrar devolucao"
-        description="Registro de devolucao do ativo."
+        title="Registrar devolução"
+        description="Registro de devolução do ativo."
       >
         <form className="space-y-4" onSubmit={handleSubmitReturn}>
           {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
           <TiInlineNotice tone="warning">
-            A devolucao sera registrada no ativo selecionado apos a confirmacao.
+            A devolução será registrada no ativo selecionado após a confirmação.
           </TiInlineNotice>
-          <TiTextarea label="Observacao" name="notes" />
+          <TiTextarea label="Observação" name="notes" />
           <div className="flex justify-end gap-2">
             <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
               Cancelar
@@ -763,7 +763,7 @@ export function TiInventoryTab() {
             <TiIconAction
               icon={RotateCcw}
               type="submit"
-              label={returnAssetMutation.isPending ? "Registrando..." : "Registrar devolucao"}
+              label={returnAssetMutation.isPending ? "Registrando..." : "Registrar devolução"}
               variant="primary"
               disabled={returnAssetMutation.isPending || !canManage}
             />
@@ -779,7 +779,7 @@ export function TiInventoryTab() {
           }
         }}
         title="Categorias"
-        description="Gestao de categorias de inventario."
+        description="Gestão de categorias de inventário."
         contentClassName="w-[min(92vw,860px)]"
       >
         <div className="space-y-4">
@@ -798,7 +798,7 @@ export function TiInventoryTab() {
                   ? `category-description-${editingCategory.id}`
                   : "category-description-new"
               }
-              label="Descricao"
+              label="Descrição"
               name="description"
               defaultValue={getText(editingCategory?.description, "")}
             />
@@ -830,7 +830,7 @@ export function TiInventoryTab() {
             }
           >
             {(categories) => (
-              <TiDataTable headers={["Categoria", "Descricao", "Status", ""]}>
+              <TiDataTable headers={["Categoria", "Descrição", "Status", ""]}>
                 {categories.map((category) => (
                   <tr key={category.id} className="text-slate-700 dark:text-slate-200">
                     <td className="px-4 py-3 font-semibold">
@@ -868,7 +868,7 @@ export function TiInventoryTab() {
           }
         }}
         title="Locais"
-        description="Gestao de locais de inventario."
+        description="Gestão de locais de inventário."
         contentClassName="w-[min(92vw,860px)]"
       >
         <div className="space-y-4">
@@ -887,7 +887,7 @@ export function TiInventoryTab() {
                   ? `location-description-${editingLocation.id}`
                   : "location-description-new"
               }
-              label="Descricao"
+              label="Descrição"
               name="description"
               defaultValue={getText(editingLocation?.description, "")}
             />
@@ -919,7 +919,7 @@ export function TiInventoryTab() {
             }
           >
             {(locations) => (
-              <TiDataTable headers={["Local", "Descricao", "Status", ""]}>
+              <TiDataTable headers={["Local", "Descrição", "Status", ""]}>
                 {locations.map((location) => (
                   <tr key={location.id} className="text-slate-700 dark:text-slate-200">
                     <td className="px-4 py-3 font-semibold">
