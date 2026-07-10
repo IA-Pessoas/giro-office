@@ -72,11 +72,11 @@ function getMutationErrorMessage(error: unknown, fallback: string): string {
   const message = error instanceof Error ? error.message : "";
 
   if (/403|forbidden|permission|permiss/i.test(message)) {
-    return "Acesso negado para executar esta acao.";
+    return "Acesso negado para executar esta ação.";
   }
 
   if (/409|conflict|duplic|existe|cadastrad/i.test(message)) {
-    return message || "Ja existe um ramal com estes dados.";
+    return message || "Já existe um ramal com estes dados.";
   }
 
   return message || fallback;
@@ -108,7 +108,7 @@ function QueryStatePanel<T>({
     return (
       <div className="flex min-h-32 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Carregando dados...
+        Carregando informações...
       </div>
     );
   }
@@ -119,7 +119,7 @@ function QueryStatePanel<T>({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-              Nao foi possivel carregar.
+              Não conseguimos carregar as informações.
             </p>
             <p className="mt-1 text-sm text-red-600 dark:text-red-300/80">
               {query.error?.message ?? "Tente novamente."}
@@ -230,12 +230,12 @@ export function TiExtensionsTab() {
     const number = extensionForm.number.trim();
 
     if (!number) {
-      toast.error("Informe o numero do ramal.");
+      toast.error("Informe o número do ramal.");
       return null;
     }
 
     if (!extensionForm.user_id) {
-      toast.error("Selecione o usuario vinculado.");
+      toast.error("Selecione o usuário vinculado.");
       return null;
     }
 
@@ -249,12 +249,12 @@ export function TiExtensionsTab() {
     const number = extensionForm.number.trim();
 
     if (!number) {
-      toast.error("Informe o numero do ramal.");
+      toast.error("Informe o número do ramal.");
       return null;
     }
 
     if (!extensionForm.user_id) {
-      toast.error("Selecione o usuario vinculado.");
+      toast.error("Selecione o usuário vinculado.");
       return null;
     }
 
@@ -296,7 +296,7 @@ export function TiExtensionsTab() {
       setEditingExtension(null);
       setExtensionForm(initialExtensionFormState);
     } catch (error) {
-      toast.error(getMutationErrorMessage(error, "Nao foi possivel salvar o ramal."));
+      toast.error(getMutationErrorMessage(error, "Não foi possível salvar o ramal."));
     }
   }
 
@@ -343,7 +343,7 @@ export function TiExtensionsTab() {
                           className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
                           onClick={() => setSelectedExtensionId(item.id)}
                         >
-                          {formatText(item.number, "Sem numero")}
+                          {formatText(item.number, "Sem número")}
                         </button>
                       </td>
                       <td className="px-4 py-3">{getExtensionUserName(item)}</td>

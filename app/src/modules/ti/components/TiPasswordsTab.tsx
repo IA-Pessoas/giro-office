@@ -88,11 +88,11 @@ function getMutationErrorMessage(error: unknown, fallback: string): string {
   const message = error instanceof Error ? error.message : "";
 
   if (/403|forbidden|permission|permiss/i.test(message)) {
-    return "Acesso negado para executar esta acao.";
+    return "Acesso negado para executar esta ação.";
   }
 
   if (/409|conflict|conflito|cadastrad/i.test(message)) {
-    return message || "Registro ja cadastrado.";
+    return message || "Registro já cadastrado.";
   }
 
   return message || fallback;
@@ -134,7 +134,7 @@ function QueryStatePanel<T>({
     return (
       <div className="flex min-h-32 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Carregando dados...
+        Carregando informações...
       </div>
     );
   }
@@ -145,7 +145,7 @@ function QueryStatePanel<T>({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-              Nao foi possivel carregar.
+              Não conseguimos carregar as informações.
             </p>
             <p className="mt-1 text-sm text-red-600 dark:text-red-300/80">
               {query.error?.message ?? "Tente novamente."}
@@ -298,7 +298,7 @@ export function TiPasswordsTab() {
     }
 
     if (!passwordForm.user_id) {
-      toast.error("Selecione o usuario vinculado.");
+      toast.error("Selecione o usuário vinculado.");
       return null;
     }
 
@@ -324,7 +324,7 @@ export function TiPasswordsTab() {
     }
 
     if (!passwordForm.user_id) {
-      toast.error("Selecione o usuario vinculado.");
+      toast.error("Selecione o usuário vinculado.");
       return null;
     }
 
@@ -371,7 +371,7 @@ export function TiPasswordsTab() {
       clearPasswordRevealCache(revealPasswordId);
       setRevealPasswordId(null);
     } catch (error) {
-      toast.error(getMutationErrorMessage(error, "Nao foi possivel salvar a senha."));
+      toast.error(getMutationErrorMessage(error, "Não foi possível salvar a senha."));
     }
   }
 
@@ -496,7 +496,7 @@ export function TiPasswordsTab() {
             ) : null}
             {revealPasswordId && revealQuery.isError ? (
               <p className="text-sm text-red-600 dark:text-red-300">
-                Acesso negado ou indisponivel.
+                Acesso negado ou indisponível.
               </p>
             ) : null}
             {revealedPassword ? (
@@ -574,7 +574,7 @@ export function TiPasswordsTab() {
                 <textarea
                   className={cn(tiInputClassName, "min-h-20 py-2")}
                   onChange={(event) => updatePasswordField("notes", event.target.value)}
-                  placeholder="Observacoes internas"
+                  placeholder="Observações internas"
                   value={passwordForm.notes}
                 />
               </label>
