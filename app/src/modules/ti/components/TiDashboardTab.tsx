@@ -22,7 +22,7 @@ function formatMetric(value: unknown): string {
     return value;
   }
 
-  return "--";
+  return "-";
 }
 
 function DashboardHeroCard({
@@ -168,7 +168,7 @@ export function TiDashboardTab() {
     return (
       <DashboardStatePanel
         icon={Loader2}
-        title="Carregando dados..."
+        title="Carregando dados"
         description="Buscando o resumo consolidado de Tecnologia."
       />
     );
@@ -178,7 +178,7 @@ export function TiDashboardTab() {
     return (
       <DashboardStatePanel
         icon={AlertCircle}
-        title="Não foi possível carregar."
+        title="Não foi possível carregar"
         description={dashboardQuery.error?.message ?? "Tente novamente."}
       />
     );
@@ -188,7 +188,7 @@ export function TiDashboardTab() {
     return (
       <DashboardStatePanel
         icon={BarChart3}
-        title="Nenhum indicador encontrado."
+        title="Nenhum indicador encontrado"
         description="Quando houver dados de Tecnologia, os principais sinais operacionais aparecem aqui."
       />
     );
