@@ -289,10 +289,23 @@ it("requires admin permission for user-management routes", async () => {
   }
 });
 
-it("allows RH module admins to proxy user management routes", async () => {
-  let seenRequest = false;
-  const upstream = createServer((_request, response) => {
-    seenRequest = true;
+it("allows RH module admins to proxy user-management routes", async () => {
+  let seenHeaders: {
+    userId?: string;
+    organizationId?: string;
+    permission?: string;
+    type?: string;
+    modules?: string;
+  } = {};
+
+  const upstream = createServer((request, response) => {
+    seenHeaders = {
+      userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
+      organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined,
+      permission: request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined,
+      type: request.headers[FORWARDED_AUTH_TYPE_HEADER] as string | undefined,
+      modules: request.headers[FORWARDED_AUTH_MODULES_HEADER] as string | undefined,
+    };
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ success: true, data: { users: [] } }));
@@ -302,7 +315,7 @@ it("allows RH module admins to proxy user management routes", async () => {
   const gateway = createServer(app);
   const gatewayUrl = await startServer(gateway);
   const token = createToken({
-    user_id: "rh-admin-1",
+    user_id: "rh-admin",
     organization_id: "org-1",
     permission: 1,
     type: "admin",
@@ -311,11 +324,17 @@ it("allows RH module admins to proxy user management routes", async () => {
 
   try {
     const response = await fetch(`${gatewayUrl}/user`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     expect(response.status).toBe(200);
-    expect(seenRequest).toBe(true);
+    expect(seenHeaders.userId).toBe("rh-admin");
+    expect(seenHeaders.organizationId).toBe("org-1");
+    expect(seenHeaders.permission).toBe("1");
+    expect(seenHeaders.type).toBe("admin");
+    expect(JSON.parse(seenHeaders.modules ?? "{}")).toMatchObject({ rh: 2 });
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

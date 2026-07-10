@@ -79,6 +79,7 @@ function getConnectionHeaderTokens(request: Request): Set<string> {
 function resolveForwardedPermission(
   permission: number | undefined,
   modules: Record<string, number | null> | undefined,
+  type: unknown,
   permissionModule?: string,
 ): number | undefined {
   if (!permissionModule) {
@@ -90,7 +91,14 @@ function resolveForwardedPermission(
     return modulePermission;
   }
 
-  if (typeof permission === "number" && permission >= GLOBAL_ADMIN_PERMISSION) {
+  const isExplicitOwner = type === "owner";
+  const isLegacyGlobalAdmin = type === undefined && typeof permission === "number";
+
+  if (
+    (isExplicitOwner || isLegacyGlobalAdmin) &&
+    typeof permission === "number" &&
+    permission >= GLOBAL_ADMIN_PERMISSION
+  ) {
     return GLOBAL_ADMIN_PERMISSION;
   }
 
@@ -141,6 +149,7 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     const forwardedPermission = resolveForwardedPermission(
       request.auth.claims.permission,
       modules,
+      request.auth.claims.type,
       options.permissionModule,
     );
 

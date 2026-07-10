@@ -4,9 +4,16 @@ import { readFileSync } from "node:fs";
 import {
   buildAdminCreateUserPayload,
   buildCreateUserModulesPayload,
+  buildDepartmentPermissionSyncPayload,
+  needsDepartmentPermissionSync,
   resolveCreateUserTopLevelPermission,
   resolveCreateUserType,
 } from "./utils/createUserPayload.ts";
+
+const administracaoSource = readFileSync(
+  new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
+  "utf8",
+);
 
 function runTest(name, fn) {
   try {
@@ -172,4 +179,75 @@ runTest("organization owner scope field uses a checkbox toggle", () => {
   assert.match(createUserModalSource, /className="flex h-\[42px\] items-center justify-center gap-3"/);
   assert.match(createUserModalSource, /className=\{`\$\{FIELD_LABEL_CLASSNAME\} mb-0`\}/);
   assert.equal(createUserModalSource.includes('name="isOrganizationOwner"'), false);
+});
+
+runTest("department permission sync payload mirrors the department module level", () => {
+  const modules = {
+    rh: 1,
+    ti: 2,
+    financeiro: null,
+  };
+
+  assert.deepEqual(buildDepartmentPermissionSyncPayload("rh", modules), {
+    permission: 1,
+    type: "user",
+    modules,
+  });
+
+  assert.deepEqual(buildDepartmentPermissionSyncPayload("ti", { ...modules, ti: 2 }), {
+    permission: 2,
+    type: "admin",
+    modules: { ...modules, ti: 2 },
+  });
+
+  assert.deepEqual(buildDepartmentPermissionSyncPayload("financeiro", modules), {
+    permission: -1,
+    type: "user",
+    modules,
+  });
+});
+
+runTest("department permission sync payload uses denied permission for no access", () => {
+  const modules = {
+    rh: null,
+    ti: 1,
+  };
+
+  assert.deepEqual(buildDepartmentPermissionSyncPayload("rh", modules), {
+    permission: -1,
+    type: "user",
+    modules,
+  });
+});
+
+runTest("department permission sync detects stale global user access", () => {
+  const modules = { rh: 1 };
+
+  assert.equal(
+    needsDepartmentPermissionSync("rh", modules, { permission: 2, type: "admin" }),
+    true,
+  );
+  assert.equal(
+    needsDepartmentPermissionSync("rh", modules, { permission: 1, type: "user" }),
+    false,
+  );
+  assert.equal(
+    needsDepartmentPermissionSync("rh", { rh: 2 }, { permission: 1, type: "user" }),
+    true,
+  );
+  assert.equal(needsDepartmentPermissionSync(null, modules, { permission: 2, type: "admin" }), false);
+});
+
+runTest("department module remains editable in permissions tab", () => {
+  assert.match(
+    administracaoSource,
+    /const isDepartmentModule = selectedPermissionDepartmentModule === moduleKey;/,
+  );
+  assert.match(administracaoSource, /buildDepartmentPermissionSyncPayload/);
+  assert.match(administracaoSource, /needsDepartmentPermissionSync/);
+  assert.match(administracaoSource, /userService\.update\(\s*selectedPermissionUserId/s);
+  assert.doesNotMatch(
+    administracaoSource,
+    /isDepartmentModule \? \(\s*<div/s,
+  );
 });

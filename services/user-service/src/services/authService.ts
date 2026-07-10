@@ -49,7 +49,7 @@ const MODULE_PERMISSION_KEYS: ModulePermissionKey[] = [
   "wiki",
 ];
 
-function normalizeUserType(value: string | null | undefined): AuthUserType | undefined {
+function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
   return value === "owner" || value === "admin" || value === "user" ? value : undefined;
 }
 
@@ -107,7 +107,7 @@ class AuthService {
       acc[key] = permissionRecord?.[key] ?? null;
       return acc;
     }, {} as ModulePermissions);
-    const userType = normalizeUserType(user.type);
+    const type = normalizeAuthUserType(user.type);
 
     const token = jwt.sign(
       {
@@ -116,7 +116,7 @@ class AuthService {
         name: user.name,
         login: user.login,
         permission: user.permission,
-        type: userType,
+        type,
         modules,
       },
       jwtSecret,
@@ -131,7 +131,7 @@ class AuthService {
       name: user.name,
       login: user.login,
       permission: user.permission,
-      type: userType,
+      type,
       modules,
       department_id: user.department_id,
       organization_id: organizationId,
