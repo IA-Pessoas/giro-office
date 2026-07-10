@@ -25,7 +25,7 @@ import { TiRequestsTab } from "./TiRequestsTab";
 import { TiRobotsTab } from "./TiRobotsTab";
 import { TiStockTab } from "./TiStockTab";
 import { TiTermsTab } from "./TiTermsTab";
-import { tiPanelClassName, tiWorkspaceShellClassName } from "./tiWorkspaceUi";
+import { tiPanelClassName, tiThinScrollbarClassName, tiWorkspaceShellClassName } from "./tiWorkspaceUi";
 
 type TiTabId =
   | "dashboard"
@@ -154,7 +154,7 @@ export function TiPage() {
             aria-label="Abas de Tecnologia"
             className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800"
           >
-            <div className="overflow-x-auto px-2 pb-1 [scrollbar-color:rgb(71_85_105)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/85 dark:[scrollbar-color:rgb(37_99_235)_transparent] dark:[&::-webkit-scrollbar-thumb]:bg-blue-600/85">
+            <div className={cn("overflow-x-auto px-2 pb-1", tiThinScrollbarClassName)}>
               <div role="tablist" className="flex min-w-max items-center justify-center gap-1 pl-7 md:min-w-full">
                 {TI_TABS.map((tab) => {
                   const Icon = tab.icon;

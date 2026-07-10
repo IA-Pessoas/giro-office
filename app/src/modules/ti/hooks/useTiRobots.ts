@@ -101,8 +101,12 @@ export function useCreateTiRobotRun(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ id, payload }) => tiRobotsService.createRobotRun(id, payload),
-    onSuccess: async () => {
-      await invalidateTiRobots(queryClient);
+    onSuccess: async (_run, variables) => {
+      await Promise.all([
+        invalidateTiRobots(queryClient),
+        queryClient.invalidateQueries({ queryKey: tiQueryKeys.robots.detail(variables.id) }),
+        queryClient.invalidateQueries({ queryKey: tiQueryKeys.robots.runs(variables.id) }),
+      ]);
     },
   });
 }

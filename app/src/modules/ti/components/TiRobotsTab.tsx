@@ -1,8 +1,9 @@
-import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useMemo, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import {
   Bot,
   CheckCircle2,
   Clock3,
+  Eye,
   History,
   Loader2,
   Pencil,
@@ -40,6 +41,7 @@ import {
   tiLabelClassName,
   tiPrimaryButtonClassName,
   tiSecondaryButtonClassName,
+  tiThinScrollbarClassName,
 } from "./tiWorkspaceUi";
 
 const ROBOT_STATUS_OPTIONS = [
@@ -93,7 +95,7 @@ type RobotDraft = {
 type RunDraft = {
   status: string;
   message: string;
-  durationMs: string;
+  durationTime: string;
 };
 
 type AutomationMetric = {
@@ -115,7 +117,7 @@ const INITIAL_ROBOT_DRAFT: RobotDraft = {
 const INITIAL_RUN_DRAFT: RunDraft = {
   status: "success",
   message: "",
-  durationMs: "",
+  durationTime: "",
 };
 
 function getStringField(source: Record<string, unknown> | undefined, fields: string[], fallback = "") {
@@ -189,6 +191,39 @@ function getRunMessage(run: TiRobotRun) {
   return getStringField(run, ["message", "output", "error_message"], "Sem retorno registrado.");
 }
 
+function getRunDate(run: TiRobotRun) {
+  return run.finished_at ?? run.started_at ?? null;
+}
+
+function getLatestDateValue(values: Array<string | null | undefined>) {
+  let latestDate: string | null = null;
+  let latestRunTimestamp = Number.NEGATIVE_INFINITY;
+
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+
+    const runTimestamp = new Date(value).getTime();
+
+    if (Number.isNaN(runTimestamp)) {
+      latestDate ??= value;
+      continue;
+    }
+
+    if (runTimestamp > latestRunTimestamp) {
+      latestDate = value;
+      latestRunTimestamp = runTimestamp;
+    }
+  }
+
+  return latestDate;
+}
+
+function getLatestRunDate(runs: TiRobotRun[]) {
+  return getLatestDateValue(runs.map(getRunDate));
+}
+
 function getWeekdayLabel(value: string) {
   return (
     {
@@ -207,7 +242,7 @@ function formatSchedule(value: string | null | undefined) {
   const schedule = value?.trim();
 
   if (!schedule) {
-    return "Sem agendamento";
+    return "Sem execução prevista";
   }
 
   const [minute, hour, day, month, weekday] = schedule.split(/\s+/);
@@ -273,25 +308,68 @@ function buildRobotPayload(draft: RobotDraft): TiRobotPayload {
   };
 }
 
-function buildRunMetadata(draft: RunDraft): Record<string, unknown> | undefined {
-  const durationText = draft.durationMs.trim();
+function parseDurationMs(value: string) {
+  const durationText = value.trim().toLowerCase();
 
   if (!durationText) {
     return undefined;
   }
 
-  const durationMs = Number(durationText);
+  const timeMatch = /^(\d+):([0-5]\d):([0-5]\d)$/.exec(durationText);
 
-  if (!Number.isFinite(durationMs) || durationMs < 0) {
-    throw new Error("Informe a duração em milissegundos.");
+  if (timeMatch) {
+    const [, hours, minutes, seconds] = timeMatch;
+    const hoursValue = Number(hours);
+    const minutesValue = Number(minutes);
+    const secondsValue = Number(seconds);
+
+    return (hoursValue * 60 * 60 + minutesValue * 60 + secondsValue) * 1000;
+  }
+
+  let durationMs = 0;
+  let hasDurationPart = false;
+  const remainingText = durationText
+    .replace(
+      /(\d+)\s*(h|hora|horas|min|m|minuto|minutos|s|seg|segundo|segundos)\b/g,
+      (_, amount: string, unit: string) => {
+        const durationAmount = Number(amount);
+        hasDurationPart = true;
+
+        if (["h", "hora", "horas"].includes(unit)) {
+          durationMs += durationAmount * 60 * 60 * 1000;
+        } else if (["min", "m", "minuto", "minutos"].includes(unit)) {
+          durationMs += durationAmount * 60 * 1000;
+        } else {
+          durationMs += durationAmount * 1000;
+        }
+
+        return " ";
+      },
+    )
+    .replace(/\be\b/g, " ")
+    .replace(/[,\s]+/g, "");
+
+  if (!hasDurationPart || remainingText) {
+    throw new Error("Informe um tempo, por exemplo: 12 min ou 00:12:00.");
+  }
+
+  return durationMs;
+}
+
+function buildRunMetadata(draft: RunDraft): Record<string, unknown> | undefined {
+  const durationMs = parseDurationMs(draft.durationTime);
+
+  if (durationMs === undefined) {
+    return undefined;
   }
 
   return { durationMs };
 }
 
-function buildRunPayload(draft: RunDraft): TiRobotRunPayload {
+function buildRunPayload(draft: RunDraft, finishedAt: string): TiRobotRunPayload {
   return {
     status: draft.status,
+    finished_at: finishedAt,
     message: draft.message.trim() || undefined,
     metadata_json: buildRunMetadata(draft),
   };
@@ -317,6 +395,7 @@ export function TiRobotsTab() {
   const [editingRobot, setEditingRobot] = useState<TiRobot | undefined>();
   const [robotDraft, setRobotDraft] = useState<RobotDraft>(INITIAL_ROBOT_DRAFT);
   const [runDraft, setRunDraft] = useState<RunDraft>(INITIAL_RUN_DRAFT);
+  const [lastRunOverrides, setLastRunOverrides] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -337,6 +416,17 @@ export function TiRobotsTab() {
   const isRunSaving = createRunMutation.isPending;
 
   const visibleRuns = useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
+  const selectedRobotKey = selectedRobotId === undefined ? undefined : String(selectedRobotId);
+  const latestSelectedRunAt = useMemo(
+    () =>
+      getLatestDateValue([
+        selectedRobotKey ? lastRunOverrides[selectedRobotKey] : undefined,
+        getLatestRunDate(visibleRuns),
+        activeRobot?.last_run_at,
+        selectedRobot?.last_run_at,
+      ]),
+    [activeRobot?.last_run_at, lastRunOverrides, selectedRobot?.last_run_at, selectedRobotKey, visibleRuns],
+  );
   const activeRobotsCount = useMemo(() => robots.filter(isRobotActive).length, [robots]);
   const failedRunsCount = useMemo(() => visibleRuns.filter(isFailedRun).length, [visibleRuns]);
   const automationMetrics = useMemo<AutomationMetric[]>(
@@ -350,7 +440,7 @@ export function TiRobotsTab() {
       {
         label: "Execuções do robô",
         value: visibleRuns.length,
-        helper: activeRobot ? "Histórico do item selecionado" : "Abra um robô",
+        helper: activeRobot ? "Histórico do item selecionado" : "Selecione um robô",
         icon: History,
       },
       {
@@ -384,7 +474,32 @@ export function TiRobotsTab() {
     }));
   }
 
+  function getRobotLastRunAt(robot: TiRobot) {
+    const runOverride = lastRunOverrides[String(robot.id)];
+
+    if (String(robot.id) === String(selectedRobotId)) {
+      return getLatestDateValue([runOverride, latestSelectedRunAt, robot.last_run_at]);
+    }
+
+    return getLatestDateValue([runOverride, robot.last_run_at]);
+  }
+
+  function clearRobotSelection() {
+    setActiveRobotId(undefined);
+    setActionError(null);
+    setIsDetailDialogOpen(false);
+  }
+
   function selectRobot(robotId: TiId) {
+    setActiveRobotId(robotId);
+    setActionError(null);
+  }
+
+  function openRobotDetail(robotId = selectedRobotId) {
+    if (!robotId) {
+      return;
+    }
+
     setActiveRobotId(robotId);
     setActionError(null);
     setIsDetailDialogOpen(true);
@@ -399,7 +514,30 @@ export function TiRobotsTab() {
     selectRobot(robotId);
   }
 
+  function handleRobotsPanelClick(event: MouseEvent<HTMLElement>) {
+    const target = event.target;
+
+    if (
+      !(target instanceof Element) ||
+      target.closest("[data-ti-robot-row]") ||
+      target.closest("[data-ti-selection-control]")
+    ) {
+      return;
+    }
+
+    clearRobotSelection();
+  }
+
+  function handleDetailDialogOpenChange(nextOpen: boolean) {
+    setIsDetailDialogOpen(nextOpen);
+
+    if (!nextOpen) {
+      setActionError(null);
+    }
+  }
+
   function openCreateDialog() {
+    clearRobotSelection();
     setEditingRobot(undefined);
     setRobotDraft(INITIAL_ROBOT_DRAFT);
     setFormError(null);
@@ -436,13 +574,13 @@ export function TiRobotsTab() {
 
     try {
       const payload = buildRobotPayload(robotDraft);
-      const savedRobot = editingRobot
-        ? await updateRobotMutation.mutateAsync({ id: editingRobot.id, payload })
-        : await createRobotMutation.mutateAsync(payload);
+      if (editingRobot) {
+        await updateRobotMutation.mutateAsync({ id: editingRobot.id, payload });
+      } else {
+        await createRobotMutation.mutateAsync(payload);
+      }
 
-      setActiveRobotId(savedRobot.id);
       setIsRobotDialogOpen(false);
-      setIsDetailDialogOpen(true);
     } catch (error) {
       setFormError(getErrorMessage(error));
     }
@@ -459,10 +597,17 @@ export function TiRobotsTab() {
     }
 
     try {
-      await createRunMutation.mutateAsync({
+      const finishedAt = new Date().toISOString();
+      const createdRun = await createRunMutation.mutateAsync({
         id: selectedRobotId,
-        payload: buildRunPayload(runDraft),
+        payload: buildRunPayload(runDraft, finishedAt),
       });
+      const createdRunAt = getRunDate(createdRun) ?? finishedAt;
+
+      setLastRunOverrides((current) => ({
+        ...current,
+        [String(selectedRobotId)]: createdRunAt,
+      }));
       setIsRunDialogOpen(false);
     } catch (error) {
       setFormError(getErrorMessage(error));
@@ -471,11 +616,18 @@ export function TiRobotsTab() {
   }
 
   return (
-    <TiPanel className="space-y-5">
+    <TiPanel className="space-y-4 p-4 sm:p-5" onClick={handleRobotsPanelClick}>
       <TiSectionHeader
         title="Robôs"
         description="Acompanhe automações, rotinas agendadas e histórico de execução."
-        action={<TiIconAction icon={Plus} label="Novo robô" variant="primary" onClick={openCreateDialog} />}
+        action={
+          <div className="flex flex-wrap justify-end gap-2" data-ti-selection-control>
+            {activeRobot ? (
+              <TiIconAction icon={Eye} label="Ver detalhes" onClick={() => openRobotDetail(activeRobot.id)} />
+            ) : null}
+            <TiIconAction icon={Plus} label="Novo robô" variant="primary" onClick={openCreateDialog} />
+          </div>
+        }
       />
 
       <div className="grid gap-3 md:grid-cols-3">
@@ -507,22 +659,22 @@ export function TiRobotsTab() {
             return (
               <div
                 key={metric.label}
-                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-400">
                       {metric.label}
                     </p>
-                    <p className="mt-2 text-2xl font-semibold tracking-normal text-slate-950 dark:text-white">
+                    <p className="mt-1 text-xl font-semibold tracking-normal text-slate-950 dark:text-white">
                       {metric.value}
                     </p>
                   </div>
-                  <span className="rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                  <span className="rounded-md bg-blue-50 p-1.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
                     <Icon className="h-4 w-4" />
                   </span>
                 </div>
-                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{metric.helper}</p>
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{metric.helper}</p>
               </div>
             );
           })}
@@ -587,11 +739,12 @@ export function TiRobotsTab() {
                         )}
                         role="button"
                         tabIndex={0}
+                        data-ti-robot-row
                         aria-selected={isActive}
                         onClick={() => selectRobot(robot.id)}
                         onKeyDown={(event) => handleRobotRowKeyDown(event, robot.id)}
                       >
-                        <td className="min-w-56 px-4 py-3">
+                        <td className="min-w-56 px-4 py-2.5">
                           <span className="block font-medium text-slate-950 dark:text-white">
                             {getRobotName(robot)}
                           </span>
@@ -599,11 +752,11 @@ export function TiRobotsTab() {
                             {getRobotTypeLabel(robot.type)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-200">
                           {getStatusLabel(robot.status)}
                         </td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                          {formatDate(robot.last_run_at)}
+                        <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">
+                          {formatDate(getRobotLastRunAt(robot))}
                         </td>
                       </tr>
                     );
@@ -617,12 +770,7 @@ export function TiRobotsTab() {
 
       <Dialog
         open={isDetailDialogOpen}
-        onOpenChange={(nextOpen) => {
-          setIsDetailDialogOpen(nextOpen);
-          if (!nextOpen) {
-            setActionError(null);
-          }
-        }}
+        onOpenChange={handleDetailDialogOpenChange}
         title={activeRobot ? getRobotName(activeRobot) : "Detalhe do robô"}
         description="Detalhe, execução e histórico da automação."
         contentClassName="w-[min(92vw,760px)] overflow-hidden border-slate-300 shadow-2xl dark:border-slate-700"
@@ -666,7 +814,7 @@ export function TiRobotsTab() {
                     </dd>
                   </div>
                   <div>
-                    <dt className={tiLabelClassName}>Agendamento</dt>
+                    <dt className={tiLabelClassName}>Execução prevista</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
                       {formatSchedule(activeRobot.schedule ?? getStringField(activeRobot, ["cron", "frequency"]))}
                     </dd>
@@ -686,7 +834,7 @@ export function TiRobotsTab() {
                   <div>
                     <dt className={tiLabelClassName}>Última execução</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
-                      {formatDate(activeRobot.last_run_at)}
+                      {formatDate(latestSelectedRunAt ?? activeRobot.last_run_at)}
                     </dd>
                   </div>
                 </dl>
@@ -735,24 +883,36 @@ export function TiRobotsTab() {
               </p>
             ) : null}
 
-            {visibleRuns.map((run) => (
+            {visibleRuns.length > 0 ? (
               <div
-                key={run.id}
-                className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40"
+                aria-label="Histórico de execuções do robô"
+                className={cn(
+                  "h-32 divide-y divide-slate-200 overflow-y-auto overscroll-contain pr-2 dark:divide-slate-800",
+                  tiThinScrollbarClassName,
+                )}
+                role="list"
               >
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="font-medium text-slate-950 dark:text-white">
-                    {getStatusLabel(run.status)}
-                  </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {formatDate(run.finished_at ?? run.started_at)}
-                  </span>
-                </div>
-                <p className="line-clamp-3 text-slate-600 dark:text-slate-300">
-                  {getRunMessage(run)}
-                </p>
+                {visibleRuns.map((run) => (
+                  <div
+                    key={run.id}
+                    className="flex items-start justify-between gap-3 py-2 text-sm"
+                    role="listitem"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-950 dark:text-white">
+                        {getStatusLabel(run.status)}
+                      </p>
+                      <p className="mt-0.5 line-clamp-2 text-slate-600 dark:text-slate-300">
+                        {getRunMessage(run)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                      {formatDate(run.finished_at ?? run.started_at)}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : null}
           </div>
         ) : null}
       </Dialog>
@@ -818,15 +978,19 @@ export function TiRobotsTab() {
               }
             />
             <label className="flex min-w-0 flex-col gap-2">
-              <span className={tiLabelClassName}>Agendamento</span>
+              <span className={tiLabelClassName}>Execução prevista</span>
               <input
+                aria-describedby="robot-schedule-help"
                 className={tiInputClassName}
                 value={robotDraft.schedule}
-                placeholder="Diário 02:00, sob demanda ou conforme operação"
+                placeholder="Sob demanda ou diariamente às 02:00"
                 onChange={(event) =>
                   setRobotDraft((draft) => ({ ...draft, schedule: event.target.value }))
                 }
               />
+              <span id="robot-schedule-help" className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+                Ex.: sob demanda, diariamente às 02:00 ou após fechamento.
+              </span>
             </label>
           </div>
 
@@ -861,7 +1025,7 @@ export function TiRobotsTab() {
             </div>
           ) : null}
 
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px]">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
             <TiNativeSelect
               label="Resultado"
               value={runDraft.status}
@@ -871,16 +1035,14 @@ export function TiRobotsTab() {
               }
             />
             <label className="flex min-w-0 flex-col gap-2">
-              <span className={tiLabelClassName}>Duração (ms)</span>
+              <span className={tiLabelClassName}>Tempo gasto</span>
               <input
-                className={tiInputClassName}
-                type="number"
-                min="0"
-                step="1"
-                inputMode="numeric"
-                value={runDraft.durationMs}
+                aria-label="Tempo gasto"
+                className={cn(tiInputClassName, "text-center")}
+                value={runDraft.durationTime}
+                placeholder="12 min ou 00:12:00"
                 onChange={(event) =>
-                  setRunDraft((draft) => ({ ...draft, durationMs: event.target.value }))
+                  setRunDraft((draft) => ({ ...draft, durationTime: event.target.value }))
                 }
               />
             </label>
