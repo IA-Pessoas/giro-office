@@ -28,6 +28,7 @@ const USER_CREATE_SELECT = {
   permission_id: true,
 } as const;
 
+const DEFAULT_NON_OWNER_PERMISSION = 1;
 const OWNER_MAX_MODULE_VALUE = 2;
 const MODULE_FIELDS = [
   "atendimento",
@@ -189,7 +190,7 @@ function normalizePermissionForType(type: AuthUserType | null, permission: numbe
   }
 
   if (type === "admin" && permission >= OWNER_MAX_MODULE_VALUE) {
-    return 1;
+    return DEFAULT_NON_OWNER_PERMISSION;
   }
 
   return permission;
@@ -358,13 +359,13 @@ class UserService {
       typeof existingUser.permission === "number" &&
       existingUser.permission >= OWNER_MAX_MODULE_VALUE
     ) {
-      updateData.permission = 1;
+      updateData.permission = DEFAULT_NON_OWNER_PERMISSION;
     } else if (
       data.type === "user" &&
       typeof existingUser.permission === "number" &&
       existingUser.permission >= OWNER_MAX_MODULE_VALUE
     ) {
-      updateData.permission = 1;
+      updateData.permission = DEFAULT_NON_OWNER_PERMISSION;
     }
     if (data.status !== undefined) updateData.status = data.status;
     if (data.photo_url !== undefined) updateData.photo_url = data.photo_url;
