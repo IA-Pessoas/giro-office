@@ -18,7 +18,7 @@ import {
 } from "./tiService.contract";
 
 export const tiRobotsService = {
-  async list(filters?: TiListFilters): Promise<TiRobot[]> {
+  async listRobots(filters?: TiListFilters): Promise<TiRobot[]> {
     const response = await api.get(TI_ENDPOINTS.robots.list, {
       params: buildTiListParams(filters),
     });
@@ -26,13 +26,13 @@ export const tiRobotsService = {
     return unwrapTiList<TiRobot>(response.data);
   },
 
-  async create(payload: TiRobotPayload): Promise<TiRobot> {
+  async createRobot(payload: TiRobotPayload): Promise<TiRobot> {
     const response = await api.post<TiEnvelope<TiRobot>>(TI_ENDPOINTS.robots.base, payload);
 
     return unwrapTiEnvelope<TiRobot>(response.data);
   },
 
-  async getById(id: TiId): Promise<TiRobot> {
+  async getRobotById(id: TiId): Promise<TiRobot> {
     const response = await api.get<TiEnvelope<TiRobot>>(
       buildTiPath(TI_ENDPOINTS.robots.detail, id),
     );
@@ -40,7 +40,7 @@ export const tiRobotsService = {
     return unwrapTiEnvelope<TiRobot>(response.data);
   },
 
-  async update(id: TiId, payload: TiRobotPayload): Promise<TiRobot> {
+  async updateRobot(id: TiId, payload: TiRobotPayload): Promise<TiRobot> {
     const response = await api.patch<TiEnvelope<TiRobot>>(
       buildTiPath(TI_ENDPOINTS.robots.detail, id),
       payload,
@@ -49,7 +49,7 @@ export const tiRobotsService = {
     return unwrapTiEnvelope<TiRobot>(response.data);
   },
 
-  async createRun(id: TiId, payload: TiRobotRunPayload): Promise<TiRobotRun> {
+  async createRobotRun(id: TiId, payload: TiRobotRunPayload): Promise<TiRobotRun> {
     const response = await api.post<TiEnvelope<TiRobotRun>>(
       buildTiPath(TI_ENDPOINTS.robots.runs, id),
       payload,
@@ -58,11 +58,35 @@ export const tiRobotsService = {
     return unwrapTiEnvelope<TiRobotRun>(response.data);
   },
 
-  async listRuns(id: TiId, filters?: TiListFilters): Promise<TiRobotRun[]> {
+  async listRobotRuns(id: TiId, filters?: TiListFilters): Promise<TiRobotRun[]> {
     const response = await api.get(buildTiPath(TI_ENDPOINTS.robots.runsList, id), {
       params: buildTiListParams(filters),
     });
 
     return unwrapTiList<TiRobotRun>(response.data);
+  },
+
+  async list(filters?: TiListFilters): Promise<TiRobot[]> {
+    return this.listRobots(filters);
+  },
+
+  async create(payload: TiRobotPayload): Promise<TiRobot> {
+    return this.createRobot(payload);
+  },
+
+  async getById(id: TiId): Promise<TiRobot> {
+    return this.getRobotById(id);
+  },
+
+  async update(id: TiId, payload: TiRobotPayload): Promise<TiRobot> {
+    return this.updateRobot(id, payload);
+  },
+
+  async createRun(id: TiId, payload: TiRobotRunPayload): Promise<TiRobotRun> {
+    return this.createRobotRun(id, payload);
+  },
+
+  async listRuns(id: TiId, filters?: TiListFilters): Promise<TiRobotRun[]> {
+    return this.listRobotRuns(id, filters);
   },
 };

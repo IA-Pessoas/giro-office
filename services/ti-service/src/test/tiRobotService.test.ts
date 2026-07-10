@@ -13,6 +13,46 @@ const context = {
 const robotId = "90000000-0000-4000-8000-000000000001";
 
 describe("TiRobotService", () => {
+  it("lists robots with the latest run summary", async () => {
+    const finishedAt = new Date("2026-07-10T12:30:00.000Z");
+    const prisma = {
+      tIRobot: {
+        findMany: vi.fn(async () => [
+          {
+            id: robotId,
+            name: "Backup diario",
+            description: "Executa backup dos arquivos internos.",
+            type: "Backup",
+            schedule: "0 2 * * *",
+            status: "active",
+            active: true,
+            organization_id: context.organizationId,
+            runs: [
+              {
+                status: "success",
+                started_at: new Date("2026-07-10T12:00:00.000Z"),
+                finished_at: finishedAt,
+              },
+            ],
+          },
+        ]),
+      },
+    };
+    const service = new TiRobotService(prisma as never);
+
+    const result = await service.list(context, {});
+
+    expect(result).toMatchObject([
+      {
+        id: robotId,
+        name: "Backup diario",
+        last_status: "success",
+        last_run_at: finishedAt.toISOString(),
+      },
+    ]);
+    expect(result[0]).not.toHaveProperty("runs");
+  });
+
   it("creates robots scoped to the authenticated organization", async () => {
     const prisma = {
       tIRobot: {
