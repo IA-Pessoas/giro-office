@@ -1,8 +1,10 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Eye, FileCheck2, Pencil, Plus, Signature } from "lucide-react";
+import { Eye, FileCheck2, Pencil, Plus, Printer, Save, Signature, X } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
+import { departmentService, type DepItem } from "@modules/departments";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -17,7 +19,6 @@ import type { TiId, TiInventoryAsset, TiTerm } from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
-  TiDetailPanel,
   TiEmptyState,
   TiFieldLine,
   TiIconAction,
@@ -30,6 +31,11 @@ import {
   TiTextarea,
   TiTextField,
 } from "./tiFormControls";
+import {
+  tiCompactButtonClassName,
+  tiPrimaryButtonClassName,
+  tiSecondaryButtonClassName,
+} from "./tiWorkspaceUi";
 
 type TermsDialogState =
   | { type: "term"; mode: "create"; term?: undefined }
@@ -38,13 +44,9 @@ type TermsDialogState =
 
 const TERM_STATUS_OPTIONS = [
   { value: "", label: "Todos" },
-  { value: "draft", label: "Rascunho" },
   { value: "pending", label: "Pendente" },
   { value: "signed", label: "Assinado" },
-  { value: "closed", label: "Encerrado" },
 ];
-
-const TERM_FORM_STATUS_OPTIONS = TERM_STATUS_OPTIONS.filter((option) => option.value);
 
 function getText(value: unknown, fallback = "-"): string {
   if (value === null || value === undefined || value === "") {
@@ -71,20 +73,12 @@ function normalizeStatus(status: unknown): string {
 function formatStatus(status: unknown): string {
   const normalized = normalizeStatus(status);
 
-  if (normalized === "draft") {
-    return "Rascunho";
-  }
-
   if (normalized === "pending") {
     return "Pendente";
   }
 
   if (normalized === "signed") {
     return "Assinado";
-  }
-
-  if (normalized === "closed") {
-    return "Encerrado";
   }
 
   return getText(status, "Sem status");
@@ -99,10 +93,6 @@ function getStatusTone(status: unknown): "neutral" | "success" | "warning" | "da
 
   if (normalized === "pending") {
     return "warning";
-  }
-
-  if (normalized === "draft") {
-    return "info";
   }
 
   return "neutral";
@@ -122,16 +112,56 @@ function formatDate(value: unknown): string {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(date);
 }
 
-function getTermTitle(term: TiTerm): string {
-  return getText(term.title ?? term.description, "Termo sem título");
+function getDateInputValue(value: unknown): string {
+  if (!value) {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  const date = new Date(String(value));
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value).slice(0, 10);
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function getAssetCode(asset?: TiInventoryAsset | null): string {
+  return getText(asset?.asset_code ?? asset?.code ?? asset?.patrimony_code ?? asset?.serial_number, "");
 }
 
 function getAssetTitle(asset: TiInventoryAsset): string {
-  return getText(asset.name ?? asset.code ?? asset.patrimony_code, "Ativo sem nome");
+  return getText(asset.name ?? getAssetCode(asset), "Ativo sem nome");
+}
+
+function getTermTitle(term: TiTerm): string {
+  if (term.title) {
+    return getText(term.title, "Termo sem título");
+  }
+
+  if (term.user_name) {
+    return `Termo de ${getText(term.user_name, "usuário")}`;
+  }
+
+  return getText(term.asset_code, "Termo sem usuário");
 }
 
 function getTermUser(term: TiTerm): string {
-  return getText(term.user_name ?? term.assignee_name ?? term.user_id);
+  return getText(
+    term.user_name ?? term.assignee_name ?? term.user?.full_name ?? term.user?.name ?? term.user_id,
+  );
+}
+
+function getTermAsset(term: TiTerm): string {
+  return getText(term.asset_code ?? term.equipament_list, "Ativo não informado");
+}
+
+function hasTermSignature(term?: TiTerm | null): boolean {
+  return Boolean(String(term?.reason ?? "").trim());
+}
+
+function getTermStatus(term?: TiTerm | null): "pending" | "signed" {
+  return hasTermSignature(term) ? "signed" : "pending";
 }
 
 function getMutationErrorMessage(error: unknown): string {
@@ -142,30 +172,91 @@ function getMutationErrorMessage(error: unknown): string {
   return "Não foi possível concluir a ação.";
 }
 
+function getSearchableText(values: unknown[]): string {
+  return values.map((value) => getText(value, "")).join(" ").toLowerCase();
+}
+
+function escapeHtml(value: unknown): string {
+  return getText(value, "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function buildPrintableTermHtml(term: TiTerm, departmentName: string): string {
+  const rows = [
+    ["Usuário", getTermUser(term)],
+    ["CPF", term.user_cpf],
+    ["Departamento", departmentName],
+    ["Data", formatDate(term.date)],
+    ["Endereço", term.address],
+    ["Equipamento", term.equipament_list],
+    ["Marca", term.brand],
+    ["Código", term.asset_code],
+    ["IMEI", term.imei],
+    ["Status", formatStatus(getTermStatus(term))],
+    ["Motivo", term.reason],
+  ];
+
+  return `<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(getTermTitle(term))}</title>
+    <style>
+      @page { margin: 18mm; }
+      body { color: #0f172a; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.5; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      .subtitle { color: #475569; margin: 0 0 24px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: left; vertical-align: top; }
+      th { background: #f1f5f9; width: 180px; }
+      .signature { display: grid; gap: 32px; grid-template-columns: 1fr 1fr; margin-top: 56px; }
+      .line { border-top: 1px solid #0f172a; padding-top: 8px; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <h1>${escapeHtml(getTermTitle(term))}</h1>
+    <p class="subtitle">Termo de responsabilidade de TI</p>
+    <table>
+      <tbody>
+        ${rows
+          .map(
+            ([label, value]) =>
+              `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+    <div class="signature">
+      <div class="line">Responsável</div>
+      <div class="line">Tecnologia da Informação</div>
+    </div>
+  </body>
+</html>`;
+}
+
 export function TiTermsTab() {
   const { access } = useModuleAccess("ti");
   const canManage = access.canEdit || access.isAdmin;
   const canSign = access.canView;
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [termStatus, setTermStatus] = useState("");
   const [assetId, setAssetId] = useState("");
   const [selectedTermId, setSelectedTermId] = useState<TiId | undefined>();
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [dialogState, setDialogState] = useState<TermsDialogState | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
-  const filters = useMemo(
-    () =>
-      compactPayload({
-        search,
-        status,
-        inventory_id: assetId,
-        asset_id: assetId,
-      }),
-    [assetId, search, status],
-  );
-
-  const termsQuery = useTiTerms(filters);
+  const termsQuery = useTiTerms();
   const assetsQuery = useTiInventory();
+  const departmentsQuery = useFetch<DepItem[]>(
+    ["ti-terms", "departments"],
+    () => departmentService.list(),
+    { retry: false },
+  );
   const selectedTermQuery = useTiTerm(selectedTermId, { enabled: Boolean(selectedTermId) });
   const createTermMutation = useCreateTiTermMutation();
   const updateTermMutation = useUpdateTiTermMutation();
@@ -176,28 +267,89 @@ export function TiTermsTab() {
     [assetsQuery.data],
   );
 
+  const assetsByCode = useMemo(
+    () =>
+      new Map(
+        (assetsQuery.data ?? []).map((asset) => [normalizeStatus(getAssetCode(asset)), asset]),
+      ),
+    [assetsQuery.data],
+  );
+
+  const departmentsById = useMemo(
+    () => new Map((departmentsQuery.data ?? []).map((department) => [String(department.id), department])),
+    [departmentsQuery.data],
+  );
+
   const assetOptions = useMemo(
-    () => [
-      { value: "", label: "Todos" },
-      ...(assetsQuery.data ?? []).map((asset) => ({
+    () =>
+      (assetsQuery.data ?? []).map((asset) => ({
         value: String(asset.id),
         label: getAssetTitle(asset),
       })),
-    ],
     [assetsQuery.data],
   );
+
+  const assetFilterOptions = useMemo(
+    () => [{ value: "", label: "Todos" }, ...assetOptions],
+    [assetOptions],
+  );
+
+  const assetFormOptions = useMemo(
+    () => [{ value: "", label: "Selecione" }, ...assetOptions],
+    [assetOptions],
+  );
+
+  const departmentOptions = useMemo(
+    () => [
+      { value: "", label: "Selecione" },
+      ...(departmentsQuery.data ?? []).map((department) => ({
+        value: String(department.id),
+        label: getText(department.name, "Departamento sem nome"),
+      })),
+    ],
+    [departmentsQuery.data],
+  );
+
+  const filteredTerms = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    const selectedAsset = assetsById.get(String(assetId));
+    const selectedAssetCode = getAssetCode(selectedAsset);
+
+    return (termsQuery.data ?? []).filter((term) => {
+      const statusMatches = !termStatus || getTermStatus(term) === termStatus;
+      const assetMatches =
+        !assetId ||
+        normalizeStatus(term.asset_code) === normalizeStatus(selectedAssetCode) ||
+        normalizeStatus(term.equipament_list).includes(normalizeStatus(selectedAssetCode));
+      const searchableText = getSearchableText([
+        getTermTitle(term),
+        getTermUser(term),
+        term.user_cpf,
+        term.asset_code,
+        term.equipament_list,
+        term.brand,
+        term.imei,
+        term.reason,
+      ]);
+
+      return statusMatches && assetMatches && (!normalizedSearch || searchableText.includes(normalizedSearch));
+    });
+  }, [assetId, assetsById, search, termStatus, termsQuery.data]);
 
   const selectedListTerm = (termsQuery.data ?? []).find(
     (term) => String(term.id) === String(selectedTermId),
   );
   const selectedTerm = selectedTermQuery.data ?? selectedListTerm;
 
-  function getAssetName(id: unknown, term?: TiTerm): string {
-    if (term?.inventory?.name) {
-      return getText(term.inventory.name);
-    }
+  function getDepartmentName(id: unknown): string {
+    return getText(departmentsById.get(String(id))?.name);
+  }
 
-    return getText(assetsById.get(String(id))?.name);
+  function getSelectedAssetIdByCode(assetCode: unknown): string {
+    const normalizedCode = normalizeStatus(assetCode);
+    const asset = assetsByCode.get(normalizedCode);
+
+    return asset ? String(asset.id) : "";
   }
 
   function closeDialog() {
@@ -210,6 +362,24 @@ export function TiTermsTab() {
     setDialogState(nextDialogState);
   }
 
+  function openTermDetail(termId: TiId) {
+    setSelectedTermId(termId);
+    setIsDetailDialogOpen(true);
+  }
+
+  function handlePrintTerm(term: TiTerm) {
+    const printWindow = window.open("", "_blank", "width=900,height=1100");
+
+    if (!printWindow) {
+      return;
+    }
+
+    printWindow.document.write(buildPrintableTermHtml(term, getDepartmentName(term.department_id)));
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+
   async function handleSubmitTerm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -218,18 +388,34 @@ export function TiTermsTab() {
     }
 
     const formData = new FormData(event.currentTarget);
-    const selectedAssetId = getFormText(formData, "inventory_id");
+    const selectedAssetId = getFormText(formData, "selected_asset_id");
+    const selectedAsset = assetsById.get(String(selectedAssetId));
+    const selectedAssetCode = getAssetCode(selectedAsset);
     const payload = compactPayload({
-      title: getFormText(formData, "title"),
-      description: getFormText(formData, "description"),
-      inventory_id: selectedAssetId,
-      asset_id: selectedAssetId,
-      user_id: getFormText(formData, "user_id"),
+      date: getFormText(formData, "date"),
       user_name: getFormText(formData, "user_name"),
-      status: getFormText(formData, "status"),
-      content: getFormText(formData, "content"),
-      notes: getFormText(formData, "notes"),
+      user_cpf: getFormText(formData, "user_cpf"),
+      user_id: getFormText(formData, "user_id"),
+      department_id: getFormText(formData, "department_id"),
+      address: getFormText(formData, "address"),
+      reason: getFormText(formData, "reason"),
+      equipament_list: getFormText(formData, "equipament_list"),
+      brand: getFormText(formData, "brand"),
+      asset_code: getFormText(formData, "asset_code"),
+      imei: getFormText(formData, "imei"),
     });
+
+    if (!payload.asset_code && selectedAssetCode) {
+      payload.asset_code = selectedAssetCode;
+    }
+
+    if (!payload.equipament_list && selectedAsset) {
+      payload.equipament_list = getAssetTitle(selectedAsset);
+    }
+
+    if (!payload.brand && selectedAsset?.brand) {
+      payload.brand = getText(selectedAsset.brand, "");
+    }
 
     try {
       setDialogError(null);
@@ -239,6 +425,7 @@ export function TiTermsTab() {
       } else {
         const createdTerm = await createTermMutation.mutateAsync(payload);
         setSelectedTermId(createdTerm.id);
+        setIsDetailDialogOpen(true);
       }
 
       closeDialog();
@@ -265,11 +452,11 @@ export function TiTermsTab() {
       await signTermMutation.mutateAsync({
         id: dialogState.term.id,
         payload: compactPayload({
-          signer_name: getFormText(formData, "signer_name"),
-          notes: getFormText(formData, "notes"),
+          reason: getFormText(formData, "reason"),
         }),
       });
       setSelectedTermId(dialogState.term.id);
+      setIsDetailDialogOpen(true);
       closeDialog();
     } catch (error) {
       setDialogError(getMutationErrorMessage(error));
@@ -300,23 +487,23 @@ export function TiTermsTab() {
           label="Busca"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Título, usuário ou ativo"
+          placeholder="Usuário, CPF ou ativo"
         />
         <TiNativeSelect
           label="Status"
-          value={status}
-          onChange={(event) => setStatus(event.target.value)}
+          value={termStatus}
+          onChange={(event) => setTermStatus(event.target.value)}
           options={TERM_STATUS_OPTIONS}
         />
         <TiNativeSelect
           label="Ativo"
           value={assetId}
           onChange={(event) => setAssetId(event.target.value)}
-          options={assetOptions}
+          options={assetFilterOptions}
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
+      <div className="grid gap-4">
         <TiQueryStatePanel
           query={termsQuery}
           emptyState={
@@ -324,83 +511,91 @@ export function TiTermsTab() {
               icon={FileCheck2}
               title="Nenhum termo gerado"
               description="Os termos assinados ou pendentes ficam disponíveis nesta área."
-              action={
-                canManage ? (
-                  <TiIconAction
-                    icon={Plus}
-                    label="Novo termo"
-                    variant="primary"
-                    onClick={() => openDialog({ type: "term", mode: "create" })}
-                  />
-                ) : null
-              }
             />
           }
         >
-          {(terms) => (
-            <TiDataTable headers={["Termo", "Ativo", "Usuário", "Assinatura", "Status", ""]}>
-              {terms.map((term) => {
-                const isSelected = String(term.id) === String(selectedTermId);
+          {() =>
+            filteredTerms.length > 0 ? (
+              <TiDataTable headers={["Termo", "Ativo", "Usuário", "Data", "Status", ""]}>
+                {filteredTerms.map((term) => {
+                  const isSelected = String(term.id) === String(selectedTermId);
+                  const termStatusValue = getTermStatus(term);
 
-                return (
-                  <tr
-                    key={term.id}
-                    className={cn(
-                      "text-slate-700 dark:text-slate-200",
-                      isSelected ? "bg-blue-50/70 dark:bg-blue-950/20" : "",
-                    )}
-                  >
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
-                        onClick={() => setSelectedTermId(term.id)}
-                      >
-                        {getTermTitle(term)}
-                      </button>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        {formatDate(term.created_at)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">{getAssetName(term.inventory_id ?? term.asset_id, term)}</td>
-                    <td className="px-4 py-3">{getTermUser(term)}</td>
-                    <td className="px-4 py-3">{formatDate(term.signed_at)}</td>
-                    <td className="px-4 py-3">
-                      <TiStatusPill tone={getStatusTone(term.status)}>
-                        {formatStatus(term.status)}
-                      </TiStatusPill>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        <TiTableAction
-                          icon={Eye}
-                          label="Detalhes"
-                          onClick={() => setSelectedTermId(term.id)}
-                        />
-                        {canManage ? (
+                  return (
+                    <tr
+                      key={term.id}
+                      className={cn(
+                        "text-slate-700 dark:text-slate-200",
+                        isSelected ? "bg-blue-50/70 dark:bg-blue-950/20" : "",
+                      )}
+                    >
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
+                          onClick={() => openTermDetail(term.id)}
+                        >
+                          {getTermTitle(term)}
+                        </button>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {getText(term.user_cpf)}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">{getTermAsset(term)}</td>
+                      <td className="px-4 py-3">{getTermUser(term)}</td>
+                      <td className="px-4 py-3">{formatDate(term.date)}</td>
+                      <td className="px-4 py-3">
+                        <TiStatusPill tone={getStatusTone(termStatusValue)}>
+                          {formatStatus(termStatusValue)}
+                        </TiStatusPill>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
                           <TiTableAction
-                            icon={Pencil}
-                            label="Editar termo"
-                            onClick={() => openDialog({ type: "term", mode: "edit", term })}
+                            icon={Eye}
+                            label="Detalhes"
+                            onClick={() => openTermDetail(term.id)}
                           />
-                        ) : null}
-                        {canSign ? (
-                          <TiTableAction
-                            icon={Signature}
-                            label="Assinar termo"
-                            onClick={() => openDialog({ type: "sign", term })}
-                          />
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </TiDataTable>
-          )}
+                          {canManage ? (
+                            <TiTableAction
+                              icon={Pencil}
+                              label="Editar termo"
+                              onClick={() => openDialog({ type: "term", mode: "edit", term })}
+                            />
+                          ) : null}
+                          {canSign ? (
+                            <TiTableAction
+                              icon={Signature}
+                              label="Assinar termo"
+                              onClick={() => openDialog({ type: "sign", term })}
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </TiDataTable>
+            ) : (
+              <TiEmptyState
+                icon={FileCheck2}
+                title="Nenhum termo encontrado"
+                description="Ajuste os filtros para localizar outros termos."
+              />
+            )
+          }
         </TiQueryStatePanel>
+      </div>
 
-        <TiDetailPanel title="Detalhe do termo">
+      <Dialog
+        open={isDetailDialogOpen}
+        onOpenChange={setIsDetailDialogOpen}
+        title={selectedTerm ? getTermTitle(selectedTerm) : "Detalhe do termo"}
+        description="Detalhe cadastral e assinatura do termo."
+        contentClassName="w-[min(92vw,760px)] overflow-hidden border-slate-300 shadow-2xl dark:border-slate-700"
+        bodyClassName="space-y-3 bg-slate-100/70 !px-4 !py-3 dark:bg-slate-950/50"
+      >
+        <div className="mx-auto max-w-2xl rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:p-4">
           {selectedTermQuery.isLoading ? (
             <TiFieldLine label="Status" value="Carregando..." />
           ) : selectedTermQuery.isError ? (
@@ -409,31 +604,45 @@ export function TiTermsTab() {
             </TiInlineNotice>
           ) : selectedTerm ? (
             <>
-              <TiFieldLine label="Termo" value={getTermTitle(selectedTerm)} />
-              <TiFieldLine
-                label="Ativo"
-                value={getAssetName(selectedTerm.inventory_id ?? selectedTerm.asset_id, selectedTerm)}
-              />
-              <TiFieldLine label="Usuário" value={getTermUser(selectedTerm)} />
-              <TiFieldLine label="Criado em" value={formatDate(selectedTerm.created_at)} />
-              <TiFieldLine label="Assinado em" value={formatDate(selectedTerm.signed_at)} />
-              <TiFieldLine
-                label="Status"
-                value={
-                  <TiStatusPill tone={getStatusTone(selectedTerm.status)}>
-                    {formatStatus(selectedTerm.status)}
-                  </TiStatusPill>
-                }
-              />
-              <TiFieldLine label="Notas" value={getText(selectedTerm.notes)} />
+              <div className="mb-3 flex justify-end">
+                <button
+                  type="button"
+                  className={cn(tiSecondaryButtonClassName, tiCompactButtonClassName)}
+                  onClick={() => handlePrintTerm(selectedTerm)}
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  <span>Imprimir / PDF</span>
+                </button>
+              </div>
+              <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                <TiFieldLine label="Termo" value={getTermTitle(selectedTerm)} />
+                <TiFieldLine label="Usuário" value={getTermUser(selectedTerm)} />
+                <TiFieldLine label="CPF" value={getText(selectedTerm.user_cpf)} />
+                <TiFieldLine label="Departamento" value={getDepartmentName(selectedTerm.department_id)} />
+                <TiFieldLine label="Data" value={formatDate(selectedTerm.date)} />
+                <TiFieldLine label="Endereço" value={getText(selectedTerm.address)} />
+                <TiFieldLine label="Equipamento" value={getText(selectedTerm.equipament_list)} />
+                <TiFieldLine label="Marca" value={getText(selectedTerm.brand)} />
+                <TiFieldLine label="Código" value={getText(selectedTerm.asset_code)} />
+                <TiFieldLine label="IMEI" value={getText(selectedTerm.imei)} />
+                <TiFieldLine
+                  label="Status"
+                  value={
+                    <TiStatusPill tone={getStatusTone(getTermStatus(selectedTerm))}>
+                      {formatStatus(getTermStatus(selectedTerm))}
+                    </TiStatusPill>
+                  }
+                />
+                <TiFieldLine label="Motivo" value={getText(selectedTerm.reason)} />
+              </div>
             </>
           ) : (
             <div className="flex min-h-32 items-center justify-center text-center text-sm font-medium text-slate-500 dark:text-slate-400">
               Selecione um termo para ver os detalhes.
             </div>
           )}
-        </TiDetailPanel>
-      </div>
+        </div>
+      </Dialog>
 
       <Dialog
         open={dialogState?.type === "term"}
@@ -448,79 +657,111 @@ export function TiTermsTab() {
             : "Novo termo"
         }
         description="Cadastro de termo de responsabilidade."
+        contentClassName="w-[min(92vw,860px)] max-h-[84vh] overflow-hidden"
+        bodyClassName="max-h-[calc(84vh-73px)] overflow-y-auto overscroll-contain"
       >
-        <form className="space-y-4" onSubmit={handleSubmitTerm}>
+        <form className="space-y-3" onSubmit={handleSubmitTerm}>
           {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
           <div className="grid gap-3 md:grid-cols-2">
             <TiTextField
-              label="Título"
-              name="title"
+              label="Nome do usuário"
+              name="user_name"
               required
-              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.title, "") : ""}
+              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.user_name, "") : ""}
             />
-            <TiNativeSelect
-              label="Status"
-              name="status"
-              defaultValue={
-                dialogState?.type === "term"
-                  ? normalizeStatus(dialogState.term?.status || "draft")
-                  : "draft"
-              }
-              options={TERM_FORM_STATUS_OPTIONS}
-            />
-            <TiNativeSelect
-              label="Ativo"
-              name="inventory_id"
-              defaultValue={
-                dialogState?.type === "term"
-                  ? getText(dialogState.term?.inventory_id ?? dialogState.term?.asset_id, "")
-                  : ""
-              }
-              options={assetOptions}
+            <TiTextField
+              label="CPF do usuário"
+              name="user_cpf"
+              required
+              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.user_cpf, "") : ""}
             />
             <TiTextField
               label="ID do usuário"
               name="user_id"
               defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.user_id, "") : ""}
             />
-            <TiTextField
-              label="Nome do usuário"
-              name="user_name"
+            <TiNativeSelect
+              label="Departamento"
+              name="department_id"
+              defaultValue={
+                dialogState?.type === "term" ? getText(dialogState.term?.department_id, "") : ""
+              }
+              options={departmentOptions}
+            />
+            <TiNativeSelect
+              label="Ativo"
+              name="selected_asset_id"
               defaultValue={
                 dialogState?.type === "term"
-                  ? getText(dialogState.term?.user_name ?? dialogState.term?.assignee_name, "")
+                  ? getSelectedAssetIdByCode(dialogState.term?.asset_code)
                   : ""
+              }
+              options={assetFormOptions}
+            />
+            <TiTextField
+              label="Código do ativo"
+              name="asset_code"
+              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.asset_code, "") : ""}
+            />
+            <TiTextField
+              label="Marca"
+              name="brand"
+              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.brand, "") : ""}
+            />
+            <TiTextField
+              label="IMEI"
+              name="imei"
+              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.imei, "") : ""}
+            />
+            <TiTextField
+              label="Data"
+              name="date"
+              type="date"
+              required
+              defaultValue={
+                dialogState?.type === "term"
+                  ? getDateInputValue(dialogState.term?.date)
+                  : getDateInputValue(null)
               }
             />
             <TiTextField
-              label="Descrição"
-              name="description"
+              label="Endereço"
+              name="address"
+              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.address, "") : ""}
+            />
+            <TiTextarea
+              label="Equipamentos"
+              name="equipament_list"
+              className="min-h-20"
               defaultValue={
-                dialogState?.type === "term" ? getText(dialogState.term?.description, "") : ""
+                dialogState?.type === "term" ? getText(dialogState.term?.equipament_list, "") : ""
               }
             />
-          </div>
-          <TiTextarea
-            label="Conteúdo"
-            name="content"
-            defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.content, "") : ""}
-          />
-          <TiTextarea
-            label="Notas"
-            name="notes"
-            defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.notes, "") : ""}
-          />
-          <div className="flex justify-end gap-2">
-            <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
-              Cancelar
-            </button>
-            <TiIconAction
-              icon={Plus}
-              type="submit"
-              label={isTermSubmitting ? "Salvando..." : "Salvar termo"}
-              variant="primary"
-              disabled={isTermSubmitting || !canManage}
+            <TiTextarea
+              label="Motivo"
+              name="reason"
+              className="min-h-20"
+              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.reason, "") : ""}
             />
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+            <button
+              type="button"
+              className={cn(tiSecondaryButtonClassName, tiCompactButtonClassName)}
+              onClick={closeDialog}
+              disabled={isTermSubmitting}
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Cancelar</span>
+            </button>
+            <button
+              type="submit"
+              className={cn(tiPrimaryButtonClassName, tiCompactButtonClassName)}
+              disabled={isTermSubmitting || !canManage}
+            >
+              <Save className="h-3.5 w-3.5" />
+              <span>{isTermSubmitting ? "Salvando..." : "Salvar termo"}</span>
+            </button>
           </div>
         </form>
       </Dialog>
@@ -540,19 +781,25 @@ export function TiTermsTab() {
           <TiInlineNotice tone="warning">
             A assinatura será registrada após a confirmação.
           </TiInlineNotice>
-          <TiTextField label="Nome do assinante" name="signer_name" />
-          <TiTextarea label="Observação" name="notes" />
-          <div className="flex justify-end gap-2">
-            <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
-              Cancelar
+          <TiTextarea label="Motivo" name="reason" />
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className={cn(tiSecondaryButtonClassName, tiCompactButtonClassName)}
+              onClick={closeDialog}
+              disabled={signTermMutation.isPending}
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Cancelar</span>
             </button>
-            <TiIconAction
-              icon={Signature}
+            <button
               type="submit"
-              label={signTermMutation.isPending ? "Assinando..." : "Assinar termo"}
-              variant="primary"
+              className={cn(tiPrimaryButtonClassName, tiCompactButtonClassName)}
               disabled={signTermMutation.isPending || !canSign}
-            />
+            >
+              <Signature className="h-3.5 w-3.5" />
+              <span>{signTermMutation.isPending ? "Assinando..." : "Assinar termo"}</span>
+            </button>
           </div>
         </form>
       </Dialog>
