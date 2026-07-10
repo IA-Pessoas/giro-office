@@ -407,7 +407,9 @@ class UserService {
     const shouldClearModules =
       data.modules === undefined &&
       (data.type === "user" ||
-        (data.permission !== undefined && data.permission <= 1 && requestedType !== "admin"));
+        (data.permission !== undefined &&
+          data.permission <= DEFAULT_NON_OWNER_PERMISSION &&
+          requestedType !== "admin"));
     if (shouldClearModules) {
       modulesToApply = EMPTY_MODULES;
     }
