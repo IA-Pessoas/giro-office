@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@shared/ui/newLayout/utils";
@@ -64,8 +64,16 @@ export function TiSectionHeader({ title, description, action }: TiSectionHeaderP
   );
 }
 
-export function TiPanel({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn(tiPanelClassName, className)}>{children}</section>;
+type TiPanelProps = HTMLAttributes<HTMLElement> & {
+  children: ReactNode;
+};
+
+export function TiPanel({ children, className, ...props }: TiPanelProps) {
+  return (
+    <section className={cn(tiPanelClassName, className)} {...props}>
+      {children}
+    </section>
+  );
 }
 
 export function TiIconAction({

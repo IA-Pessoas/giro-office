@@ -108,11 +108,13 @@ describe("ti robot routes", () => {
   });
 
   it("POST /ti/robots/:id/runs records a run", async () => {
+    const finishedAt = "2026-07-10T12:30:00.000Z";
     const response = await request(createTestApp())
       .post(`/ti/robots/${robotId}/runs`)
       .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({
         status: "success",
+        finished_at: finishedAt,
         message: "Executado manualmente.",
         metadata_json: { durationMs: 2300 },
       });
@@ -123,6 +125,7 @@ describe("ti robot routes", () => {
       data: {
         robot_id: robotId,
         status: "success",
+        finished_at: finishedAt,
         message: "Executado manualmente.",
         organization_id: organizationId,
       },
