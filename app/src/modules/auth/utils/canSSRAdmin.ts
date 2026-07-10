@@ -115,7 +115,7 @@ function isAuthTokenFailure(err: unknown): boolean {
   return (
     errorName === "AuthTokenError" ||
     errorMessage === "Unauthorized" ||
-    errorMessage === "Erro de autorizacao" ||
+    errorMessage === "Erro de autorização" ||
     errorMessage.includes("401")
   );
 }
