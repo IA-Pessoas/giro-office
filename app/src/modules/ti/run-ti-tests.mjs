@@ -194,8 +194,10 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.doesNotMatch(pageSource, /description:\s*"/);
   assert.doesNotMatch(pageSource, /grid-cols-2.*xl:grid-cols-8/);
   assert.match(pageSource, /overflow-x-auto/);
-  assert.match(pageSource, /scrollbar-width:thin/);
-  assert.match(pageSource, /scrollbar-thumb.*blue-600/);
+  assert.match(pageSource, /tiThinScrollbarClassName/);
+  assert.match(workspaceUiSource, /export const tiThinScrollbarClassName/);
+  assert.match(workspaceUiSource, /scrollbar-width:thin/);
+  assert.match(workspaceUiSource, /scrollbar-thumb.*blue-600/);
   assert.match(pageSource, /flex min-w-max items-center justify-center gap-1 pl-7 md:min-w-full/);
   assert.match(pageSource, /px-4 py-2\.5/);
   assert.doesNotMatch(pageSource, /md:flex-1/);
@@ -386,10 +388,12 @@ await runTest("ti native select uses a centered chevron instead of the browser d
   assert.match(selectSource, /ChevronDown/);
   assert.match(selectSource, /appearance-none/);
   assert.match(selectSource, /pr-10/);
+  assert.match(selectSource, /relative/);
   assert.match(selectSource, /pointer-events-none/);
   assert.match(selectSource, /absolute right-3 top-1\/2/);
   assert.match(selectSource, /-translate-y-1\/2/);
   assert.match(selectSource, /aria-hidden="true"/);
+  assert.match(selectSource, /Omit<SelectHTMLAttributes<HTMLSelectElement>, "style">/);
 });
 
 await runTest("ti dashboard tab consumes the consolidated backend summary", async () => {
@@ -585,13 +589,217 @@ await runTest("ti visible copy keeps Portuguese accents and punctuation consiste
 
   for (const file of files) {
     const source = await readModuleSource(file);
+    const copySource = source.replaceAll('value: "Integracao"', 'value: ""');
 
     for (const snippet of forbiddenSnippets) {
       assert.equal(
-        source.includes(snippet),
+        copySource.includes(snippet),
         false,
         `${file} should not include unpolished copy: ${snippet}`,
       );
     }
   }
+});
+
+await runTest("ti robots hooks expose write flows and invalidate robots plus dashboard caches", async () => {
+  const hookSource = await readModuleSource("hooks/useTiRobots.ts");
+  const serviceSource = await readModuleSource("services/tiRobotsService.ts");
+  const typeSource = await readModuleSource("types/robots.ts");
+
+  for (const serviceMethod of [
+    "listRobots",
+    "createRobot",
+    "getRobotById",
+    "updateRobot",
+    "createRobotRun",
+    "listRobotRuns",
+  ]) {
+    assert.match(serviceSource, new RegExp(`${serviceMethod}\\s*\\(`));
+  }
+
+  assert.match(typeSource, /interface TiRobotPayload/);
+  assert.match(typeSource, /interface TiRobotRunPayload/);
+  assert.match(typeSource, /type\?: TiRobotType \| string/);
+  assert.match(typeSource, /active\?: boolean/);
+  assert.match(typeSource, /message\?: string/);
+  assert.match(typeSource, /metadata_json\?: Record<string, unknown>/);
+  assert.doesNotMatch(typeSource, /owner_id\?: TiId \| null/);
+  assert.doesNotMatch(typeSource, /output\?: string \| null/);
+  assert.doesNotMatch(typeSource, /error_message\?: string \| null/);
+  assert.match(hookSource, /useMutation/);
+  assert.match(hookSource, /useQueryClient/);
+
+  for (const hookName of ["useCreateTiRobot", "useUpdateTiRobot", "useCreateTiRobotRun"]) {
+    assert.match(hookSource, new RegExp(`function\\s+${hookName}\\s*\\(`));
+  }
+
+  assert.match(hookSource, /queryClient\.invalidateQueries\(\{\s*queryKey:\s*tiQueryKeys\.robots\.all\(\)/);
+  assert.match(hookSource, /queryClient\.invalidateQueries\(\{\s*queryKey:\s*tiQueryKeys\.dashboard\(\)/);
+  assert.match(hookSource, /queryClient\.invalidateQueries\(\{\s*queryKey:\s*tiQueryKeys\.robots\.detail\(variables\.id\)/);
+  assert.match(hookSource, /queryClient\.invalidateQueries\(\{\s*queryKey:\s*tiQueryKeys\.robots\.runs\(variables\.id\)/);
+});
+
+await runTest("ti robots tab exposes operational list detail forms and run action", async () => {
+  const tabSource = await readModuleSource("components/TiRobotsTab.tsx");
+
+  assert.match(tabSource, /useTiRobots/);
+  assert.match(tabSource, /useTiRobot\(/);
+  assert.match(tabSource, /useTiRobotRuns/);
+  assert.match(tabSource, /useCreateTiRobot/);
+  assert.match(tabSource, /useUpdateTiRobot/);
+  assert.match(tabSource, /useCreateTiRobotRun/);
+  assert.match(tabSource, /Novo robô/);
+  assert.match(tabSource, /Editar robô/);
+  assert.match(tabSource, /Registrar execução/);
+  assert.match(tabSource, /Dialog/);
+  assert.match(tabSource, /TiNativeSelect/);
+  assert.match(tabSource, /ROBOT_TYPE_OPTIONS/);
+  assert.match(tabSource, /ROBOT_ACTIVE_FILTER_OPTIONS/);
+  assert.match(tabSource, /type: draft\.type/);
+  assert.match(tabSource, /active: draft\.active/);
+  assert.match(tabSource, /message: draft\.message\.trim\(\)/);
+  assert.match(tabSource, /Tempo gasto/);
+  assert.match(tabSource, /placeholder="12 min ou 00:12:00"/);
+  assert.match(tabSource, /durationTime/);
+  assert.match(tabSource, /function parseDurationMs/);
+  assert.match(tabSource, /12 min/);
+  assert.match(tabSource, /00:12:00/);
+  assert.match(tabSource, /durationMs/);
+  assert.match(tabSource, /Sob demanda ou diariamente .* 02:00/);
+  assert.match(tabSource, /Ex\.: sob demanda, diariamente .* 02:00 ou ap.* fechamento/);
+  assert.match(tabSource, /Informe um tempo, por exemplo: 12 min ou 00:12:00/);
+  assert.match(tabSource, /metadata_json: buildRunMetadata\(draft\)/);
+  assert.match(tabSource, /finished_at: finishedAt/);
+  assert.match(tabSource, /function buildRunPayload\(draft: RunDraft, finishedAt: string\)/);
+  assert.match(tabSource, /bodyClassName="space-y-4"/);
+  assert.doesNotMatch(tabSource, /owner_id: draft/);
+  assert.doesNotMatch(tabSource, /output: draft/);
+  assert.doesNotMatch(tabSource, /error_message: draft/);
+  assert.doesNotMatch(tabSource, /Cron ou frequ.ncia/);
+  assert.doesNotMatch(tabSource, /Metadados JSON/);
+  assert.doesNotMatch(tabSource, /metadataJson/);
+  assert.doesNotMatch(tabSource, /parseRunMetadataJson/);
+  assert.doesNotMatch(tabSource, /ROBOT_SCHEDULE_OPTIONS/);
+  assert.doesNotMatch(tabSource, /Rotina autom.tica/);
+  assert.doesNotMatch(tabSource, /Agendamento personalizado/);
+  assert.doesNotMatch(tabSource, /Agendamento/);
+  assert.doesNotMatch(tabSource, /Frequ.ncia/);
+  assert.doesNotMatch(tabSource, /Dura..o \(ms\)/);
+  assert.doesNotMatch(tabSource, /durationMs: string/);
+  assert.doesNotMatch(tabSource, /durationHours/);
+  assert.doesNotMatch(tabSource, /durationMinutes/);
+  assert.doesNotMatch(tabSource, /durationSeconds/);
+  assert.doesNotMatch(tabSource, /function isInvalidScheduleSyntax/);
+  assert.doesNotMatch(tabSource, /hasScheduleSyntaxWarning/);
+  assert.doesNotMatch(tabSource, /agenda completa com 5 partes/);
+  assert.doesNotMatch(tabSource, /Informe a execu..o prevista em texto ou use uma agenda v.lida/);
+  assert.doesNotMatch(tabSource, /Informe o tempo gasto no formato 00:00:00/);
+  assert.doesNotMatch(tabSource, /Di.rio 02:00, sob demanda ou conforme opera..o/);
+  assert.doesNotMatch(tabSource, /grid grid-cols-3 gap-2/);
+  assert.doesNotMatch(tabSource, /max-h-\[72vh\] space-y-4 overflow-y-auto/);
+  assert.doesNotMatch(tabSource, /bodyClassName="[^"]*overflow-y-auto/);
+  assert.match(tabSource, /activeRobotId/);
+  assert.match(tabSource, /const selectedRobotId = activeRobotId/);
+  assert.match(tabSource, /const \[isDetailDialogOpen, setIsDetailDialogOpen\] = useState\(false\)/);
+  assert.match(tabSource, /setIsDetailDialogOpen\(true\)/);
+  assert.match(tabSource, /Eye/);
+  assert.match(tabSource, /label="Ver detalhes"/);
+  assert.match(tabSource, /function openRobotDetail/);
+  assert.match(tabSource, /function clearRobotSelection/);
+  assert.match(tabSource, /function handleRobotsPanelClick/);
+  assert.match(tabSource, /closest\("\[data-ti-robot-row\]"\)/);
+  assert.match(tabSource, /closest\("\[data-ti-selection-control\]"\)/);
+  assert.match(tabSource, /setActiveRobotId\(undefined\)/);
+  assert.match(tabSource, /onClick=\{handleRobotsPanelClick\}/);
+  assert.match(tabSource, /data-ti-robot-row/);
+  assert.match(tabSource, /data-ti-selection-control/);
+  assert.match(tabSource, /function handleDetailDialogOpenChange/);
+  assert.doesNotMatch(tabSource, /setActiveRobotId\(savedRobot\.id\)/);
+  const selectRobotBody = tabSource.match(
+    /function selectRobot\(robotId: TiId\) \{[\s\S]*?\n  \}/,
+  )?.[0] ?? "";
+  const detailOpenChangeBody = tabSource.match(
+    /function handleDetailDialogOpenChange\(nextOpen: boolean\) \{[\s\S]*?\n  \}/,
+  )?.[0] ?? "";
+  assert.doesNotMatch(selectRobotBody, /setIsDetailDialogOpen/);
+  assert.doesNotMatch(detailOpenChangeBody, /clearRobotSelection/);
+  assert.match(tabSource, /open=\{isDetailDialogOpen\}/);
+  assert.match(tabSource, /title=\{activeRobot \? getRobotName\(activeRobot\) : "Detalhe do robô"\}/);
+  assert.match(tabSource, /contentClassName="w-\[min\(92vw,760px\)\]/);
+  assert.match(tabSource, /mx-auto max-w-2xl/);
+  assert.match(tabSource, /className="space-y-4 p-4 sm:p-5"/);
+  assert.match(tabSource, /rounded-lg border border-slate-200 bg-white p-3 shadow-sm/);
+  assert.match(tabSource, /mt-1 text-xl font-semibold/);
+  assert.match(tabSource, /rounded-md bg-blue-50 p-1\.5/);
+  assert.match(tabSource, /mt-2 text-xs text-slate-500/);
+  assert.match(tabSource, /px-4 py-2\.5/);
+  assert.doesNotMatch(tabSource, /bg-white p-4 shadow-sm/);
+  assert.doesNotMatch(tabSource, /mt-2 text-2xl/);
+  assert.doesNotMatch(tabSource, /rounded-lg bg-blue-50 p-2/);
+  assert.match(tabSource, /aria-label="Hist.*rico de execu.*es do rob.*"/);
+  assert.match(tabSource, /role="list"/);
+  assert.match(tabSource, /role="listitem"/);
+  assert.match(tabSource, /tiThinScrollbarClassName/);
+  assert.match(tabSource, /h-32 divide-y divide-slate-200 overflow-y-auto overscroll-contain pr-2/);
+  assert.match(tabSource, /flex items-start justify-between gap-3 py-2 text-sm/);
+  assert.match(tabSource, /line-clamp-2/);
+  assert.match(tabSource, /function getLatestRunDate/);
+  assert.match(tabSource, /function getLatestDateValue/);
+  assert.match(tabSource, /latestSelectedRunAt/);
+  assert.match(tabSource, /lastRunOverrides/);
+  assert.match(tabSource, /setLastRunOverrides/);
+  assert.match(tabSource, /const finishedAt = new Date\(\)\.toISOString\(\)/);
+  assert.match(tabSource, /payload: buildRunPayload\(runDraft, finishedAt\)/);
+  assert.match(tabSource, /getRunDate\(createdRun\) \?\? finishedAt/);
+  assert.match(tabSource, /getRobotLastRunAt/);
+  assert.match(tabSource, /latestSelectedRunAt \?\? activeRobot\.last_run_at/);
+  assert.match(tabSource, /function formatSchedule/);
+  assert.match(tabSource, /Execu..o prevista/);
+  assert.doesNotMatch(tabSource, />Agenda<\//);
+  assert.doesNotMatch(tabSource, /max-h-72/);
+  assert.doesNotMatch(tabSource, /max-h-44/);
+  assert.doesNotMatch(tabSource, /h-48/);
+  assert.doesNotMatch(tabSource, /rounded-md border border-slate-200 bg-slate-50 p-3/);
+  assert.doesNotMatch(tabSource, /robots\[0\]\?\.id/);
+  assert.doesNotMatch(tabSource, /<aside/);
+  assert.doesNotMatch(tabSource, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(320px,420px\)\]/);
+  assert.match(tabSource, /handleRobotRowKeyDown/);
+  assert.match(tabSource, /role="button"/);
+  assert.match(tabSource, /tabIndex=\{0\}/);
+  assert.match(tabSource, /aria-selected=\{isActive\}/);
+  assert.match(tabSource, /actionError/);
+  assert.match(tabSource, /robotsQuery\.isError/);
+  assert.match(tabSource, /runsQuery\.isError/);
+  assert.match(tabSource, /mutateAsync/);
+  assert.doesNotMatch(tabSource, /api\.(get|post|patch|put|delete)\(/);
+});
+
+await runTest("ti robots filters normalize empty values before query state", async () => {
+  const tabSource = await readModuleSource("components/TiRobotsTab.tsx");
+
+  assert.match(tabSource, /function normalizeRobotFilters/);
+  assert.match(tabSource, /const normalizedFilters = useMemo\(\(\) => normalizeRobotFilters\(filters\), \[filters\]\)/);
+  assert.match(tabSource, /useTiRobots\(normalizedFilters\)/);
+  assert.match(tabSource, /type: value/);
+  assert.match(tabSource, /active: value/);
+  assert.doesNotMatch(tabSource, /search: value/);
+  assert.match(tabSource, /value !== ""/);
+});
+
+await runTest("ti automation metrics stay inside the robots tab for this PR", async () => {
+  const tabSource = await readModuleSource("components/TiRobotsTab.tsx");
+  const dashboardSource = await readModuleSource("components/TiDashboardTab.tsx");
+  const dashboardTypeSource = await readModuleSource("types/dashboard.ts");
+
+  assert.match(tabSource, /automationMetrics/);
+  assert.match(tabSource, /Robôs ativos/);
+  assert.match(tabSource, /Execuções do robô/);
+  assert.match(tabSource, /Falhas do robô/);
+  assert.match(tabSource, /isRobotActive/);
+  assert.match(tabSource, /isFailedRun/);
+  assert.doesNotMatch(dashboardSource, /robot_runs_recent/);
+  assert.doesNotMatch(dashboardSource, /robot_runs_failed/);
+  assert.doesNotMatch(dashboardTypeSource, /robot_runs_recent\?: number/);
+  assert.doesNotMatch(dashboardTypeSource, /robot_runs_failed\?: number/);
+  assert.doesNotMatch(dashboardSource, /api\.(get|post|patch|put|delete)\(/);
 });

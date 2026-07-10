@@ -731,14 +731,15 @@ git commit -m "feat: add tecnologia support requests"
 - [ ] Mostrar loading, error, empty e retry dentro da aba.
 - [ ] Tratar erro de permissao em criacao/edicao/run.
 
-### Task 3: Complementar Dashboard De Automacao
+### Task 3: Complementar Resumo De Automacao Na Aba De Robos
 
 **Files:**
-- Modify: `app/src/modules/ti/components/TiDashboardTab.tsx`
+- Modify: `app/src/modules/ti/components/TiRobotsTab.tsx`
 
-- [ ] Exibir metricas de robos ativos, execucoes recentes e falhas quando vierem de
-  `/ti/dashboard`.
-- [ ] Garantir que ausencia desses campos nao quebra a aba.
+- [ ] Exibir metricas de robos ativos, execucoes do robo selecionado e falhas do robo selecionado
+  dentro da propria aba de robos.
+- [ ] Nao refazer a aba geral de dashboard nesta PR; o dashboard operacional inicial pertence a PR 2.
+- [ ] Garantir que ausencia de robos ou execucoes nao quebra a aba.
 - [ ] Evitar tocar nos componentes de chamados alem do necessario.
 
 ### Task 4: Validar PR 3

@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
+import type { HTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { Loader2, RefreshCw, type LucideIcon } from "lucide-react";
 
@@ -90,8 +90,16 @@ export function TiSectionHeader({ title, description, action }: TiSectionHeaderP
   );
 }
 
-export function TiPanel({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn(tiPanelClassName, className)}>{children}</section>;
+type TiPanelProps = HTMLAttributes<HTMLElement> & {
+  children: ReactNode;
+};
+
+export function TiPanel({ children, className, ...props }: TiPanelProps) {
+  return (
+    <section className={cn(tiPanelClassName, className)} {...props}>
+      {children}
+    </section>
+  );
 }
 
 export function TiTextField({ className, helperText, label, ...props }: TiTextFieldProps) {

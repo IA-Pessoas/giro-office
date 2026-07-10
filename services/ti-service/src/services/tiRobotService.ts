@@ -11,27 +11,80 @@ import type {
 } from "../schemas/tiRobot.schemas.js";
 import type { TiAuthContext } from "./tiRequestService.js";
 
+const robotLatestRunInclude = {
+  runs: {
+    orderBy: { started_at: "desc" },
+    take: 1,
+    select: {
+      status: true,
+      started_at: true,
+      finished_at: true,
+    },
+  },
+} satisfies Prisma.TIRobotInclude;
+
+type RobotRunSummary = {
+  status: string | null;
+  started_at: Date | string | null;
+  finished_at: Date | string | null;
+};
+
+type RobotWithLatestRun = Record<string, unknown> & {
+  runs?: RobotRunSummary[];
+};
+
+function toIsoDate(value: Date | string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function withLatestRunSummary(robot: RobotWithLatestRun): Record<string, unknown> {
+  const { runs, ...robotData } = robot;
+  const latestRun = runs?.[0];
+
+  return {
+    ...robotData,
+    last_status: latestRun?.status ?? null,
+    last_run_at: toIsoDate(latestRun?.finished_at ?? latestRun?.started_at),
+  };
+}
+
 export class TiRobotService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async list(context: TiAuthContext, query: ListTiRobotsQuery): Promise<unknown[]> {
     const { skip, take } = getPaginationParams(query);
 
-    return this.prisma.tIRobot.findMany({
+    const robots = await this.prisma.tIRobot.findMany({
       where: {
         organization_id: context.organizationId,
         ...(query.type ? { type: query.type } : {}),
         ...(query.status ? { status: query.status } : {}),
         ...(query.active === undefined ? {} : { active: query.active }),
       },
+      include: robotLatestRunInclude,
       orderBy: { name: "asc" },
       skip,
       take,
     });
+
+    return robots.map(withLatestRunSummary);
   }
 
   async getById(context: TiAuthContext, id: string): Promise<unknown> {
-    return this.ensureRobot(context, id);
+    const robot = await this.prisma.tIRobot.findFirst({
+      where: { id, organization_id: context.organizationId },
+      include: robotLatestRunInclude,
+    });
+
+    if (!robot) {
+      throw new ServiceError(404, "Robo de TI nao encontrado.");
+    }
+
+    return withLatestRunSummary(robot);
   }
 
   async create(context: TiAuthContext, body: CreateTiRobotBody): Promise<unknown> {
