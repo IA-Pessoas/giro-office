@@ -27,7 +27,9 @@ export interface TiInventoryAsset {
 export interface TiInventoryCategory {
   id: TiId;
   name?: string;
+  tag?: string | null;
   description?: string | null;
+  active?: boolean | null;
   status?: TiStatus | boolean;
   is_active?: boolean | null;
   [key: string]: unknown;
@@ -72,10 +74,8 @@ export interface TiInventoryReturnPayload {
 
 export interface TiInventoryCategoryPayload {
   name?: string;
-  description?: string;
-  status?: string | boolean;
-  is_active?: boolean;
-  [key: string]: unknown;
+  tag?: string;
+  active?: boolean;
 }
 
 export interface TiInventoryLocationPayload {

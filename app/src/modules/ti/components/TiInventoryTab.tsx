@@ -1,34 +1,27 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Boxes, Eye, MapPin, Pencil, Plus, RotateCcw, Tags, UserPlus } from "lucide-react";
+import { Boxes, Eye, Pencil, Plus, RotateCcw, Save, Tags, UserPlus, X } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
+import { departmentService, type DepItem } from "@modules/departments";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
   useAssignTiInventoryAssetUserMutation,
   useCreateTiInventoryAssetMutation,
   useCreateTiInventoryCategoryMutation,
-  useCreateTiInventoryLocationMutation,
   useReturnTiInventoryAssetMutation,
   useTiInventory,
   useTiInventoryAsset,
   useTiInventoryCategories,
-  useTiInventoryLocations,
   useUpdateTiInventoryAssetMutation,
   useUpdateTiInventoryCategoryMutation,
-  useUpdateTiInventoryLocationMutation,
 } from "../hooks";
-import type {
-  TiId,
-  TiInventoryAsset,
-  TiInventoryCategory,
-  TiInventoryLocation,
-} from "../types";
+import type { TiId, TiInventoryAsset, TiInventoryCategory } from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
-  TiDetailPanel,
   TiEmptyState,
   TiFieldLine,
   TiIconAction,
@@ -41,14 +34,19 @@ import {
   TiTextarea,
   TiTextField,
 } from "./tiFormControls";
+import {
+  tiCompactButtonClassName,
+  tiDialogSubsectionClassName,
+  tiPrimaryButtonClassName,
+  tiSecondaryButtonClassName,
+} from "./tiWorkspaceUi";
 
 type InventoryDialogState =
   | { type: "asset"; mode: "create"; asset?: undefined }
   | { type: "asset"; mode: "edit"; asset: TiInventoryAsset }
   | { type: "assign"; asset: TiInventoryAsset }
   | { type: "return"; asset: TiInventoryAsset }
-  | { type: "categories" }
-  | { type: "locations" };
+  | { type: "categories" };
 
 const INVENTORY_STATUS_OPTIONS = [
   { value: "", label: "Todos" },
@@ -144,13 +142,13 @@ function getStatusTone(status: unknown): "neutral" | "success" | "warning" | "da
 }
 
 function getCatalogStatus(
-  item?: { status?: unknown; is_active?: boolean | null } | null,
+  item?: { status?: unknown; active?: boolean | null; is_active?: boolean | null } | null,
 ): unknown {
   if (!item) {
     return undefined;
   }
 
-  return item.status ?? item.is_active;
+  return item.status ?? item.active ?? item.is_active;
 }
 
 function getAssetTitle(asset: TiInventoryAsset): string {
@@ -181,12 +179,12 @@ export function TiInventoryTab() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [locationId, setLocationId] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
   const [selectedAssetId, setSelectedAssetId] = useState<TiId | undefined>();
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [dialogState, setDialogState] = useState<InventoryDialogState | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<TiInventoryCategory | null>(null);
-  const [editingLocation, setEditingLocation] = useState<TiInventoryLocation | null>(null);
 
   const filters = useMemo(
     () =>
@@ -194,14 +192,18 @@ export function TiInventoryTab() {
         search,
         status,
         category_id: categoryId,
-        location_id: locationId,
+        location_id: departmentId,
       }),
-    [categoryId, locationId, search, status],
+    [categoryId, departmentId, search, status],
   );
 
   const inventoryQuery = useTiInventory(filters);
   const categoriesQuery = useTiInventoryCategories();
-  const locationsQuery = useTiInventoryLocations();
+  const departmentsQuery = useFetch<DepItem[]>(
+    ["ti-inventory", "departments"],
+    () => departmentService.list(),
+    { retry: false },
+  );
   const selectedAssetQuery = useTiInventoryAsset(selectedAssetId, { enabled: Boolean(selectedAssetId) });
 
   const createAssetMutation = useCreateTiInventoryAssetMutation();
@@ -210,17 +212,15 @@ export function TiInventoryTab() {
   const returnAssetMutation = useReturnTiInventoryAssetMutation();
   const createCategoryMutation = useCreateTiInventoryCategoryMutation();
   const updateCategoryMutation = useUpdateTiInventoryCategoryMutation();
-  const createLocationMutation = useCreateTiInventoryLocationMutation();
-  const updateLocationMutation = useUpdateTiInventoryLocationMutation();
 
   const categoriesById = useMemo(
     () => new Map((categoriesQuery.data ?? []).map((category) => [String(category.id), category])),
     [categoriesQuery.data],
   );
 
-  const locationsById = useMemo(
-    () => new Map((locationsQuery.data ?? []).map((location) => [String(location.id), location])),
-    [locationsQuery.data],
+  const departmentsById = useMemo(
+    () => new Map((departmentsQuery.data ?? []).map((department) => [String(department.id), department])),
+    [departmentsQuery.data],
   );
 
   const categoryOptions = useMemo(
@@ -234,15 +234,23 @@ export function TiInventoryTab() {
     [categoriesQuery.data],
   );
 
-  const locationOptions = useMemo(
-    () => [
-      { value: "", label: "Todos" },
-      ...(locationsQuery.data ?? []).map((location) => ({
-        value: String(location.id),
-        label: getText(location.name, "Local sem nome"),
+  const departmentOptions = useMemo(
+    () =>
+      (departmentsQuery.data ?? []).map((department) => ({
+        value: String(department.id),
+        label: getText(department.name, "Departamento sem nome"),
       })),
-    ],
-    [locationsQuery.data],
+    [departmentsQuery.data],
+  );
+
+  const departmentFilterOptions = useMemo(
+    () => [{ value: "", label: "Todos" }, ...departmentOptions],
+    [departmentOptions],
+  );
+
+  const departmentFormOptions = useMemo(
+    () => [{ value: "", label: "Selecione" }, ...departmentOptions],
+    [departmentOptions],
   );
 
   const selectedListAsset = (inventoryQuery.data ?? []).find(
@@ -254,20 +262,29 @@ export function TiInventoryTab() {
     return getText(categoriesById.get(String(id))?.name);
   }
 
-  function getLocationName(id: unknown): string {
-    return getText(locationsById.get(String(id))?.name);
+  function getDepartmentName(id: unknown, fallback?: unknown): string {
+    return getText(departmentsById.get(String(id))?.name ?? fallback);
   }
 
   function closeDialog() {
     setDialogState(null);
     setDialogError(null);
     setEditingCategory(null);
-    setEditingLocation(null);
   }
 
   function openDialog(nextDialogState: InventoryDialogState) {
     setDialogError(null);
     setDialogState(nextDialogState);
+  }
+
+  function openAssetDetail(assetId: TiId) {
+    setSelectedAssetId(assetId);
+    setIsDetailDialogOpen(true);
+  }
+
+  function startEditingCategory(category: TiInventoryCategory) {
+    setDialogError(null);
+    setEditingCategory(category);
   }
 
   async function handleSubmitAsset(event: FormEvent<HTMLFormElement>) {
@@ -298,6 +315,7 @@ export function TiInventoryTab() {
       } else {
         const createdAsset = await createAssetMutation.mutateAsync(payload);
         setSelectedAssetId(createdAsset.id);
+        setIsDetailDialogOpen(true);
       }
 
       closeDialog();
@@ -374,13 +392,19 @@ export function TiInventoryTab() {
 
     const categoryForm = event.currentTarget;
     const formData = new FormData(categoryForm);
-    const activeStatus = getFormText(formData, "status");
-    const payload = compactPayload({
-      name: getFormText(formData, "name"),
-      description: getFormText(formData, "description"),
-      status: activeStatus,
-      is_active: activeStatus ? activeStatus === "active" : undefined,
-    });
+    const categoryActive = getFormText(formData, "active");
+    const payload = compactPayload(
+      editingCategory
+        ? {
+            name: getFormText(formData, "name"),
+            tag: getFormText(formData, "tag"),
+            active: categoryActive ? categoryActive === "active" : undefined,
+          }
+        : {
+            name: getFormText(formData, "name"),
+            tag: getFormText(formData, "tag"),
+          },
+    );
 
     try {
       setDialogError(null);
@@ -398,50 +422,15 @@ export function TiInventoryTab() {
     }
   }
 
-  async function handleSubmitLocation(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!canManage) {
-      return;
-    }
-
-    const locationForm = event.currentTarget;
-    const formData = new FormData(locationForm);
-    const activeStatus = getFormText(formData, "status");
-    const payload = compactPayload({
-      name: getFormText(formData, "name"),
-      description: getFormText(formData, "description"),
-      status: activeStatus,
-      is_active: activeStatus ? activeStatus === "active" : undefined,
-    });
-
-    try {
-      setDialogError(null);
-
-      if (editingLocation) {
-        await updateLocationMutation.mutateAsync({ id: editingLocation.id, payload });
-      } else {
-        await createLocationMutation.mutateAsync(payload);
-      }
-
-      setEditingLocation(null);
-      locationForm.reset();
-    } catch (error) {
-      setDialogError(getMutationErrorMessage(error));
-    }
-  }
-
   const isAssetSubmitting = createAssetMutation.isPending || updateAssetMutation.isPending;
   const isCategorySubmitting =
     createCategoryMutation.isPending || updateCategoryMutation.isPending;
-  const isLocationSubmitting =
-    createLocationMutation.isPending || updateLocationMutation.isPending;
 
   return (
     <TiPanel className="space-y-5">
       <TiSectionHeader
         title="Inventário"
-        description="Controle ativos, categorias, locais, usuários responsáveis e devoluções."
+        description="Controle ativos, categorias, departamentos, usuários responsáveis e devoluções."
         action={
           canManage ? (
             <div className="flex flex-wrap gap-2">
@@ -456,11 +445,6 @@ export function TiInventoryTab() {
                 label="Categorias"
                 onClick={() => openDialog({ type: "categories" })}
               />
-              <TiIconAction
-                icon={MapPin}
-                label="Locais"
-                onClick={() => openDialog({ type: "locations" })}
-              />
             </div>
           ) : null
         }
@@ -471,7 +455,7 @@ export function TiInventoryTab() {
           label="Busca"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Nome, código ou serial"
+          placeholder="Nome, código ou nº de série"
         />
         <TiNativeSelect
           label="Status"
@@ -486,14 +470,14 @@ export function TiInventoryTab() {
           options={categoryOptions}
         />
         <TiNativeSelect
-          label="Local"
-          value={locationId}
-          onChange={(event) => setLocationId(event.target.value)}
-          options={locationOptions}
+          label="Departamento"
+          value={departmentId}
+          onChange={(event) => setDepartmentId(event.target.value)}
+          options={departmentFilterOptions}
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
+      <div className="grid gap-4">
         <TiQueryStatePanel
           query={inventoryQuery}
           emptyState={
@@ -501,21 +485,11 @@ export function TiInventoryTab() {
               icon={Boxes}
               title="Nenhum ativo encontrado"
               description="Os equipamentos e demais ativos de Tecnologia aparecem aqui depois do cadastro."
-              action={
-                canManage ? (
-                  <TiIconAction
-                    icon={Plus}
-                    label="Novo ativo"
-                    variant="primary"
-                    onClick={() => openDialog({ type: "asset", mode: "create" })}
-                  />
-                ) : null
-              }
             />
           }
         >
           {(assets) => (
-            <TiDataTable headers={["Ativo", "Categoria", "Local", "Responsável", "Status", ""]}>
+            <TiDataTable headers={["Ativo", "Categoria", "Departamento", "Responsável", "Status", ""]}>
               {assets.map((asset) => {
                 const isSelected = String(asset.id) === String(selectedAssetId);
 
@@ -531,7 +505,7 @@ export function TiInventoryTab() {
                       <button
                         type="button"
                         className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
-                        onClick={() => setSelectedAssetId(asset.id)}
+                        onClick={() => openAssetDetail(asset.id)}
                       >
                         {getAssetTitle(asset)}
                       </button>
@@ -540,7 +514,9 @@ export function TiInventoryTab() {
                       </p>
                     </td>
                     <td className="px-4 py-3">{getCategoryName(asset.category_id)}</td>
-                    <td className="px-4 py-3">{getLocationName(asset.location_id)}</td>
+                    <td className="px-4 py-3">
+                      {getDepartmentName(asset.location_id, asset.location?.name)}
+                    </td>
                     <td className="px-4 py-3">{getAssignedUser(asset)}</td>
                     <td className="px-4 py-3">
                       <TiStatusPill tone={getStatusTone(asset.status)}>
@@ -552,7 +528,7 @@ export function TiInventoryTab() {
                         <TiTableAction
                           icon={Eye}
                           label="Detalhes"
-                          onClick={() => setSelectedAssetId(asset.id)}
+                          onClick={() => openAssetDetail(asset.id)}
                         />
                         {canManage ? (
                           <>
@@ -581,8 +557,17 @@ export function TiInventoryTab() {
             </TiDataTable>
           )}
         </TiQueryStatePanel>
+      </div>
 
-        <TiDetailPanel title="Detalhe do ativo">
+      <Dialog
+        open={isDetailDialogOpen}
+        onOpenChange={setIsDetailDialogOpen}
+        title={selectedAsset ? getAssetTitle(selectedAsset) : "Detalhe do ativo"}
+        description="Detalhe cadastral e responsabilidade do ativo."
+        contentClassName="w-[min(92vw,760px)] overflow-hidden border-slate-300 shadow-2xl dark:border-slate-700"
+        bodyClassName="space-y-3 bg-slate-100/70 !px-4 !py-3 dark:bg-slate-950/50"
+      >
+        <div className="mx-auto max-w-2xl rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:p-4">
           {selectedAssetQuery.isLoading ? (
             <TiFieldLine label="Status" value="Carregando..." />
           ) : selectedAssetQuery.isError ? (
@@ -590,11 +575,14 @@ export function TiInventoryTab() {
               {selectedAssetQuery.error?.message ?? "Não foi possível carregar o detalhe."}
             </TiInlineNotice>
           ) : selectedAsset ? (
-            <>
+            <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
               <TiFieldLine label="Ativo" value={getAssetTitle(selectedAsset)} />
               <TiFieldLine label="Código" value={getAssetCode(selectedAsset)} />
               <TiFieldLine label="Categoria" value={getCategoryName(selectedAsset.category_id)} />
-              <TiFieldLine label="Local" value={getLocationName(selectedAsset.location_id)} />
+              <TiFieldLine
+                label="Departamento"
+                value={getDepartmentName(selectedAsset.location_id, selectedAsset.location?.name)}
+              />
               <TiFieldLine label="Responsável" value={getAssignedUser(selectedAsset)} />
               <TiFieldLine
                 label="Status"
@@ -607,14 +595,14 @@ export function TiInventoryTab() {
               <TiFieldLine label="Marca" value={getText(selectedAsset.brand)} />
               <TiFieldLine label="Modelo" value={getText(selectedAsset.model)} />
               <TiFieldLine label="Notas" value={getText(selectedAsset.notes)} />
-            </>
+            </div>
           ) : (
             <div className="flex min-h-32 items-center justify-center text-center text-sm font-medium text-slate-500 dark:text-slate-400">
               Selecione um ativo para ver os detalhes.
             </div>
           )}
-        </TiDetailPanel>
-      </div>
+        </div>
+      </Dialog>
 
       <Dialog
         open={dialogState?.type === "asset"}
@@ -645,7 +633,7 @@ export function TiInventoryTab() {
               defaultValue={dialogState?.type === "asset" ? getText(dialogState.asset?.code, "") : ""}
             />
             <TiTextField
-              label="Serial"
+              label="Nº de série"
               name="serial_number"
               defaultValue={
                 dialogState?.type === "asset" ? getText(dialogState.asset?.serial_number, "") : ""
@@ -670,12 +658,12 @@ export function TiInventoryTab() {
               options={categoryOptions}
             />
             <TiNativeSelect
-              label="Local"
+              label="Departamento"
               name="location_id"
               defaultValue={
                 dialogState?.type === "asset" ? getText(dialogState.asset?.location_id, "") : ""
               }
-              options={locationOptions}
+              options={departmentFormOptions}
             />
             <TiTextField
               label="Marca"
@@ -780,45 +768,88 @@ export function TiInventoryTab() {
         }}
         title="Categorias"
         description="Gestão de categorias de inventário."
-        contentClassName="w-[min(92vw,860px)]"
+        contentClassName="w-[min(92vw,1040px)]"
       >
         <div className="space-y-4">
           {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
-          <form className="grid gap-3 md:grid-cols-[1fr_1fr_140px_auto]" onSubmit={handleSubmitCategory}>
-            <TiTextField
-              key={editingCategory ? `category-name-${editingCategory.id}` : "category-name-new"}
-              label="Nome"
-              name="name"
-              required
-              defaultValue={getText(editingCategory?.name, "")}
-            />
-            <TiTextField
-              key={
-                editingCategory
-                  ? `category-description-${editingCategory.id}`
-                  : "category-description-new"
-              }
-              label="Descrição"
-              name="description"
-              defaultValue={getText(editingCategory?.description, "")}
-            />
-            <TiNativeSelect
-              key={editingCategory ? `category-status-${editingCategory.id}` : "category-status-new"}
-              label="Status"
-              name="status"
-              defaultValue={normalizeStatus(getCatalogStatus(editingCategory) ?? "active")}
-              options={ACTIVE_STATUS_OPTIONS}
-            />
-            <div className="flex items-end gap-2">
-              <TiIconAction
-                icon={Plus}
-                type="submit"
-                label={isCategorySubmitting ? "Salvando..." : "Salvar"}
-                variant="primary"
-                disabled={isCategorySubmitting || !canManage}
-              />
+          <section className={tiDialogSubsectionClassName}>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <h3 className="text-base font-semibold text-slate-950 dark:text-white">
+                  {editingCategory ? "Editar categoria" : "Adicionar categoria"}
+                </h3>
+                <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Categorias ativas ficam disponíveis no cadastro dos ativos.
+                </p>
+              </div>
             </div>
-          </form>
+            <form
+              className={cn(
+                "grid gap-3",
+                editingCategory
+                  ? "lg:grid-cols-[minmax(220px,1fr)_minmax(320px,1.45fr)_minmax(140px,160px)_auto]"
+                  : "lg:grid-cols-[minmax(220px,1fr)_minmax(320px,1.45fr)_auto]",
+              )}
+              onSubmit={handleSubmitCategory}
+            >
+              <TiTextField
+                key={editingCategory ? `category-name-${editingCategory.id}` : "category-name-new"}
+                label="Nome"
+                name="name"
+                required
+                defaultValue={getText(editingCategory?.name, "")}
+              />
+              <TiTextField
+                key={
+                  editingCategory
+                    ? `category-description-${editingCategory.id}`
+                    : "category-description-new"
+                }
+                label="Descrição"
+                name="tag"
+                defaultValue={getText(editingCategory?.description ?? editingCategory?.tag, "")}
+              />
+              {editingCategory ? (
+                <TiNativeSelect
+                  key={`category-status-${editingCategory.id}`}
+                  label="Status"
+                  name="active"
+                  defaultValue={normalizeStatus(getCatalogStatus(editingCategory) ?? "active")}
+                  options={ACTIVE_STATUS_OPTIONS}
+                />
+              ) : null}
+              <div className="flex flex-wrap items-end justify-end gap-2 lg:flex-nowrap lg:self-end">
+                <button
+                  type="submit"
+                  className={cn(tiPrimaryButtonClassName, tiCompactButtonClassName)}
+                  disabled={isCategorySubmitting || !canManage}
+                >
+                  {editingCategory ? <Save className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                  <span>
+                    {isCategorySubmitting
+                      ? "Salvando..."
+                      : editingCategory
+                        ? "Salvar"
+                        : "Criar"}
+                  </span>
+                </button>
+                {editingCategory ? (
+                  <button
+                    type="button"
+                    className={cn(tiSecondaryButtonClassName, tiCompactButtonClassName)}
+                    onClick={() => {
+                      setDialogError(null);
+                      setEditingCategory(null);
+                    }}
+                    disabled={isCategorySubmitting}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    <span>Cancelar</span>
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          </section>
           <TiQueryStatePanel
             query={categoriesQuery}
             emptyState={
@@ -831,118 +862,37 @@ export function TiInventoryTab() {
           >
             {(categories) => (
               <TiDataTable headers={["Categoria", "Descrição", "Status", ""]}>
-                {categories.map((category) => (
-                  <tr key={category.id} className="text-slate-700 dark:text-slate-200">
-                    <td className="px-4 py-3 font-semibold">
-                      {getText(category.name, "Categoria sem nome")}
-                    </td>
-                    <td className="px-4 py-3">{getText(category.description)}</td>
-                    <td className="px-4 py-3">
-                      <TiStatusPill tone={getStatusTone(getCatalogStatus(category))}>
-                        {formatStatus(getCatalogStatus(category))}
-                      </TiStatusPill>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end">
-                        <TiTableAction
-                          icon={Pencil}
-                          label="Editar"
-                          disabled={!canManage}
-                          onClick={() => setEditingCategory(category)}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </TiDataTable>
-            )}
-          </TiQueryStatePanel>
-        </div>
-      </Dialog>
+                {categories.map((category) => {
+                  const isEditingCategory = String(editingCategory?.id) === String(category.id);
 
-      <Dialog
-        open={dialogState?.type === "locations"}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeDialog();
-          }
-        }}
-        title="Locais"
-        description="Gestão de locais de inventário."
-        contentClassName="w-[min(92vw,860px)]"
-      >
-        <div className="space-y-4">
-          {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
-          <form className="grid gap-3 md:grid-cols-[1fr_1fr_140px_auto]" onSubmit={handleSubmitLocation}>
-            <TiTextField
-              key={editingLocation ? `location-name-${editingLocation.id}` : "location-name-new"}
-              label="Nome"
-              name="name"
-              required
-              defaultValue={getText(editingLocation?.name, "")}
-            />
-            <TiTextField
-              key={
-                editingLocation
-                  ? `location-description-${editingLocation.id}`
-                  : "location-description-new"
-              }
-              label="Descrição"
-              name="description"
-              defaultValue={getText(editingLocation?.description, "")}
-            />
-            <TiNativeSelect
-              key={editingLocation ? `location-status-${editingLocation.id}` : "location-status-new"}
-              label="Status"
-              name="status"
-              defaultValue={normalizeStatus(getCatalogStatus(editingLocation) ?? "active")}
-              options={ACTIVE_STATUS_OPTIONS}
-            />
-            <div className="flex items-end gap-2">
-              <TiIconAction
-                icon={Plus}
-                type="submit"
-                label={isLocationSubmitting ? "Salvando..." : "Salvar"}
-                variant="primary"
-                disabled={isLocationSubmitting || !canManage}
-              />
-            </div>
-          </form>
-          <TiQueryStatePanel
-            query={locationsQuery}
-            emptyState={
-              <TiEmptyState
-                icon={MapPin}
-                title="Nenhum local encontrado"
-                description="Cadastre locais para organizar os ativos."
-              />
-            }
-          >
-            {(locations) => (
-              <TiDataTable headers={["Local", "Descrição", "Status", ""]}>
-                {locations.map((location) => (
-                  <tr key={location.id} className="text-slate-700 dark:text-slate-200">
-                    <td className="px-4 py-3 font-semibold">
-                      {getText(location.name, "Local sem nome")}
-                    </td>
-                    <td className="px-4 py-3">{getText(location.description)}</td>
-                    <td className="px-4 py-3">
-                      <TiStatusPill tone={getStatusTone(getCatalogStatus(location))}>
-                        {formatStatus(getCatalogStatus(location))}
-                      </TiStatusPill>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end">
-                        <TiTableAction
-                          icon={Pencil}
-                          label="Editar"
-                          disabled={!canManage}
-                          onClick={() => setEditingLocation(location)}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                  return (
+                    <tr key={category.id} className="text-slate-700 dark:text-slate-200">
+                      <td className="px-4 py-3 font-semibold">
+                        {getText(category.name, "Categoria sem nome")}
+                      </td>
+                      <td className="px-4 py-3">{getText(category.description ?? category.tag)}</td>
+                      <td className="px-4 py-3">
+                        <TiStatusPill tone={getStatusTone(getCatalogStatus(category))}>
+                          {formatStatus(getCatalogStatus(category))}
+                        </TiStatusPill>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end">
+                          {isEditingCategory ? (
+                            <TiStatusPill tone="info">Em edição</TiStatusPill>
+                          ) : (
+                            <TiTableAction
+                              icon={Pencil}
+                              label="Editar"
+                              disabled={!canManage}
+                              onClick={() => startEditingCategory(category)}
+                            />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </TiDataTable>
             )}
           </TiQueryStatePanel>
