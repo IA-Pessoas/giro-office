@@ -6,7 +6,7 @@ import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
-import { AdminUserDetailsPanel, CreateUserModal, type UserItem } from "@modules/users";
+import { AdminUserDetailsPanel, CreateUserModal, userService, type UserItem } from "@modules/users";
 import {
   canAccessAdministration,
   canCreateOrganizationOwner,
@@ -34,6 +34,10 @@ import {
   normalizePermissionDraft,
   normalizePermissionResponse,
 } from "@modules/users/utils/permissionUtils";
+import {
+  buildDepartmentPermissionSyncPayload,
+  needsDepartmentPermissionSync,
+} from "@modules/users/utils/createUserPayload";
 import { useAuth } from "@/context/AuthContext";
 import { setupAPIClient } from "@shared/services/api";
 import { useFetch } from "@shared/hooks";
@@ -262,8 +266,20 @@ export function Administracao() {
       return false;
     }
 
-    return !arePermissionDraftsEqual(normalizedPermissionDraft, permissionSnapshot);
-  }, [normalizedPermissionDraft, permissionSnapshot]);
+    return (
+      !arePermissionDraftsEqual(normalizedPermissionDraft, permissionSnapshot) ||
+      needsDepartmentPermissionSync(
+        selectedPermissionDepartmentModule,
+        normalizedPermissionDraft,
+        selectedPermissionUser,
+      )
+    );
+  }, [
+    normalizedPermissionDraft,
+    permissionSnapshot,
+    selectedPermissionDepartmentModule,
+    selectedPermissionUser,
+  ]);
   const isSelectedPermissionOwner = isOwnerUser(selectedPermissionUser);
 
   const permissionQuery = useQuery<PermissionQueryResult>({
@@ -534,7 +550,13 @@ export function Administracao() {
     }
 
     const payload = buildPermissionUpdatePayload(permissionDraft, permissionExtraKeys);
-    if (arePermissionDraftsEqual(payload, permissionSnapshot)) {
+    const shouldSyncDepartmentPermission = needsDepartmentPermissionSync(
+      selectedPermissionDepartmentModule,
+      payload,
+      selectedPermissionUser,
+    );
+
+    if (arePermissionDraftsEqual(payload, permissionSnapshot) && !shouldSyncDepartmentPermission) {
       return;
     }
 
@@ -542,7 +564,20 @@ export function Administracao() {
     setPermissionSaveError(null);
 
     try {
-      const raw = await permissionService.update(selectedPermissionUserId, payload);
+      const raw = shouldSyncDepartmentPermission
+        ? await (async () => {
+            if (!selectedPermissionDepartmentModule) {
+              throw new Error("Modulo do departamento nao encontrado.");
+            }
+
+            await userService.update(
+              selectedPermissionUserId,
+              buildDepartmentPermissionSyncPayload(selectedPermissionDepartmentModule, payload),
+            );
+
+            return permissionService.getByUserId(selectedPermissionUserId);
+          })()
+        : await permissionService.update(selectedPermissionUserId, payload);
       const normalizationResult = normalizePermissionResponse(raw);
       const nextExtraKeys = Object.keys(normalizationResult.extras);
       const nextDraft = normalizePermissionDraft(
@@ -570,6 +605,7 @@ export function Administracao() {
           }),
           invalidateAdminUserLists(),
         ]);
+        await refetchPermissionUsers();
       } catch {
         toast.warn(
           "Permissões salvas, mas a lista de acessos não pôde ser atualizada agora.",
@@ -1083,6 +1119,7 @@ export function Administracao() {
                         <div className="mt-4 space-y-3">
                           {group.keys.map((moduleKey) => {
                             const isDepartmentModule = selectedPermissionDepartmentModule === moduleKey;
+                            const moduleLabel = getPermissionModuleLabel(moduleKey);
 
                             return (
                               <div
@@ -1090,35 +1127,38 @@ export function Administracao() {
                                 className="grid gap-2 2xl:grid-cols-[minmax(0,1fr)_200px] 2xl:items-center"
                               >
                                 <label
-                                  className="block max-w-full truncate text-sm font-medium text-slate-700 dark:text-slate-200"
-                                  title={getPermissionModuleLabel(moduleKey)}
+                                  className="flex max-w-full items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200"
+                                  title={
+                                    isDepartmentModule
+                                      ? `${moduleLabel} - módulo vinculado ao departamento do usuário`
+                                      : moduleLabel
+                                  }
                                 >
-                                  {getPermissionModuleLabel(moduleKey)}
+                                  <span className="min-w-0 truncate">{moduleLabel}</span>
+                                  {isDepartmentModule ? (
+                                    <span className="shrink-0 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                      Departamento
+                                    </span>
+                                  ) : null}
                                 </label>
-                                {isDepartmentModule ? (
-                                  <div className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                    Acesso pelo departamento
-                                  </div>
-                                ) : (
-                                  <select
-                                    value={getPermissionSelectValue(normalizedPermissionDraft[moduleKey])}
-                                    onChange={(event) =>
-                                      handlePermissionChange(
-                                        moduleKey,
-                                        event.target.value as PermissionSelectValue,
-                                      )
-                                    }
-                                    className={ADMIN_SELECT_CLASSNAME}
-                                    style={ADMIN_SELECT_ARROW_STYLE}
-                                    disabled={isSelectedPermissionOwner || isSavingPermissions}
-                                  >
-                                    {PERMISSION_SELECT_OPTIONS.map((option) => (
-                                      <option key={option.value} value={option.value}>
-                                        {option.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
+                                <select
+                                  value={getPermissionSelectValue(normalizedPermissionDraft[moduleKey])}
+                                  onChange={(event) =>
+                                    handlePermissionChange(
+                                      moduleKey,
+                                      event.target.value as PermissionSelectValue,
+                                    )
+                                  }
+                                  className={ADMIN_SELECT_CLASSNAME}
+                                  style={ADMIN_SELECT_ARROW_STYLE}
+                                  disabled={isSelectedPermissionOwner || isSavingPermissions}
+                                >
+                                  {PERMISSION_SELECT_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
                             );
                           })}

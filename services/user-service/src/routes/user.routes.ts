@@ -2,7 +2,6 @@ import {
   createSuccessResponse,
   error as logError,
   parseWithZod,
-  requireAuthenticatedRequestContext,
   ServiceError,
 } from "@workspace/shared";
 import { createPhotoUploadMiddleware, validateUploadFileSignature } from "@workspace/shared/upload";
@@ -16,6 +15,11 @@ import {
   updateUserBodySchema,
   userIdParamsSchema,
 } from "../schemas/user.schemas.js";
+import {
+  isOwnerMutationPayload,
+  requireManageUsersAuth,
+  requireOwnerUserAuth,
+} from "../security/userManagementAuth.js";
 import { StorageService } from "../services/storageService.js";
 import { UserService } from "../services/userService.js";
 
@@ -23,75 +27,6 @@ const router: ReturnType<typeof Router> = Router();
 const upload = createPhotoUploadMiddleware();
 const userService = new UserService();
 const storageService = new StorageService();
-const ADMIN_PERMISSION = 2;
-
-function requireUserAuth(request: Request) {
-  return requireAuthenticatedRequestContext(request, {
-    userIdMessage: "Não autenticado.",
-    organizationIdMessage: "Não autenticado.",
-  });
-}
-
-function isOwnerRequest(request: Request): boolean {
-  if (request.user_type === "owner") {
-    return true;
-  }
-
-  return (
-    request.user_type === undefined &&
-    typeof request.permission === "number" &&
-    request.permission >= ADMIN_PERMISSION
-  );
-}
-
-function hasRhAdminPermission(request: Request): boolean {
-  const rhPermission = request.modules?.rh;
-  return typeof rhPermission === "number" && rhPermission >= ADMIN_PERMISSION;
-}
-
-function requireManageUsersAuth(request: Request) {
-  const auth = requireUserAuth(request);
-  if (!isOwnerRequest(request) && !hasRhAdminPermission(request)) {
-    throw new ServiceError(403, "Usuario nao tem permissao para gerenciar usuarios.");
-  }
-  return auth;
-}
-
-function isOwnerMutationPayload(body: {
-  type?: string | null;
-  first_owner_flag?: boolean;
-}): boolean {
-  return body.type === "owner" || body.first_owner_flag === true;
-}
-
-function requiresOwnerForCreatePayload(body: {
-  permission?: number;
-  type?: string | null;
-  first_owner_flag?: boolean;
-  modules?: Record<string, number | null>;
-}): boolean {
-  return (
-    isOwnerMutationPayload(body) ||
-    (typeof body.permission === "number" && body.permission >= ADMIN_PERMISSION)
-  );
-}
-
-function requiresOwnerForUpdatePayload(body: {
-  permission?: number;
-  type?: string | null;
-  first_owner_flag?: boolean;
-  modules?: Record<string, number | null>;
-}): boolean {
-  return isOwnerMutationPayload(body) || body.permission !== undefined || body.type !== undefined;
-}
-
-function requireOwnerUserAuth(request: Request) {
-  const auth = requireUserAuth(request);
-  if (!isOwnerRequest(request)) {
-    throw new ServiceError(403, "Apenas owners podem alterar escopo ou permissoes de usuario.");
-  }
-  return auth;
-}
 
 function requireManageUsersAuthMiddleware(
   request: Request,
@@ -169,12 +104,11 @@ router.post(
     try {
       const auth = requireManageUsersAuth(request);
       const body = parseWithZod(createUserBodySchema, request.body);
-      if (requiresOwnerForCreatePayload(body)) {
-        requireOwnerUserAuth(request);
-      }
-
       if (body.organization_id !== undefined && body.organization_id !== auth.organization_id) {
-        throw new ServiceError(403, "Organização da requisição não confere.");
+        throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+      }
+      if (isOwnerMutationPayload(body)) {
+        requireOwnerUserAuth(request);
       }
 
       const user = await userService.create({
@@ -199,7 +133,7 @@ router.patch(
       const auth = requireManageUsersAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
       const body = parseWithZod(updateUserBodySchema, request.body);
-      if (requiresOwnerForUpdatePayload(body)) {
+      if (isOwnerMutationPayload(body)) {
         requireOwnerUserAuth(request);
       }
 
