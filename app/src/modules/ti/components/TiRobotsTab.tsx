@@ -623,9 +623,18 @@ export function TiRobotsTab() {
         action={
           <div className="flex flex-wrap justify-end gap-2" data-ti-selection-control>
             {activeRobot ? (
-              <TiIconAction icon={Eye} label="Ver detalhes" onClick={() => openRobotDetail(activeRobot.id)} />
+              <TiIconAction
+                icon={Eye}
+                label="Ver detalhes"
+                onClick={() => openRobotDetail(activeRobot.id)}
+              />
             ) : null}
-            <TiIconAction icon={Plus} label="Novo robô" variant="primary" onClick={openCreateDialog} />
+            <TiIconAction
+              icon={Plus}
+              label="Novo robô"
+              variant="primary"
+              onClick={openCreateDialog}
+            />
           </div>
         }
       />

@@ -7,12 +7,12 @@ export function TiStockTab() {
     <TiPanel className="space-y-5">
       <TiSectionHeader
         title="Estoque"
-        description="Controle itens, entradas, saidas, categorias, locais e niveis minimos."
+        description="Controle itens, entradas, saídas, categorias, locais e níveis mínimos."
       />
       <TiEmptyState
         icon={PackageSearch}
         title="Nenhum item em estoque"
-        description="Itens consumiveis e movimentacoes de Tecnologia aparecem aqui quando cadastrados."
+        description="Itens consumíveis e movimentações de Tecnologia aparecem aqui quando cadastrados."
       />
     </TiPanel>
   );

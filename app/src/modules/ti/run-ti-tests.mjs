@@ -415,6 +415,384 @@ await runTest("ti dashboard tab consumes the consolidated backend summary", asyn
   assert.match(tabSource, /isError/);
 });
 
+await runTest("ti inventory and terms expose PR4 mutations through hooks", async () => {
+  const inventoryHooksSource = await readModuleSource("hooks/useTiInventory.ts");
+  const termsHooksSource = await readModuleSource("hooks/useTiTerms.ts");
+
+  for (const expected of [
+    "useCreateTiInventoryAssetMutation",
+    "useUpdateTiInventoryAssetMutation",
+    "useAssignTiInventoryAssetUserMutation",
+    "useReturnTiInventoryAssetMutation",
+    "useCreateTiInventoryCategoryMutation",
+    "useUpdateTiInventoryCategoryMutation",
+    "useCreateTiInventoryLocationMutation",
+    "useUpdateTiInventoryLocationMutation",
+  ]) {
+    assert.match(inventoryHooksSource, new RegExp(`function\\s+${expected}`));
+  }
+
+  for (const expected of [
+    "useCreateTiTermMutation",
+    "useUpdateTiTermMutation",
+    "useSignTiTermMutation",
+  ]) {
+    assert.match(termsHooksSource, new RegExp(`function\\s+${expected}`));
+  }
+
+  assert.match(inventoryHooksSource, /useMutation/);
+  assert.match(inventoryHooksSource, /useQueryClient/);
+  assert.match(inventoryHooksSource, /tiQueryKeys\.inventory\.all\(\)/);
+  assert.match(inventoryHooksSource, /tiQueryKeys\.dashboard\(\)/);
+  assert.match(termsHooksSource, /useMutation/);
+  assert.match(termsHooksSource, /useQueryClient/);
+  assert.match(termsHooksSource, /tiQueryKeys\.terms\.all\(\)/);
+  assert.match(termsHooksSource, /tiQueryKeys\.inventory\.all\(\)/);
+  assert.match(termsHooksSource, /tiQueryKeys\.dashboard\(\)/);
+});
+
+await runTest("ti inventory and terms tabs use shared controls for filters and dialogs", async () => {
+  for (const tabPath of ["components/TiInventoryTab.tsx", "components/TiTermsTab.tsx"]) {
+    const source = await readModuleSource(tabPath);
+
+    assert.match(source, /TiNativeSelect/);
+    assert.match(source, /Dialog/);
+    assert.doesNotMatch(source, /<select\b/);
+    assert.doesNotMatch(source, /style=\{/);
+  }
+});
+
+await runTest("ti inventory tab exposes assets, categories, departments, assignment and return actions", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+  const controlsSource = await readModuleSource("components/tiFormControls.tsx");
+
+  for (const expected of [
+    "Novo ativo",
+    "Categorias",
+    "Departamento",
+    "Atribuir usuário",
+    "Registrar devolução",
+  ]) {
+    assert.match(source, new RegExp(expected));
+  }
+
+  assert.match(`${source}\n${controlsSource}`, /Tentar novamente/);
+
+  assert.match(source, /useTiInventory\(/);
+  assert.match(source, /useTiInventoryAsset\(/);
+  assert.match(source, /useTiInventoryCategories\(/);
+  assert.match(source, /departmentService\.list\(\)/);
+  assert.match(source, /useFetch<DepItem\[\]>/);
+  assert.doesNotMatch(source, /useTiInventoryLocations\(/);
+  assert.match(source, /confirm\(/);
+});
+
+await runTest("ti inventory department options come from the global department endpoint", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.match(source, /import \{ departmentService, type DepItem \} from "@modules\/departments"/);
+  assert.match(source, /const departmentsQuery = useFetch<DepItem\[\]>/);
+  assert.match(source, /\["ti-inventory", "departments"\]/);
+  assert.match(source, /\(\) => departmentService\.list\(\)/);
+  assert.doesNotMatch(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
+  assert.match(source, /departmentsById/);
+  assert.match(source, /departmentFilterOptions/);
+  assert.match(source, /departmentFormOptions/);
+  assert.doesNotMatch(source, /const locationsQuery = useTiInventoryLocations\(\)/);
+  assert.doesNotMatch(source, /const locationsById/);
+  assert.doesNotMatch(source, /const locationOptions/);
+});
+
+await runTest("ti inventory keeps primary actions clear and opens asset detail in a dialog", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.equal([...source.matchAll(/label="Novo ativo"/g)].length, 1);
+  assert.match(source, /label="Categorias"/);
+  assert.doesNotMatch(source, /label="Departamentos"/);
+  assert.match(source, /const \[isDetailDialogOpen, setIsDetailDialogOpen\] = useState\(false\)/);
+  assert.match(source, /function openAssetDetail\(assetId: TiId\)/);
+  assert.match(source, /open=\{isDetailDialogOpen\}/);
+  assert.match(source, /title=\{selectedAsset \? getAssetTitle\(selectedAsset\) : "Detalhe do ativo"\}/);
+  assert.match(source, /contentClassName="w-\[min\(92vw,760px\)\]/);
+  assert.match(source, /bodyClassName="space-y-3/);
+  assert.doesNotMatch(source, /TiDetailPanel/);
+  assert.doesNotMatch(source, /xl:grid-cols-\[minmax\(0,1\.45fr\)_minmax\(320px,0\.75fr\)\]/);
+});
+
+await runTest("ti inventory catalog edit actions make editing state explicit", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+  const workspaceUiSource = await readModuleSource("components/tiWorkspaceUi.ts");
+
+  assert.match(source, /function startEditingCategory\(category: TiInventoryCategory\)/);
+  assert.match(source, /onClick=\{\(\) => startEditingCategory\(category\)\}/);
+  assert.match(source, /editingCategory \? "Editar categoria" : "Adicionar categoria"/);
+  assert.match(source, /editingCategory\s*\?\s*"Salvar"\s*:\s*"Criar"/);
+  assert.match(source, /editingCategory \? <Save className="h-3\.5 w-3\.5" \/> : <Plus className="h-3\.5 w-3\.5" \/>/);
+  assert.match(source, /<X className="h-3\.5 w-3\.5" \/>/);
+  assert.match(source, /<span>Cancelar<\/span>/);
+  assert.doesNotMatch(source, /<Check className="h-3\.5 w-3\.5" \/>/);
+  assert.doesNotMatch(source, /Atualizar categoria|Cancelar edição/);
+  assert.doesNotMatch(source, /Editando categoria:/);
+  assert.doesNotMatch(source, /Nova categoria/);
+  assert.doesNotMatch(source, /Adicionar departamento|Criar departamento|Atualizar departamento|Editar departamento/);
+  assert.match(workspaceUiSource, /tiCompactButtonClassName/);
+  assert.match(source, /lg:grid-cols-\[minmax\(220px,1fr\)_minmax\(320px,1\.45fr\)_minmax\(140px,160px\)_auto\]/);
+  assert.doesNotMatch(source, /md:grid-cols-\[1fr_1fr_140px_auto\]/);
+  assert.match(source, /className=\{cn\(tiPrimaryButtonClassName, tiCompactButtonClassName\)\}/);
+  assert.match(source, /className=\{cn\(tiSecondaryButtonClassName, tiCompactButtonClassName\)\}/);
+  assert.match(source, /const isEditingCategory = String\(editingCategory\?\.id\) === String\(category\.id\)/);
+  assert.match(source, /isEditingCategory \? \(\s*<TiStatusPill tone="info">Em edição<\/TiStatusPill>/);
+  assert.match(source, /disabled=\{!canManage\}/);
+});
+
+await runTest("ti inventory category form sends the backend category contract", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+  const typesSource = await readModuleSource("types/inventory.ts");
+  const categoryPayloadSource = typesSource.slice(
+    typesSource.indexOf("export interface TiInventoryCategoryPayload"),
+    typesSource.indexOf("export interface TiInventoryLocationPayload"),
+  );
+
+  assert.match(source, /const categoryActive = getFormText\(formData, "active"\)/);
+  assert.match(source, /tag: getFormText\(formData, "tag"\)/);
+  assert.match(source, /active: categoryActive \? categoryActive === "active" : undefined/);
+  assert.match(source, /name="active"/);
+  assert.match(categoryPayloadSource, /active\?: boolean/);
+  assert.match(categoryPayloadSource, /tag\?: string/);
+  assert.doesNotMatch(source, /description: getFormText\(formData, "description"\)/);
+  assert.doesNotMatch(source, /status: activeStatus/);
+  assert.doesNotMatch(source, /is_active: activeStatus/);
+  assert.doesNotMatch(categoryPayloadSource, /status\?: string \| boolean/);
+});
+
+await runTest("ti inventory copy uses department and serial number labels", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.match(source, /placeholder="Nome, código ou nº de série"/);
+  assert.match(source, /label="Nº de série"/);
+  assert.match(source, /label="Departamento"/);
+  assert.match(source, /headers=\{\["Ativo", "Categoria", "Departamento"/);
+  assert.match(source, /Departamento sem nome/);
+  assert.doesNotMatch(source, /placeholder="Nome, código ou serial"/);
+  assert.doesNotMatch(source, /label="Serial"/);
+  assert.doesNotMatch(source, /label="Local"/);
+  assert.doesNotMatch(source, /title="Locais"/);
+  assert.doesNotMatch(source, /title="Departamentos"/);
+  assert.doesNotMatch(source, /Criar departamento|Atualizar departamento|Adicionar departamento|Editar departamento/);
+});
+
+await runTest("ti terms tab exposes term create, edit, detail and signing actions", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+  const controlsSource = await readModuleSource("components/tiFormControls.tsx");
+
+  for (const expected of [
+    "Novo termo",
+    "Assinar termo",
+    "Editar termo",
+  ]) {
+    assert.match(source, new RegExp(expected));
+  }
+
+  assert.match(`${source}\n${controlsSource}`, /Tentar novamente/);
+
+  assert.match(source, /useTiTerms\(/);
+  assert.match(source, /useTiTerm\(/);
+  assert.match(source, /useTiInventory\(/);
+  assert.match(source, /confirm\(/);
+});
+
+await runTest("ti terms keeps primary action clear and opens term detail in a dialog", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.equal([...source.matchAll(/label="Novo termo"/g)].length, 1);
+  assert.match(source, /Printer/);
+  assert.match(source, /function handlePrintTerm\(term: TiTerm\)/);
+  assert.match(source, /function buildPrintableTermHtml\(term: TiTerm, departmentName: string\)/);
+  assert.match(source, /window\.open\("", "_blank", "width=900,height=1100"\)/);
+  assert.match(source, /printWindow\.print\(\)/);
+  assert.match(source, /Imprimir \/ PDF/);
+  assert.match(source, /const \[isDetailDialogOpen, setIsDetailDialogOpen\] = useState\(false\)/);
+  assert.match(source, /function openTermDetail\(termId: TiId\)/);
+  assert.match(source, /open=\{isDetailDialogOpen\}/);
+  assert.match(source, /title=\{selectedTerm \? getTermTitle\(selectedTerm\) : "Detalhe do termo"\}/);
+  assert.match(source, /contentClassName="w-\[min\(92vw,760px\)\]/);
+  assert.match(source, /bodyClassName="space-y-3/);
+  assert.doesNotMatch(source, /TiDetailPanel/);
+  assert.doesNotMatch(source, /xl:grid-cols-\[minmax\(0,1\.45fr\)_minmax\(320px,0\.75fr\)\]/);
+});
+
+await runTest("ti terms form dialog stays scrollable and compact", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.match(source, /contentClassName="w-\[min\(92vw,860px\)\] max-h-\[84vh\] overflow-hidden"/);
+  assert.match(source, /bodyClassName="max-h-\[calc\(84vh-73px\)\] overflow-y-auto overscroll-contain"/);
+  assert.match(source, /<form className="space-y-3"/);
+  assert.match(source, /<div className="grid gap-3 md:grid-cols-2">/);
+  assert.match(source, /label="Nome do usuário"[\s\S]*label="CPF do usuário"/);
+  assert.match(source, /label="Ativo"[\s\S]*label="Código do ativo"[\s\S]*label="Marca"[\s\S]*label="IMEI"/);
+  assert.match(source, /label="Equipamentos"[\s\S]*label="Motivo"/);
+  assert.match(source, /className="[^"]*min-h-20/);
+  assert.match(source, /<Save className="h-3\.5 w-3\.5" \/>[\s\S]*Salvar termo/);
+  assert.match(source, /className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-3/);
+  assert.doesNotMatch(source, /tiDialogSectionClassName/);
+  assert.doesNotMatch(source, /<section className=/);
+  assert.doesNotMatch(source, /Dados do usuário|Ativo do termo|Dados adicionais do ativo|Detalhes do termo/);
+  assert.doesNotMatch(source, /dialogState\?\.type === "term" && dialogState\.mode === "edit" \? \(/);
+  assert.doesNotMatch(source, /sticky bottom-0/);
+  assert.doesNotMatch(source, /-mx-5 -mb-4/);
+  assert.doesNotMatch(source, /bg-white\/95/);
+  assert.doesNotMatch(source, /lg:grid-cols-3/);
+});
+
+await runTest("ti terms filters stay local because the backend list only supports user_id", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.match(source, /const termsQuery = useTiTerms\(\)/);
+  assert.match(source, /const filteredTerms = useMemo\(/);
+  assert.match(source, /getTermStatus\(term\)/);
+  assert.match(source, /selectedAssetCode/);
+  assert.doesNotMatch(source, /useTiTerms\(filters\)/);
+  assert.doesNotMatch(source, /inventory_id: assetId/);
+  assert.doesNotMatch(source, /asset_id: assetId/);
+  assert.doesNotMatch(source, /status,\s*inventory_id/);
+});
+
+await runTest("ti terms form sends the backend term contract", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+  const typesSource = await readModuleSource("types/terms.ts");
+  const termPayloadSource = typesSource.slice(
+    typesSource.indexOf("export interface TiTermPayload"),
+    typesSource.indexOf("export interface TiTermSignPayload"),
+  );
+  const signPayloadSource = typesSource.slice(typesSource.indexOf("export interface TiTermSignPayload"));
+
+  for (const expected of [
+    "date",
+    "user_name",
+    "user_cpf",
+    "user_id",
+    "department_id",
+    "address",
+    "reason",
+    "equipament_list",
+    "brand",
+    "asset_code",
+    "imei",
+  ]) {
+    assert.match(source, new RegExp(`${expected}: getFormText\\(formData, "${expected}"\\)`));
+  }
+
+  assert.match(source, /name="selected_asset_id"/);
+  assert.match(source, /name="department_id"/);
+  assert.match(source, /departmentService\.list\(\)/);
+  assert.match(source, /reason: getFormText\(formData, "reason"\)/);
+  assert.match(signPayloadSource, /reason\?: string/);
+  assert.doesNotMatch(source, /title: getFormText\(formData, "title"\)/);
+  assert.doesNotMatch(source, /description: getFormText\(formData, "description"\)/);
+  assert.doesNotMatch(source, /inventory_id: selectedAssetId/);
+  assert.doesNotMatch(source, /asset_id: selectedAssetId/);
+  assert.doesNotMatch(source, /status: getFormText\(formData, "status"\)/);
+  assert.doesNotMatch(source, /content: getFormText\(formData, "content"\)/);
+  assert.doesNotMatch(source, /notes: getFormText\(formData, "notes"\)/);
+  assert.doesNotMatch(source, /signer_name/);
+  assert.doesNotMatch(termPayloadSource, /title\?:|description\?:|inventory_id\?:|asset_id\?:|content\?:|notes\?:|status\?:/);
+  assert.doesNotMatch(signPayloadSource, /signer_name\?:|signed_at\?:|notes\?:/);
+});
+
+await runTest("ti inventory category form keeps a stable form reference", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.doesNotMatch(source, /event\.currentTarget\.reset\(\)/);
+  assert.match(source, /const\s+categoryForm\s*=\s*event\.currentTarget/);
+  assert.match(source, /categoryForm\.reset\(\)/);
+  assert.doesNotMatch(source, /const\s+locationForm\s*=\s*event\.currentTarget/);
+  assert.doesNotMatch(source, /locationForm\.reset\(\)/);
+});
+
+await runTest("ti inventory category status supports is_active fallback", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.match(source, /item\.status\s*\?\?\s*item\.active\s*\?\?\s*item\.is_active/);
+  assert.match(source, /getCatalogStatus\(category\)/);
+  assert.match(source, /getCatalogStatus\(editingCategory\)/);
+});
+
+await runTest("ti inventory and terms lookup labels use memoized maps", async () => {
+  const inventorySource = await readModuleSource("components/TiInventoryTab.tsx");
+  const termsSource = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.match(inventorySource, /categoriesById/);
+  assert.match(inventorySource, /departmentsById/);
+  assert.match(inventorySource, /new Map/);
+  assert.match(termsSource, /assetsById/);
+  assert.match(termsSource, /new Map/);
+  assert.doesNotMatch(inventorySource, /\(categoriesQuery\.data \?\? \[\]\)\.find/);
+  assert.doesNotMatch(inventorySource, /\(departmentsQuery\.data \?\? \[\]\)\.find/);
+  assert.doesNotMatch(termsSource, /\(assetsQuery\.data \?\? \[\]\)\.find/);
+});
+
+await runTest("ti visible copy keeps Portuguese accents and punctuation consistent", async () => {
+  const files = [
+    "components/TiDashboardTab.tsx",
+    "components/TiExtensionsTab.tsx",
+    "components/TiInventoryTab.tsx",
+    "components/TiPasswordsTab.tsx",
+    "components/TiRobotsTab.tsx",
+    "components/TiStockTab.tsx",
+    "components/TiTermsTab.tsx",
+  ];
+  const forbiddenSnippets = [
+    "\"--\"",
+    "Carregando dados...",
+    "Não foi possível carregar.",
+    "Nenhum indicador encontrado.",
+    "Robos",
+    "robo cadastrado",
+    "automacoes",
+    "historico",
+    "execucao",
+    "ultimos",
+    "saidas",
+    "niveis minimos",
+    "consumiveis",
+    "movimentacoes",
+    "nesta area",
+    "Nao foi",
+    "possivel",
+    "acao",
+    "atribuicao",
+    "devolucao",
+    "usuarios",
+    "responsaveis",
+    "Codigo",
+    "Responsavel",
+    "usuario",
+    "Observacao",
+    "Descricao",
+    "Gestao",
+    "confirmacao",
+    "sera",
+    "apos",
+    "Titulo",
+    "vinculo",
+    "disponiveis",
+    "Conteudo",
+  ];
+
+  for (const file of files) {
+    const source = await readModuleSource(file);
+    const copySource = source.replaceAll('value: "Integracao"', 'value: ""');
+
+    for (const snippet of forbiddenSnippets) {
+      assert.equal(
+        copySource.includes(snippet),
+        false,
+        `${file} should not include unpolished copy: ${snippet}`,
+      );
+    }
+  }
+});
+
 await runTest("ti robots hooks expose write flows and invalidate robots plus dashboard caches", async () => {
   const hookSource = await readModuleSource("hooks/useTiRobots.ts");
   const serviceSource = await readModuleSource("services/tiRobotsService.ts");
