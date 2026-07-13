@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import type { UseQueryResult } from "@tanstack/react-query";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -47,18 +46,24 @@ import type {
   TiStockLocation,
 } from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
-import { TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
 import {
-  tiInputClassName,
-  tiLabelClassName,
+  TiDataTable,
+  TiEmptyState,
+  TiFieldLine,
+  TiIconAction,
+  TiInlineNotice,
+  TiPanel,
+  TiQueryStatePanel,
+  TiSectionHeader,
+  TiTableAction,
+  TiTextField,
+  TiTextarea,
+} from "./tiFormControls";
+import {
+  tiCardClassName,
   tiPrimaryButtonClassName,
   tiSecondaryButtonClassName,
 } from "./tiWorkspaceUi";
-
-type ListQuery<T> = Pick<
-  UseQueryResult<T[], Error>,
-  "data" | "error" | "isError" | "isFetching" | "isLoading" | "refetch"
->;
 
 type StockItemFormState = {
   name: string;
@@ -218,117 +223,6 @@ function buildItemFormState(item?: TiStockItem | null): StockItemFormState {
     description: formatText(item.description, ""),
     status: item.status === false ? "false" : "true",
   };
-}
-
-function QueryStatePanel<T>({
-  children,
-  emptyTitle,
-  icon: Icon,
-  query,
-}: {
-  children: (rows: T[]) => ReactNode;
-  emptyTitle: string;
-  icon: LucideIcon;
-  query: ListQuery<T>;
-}) {
-  if (query.isLoading) {
-    return (
-      <div className="flex min-h-32 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Carregando informações...
-      </div>
-    );
-  }
-
-  if (query.isError) {
-    return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-950/20">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-              Não conseguimos carregar as informações.
-            </p>
-            <p className="mt-1 text-sm text-red-600 dark:text-red-300/80">
-              {query.error?.message ?? "Tente novamente."}
-            </p>
-          </div>
-          <TiIconAction
-            icon={RefreshCw}
-            label="Tentar novamente"
-            onClick={() => {
-              void query.refetch();
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  const rows = query.data ?? [];
-
-  if (rows.length === 0) {
-    return (
-      <div className="flex min-h-32 items-center gap-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-900/60">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-slate-700 shadow-sm dark:bg-slate-950 dark:text-slate-200">
-          <Icon className="h-5 w-5" />
-        </div>
-        <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{emptyTitle}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {query.isFetching ? (
-        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Atualizando...
-        </div>
-      ) : null}
-      {children(rows)}
-    </div>
-  );
-}
-
-function FieldLine({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0 dark:border-slate-800">
-      <span className="shrink-0 text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-500">
-        {label}
-      </span>
-      <span className="min-w-0 text-right text-sm font-medium text-slate-800 dark:text-slate-100">
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function CompactTextField({
-  label,
-  onChange,
-  placeholder,
-  type = "text",
-  value,
-}: {
-  label: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  type?: "number" | "text";
-  value: string;
-}) {
-  return (
-    <label className="flex min-w-0 flex-col gap-2">
-      <span className={tiLabelClassName}>{label}</span>
-      <input
-        className={tiInputClassName}
-        min={type === "number" ? 0 : undefined}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        type={type}
-        value={value}
-      />
-    </label>
-  );
 }
 
 export function TiStockTab() {
@@ -663,21 +557,23 @@ export function TiStockTab() {
       />
 
       {!canEditStock ? (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>Seu perfil atual permite consulta, mas não alterações de estoque.</p>
-        </div>
+        <TiInlineNotice tone="warning">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>Seu perfil atual permite consulta, mas não alterações de estoque.</p>
+          </div>
+        </TiInlineNotice>
       ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
         <div className="space-y-4">
           <form
-            className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 md:grid-cols-[minmax(0,1fr)_auto]"
+            className={`${tiCardClassName} grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]`}
             onSubmit={applySearchFilter}
           >
-            <CompactTextField
+            <TiTextField
               label="Buscar item"
-              onChange={setSearchDraft}
+              onChange={(event) => setSearchDraft(event.target.value)}
               placeholder="Nome do item"
               value={searchDraft}
             />
@@ -689,96 +585,81 @@ export function TiStockTab() {
             </div>
           </form>
 
-          <QueryStatePanel
-            emptyTitle="Nenhum item em estoque."
-            icon={PackageSearch}
+          <TiQueryStatePanel
+            emptyState={
+              <TiEmptyState
+                icon={PackageSearch}
+                title="Nenhum item em estoque"
+                description="Itens de Tecnologia aparecem aqui quando forem cadastrados."
+              />
+            }
             query={stockItemsQuery}
           >
             {(items) => (
-              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-                <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-                  <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold">Item</th>
-                      <th className="px-4 py-3 text-left font-semibold">Categoria</th>
-                      <th className="px-4 py-3 text-left font-semibold">Local</th>
-                      <th className="px-4 py-3 text-right font-semibold">Qtd.</th>
-                      <th className="px-4 py-3 text-left font-semibold">Status</th>
-                      <th className="px-4 py-3 text-right font-semibold">Acoes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {items.map((item) => {
-                      const isSelected = getId(item.id) === getId(selectedItemId);
+              <TiDataTable headers={["Item", "Categoria", "Local", "Qtd.", "Status", ""]}>
+                {items.map((item) => {
+                  const isSelected = getId(item.id) === getId(selectedItemId);
 
-                      return (
-                        <tr
-                          key={getId(item.id)}
-                          className={cn(
-                            "text-slate-700 dark:text-slate-200",
-                            isSelected ? "bg-blue-50/60 dark:bg-blue-950/20" : null,
-                          )}
+                  return (
+                    <tr
+                      key={getId(item.id)}
+                      className={cn(
+                        "text-slate-700 dark:text-slate-200",
+                        isSelected ? "bg-blue-50/60 dark:bg-blue-950/20" : null,
+                      )}
+                    >
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
+                          onClick={() => handleSelectItem(item)}
                         >
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
-                              onClick={() => handleSelectItem(item)}
-                            >
-                              {formatText(item.name, "Item sem nome")}
-                            </button>
-                            {item.description ? (
-                              <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
-                                {formatText(item.description)}
-                              </p>
-                            ) : null}
-                          </td>
-                          <td className="px-4 py-3">
-                            {getRelatedName(item.category, item.category_id)}
-                          </td>
-                          <td className="px-4 py-3">
-                            {getRelatedName(item.location, item.location_id)}
-                          </td>
-                          <td className="px-4 py-3 text-right font-semibold">
-                            {formatQuantity(item.quantity)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <StatusBadge config={formatStatus(item.status)} size="sm" />
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex justify-end gap-1">
-                              <button
-                                type="button"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                                onClick={() => handleSelectItem(item)}
-                                title="Abrir detalhe"
-                              >
-                                <PackageCheck className="h-4 w-4" />
-                              </button>
-                              {canEditStock ? (
-                                <button
-                                  type="button"
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                                  onClick={() => handleEditItem(item)}
-                                  title="Editar item"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </button>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          {formatText(item.name, "Item sem nome")}
+                        </button>
+                        {item.description ? (
+                          <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                            {formatText(item.description)}
+                          </p>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3">
+                        {getRelatedName(item.category, item.category_id)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {getRelatedName(item.location, item.location_id)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold">
+                        {formatQuantity(item.quantity)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge config={formatStatus(item.status)} size="sm" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <TiTableAction
+                            icon={PackageCheck}
+                            label="Abrir"
+                            onClick={() => handleSelectItem(item)}
+                          />
+                          {canEditStock ? (
+                            <TiTableAction
+                              icon={Pencil}
+                              label="Editar"
+                              onClick={() => handleEditItem(item)}
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </TiDataTable>
             )}
-          </QueryStatePanel>
+          </TiQueryStatePanel>
         </div>
 
         <div className="space-y-4">
-          <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <section className={tiCardClassName}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-slate-950 dark:text-white">
                 Item selecionado
@@ -789,17 +670,17 @@ export function TiStockTab() {
             </div>
             {selectedItem ? (
               <div className="space-y-2">
-                <FieldLine label="Nome" value={formatText(selectedItem.name, "Item sem nome")} />
-                <FieldLine
+                <TiFieldLine label="Nome" value={formatText(selectedItem.name, "Item sem nome")} />
+                <TiFieldLine
                   label="Categoria"
                   value={getRelatedName(selectedItem.category, selectedItem.category_id)}
                 />
-                <FieldLine
+                <TiFieldLine
                   label="Local"
                   value={getRelatedName(selectedItem.location, selectedItem.location_id)}
                 />
-                <FieldLine label="Quantidade" value={formatQuantity(selectedItem.quantity)} />
-                <FieldLine
+                <TiFieldLine label="Quantidade" value={formatQuantity(selectedItem.quantity)} />
+                <TiFieldLine
                   label="Status"
                   value={<StatusBadge config={formatStatus(selectedItem.status)} size="sm" />}
                 />
@@ -812,7 +693,7 @@ export function TiStockTab() {
           </section>
 
           <form
-            className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+            className={`${tiCardClassName} space-y-3`}
             onSubmit={handleSubmitItem}
           >
             <div className="flex items-center justify-between gap-3">
@@ -830,9 +711,9 @@ export function TiStockTab() {
               ) : null}
             </div>
 
-            <CompactTextField
+            <TiTextField
               label="Nome"
-              onChange={(value) => updateItemField("name", value)}
+              onChange={(event) => updateItemField("name", event.target.value)}
               placeholder="Notebook reserva"
               value={itemForm.name}
             />
@@ -851,9 +732,10 @@ export function TiStockTab() {
               value={itemForm.location_id}
             />
             {!editingItemId ? (
-              <CompactTextField
+              <TiTextField
                 label="Quantidade inicial"
-                onChange={(value) => updateItemField("quantity", value)}
+                min={0}
+                onChange={(event) => updateItemField("quantity", event.target.value)}
                 type="number"
                 value={itemForm.quantity}
               />
@@ -868,15 +750,13 @@ export function TiStockTab() {
                 value={itemForm.status}
               />
             )}
-            <label className="flex min-w-0 flex-col gap-2">
-              <span className={tiLabelClassName}>Descrição</span>
-              <textarea
-                className={cn(tiInputClassName, "min-h-20 py-2")}
-                onChange={(event) => updateItemField("description", event.target.value)}
-                placeholder="Observações internas"
-                value={itemForm.description}
-              />
-            </label>
+            <TiTextarea
+              className="min-h-20"
+              label="Descrição"
+              onChange={(event) => updateItemField("description", event.target.value)}
+              placeholder="Observações internas"
+              value={itemForm.description}
+            />
             <button
               type="submit"
               className={tiPrimaryButtonClassName}
@@ -895,16 +775,17 @@ export function TiStockTab() {
 
       <div className="grid gap-5 xl:grid-cols-2">
         <form
-          className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+          className={`${tiCardClassName} space-y-3`}
           onSubmit={handleSubmitEntry}
         >
           <div className="flex items-center gap-2">
             <LogIn className="h-4 w-4 text-green-600 dark:text-green-300" />
             <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Entrada</h3>
           </div>
-          <CompactTextField
+          <TiTextField
             label="Quantidade"
-            onChange={setEntryQuantity}
+            min={0}
+            onChange={(event) => setEntryQuantity(event.target.value)}
             type="number"
             value={entryQuantity}
           />
@@ -923,7 +804,7 @@ export function TiStockTab() {
         </form>
 
         <form
-          className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+          className={`${tiCardClassName} space-y-3`}
           onSubmit={handleSubmitExit}
         >
           <div className="flex items-center gap-2">
@@ -931,9 +812,10 @@ export function TiStockTab() {
             <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Saida</h3>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <CompactTextField
+            <TiTextField
               label="Quantidade"
-              onChange={(value) => updateExitField("quantity", value)}
+              min={0}
+              onChange={(event) => updateExitField("quantity", event.target.value)}
               type="number"
               value={exitForm.quantity}
             />
@@ -944,9 +826,9 @@ export function TiStockTab() {
               options={userOptions}
               value={exitForm.requester_id}
             />
-            <CompactTextField
+            <TiTextField
               label="Destino"
-              onChange={(value) => updateExitField("destination", value)}
+              onChange={(event) => updateExitField("destination", event.target.value)}
               placeholder="Sala, colaborador ou projeto"
               value={exitForm.destination}
             />
@@ -987,16 +869,16 @@ export function TiStockTab() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <section className={`${tiCardClassName} space-y-4`}>
           <div className="flex items-center gap-2">
             <Tags className="h-4 w-4 text-blue-600 dark:text-blue-300" />
             <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Categorias</h3>
           </div>
           <form className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={handleSubmitCategory}>
-            <CompactTextField
+            <TiTextField
               label="Nome"
-              onChange={setCategoryName}
-              placeholder="Perifericos"
+              onChange={(event) => setCategoryName(event.target.value)}
+              placeholder="Periféricos"
               value={categoryName}
             />
             <div className="flex items-end">
@@ -1017,21 +899,21 @@ export function TiStockTab() {
           />
         </section>
 
-        <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <section className={`${tiCardClassName} space-y-4`}>
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-300" />
             <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Locais</h3>
           </div>
           <form className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px_auto]" onSubmit={handleSubmitLocation}>
-            <CompactTextField
+            <TiTextField
               label="Nome"
-              onChange={setLocationName}
+              onChange={(event) => setLocationName(event.target.value)}
               placeholder="Almoxarifado"
               value={locationName}
             />
-            <CompactTextField
+            <TiTextField
               label="Andar"
-              onChange={setLocationFloor}
+              onChange={(event) => setLocationFloor(event.target.value)}
               type="number"
               value={locationFloor}
             />

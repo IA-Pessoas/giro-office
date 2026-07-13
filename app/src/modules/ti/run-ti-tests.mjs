@@ -228,7 +228,44 @@ await runTest("ti stock tab renders operational item, movement, category and loc
     assert.match(tabSource, new RegExp(token.replaceAll(".", "\\.")));
   }
 
-  assert.doesNotMatch(tabSource, /<TiEmptyState/);
+  assert.match(tabSource, /<TiEmptyState/);
+});
+
+await runTest("ti stock passwords and extensions reuse shared card and table controls", async () => {
+  const controlsSource = await readModuleSource("components/tiFormControls.tsx");
+
+  assert.match(controlsSource, /Carregando informações/);
+  assert.match(controlsSource, /Não conseguimos carregar as informações/);
+  assert.doesNotMatch(controlsSource, /Carregando dados/);
+  assert.doesNotMatch(controlsSource, /Nao foi possivel/);
+
+  for (const componentPath of [
+    "components/TiStockTab.tsx",
+    "components/TiPasswordsTab.tsx",
+    "components/TiExtensionsTab.tsx",
+  ]) {
+    const source = await readModuleSource(componentPath);
+
+    for (const token of [
+      "TiQueryStatePanel",
+      "TiDataTable",
+      "TiEmptyState",
+      "TiFieldLine",
+      "TiTableAction",
+      "tiCardClassName",
+    ]) {
+      assert.match(source, new RegExp(token));
+    }
+
+    assert.doesNotMatch(source, /function QueryStatePanel/);
+    assert.doesNotMatch(source, /function FieldLine/);
+    assert.doesNotMatch(source, /function CompactTextField/);
+    assert.doesNotMatch(source, /function TextField/);
+    assert.doesNotMatch(
+      source,
+      /overflow-x-auto rounded-lg border border-slate-200 bg-white/,
+    );
+  }
 });
 
 await runTest("ti password contracts separate list data from explicit reveal detail", async () => {
@@ -276,6 +313,23 @@ await runTest("ti password reveal clears sensitive detail cache when hidden", as
   assert.match(tabSource, /setRevealPasswordId\(null\)/);
 });
 
+await runTest("ti user selects reuse the paginated assignable users source", async () => {
+  const hookSource = await readAppSource("src/modules/rh/hooks/useAssignableUsers.ts");
+
+  assert.match(hookSource, /listAdminUsers\("active"\)/);
+  assert.doesNotMatch(hookSource, /const page = await userService\.listPage\(\{\s*skip:\s*0,/);
+
+  for (const componentPath of [
+    "components/TiStockTab.tsx",
+    "components/TiPasswordsTab.tsx",
+    "components/TiExtensionsTab.tsx",
+  ]) {
+    const source = await readModuleSource(componentPath);
+
+    assert.match(source, /useAssignableUsers/);
+  }
+});
+
 await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   const hookSource = await readModuleSource("hooks/useTiExtensions.ts");
   const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
@@ -292,7 +346,13 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(hookSource, /tiQueryKeys\.extensions\.all\(\)/);
   assert.match(tabSource, /useTiExtensions/);
   assert.match(tabSource, /useTiExtension/);
-  assert.doesNotMatch(tabSource, /<TiEmptyState/);
+  assert.match(tabSource, /<TiEmptyState/);
+  const sectionHeaderMatch = tabSource.match(/<TiSectionHeader[\s\S]*?\/>/);
+  assert.ok(sectionHeaderMatch);
+  assert.doesNotMatch(sectionHeaderMatch[0], /action=/);
+  assert.match(tabSource, /selectedExtensionId\s*\?\s*\(/);
+  assert.doesNotMatch(tabSource, /Selecione um ramal para ver detalhes\./);
+  assert.match(tabSource, /Criar ramal/);
 });
 
 await runTest("ti visible copy stays product-facing and avoids implementation handoff terms", async () => {

@@ -1,15 +1,11 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import type { UseQueryResult } from "@tanstack/react-query";
+import { useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   Loader2,
   Pencil,
   Phone,
   PhoneCall,
-  Plus,
-  RefreshCw,
   Save,
-  type LucideIcon,
 } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -30,17 +26,21 @@ import type {
   TiListFilters,
 } from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
-import { TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
 import {
-  tiInputClassName,
-  tiLabelClassName,
+  TiDataTable,
+  TiEmptyState,
+  TiFieldLine,
+  TiInlineNotice,
+  TiPanel,
+  TiQueryStatePanel,
+  TiSectionHeader,
+  TiTableAction,
+  TiTextField,
+} from "./tiFormControls";
+import {
+  tiCardClassName,
   tiPrimaryButtonClassName,
 } from "./tiWorkspaceUi";
-
-type ListQuery<T> = Pick<
-  UseQueryResult<T[], Error>,
-  "data" | "error" | "isError" | "isFetching" | "isLoading" | "refetch"
->;
 
 type ExtensionFormState = {
   number: string;
@@ -93,88 +93,6 @@ function buildExtensionFormState(item?: TiExtension | null): ExtensionFormState 
   };
 }
 
-function QueryStatePanel<T>({
-  children,
-  emptyTitle,
-  icon: Icon,
-  query,
-}: {
-  children: (rows: T[]) => ReactNode;
-  emptyTitle: string;
-  icon: LucideIcon;
-  query: ListQuery<T>;
-}) {
-  if (query.isLoading) {
-    return (
-      <div className="flex min-h-32 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Carregando informações...
-      </div>
-    );
-  }
-
-  if (query.isError) {
-    return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-950/20">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-              Não conseguimos carregar as informações.
-            </p>
-            <p className="mt-1 text-sm text-red-600 dark:text-red-300/80">
-              {query.error?.message ?? "Tente novamente."}
-            </p>
-          </div>
-          <TiIconAction
-            icon={RefreshCw}
-            label="Tentar novamente"
-            onClick={() => {
-              void query.refetch();
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  const rows = query.data ?? [];
-
-  if (rows.length === 0) {
-    return (
-      <div className="flex min-h-32 items-center gap-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-900/60">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-slate-700 shadow-sm dark:bg-slate-950 dark:text-slate-200">
-          <Icon className="h-5 w-5" />
-        </div>
-        <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{emptyTitle}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {query.isFetching ? (
-        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Atualizando...
-        </div>
-      ) : null}
-      {children(rows)}
-    </div>
-  );
-}
-
-function FieldLine({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0 dark:border-slate-800">
-      <span className="shrink-0 text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-500">
-        {label}
-      </span>
-      <span className="min-w-0 text-right text-sm font-medium text-slate-800 dark:text-slate-100">
-        {value}
-      </span>
-    </div>
-  );
-}
 
 export function TiExtensionsTab() {
   const { access } = useModuleAccess("ti");
@@ -305,104 +223,94 @@ export function TiExtensionsTab() {
       <TiSectionHeader
         title="Ramais"
         description="Consulte e mantenha a lista de telefones internos."
-        action={
-          canManageExtensions ? (
-            <button type="button" className={tiPrimaryButtonClassName} onClick={openCreateForm}>
-              <Plus className="h-4 w-4" />
-              <span>Novo ramal</span>
-            </button>
-          ) : null
-        }
       />
 
       {!canManageExtensions ? (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>Seu perfil atual permite consulta, mas nao alteracoes de ramais.</p>
-        </div>
+        <TiInlineNotice tone="warning">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>Seu perfil atual permite consulta, mas não alterações de ramais.</p>
+          </div>
+        </TiInlineNotice>
       ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-        <QueryStatePanel emptyTitle="Nenhum ramal cadastrado." icon={Phone} query={extensionsQuery}>
+        <TiQueryStatePanel
+          emptyState={
+            <TiEmptyState
+              icon={Phone}
+              title="Nenhum ramal cadastrado"
+              description="Ramais internos aparecem aqui quando forem vinculados a usuários."
+            />
+          }
+          query={extensionsQuery}
+        >
           {(rows) => (
-            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-                <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold">Ramal</th>
-                    <th className="px-4 py-3 text-left font-semibold">Usuario</th>
-                    <th className="px-4 py-3 text-right font-semibold">Acoes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {rows.map((item) => (
-                    <tr key={getId(item.id)} className="text-slate-700 dark:text-slate-200">
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
-                          onClick={() => setSelectedExtensionId(item.id)}
-                        >
-                          {formatText(item.number, "Sem número")}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">{getExtensionUserName(item)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-1">
-                          <button
-                            type="button"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                            onClick={() => setSelectedExtensionId(item.id)}
-                            title="Abrir detalhe"
-                          >
-                            <PhoneCall className="h-4 w-4" />
-                          </button>
-                          {canManageExtensions ? (
-                            <button
-                              type="button"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                              onClick={() => openEditForm(item)}
-                              title="Editar ramal"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <TiDataTable headers={["Ramal", "Usuário", ""]}>
+              {rows.map((item) => (
+                <tr key={getId(item.id)} className="text-slate-700 dark:text-slate-200">
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
+                      onClick={() => setSelectedExtensionId(item.id)}
+                    >
+                      {formatText(item.number, "Sem número")}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">{getExtensionUserName(item)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-1">
+                      <TiTableAction
+                        icon={PhoneCall}
+                        label="Abrir"
+                        onClick={() => setSelectedExtensionId(item.id)}
+                      />
+                      {canManageExtensions ? (
+                        <TiTableAction
+                          icon={Pencil}
+                          label="Editar"
+                          onClick={() => openEditForm(item)}
+                        />
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </TiDataTable>
           )}
-        </QueryStatePanel>
+        </TiQueryStatePanel>
 
         <div className="space-y-4">
-          <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-slate-950 dark:text-white">
-                Ramal selecionado
-              </h3>
-              {selectedExtensionQuery.isFetching ? (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-              ) : null}
-            </div>
-            {selectedExtension ? (
-              <div className="space-y-2">
-                <FieldLine label="Numero" value={formatText(selectedExtension.number)} />
-                <FieldLine label="Usuario" value={getExtensionUserName(selectedExtension)} />
-                <FieldLine label="ID" value={getId(selectedExtension.id)} />
+          {selectedExtensionId ? (
+            <section className={tiCardClassName}>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-slate-950 dark:text-white">
+                  Ramal selecionado
+                </h3>
+                {selectedExtensionQuery.isFetching ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                ) : null}
               </div>
-            ) : (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Selecione um ramal para ver detalhes.
-              </p>
-            )}
-          </section>
+              {selectedExtension ? (
+                <div className="space-y-2">
+                  <TiFieldLine label="Número" value={formatText(selectedExtension.number)} />
+                  <TiFieldLine label="Usuário" value={getExtensionUserName(selectedExtension)} />
+                  <TiFieldLine label="ID" value={getId(selectedExtension.id)} />
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {selectedExtensionQuery.isError
+                    ? "Não conseguimos carregar este ramal."
+                    : "Carregando detalhes do ramal..."}
+                </p>
+              )}
+            </section>
+          ) : null}
 
           {canManageExtensions ? (
             <form
-              className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+              className={`${tiCardClassName} space-y-3`}
               onSubmit={handleSubmitExtension}
             >
               <div className="flex items-center justify-between gap-3">
@@ -419,18 +327,15 @@ export function TiExtensionsTab() {
                   </button>
                 ) : null}
               </div>
-              <label className="flex min-w-0 flex-col gap-2">
-                <span className={tiLabelClassName}>Numero</span>
-                <input
-                  className={tiInputClassName}
-                  onChange={(event) => updateExtensionField("number", event.target.value)}
-                  placeholder="1001"
-                  value={extensionForm.number}
-                />
-              </label>
+              <TiTextField
+                label="Número"
+                onChange={(event) => updateExtensionField("number", event.target.value)}
+                placeholder="1001"
+                value={extensionForm.number}
+              />
               <TiNativeSelect
                 disabled={assignableUsersQuery.isLoading}
-                label="Usuario"
+                label="Usuário"
                 onChange={(event) => updateExtensionField("user_id", event.target.value)}
                 options={userOptions}
                 value={extensionForm.user_id}

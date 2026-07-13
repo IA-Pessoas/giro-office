@@ -179,7 +179,7 @@ export function TiQueryStatePanel<T>({
     return (
       <div className="flex min-h-32 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Carregando dados...
+        Carregando informações...
       </div>
     );
   }
@@ -190,7 +190,7 @@ export function TiQueryStatePanel<T>({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-              Nao foi possivel carregar.
+              Não conseguimos carregar as informações.
             </p>
             <p className="mt-1 text-sm text-red-600 dark:text-red-300/80">
               {query.error?.message ?? "Tente novamente."}
