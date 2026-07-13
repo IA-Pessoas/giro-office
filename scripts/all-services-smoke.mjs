@@ -1512,6 +1512,13 @@ const handlers = {
     });
   },
 
+  async tiStockItemMovementsList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/stock/items/${requireState("tiStockItemId")}/movements/list`,
+    });
+  },
+
   async tiPasswordList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },

@@ -150,6 +150,68 @@ describe("ti stock routes", () => {
     });
   });
 
+  it("GET /ti/stock/items/:id/movements/list lists consolidated movements", async () => {
+    const response = await request(createTestApp())
+      .get(`/ti/stock/items/${stockId}/movements/list`)
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: [
+        {
+          id: "exit-1",
+          type: "exit",
+          quantity: 1,
+          created_at: "2026-07-13T13:00:00.000Z",
+          item_id: stockId,
+          requester_id: userId,
+          requester_name: "Usuario TI",
+          approver_id: null,
+          approver_name: null,
+          operator_id: null,
+          operator_name: null,
+          destination: "Smoke TI stock exit.",
+          location_destination_id: null,
+          location_destination_name: null,
+          balance_before: null,
+          balance_after: null,
+        },
+        {
+          id: "entry-1",
+          type: "entry",
+          quantity: 2,
+          created_at: "2026-07-13T12:00:00.000Z",
+          item_id: stockId,
+          requester_id: null,
+          requester_name: null,
+          approver_id: null,
+          approver_name: null,
+          operator_id: userId,
+          operator_name: "Usuario TI",
+          destination: null,
+          location_destination_id: null,
+          location_destination_name: null,
+          balance_before: null,
+          balance_after: null,
+        },
+      ],
+    });
+  });
+
+  it("GET /ti/stock/items/:id/movements/list rejects invalid item id", async () => {
+    const response = await request(createTestApp())
+      .get("/ti/stock/items/not-a-uuid/movements/list")
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "BAD_REQUEST",
+      error: "Item de estoque invalido.",
+    });
+  });
+
   it("POST /ti/stock/categories creates a stock category", async () => {
     const response = await request(createTestApp())
       .post("/ti/stock/categories")
