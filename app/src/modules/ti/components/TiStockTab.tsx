@@ -21,6 +21,7 @@ import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
 import { useAssignableUsers } from "@modules/rh";
+import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { cn } from "@shared/ui/newLayout/utils";
 
@@ -61,7 +62,8 @@ import {
 } from "./tiFormControls";
 import {
   tiCardClassName,
-  tiPrimaryButtonClassName,
+  tiCompactButtonClassName,
+  tiDialogSubsectionClassName,
   tiSecondaryButtonClassName,
 } from "./tiWorkspaceUi";
 
@@ -83,6 +85,15 @@ type StockExitFormState = {
   location_destination_id: string;
 };
 
+type StockDialogState = "item" | "entry" | "exit" | "categories" | "locations" | null;
+
+type StockFilterDraft = {
+  name: string;
+  category_id: string;
+  location_id: string;
+  status: string;
+};
+
 const initialItemFormState: StockItemFormState = {
   name: "",
   category_id: "",
@@ -100,6 +111,19 @@ const initialExitFormState: StockExitFormState = {
   operator_id: "",
   location_destination_id: "",
 };
+
+const initialStockFilterDraft: StockFilterDraft = {
+  name: "",
+  category_id: "",
+  location_id: "",
+  status: "",
+};
+
+const STOCK_STATUS_FILTER_OPTIONS = [
+  { value: "", label: "Todos" },
+  { value: "true", label: "Ativos" },
+  { value: "false", label: "Inativos" },
+] as const;
 
 function formatText(value: unknown, fallback = "-"): string {
   if (value === null || value === undefined || value === "") {
@@ -229,10 +253,14 @@ export function TiStockTab() {
   const { access } = useModuleAccess("ti");
   const canEditStock = access.canEdit || access.isAdmin;
   const [filters, setFilters] = useState<TiListFilters>({});
-  const [searchDraft, setSearchDraft] = useState("");
+  const [stockFilterDraft, setStockFilterDraft] =
+    useState<StockFilterDraft>(initialStockFilterDraft);
   const [selectedItemId, setSelectedItemId] = useState<TiId | undefined>();
+  const [isStockDetailDialogOpen, setIsStockDetailDialogOpen] = useState(false);
   const [itemForm, setItemForm] = useState<StockItemFormState>(initialItemFormState);
   const [editingItemId, setEditingItemId] = useState<TiId | undefined>();
+  const [stockDialog, setStockDialog] = useState<StockDialogState>(null);
+  const [movementItemId, setMovementItemId] = useState("");
   const [entryQuantity, setEntryQuantity] = useState("");
   const [exitForm, setExitForm] = useState<StockExitFormState>(initialExitFormState);
   const [categoryName, setCategoryName] = useState("");
@@ -254,14 +282,33 @@ export function TiStockTab() {
 
   const stockCategories = stockCategoriesQuery.data ?? [];
   const stockLocations = stockLocationsQuery.data ?? [];
+  const stockItems = stockItemsQuery.data ?? [];
   const users = assignableUsersQuery.data ?? [];
-  const selectedItem = selectedItemQuery.data;
+  const selectedListItem = stockItems.find((item) => getId(item.id) === getId(selectedItemId));
+  const selectedItem = selectedItemQuery.data ?? selectedListItem;
   const isItemSubmitting = createItemMutation.isPending || updateItemMutation.isPending;
   const isMovementSubmitting = createEntryMutation.isPending || createExitMutation.isPending;
+  const isStockRefreshing =
+    stockItemsQuery.isFetching ||
+    selectedItemQuery.isFetching ||
+    stockCategoriesQuery.isFetching ||
+    stockLocationsQuery.isFetching ||
+    assignableUsersQuery.isFetching;
 
   const categoryOptions = useMemo(
     () => [
       { value: "", label: "Selecione" },
+      ...stockCategories.map((category) => ({
+        value: getId(category.id),
+        label: formatText(category.name, "Categoria sem nome"),
+      })),
+    ],
+    [stockCategories],
+  );
+
+  const categoryFilterOptions = useMemo(
+    () => [
+      { value: "", label: "Todas" },
       ...stockCategories.map((category) => ({
         value: getId(category.id),
         label: formatText(category.name, "Categoria sem nome"),
@@ -279,6 +326,28 @@ export function TiStockTab() {
       })),
     ],
     [stockLocations],
+  );
+
+  const locationFilterOptions = useMemo(
+    () => [
+      { value: "", label: "Todos" },
+      ...stockLocations.map((location) => ({
+        value: getId(location.id),
+        label: formatText(location.name, "Local sem nome"),
+      })),
+    ],
+    [stockLocations],
+  );
+
+  const stockItemOptions = useMemo(
+    () => [
+      { value: "", label: "Selecione" },
+      ...stockItems.map((item) => ({
+        value: getId(item.id),
+        label: formatText(item.name, "Item sem nome"),
+      })),
+    ],
+    [stockItems],
   );
 
   const userOptions = useMemo(
@@ -312,6 +381,13 @@ export function TiStockTab() {
     setExitForm((current) => ({ ...current, [field]: value }));
   }
 
+  function updateStockFilterField<Key extends keyof StockFilterDraft>(
+    field: Key,
+    value: StockFilterDraft[Key],
+  ) {
+    setStockFilterDraft((current) => ({ ...current, [field]: value }));
+  }
+
   function handleSelectItem(item: TiStockItem) {
     setSelectedItemId(item.id);
     setEditingItemId(undefined);
@@ -320,15 +396,73 @@ export function TiStockTab() {
     setExitForm(initialExitFormState);
   }
 
+  function openStockDetail(item: TiStockItem) {
+    handleSelectItem(item);
+    setIsStockDetailDialogOpen(true);
+  }
+
   function handleEditItem(item: TiStockItem) {
     setSelectedItemId(item.id);
     setEditingItemId(item.id);
     setItemForm(buildItemFormState(item));
+    setStockDialog("item");
   }
 
   function resetItemForm() {
     setEditingItemId(undefined);
     setItemForm(initialItemFormState);
+  }
+
+  function openCreateItemDialog() {
+    resetItemForm();
+    setStockDialog("item");
+  }
+
+  function closeItemDialog() {
+    resetItemForm();
+    setStockDialog(null);
+  }
+
+  function openMovementDialog(nextDialog: "entry" | "exit") {
+    setMovementItemId(getId(selectedItemId));
+    setStockDialog(nextDialog);
+  }
+
+  function closeEntryDialog() {
+    setMovementItemId("");
+    setEntryQuantity("");
+    setStockDialog(null);
+  }
+
+  function closeExitDialog() {
+    setMovementItemId("");
+    setExitForm(initialExitFormState);
+    setStockDialog(null);
+  }
+
+  function closeCategoryDialog() {
+    setCategoryName("");
+    setStockDialog(null);
+  }
+
+  function closeLocationDialog() {
+    setLocationName("");
+    setLocationFloor("");
+    setStockDialog(null);
+  }
+
+  function refreshStockWorkspace() {
+    void stockItemsQuery.refetch();
+    void stockCategoriesQuery.refetch();
+    void stockLocationsQuery.refetch();
+
+    if (selectedItemId) {
+      void selectedItemQuery.refetch();
+    }
+
+    if (canEditStock) {
+      void assignableUsersQuery.refetch();
+    }
   }
 
   function buildItemPayload(): TiStockItemCreatePayload | TiStockItemUpdatePayload | null {
@@ -404,6 +538,7 @@ export function TiStockTab() {
       }
 
       resetItemForm();
+      setStockDialog(null);
     } catch (error) {
       toast.error(getMutationErrorMessage(error, "Não foi possível salvar o item."));
     }
@@ -412,7 +547,14 @@ export function TiStockTab() {
   async function handleSubmitEntry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedItemId || !canEditStock || isMovementSubmitting) {
+    if (!canEditStock || isMovementSubmitting) {
+      return;
+    }
+
+    const itemId = toOptionalId(movementItemId);
+
+    if (!itemId) {
+      toast.error("Selecione o item da entrada.");
       return;
     }
 
@@ -424,8 +566,9 @@ export function TiStockTab() {
     }
 
     try {
-      await createEntryMutation.mutateAsync({ id: selectedItemId, payload: { quantity } });
-      setEntryQuantity("");
+      await createEntryMutation.mutateAsync({ id: itemId, payload: { quantity } });
+      setSelectedItemId(itemId);
+      closeEntryDialog();
       toast.success("Entrada registrada com sucesso.");
     } catch (error) {
       toast.error(getMutationErrorMessage(error, "Não foi possível registrar a entrada."));
@@ -435,7 +578,14 @@ export function TiStockTab() {
   async function handleSubmitExit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedItemId || !canEditStock || isMovementSubmitting) {
+    if (!canEditStock || isMovementSubmitting) {
+      return;
+    }
+
+    const itemId = toOptionalId(movementItemId);
+
+    if (!itemId) {
+      toast.error("Selecione o item da saída.");
       return;
     }
 
@@ -459,7 +609,7 @@ export function TiStockTab() {
 
     try {
       await createExitMutation.mutateAsync({
-        id: selectedItemId,
+        id: itemId,
         payload: {
           quantity,
           requester_id: exitForm.requester_id,
@@ -473,7 +623,8 @@ export function TiStockTab() {
             : {}),
         },
       });
-      setExitForm(initialExitFormState);
+      setSelectedItemId(itemId);
+      closeExitDialog();
       toast.success("Saída registrada com sucesso.");
     } catch (error) {
       toast.error(getMutationErrorMessage(error, "Não foi possível registrar a saída."));
@@ -497,6 +648,7 @@ export function TiStockTab() {
     try {
       await createCategoryMutation.mutateAsync({ name });
       setCategoryName("");
+      void stockCategoriesQuery.refetch();
       toast.success("Categoria criada com sucesso.");
     } catch (error) {
       toast.error(getMutationErrorMessage(error, "Não foi possível criar a categoria."));
@@ -526,18 +678,21 @@ export function TiStockTab() {
       });
       setLocationName("");
       setLocationFloor("");
+      void stockLocationsQuery.refetch();
       toast.success("Local criado com sucesso.");
     } catch (error) {
       toast.error(getMutationErrorMessage(error, "Não foi possível criar o local."));
     }
   }
 
-  function applySearchFilter(event: FormEvent<HTMLFormElement>) {
+  function applyStockFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setFilters((current) => ({
-      ...current,
-      name: toOptionalText(searchDraft),
-    }));
+    setFilters({
+      name: toOptionalText(stockFilterDraft.name),
+      category_id: toOptionalId(stockFilterDraft.category_id),
+      location_id: toOptionalId(stockFilterDraft.location_id),
+      status: toOptionalText(stockFilterDraft.status),
+    });
   }
 
   return (
@@ -546,13 +701,22 @@ export function TiStockTab() {
         title="Estoque"
         description="Controle itens, entradas, saídas, categorias, locais e níveis mínimos."
         action={
-          <TiIconAction
-            icon={RefreshCw}
-            label="Atualizar"
-            onClick={() => {
-              void stockItemsQuery.refetch();
-            }}
-          />
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            {canEditStock ? (
+              <TiIconAction
+                icon={Plus}
+                label="Novo item"
+                variant="primary"
+                onClick={openCreateItemDialog}
+              />
+            ) : null}
+            <TiIconAction
+              icon={RefreshCw}
+              label={isStockRefreshing ? "Atualizando..." : "Atualizar"}
+              disabled={isStockRefreshing}
+              onClick={refreshStockWorkspace}
+            />
+          </div>
         }
       />
 
@@ -565,26 +729,53 @@ export function TiStockTab() {
         </TiInlineNotice>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-        <div className="space-y-4">
-          <form
-            className={`${tiCardClassName} grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]`}
-            onSubmit={applySearchFilter}
-          >
-            <TiTextField
-              label="Buscar item"
-              onChange={(event) => setSearchDraft(event.target.value)}
-              placeholder="Nome do item"
-              value={searchDraft}
-            />
-            <div className="flex items-end">
-              <button type="submit" className={tiSecondaryButtonClassName}>
-                <PackageSearch className="h-4 w-4" />
-                <span>Filtrar</span>
-              </button>
-            </div>
-          </form>
+      <form
+        aria-label="Filtros do estoque"
+        className={`${tiCardClassName} grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_minmax(150px,180px)_minmax(150px,180px)_minmax(120px,140px)_128px]`}
+        onSubmit={applyStockFilters}
+      >
+        <TiTextField
+          label="Buscar item"
+          onChange={(event) => updateStockFilterField("name", event.target.value)}
+          placeholder="Nome do item"
+          value={stockFilterDraft.name}
+        />
+        <TiNativeSelect
+          disabled={stockCategoriesQuery.isLoading}
+          label="Categoria"
+          onChange={(event) => updateStockFilterField("category_id", event.target.value)}
+          options={categoryFilterOptions}
+          value={stockFilterDraft.category_id}
+        />
+        <TiNativeSelect
+          disabled={stockLocationsQuery.isLoading}
+          label="Local"
+          onChange={(event) => updateStockFilterField("location_id", event.target.value)}
+          options={locationFilterOptions}
+          value={stockFilterDraft.location_id}
+        />
+        <TiNativeSelect
+          label="Status"
+          onChange={(event) => updateStockFilterField("status", event.target.value)}
+          options={STOCK_STATUS_FILTER_OPTIONS}
+          value={stockFilterDraft.status}
+        />
+        <div className="flex items-end md:col-span-2 xl:col-span-1">
+          <button type="submit" className={cn(tiSecondaryButtonClassName, "w-full")}>
+            <PackageSearch className="h-4 w-4" />
+            <span>Buscar</span>
+          </button>
+        </div>
+      </form>
 
+      <div
+        aria-label="Conteúdo do estoque"
+        className={cn(
+          "grid items-start gap-5",
+          canEditStock ? "xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]" : null,
+        )}
+      >
+        <div className="space-y-4">
           <TiQueryStatePanel
             emptyState={
               <TiEmptyState
@@ -596,7 +787,7 @@ export function TiStockTab() {
             query={stockItemsQuery}
           >
             {(items) => (
-              <TiDataTable headers={["Item", "Categoria", "Local", "Qtd.", "Status", ""]}>
+              <TiDataTable headers={["Item", "Categoria", "Local", "Saldo", "Status", ""]}>
                 {items.map((item) => {
                   const isSelected = getId(item.id) === getId(selectedItemId);
 
@@ -608,38 +799,42 @@ export function TiStockTab() {
                         isSelected ? "bg-blue-50/60 dark:bg-blue-950/20" : null,
                       )}
                     >
-                      <td className="px-4 py-3">
+                      <td className="min-w-56 max-w-sm px-4 py-3 align-top">
                         <button
                           type="button"
-                          className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
-                          onClick={() => handleSelectItem(item)}
+                          className="max-w-full break-words text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
+                          onClick={() => openStockDetail(item)}
                         >
                           {formatText(item.name, "Item sem nome")}
                         </button>
                         {item.description ? (
-                          <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                          <p className="mt-1 line-clamp-2 max-w-sm break-words text-xs text-slate-500 dark:text-slate-400">
                             {formatText(item.description)}
                           </p>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3">
-                        {getRelatedName(item.category, item.category_id)}
+                      <td className="max-w-44 px-4 py-3 align-top">
+                        <span className="block break-words">
+                          {getRelatedName(item.category, item.category_id)}
+                        </span>
                       </td>
-                      <td className="px-4 py-3">
-                        {getRelatedName(item.location, item.location_id)}
+                      <td className="max-w-44 px-4 py-3 align-top">
+                        <span className="block break-words">
+                          {getRelatedName(item.location, item.location_id)}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold">
+                      <td className="whitespace-nowrap px-4 py-3 text-right align-top font-semibold">
                         {formatQuantity(item.quantity)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 align-top">
                         <StatusBadge config={formatStatus(item.status)} size="sm" />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 align-top">
                         <div className="flex justify-end gap-1">
                           <TiTableAction
                             icon={PackageCheck}
                             label="Abrir"
-                            onClick={() => handleSelectItem(item)}
+                            onClick={() => openStockDetail(item)}
                           />
                           {canEditStock ? (
                             <TiTableAction
@@ -658,59 +853,119 @@ export function TiStockTab() {
           </TiQueryStatePanel>
         </div>
 
-        <div className="space-y-4">
-          <section className={tiCardClassName}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-slate-950 dark:text-white">
-                Item selecionado
-              </h3>
-              {selectedItemQuery.isFetching ? (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-              ) : null}
+        {canEditStock ? (
+          <section className={`${tiCardClassName} space-y-3 self-start`} aria-label="Operações do estoque">
+            <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Operações</h3>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+              <StockOperationButton
+                icon={LogIn}
+                label="Entrada"
+                onClick={() => openMovementDialog("entry")}
+              />
+              <StockOperationButton
+                icon={LogOut}
+                label="Saída"
+                onClick={() => openMovementDialog("exit")}
+              />
+              <StockOperationButton
+                icon={Tags}
+                label="Categorias"
+                onClick={() => setStockDialog("categories")}
+              />
+              <StockOperationButton
+                icon={MapPin}
+                label="Locais"
+                onClick={() => setStockDialog("locations")}
+              />
             </div>
-            {selectedItem ? (
-              <div className="space-y-2">
-                <TiFieldLine label="Nome" value={formatText(selectedItem.name, "Item sem nome")} />
-                <TiFieldLine
-                  label="Categoria"
-                  value={getRelatedName(selectedItem.category, selectedItem.category_id)}
-                />
-                <TiFieldLine
-                  label="Local"
-                  value={getRelatedName(selectedItem.location, selectedItem.location_id)}
-                />
-                <TiFieldLine label="Quantidade" value={formatQuantity(selectedItem.quantity)} />
-                <TiFieldLine
-                  label="Status"
-                  value={<StatusBadge config={formatStatus(selectedItem.status)} size="sm" />}
-                />
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Selecione um item para ver detalhes e movimentar saldo.
-              </p>
-            )}
           </section>
+        ) : null}
+      </div>
 
-          <form
-            className={`${tiCardClassName} space-y-3`}
-            onSubmit={handleSubmitItem}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-slate-950 dark:text-white">
-                {editingItemId ? "Editar item" : "Novo item"}
-              </h3>
-              {editingItemId ? (
-                <button
-                  type="button"
-                  className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                  onClick={resetItemForm}
-                >
-                  Cancelar
-                </button>
+      <Dialog
+        open={isStockDetailDialogOpen}
+        onOpenChange={setIsStockDetailDialogOpen}
+        title={selectedItem ? formatText(selectedItem.name, "Detalhe do item") : "Detalhe do item"}
+        description="Detalhe cadastral e saldo atual do item."
+        contentClassName="w-[min(92vw,720px)]"
+        bodyClassName="space-y-3"
+      >
+        {selectedItemQuery.isLoading && !selectedItem ? (
+          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando informações...
+          </div>
+        ) : null}
+
+        {selectedItemQuery.isError ? (
+          <TiInlineNotice tone="warning">
+            Não foi possível atualizar o detalhe deste item. Exibindo dados da lista.
+          </TiInlineNotice>
+        ) : null}
+
+        {selectedItem ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-400">
+                  Saldo atual
+                </p>
+                <p className="mt-1 text-2xl font-semibold tracking-normal text-slate-950 dark:text-white">
+                  {formatQuantity(selectedItem.quantity)}
+                </p>
+              </div>
+              <StatusBadge config={formatStatus(selectedItem.status)} size="sm" />
+            </div>
+            <div className="space-y-2">
+              <TiFieldLine
+                label="Nome"
+                value={
+                  <span className="break-words">
+                    {formatText(selectedItem.name, "Item sem nome")}
+                  </span>
+                }
+              />
+              <TiFieldLine
+                label="Categoria"
+                value={
+                  <span className="break-words">
+                    {getRelatedName(selectedItem.category, selectedItem.category_id)}
+                  </span>
+                }
+              />
+              <TiFieldLine
+                label="Local"
+                value={
+                  <span className="break-words">
+                    {getRelatedName(selectedItem.location, selectedItem.location_id)}
+                  </span>
+                }
+              />
+              {selectedItem.description ? (
+                <TiFieldLine
+                  label="Descrição"
+                  value={<span className="break-words">{formatText(selectedItem.description)}</span>}
+                />
               ) : null}
             </div>
+          </div>
+        ) : null}
+      </Dialog>
 
+      <Dialog
+        open={stockDialog === "item"}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeItemDialog();
+          }
+        }}
+        title={editingItemId ? "Editar item" : "Novo item"}
+        description="Cadastre e mantenha os itens controlados no estoque de Tecnologia."
+        contentClassName="w-[min(92vw,640px)]"
+        bodyClassName="max-h-[72vh] overflow-y-auto"
+      >
+        <form className="space-y-4" onSubmit={handleSubmitItem}>
+          <div className="grid gap-3 md:grid-cols-2">
             <TiTextField
               label="Nome"
               onChange={(event) => updateItemField("name", event.target.value)}
@@ -750,38 +1005,58 @@ export function TiStockTab() {
                 value={itemForm.status}
               />
             )}
-            <TiTextarea
-              className="min-h-20"
-              label="Descrição"
-              onChange={(event) => updateItemField("description", event.target.value)}
-              placeholder="Observações internas"
-              value={itemForm.description}
-            />
-            <button
-              type="submit"
-              className={tiPrimaryButtonClassName}
-              disabled={!canEditStock || isItemSubmitting}
-            >
-              {isItemSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              <span>{editingItemId ? "Salvar item" : "Criar item"}</span>
-            </button>
-          </form>
-        </div>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-2">
-        <form
-          className={`${tiCardClassName} space-y-3`}
-          onSubmit={handleSubmitEntry}
-        >
-          <div className="flex items-center gap-2">
-            <LogIn className="h-4 w-4 text-green-600 dark:text-green-300" />
-            <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Entrada</h3>
           </div>
+          <TiTextarea
+            className="min-h-20"
+            label="Descrição"
+            onChange={(event) => updateItemField("description", event.target.value)}
+            placeholder="Observações internas"
+            value={itemForm.description}
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="h-10 px-4 text-sm font-semibold"
+              onClick={closeItemDialog}
+            >
+              Cancelar
+            </button>
+            <TiIconAction
+              icon={Save}
+              type="submit"
+              label={
+                isItemSubmitting
+                  ? "Salvando..."
+                  : editingItemId
+                    ? "Salvar item"
+                    : "Criar item"
+              }
+              variant="primary"
+              disabled={!canEditStock || isItemSubmitting}
+            />
+          </div>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={stockDialog === "entry"}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeEntryDialog();
+          }
+        }}
+        title="Registrar entrada"
+        description="Escolha o item e registre a quantidade adicionada ao estoque."
+        contentClassName="w-[min(92vw,520px)]"
+      >
+        <form className="space-y-4" onSubmit={handleSubmitEntry}>
+          <TiNativeSelect
+            disabled={stockItemsQuery.isLoading}
+            label="Item"
+            onChange={(event) => setMovementItemId(event.target.value)}
+            options={stockItemOptions}
+            value={movementItemId}
+          />
           <TiTextField
             label="Quantidade"
             min={0}
@@ -789,29 +1064,45 @@ export function TiStockTab() {
             type="number"
             value={entryQuantity}
           />
-          <button
-            type="submit"
-            className={tiSecondaryButtonClassName}
-            disabled={!selectedItemId || !canEditStock || isMovementSubmitting}
-          >
-            {createEntryMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <LogIn className="h-4 w-4" />
-            )}
-            <span>Registrar entrada</span>
-          </button>
-        </form>
-
-        <form
-          className={`${tiCardClassName} space-y-3`}
-          onSubmit={handleSubmitExit}
-        >
-          <div className="flex items-center gap-2">
-            <LogOut className="h-4 w-4 text-orange-600 dark:text-orange-300" />
-            <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Saida</h3>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="h-10 px-4 text-sm font-semibold"
+              onClick={closeEntryDialog}
+            >
+              Cancelar
+            </button>
+            <TiIconAction
+              icon={LogIn}
+              type="submit"
+              label={createEntryMutation.isPending ? "Registrando..." : "Registrar entrada"}
+              variant="primary"
+              disabled={!movementItemId || !canEditStock || isMovementSubmitting}
+            />
           </div>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={stockDialog === "exit"}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeExitDialog();
+          }
+        }}
+        title="Registrar saída"
+        description="Escolha o item e registre a quantidade retirada do estoque."
+        contentClassName="w-[min(92vw,720px)]"
+      >
+        <form className="space-y-4" onSubmit={handleSubmitExit}>
           <div className="grid gap-3 md:grid-cols-2">
+            <TiNativeSelect
+              disabled={stockItemsQuery.isLoading}
+              label="Item"
+              onChange={(event) => setMovementItemId(event.target.value)}
+              options={stockItemOptions}
+              value={movementItemId}
+            />
             <TiTextField
               label="Quantidade"
               min={0}
@@ -853,89 +1144,167 @@ export function TiStockTab() {
               value={exitForm.operator_id}
             />
           </div>
-          <button
-            type="submit"
-            className={tiSecondaryButtonClassName}
-            disabled={!selectedItemId || !canEditStock || isMovementSubmitting}
-          >
-            {createExitMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <LogOut className="h-4 w-4" />
-            )}
-            <span>Registrar saída</span>
-          </button>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="h-10 px-4 text-sm font-semibold"
+              onClick={closeExitDialog}
+            >
+              Cancelar
+            </button>
+            <TiIconAction
+              icon={LogOut}
+              type="submit"
+              label={createExitMutation.isPending ? "Registrando..." : "Registrar saída"}
+              variant="primary"
+              disabled={!movementItemId || !canEditStock || isMovementSubmitting}
+            />
+          </div>
         </form>
-      </div>
+      </Dialog>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <section className={`${tiCardClassName} space-y-4`}>
-          <div className="flex items-center gap-2">
-            <Tags className="h-4 w-4 text-blue-600 dark:text-blue-300" />
-            <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Categorias</h3>
-          </div>
-          <form className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={handleSubmitCategory}>
-            <TiTextField
-              label="Nome"
-              onChange={(event) => setCategoryName(event.target.value)}
-              placeholder="Periféricos"
-              value={categoryName}
-            />
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className={tiSecondaryButtonClassName}
-                disabled={!canEditStock || createCategoryMutation.isPending}
-              >
-                <Plus className="h-4 w-4" />
-                <span>Criar</span>
-              </button>
+      <Dialog
+        open={stockDialog === "categories"}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeCategoryDialog();
+          }
+        }}
+        title="Categorias de estoque"
+        description="Gerencie as categorias usadas nos itens do estoque."
+        contentClassName="w-[min(92vw,760px)]"
+        bodyClassName="max-h-[72vh] overflow-y-auto"
+      >
+        <div className="space-y-4">
+          <section className={tiDialogSubsectionClassName}>
+            <div className="mb-4 flex items-center gap-2">
+              <Tags className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+              <h3 className="text-base font-semibold text-slate-950 dark:text-white">
+                Adicionar categoria
+              </h3>
             </div>
-          </form>
-          <MiniResourceList
-            emptyLabel="Nenhuma categoria cadastrada."
-            icon={Layers3}
-            rows={stockCategories}
-          />
-        </section>
+            <form
+              className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+              onSubmit={handleSubmitCategory}
+            >
+              <TiTextField
+                label="Nome"
+                onChange={(event) => setCategoryName(event.target.value)}
+                placeholder="Periféricos"
+                value={categoryName}
+              />
+              <div className="flex items-end">
+                <TiIconAction
+                  icon={Plus}
+                  type="submit"
+                  label={createCategoryMutation.isPending ? "Criando..." : "Criar"}
+                  variant="primary"
+                  disabled={!canEditStock || createCategoryMutation.isPending}
+                />
+              </div>
+            </form>
+          </section>
 
-        <section className={`${tiCardClassName} space-y-4`}>
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-300" />
-            <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Locais</h3>
-          </div>
-          <form className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px_auto]" onSubmit={handleSubmitLocation}>
-            <TiTextField
-              label="Nome"
-              onChange={(event) => setLocationName(event.target.value)}
-              placeholder="Almoxarifado"
-              value={locationName}
+          <section className="space-y-3">
+            <h3 className="text-base font-semibold text-slate-950 dark:text-white">
+              Categorias cadastradas
+            </h3>
+            <MiniResourceList
+              emptyLabel="Nenhuma categoria cadastrada."
+              icon={Layers3}
+              rows={stockCategories}
             />
-            <TiTextField
-              label="Andar"
-              onChange={(event) => setLocationFloor(event.target.value)}
-              type="number"
-              value={locationFloor}
-            />
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className={tiSecondaryButtonClassName}
-                disabled={!canEditStock || createLocationMutation.isPending}
-              >
-                <Plus className="h-4 w-4" />
-                <span>Criar</span>
-              </button>
+          </section>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={stockDialog === "locations"}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeLocationDialog();
+          }
+        }}
+        title="Locais de estoque"
+        description="Gerencie os locais usados nos itens do estoque."
+        contentClassName="w-[min(92vw,760px)]"
+        bodyClassName="max-h-[72vh] overflow-y-auto"
+      >
+        <div className="space-y-4">
+          <section className={tiDialogSubsectionClassName}>
+            <div className="mb-4 flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+              <h3 className="text-base font-semibold text-slate-950 dark:text-white">
+                Adicionar local
+              </h3>
             </div>
-          </form>
-          <MiniResourceList
-            emptyLabel="Nenhum local cadastrado."
-            icon={MapPin}
-            rows={stockLocations}
-          />
-        </section>
-      </div>
+            <form
+              className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px_auto]"
+              onSubmit={handleSubmitLocation}
+            >
+              <TiTextField
+                label="Nome"
+                onChange={(event) => setLocationName(event.target.value)}
+                placeholder="Almoxarifado"
+                value={locationName}
+              />
+              <TiTextField
+                label="Andar"
+                onChange={(event) => setLocationFloor(event.target.value)}
+                type="number"
+                value={locationFloor}
+              />
+              <div className="flex items-end">
+                <TiIconAction
+                  icon={Plus}
+                  type="submit"
+                  label={createLocationMutation.isPending ? "Criando..." : "Criar"}
+                  variant="primary"
+                  disabled={!canEditStock || createLocationMutation.isPending}
+                />
+              </div>
+            </form>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-base font-semibold text-slate-950 dark:text-white">
+              Locais cadastrados
+            </h3>
+            <MiniResourceList
+              emptyLabel="Nenhum local cadastrado."
+              icon={MapPin}
+              rows={stockLocations}
+            />
+          </section>
+        </div>
+      </Dialog>
     </TiPanel>
+  );
+}
+
+function StockOperationButton({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        tiSecondaryButtonClassName,
+        tiCompactButtonClassName,
+        "w-full min-w-0 sm:w-auto sm:min-w-32",
+      )}
+      onClick={onClick}
+      title={label}
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{label}</span>
+    </button>
   );
 }
 
