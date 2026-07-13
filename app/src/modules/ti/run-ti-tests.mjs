@@ -395,6 +395,49 @@ await runTest("ti passwords tab never renders secrets in list and reveals only b
   assert.doesNotMatch(tabSource, /passwordRows[^]*?\.password/);
 });
 
+await runTest("ti passwords tab keeps create edit flows in a dialog and filters by local", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+  const dialogSource = await readAppSource("src/shared/components/ui/Dialog.tsx");
+
+  assert.match(tabSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog"/);
+  assert.match(tabSource, /const \[filters, setFilters\] = useState<TiListFilters>\(\{\}\)/);
+  assert.match(tabSource, /const \[localSearchDraft, setLocalSearchDraft\] = useState\(""\)/);
+  assert.match(tabSource, /const \[isPasswordDialogOpen, setIsPasswordDialogOpen\] = useState\(false\)/);
+  assert.match(tabSource, /function applyPasswordFilters/);
+  assert.match(tabSource, /local: toOptionalText\(localSearchDraft\)/);
+  assert.match(tabSource, /aria-label="Filtros de senhas"/);
+  assert.match(tabSource, /label="Buscar local"/);
+  assert.match(tabSource, /placeholder="Local da senha"/);
+  assert.match(tabSource, /open=\{isPasswordDialogOpen\}/);
+  assert.match(tabSource, /title=\{editingPassword \? "Editar senha" : "Nova senha"\}/);
+  assert.match(
+    tabSource,
+    /contentClassName="!w-\[min\(92vw,400px\)\] \[\&>header\]:px-4 \[\&>header\]:py-3"/,
+  );
+  assert.match(tabSource, /bodyClassName="!px-4 !py-3"/);
+  assert.doesNotMatch(dialogSource, /@shared\/ui\/newLayout\/utils/);
+  assert.doesNotMatch(dialogSource, /contentClassName,\s*\)\}/);
+  assert.match(tabSource, /aria-label="Conteúdo de senhas"/);
+  assert.match(
+    tabSource,
+    /className="grid gap-5 xl:grid-cols-\[minmax\(0,1fr\)_minmax\(280px,360px\)\]"/,
+  );
+  assert.match(tabSource, /<form className="space-y-2" onSubmit=\{handleSubmitPassword\}>/);
+  assert.match(tabSource, /className="h-9"/);
+  assert.match(tabSource, /className="h-14 min-h-14 resize-none"/);
+  assert.match(tabSource, /onClick=\{openCreateForm\}/);
+  assert.match(tabSource, /<span>Buscar<\/span>/);
+  assert.doesNotMatch(tabSource, /bodyClassName="max-h-\[72vh\] overflow-y-auto"/);
+  assert.doesNotMatch(
+    tabSource,
+    /<form className="space-y-2" onSubmit=\{handleSubmitPassword\}>[\s\S]*?className="grid gap-3 md:grid-cols-2"/,
+  );
+  assert.doesNotMatch(
+    tabSource,
+    /<form\s+className=\{`\$\{tiCardClassName\} space-y-3`\}\s+onSubmit=\{handleSubmitPassword\}/,
+  );
+});
+
 await runTest("ti password reveal clears sensitive detail cache when hidden", async () => {
   const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
   const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
