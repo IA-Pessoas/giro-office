@@ -317,6 +317,14 @@ export const operations = [
   {
     service: "ti-service",
     method: "GET",
+    path: "/ti/stock/items/{id}/movements/list",
+    action: "tiStockItemMovementsList",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "ti-service",
+    method: "GET",
     path: "/ti/passwords/list",
     action: "tiPasswordList",
     target: "gateway",

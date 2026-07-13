@@ -75,6 +75,23 @@ export function createTiStockRoutes(prisma: PrismaClient): Router {
     },
   );
 
+  router.get(
+    "/items/:id/movements/list",
+    requireTiPermission(TiPermissionLevel.Requester),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const params = parseWithZod(stockItemIdParamsSchema, request.params);
+        const result = await service.listItemMovements(context, params.id);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao listar movimentacoes de estoque de TI", { err });
+        next(err);
+      }
+    },
+  );
+
   router.post(
     "/items",
     requireTiPermission(TiPermissionLevel.Admin),
