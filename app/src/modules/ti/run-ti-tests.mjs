@@ -167,6 +167,335 @@ await runTest("ti page remains a shell without embedded primary mock datasets", 
   assert.doesNotMatch(pageSource, /api\.(get|post|patch|put|delete)\(/);
 });
 
+await runTest("ti stock hooks expose mutations and invalidate stock plus dashboard caches", async () => {
+  const hookSource = await readModuleSource("hooks/useTiStock.ts");
+  const serviceSource = await readModuleSource("services/tiStockService.ts");
+
+  for (const method of [
+    "listStockItems",
+    "createStockItem",
+    "getStockItemById",
+    "updateStockItem",
+    "createStockEntry",
+    "createStockExit",
+    "listStockCategories",
+    "createStockCategory",
+    "updateStockCategory",
+    "listStockLocations",
+    "createStockLocation",
+    "updateStockLocation",
+  ]) {
+    assert.match(serviceSource, new RegExp(`async\\s+${method}\\s*\\(`));
+  }
+
+  for (const mutation of [
+    "useCreateTiStockItemMutation",
+    "useUpdateTiStockItemMutation",
+    "useCreateTiStockEntryMutation",
+    "useCreateTiStockExitMutation",
+    "useCreateTiStockCategoryMutation",
+    "useUpdateTiStockCategoryMutation",
+    "useCreateTiStockLocationMutation",
+    "useUpdateTiStockLocationMutation",
+  ]) {
+    assert.match(hookSource, new RegExp(`export function ${mutation}`));
+  }
+
+  assert.match(hookSource, /useMutation/);
+  assert.match(hookSource, /useQueryClient/);
+  assert.match(hookSource, /tiQueryKeys\.stock\.all\(\)/);
+  assert.match(hookSource, /tiQueryKeys\.dashboard\(\)/);
+});
+
+await runTest("ti stock tab renders operational item, movement, category and location workflows", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+
+  for (const token of [
+    "useTiStockItems",
+    "useTiStockItem",
+    "useCreateTiStockItemMutation",
+    "useUpdateTiStockItemMutation",
+    "useCreateTiStockEntryMutation",
+    "useCreateTiStockExitMutation",
+    "useCreateTiStockCategoryMutation",
+    "useCreateTiStockLocationMutation",
+    "window.confirm",
+    "Entrada",
+    "Saída",
+    "Categorias",
+    "Locais",
+  ]) {
+    assert.match(tabSource, new RegExp(token.replaceAll(".", "\\.")));
+  }
+
+  assert.match(tabSource, /<TiEmptyState/);
+  assert.match(tabSource, /type StockDialogState =/);
+  assert.match(tabSource, /const \[stockDialog, setStockDialog\]/);
+  assert.match(tabSource, /open=\{stockDialog === "item"\}/);
+  assert.match(tabSource, /open=\{stockDialog === "entry"\}/);
+  assert.match(tabSource, /open=\{stockDialog === "exit"\}/);
+  assert.match(tabSource, /open=\{stockDialog === "categories"\}/);
+  assert.match(tabSource, /open=\{stockDialog === "locations"\}/);
+  assert.match(tabSource, /const \[isStockDetailDialogOpen, setIsStockDetailDialogOpen\]/);
+  assert.match(tabSource, /open=\{isStockDetailDialogOpen\}/);
+  assert.match(tabSource, /function openStockDetail\(item: TiStockItem\)/);
+  assert.match(tabSource, /title="Categorias de estoque"/);
+  assert.match(tabSource, /title="Locais de estoque"/);
+  assert.match(tabSource, /aria-label="Operações do estoque"/);
+  assert.match(tabSource, /aria-label="Filtros do estoque"/);
+  assert.match(tabSource, /aria-label="Conteúdo do estoque"/);
+  assert.match(tabSource, /function StockOperationButton/);
+  assert.match(tabSource, /tiCompactButtonClassName/);
+  assert.match(tabSource, /flex items-end md:col-span-2 xl:col-span-1/);
+  assert.match(
+    tabSource,
+    /md:grid-cols-2 xl:grid-cols-\[minmax\(240px,1fr\)_minmax\(150px,180px\)_minmax\(150px,180px\)_minmax\(120px,140px\)_128px\]/,
+  );
+  assert.match(tabSource, /className=\{cn\(tiSecondaryButtonClassName, "w-full"\)\}/);
+  assert.match(tabSource, /grid items-start gap-5/);
+  assert.match(tabSource, /xl:grid-cols-\[minmax\(0,1fr\)_minmax\(280px,360px\)\]/);
+  assert.match(tabSource, /type StockFilterDraft/);
+  assert.match(tabSource, /const \[stockFilterDraft, setStockFilterDraft\]/);
+  assert.match(tabSource, /STOCK_STATUS_FILTER_OPTIONS/);
+  assert.match(tabSource, /categoryFilterOptions/);
+  assert.match(tabSource, /locationFilterOptions/);
+  assert.match(tabSource, /function applyStockFilters/);
+  assert.match(tabSource, /name: toOptionalText\(stockFilterDraft\.name\)/);
+  assert.match(tabSource, /category_id: toOptionalId\(stockFilterDraft\.category_id\)/);
+  assert.match(tabSource, /location_id: toOptionalId\(stockFilterDraft\.location_id\)/);
+  assert.match(tabSource, /status: toOptionalText\(stockFilterDraft\.status\)/);
+  assert.match(tabSource, /label="Categoria"/);
+  assert.match(tabSource, /label="Local"/);
+  assert.match(tabSource, /label="Status"/);
+  assert.match(tabSource, /<span>Buscar<\/span>/);
+  assert.doesNotMatch(tabSource, /Filtrar/);
+  assert.doesNotMatch(tabSource, /searchDraft/);
+  assert.doesNotMatch(tabSource, /applySearchFilter/);
+  assert.doesNotMatch(tabSource, /aria-expanded=\{isStockActionsOpen\}/);
+  assert.doesNotMatch(tabSource, /Item selecionado/);
+  assert.doesNotMatch(tabSource, /Selecione um item para ver detalhes e movimentar saldo/);
+  assert.match(tabSource, /label="Novo item"/);
+  assert.match(tabSource, /onClick=\{openCreateItemDialog\}/);
+  assert.match(tabSource, /label=\{isStockRefreshing \? "Atualizando\.\.\." : "Atualizar"\}/);
+  assert.match(tabSource, /onClick=\{refreshStockWorkspace\}/);
+  assert.match(tabSource, /const selectedListItem = stockItems\.find/);
+  assert.match(tabSource, /const selectedItem = selectedItemQuery\.data \?\? selectedListItem/);
+  assert.match(tabSource, /headers=\{\["Item", "Categoria", "Local", "Saldo", "Status", ""\]\}/);
+  assert.match(tabSource, /Saldo atual/);
+  assert.match(tabSource, /selectedItemQuery\.isError/);
+  assert.match(tabSource, /const \[movementItemId, setMovementItemId\]/);
+  assert.match(tabSource, /stockItemOptions/);
+  assert.match(tabSource, /function closeItemDialog/);
+  assert.match(tabSource, /function closeEntryDialog/);
+  assert.match(tabSource, /function closeExitDialog/);
+  assert.match(tabSource, /function closeCategoryDialog/);
+  assert.match(tabSource, /function closeLocationDialog/);
+  assert.match(tabSource, /openMovementDialog\("entry"\)/);
+  assert.match(tabSource, /openMovementDialog\("exit"\)/);
+  assert.match(tabSource, /setStockDialog\("categories"\)/);
+  assert.match(tabSource, /setStockDialog\("locations"\)/);
+  assert.match(tabSource, /setCategoryName\(""\)/);
+  assert.match(tabSource, /setLocationName\(""\)/);
+  assert.match(tabSource, /stockCategoriesQuery\.refetch\(\)/);
+  assert.match(tabSource, /stockLocationsQuery\.refetch\(\)/);
+  assert.match(tabSource, /disabled=\{!movementItemId \|\| !canEditStock \|\| isMovementSubmitting\}/);
+  assert.doesNotMatch(tabSource, /disabled=\{!selectedItemId\}/);
+  assert.doesNotMatch(tabSource, /Ações do estoque/);
+  assert.doesNotMatch(tabSource, /Movimentação/);
+  assert.doesNotMatch(tabSource, /Cadastros/);
+  assert.doesNotMatch(tabSource, /border-t border-slate-200/);
+  assert.doesNotMatch(tabSource, /lg:grid-cols-\[minmax\(220px,1\.4fr\)_/);
+  assert.doesNotMatch(tabSource, /2xl:grid-cols-\[minmax\(220px,1\.4fr\)_/);
+  assert.doesNotMatch(
+    tabSource,
+    /xl:grid-cols-\[minmax\(0,1\.35fr\)_minmax\(360px,0\.65fr\)\]/,
+  );
+  assert.doesNotMatch(tabSource, /STOCK_WORKSPACE_ACTIONS/);
+  assert.doesNotMatch(
+    tabSource,
+    /<div className="grid gap-5 xl:grid-cols-2">[\s\S]*onSubmit=\{handleSubmitEntry\}[\s\S]*onSubmit=\{handleSubmitExit\}/,
+  );
+
+  const filtersIndex = tabSource.indexOf('aria-label="Filtros do estoque"');
+  const contentIndex = tabSource.indexOf('aria-label="Conteúdo do estoque"');
+  const emptyStateIndex = tabSource.indexOf('title="Nenhum item em estoque"');
+  const operationPanelIndex = tabSource.indexOf('aria-label="Operações do estoque"');
+  assert.ok(filtersIndex > 0);
+  assert.ok(contentIndex > filtersIndex);
+  assert.ok(emptyStateIndex > contentIndex);
+  assert.ok(operationPanelIndex > emptyStateIndex);
+  assert.ok(operationPanelIndex > 0);
+});
+
+await runTest("ti stock passwords and extensions reuse shared card and table controls", async () => {
+  const controlsSource = await readModuleSource("components/tiFormControls.tsx");
+
+  assert.match(controlsSource, /Carregando informações/);
+  assert.match(controlsSource, /Não conseguimos carregar as informações/);
+  assert.doesNotMatch(controlsSource, /Carregando dados/);
+  assert.doesNotMatch(controlsSource, /Nao foi possivel/);
+
+  for (const componentPath of [
+    "components/TiStockTab.tsx",
+    "components/TiPasswordsTab.tsx",
+    "components/TiExtensionsTab.tsx",
+  ]) {
+    const source = await readModuleSource(componentPath);
+
+    for (const token of [
+      "TiQueryStatePanel",
+      "TiDataTable",
+      "TiEmptyState",
+      "TiFieldLine",
+      "TiTableAction",
+      "tiCardClassName",
+    ]) {
+      assert.match(source, new RegExp(token));
+    }
+
+    assert.doesNotMatch(source, /function QueryStatePanel/);
+    assert.doesNotMatch(source, /function FieldLine/);
+    assert.doesNotMatch(source, /function CompactTextField/);
+    assert.doesNotMatch(source, /function TextField/);
+    assert.doesNotMatch(
+      source,
+      /overflow-x-auto rounded-lg border border-slate-200 bg-white/,
+    );
+  }
+});
+
+await runTest("ti password contracts separate list data from explicit reveal detail", async () => {
+  const typesSource = await readModuleSource("types/passwords.ts");
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+
+  assert.match(typesSource, /export interface TiPasswordListItem/);
+  assert.match(typesSource, /export interface TiPasswordDetail/);
+
+  const listInterfaceStart = typesSource.indexOf("export interface TiPasswordListItem");
+  const detailInterfaceStart = typesSource.indexOf("export interface TiPasswordDetail");
+  const listInterfaceSource = typesSource.slice(listInterfaceStart, detailInterfaceStart);
+
+  assert.doesNotMatch(listInterfaceSource, /\bpassword\??:/);
+  assert.match(hookSource, /export function useTiPasswordReveal/);
+  assert.match(hookSource, /enabled:\s*Boolean\(id\)\s*&&\s*Boolean\(canReveal\)/);
+});
+
+await runTest("ti passwords tab never renders secrets in list and reveals only by explicit action", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /const \[revealPasswordId, setRevealPasswordId\]/);
+  assert.match(
+    tabSource,
+    /useTiPasswordReveal\(\s*revealPasswordId,\s*Boolean\(revealPasswordId\)\s*&&\s*canRevealPasswords/,
+  );
+  assert.match(tabSource, /<MaskedSecret\s*\/>/);
+  assert.match(tabSource, /setRevealPasswordId\(item\.id\)/);
+  assert.match(tabSource, /setRevealPasswordId\(null\)/);
+  assert.doesNotMatch(tabSource, /\.map\(\(item[^]*?item\.password[^]*?\)\)/);
+  assert.doesNotMatch(tabSource, /passwordRows[^]*?\.password/);
+});
+
+await runTest("ti passwords tab keeps create edit flows in a dialog and filters by local", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+  const dialogSource = await readAppSource("src/shared/components/ui/Dialog.tsx");
+
+  assert.match(tabSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog"/);
+  assert.match(tabSource, /const \[filters, setFilters\] = useState<TiListFilters>\(\{\}\)/);
+  assert.match(tabSource, /const \[localSearchDraft, setLocalSearchDraft\] = useState\(""\)/);
+  assert.match(tabSource, /const \[isPasswordDialogOpen, setIsPasswordDialogOpen\] = useState\(false\)/);
+  assert.match(tabSource, /function applyPasswordFilters/);
+  assert.match(tabSource, /local: toOptionalText\(localSearchDraft\)/);
+  assert.match(tabSource, /aria-label="Filtros de senhas"/);
+  assert.match(tabSource, /label="Buscar local"/);
+  assert.match(tabSource, /placeholder="Local da senha"/);
+  assert.match(tabSource, /open=\{isPasswordDialogOpen\}/);
+  assert.match(tabSource, /title=\{editingPassword \? "Editar senha" : "Nova senha"\}/);
+  assert.match(
+    tabSource,
+    /contentClassName="!w-\[min\(92vw,400px\)\] \[\&>header\]:px-4 \[\&>header\]:py-3"/,
+  );
+  assert.match(tabSource, /bodyClassName="!px-4 !py-3"/);
+  assert.doesNotMatch(dialogSource, /@shared\/ui\/newLayout\/utils/);
+  assert.doesNotMatch(dialogSource, /contentClassName,\s*\)\}/);
+  assert.match(tabSource, /aria-label="Conteúdo de senhas"/);
+  assert.match(
+    tabSource,
+    /className="grid gap-5 xl:grid-cols-\[minmax\(0,1fr\)_minmax\(280px,360px\)\]"/,
+  );
+  assert.match(tabSource, /<form className="space-y-2" onSubmit=\{handleSubmitPassword\}>/);
+  assert.match(tabSource, /className="h-9"/);
+  assert.match(tabSource, /className="h-14 min-h-14 resize-none"/);
+  assert.match(tabSource, /onClick=\{openCreateForm\}/);
+  assert.match(tabSource, /<span>Buscar<\/span>/);
+  assert.doesNotMatch(tabSource, /bodyClassName="max-h-\[72vh\] overflow-y-auto"/);
+  assert.doesNotMatch(
+    tabSource,
+    /<form className="space-y-2" onSubmit=\{handleSubmitPassword\}>[\s\S]*?className="grid gap-3 md:grid-cols-2"/,
+  );
+  assert.doesNotMatch(
+    tabSource,
+    /<form\s+className=\{`\$\{tiCardClassName\} space-y-3`\}\s+onSubmit=\{handleSubmitPassword\}/,
+  );
+});
+
+await runTest("ti password reveal clears sensitive detail cache when hidden", async () => {
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(hookSource, /export function useClearTiPasswordRevealCache/);
+  assert.match(
+    hookSource,
+    /removeQueries\(\{\s*queryKey:\s*tiQueryKeys\.passwords\.detail\(id\),\s*exact:\s*true,?\s*\}\)/,
+  );
+  assert.match(tabSource, /const clearPasswordRevealCache = useClearTiPasswordRevealCache\(\)/);
+  assert.match(tabSource, /clearPasswordRevealCache\(revealPasswordId\)/);
+  assert.match(tabSource, /setRevealPasswordId\(null\)/);
+});
+
+await runTest("ti user selects reuse the paginated assignable users source", async () => {
+  const hookSource = await readAppSource("src/modules/rh/hooks/useAssignableUsers.ts");
+
+  assert.match(hookSource, /listAdminUsers\("active"\)/);
+  assert.doesNotMatch(hookSource, /const page = await userService\.listPage\(\{\s*skip:\s*0,/);
+
+  for (const componentPath of [
+    "components/TiStockTab.tsx",
+    "components/TiPasswordsTab.tsx",
+    "components/TiExtensionsTab.tsx",
+  ]) {
+    const source = await readModuleSource(componentPath);
+
+    assert.match(source, /useAssignableUsers/);
+  }
+});
+
+await runTest("ti extension hooks and tab expose ramal mutations", async () => {
+  const hookSource = await readModuleSource("hooks/useTiExtensions.ts");
+  const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
+
+  for (const mutation of [
+    "useCreateTiExtensionMutation",
+    "useUpdateTiExtensionMutation",
+  ]) {
+    assert.match(hookSource, new RegExp(`export function ${mutation}`));
+    assert.match(tabSource, new RegExp(mutation));
+  }
+
+  assert.match(hookSource, /useMutation/);
+  assert.match(hookSource, /tiQueryKeys\.extensions\.all\(\)/);
+  assert.match(tabSource, /useTiExtensions/);
+  assert.match(tabSource, /useTiExtension/);
+  assert.match(tabSource, /<TiEmptyState/);
+  const sectionHeaderMatch = tabSource.match(/<TiSectionHeader[\s\S]*?\/>/);
+  assert.ok(sectionHeaderMatch);
+  assert.doesNotMatch(sectionHeaderMatch[0], /action=/);
+  assert.match(tabSource, /selectedExtensionId\s*\?\s*\(/);
+  assert.doesNotMatch(tabSource, /Selecione um ramal para ver detalhes\./);
+  assert.match(tabSource, /Criar ramal/);
+  assert.match(tabSource, /placeholder="Ex: 1001"/);
+  assert.doesNotMatch(tabSource, /placeholder="1001"/);
+});
+
 await runTest("ti visible copy stays product-facing and avoids implementation handoff terms", async () => {
   const files = await collectSourceFiles(join(moduleRoot, "components"));
   const offenders = [];

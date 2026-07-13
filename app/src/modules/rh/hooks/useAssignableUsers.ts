@@ -1,31 +1,17 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 
 import { useFetch } from "@shared/hooks";
-import { userService } from "@modules/users";
+import { listAdminUsers, normalizeAdminUserStatus } from "@modules/users";
 
 import { RH_QUERY_KEY } from "./useRhRequests";
 import type { AssignableUser } from "../types";
-
-const ASSIGNABLE_USERS_PAGE_SIZE = 100;
 
 interface UseAssignableUsersOptions {
   enabled?: boolean;
 }
 
-function normalizeAssignableUserStatus(status: string | null | undefined) {
-  if (status === "active" || status === "Ativo") {
-    return "active";
-  }
-
-  if (status === "inactive" || status === "Inativo") {
-    return "inactive";
-  }
-
-  return status ?? null;
-}
-
 export function assignableUsersQueryKey() {
-  return [...RH_QUERY_KEY, "assignable-users", ASSIGNABLE_USERS_PAGE_SIZE] as const;
+  return [...RH_QUERY_KEY, "assignable-users", "active"] as const;
 }
 
 export function useAssignableUsers(
@@ -34,20 +20,15 @@ export function useAssignableUsers(
   return useFetch(
     assignableUsersQueryKey(),
     async () => {
-      const page = await userService.listPage({
-        skip: 0,
-        take: ASSIGNABLE_USERS_PAGE_SIZE,
-      });
+      const users = await listAdminUsers("active");
 
-      return page.users
-        .filter((user) => normalizeAssignableUserStatus(user.status) === "active")
-        .map<AssignableUser>((user) => ({
-          id: user.id,
-          name: user.name,
-          status: normalizeAssignableUserStatus(user.status),
-          departmentName: user.department?.name ?? null,
-          photoUrl: user.photo_url ?? user.photo ?? null,
-        }));
+      return users.map<AssignableUser>((user) => ({
+        id: user.id,
+        name: user.name,
+        status: normalizeAdminUserStatus(user.status),
+        departmentName: user.department?.name ?? null,
+        photoUrl: user.photo_url ?? user.photo ?? null,
+      }));
     },
     {
       enabled: options?.enabled ?? true,

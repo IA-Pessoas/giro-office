@@ -9,6 +9,9 @@ export const tiThinScrollbarClassName =
 export const tiPanelClassName =
   "rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
 
+export const tiCardClassName =
+  "rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900";
+
 export const tiMutedPanelClassName =
   "rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-900/60";
 

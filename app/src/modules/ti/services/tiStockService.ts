@@ -4,14 +4,17 @@ import type {
   TiEnvelope,
   TiId,
   TiListFilters,
-  TiMutationMessage,
   TiStockCategory,
-  TiStockCategoryPayload,
+  TiStockCategoryCreatePayload,
+  TiStockCategoryUpdatePayload,
+  TiStockEntryPayload,
+  TiStockExitPayload,
   TiStockItem,
-  TiStockItemPayload,
+  TiStockItemCreatePayload,
+  TiStockItemUpdatePayload,
   TiStockLocation,
-  TiStockLocationPayload,
-  TiStockMovementPayload,
+  TiStockLocationCreatePayload,
+  TiStockLocationUpdatePayload,
 } from "../types";
 import {
   buildTiListParams,
@@ -22,7 +25,7 @@ import {
 } from "./tiService.contract";
 
 export const tiStockService = {
-  async listItems(filters?: TiListFilters): Promise<TiStockItem[]> {
+  async listStockItems(filters?: TiListFilters): Promise<TiStockItem[]> {
     const response = await api.get(TI_ENDPOINTS.stockItems.list, {
       params: buildTiListParams(filters),
     });
@@ -30,13 +33,13 @@ export const tiStockService = {
     return unwrapTiList<TiStockItem>(response.data);
   },
 
-  async createItem(payload: TiStockItemPayload): Promise<TiStockItem> {
+  async createStockItem(payload: TiStockItemCreatePayload): Promise<TiStockItem> {
     const response = await api.post<TiEnvelope<TiStockItem>>(TI_ENDPOINTS.stockItems.base, payload);
 
     return unwrapTiEnvelope<TiStockItem>(response.data);
   },
 
-  async getItem(id: TiId): Promise<TiStockItem> {
+  async getStockItemById(id: TiId): Promise<TiStockItem> {
     const response = await api.get<TiEnvelope<TiStockItem>>(
       buildTiPath(TI_ENDPOINTS.stockItems.detail, id),
     );
@@ -44,7 +47,7 @@ export const tiStockService = {
     return unwrapTiEnvelope<TiStockItem>(response.data);
   },
 
-  async updateItem(id: TiId, payload: TiStockItemPayload): Promise<TiStockItem> {
+  async updateStockItem(id: TiId, payload: TiStockItemUpdatePayload): Promise<TiStockItem> {
     const response = await api.patch<TiEnvelope<TiStockItem>>(
       buildTiPath(TI_ENDPOINTS.stockItems.detail, id),
       payload,
@@ -53,25 +56,25 @@ export const tiStockService = {
     return unwrapTiEnvelope<TiStockItem>(response.data);
   },
 
-  async createEntry(id: TiId, payload: TiStockMovementPayload): Promise<TiMutationMessage> {
-    const response = await api.post<TiEnvelope<TiMutationMessage>>(
+  async createStockEntry(id: TiId, payload: TiStockEntryPayload): Promise<TiStockItem> {
+    const response = await api.post<TiEnvelope<TiStockItem>>(
       buildTiPath(TI_ENDPOINTS.stockItems.entries, id),
       payload,
     );
 
-    return unwrapTiEnvelope<TiMutationMessage>(response.data);
+    return unwrapTiEnvelope<TiStockItem>(response.data);
   },
 
-  async createExit(id: TiId, payload: TiStockMovementPayload): Promise<TiMutationMessage> {
-    const response = await api.post<TiEnvelope<TiMutationMessage>>(
+  async createStockExit(id: TiId, payload: TiStockExitPayload): Promise<TiStockItem> {
+    const response = await api.post<TiEnvelope<TiStockItem>>(
       buildTiPath(TI_ENDPOINTS.stockItems.exits, id),
       payload,
     );
 
-    return unwrapTiEnvelope<TiMutationMessage>(response.data);
+    return unwrapTiEnvelope<TiStockItem>(response.data);
   },
 
-  async listCategories(filters?: TiListFilters): Promise<TiStockCategory[]> {
+  async listStockCategories(filters?: TiListFilters): Promise<TiStockCategory[]> {
     const response = await api.get(TI_ENDPOINTS.stockCategories.list, {
       params: buildTiListParams(filters),
     });
@@ -79,7 +82,7 @@ export const tiStockService = {
     return unwrapTiList<TiStockCategory>(response.data);
   },
 
-  async createCategory(payload: TiStockCategoryPayload): Promise<TiStockCategory> {
+  async createStockCategory(payload: TiStockCategoryCreatePayload): Promise<TiStockCategory> {
     const response = await api.post<TiEnvelope<TiStockCategory>>(
       TI_ENDPOINTS.stockCategories.base,
       payload,
@@ -88,7 +91,10 @@ export const tiStockService = {
     return unwrapTiEnvelope<TiStockCategory>(response.data);
   },
 
-  async updateCategory(id: TiId, payload: TiStockCategoryPayload): Promise<TiStockCategory> {
+  async updateStockCategory(
+    id: TiId,
+    payload: TiStockCategoryUpdatePayload,
+  ): Promise<TiStockCategory> {
     const response = await api.patch<TiEnvelope<TiStockCategory>>(
       buildTiPath(TI_ENDPOINTS.stockCategories.detail, id),
       payload,
@@ -97,7 +103,7 @@ export const tiStockService = {
     return unwrapTiEnvelope<TiStockCategory>(response.data);
   },
 
-  async listLocations(filters?: TiListFilters): Promise<TiStockLocation[]> {
+  async listStockLocations(filters?: TiListFilters): Promise<TiStockLocation[]> {
     const response = await api.get(TI_ENDPOINTS.stockLocations.list, {
       params: buildTiListParams(filters),
     });
@@ -105,7 +111,7 @@ export const tiStockService = {
     return unwrapTiList<TiStockLocation>(response.data);
   },
 
-  async createLocation(payload: TiStockLocationPayload): Promise<TiStockLocation> {
+  async createStockLocation(payload: TiStockLocationCreatePayload): Promise<TiStockLocation> {
     const response = await api.post<TiEnvelope<TiStockLocation>>(
       TI_ENDPOINTS.stockLocations.base,
       payload,
@@ -114,7 +120,10 @@ export const tiStockService = {
     return unwrapTiEnvelope<TiStockLocation>(response.data);
   },
 
-  async updateLocation(id: TiId, payload: TiStockLocationPayload): Promise<TiStockLocation> {
+  async updateStockLocation(
+    id: TiId,
+    payload: TiStockLocationUpdatePayload,
+  ): Promise<TiStockLocation> {
     const response = await api.patch<TiEnvelope<TiStockLocation>>(
       buildTiPath(TI_ENDPOINTS.stockLocations.detail, id),
       payload,
