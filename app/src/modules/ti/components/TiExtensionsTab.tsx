@@ -330,7 +330,7 @@ export function TiExtensionsTab() {
               <TiTextField
                 label="Número"
                 onChange={(event) => updateExtensionField("number", event.target.value)}
-                placeholder="1001"
+                placeholder="Ex: 1001"
                 value={extensionForm.number}
               />
               <TiNativeSelect
