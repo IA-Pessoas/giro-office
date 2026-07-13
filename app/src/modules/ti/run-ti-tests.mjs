@@ -221,7 +221,7 @@ await runTest("ti stock tab renders operational item, movement, category and loc
     "useCreateTiStockLocationMutation",
     "window.confirm",
     "Entrada",
-    "Saida",
+    "Saída",
     "Categorias",
     "Locais",
   ]) {
@@ -229,6 +229,102 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   }
 
   assert.match(tabSource, /<TiEmptyState/);
+  assert.match(tabSource, /type StockDialogState =/);
+  assert.match(tabSource, /const \[stockDialog, setStockDialog\]/);
+  assert.match(tabSource, /open=\{stockDialog === "item"\}/);
+  assert.match(tabSource, /open=\{stockDialog === "entry"\}/);
+  assert.match(tabSource, /open=\{stockDialog === "exit"\}/);
+  assert.match(tabSource, /open=\{stockDialog === "categories"\}/);
+  assert.match(tabSource, /open=\{stockDialog === "locations"\}/);
+  assert.match(tabSource, /const \[isStockDetailDialogOpen, setIsStockDetailDialogOpen\]/);
+  assert.match(tabSource, /open=\{isStockDetailDialogOpen\}/);
+  assert.match(tabSource, /function openStockDetail\(item: TiStockItem\)/);
+  assert.match(tabSource, /title="Categorias de estoque"/);
+  assert.match(tabSource, /title="Locais de estoque"/);
+  assert.match(tabSource, /aria-label="Operações do estoque"/);
+  assert.match(tabSource, /aria-label="Filtros do estoque"/);
+  assert.match(tabSource, /aria-label="Conteúdo do estoque"/);
+  assert.match(tabSource, /function StockOperationButton/);
+  assert.match(tabSource, /tiCompactButtonClassName/);
+  assert.match(tabSource, /flex items-end md:col-span-2 xl:col-span-1/);
+  assert.match(
+    tabSource,
+    /md:grid-cols-2 xl:grid-cols-\[minmax\(240px,1fr\)_minmax\(150px,180px\)_minmax\(150px,180px\)_minmax\(120px,140px\)_128px\]/,
+  );
+  assert.match(tabSource, /className=\{cn\(tiSecondaryButtonClassName, "w-full"\)\}/);
+  assert.match(tabSource, /grid items-start gap-5/);
+  assert.match(tabSource, /xl:grid-cols-\[minmax\(0,1fr\)_minmax\(280px,360px\)\]/);
+  assert.match(tabSource, /type StockFilterDraft/);
+  assert.match(tabSource, /const \[stockFilterDraft, setStockFilterDraft\]/);
+  assert.match(tabSource, /STOCK_STATUS_FILTER_OPTIONS/);
+  assert.match(tabSource, /categoryFilterOptions/);
+  assert.match(tabSource, /locationFilterOptions/);
+  assert.match(tabSource, /function applyStockFilters/);
+  assert.match(tabSource, /name: toOptionalText\(stockFilterDraft\.name\)/);
+  assert.match(tabSource, /category_id: toOptionalId\(stockFilterDraft\.category_id\)/);
+  assert.match(tabSource, /location_id: toOptionalId\(stockFilterDraft\.location_id\)/);
+  assert.match(tabSource, /status: toOptionalText\(stockFilterDraft\.status\)/);
+  assert.match(tabSource, /label="Categoria"/);
+  assert.match(tabSource, /label="Local"/);
+  assert.match(tabSource, /label="Status"/);
+  assert.match(tabSource, /<span>Buscar<\/span>/);
+  assert.doesNotMatch(tabSource, /Filtrar/);
+  assert.doesNotMatch(tabSource, /searchDraft/);
+  assert.doesNotMatch(tabSource, /applySearchFilter/);
+  assert.doesNotMatch(tabSource, /aria-expanded=\{isStockActionsOpen\}/);
+  assert.doesNotMatch(tabSource, /Item selecionado/);
+  assert.doesNotMatch(tabSource, /Selecione um item para ver detalhes e movimentar saldo/);
+  assert.match(tabSource, /label="Novo item"/);
+  assert.match(tabSource, /onClick=\{openCreateItemDialog\}/);
+  assert.match(tabSource, /label=\{isStockRefreshing \? "Atualizando\.\.\." : "Atualizar"\}/);
+  assert.match(tabSource, /onClick=\{refreshStockWorkspace\}/);
+  assert.match(tabSource, /const selectedListItem = stockItems\.find/);
+  assert.match(tabSource, /const selectedItem = selectedItemQuery\.data \?\? selectedListItem/);
+  assert.match(tabSource, /headers=\{\["Item", "Categoria", "Local", "Saldo", "Status", ""\]\}/);
+  assert.match(tabSource, /Saldo atual/);
+  assert.match(tabSource, /selectedItemQuery\.isError/);
+  assert.match(tabSource, /const \[movementItemId, setMovementItemId\]/);
+  assert.match(tabSource, /stockItemOptions/);
+  assert.match(tabSource, /function closeItemDialog/);
+  assert.match(tabSource, /function closeEntryDialog/);
+  assert.match(tabSource, /function closeExitDialog/);
+  assert.match(tabSource, /function closeCategoryDialog/);
+  assert.match(tabSource, /function closeLocationDialog/);
+  assert.match(tabSource, /openMovementDialog\("entry"\)/);
+  assert.match(tabSource, /openMovementDialog\("exit"\)/);
+  assert.match(tabSource, /setStockDialog\("categories"\)/);
+  assert.match(tabSource, /setStockDialog\("locations"\)/);
+  assert.match(tabSource, /setCategoryName\(""\)/);
+  assert.match(tabSource, /setLocationName\(""\)/);
+  assert.match(tabSource, /stockCategoriesQuery\.refetch\(\)/);
+  assert.match(tabSource, /stockLocationsQuery\.refetch\(\)/);
+  assert.match(tabSource, /disabled=\{!movementItemId \|\| !canEditStock \|\| isMovementSubmitting\}/);
+  assert.doesNotMatch(tabSource, /disabled=\{!selectedItemId\}/);
+  assert.doesNotMatch(tabSource, /Ações do estoque/);
+  assert.doesNotMatch(tabSource, /Movimentação/);
+  assert.doesNotMatch(tabSource, /Cadastros/);
+  assert.doesNotMatch(tabSource, /border-t border-slate-200/);
+  assert.doesNotMatch(tabSource, /lg:grid-cols-\[minmax\(220px,1\.4fr\)_/);
+  assert.doesNotMatch(tabSource, /2xl:grid-cols-\[minmax\(220px,1\.4fr\)_/);
+  assert.doesNotMatch(
+    tabSource,
+    /xl:grid-cols-\[minmax\(0,1\.35fr\)_minmax\(360px,0\.65fr\)\]/,
+  );
+  assert.doesNotMatch(tabSource, /STOCK_WORKSPACE_ACTIONS/);
+  assert.doesNotMatch(
+    tabSource,
+    /<div className="grid gap-5 xl:grid-cols-2">[\s\S]*onSubmit=\{handleSubmitEntry\}[\s\S]*onSubmit=\{handleSubmitExit\}/,
+  );
+
+  const filtersIndex = tabSource.indexOf('aria-label="Filtros do estoque"');
+  const contentIndex = tabSource.indexOf('aria-label="Conteúdo do estoque"');
+  const emptyStateIndex = tabSource.indexOf('title="Nenhum item em estoque"');
+  const operationPanelIndex = tabSource.indexOf('aria-label="Operações do estoque"');
+  assert.ok(filtersIndex > 0);
+  assert.ok(contentIndex > filtersIndex);
+  assert.ok(emptyStateIndex > contentIndex);
+  assert.ok(operationPanelIndex > emptyStateIndex);
+  assert.ok(operationPanelIndex > 0);
 });
 
 await runTest("ti stock passwords and extensions reuse shared card and table controls", async () => {
@@ -353,6 +449,8 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(tabSource, /selectedExtensionId\s*\?\s*\(/);
   assert.doesNotMatch(tabSource, /Selecione um ramal para ver detalhes\./);
   assert.match(tabSource, /Criar ramal/);
+  assert.match(tabSource, /placeholder="Ex: 1001"/);
+  assert.doesNotMatch(tabSource, /placeholder="1001"/);
 });
 
 await runTest("ti visible copy stays product-facing and avoids implementation handoff terms", async () => {
