@@ -288,8 +288,7 @@ export function TiRequestsTab() {
   const [messageDraft, setMessageDraft] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const requestFilters = useMemo(() => filters, [filters]);
-  const requestsQuery = useTiRequests(requestFilters);
+  const requestsQuery = useTiRequests(filters);
   const categoriesQuery = useTiRequestCategories();
   const requests = requestsQuery.data ?? [];
   const selectedRequest = requests.find((request) => request.id === selectedRequestId);

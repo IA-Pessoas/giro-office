@@ -23,7 +23,6 @@ import type {
   TiExtensionCreatePayload,
   TiExtensionUpdatePayload,
   TiId,
-  TiListFilters,
 } from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
@@ -97,14 +96,13 @@ function buildExtensionFormState(item?: TiExtension | null): ExtensionFormState 
 export function TiExtensionsTab() {
   const { access } = useModuleAccess("ti");
   const canManageExtensions = access.canEdit || access.isAdmin;
-  const [filters] = useState<TiListFilters>({});
   const [selectedExtensionId, setSelectedExtensionId] = useState<TiId | undefined>();
   const [editingExtension, setEditingExtension] = useState<TiExtension | null>(null);
   const [extensionForm, setExtensionForm] = useState<ExtensionFormState>(
     initialExtensionFormState,
   );
 
-  const extensionsQuery = useTiExtensions(filters);
+  const extensionsQuery = useTiExtensions();
   const selectedExtensionQuery = useTiExtension(selectedExtensionId, {
     enabled: Boolean(selectedExtensionId),
   });

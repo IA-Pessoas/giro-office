@@ -296,33 +296,3 @@ export function TiInlineNotice({
 
   return <div className={cn("rounded-lg border p-3 text-sm", toneClassName)}>{children}</div>;
 }
-
-export function TiStatusPill({
-  children,
-  tone = "neutral",
-}: {
-  children: ReactNode;
-  tone?: "neutral" | "success" | "warning" | "danger" | "info";
-}) {
-  const toneClassName =
-    tone === "success"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300"
-      : tone === "warning"
-        ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
-        : tone === "danger"
-          ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"
-          : tone === "info"
-            ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300"
-            : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300";
-
-  return (
-    <span
-      className={cn(
-        "inline-flex min-h-7 items-center rounded-full border px-2.5 text-xs font-semibold",
-        toneClassName,
-      )}
-    >
-      {children}
-    </span>
-  );
-}

@@ -4,6 +4,7 @@ import { Boxes, Eye, Pencil, Plus, RotateCcw, Save, Tags, UserPlus, X } from "lu
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
@@ -29,7 +30,6 @@ import {
   TiPanel,
   TiQueryStatePanel,
   TiSectionHeader,
-  TiStatusPill,
   TiTableAction,
   TiTextarea,
   TiTextField,
@@ -39,6 +39,7 @@ import {
   tiDialogSubsectionClassName,
   tiPrimaryButtonClassName,
   tiSecondaryButtonClassName,
+  tiStatusBadgeClassName,
 } from "./tiWorkspaceUi";
 
 type InventoryDialogState =
@@ -119,26 +120,26 @@ function formatStatus(status: unknown): string {
   return getText(status, "Sem status");
 }
 
-function getStatusTone(status: unknown): "neutral" | "success" | "warning" | "danger" | "info" {
+function getStatusBadgeConfig(status: unknown): StatusBadgeConfig {
   const normalized = normalizeStatus(status);
 
   if (normalized === "available" || normalized === "active") {
-    return "success";
+    return { label: formatStatus(status), variant: "success" };
   }
 
   if (normalized === "assigned") {
-    return "info";
+    return { label: formatStatus(status), variant: "info" };
   }
 
   if (normalized === "maintenance") {
-    return "warning";
+    return { label: formatStatus(status), variant: "warning" };
   }
 
   if (normalized === "retired" || normalized === "inactive") {
-    return "neutral";
+    return { label: formatStatus(status), variant: "neutral" };
   }
 
-  return "neutral";
+  return { label: formatStatus(status), variant: "neutral" };
 }
 
 function getCatalogStatus(
@@ -519,9 +520,10 @@ export function TiInventoryTab() {
                     </td>
                     <td className="px-4 py-3">{getAssignedUser(asset)}</td>
                     <td className="px-4 py-3">
-                      <TiStatusPill tone={getStatusTone(asset.status)}>
-                        {formatStatus(asset.status)}
-                      </TiStatusPill>
+                      <StatusBadge
+                        config={getStatusBadgeConfig(asset.status)}
+                        className={tiStatusBadgeClassName}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
@@ -587,9 +589,10 @@ export function TiInventoryTab() {
               <TiFieldLine
                 label="Status"
                 value={
-                  <TiStatusPill tone={getStatusTone(selectedAsset.status)}>
-                    {formatStatus(selectedAsset.status)}
-                  </TiStatusPill>
+                  <StatusBadge
+                    config={getStatusBadgeConfig(selectedAsset.status)}
+                    className={tiStatusBadgeClassName}
+                  />
                 }
               />
               <TiFieldLine label="Marca" value={getText(selectedAsset.brand)} />
@@ -872,14 +875,18 @@ export function TiInventoryTab() {
                       </td>
                       <td className="px-4 py-3">{getText(category.description ?? category.tag)}</td>
                       <td className="px-4 py-3">
-                        <TiStatusPill tone={getStatusTone(getCatalogStatus(category))}>
-                          {formatStatus(getCatalogStatus(category))}
-                        </TiStatusPill>
+                        <StatusBadge
+                          config={getStatusBadgeConfig(getCatalogStatus(category))}
+                          className={tiStatusBadgeClassName}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end">
                           {isEditingCategory ? (
-                            <TiStatusPill tone="info">Em edição</TiStatusPill>
+                            <StatusBadge
+                              config={{ label: "Em edição", variant: "info" }}
+                              className={tiStatusBadgeClassName}
+                            />
                           ) : (
                             <TiTableAction
                               icon={Pencil}

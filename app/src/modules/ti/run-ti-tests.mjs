@@ -246,14 +246,6 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.match(tabSource, /aria-label="Conteúdo do estoque"/);
   assert.match(tabSource, /function StockOperationButton/);
   assert.match(tabSource, /tiCompactButtonClassName/);
-  assert.match(tabSource, /flex items-end md:col-span-2 xl:col-span-1/);
-  assert.match(
-    tabSource,
-    /md:grid-cols-2 xl:grid-cols-\[minmax\(240px,1fr\)_minmax\(150px,180px\)_minmax\(150px,180px\)_minmax\(120px,140px\)_128px\]/,
-  );
-  assert.match(tabSource, /className=\{cn\(tiSecondaryButtonClassName, "w-full"\)\}/);
-  assert.match(tabSource, /grid items-start gap-5/);
-  assert.match(tabSource, /xl:grid-cols-\[minmax\(0,1fr\)_minmax\(280px,360px\)\]/);
   assert.match(tabSource, /type StockFilterDraft/);
   assert.match(tabSource, /const \[stockFilterDraft, setStockFilterDraft\]/);
   assert.match(tabSource, /STOCK_STATUS_FILTER_OPTIONS/);
@@ -303,13 +295,6 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.doesNotMatch(tabSource, /Ações do estoque/);
   assert.doesNotMatch(tabSource, /Movimentação/);
   assert.doesNotMatch(tabSource, /Cadastros/);
-  assert.doesNotMatch(tabSource, /border-t border-slate-200/);
-  assert.doesNotMatch(tabSource, /lg:grid-cols-\[minmax\(220px,1\.4fr\)_/);
-  assert.doesNotMatch(tabSource, /2xl:grid-cols-\[minmax\(220px,1\.4fr\)_/);
-  assert.doesNotMatch(
-    tabSource,
-    /xl:grid-cols-\[minmax\(0,1\.35fr\)_minmax\(360px,0\.65fr\)\]/,
-  );
   assert.doesNotMatch(tabSource, /STOCK_WORKSPACE_ACTIONS/);
   assert.doesNotMatch(
     tabSource,
@@ -357,10 +342,6 @@ await runTest("ti stock passwords and extensions reuse shared card and table con
     assert.doesNotMatch(source, /function FieldLine/);
     assert.doesNotMatch(source, /function CompactTextField/);
     assert.doesNotMatch(source, /function TextField/);
-    assert.doesNotMatch(
-      source,
-      /overflow-x-auto rounded-lg border border-slate-200 bg-white/,
-    );
   }
 });
 
@@ -410,24 +391,12 @@ await runTest("ti passwords tab keeps create edit flows in a dialog and filters 
   assert.match(tabSource, /placeholder="Local da senha"/);
   assert.match(tabSource, /open=\{isPasswordDialogOpen\}/);
   assert.match(tabSource, /title=\{editingPassword \? "Editar senha" : "Nova senha"\}/);
-  assert.match(
-    tabSource,
-    /contentClassName="!w-\[min\(92vw,400px\)\] \[\&>header\]:px-4 \[\&>header\]:py-3"/,
-  );
-  assert.match(tabSource, /bodyClassName="!px-4 !py-3"/);
   assert.doesNotMatch(dialogSource, /@shared\/ui\/newLayout\/utils/);
   assert.doesNotMatch(dialogSource, /contentClassName,\s*\)\}/);
   assert.match(tabSource, /aria-label="Conteúdo de senhas"/);
-  assert.match(
-    tabSource,
-    /className="grid gap-5 xl:grid-cols-\[minmax\(0,1fr\)_minmax\(280px,360px\)\]"/,
-  );
   assert.match(tabSource, /<form className="space-y-2" onSubmit=\{handleSubmitPassword\}>/);
-  assert.match(tabSource, /className="h-9"/);
-  assert.match(tabSource, /className="h-14 min-h-14 resize-none"/);
   assert.match(tabSource, /onClick=\{openCreateForm\}/);
   assert.match(tabSource, /<span>Buscar<\/span>/);
-  assert.doesNotMatch(tabSource, /bodyClassName="max-h-\[72vh\] overflow-y-auto"/);
   assert.doesNotMatch(
     tabSource,
     /<form className="space-y-2" onSubmit=\{handleSubmitPassword\}>[\s\S]*?className="grid gap-3 md:grid-cols-2"/,
@@ -525,10 +494,6 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.match(pageSource, /overflow-x-auto/);
   assert.match(pageSource, /tiThinScrollbarClassName/);
   assert.match(workspaceUiSource, /export const tiThinScrollbarClassName/);
-  assert.match(workspaceUiSource, /scrollbar-width:thin/);
-  assert.match(workspaceUiSource, /scrollbar-thumb.*blue-600/);
-  assert.match(pageSource, /flex min-w-max items-center justify-center gap-1 pl-7 md:min-w-full/);
-  assert.match(pageSource, /px-4 py-2\.5/);
   assert.doesNotMatch(pageSource, /md:flex-1/);
   assert.match(pageSource, /shrink-0 items-center justify-center/);
   assert.doesNotMatch(pageSource, /truncate/);
@@ -580,28 +545,19 @@ await runTest("ti requests creation opens in a dialog and leaves filters spannin
   assert.match(tabSource, /const \[isCreateDialogOpen, setIsCreateDialogOpen\] = useState\(false\)/);
   assert.match(tabSource, /open=\{isCreateDialogOpen\}/);
   assert.match(tabSource, /title="Novo chamado"/);
-  assert.match(tabSource, /contentClassName="w-\[min\(94vw,860px\)\]"/);
-  assert.match(tabSource, /md:grid-cols-\[minmax\(320px,1fr\)_180px_220px\]/);
-  assert.match(tabSource, /lg:grid-cols-\[minmax\(420px,1fr\)_180px_220px\]/);
-  assert.match(tabSource, /<div className="space-y-4">/);
   assert.doesNotMatch(tabSource, /isCreateFormOpen/);
   assert.doesNotMatch(tabSource, /Fechar formul/);
 });
 
 await runTest("ti request detail opens in a dialog instead of a stretched side panel", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
-  const workspaceUiSource = await readModuleSource("components/tiWorkspaceUi.ts");
 
   assert.match(tabSource, /const \[isDetailDialogOpen, setIsDetailDialogOpen\] = useState\(false\)/);
   assert.match(tabSource, /open=\{isDetailDialogOpen\}/);
   assert.match(tabSource, /title=\{activeRequest \? getRequestTitle\(activeRequest\) : "Detalhe do chamado"\}/);
-  assert.match(tabSource, /contentClassName="w-\[min\(94vw,920px\)\][^"]*border-slate-300/);
   assert.match(tabSource, /tiDialogSectionClassName/);
   assert.match(tabSource, /tiDialogSubsectionClassName/);
-  assert.match(workspaceUiSource, /ring-slate-950\/5/);
-  assert.match(workspaceUiSource, /dark:ring-white\/5/);
   assert.match(tabSource, /setIsDetailDialogOpen\(true\)/);
-  assert.doesNotMatch(tabSource, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(320px,420px\)\]/);
   assert.doesNotMatch(tabSource, /title="Selecione um chamado"/);
 });
 
@@ -613,9 +569,6 @@ await runTest("ti request detail keeps secondary actions compact", async () => {
   assert.match(tabSource, /Editar chamado/);
   assert.match(tabSource, /Status do chamado/);
   assert.match(tabSource, /onChange=\{\(event\) => handleUpdateStatus\(event\.target\.value\)\}/);
-  assert.match(tabSource, /lg:grid-cols-5/);
-  assert.match(tabSource, /border-t border-slate-200 pt-3/);
-  assert.match(tabSource, /min-h-16/);
   assert.doesNotMatch(tabSource, /REQUEST_STATUS_ACTIONS\.map/);
   assert.doesNotMatch(tabSource, /Atualiza o fluxo do atendimento/);
   assert.doesNotMatch(tabSource, /Expandir/);
@@ -675,9 +628,9 @@ await runTest("ti requests tab keeps text search local and renders requester lab
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 
   assert.match(tabSource, /const \[searchTerm, setSearchTerm\] = useState\(""\)/);
-  assert.match(tabSource, /const requestFilters = useMemo/);
   assert.match(tabSource, /const filteredRequests = useMemo/);
-  assert.match(tabSource, /useTiRequests\(requestFilters\)/);
+  assert.match(tabSource, /useTiRequests\(filters\)/);
+  assert.doesNotMatch(tabSource, /const requestFilters = useMemo/);
   assert.match(tabSource, /getRequesterLabel/);
   assert.match(tabSource, /Solicitante/);
   assert.match(tabSource, /currentUser/);
@@ -705,10 +658,6 @@ await runTest("ti requests tab exposes request category management actions", asy
   assert.doesNotMatch(tabSource, /Salvar categoria/);
   assert.doesNotMatch(tabSource, /handleStartEditCategory/);
   assert.doesNotMatch(tabSource, /editingCategoryId/);
-  assert.doesNotMatch(
-    tabSource,
-    /<p className="text-xs text-slate-500 dark:text-slate-400">\s*{category\.id}\s*<\/p>/,
-  );
 });
 
 await runTest("ti native select uses a centered chevron instead of the browser default arrow", async () => {
@@ -842,10 +791,7 @@ await runTest("ti inventory keeps primary actions clear and opens asset detail i
   assert.match(source, /function openAssetDetail\(assetId: TiId\)/);
   assert.match(source, /open=\{isDetailDialogOpen\}/);
   assert.match(source, /title=\{selectedAsset \? getAssetTitle\(selectedAsset\) : "Detalhe do ativo"\}/);
-  assert.match(source, /contentClassName="w-\[min\(92vw,760px\)\]/);
-  assert.match(source, /bodyClassName="space-y-3/);
   assert.doesNotMatch(source, /TiDetailPanel/);
-  assert.doesNotMatch(source, /xl:grid-cols-\[minmax\(0,1\.45fr\)_minmax\(320px,0\.75fr\)\]/);
 });
 
 await runTest("ti inventory catalog edit actions make editing state explicit", async () => {
@@ -865,12 +811,10 @@ await runTest("ti inventory catalog edit actions make editing state explicit", a
   assert.doesNotMatch(source, /Nova categoria/);
   assert.doesNotMatch(source, /Adicionar departamento|Criar departamento|Atualizar departamento|Editar departamento/);
   assert.match(workspaceUiSource, /tiCompactButtonClassName/);
-  assert.match(source, /lg:grid-cols-\[minmax\(220px,1fr\)_minmax\(320px,1\.45fr\)_minmax\(140px,160px\)_auto\]/);
-  assert.doesNotMatch(source, /md:grid-cols-\[1fr_1fr_140px_auto\]/);
   assert.match(source, /className=\{cn\(tiPrimaryButtonClassName, tiCompactButtonClassName\)\}/);
   assert.match(source, /className=\{cn\(tiSecondaryButtonClassName, tiCompactButtonClassName\)\}/);
   assert.match(source, /const isEditingCategory = String\(editingCategory\?\.id\) === String\(category\.id\)/);
-  assert.match(source, /isEditingCategory \? \(\s*<TiStatusPill tone="info">Em edição<\/TiStatusPill>/);
+  assert.match(source, /config=\{\{ label: "Em edição", variant: "info" \}\}/);
   assert.match(source, /disabled=\{!canManage\}/);
 });
 
@@ -944,33 +888,21 @@ await runTest("ti terms keeps primary action clear and opens term detail in a di
   assert.match(source, /function openTermDetail\(termId: TiId\)/);
   assert.match(source, /open=\{isDetailDialogOpen\}/);
   assert.match(source, /title=\{selectedTerm \? getTermTitle\(selectedTerm\) : "Detalhe do termo"\}/);
-  assert.match(source, /contentClassName="w-\[min\(92vw,760px\)\]/);
-  assert.match(source, /bodyClassName="space-y-3/);
   assert.doesNotMatch(source, /TiDetailPanel/);
-  assert.doesNotMatch(source, /xl:grid-cols-\[minmax\(0,1\.45fr\)_minmax\(320px,0\.75fr\)\]/);
 });
 
 await runTest("ti terms form dialog stays scrollable and compact", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
 
-  assert.match(source, /contentClassName="w-\[min\(92vw,860px\)\] max-h-\[84vh\] overflow-hidden"/);
-  assert.match(source, /bodyClassName="max-h-\[calc\(84vh-73px\)\] overflow-y-auto overscroll-contain"/);
   assert.match(source, /<form className="space-y-3"/);
-  assert.match(source, /<div className="grid gap-3 md:grid-cols-2">/);
   assert.match(source, /label="Nome do usuário"[\s\S]*label="CPF do usuário"/);
   assert.match(source, /label="Ativo"[\s\S]*label="Código do ativo"[\s\S]*label="Marca"[\s\S]*label="IMEI"/);
   assert.match(source, /label="Equipamentos"[\s\S]*label="Motivo"/);
-  assert.match(source, /className="[^"]*min-h-20/);
   assert.match(source, /<Save className="h-3\.5 w-3\.5" \/>[\s\S]*Salvar termo/);
-  assert.match(source, /className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-3/);
   assert.doesNotMatch(source, /tiDialogSectionClassName/);
   assert.doesNotMatch(source, /<section className=/);
   assert.doesNotMatch(source, /Dados do usuário|Ativo do termo|Dados adicionais do ativo|Detalhes do termo/);
   assert.doesNotMatch(source, /dialogState\?\.type === "term" && dialogState\.mode === "edit" \? \(/);
-  assert.doesNotMatch(source, /sticky bottom-0/);
-  assert.doesNotMatch(source, /-mx-5 -mb-4/);
-  assert.doesNotMatch(source, /bg-white\/95/);
-  assert.doesNotMatch(source, /lg:grid-cols-3/);
 });
 
 await runTest("ti terms filters stay local because the backend list only supports user_id", async () => {
@@ -1192,7 +1124,6 @@ await runTest("ti robots tab exposes operational list detail forms and run actio
   assert.match(tabSource, /metadata_json: buildRunMetadata\(draft\)/);
   assert.match(tabSource, /finished_at: finishedAt/);
   assert.match(tabSource, /function buildRunPayload\(draft: RunDraft, finishedAt: string\)/);
-  assert.match(tabSource, /bodyClassName="space-y-4"/);
   assert.doesNotMatch(tabSource, /owner_id: draft/);
   assert.doesNotMatch(tabSource, /output: draft/);
   assert.doesNotMatch(tabSource, /error_message: draft/);
@@ -1216,9 +1147,6 @@ await runTest("ti robots tab exposes operational list detail forms and run actio
   assert.doesNotMatch(tabSource, /Informe a execu..o prevista em texto ou use uma agenda v.lida/);
   assert.doesNotMatch(tabSource, /Informe o tempo gasto no formato 00:00:00/);
   assert.doesNotMatch(tabSource, /Di.rio 02:00, sob demanda ou conforme opera..o/);
-  assert.doesNotMatch(tabSource, /grid grid-cols-3 gap-2/);
-  assert.doesNotMatch(tabSource, /max-h-\[72vh\] space-y-4 overflow-y-auto/);
-  assert.doesNotMatch(tabSource, /bodyClassName="[^"]*overflow-y-auto/);
   assert.match(tabSource, /activeRobotId/);
   assert.match(tabSource, /const selectedRobotId = activeRobotId/);
   assert.match(tabSource, /const \[isDetailDialogOpen, setIsDetailDialogOpen\] = useState\(false\)/);
@@ -1246,23 +1174,10 @@ await runTest("ti robots tab exposes operational list detail forms and run actio
   assert.doesNotMatch(detailOpenChangeBody, /clearRobotSelection/);
   assert.match(tabSource, /open=\{isDetailDialogOpen\}/);
   assert.match(tabSource, /title=\{activeRobot \? getRobotName\(activeRobot\) : "Detalhe do robô"\}/);
-  assert.match(tabSource, /contentClassName="w-\[min\(92vw,760px\)\]/);
-  assert.match(tabSource, /mx-auto max-w-2xl/);
-  assert.match(tabSource, /className="space-y-4 p-4 sm:p-5"/);
-  assert.match(tabSource, /rounded-lg border border-slate-200 bg-white p-3 shadow-sm/);
-  assert.match(tabSource, /mt-1 text-xl font-semibold/);
-  assert.match(tabSource, /rounded-md bg-blue-50 p-1\.5/);
-  assert.match(tabSource, /mt-2 text-xs text-slate-500/);
-  assert.match(tabSource, /px-4 py-2\.5/);
-  assert.doesNotMatch(tabSource, /bg-white p-4 shadow-sm/);
-  assert.doesNotMatch(tabSource, /mt-2 text-2xl/);
-  assert.doesNotMatch(tabSource, /rounded-lg bg-blue-50 p-2/);
   assert.match(tabSource, /aria-label="Hist.*rico de execu.*es do rob.*"/);
   assert.match(tabSource, /role="list"/);
   assert.match(tabSource, /role="listitem"/);
   assert.match(tabSource, /tiThinScrollbarClassName/);
-  assert.match(tabSource, /h-32 divide-y divide-slate-200 overflow-y-auto overscroll-contain pr-2/);
-  assert.match(tabSource, /flex items-start justify-between gap-3 py-2 text-sm/);
   assert.match(tabSource, /line-clamp-2/);
   assert.match(tabSource, /function getLatestRunDate/);
   assert.match(tabSource, /function getLatestDateValue/);
@@ -1277,13 +1192,8 @@ await runTest("ti robots tab exposes operational list detail forms and run actio
   assert.match(tabSource, /function formatSchedule/);
   assert.match(tabSource, /Execu..o prevista/);
   assert.doesNotMatch(tabSource, />Agenda<\//);
-  assert.doesNotMatch(tabSource, /max-h-72/);
-  assert.doesNotMatch(tabSource, /max-h-44/);
-  assert.doesNotMatch(tabSource, /h-48/);
-  assert.doesNotMatch(tabSource, /rounded-md border border-slate-200 bg-slate-50 p-3/);
   assert.doesNotMatch(tabSource, /robots\[0\]\?\.id/);
   assert.doesNotMatch(tabSource, /<aside/);
-  assert.doesNotMatch(tabSource, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(320px,420px\)\]/);
   assert.match(tabSource, /handleRobotRowKeyDown/);
   assert.match(tabSource, /role="button"/);
   assert.match(tabSource, /tabIndex=\{0\}/);

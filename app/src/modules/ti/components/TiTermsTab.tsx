@@ -4,6 +4,7 @@ import { Eye, FileCheck2, Pencil, Plus, Printer, Save, Signature, X } from "luci
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
@@ -26,7 +27,6 @@ import {
   TiPanel,
   TiQueryStatePanel,
   TiSectionHeader,
-  TiStatusPill,
   TiTableAction,
   TiTextarea,
   TiTextField,
@@ -35,6 +35,7 @@ import {
   tiCompactButtonClassName,
   tiPrimaryButtonClassName,
   tiSecondaryButtonClassName,
+  tiStatusBadgeClassName,
 } from "./tiWorkspaceUi";
 
 type TermsDialogState =
@@ -84,18 +85,18 @@ function formatStatus(status: unknown): string {
   return getText(status, "Sem status");
 }
 
-function getStatusTone(status: unknown): "neutral" | "success" | "warning" | "danger" | "info" {
+function getStatusBadgeConfig(status: unknown): StatusBadgeConfig {
   const normalized = normalizeStatus(status);
 
   if (normalized === "signed") {
-    return "success";
+    return { label: formatStatus(status), variant: "success" };
   }
 
   if (normalized === "pending") {
-    return "warning";
+    return { label: formatStatus(status), variant: "warning" };
   }
 
-  return "neutral";
+  return { label: formatStatus(status), variant: "neutral" };
 }
 
 function formatDate(value: unknown): string {
@@ -545,9 +546,10 @@ export function TiTermsTab() {
                       <td className="px-4 py-3">{getTermUser(term)}</td>
                       <td className="px-4 py-3">{formatDate(term.date)}</td>
                       <td className="px-4 py-3">
-                        <TiStatusPill tone={getStatusTone(termStatusValue)}>
-                          {formatStatus(termStatusValue)}
-                        </TiStatusPill>
+                        <StatusBadge
+                          config={getStatusBadgeConfig(termStatusValue)}
+                          className={tiStatusBadgeClassName}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
@@ -628,9 +630,10 @@ export function TiTermsTab() {
                 <TiFieldLine
                   label="Status"
                   value={
-                    <TiStatusPill tone={getStatusTone(getTermStatus(selectedTerm))}>
-                      {formatStatus(getTermStatus(selectedTerm))}
-                    </TiStatusPill>
+                    <StatusBadge
+                      config={getStatusBadgeConfig(getTermStatus(selectedTerm))}
+                      className={tiStatusBadgeClassName}
+                    />
                   }
                 />
                 <TiFieldLine label="Motivo" value={getText(selectedTerm.reason)} />
