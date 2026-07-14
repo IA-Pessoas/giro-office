@@ -88,4 +88,9 @@ export interface ForwardedAuditAuthContext {
   userId: string;
   organizationId: string;
   permission?: number;
+  authKind?: "organization" | "platform";
+  platformRole?: "super_admin";
+  supportMode?: boolean;
+  supportSessionId?: string;
+  supportOrganizationId?: string;
 }
