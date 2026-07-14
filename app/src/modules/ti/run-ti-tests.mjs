@@ -87,6 +87,7 @@ await runTest("ti endpoints stay centralized in the frontend contract", async ()
     "/ti/stock/items/{id}",
     "/ti/stock/items/{id}/entries",
     "/ti/stock/items/{id}/exits",
+    "/ti/stock/items/{id}/movements/list",
     "/ti/stock/categories/list",
     "/ti/stock/categories",
     "/ti/stock/categories/{id}",
@@ -178,6 +179,7 @@ await runTest("ti stock hooks expose mutations and invalidate stock plus dashboa
     "updateStockItem",
     "createStockEntry",
     "createStockExit",
+    "listStockItemMovements",
     "listStockCategories",
     "createStockCategory",
     "updateStockCategory",
@@ -193,6 +195,7 @@ await runTest("ti stock hooks expose mutations and invalidate stock plus dashboa
     "useUpdateTiStockItemMutation",
     "useCreateTiStockEntryMutation",
     "useCreateTiStockExitMutation",
+    "useTiStockItemMovements",
     "useCreateTiStockCategoryMutation",
     "useUpdateTiStockCategoryMutation",
     "useCreateTiStockLocationMutation",
@@ -213,6 +216,7 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   for (const token of [
     "useTiStockItems",
     "useTiStockItem",
+    "useTiStockItemMovements",
     "useCreateTiStockItemMutation",
     "useUpdateTiStockItemMutation",
     "useCreateTiStockEntryMutation",
@@ -274,6 +278,8 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.match(tabSource, /const selectedItem = selectedItemQuery\.data \?\? selectedListItem/);
   assert.match(tabSource, /headers=\{\["Item", "Categoria", "Local", "Saldo", "Status", ""\]\}/);
   assert.match(tabSource, /Saldo atual/);
+  assert.match(tabSource, /Movimentacoes/);
+  assert.match(tabSource, /stockMovementsQuery/);
   assert.match(tabSource, /selectedItemQuery\.isError/);
   assert.match(tabSource, /const \[movementItemId, setMovementItemId\]/);
   assert.match(tabSource, /stockItemOptions/);

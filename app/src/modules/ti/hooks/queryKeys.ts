@@ -37,6 +37,7 @@ export const tiQueryKeys = {
     all: () => [...tiQueryKeys.all, "stock"] as const,
     items: (filters?: TiListFilters) => [...tiQueryKeys.stock.all(), "items", filters ?? {}] as const,
     item: (id?: TiId) => [...tiQueryKeys.stock.all(), "item", id] as const,
+    movements: (id?: TiId) => [...tiQueryKeys.stock.item(id), "movements"] as const,
     categories: (filters?: TiListFilters) =>
       [...tiQueryKeys.stock.all(), "categories", filters ?? {}] as const,
     locations: (filters?: TiListFilters) =>

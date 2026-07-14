@@ -54,6 +54,7 @@ export const TI_ENDPOINTS = {
     detail: "/ti/stock/items/{id}",
     entries: "/ti/stock/items/{id}/entries",
     exits: "/ti/stock/items/{id}/exits",
+    movements: "/ti/stock/items/{id}/movements/list",
   },
   stockCategories: {
     list: "/ti/stock/categories/list",

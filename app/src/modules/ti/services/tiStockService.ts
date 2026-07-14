@@ -15,6 +15,7 @@ import type {
   TiStockLocation,
   TiStockLocationCreatePayload,
   TiStockLocationUpdatePayload,
+  TiStockMovement,
 } from "../types";
 import {
   buildTiListParams,
@@ -72,6 +73,14 @@ export const tiStockService = {
     );
 
     return unwrapTiEnvelope<TiStockItem>(response.data);
+  },
+
+  async listStockItemMovements(id: TiId): Promise<TiStockMovement[]> {
+    const response = await api.get<TiEnvelope<TiStockMovement[]>>(
+      buildTiPath(TI_ENDPOINTS.stockItems.movements, id),
+    );
+
+    return unwrapTiList<TiStockMovement>(response.data);
   },
 
   async listStockCategories(filters?: TiListFilters): Promise<TiStockCategory[]> {

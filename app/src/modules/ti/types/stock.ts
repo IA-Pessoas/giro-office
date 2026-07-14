@@ -63,6 +63,25 @@ export interface TiStockExitPayload {
   exit_date?: string;
 }
 
+export interface TiStockMovement {
+  id: TiId;
+  type: "entry" | "exit";
+  quantity: number;
+  created_at: string;
+  item_id: TiId;
+  requester_id: TiId | null;
+  requester_name: string | null;
+  approver_id: TiId | null;
+  approver_name: string | null;
+  operator_id: TiId | null;
+  operator_name: string | null;
+  destination: string | null;
+  location_destination_id: TiId | null;
+  location_destination_name: string | null;
+  balance_before: number | null;
+  balance_after: number | null;
+}
+
 export interface TiStockCategoryCreatePayload {
   name: string;
 }

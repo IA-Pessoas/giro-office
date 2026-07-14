@@ -23,6 +23,7 @@ import type {
   TiStockLocation,
   TiStockLocationCreatePayload,
   TiStockLocationUpdatePayload,
+  TiStockMovement,
 } from "../types";
 import { tiQueryKeys } from "./queryKeys";
 
@@ -79,6 +80,20 @@ export function useTiStockItem(
     ...options,
     enabled: Boolean(id) && options?.enabled !== false,
   });
+}
+
+export function useTiStockItemMovements(
+  id?: TiId,
+  options?: TiReadQueryOptions,
+): UseQueryResult<TiStockMovement[], Error> {
+  return useFetch(
+    tiQueryKeys.stock.movements(id),
+    () => tiStockService.listStockItemMovements(id as TiId),
+    {
+      ...options,
+      enabled: Boolean(id) && options?.enabled !== false,
+    },
+  );
 }
 
 export function useTiStockCategories(

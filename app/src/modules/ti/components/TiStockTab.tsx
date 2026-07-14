@@ -33,6 +33,7 @@ import {
   useCreateTiStockLocationMutation,
   useTiStockCategories,
   useTiStockItem,
+  useTiStockItemMovements,
   useTiStockItems,
   useTiStockLocations,
   useUpdateTiStockItemMutation,
@@ -45,6 +46,7 @@ import type {
   TiStockItemCreatePayload,
   TiStockItemUpdatePayload,
   TiStockLocation,
+  TiStockMovement,
 } from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
@@ -139,6 +141,26 @@ function formatQuantity(value: unknown): string {
   }
 
   return formatText(value);
+}
+
+function formatDateTime(value: unknown): string {
+  const date = typeof value === "string" || value instanceof Date ? new Date(value) : null;
+
+  if (!date || Number.isNaN(date.getTime())) {
+    return formatText(value);
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function getMovementActor(movement: TiStockMovement): string {
+  return formatText(
+    movement.type === "entry" ? movement.operator_name : movement.requester_name,
+    "Responsável não informado",
+  );
 }
 
 function formatStatus(value: unknown): StatusBadgeConfig {
@@ -269,6 +291,9 @@ export function TiStockTab() {
 
   const stockItemsQuery = useTiStockItems(filters);
   const selectedItemQuery = useTiStockItem(selectedItemId, { enabled: Boolean(selectedItemId) });
+  const stockMovementsQuery = useTiStockItemMovements(selectedItemId, {
+    enabled: Boolean(selectedItemId && isStockDetailDialogOpen),
+  });
   const stockCategoriesQuery = useTiStockCategories();
   const stockLocationsQuery = useTiStockLocations();
   const assignableUsersQuery = useAssignableUsers({ enabled: canEditStock });
@@ -286,6 +311,7 @@ export function TiStockTab() {
   const users = assignableUsersQuery.data ?? [];
   const selectedListItem = stockItems.find((item) => getId(item.id) === getId(selectedItemId));
   const selectedItem = selectedItemQuery.data ?? selectedListItem;
+  const stockMovements = stockMovementsQuery.data ?? [];
   const isItemSubmitting = createItemMutation.isPending || updateItemMutation.isPending;
   const isMovementSubmitting = createEntryMutation.isPending || createExitMutation.isPending;
   const isStockRefreshing =
@@ -458,6 +484,10 @@ export function TiStockTab() {
 
     if (selectedItemId) {
       void selectedItemQuery.refetch();
+
+      if (isStockDetailDialogOpen) {
+        void stockMovementsQuery.refetch();
+      }
     }
 
     if (canEditStock) {
@@ -948,6 +978,68 @@ export function TiStockTab() {
                 />
               ) : null}
             </div>
+            <section className={tiDialogSubsectionClassName} aria-label="Movimentacoes do estoque">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-slate-950 dark:text-white">
+                  Movimentações
+                </h3>
+                {stockMovementsQuery.isFetching ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                ) : null}
+              </div>
+
+              {stockMovementsQuery.isError ? (
+                <TiInlineNotice tone="warning">Histórico indisponível no momento.</TiInlineNotice>
+              ) : null}
+
+              {!stockMovementsQuery.isError &&
+              !stockMovementsQuery.isLoading &&
+              stockMovements.length === 0 ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Nenhuma movimentação registrada.
+                </p>
+              ) : null}
+
+              {stockMovements.length > 0 ? (
+                <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                  {stockMovements.map((movement) => {
+                    const MovementIcon = movement.type === "entry" ? LogIn : LogOut;
+                    const destination =
+                      movement.destination ?? movement.location_destination_name ?? null;
+
+                    return (
+                      <div key={getId(movement.id)} className="flex gap-3 py-3 first:pt-0 last:pb-0">
+                        <span
+                          className={cn(
+                            "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                            movement.type === "entry"
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                              : "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300",
+                          )}
+                        >
+                          <MovementIcon className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                              {movement.type === "entry" ? "Entrada" : "Saída"} de{" "}
+                              {formatQuantity(movement.quantity)}
+                            </p>
+                            <time className="text-xs text-slate-500 dark:text-slate-400">
+                              {formatDateTime(movement.created_at)}
+                            </time>
+                          </div>
+                          <p className="mt-1 break-words text-xs text-slate-500 dark:text-slate-400">
+                            {getMovementActor(movement)}
+                            {destination ? ` - ${destination}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </section>
           </div>
         ) : null}
       </Dialog>
