@@ -64,6 +64,7 @@ const tiPublicOpenApiOperations = {
   "/ti/terms": ["post"],
   "/ti/terms/{id}": ["get", "patch"],
   "/ti/terms/{id}/sign": ["patch"],
+  "/ti/stock/items/{id}/movements/list": ["get"],
 } as const;
 
 const tiPublicOpenApiPaths = Object.keys(tiPublicOpenApiOperations);
@@ -205,6 +206,22 @@ describe("ti-service app", () => {
         expect(operation.responses).toHaveProperty("401");
       }
     }
+
+    expect(
+      response.body.paths["/ti/stock/items/{id}/movements/list"].get.responses["200"].content[
+        "application/json"
+      ].schema,
+    ).toMatchObject({
+      type: "object",
+      required: ["success", "data"],
+      properties: {
+        success: { type: "boolean", enum: [true] },
+        data: {
+          type: "array",
+          items: { $ref: "#/components/schemas/TiStockMovement" },
+        },
+      },
+    });
   });
 });
 

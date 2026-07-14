@@ -33,10 +33,21 @@ const errorDescriptions: Record<number, string> = {
   409: "Conflito de dominio",
 };
 
-function successResponse(description: string): OpenApiResponse {
+function successResponse(description: string, schema?: OpenApiSchema): OpenApiResponse {
+  if (!schema) {
+    return {
+      description,
+      content: jsonEnvelopeContent,
+    };
+  }
+
   return {
     description,
-    content: jsonEnvelopeContent,
+    content: {
+      "application/json": {
+        schema,
+      },
+    },
   };
 }
 
@@ -138,6 +149,7 @@ function publicTiOperation({
   parameters,
   requestBody,
   successStatus = 200,
+  successSchema,
   successDescription,
   errors,
 }: {
@@ -147,6 +159,7 @@ function publicTiOperation({
   parameters?: OpenApiParameter[];
   requestBody?: Record<string, unknown>;
   successStatus?: 200 | 201;
+  successSchema?: OpenApiSchema;
   successDescription: string;
   errors: number[];
 }): OpenApiOperation {
@@ -158,7 +171,7 @@ function publicTiOperation({
     ...(parameters ? { parameters } : {}),
     ...(requestBody ? { requestBody } : {}),
     responses: {
-      [String(successStatus)]: successResponse(successDescription),
+      [String(successStatus)]: successResponse(successDescription, successSchema),
       ...errorResponses(errors),
     },
   };
@@ -473,6 +486,46 @@ const schemas: Record<string, OpenApiSchema> = {
       operator_id: { type: "string", format: "uuid" },
       location_destination_id: { type: "string", format: "uuid" },
       exit_date: { type: "string", format: "date-time" },
+    },
+    additionalProperties: false,
+  },
+  TiStockMovement: {
+    type: "object",
+    required: [
+      "id",
+      "type",
+      "quantity",
+      "created_at",
+      "item_id",
+      "requester_id",
+      "requester_name",
+      "approver_id",
+      "approver_name",
+      "operator_id",
+      "operator_name",
+      "destination",
+      "location_destination_id",
+      "location_destination_name",
+      "balance_before",
+      "balance_after",
+    ],
+    properties: {
+      id: { type: "string", format: "uuid" },
+      type: { type: "string", enum: ["entry", "exit"] },
+      quantity: { type: "integer", minimum: 1 },
+      created_at: { type: "string", format: "date-time" },
+      item_id: { type: "string", format: "uuid" },
+      requester_id: { type: "string", format: "uuid", nullable: true },
+      requester_name: { type: "string", nullable: true },
+      approver_id: { type: "string", format: "uuid", nullable: true },
+      approver_name: { type: "string", nullable: true },
+      operator_id: { type: "string", format: "uuid", nullable: true },
+      operator_name: { type: "string", nullable: true },
+      destination: { type: "string", nullable: true },
+      location_destination_id: { type: "string", format: "uuid", nullable: true },
+      location_destination_name: { type: "string", nullable: true },
+      balance_before: { type: "integer", nullable: true },
+      balance_after: { type: "integer", nullable: true },
     },
     additionalProperties: false,
   },
@@ -827,6 +880,28 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Item de estoque de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiStockItemUpdateInput"),
           successDescription: "Item de estoque atualizado",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/stock/items/{id}/movements/list": {
+        get: publicTiOperation({
+          operationId: "listTiStockItemMovements",
+          tags: ["TI Stock"],
+          summary: "Lista historico consolidado de movimentacoes do item de estoque de TI",
+          parameters: [pathIdParameter("Item de estoque de TI")],
+          successSchema: {
+            type: "object",
+            required: ["success", "data"],
+            properties: {
+              success: { type: "boolean", enum: [true] },
+              data: {
+                type: "array",
+                items: { $ref: "#/components/schemas/TiStockMovement" },
+              },
+            },
+            additionalProperties: true,
+          },
+          successDescription: "Movimentacoes de estoque listadas",
           errors: [400, 401, 403, 404],
         }),
       },

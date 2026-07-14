@@ -10,6 +10,7 @@ export function createPrismaMock(): PrismaClient {
   const organizationId = "10000000-0000-4000-8000-000000000001";
   const departmentId = "50000000-0000-4000-8000-000000000001";
   const stockId = "80000000-0000-4000-8000-000000000001";
+  const userId = "00000000-0000-4000-8000-000000000001";
   const robotId = "90000000-0000-4000-8000-000000000001";
   let stockQuantity = 5;
   const stockTransaction = {
@@ -194,9 +195,54 @@ export function createPrismaMock(): PrismaClient {
     },
     entryStock: {
       create: vi.fn(async ({ data }) => ({ id: "entry-1", ...data })),
+      findMany: vi.fn(async ({ where }) => {
+        if (where.stock_id !== stockId || where.organization_id !== organizationId) {
+          return [];
+        }
+
+        return [
+          {
+            id: "entry-1",
+            stock_id: stockId,
+            quantity: 2,
+            entry_date: new Date("2026-07-13T12:00:00.000Z"),
+            entry_by_user_id: userId,
+            entry_by_user: {
+              id: userId,
+              name: "Usuario TI",
+            },
+          },
+        ];
+      }),
     },
     exitStock: {
       create: vi.fn(async ({ data }) => ({ id: "exit-1", ...data })),
+      findMany: vi.fn(async ({ where }) => {
+        if (where.stock_id !== stockId || where.organization_id !== organizationId) {
+          return [];
+        }
+
+        return [
+          {
+            id: "exit-1",
+            stock_id: stockId,
+            quantity: 1,
+            destination: "Smoke TI stock exit.",
+            exit_date: new Date("2026-07-13T13:00:00.000Z"),
+            requester_id: userId,
+            approver_id: null,
+            operator_id: null,
+            location_destination_id: null,
+            requester: {
+              id: userId,
+              name: "Usuario TI",
+            },
+            approver: null,
+            operator: null,
+            loc_dest: null,
+          },
+        ];
+      }),
     },
     $transaction: vi.fn(async (callback) => callback(stockTransaction)),
     inventoryCategoryTecnologia: {
