@@ -918,7 +918,7 @@ export function TiStockTab() {
         title={selectedItem ? formatText(selectedItem.name, "Detalhe do item") : "Detalhe do item"}
         description="Detalhe cadastral e saldo atual do item."
         contentClassName="w-[min(92vw,720px)]"
-        bodyClassName="space-y-3"
+        bodyClassName="max-h-[72vh] overflow-y-auto space-y-3"
       >
         {selectedItemQuery.isLoading && !selectedItem ? (
           <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
