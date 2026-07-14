@@ -14,6 +14,8 @@ import type { ParcelamentoServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildParcelamentoServiceOpenApiSpec } from "./openapi/spec.js";
 import type { ParcelamentoPrismaClient } from "./prisma/index.js";
+import { createInstallmentRouter } from "./routes/installment.routes.js";
+import { InstallmentService } from "./services/installmentService.js";
 
 function parcelamentoServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const context = request.parcelamentoContext;
@@ -46,7 +48,7 @@ export function createParcelamentoApp({
   auditService,
 }: CreateParcelamentoAppOptions): express.Express {
   const app = express();
-  void auditService;
+  const installmentService = new InstallmentService({ prisma, auditService });
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -81,6 +83,8 @@ export function createParcelamentoApp({
       siteTitle: "Parcelamento Service - OpenAPI",
     });
   }
+
+  app.use("/parcelamento/installments", createInstallmentRouter({ installmentService }));
 
   app.use(
     createExpressErrorHandler({
