@@ -1,8 +1,7 @@
-import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { DepartamentoPessoal } from "../../shared/components/newLayout/DepartamentoPessoal";
+import { PessoalShell } from "@modules/pessoal";
 
 export default function DepartamentoPessoalPage() {
   return (
@@ -10,7 +9,7 @@ export default function DepartamentoPessoalPage() {
       <Head>
         <title>Departamento Pessoal</title>
       </Head>
-      <DepartamentoPessoal />
+      <PessoalShell />
     </>
   );
 }
