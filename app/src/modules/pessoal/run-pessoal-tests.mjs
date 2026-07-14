@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   PESSOAL_ENDPOINTS,
@@ -64,6 +65,13 @@ runTest("pessoal query keys include domain and optional params", () => {
     "payroll",
     "client-1",
   ]);
+});
+
+runTest("departamento pessoal page uses the pessoal module instead of the old mock", () => {
+  const page = readFileSync("src/pages/departamento-pessoal/index.tsx", "utf8");
+
+  assert.match(page, /@modules\/pessoal/);
+  assert.doesNotMatch(page, /shared\/components\/newLayout\/DepartamentoPessoal/);
 });
 
 console.log("pessoal contract tests passed");
