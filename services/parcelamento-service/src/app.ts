@@ -15,6 +15,11 @@ import { requestContext } from "./middlewares/requestContext.js";
 import { buildParcelamentoServiceOpenApiSpec } from "./openapi/spec.js";
 import type { ParcelamentoPrismaClient } from "./prisma/index.js";
 import { createInstallmentRouter } from "./routes/installment.routes.js";
+import {
+  createInstallmentCompetencyCollectionRouter,
+  createInstallmentCompetencyItemRouter,
+} from "./routes/installmentCompetency.routes.js";
+import { InstallmentCompetencyService } from "./services/installmentCompetencyService.js";
 import { InstallmentService } from "./services/installmentService.js";
 
 function parcelamentoServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -49,6 +54,11 @@ export function createParcelamentoApp({
 }: CreateParcelamentoAppOptions): express.Express {
   const app = express();
   const installmentService = new InstallmentService({ prisma, auditService });
+  const competencyService = new InstallmentCompetencyService({
+    prisma,
+    installmentService,
+    auditService,
+  });
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -84,7 +94,15 @@ export function createParcelamentoApp({
     });
   }
 
+  app.use(
+    "/parcelamento/installments",
+    createInstallmentCompetencyCollectionRouter({ competencyService }),
+  );
   app.use("/parcelamento/installments", createInstallmentRouter({ installmentService }));
+  app.use(
+    "/parcelamento/installment-competencies",
+    createInstallmentCompetencyItemRouter({ competencyService }),
+  );
 
   app.use(
     createExpressErrorHandler({

@@ -11,6 +11,7 @@ export const userId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 export const clientId = "cccccccc-cccc-cccc-cccc-cccccccccccc";
 export const installmentId = "dddddddd-dddd-dddd-dddd-dddddddddddd";
 export const otherInstallmentId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+export const competencyId = "ffffffff-ffff-ffff-ffff-ffffffffffff";
 export const requestId = "request-installment-1";
 
 export const parcelamentoContext: ParcelamentoRequestContext = {
@@ -67,6 +68,41 @@ export function createCreateInstallmentBody(overrides: Record<string, unknown> =
   };
 }
 
+export function createInstallmentCompetencyFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: competencyId,
+    installment_id: installmentId,
+    competence: "2026-07",
+    how_many_paid: 1,
+    how_many_overdue: 0,
+    download: false,
+    download_notes: null,
+    upload_file: false,
+    is_sent: false,
+    submission_type: null,
+    notes: null,
+    installment_amount: 120,
+    organization_id: organizationId,
+    ...overrides,
+  };
+}
+
+export function createCreateInstallmentCompetencyBody(overrides: Record<string, unknown> = {}) {
+  return {
+    competence: "2026-07",
+    how_many_paid: 1,
+    how_many_overdue: 0,
+    download: false,
+    download_notes: "Sem pendencias",
+    upload_file: false,
+    is_sent: false,
+    submission_type: "manual",
+    notes: "Primeira competencia",
+    installment_amount: 120,
+    ...overrides,
+  };
+}
+
 export function createPrismaMock() {
   const fixture = createInstallmentFixture();
 
@@ -83,7 +119,12 @@ export function createPrismaMock() {
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     installmentCompetencies: {
+      count: vi.fn(async () => 1),
+      create: vi.fn(async ({ data }) => createInstallmentCompetencyFixture(data)),
       findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async () => null),
+      update: vi.fn(async ({ data }) => createInstallmentCompetencyFixture(data)),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     $queryRaw: vi.fn(async () => [{ ok: 1 }]),
   };
