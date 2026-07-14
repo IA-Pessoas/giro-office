@@ -87,6 +87,12 @@ generator pessoalServiceClient {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator parcelamentoServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/parcelamento-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -1310,11 +1316,15 @@ model Installment {
   down_payment_installments_count  Int
   legal_nature                     String
   situation_shutdown               String?
+  agreement_number                 String?
   organization_id                  String
   client                           Client                    @relation(fields: [client_id], references: [id])
   organization                     Organization              @relation(fields: [organization_id], references: [id])
   competencies                     InstallmentCompetencies[]
 
+  @@unique([organization_id, agreement_number], map: "parcelamento_installments_org_agreement_number_unique")
+  @@index([organization_id, client_id, type, legal_nature, jurisdiction, enrollment_date], map: "parcelamento_installments_fallback_lookup_idx")
+  @@index([organization_id, status], map: "parcelamento_installments_org_status_idx")
   @@map("parcelamento.installments")
 }
 
@@ -1335,6 +1345,8 @@ model InstallmentCompetencies {
   installment        Installment  @relation(fields: [installment_id], references: [id])
   organization       Organization @relation(fields: [organization_id], references: [id])
 
+  @@unique([organization_id, installment_id, competence], map: "parcelamento_installment_competencies_unique")
+  @@index([organization_id, installment_id], map: "parcelamento_installment_competencies_parent_idx")
   @@map("parcelamento.installmentsCompetencies")
 }
 
@@ -1356,6 +1368,8 @@ model PanoramaParcelameto {
   organization          Organization @relation(fields: [organization_id], references: [id])
   responsavel           User?        @relation("responsavelPanorama", fields: [responsavel_id], references: [id])
 
+  @@unique([organization_id, client_id, competence], map: "parcelamento_panorama_client_competence_unique")
+  @@index([organization_id, competence], map: "parcelamento_panorama_org_competence_idx")
   @@map("parcelamento.panorama")
 }
 
