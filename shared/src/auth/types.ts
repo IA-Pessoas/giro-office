@@ -1,5 +1,7 @@
 export type AuthUserType = "owner" | "admin" | "user";
-export type AuthSpecialPolicy = "manageUsers" | "ownerOnly";
+export type AuthKind = "organization" | "platform";
+export type PlatformRole = "super_admin";
+export type AuthSpecialPolicy = "manageUsers" | "ownerOnly" | "platformOnly";
 
 export interface AuthIdentity {
   user_id: string;
@@ -7,6 +9,11 @@ export interface AuthIdentity {
   permission?: number;
   modules?: Record<string, number | null>;
   type?: AuthUserType;
+  auth_kind?: AuthKind;
+  platform_role?: PlatformRole;
+  support_mode?: boolean;
+  support_session_id?: string;
+  support_organization_id?: string;
   name?: string;
   login?: string;
   [key: string]: unknown;
@@ -17,6 +24,11 @@ export interface AuthContext {
   userId: string;
   organizationId: string;
   claims: AuthIdentity;
+  actorKind: AuthKind;
+  isPlatformAdmin: boolean;
+  isSupportMode: boolean;
+  supportOrganizationId?: string;
+  supportSessionId?: string;
 }
 
 export interface AuthModulePolicy {
