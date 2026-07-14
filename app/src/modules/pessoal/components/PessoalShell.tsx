@@ -16,6 +16,7 @@ import type { PessoalTabId } from "../types";
 import { PessoalClientSelector } from "./PessoalClientSelector";
 import { PessoalOverviewSection } from "./PessoalOverviewSection";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
+import { PessoalUnionsSection } from "./PessoalUnionsSection";
 
 const tabIcons = {
   overview: BarChart3,
@@ -110,6 +111,8 @@ export function PessoalShell() {
 
       {activeTab === "overview" ? (
         <PessoalOverviewSection />
+      ) : activeTab === "unions" ? (
+        <PessoalUnionsSection canEdit={access.canEdit} />
       ) : (
         <PessoalPlaceholderSection
           icon={ActiveIcon}

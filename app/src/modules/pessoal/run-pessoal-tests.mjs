@@ -6,6 +6,7 @@ import {
   PESSOAL_TABS,
   unwrapPessoalEnvelope,
 } from "./services/pessoalService.contract.ts";
+import { buildPessoalUnionPayload } from "./services/pessoalService.ts";
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
 
 function runTest(name, fn) {
@@ -72,6 +73,21 @@ runTest("departamento pessoal page uses the pessoal module instead of the old mo
 
   assert.match(page, /@modules\/pessoal/);
   assert.doesNotMatch(page, /shared\/components\/newLayout\/DepartamentoPessoal/);
+});
+
+runTest("union payload builder keeps backend field names", () => {
+  assert.deepEqual(
+    buildPessoalUnionPayload({
+      name: "Sindicato A",
+      cnpj: "12.345.678/0001-90",
+      base_date: null,
+    }),
+    {
+      name: "Sindicato A",
+      cnpj: "12.345.678/0001-90",
+      base_date: null,
+    },
+  );
 });
 
 console.log("pessoal contract tests passed");
