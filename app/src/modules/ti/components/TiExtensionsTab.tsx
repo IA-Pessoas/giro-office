@@ -38,6 +38,7 @@ import {
 } from "./tiFormControls";
 import {
   tiCardClassName,
+  tiFiveRowTableClassName,
   tiPrimaryButtonClassName,
 } from "./tiWorkspaceUi";
 
@@ -244,10 +245,10 @@ export function TiExtensionsTab() {
           query={extensionsQuery}
         >
           {(rows) => (
-            <TiDataTable headers={["Ramal", "Usuário", ""]}>
+            <TiDataTable className={tiFiveRowTableClassName} headers={["Ramal", "Usuário", ""]}>
               {rows.map((item) => (
                 <tr key={getId(item.id)} className="text-slate-700 dark:text-slate-200">
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-2">
                     <button
                       type="button"
                       className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
@@ -256,8 +257,8 @@ export function TiExtensionsTab() {
                       {formatText(item.number, "Sem número")}
                     </button>
                   </td>
-                  <td className="px-4 py-3">{getExtensionUserName(item)}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-2">{getExtensionUserName(item)}</td>
+                  <td className="px-4 py-2">
                     <div className="flex justify-end gap-1">
                       <TiTableAction
                         icon={PhoneCall}

@@ -230,9 +230,22 @@ export function TiQueryStatePanel<T>({
   );
 }
 
-export function TiDataTable({ children, headers }: { children: ReactNode; headers: string[] }) {
+export function TiDataTable({
+  children,
+  className,
+  headers,
+}: {
+  children: ReactNode;
+  className?: string;
+  headers: string[];
+}) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+    <div
+      className={cn(
+        "overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900",
+        className,
+      )}
+    >
       <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
         <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
           <tr>

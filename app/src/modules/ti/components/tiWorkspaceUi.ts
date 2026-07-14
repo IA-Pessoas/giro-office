@@ -6,6 +6,8 @@ export const tiWorkspaceContentClassName = "mx-auto flex w-full max-w-7xl flex-c
 export const tiThinScrollbarClassName =
   "[scrollbar-color:rgb(71_85_105)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/85 dark:[scrollbar-color:rgb(37_99_235)_transparent] dark:[&::-webkit-scrollbar-thumb]:bg-blue-600/85";
 
+export const tiFiveRowTableClassName = `${tiThinScrollbarClassName} max-h-[280px] overflow-y-auto`;
+
 export const tiPanelClassName =
   "rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
 

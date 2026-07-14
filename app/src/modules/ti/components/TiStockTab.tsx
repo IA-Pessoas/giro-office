@@ -64,8 +64,8 @@ import {
 } from "./tiFormControls";
 import {
   tiCardClassName,
-  tiCompactButtonClassName,
   tiDialogSubsectionClassName,
+  tiFiveRowTableClassName,
   tiSecondaryButtonClassName,
 } from "./tiWorkspaceUi";
 
@@ -817,7 +817,10 @@ export function TiStockTab() {
             query={stockItemsQuery}
           >
             {(items) => (
-              <TiDataTable headers={["Item", "Categoria", "Local", "Saldo", "Status", ""]}>
+              <TiDataTable
+                className={tiFiveRowTableClassName}
+                headers={["Item", "Categoria", "Local", "Saldo", "Status", ""]}
+              >
                 {items.map((item) => {
                   const isSelected = getId(item.id) === getId(selectedItemId);
 
@@ -829,7 +832,7 @@ export function TiStockTab() {
                         isSelected ? "bg-blue-50/60 dark:bg-blue-950/20" : null,
                       )}
                     >
-                      <td className="min-w-56 max-w-sm px-4 py-3 align-top">
+                      <td className="min-w-56 max-w-sm px-4 py-2 align-top">
                         <button
                           type="button"
                           className="max-w-full break-words text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
@@ -843,23 +846,23 @@ export function TiStockTab() {
                           </p>
                         ) : null}
                       </td>
-                      <td className="max-w-44 px-4 py-3 align-top">
+                      <td className="max-w-44 px-4 py-2 align-top">
                         <span className="block break-words">
                           {getRelatedName(item.category, item.category_id)}
                         </span>
                       </td>
-                      <td className="max-w-44 px-4 py-3 align-top">
+                      <td className="max-w-44 px-4 py-2 align-top">
                         <span className="block break-words">
                           {getRelatedName(item.location, item.location_id)}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right align-top font-semibold">
+                      <td className="whitespace-nowrap px-4 py-2 text-right align-top font-semibold">
                         {formatQuantity(item.quantity)}
                       </td>
-                      <td className="px-4 py-3 align-top">
+                      <td className="px-4 py-2 align-top">
                         <StatusBadge config={formatStatus(item.status)} size="sm" />
                       </td>
-                      <td className="px-4 py-3 align-top">
+                      <td className="px-4 py-2 align-top">
                         <div className="flex justify-end gap-1">
                           <TiTableAction
                             icon={PackageCheck}
@@ -884,7 +887,10 @@ export function TiStockTab() {
         </div>
 
         {canEditStock ? (
-          <section className={`${tiCardClassName} space-y-3 self-start`} aria-label="Operações do estoque">
+          <section
+            className={`${tiCardClassName} space-y-3 self-start xl:min-h-[280px]`}
+            aria-label="Operações do estoque"
+          >
             <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Operações</h3>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
               <StockOperationButton
@@ -1388,7 +1394,6 @@ function StockOperationButton({
       type="button"
       className={cn(
         tiSecondaryButtonClassName,
-        tiCompactButtonClassName,
         "w-full min-w-0 sm:w-auto sm:min-w-32",
       )}
       onClick={onClick}

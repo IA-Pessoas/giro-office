@@ -249,7 +249,6 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.match(tabSource, /aria-label="Filtros do estoque"/);
   assert.match(tabSource, /aria-label="Conteúdo do estoque"/);
   assert.match(tabSource, /function StockOperationButton/);
-  assert.match(tabSource, /tiCompactButtonClassName/);
   assert.match(tabSource, /type StockFilterDraft/);
   assert.match(tabSource, /const \[stockFilterDraft, setStockFilterDraft\]/);
   assert.match(tabSource, /STOCK_STATUS_FILTER_OPTIONS/);
@@ -277,6 +276,8 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.match(tabSource, /const selectedListItem = stockItems\.find/);
   assert.match(tabSource, /const selectedItem = selectedItemQuery\.data \?\? selectedListItem/);
   assert.match(tabSource, /headers=\{\["Item", "Categoria", "Local", "Saldo", "Status", ""\]\}/);
+  assert.match(tabSource, /className=\{tiFiveRowTableClassName\}/);
+  assert.match(tabSource, /xl:min-h-\[280px\]/);
   assert.match(tabSource, /Saldo atual/);
   assert.match(tabSource, /Movimentacoes/);
   assert.match(tabSource, /stockMovementsQuery/);
@@ -469,6 +470,7 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(tabSource, /Criar ramal/);
   assert.match(tabSource, /placeholder="Ex: 1001"/);
   assert.doesNotMatch(tabSource, /placeholder="1001"/);
+  assert.match(tabSource, /className=\{tiFiveRowTableClassName\}/);
 });
 
 await runTest("ti visible copy stays product-facing and avoids implementation handoff terms", async () => {
