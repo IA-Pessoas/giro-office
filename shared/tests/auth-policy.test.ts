@@ -10,6 +10,9 @@ function authContext(claims: AuthContext["claims"]): AuthContext {
     userId: claims.user_id,
     organizationId: claims.organization_id ?? "org-1",
     claims,
+    actorKind: "organization",
+    isPlatformAdmin: false,
+    isSupportMode: false,
   };
 }
 
