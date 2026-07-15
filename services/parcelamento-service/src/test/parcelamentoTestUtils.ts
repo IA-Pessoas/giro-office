@@ -9,9 +9,12 @@ export const organizationId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 export const otherOrganizationId = "aaaaaaaa-aaaa-aaaa-aaaa-bbbbbbbbbbbb";
 export const userId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 export const clientId = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+export const otherClientId = "cccccccc-cccc-cccc-cccc-dddddddddddd";
 export const installmentId = "dddddddd-dddd-dddd-dddd-dddddddddddd";
 export const otherInstallmentId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
 export const competencyId = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+export const panoramaId = "11111111-1111-1111-1111-111111111111";
+export const responsavelId = "22222222-2222-2222-2222-222222222222";
 export const requestId = "request-installment-1";
 
 export const parcelamentoContext: ParcelamentoRequestContext = {
@@ -103,12 +106,43 @@ export function createCreateInstallmentCompetencyBody(overrides: Record<string, 
   };
 }
 
+export function createPanoramaFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: panoramaId,
+    competence: "2026-07",
+    cnd_municipal: false,
+    cnd_state: false,
+    cnd_federal: false,
+    cnd_fgts: false,
+    cnd_labor: false,
+    protests: false,
+    state_tax_situation: false,
+    federal_tax_situation: false,
+    responsavel_id: null,
+    client_id: clientId,
+    organization_id: organizationId,
+    ...overrides,
+  };
+}
+
+export function createCreatePanoramaBody(overrides: Record<string, unknown> = {}) {
+  return {
+    client_id: clientId,
+    competence: "2026-07",
+    ...overrides,
+  };
+}
+
 export function createPrismaMock() {
   const fixture = createInstallmentFixture();
 
   return {
     client: {
       findFirst: vi.fn(async () => ({ id: clientId, organization_id: organizationId })),
+      findMany: vi.fn(async () => [{ id: clientId }]),
+    },
+    user: {
+      findFirst: vi.fn(async () => ({ id: responsavelId, organization_id: organizationId })),
     },
     installment: {
       count: vi.fn(async () => 1),
@@ -124,6 +158,15 @@ export function createPrismaMock() {
       findMany: vi.fn(async () => []),
       findFirst: vi.fn(async () => null),
       update: vi.fn(async ({ data }) => createInstallmentCompetencyFixture(data)),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
+    panoramaParcelameto: {
+      count: vi.fn(async () => 1),
+      create: vi.fn(async ({ data }) => createPanoramaFixture(data)),
+      createMany: vi.fn(async ({ data }) => ({ count: Array.isArray(data) ? data.length : 0 })),
+      findMany: vi.fn(async () => [createPanoramaFixture()]),
+      findFirst: vi.fn(async () => null),
+      update: vi.fn(async ({ data }) => createPanoramaFixture(data)),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     $queryRaw: vi.fn(async () => [{ ok: 1 }]),
