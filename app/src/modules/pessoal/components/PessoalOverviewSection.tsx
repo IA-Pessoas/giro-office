@@ -28,18 +28,18 @@ export function PessoalOverviewSection() {
         `${formatCount(cnpjCount, isLoading)} CNPJs cadastrados`,
       ],
       icon: Landmark,
-      tone: "indigo",
+      tone: "blue",
     },
     {
       label: "Folha",
-      description: "Rotinas por cliente e competencia.",
+      description: "Rotinas por cliente e competência.",
       icon: WalletCards,
       tone: "gray",
       details: [],
     },
     {
       label: "Obrigacoes",
-      description: "Geracao e conferencia mensal.",
+      description: "Geração e conferência mensal.",
       icon: CheckSquare,
       tone: "gray",
       details: [],
@@ -55,28 +55,28 @@ export function PessoalOverviewSection() {
 
   return (
     <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-      <div className="relative min-h-[320px] overflow-hidden rounded-xl border border-indigo-500/40 bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-700 p-6 text-white shadow-lg">
+      <div className="relative min-h-[320px] overflow-hidden rounded-xl border border-blue-500/40 bg-gradient-to-br from-blue-700 via-sky-700 to-blue-800 p-6 text-white shadow-lg">
         <div className="absolute right-6 top-6 flex h-12 w-12 items-center justify-center rounded-xl bg-white/15">
           <UserRoundCog className="h-6 w-6" />
         </div>
 
         <div className="flex min-h-[270px] max-w-xl flex-col justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-indigo-100">
+            <p className="text-sm font-semibold uppercase tracking-wide text-blue-100">
               Resumo operacional
             </p>
             <h2 className="mt-5 max-w-lg text-4xl font-bold leading-tight">
               Departamento Pessoal
             </h2>
-            <p className="mt-5 max-w-lg text-base leading-7 text-indigo-100">
-              Rotinas de folha, obrigacoes, sindicatos, acompanhamentos e acessos no mesmo fluxo.
+            <p className="mt-5 max-w-lg text-base leading-7 text-blue-100">
+              Rotinas de folha, obrigações, sindicatos, acompanhamentos e acessos no mesmo fluxo.
             </p>
           </div>
         </div>
 
         {isError ? (
           <p className="mt-5 rounded-lg bg-white/15 px-3 py-2 text-sm text-white">
-            Nao foi possivel carregar os indicadores de sindicatos agora.
+            Não foi possível carregar os indicadores de sindicatos agora.
           </p>
         ) : null}
       </div>
@@ -84,7 +84,7 @@ export function PessoalOverviewSection() {
       <div className="grid gap-5">
         {featureCards.map((card) => {
           const Icon = card.icon;
-          const isPrimary = card.tone === "indigo";
+          const isPrimary = card.tone === "blue";
 
           return (
             <div
@@ -95,7 +95,7 @@ export function PessoalOverviewSection() {
                 <span
                   className={`flex h-11 w-11 items-center justify-center rounded-xl ${
                     isPrimary
-                      ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                       : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
                   }`}
                 >
@@ -120,7 +120,7 @@ export function PessoalOverviewSection() {
                       {card.details.map((detail) => (
                         <span
                           key={detail}
-                          className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                          className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                         >
                           {detail}
                         </span>

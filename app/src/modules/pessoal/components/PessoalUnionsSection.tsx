@@ -152,7 +152,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
       setFormValues(buildUnionFormValues(savedUnion));
       setIsFormOpen(false);
     } catch (error) {
-      setFormError(getPessoalErrorMessage(error, "Nao foi possivel salvar o sindicato."));
+      setFormError(getPessoalErrorMessage(error, "Não foi possível salvar o sindicato."));
     }
   }
 
@@ -162,7 +162,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <Landmark className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <Landmark className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Sindicatos
               </h2>
@@ -202,12 +202,12 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
         <div className="mt-5 space-y-3">
           {unionsQuery.isLoading ? (
             <StateMessage icon={Loader2} title="Carregando sindicatos" tone="loading">
-              Buscando os cadastros disponiveis para esta organizacao.
+              Buscando os cadastros disponíveis para esta organização.
             </StateMessage>
           ) : null}
 
           {unionsQuery.isError ? (
-            <StateMessage icon={AlertCircle} title="Nao foi possivel carregar" tone="danger">
+            <StateMessage icon={AlertCircle} title="Não foi possível carregar" tone="danger">
               {getPessoalErrorMessage(unionsQuery.error, "Falha ao carregar sindicatos.")}
             </StateMessage>
           ) : null}
@@ -215,8 +215,8 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
           {!unionsQuery.isLoading && !unionsQuery.isError && unions.length === 0 ? (
             <StateMessage icon={Landmark} title="Nenhum sindicato cadastrado">
               {canEdit
-                ? "Use o botao Criar sindicato para criar o primeiro cadastro."
-                : "Nao ha sindicatos cadastrados para esta organizacao."}
+                ? "Use o botão Criar sindicato para criar o primeiro cadastro."
+                : "Não há sindicatos cadastrados para esta organização."}
             </StateMessage>
           ) : null}
 
@@ -228,7 +228,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
                     <th className="px-4 py-3">Nome</th>
                     <th className="px-4 py-3">CNPJ</th>
                     <th className="px-4 py-3">Data-base</th>
-                    {canEdit ? <th className="px-4 py-3 text-right">Acao</th> : null}
+                    {canEdit ? <th className="px-4 py-3 text-right">Ação</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -237,7 +237,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
                       key={union.id}
                       className={cn(
                         "bg-white transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700/50",
-                        selectedUnion?.id === union.id && "bg-indigo-50 dark:bg-indigo-900/20",
+                        selectedUnion?.id === union.id && "bg-blue-50 dark:bg-blue-900/20",
                       )}
                     >
                       <td className="rounded-l-lg px-4 py-3 font-medium text-gray-900 dark:text-white">
@@ -254,7 +254,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
                           <button
                             type="button"
                             onClick={() => handleStartEdit(union)}
-                            className="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
+                            className="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950/30"
                           >
                             <Pencil className="h-4 w-4" />
                             Editar
@@ -336,7 +336,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
                 ) : (
                   <Plus className="h-4 w-4" />
                 )}
-                {selectedUnion ? "Salvar alteracoes" : "Criar sindicato"}
+                {selectedUnion ? "Salvar alterações" : "Criar sindicato"}
               </button>
             </form>
           </div>
@@ -364,7 +364,7 @@ function StateMessage({
         tone === "danger" &&
           "border-red-200 bg-red-50 text-red-800 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-100",
         tone === "loading" &&
-          "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-900/50 dark:bg-indigo-950/20 dark:text-indigo-100",
+          "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-100",
         tone === "neutral" &&
           "border-dashed border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-300",
       )}

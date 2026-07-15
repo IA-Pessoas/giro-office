@@ -6,7 +6,11 @@ import {
   PESSOAL_TABS,
   unwrapPessoalEnvelope,
 } from "./services/pessoalService.contract.ts";
-import { buildPessoalUnionPayload } from "./services/pessoalService.ts";
+import {
+  buildPessoalPayrollPayload,
+  buildPessoalPayrollUpdatePayload,
+  buildPessoalUnionPayload,
+} from "./services/pessoalService.ts";
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
 
 function runTest(name, fn) {
@@ -90,6 +94,35 @@ runTest("union payload builder keeps backend field names", () => {
   );
 });
 
+runTest("payroll payload builder keeps backend payroll fields", () => {
+  assert.equal(PESSOAL_ENDPOINTS.payrollDetail("client-1"), "/pessoal/payroll/client-1");
+  const payload = {
+    client_id: "client-1",
+    responsible_id: null,
+    advance: false,
+    advance_type: null,
+    advance_amount: null,
+    info: "Folha mensal",
+    previous: false,
+    onvio: false,
+    group: "Grupo A",
+    vt: false,
+    vt_value: null,
+    vt_type: null,
+    va: false,
+    assistance_fee: false,
+    union_id: null,
+    bem_mais: false,
+    bsf: false,
+    reinf: false,
+    employees: 0,
+    contact: null,
+  };
+
+  assert.equal(buildPessoalPayrollPayload(payload).client_id, "client-1");
+  assert.equal("client_id" in buildPessoalPayrollUpdatePayload(payload), false);
+});
+
 runTest("pessoal UI follows tecnologia-style system accent and centered tabs", () => {
   const shell = readFileSync("src/modules/pessoal/components/PessoalShell.tsx", "utf8");
   const overview = readFileSync("src/modules/pessoal/components/PessoalOverviewSection.tsx", "utf8");
@@ -99,12 +132,19 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   );
   const controls = readFileSync("src/modules/pessoal/components/pessoalFormControls.ts", "utf8");
   const unions = readFileSync("src/modules/pessoal/components/PessoalUnionsSection.tsx", "utf8");
-  const source = [shell, overview, placeholder, controls, unions].join("\n");
+  const payroll = readFileSync("src/modules/pessoal/components/PessoalPayrollSection.tsx", "utf8");
+  const clientSelector = readFileSync(
+    "src/modules/pessoal/components/PessoalClientSelector.tsx",
+    "utf8",
+  );
+  const source = [shell, overview, placeholder, controls, unions, payroll, clientSelector].join(
+    "\n",
+  );
 
   assert.match(shell, /justify-center/);
   assert.match(shell, /dark:bg-gray-800/);
-  assert.match(shell, /useClients/);
-  assert.match(shell, /clientQuery\.data\?\.items/);
+  assert.doesNotMatch(shell, /useClients/);
+  assert.doesNotMatch(shell, /clientQuery\.data\?\.items/);
   assert.doesNotMatch(shell, /unionCreateRequestId/);
   assert.doesNotMatch(shell, /openCreateRequestId/);
   assert.doesNotMatch(shell, /PessoalOverviewSection hasClient/);
@@ -112,6 +152,7 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(overview, /usePessoalUnions/);
   assert.doesNotMatch(overview, /onCreateUnion|canCreateUnion|Criar sindicato/);
   assert.match(overview, /Resumo operacional/);
+  assert.match(overview, /from-blue-700 via-sky-700 to-blue-800/);
   assert.match(overview, /featureCards/);
   assert.match(overview, /Folha/);
   assert.match(overview, /Obrigacoes/);
@@ -126,24 +167,53 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.doesNotMatch(overview, /Sindicatos cadastrados/);
   assert.doesNotMatch(overview, /overviewCards/);
   assert.doesNotMatch(overview, /Disponivel|Por cliente|Restrito|hasClient|Cliente selecionado/);
-  const clientSelector = readFileSync(
-    "src/modules/pessoal/components/PessoalClientSelector.tsx",
-    "utf8",
-  );
-
-  assert.match(clientSelector, /aria-haspopup="listbox"/);
+  assert.match(clientSelector, /aria-haspopup="dialog"/);
+  assert.match(clientSelector, /role="dialog"/);
+  assert.match(clientSelector, /useClients/);
+  assert.match(clientSelector, /useDeferredValue/);
+  assert.match(clientSelector, /CLIENT_PICKER_LIMIT = 50/);
+  assert.match(clientSelector, /type="number"/);
+  assert.match(clientSelector, /sm:w-auto/);
+  assert.match(clientSelector, /min-w-44/);
+  assert.match(clientSelector, /sm:max-w-80/);
+  assert.match(clientSelector, /justify-center/);
+  assert.match(clientSelector, /py-2\.5/);
+  assert.match(clientSelector, /text-center/);
+  assert.match(clientSelector, /h-8 w-14/);
+  assert.match(clientSelector, /bg-blue-600/);
+  assert.match(clientSelector, /setPage\(\(current\) => current \+ 1\)/);
   assert.match(clientSelector, /Selecionar cliente/);
-  assert.match(clientSelector, /Nenhum cliente disponivel/);
+  assert.match(clientSelector, /Sem cliente selecionado/);
+  assert.match(clientSelector, /handleSelect\(null\)/);
+  assert.match(clientSelector, /Nenhum cliente disponível/);
+  assert.doesNotMatch(clientSelector, /Todos os clientes/);
+  assert.doesNotMatch(clientSelector, /ChevronDown/);
   assert.doesNotMatch(clientSelector, /<select/);
   assert.doesNotMatch(clientSelector, />\s*Cliente\s*</);
   assert.doesNotMatch(unions, /openCreateRequestId/);
   assert.match(unions, /role="dialog"/);
   assert.match(unions, /backdrop-blur-sm/);
   assert.match(unions, /Criar sindicato/);
+  assert.match(shell, /PessoalPayrollSection/);
+  assert.match(shell, /activeTab === "payroll"/);
+  assert.match(payroll, /usePessoalPayroll/);
+  assert.match(payroll, /function optional\(value: string\): string \| null/);
+  assert.match(
+    payroll,
+    /function optional<T>\(value: string, transform: \(value: string\) => T\): T \| null/,
+  );
+  assert.doesNotMatch(payroll, /optionalText|optionalNumber/);
+  assert.match(payroll, /Nenhuma configuração de folha cadastrada para este cliente/);
+  assert.match(payroll, /ChevronDown/);
+  assert.match(payroll, /appearance-none pr-12/);
+  assert.match(payroll, /right-4/);
+  assert.match(payroll, /type="checkbox"/);
+  assert.match(payroll, /type="number"/);
   assert.match(overview, /text-4xl/);
   assert.match(overview, /text-3xl/);
   assert.match(unions, /border-spacing-y-2/);
-  assert.doesNotMatch(source, /pink-/);
+  assert.match(controls, /focus:border-blue-500/);
+  assert.doesNotMatch(source, /(indigo|pink|purple|violet|fuchsia|rose)-/);
 });
 
 console.log("pessoal contract tests passed");

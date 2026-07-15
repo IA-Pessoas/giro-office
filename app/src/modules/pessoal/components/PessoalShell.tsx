@@ -10,12 +10,12 @@ import {
 } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
-import { useClients } from "@modules/clients";
 
 import { PESSOAL_TABS } from "../services/pessoalService.contract";
-import type { PessoalTabId } from "../types";
+import type { PessoalClientOption, PessoalTabId } from "../types";
 import { PessoalClientSelector } from "./PessoalClientSelector";
 import { PessoalOverviewSection } from "./PessoalOverviewSection";
+import { PessoalPayrollSection } from "./PessoalPayrollSection";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 import { PessoalUnionsSection } from "./PessoalUnionsSection";
 
@@ -37,16 +37,11 @@ const clientRequiredTabs = new Set<PessoalTabId>([
 
 export function PessoalShell() {
   const { access, isLoading } = useModuleAccess("pessoal");
-  const clientQuery = useClients({ status: "Ativo", page: 1, limit: 100 });
   const [activeTab, setActiveTab] = useState<PessoalTabId>("overview");
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedClient, setSelectedClient] = useState<PessoalClientOption | null>(null);
+  const selectedClientId = selectedClient?.id ?? "";
   const hasClient = selectedClientId.length > 0;
   const activeTabLabel = PESSOAL_TABS.find((tab) => tab.id === activeTab)?.label;
-  const clients = (clientQuery.data?.items ?? []).map((client) => ({
-    id: client.id,
-    name: client.company_name || client.name,
-    document: client.cpf_cnpj,
-  }));
 
   if (isLoading) {
     return (
@@ -60,7 +55,7 @@ export function PessoalShell() {
     return (
       <div className="mx-auto max-w-[1600px] p-6">
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
-          Acesso negado ao modulo de Departamento Pessoal.
+          Acesso negado ao módulo de Departamento Pessoal.
         </section>
       </div>
     );
@@ -73,21 +68,18 @@ export function PessoalShell() {
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-md">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-md">
               <UserRoundCog className="h-6 w-6 text-white" />
             </span>
             Departamento Pessoal
           </h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">
-            Gestao de folha, obrigacoes, sindicatos e acessos.
+            Gestão de folha, obrigações, sindicatos e acessos.
           </p>
         </div>
         <PessoalClientSelector
-          clients={clients}
-          selectedClientId={selectedClientId}
-          onSelectClient={setSelectedClientId}
-          isLoading={clientQuery.isLoading}
-          isError={clientQuery.isError}
+          selectedClient={selectedClient}
+          onSelectClient={setSelectedClient}
         />
       </header>
 
@@ -106,7 +98,7 @@ export function PessoalShell() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`inline-flex min-w-fit flex-1 shrink-0 items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
                   isActive
-                    ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                     : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                 }`}
               >
@@ -122,11 +114,13 @@ export function PessoalShell() {
         <PessoalOverviewSection />
       ) : activeTab === "unions" ? (
         <PessoalUnionsSection canEdit={access.canEdit} />
+      ) : activeTab === "payroll" ? (
+        <PessoalPayrollSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
       ) : (
         <PessoalPlaceholderSection
           icon={ActiveIcon}
           title={activeTabLabel || "Departamento Pessoal"}
-          description="Esta area sera entregue em uma branch funcional propria."
+          description="Esta área será entregue em uma branch funcional própria."
           requiresClient={clientRequiredTabs.has(activeTab)}
           hasClient={hasClient}
         />
