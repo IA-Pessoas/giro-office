@@ -105,6 +105,7 @@ model Organization {
   agendas                       Agenda[]
   recurringAgendas              RecurringAgenda[]
   auditRequests                 AuditRequest[]
+  supportSessions               SupportSession[]
   budgets                       Budget[]
   certificatesPF                CertificatePF[]
   certificatesPJ                CertificatePJ[]
@@ -213,6 +214,37 @@ model OrganizationInvite {
   organization    Organization @relation(fields: [organization_id], references: [id])
 
   @@map("organization_invites")
+}
+
+model PlatformUser {
+  id              String           @id @default(uuid())
+  name            String
+  email           String           @unique
+  password        String
+  platform_role   PlatformRole     @default(super_admin)
+  status          String           @default("active")
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+  supportSessions SupportSession[]
+
+  @@map("platform_users")
+}
+
+model SupportSession {
+  id               String               @id @default(uuid())
+  platform_user_id String
+  organization_id  String
+  reason           String
+  status           SupportSessionStatus @default(active)
+  started_at       DateTime             @default(now())
+  expires_at       DateTime
+  ended_at         DateTime?
+  platformUser     PlatformUser         @relation(fields: [platform_user_id], references: [id])
+  organization     Organization         @relation(fields: [organization_id], references: [id])
+
+  @@index([platform_user_id, status, started_at(sort: Desc)], map: "idx_support_sessions_platform_status_started")
+  @@index([organization_id, started_at(sort: Desc)], map: "idx_support_sessions_org_started")
+  @@map("platform_support_sessions")
 }
 
 model Department {
@@ -430,6 +462,7 @@ model AuditRequest {
   @@index([path, created_at(sort: Desc)])
   @@index([status_code, created_at(sort: Desc)])
   @@index([organization_id, referring, referring_id, created_at(sort: Desc)])
+  @@index([created_at(sort: Desc)], map: "idx_audit_requests_created_at_desc")
   @@map("audit_requests")
 }
 
@@ -2134,6 +2167,16 @@ enum enumType {
   admin
   owner
   user
+}
+
+enum PlatformRole {
+  super_admin
+}
+
+enum SupportSessionStatus {
+  active
+  closed
+  expired
 }
 
 enum ChatType {

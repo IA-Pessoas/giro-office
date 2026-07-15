@@ -21,6 +21,31 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  const platformAdminEmail = process.env.PLATFORM_ADMIN_EMAIL;
+  const platformAdminPassword = process.env.PLATFORM_ADMIN_PASSWORD;
+  const platformAdminName = process.env.PLATFORM_ADMIN_NAME ?? "Platform Admin";
+
+  if (platformAdminEmail && platformAdminPassword) {
+    const platformAdminPasswordHash = await bcrypt.hash(platformAdminPassword, 8);
+
+    await prisma.platformUser.upsert({
+      where: { email: platformAdminEmail },
+      update: {
+        name: platformAdminName,
+        password: platformAdminPasswordHash,
+        status: "active",
+        platform_role: "super_admin",
+      },
+      create: {
+        name: platformAdminName,
+        email: platformAdminEmail,
+        password: platformAdminPasswordHash,
+        status: "active",
+        platform_role: "super_admin",
+      },
+    });
+  }
+
   console.log("🌱 Iniciando seed do banco de dados...\n");
 
   // =============================================================
