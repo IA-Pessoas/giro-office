@@ -268,7 +268,7 @@ export function PessoalPayrollSection({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <WalletCards className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <WalletCards className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Folha</h2>
             </div>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
@@ -390,7 +390,7 @@ export function PessoalPayrollSection({
                 checked={Boolean(formValues[field.name])}
                 onChange={(event) => handleFieldChange(field.name, event.target.checked)}
                 disabled={isFormDisabled}
-                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               {field.label}
             </label>
@@ -430,8 +430,8 @@ function StateMessage({
           "border-red-200 bg-red-50 text-red-800 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-100",
         tone === "loading" &&
           cn(
-            "border-indigo-200 bg-indigo-50 text-indigo-800",
-            "dark:border-indigo-900/50 dark:bg-indigo-950/20 dark:text-indigo-100",
+            "border-blue-200 bg-blue-50 text-blue-800",
+            "dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-100",
           ),
         tone === "neutral" &&
           cn(

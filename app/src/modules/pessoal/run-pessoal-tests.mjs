@@ -152,6 +152,7 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(overview, /usePessoalUnions/);
   assert.doesNotMatch(overview, /onCreateUnion|canCreateUnion|Criar sindicato/);
   assert.match(overview, /Resumo operacional/);
+  assert.match(overview, /from-blue-700 via-sky-700 to-blue-800/);
   assert.match(overview, /featureCards/);
   assert.match(overview, /Folha/);
   assert.match(overview, /Obrigacoes/);
@@ -198,7 +199,8 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(overview, /text-4xl/);
   assert.match(overview, /text-3xl/);
   assert.match(unions, /border-spacing-y-2/);
-  assert.doesNotMatch(source, /pink-/);
+  assert.match(controls, /focus:border-blue-500/);
+  assert.doesNotMatch(source, /(indigo|pink|purple|violet|fuchsia|rose)-/);
 });
 
 console.log("pessoal contract tests passed");
