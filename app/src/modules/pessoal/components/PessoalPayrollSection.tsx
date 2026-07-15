@@ -11,6 +11,7 @@ import {
 import { usePessoalUnions } from "../hooks/usePessoalUnions";
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import {
+  pessoalCheckboxCardClassName,
   pessoalPrimaryButtonClassName,
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
@@ -69,7 +70,7 @@ const emptyPayrollFormValues: PayrollFormValues = {
 const textFields = [
   { name: "info", label: "Informações", type: "text", required: true },
   { name: "group", label: "Grupo", type: "text", required: true },
-  { name: "responsible_id", label: "Responsavel ID", type: "text", required: false },
+  { name: "responsible_id", label: "Responsável ID", type: "text", required: false },
   { name: "advance_type", label: "Tipo de adiantamento", type: "text", required: false },
   { name: "vt_type", label: "Tipo de VT", type: "text", required: false },
   { name: "contact", label: "Contato", type: "text", required: false },
@@ -383,10 +384,7 @@ export function PessoalPayrollSection({
           {checkboxFields.map((field) => (
             <label
               key={field.name}
-              className={cn(
-                "flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 text-sm",
-                "text-gray-700 dark:border-gray-700 dark:text-gray-300",
-              )}
+              className={pessoalCheckboxCardClassName}
             >
               <input
                 type="checkbox"

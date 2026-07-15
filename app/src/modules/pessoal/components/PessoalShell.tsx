@@ -14,6 +14,7 @@ import { useModuleAccess } from "@modules/auth";
 import { PESSOAL_TABS } from "../services/pessoalService.contract";
 import type { PessoalClientOption, PessoalTabId } from "../types";
 import { PessoalClientSelector } from "./PessoalClientSelector";
+import { PessoalObligationsSection } from "./PessoalObligationsSection";
 import { PessoalOverviewSection } from "./PessoalOverviewSection";
 import { PessoalPayrollSection } from "./PessoalPayrollSection";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
@@ -116,6 +117,8 @@ export function PessoalShell() {
         <PessoalUnionsSection canEdit={access.canEdit} />
       ) : activeTab === "payroll" ? (
         <PessoalPayrollSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
+      ) : activeTab === "obligations" ? (
+        <PessoalObligationsSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
       ) : (
         <PessoalPlaceholderSection
           icon={ActiveIcon}

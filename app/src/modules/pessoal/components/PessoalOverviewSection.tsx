@@ -38,7 +38,7 @@ export function PessoalOverviewSection() {
       details: [],
     },
     {
-      label: "Obrigacoes",
+      label: "Obrigações",
       description: "Geração e conferência mensal.",
       icon: CheckSquare,
       tone: "gray",

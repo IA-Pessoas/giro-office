@@ -21,7 +21,7 @@ export const PESSOAL_TABS: PessoalTab[] = [
   { id: "overview", label: "Visao geral" },
   { id: "unions", label: "Sindicatos" },
   { id: "payroll", label: "Folha" },
-  { id: "obligations", label: "Obrigacoes" },
+  { id: "obligations", label: "Obrigações" },
   { id: "tracking", label: "Acompanhamentos" },
   { id: "passwords", label: "Senhas" },
 ];
