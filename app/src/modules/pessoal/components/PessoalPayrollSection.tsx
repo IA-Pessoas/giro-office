@@ -124,16 +124,16 @@ function buildPayrollFormValues(
   };
 }
 
-function optionalText(value: string): string | null {
+function optional(value: string): string | null;
+function optional<T>(value: string, transform: (value: string) => T): T | null;
+function optional<T>(value: string, transform?: (value: string) => T): string | T | null {
   const trimmed = value.trim();
 
-  return trimmed ? trimmed : null;
-}
+  if (!trimmed) {
+    return null;
+  }
 
-function optionalNumber(value: string): number | null {
-  const trimmed = value.trim();
-
-  return trimmed ? Number(trimmed) : null;
+  return transform ? transform(trimmed) : trimmed;
 }
 
 function buildPayrollFormPayload(
@@ -142,25 +142,25 @@ function buildPayrollFormPayload(
 ): PessoalPayrollPayload {
   return {
     client_id: selectedClientId,
-    responsible_id: optionalText(values.responsible_id),
+    responsible_id: optional(values.responsible_id),
     advance: values.advance,
-    advance_type: optionalText(values.advance_type),
-    advance_amount: optionalNumber(values.advance_amount),
+    advance_type: optional(values.advance_type),
+    advance_amount: optional(values.advance_amount, Number),
     info: values.info.trim(),
     previous: values.previous,
     onvio: values.onvio,
     group: values.group.trim(),
     vt: values.vt,
-    vt_value: optionalNumber(values.vt_value),
-    vt_type: optionalText(values.vt_type),
+    vt_value: optional(values.vt_value, Number),
+    vt_type: optional(values.vt_type),
     va: values.va,
     assistance_fee: values.assistance_fee,
-    union_id: optionalText(values.union_id),
+    union_id: optional(values.union_id),
     bem_mais: values.bem_mais,
     bsf: values.bsf,
     reinf: values.reinf,
     employees: Number(values.employees),
-    contact: optionalText(values.contact),
+    contact: optional(values.contact),
   };
 }
 
