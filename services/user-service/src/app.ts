@@ -17,6 +17,7 @@ import { requestContext } from "./middlewares/requestContext.js";
 import { buildUserServiceOpenApiSpec } from "./openapi/spec.js";
 import { authRoutes } from "./routes/auth.routes.js";
 import { permissionRoutes } from "./routes/permission.routes.js";
+import { platformRoutes } from "./routes/platform.routes.js";
 import { userRoutes } from "./routes/user.routes.js";
 
 function userServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -51,6 +52,7 @@ export function createUserApp(env: UserServiceEnv, logger: Logger): Express {
     });
   }
 
+  app.use("/platform", platformRoutes);
   app.use("/user", authRoutes);
   app.post(
     "/user/:id/photo",

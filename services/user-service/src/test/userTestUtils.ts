@@ -1,7 +1,10 @@
 import {
+  FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+  FORWARDED_AUTH_SUPPORT_SESSION_ID_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -15,6 +18,12 @@ interface UserRouteMocks {
   authServiceMock: {
     login: Mock;
     firstCreate: Mock;
+  };
+  platformAuthServiceMock: {
+    login: Mock;
+    getMe: Mock;
+    startSupportSession: Mock;
+    endSupportSession: Mock;
   };
   userServiceMock: {
     list: Mock;
@@ -40,6 +49,12 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
       login: vi.fn(),
       firstCreate: vi.fn(),
     },
+    platformAuthServiceMock: {
+      login: vi.fn(),
+      getMe: vi.fn(),
+      startSupportSession: vi.fn(),
+      endSupportSession: vi.fn(),
+    },
     userServiceMock: {
       list: vi.fn(),
       getById: vi.fn(),
@@ -62,6 +77,12 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
 vi.mock("../services/authService.js", () => ({
   AuthService: vi.fn(function AuthService() {
     return userRouteMocks.authServiceMock;
+  }),
+}));
+
+vi.mock("../services/platformAuthService.js", () => ({
+  PlatformAuthService: vi.fn(function PlatformAuthService() {
+    return userRouteMocks.platformAuthServiceMock;
   }),
 }));
 
@@ -128,6 +149,20 @@ export function gatewayAuthHeaders(overrides?: {
   };
 }
 
+export function gatewayPlatformAuthHeaders(overrides?: {
+  supportSessionId?: string;
+}): Record<string, string> {
+  return {
+    [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
+    [FORWARDED_AUTH_USER_ID_HEADER]: "platform-1",
+    [FORWARDED_AUTH_KIND_HEADER]: "platform",
+    [FORWARDED_AUTH_PLATFORM_ROLE_HEADER]: "super_admin",
+    ...(overrides?.supportSessionId
+      ? { [FORWARDED_AUTH_SUPPORT_SESSION_ID_HEADER]: overrides.supportSessionId }
+      : {}),
+  };
+}
+
 export function createTestApp(overrides: Partial<UserServiceEnv> = {}) {
   const env = { ...getUserServiceEnv(), ...overrides };
   const logger = createLogger({
@@ -145,9 +180,17 @@ export function resetUserRouteMocks() {
 }
 
 const authServiceMock: UserRouteMocks["authServiceMock"] = userRouteMocks.authServiceMock;
+const platformAuthServiceMock: UserRouteMocks["platformAuthServiceMock"] =
+  userRouteMocks.platformAuthServiceMock;
 const userServiceMock: UserRouteMocks["userServiceMock"] = userRouteMocks.userServiceMock;
 const permissionServiceMock: UserRouteMocks["permissionServiceMock"] =
   userRouteMocks.permissionServiceMock;
 const storageServiceMock: UserRouteMocks["storageServiceMock"] = userRouteMocks.storageServiceMock;
 
-export { authServiceMock, permissionServiceMock, storageServiceMock, userServiceMock };
+export {
+  authServiceMock,
+  permissionServiceMock,
+  platformAuthServiceMock,
+  storageServiceMock,
+  userServiceMock,
+};
