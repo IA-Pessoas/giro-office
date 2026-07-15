@@ -16,6 +16,7 @@ import { PESSOAL_TABS } from "../services/pessoalService.contract";
 import type { PessoalTabId } from "../types";
 import { PessoalClientSelector } from "./PessoalClientSelector";
 import { PessoalOverviewSection } from "./PessoalOverviewSection";
+import { PessoalPayrollSection } from "./PessoalPayrollSection";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 import { PessoalUnionsSection } from "./PessoalUnionsSection";
 
@@ -79,7 +80,7 @@ export function PessoalShell() {
             Departamento Pessoal
           </h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">
-            Gestao de folha, obrigacoes, sindicatos e acessos.
+            Gestão de folha, obrigações, sindicatos e acessos.
           </p>
         </div>
         <PessoalClientSelector
@@ -122,6 +123,8 @@ export function PessoalShell() {
         <PessoalOverviewSection />
       ) : activeTab === "unions" ? (
         <PessoalUnionsSection canEdit={access.canEdit} />
+      ) : activeTab === "payroll" ? (
+        <PessoalPayrollSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
       ) : (
         <PessoalPlaceholderSection
           icon={ActiveIcon}

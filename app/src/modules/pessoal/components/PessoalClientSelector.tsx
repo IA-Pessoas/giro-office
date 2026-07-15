@@ -56,7 +56,7 @@ export function PessoalClientSelector({
             </p>
           ) : isError ? (
             <p className="px-3 py-2 text-sm text-red-600 dark:text-red-300">
-              Nao foi possivel carregar clientes.
+              Não foi possível carregar clientes.
             </p>
           ) : clients.length === 0 ? (
             <p className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">

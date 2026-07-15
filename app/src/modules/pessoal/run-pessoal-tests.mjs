@@ -6,7 +6,11 @@ import {
   PESSOAL_TABS,
   unwrapPessoalEnvelope,
 } from "./services/pessoalService.contract.ts";
-import { buildPessoalUnionPayload } from "./services/pessoalService.ts";
+import {
+  buildPessoalPayrollPayload,
+  buildPessoalPayrollUpdatePayload,
+  buildPessoalUnionPayload,
+} from "./services/pessoalService.ts";
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
 
 function runTest(name, fn) {
@@ -90,6 +94,35 @@ runTest("union payload builder keeps backend field names", () => {
   );
 });
 
+runTest("payroll payload builder keeps backend payroll fields", () => {
+  assert.equal(PESSOAL_ENDPOINTS.payrollDetail("client-1"), "/pessoal/payroll/client-1");
+  const payload = {
+    client_id: "client-1",
+    responsible_id: null,
+    advance: false,
+    advance_type: null,
+    advance_amount: null,
+    info: "Folha mensal",
+    previous: false,
+    onvio: false,
+    group: "Grupo A",
+    vt: false,
+    vt_value: null,
+    vt_type: null,
+    va: false,
+    assistance_fee: false,
+    union_id: null,
+    bem_mais: false,
+    bsf: false,
+    reinf: false,
+    employees: 0,
+    contact: null,
+  };
+
+  assert.equal(buildPessoalPayrollPayload(payload).client_id, "client-1");
+  assert.equal("client_id" in buildPessoalPayrollUpdatePayload(payload), false);
+});
+
 runTest("pessoal UI follows tecnologia-style system accent and centered tabs", () => {
   const shell = readFileSync("src/modules/pessoal/components/PessoalShell.tsx", "utf8");
   const overview = readFileSync("src/modules/pessoal/components/PessoalOverviewSection.tsx", "utf8");
@@ -99,7 +132,8 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   );
   const controls = readFileSync("src/modules/pessoal/components/pessoalFormControls.ts", "utf8");
   const unions = readFileSync("src/modules/pessoal/components/PessoalUnionsSection.tsx", "utf8");
-  const source = [shell, overview, placeholder, controls, unions].join("\n");
+  const payroll = readFileSync("src/modules/pessoal/components/PessoalPayrollSection.tsx", "utf8");
+  const source = [shell, overview, placeholder, controls, unions, payroll].join("\n");
 
   assert.match(shell, /justify-center/);
   assert.match(shell, /dark:bg-gray-800/);
@@ -140,6 +174,12 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(unions, /role="dialog"/);
   assert.match(unions, /backdrop-blur-sm/);
   assert.match(unions, /Criar sindicato/);
+  assert.match(shell, /PessoalPayrollSection/);
+  assert.match(shell, /activeTab === "payroll"/);
+  assert.match(payroll, /usePessoalPayroll/);
+  assert.match(payroll, /Nenhuma configuração de folha cadastrada para este cliente/);
+  assert.match(payroll, /type="checkbox"/);
+  assert.match(payroll, /type="number"/);
   assert.match(overview, /text-4xl/);
   assert.match(overview, /text-3xl/);
   assert.match(unions, /border-spacing-y-2/);

@@ -32,14 +32,14 @@ export function PessoalOverviewSection() {
     },
     {
       label: "Folha",
-      description: "Rotinas por cliente e competencia.",
+      description: "Rotinas por cliente e competência.",
       icon: WalletCards,
       tone: "gray",
       details: [],
     },
     {
       label: "Obrigacoes",
-      description: "Geracao e conferencia mensal.",
+      description: "Geração e conferência mensal.",
       icon: CheckSquare,
       tone: "gray",
       details: [],
@@ -69,14 +69,14 @@ export function PessoalOverviewSection() {
               Departamento Pessoal
             </h2>
             <p className="mt-5 max-w-lg text-base leading-7 text-indigo-100">
-              Rotinas de folha, obrigacoes, sindicatos, acompanhamentos e acessos no mesmo fluxo.
+              Rotinas de folha, obrigações, sindicatos, acompanhamentos e acessos no mesmo fluxo.
             </p>
           </div>
         </div>
 
         {isError ? (
           <p className="mt-5 rounded-lg bg-white/15 px-3 py-2 text-sm text-white">
-            Nao foi possivel carregar os indicadores de sindicatos agora.
+            Não foi possível carregar os indicadores de sindicatos agora.
           </p>
         ) : null}
       </div>

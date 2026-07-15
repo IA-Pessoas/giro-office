@@ -152,7 +152,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
       setFormValues(buildUnionFormValues(savedUnion));
       setIsFormOpen(false);
     } catch (error) {
-      setFormError(getPessoalErrorMessage(error, "Nao foi possivel salvar o sindicato."));
+      setFormError(getPessoalErrorMessage(error, "Não foi possível salvar o sindicato."));
     }
   }
 
@@ -202,12 +202,12 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
         <div className="mt-5 space-y-3">
           {unionsQuery.isLoading ? (
             <StateMessage icon={Loader2} title="Carregando sindicatos" tone="loading">
-              Buscando os cadastros disponiveis para esta organizacao.
+              Buscando os cadastros disponíveis para esta organização.
             </StateMessage>
           ) : null}
 
           {unionsQuery.isError ? (
-            <StateMessage icon={AlertCircle} title="Nao foi possivel carregar" tone="danger">
+            <StateMessage icon={AlertCircle} title="Não foi possível carregar" tone="danger">
               {getPessoalErrorMessage(unionsQuery.error, "Falha ao carregar sindicatos.")}
             </StateMessage>
           ) : null}
@@ -215,8 +215,8 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
           {!unionsQuery.isLoading && !unionsQuery.isError && unions.length === 0 ? (
             <StateMessage icon={Landmark} title="Nenhum sindicato cadastrado">
               {canEdit
-                ? "Use o botao Criar sindicato para criar o primeiro cadastro."
-                : "Nao ha sindicatos cadastrados para esta organizacao."}
+                ? "Use o botão Criar sindicato para criar o primeiro cadastro."
+                : "Não há sindicatos cadastrados para esta organização."}
             </StateMessage>
           ) : null}
 
@@ -228,7 +228,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
                     <th className="px-4 py-3">Nome</th>
                     <th className="px-4 py-3">CNPJ</th>
                     <th className="px-4 py-3">Data-base</th>
-                    {canEdit ? <th className="px-4 py-3 text-right">Acao</th> : null}
+                    {canEdit ? <th className="px-4 py-3 text-right">Ação</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -336,7 +336,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
                 ) : (
                   <Plus className="h-4 w-4" />
                 )}
-                {selectedUnion ? "Salvar alteracoes" : "Criar sindicato"}
+                {selectedUnion ? "Salvar alterações" : "Criar sindicato"}
               </button>
             </form>
           </div>

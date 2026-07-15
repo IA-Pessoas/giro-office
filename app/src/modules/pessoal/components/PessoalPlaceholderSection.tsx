@@ -29,7 +29,7 @@ export function PessoalPlaceholderSection({
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{message}</p>
           {requiresClient && !hasClient ? (
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
-              Folha, Obrigacoes, Senhas e Acompanhamentos dependem de um cliente.
+              Folha, Obrigações, Senhas e Acompanhamentos dependem de um cliente.
             </p>
           ) : null}
         </div>

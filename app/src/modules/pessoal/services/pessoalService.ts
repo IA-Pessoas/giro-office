@@ -1,3 +1,4 @@
+import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import type { PessoalUnion, PessoalUnionPayload } from "../types/unions";
 
 async function getPessoalHttp() {
@@ -18,6 +19,50 @@ export function buildPessoalUnionPayload(payload: PessoalUnionPayload): PessoalU
     cnpj: payload.cnpj,
     base_date: typeof payload.base_date === "undefined" ? null : payload.base_date,
   };
+}
+
+export function buildPessoalPayrollPayload(
+  payload: PessoalPayrollPayload,
+): PessoalPayrollPayload {
+  return {
+    client_id: payload.client_id,
+    responsible_id: payload.responsible_id ?? null,
+    advance: payload.advance,
+    advance_type: payload.advance_type ?? null,
+    advance_amount: payload.advance_amount ?? null,
+    info: payload.info,
+    previous: payload.previous,
+    onvio: payload.onvio,
+    group: payload.group,
+    vt: payload.vt,
+    vt_value: payload.vt_value ?? null,
+    vt_type: payload.vt_type ?? null,
+    va: payload.va,
+    assistance_fee: payload.assistance_fee,
+    union_id: payload.union_id ?? null,
+    bem_mais: payload.bem_mais,
+    bsf: payload.bsf,
+    reinf: payload.reinf,
+    employees: payload.employees,
+    contact: payload.contact ?? null,
+  };
+}
+
+export function buildPessoalPayrollUpdatePayload(
+  payload: PessoalPayrollPayload,
+): Omit<PessoalPayrollPayload, "client_id"> {
+  const { client_id: _clientId, ...body } = buildPessoalPayrollPayload(payload);
+
+  return body;
+}
+
+function isNotFoundError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "response" in error &&
+    (error as { response?: { status?: number } }).response?.status === 404
+  );
 }
 
 export const pessoalService = {
@@ -50,5 +95,44 @@ export const pessoalService = {
     );
 
     return unwrapPessoalEnvelope<PessoalUnion>(response.data);
+  },
+
+  async detailPayroll(clientId: string): Promise<PessoalPayroll | null> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+
+    try {
+      const response = await api.get(PESSOAL_ENDPOINTS.payrollDetail(clientId));
+
+      return unwrapPessoalEnvelope<PessoalPayroll>(response.data);
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return null;
+      }
+
+      throw error;
+    }
+  },
+
+  async createPayroll(payload: PessoalPayrollPayload): Promise<PessoalPayroll> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(
+      PESSOAL_ENDPOINTS.payroll,
+      buildPessoalPayrollPayload(payload),
+    );
+
+    return unwrapPessoalEnvelope<PessoalPayroll>(response.data);
+  },
+
+  async updatePayroll(
+    clientId: string,
+    payload: PessoalPayrollPayload,
+  ): Promise<PessoalPayroll> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.patch(
+      PESSOAL_ENDPOINTS.payrollDetail(clientId),
+      buildPessoalPayrollUpdatePayload(payload),
+    );
+
+    return unwrapPessoalEnvelope<PessoalPayroll>(response.data);
   },
 };
