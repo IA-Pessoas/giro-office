@@ -173,7 +173,9 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(clientSelector, /useDeferredValue/);
   assert.match(clientSelector, /CLIENT_PICKER_LIMIT = 50/);
   assert.match(clientSelector, /type="number"/);
-  assert.match(clientSelector, /sm:w-48 lg:w-56/);
+  assert.match(clientSelector, /sm:w-auto/);
+  assert.match(clientSelector, /min-w-44/);
+  assert.match(clientSelector, /sm:max-w-80/);
   assert.match(clientSelector, /justify-center/);
   assert.match(clientSelector, /py-2\.5/);
   assert.match(clientSelector, /text-center/);
@@ -181,6 +183,8 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(clientSelector, /bg-blue-600/);
   assert.match(clientSelector, /setPage\(\(current\) => current \+ 1\)/);
   assert.match(clientSelector, /Selecionar cliente/);
+  assert.match(clientSelector, /Sem cliente selecionado/);
+  assert.match(clientSelector, /handleSelect\(null\)/);
   assert.match(clientSelector, /Nenhum cliente disponível/);
   assert.doesNotMatch(clientSelector, /Todos os clientes/);
   assert.doesNotMatch(clientSelector, /ChevronDown/);

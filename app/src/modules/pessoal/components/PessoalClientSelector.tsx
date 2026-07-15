@@ -59,13 +59,13 @@ export function PessoalClientSelector({
   }
 
   return (
-    <div className="relative w-full sm:w-48 lg:w-56">
+    <div className="relative w-full max-w-full sm:w-auto">
       <button
         type="button"
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         onClick={() => setIsOpen(true)}
-        className="flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-center text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full min-w-44 max-w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-center text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:max-w-80"
       >
         <span className="min-w-0 text-center">
           <span className="block truncate text-sm font-semibold">
@@ -121,6 +121,20 @@ export function PessoalClientSelector({
             </div>
 
             <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+              <button
+                type="button"
+                role="option"
+                aria-selected={!selectedClient}
+                onClick={() => handleSelect(null)}
+                className="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 text-left hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700"
+              >
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  Sem cliente selecionado
+                </span>
+                {!selectedClient ? (
+                  <Check className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300" />
+                ) : null}
+              </button>
               {clientsQuery.isLoading ? (
                 <p className="flex items-center gap-2 px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
