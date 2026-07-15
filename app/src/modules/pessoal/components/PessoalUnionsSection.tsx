@@ -1,0 +1,386 @@
+import { useState, type FormEvent } from "react";
+import { AlertCircle, Landmark, Loader2, Pencil, Plus, RefreshCw, X } from "lucide-react";
+
+import { cn } from "@shared/ui/newLayout/utils";
+import { formatCPF_CNPJ } from "@shared/utils/formatters";
+
+import {
+  useCreatePessoalUnionMutation,
+  usePessoalUnions,
+  useUpdatePessoalUnionMutation,
+} from "../hooks/usePessoalUnions";
+import type { PessoalUnion, PessoalUnionPayload } from "../types/unions";
+import {
+  pessoalPrimaryButtonClassName,
+  pessoalSecondaryButtonClassName,
+  pessoalTextFieldClassName,
+} from "./pessoalFormControls";
+
+interface PessoalUnionsSectionProps {
+  canEdit: boolean;
+}
+
+type UnionFormValues = {
+  name: string;
+  cnpj: string;
+  base_date: string;
+};
+
+const emptyUnionFormValues: UnionFormValues = {
+  name: "",
+  cnpj: "",
+  base_date: "",
+};
+
+const unionFields = [
+  { name: "name", label: "Nome", type: "text" },
+  { name: "cnpj", label: "CNPJ", type: "text" },
+  { name: "base_date", label: "Data-base", type: "date" },
+] as const;
+
+function buildUnionFormValues(union: PessoalUnion | null): UnionFormValues {
+  if (!union) {
+    return emptyUnionFormValues;
+  }
+
+  return {
+    name: union.name,
+    cnpj: union.cnpj,
+    base_date: union.base_date ? union.base_date.slice(0, 10) : "",
+  };
+}
+
+function buildUnionFormPayload(values: UnionFormValues): PessoalUnionPayload {
+  return {
+    name: values.name.trim(),
+    cnpj: values.cnpj.trim(),
+    base_date: values.base_date || null,
+  };
+}
+
+function formatUnionDate(value: string | null): string {
+  if (!value) {
+    return "-";
+  }
+
+  const [year, month, day] = value.slice(0, 10).split("-");
+
+  if (!year || !month || !day) {
+    return value;
+  }
+
+  return `${day}/${month}/${year}`;
+}
+
+function getPessoalErrorMessage(error: unknown, fallback: string): string {
+  if (error !== null && typeof error === "object" && "response" in error) {
+    const data = (error as { response?: { data?: { error?: unknown; message?: unknown } } })
+      .response?.data;
+    const message = data?.error ?? data?.message;
+
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
+  const unionsQuery = usePessoalUnions();
+  const createMutation = useCreatePessoalUnionMutation();
+  const [selectedUnion, setSelectedUnion] = useState<PessoalUnion | null>(null);
+  const updateMutation = useUpdatePessoalUnionMutation(selectedUnion?.id ?? "");
+  const [formValues, setFormValues] = useState<UnionFormValues>(emptyUnionFormValues);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const unions = unionsQuery.data ?? [];
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  function handleStartCreate() {
+    setSelectedUnion(null);
+    setFormValues(emptyUnionFormValues);
+    setFormError(null);
+    setIsFormOpen(true);
+  }
+
+  function handleStartEdit(union: PessoalUnion) {
+    setSelectedUnion(union);
+    setFormValues(buildUnionFormValues(union));
+    setFormError(null);
+    setIsFormOpen(true);
+  }
+
+  function handleCloseForm() {
+    setIsFormOpen(false);
+    setFormError(null);
+  }
+
+  function handleFieldChange(field: keyof UnionFormValues, value: string) {
+    setFormValues((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canEdit) {
+      return;
+    }
+
+    const payload = buildUnionFormPayload(formValues);
+
+    if (!payload.name || !payload.cnpj) {
+      setFormError("Informe nome e CNPJ.");
+      return;
+    }
+
+    setFormError(null);
+
+    try {
+      const savedUnion = selectedUnion
+        ? await updateMutation.mutateAsync(payload)
+        : await createMutation.mutateAsync(payload);
+
+      setSelectedUnion(savedUnion);
+      setFormValues(buildUnionFormValues(savedUnion));
+      setIsFormOpen(false);
+    } catch (error) {
+      setFormError(getPessoalErrorMessage(error, "Nao foi possivel salvar o sindicato."));
+    }
+  }
+
+  return (
+    <section className="space-y-6">
+      <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Landmark className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Sindicatos
+              </h2>
+            </div>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Cadastros usados na folha e nas rotinas de data-base.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={handleStartCreate}
+                className={pessoalPrimaryButtonClassName}
+              >
+                <Plus className="h-4 w-4" />
+                Criar sindicato
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => unionsQuery.refetch()}
+              disabled={unionsQuery.isFetching}
+              className={pessoalSecondaryButtonClassName}
+            >
+              {unionsQuery.isFetching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Atualizar
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {unionsQuery.isLoading ? (
+            <StateMessage icon={Loader2} title="Carregando sindicatos" tone="loading">
+              Buscando os cadastros disponiveis para esta organizacao.
+            </StateMessage>
+          ) : null}
+
+          {unionsQuery.isError ? (
+            <StateMessage icon={AlertCircle} title="Nao foi possivel carregar" tone="danger">
+              {getPessoalErrorMessage(unionsQuery.error, "Falha ao carregar sindicatos.")}
+            </StateMessage>
+          ) : null}
+
+          {!unionsQuery.isLoading && !unionsQuery.isError && unions.length === 0 ? (
+            <StateMessage icon={Landmark} title="Nenhum sindicato cadastrado">
+              {canEdit
+                ? "Use o botao Criar sindicato para criar o primeiro cadastro."
+                : "Nao ha sindicatos cadastrados para esta organizacao."}
+            </StateMessage>
+          ) : null}
+
+          {!unionsQuery.isLoading && !unionsQuery.isError && unions.length > 0 ? (
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+              <table className="w-full min-w-[720px] border-separate border-spacing-y-2 px-2 text-sm">
+                <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-700 dark:bg-gray-700/50 dark:text-gray-300">
+                  <tr>
+                    <th className="px-4 py-3">Nome</th>
+                    <th className="px-4 py-3">CNPJ</th>
+                    <th className="px-4 py-3">Data-base</th>
+                    {canEdit ? <th className="px-4 py-3 text-right">Acao</th> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {unions.map((union) => (
+                    <tr
+                      key={union.id}
+                      className={cn(
+                        "bg-white transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700/50",
+                        selectedUnion?.id === union.id && "bg-indigo-50 dark:bg-indigo-900/20",
+                      )}
+                    >
+                      <td className="rounded-l-lg px-4 py-3 font-medium text-gray-900 dark:text-white">
+                        {union.name}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                        {formatCPF_CNPJ(union.cnpj) || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                        {formatUnionDate(union.base_date)}
+                      </td>
+                      {canEdit ? (
+                        <td className="rounded-r-lg px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(union)}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
+                          >
+                            <Pencil className="h-4 w-4" />
+                            Editar
+                          </button>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {isFormOpen && canEdit ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 p-4 backdrop-blur-sm">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pessoal-union-form-title"
+            className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
+          >
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3
+                    id="pessoal-union-form-title"
+                    className="text-base font-semibold text-gray-900 dark:text-white"
+                  >
+                    {selectedUnion ? "Editar sindicato" : "Novo sindicato"}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    Informe os dados do sindicato.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseForm}
+                  disabled={isSubmitting}
+                  className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-60 dark:text-gray-400 dark:hover:bg-gray-700"
+                  aria-label="Fechar cadastro"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {unionFields.map((field) => (
+                <label
+                  key={field.name}
+                  className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
+                >
+                  {field.label}
+                  <input
+                    type={field.type}
+                    value={formValues[field.name]}
+                    onChange={(event) => handleFieldChange(field.name, event.target.value)}
+                    disabled={isSubmitting}
+                    className={pessoalTextFieldClassName}
+                  />
+                </label>
+              ))}
+
+              {formError ? (
+                <p role="alert" className="text-sm text-red-600 dark:text-red-300">
+                  {formError}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`${pessoalPrimaryButtonClassName} w-full`}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : selectedUnion ? (
+                  <Pencil className="h-4 w-4" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                {selectedUnion ? "Salvar alteracoes" : "Criar sindicato"}
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function StateMessage({
+  children,
+  icon: Icon,
+  title,
+  tone = "neutral",
+}: {
+  children: string;
+  icon: typeof AlertCircle;
+  title: string;
+  tone?: "danger" | "loading" | "neutral";
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border p-4 text-sm",
+        tone === "danger" &&
+          "border-red-200 bg-red-50 text-red-800 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-100",
+        tone === "loading" &&
+          "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-900/50 dark:bg-indigo-950/20 dark:text-indigo-100",
+        tone === "neutral" &&
+          "border-dashed border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-300",
+      )}
+    >
+      <div className="flex gap-3">
+        <Icon
+          className={cn(
+            "mt-0.5 h-4 w-4 shrink-0",
+            tone === "loading" && "animate-spin",
+          )}
+        />
+        <div>
+          <p className="font-semibold">{title}</p>
+          <p className="mt-1">{children}</p>
+        </div>
+      </div>
+    </div>
+  );
+}

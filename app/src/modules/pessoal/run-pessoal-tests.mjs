@@ -6,6 +6,7 @@ import {
   PESSOAL_TABS,
   unwrapPessoalEnvelope,
 } from "./services/pessoalService.contract.ts";
+import { buildPessoalUnionPayload } from "./services/pessoalService.ts";
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
 
 function runTest(name, fn) {
@@ -72,6 +73,77 @@ runTest("departamento pessoal page uses the pessoal module instead of the old mo
 
   assert.match(page, /@modules\/pessoal/);
   assert.doesNotMatch(page, /shared\/components\/newLayout\/DepartamentoPessoal/);
+});
+
+runTest("union payload builder keeps backend field names", () => {
+  assert.deepEqual(
+    buildPessoalUnionPayload({
+      name: "Sindicato A",
+      cnpj: "12.345.678/0001-90",
+      base_date: null,
+    }),
+    {
+      name: "Sindicato A",
+      cnpj: "12.345.678/0001-90",
+      base_date: null,
+    },
+  );
+});
+
+runTest("pessoal UI follows tecnologia-style system accent and centered tabs", () => {
+  const shell = readFileSync("src/modules/pessoal/components/PessoalShell.tsx", "utf8");
+  const overview = readFileSync("src/modules/pessoal/components/PessoalOverviewSection.tsx", "utf8");
+  const placeholder = readFileSync(
+    "src/modules/pessoal/components/PessoalPlaceholderSection.tsx",
+    "utf8",
+  );
+  const controls = readFileSync("src/modules/pessoal/components/pessoalFormControls.ts", "utf8");
+  const unions = readFileSync("src/modules/pessoal/components/PessoalUnionsSection.tsx", "utf8");
+  const source = [shell, overview, placeholder, controls, unions].join("\n");
+
+  assert.match(shell, /justify-center/);
+  assert.match(shell, /dark:bg-gray-800/);
+  assert.match(shell, /useClients/);
+  assert.match(shell, /clientQuery\.data\?\.items/);
+  assert.doesNotMatch(shell, /unionCreateRequestId/);
+  assert.doesNotMatch(shell, /openCreateRequestId/);
+  assert.doesNotMatch(shell, /PessoalOverviewSection hasClient/);
+  assert.doesNotMatch(shell, /clients=\{\[\]\}/);
+  assert.match(overview, /usePessoalUnions/);
+  assert.doesNotMatch(overview, /onCreateUnion|canCreateUnion|Criar sindicato/);
+  assert.match(overview, /Resumo operacional/);
+  assert.match(overview, /featureCards/);
+  assert.match(overview, /Folha/);
+  assert.match(overview, /Obrigacoes/);
+  assert.match(overview, /Acompanhamentos/);
+  assert.doesNotMatch(overview, /label: "Senhas"/);
+  assert.match(overview, /com data-base/);
+  assert.match(overview, /sem data-base/);
+  assert.match(overview, /CNPJs cadastrados/);
+  assert.match(overview, /Boolean\(union\.cnpj\)/);
+  assert.match(overview, /lg:grid-cols-\[minmax\(0,2fr\)_minmax\(280px,1fr\)\]/);
+  assert.doesNotMatch(overview, /Operacao atual/);
+  assert.doesNotMatch(overview, /Sindicatos cadastrados/);
+  assert.doesNotMatch(overview, /overviewCards/);
+  assert.doesNotMatch(overview, /Disponivel|Por cliente|Restrito|hasClient|Cliente selecionado/);
+  const clientSelector = readFileSync(
+    "src/modules/pessoal/components/PessoalClientSelector.tsx",
+    "utf8",
+  );
+
+  assert.match(clientSelector, /aria-haspopup="listbox"/);
+  assert.match(clientSelector, /Selecionar cliente/);
+  assert.match(clientSelector, /Nenhum cliente disponivel/);
+  assert.doesNotMatch(clientSelector, /<select/);
+  assert.doesNotMatch(clientSelector, />\s*Cliente\s*</);
+  assert.doesNotMatch(unions, /openCreateRequestId/);
+  assert.match(unions, /role="dialog"/);
+  assert.match(unions, /backdrop-blur-sm/);
+  assert.match(unions, /Criar sindicato/);
+  assert.match(overview, /text-4xl/);
+  assert.match(overview, /text-3xl/);
+  assert.match(unions, /border-spacing-y-2/);
+  assert.doesNotMatch(source, /pink-/);
 });
 
 console.log("pessoal contract tests passed");
