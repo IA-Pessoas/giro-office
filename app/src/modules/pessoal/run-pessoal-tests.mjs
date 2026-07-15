@@ -133,12 +133,18 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   const controls = readFileSync("src/modules/pessoal/components/pessoalFormControls.ts", "utf8");
   const unions = readFileSync("src/modules/pessoal/components/PessoalUnionsSection.tsx", "utf8");
   const payroll = readFileSync("src/modules/pessoal/components/PessoalPayrollSection.tsx", "utf8");
-  const source = [shell, overview, placeholder, controls, unions, payroll].join("\n");
+  const clientSelector = readFileSync(
+    "src/modules/pessoal/components/PessoalClientSelector.tsx",
+    "utf8",
+  );
+  const source = [shell, overview, placeholder, controls, unions, payroll, clientSelector].join(
+    "\n",
+  );
 
   assert.match(shell, /justify-center/);
   assert.match(shell, /dark:bg-gray-800/);
-  assert.match(shell, /useClients/);
-  assert.match(shell, /clientQuery\.data\?\.items/);
+  assert.doesNotMatch(shell, /useClients/);
+  assert.doesNotMatch(shell, /clientQuery\.data\?\.items/);
   assert.doesNotMatch(shell, /unionCreateRequestId/);
   assert.doesNotMatch(shell, /openCreateRequestId/);
   assert.doesNotMatch(shell, /PessoalOverviewSection hasClient/);
@@ -160,14 +166,23 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.doesNotMatch(overview, /Sindicatos cadastrados/);
   assert.doesNotMatch(overview, /overviewCards/);
   assert.doesNotMatch(overview, /Disponivel|Por cliente|Restrito|hasClient|Cliente selecionado/);
-  const clientSelector = readFileSync(
-    "src/modules/pessoal/components/PessoalClientSelector.tsx",
-    "utf8",
-  );
-
-  assert.match(clientSelector, /aria-haspopup="listbox"/);
+  assert.match(clientSelector, /aria-haspopup="dialog"/);
+  assert.match(clientSelector, /role="dialog"/);
+  assert.match(clientSelector, /useClients/);
+  assert.match(clientSelector, /useDeferredValue/);
+  assert.match(clientSelector, /CLIENT_PICKER_LIMIT = 50/);
+  assert.match(clientSelector, /type="number"/);
+  assert.match(clientSelector, /sm:w-48 lg:w-56/);
+  assert.match(clientSelector, /justify-center/);
+  assert.match(clientSelector, /py-2\.5/);
+  assert.match(clientSelector, /text-center/);
+  assert.match(clientSelector, /h-8 w-14/);
+  assert.match(clientSelector, /bg-blue-600/);
+  assert.match(clientSelector, /setPage\(\(current\) => current \+ 1\)/);
   assert.match(clientSelector, /Selecionar cliente/);
-  assert.match(clientSelector, /Nenhum cliente disponivel/);
+  assert.match(clientSelector, /Nenhum cliente disponível/);
+  assert.doesNotMatch(clientSelector, /Todos os clientes/);
+  assert.doesNotMatch(clientSelector, /ChevronDown/);
   assert.doesNotMatch(clientSelector, /<select/);
   assert.doesNotMatch(clientSelector, />\s*Cliente\s*</);
   assert.doesNotMatch(unions, /openCreateRequestId/);

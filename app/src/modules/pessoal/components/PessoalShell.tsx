@@ -10,10 +10,9 @@ import {
 } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
-import { useClients } from "@modules/clients";
 
 import { PESSOAL_TABS } from "../services/pessoalService.contract";
-import type { PessoalTabId } from "../types";
+import type { PessoalClientOption, PessoalTabId } from "../types";
 import { PessoalClientSelector } from "./PessoalClientSelector";
 import { PessoalOverviewSection } from "./PessoalOverviewSection";
 import { PessoalPayrollSection } from "./PessoalPayrollSection";
@@ -38,16 +37,11 @@ const clientRequiredTabs = new Set<PessoalTabId>([
 
 export function PessoalShell() {
   const { access, isLoading } = useModuleAccess("pessoal");
-  const clientQuery = useClients({ status: "Ativo", page: 1, limit: 100 });
   const [activeTab, setActiveTab] = useState<PessoalTabId>("overview");
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedClient, setSelectedClient] = useState<PessoalClientOption | null>(null);
+  const selectedClientId = selectedClient?.id ?? "";
   const hasClient = selectedClientId.length > 0;
   const activeTabLabel = PESSOAL_TABS.find((tab) => tab.id === activeTab)?.label;
-  const clients = (clientQuery.data?.items ?? []).map((client) => ({
-    id: client.id,
-    name: client.company_name || client.name,
-    document: client.cpf_cnpj,
-  }));
 
   if (isLoading) {
     return (
@@ -61,7 +55,7 @@ export function PessoalShell() {
     return (
       <div className="mx-auto max-w-[1600px] p-6">
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
-          Acesso negado ao modulo de Departamento Pessoal.
+          Acesso negado ao módulo de Departamento Pessoal.
         </section>
       </div>
     );
@@ -84,11 +78,8 @@ export function PessoalShell() {
           </p>
         </div>
         <PessoalClientSelector
-          clients={clients}
-          selectedClientId={selectedClientId}
-          onSelectClient={setSelectedClientId}
-          isLoading={clientQuery.isLoading}
-          isError={clientQuery.isError}
+          selectedClient={selectedClient}
+          onSelectClient={setSelectedClient}
         />
       </header>
 
@@ -129,7 +120,7 @@ export function PessoalShell() {
         <PessoalPlaceholderSection
           icon={ActiveIcon}
           title={activeTabLabel || "Departamento Pessoal"}
-          description="Esta area sera entregue em uma branch funcional propria."
+          description="Esta área será entregue em uma branch funcional própria."
           requiresClient={clientRequiredTabs.has(activeTab)}
           hasClient={hasClient}
         />
