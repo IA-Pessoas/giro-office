@@ -19,8 +19,10 @@ import {
   createInstallmentCompetencyCollectionRouter,
   createInstallmentCompetencyItemRouter,
 } from "./routes/installmentCompetency.routes.js";
+import { createPanoramaRouter } from "./routes/panorama.routes.js";
 import { InstallmentCompetencyService } from "./services/installmentCompetencyService.js";
 import { InstallmentService } from "./services/installmentService.js";
+import { PanoramaService } from "./services/panoramaService.js";
 
 function parcelamentoServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const context = request.parcelamentoContext;
@@ -59,6 +61,7 @@ export function createParcelamentoApp({
     installmentService,
     auditService,
   });
+  const panoramaService = new PanoramaService({ prisma });
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -103,6 +106,7 @@ export function createParcelamentoApp({
     "/parcelamento/installment-competencies",
     createInstallmentCompetencyItemRouter({ competencyService }),
   );
+  app.use("/parcelamento/panoramas", createPanoramaRouter({ panoramaService }));
 
   app.use(
     createExpressErrorHandler({
