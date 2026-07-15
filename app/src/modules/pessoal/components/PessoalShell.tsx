@@ -18,6 +18,7 @@ import { PessoalObligationsSection } from "./PessoalObligationsSection";
 import { PessoalOverviewSection } from "./PessoalOverviewSection";
 import { PessoalPayrollSection } from "./PessoalPayrollSection";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
+import { PessoalTrackingSection } from "./PessoalTrackingSection";
 import { PessoalUnionsSection } from "./PessoalUnionsSection";
 
 const tabIcons = {
@@ -119,6 +120,8 @@ export function PessoalShell() {
         <PessoalPayrollSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
       ) : activeTab === "obligations" ? (
         <PessoalObligationsSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
+      ) : activeTab === "tracking" ? (
+        <PessoalTrackingSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
       ) : (
         <PessoalPlaceholderSection
           icon={ActiveIcon}

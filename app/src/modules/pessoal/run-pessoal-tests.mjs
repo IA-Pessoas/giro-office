@@ -8,6 +8,7 @@ import {
 } from "./services/pessoalService.contract.ts";
 import {
   buildPessoalObligationParams,
+  buildPessoalLddListParams,
   buildPessoalPayrollPayload,
   buildPessoalPayrollUpdatePayload,
   buildPessoalUnionPayload,
@@ -132,6 +133,11 @@ runTest("obligation params map client and competence", () => {
   });
 });
 
+runTest("ldd list params include optional client id only when present", () => {
+  assert.deepEqual(buildPessoalLddListParams("client-1"), { client_id: "client-1" });
+  assert.deepEqual(buildPessoalLddListParams(""), {});
+});
+
 runTest("pessoal UI follows tecnologia-style system accent and centered tabs", () => {
   const shell = readFileSync("src/modules/pessoal/components/PessoalShell.tsx", "utf8");
   const overview = readFileSync("src/modules/pessoal/components/PessoalOverviewSection.tsx", "utf8");
@@ -146,6 +152,10 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
     "src/modules/pessoal/components/PessoalObligationsSection.tsx",
     "utf8",
   );
+  const tracking = readFileSync(
+    "src/modules/pessoal/components/PessoalTrackingSection.tsx",
+    "utf8",
+  );
   const clientSelector = readFileSync(
     "src/modules/pessoal/components/PessoalClientSelector.tsx",
     "utf8",
@@ -158,6 +168,7 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
     unions,
     payroll,
     obligations,
+    tracking,
     clientSelector,
   ].join("\n");
 
@@ -242,6 +253,15 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(obligations, /Geração concluída/);
   assert.match(obligations, /setTimeout\(\(\) => \{/);
   assert.match(obligations, /}, 3000\)/);
+  assert.match(shell, /PessoalTrackingSection/);
+  assert.match(shell, /activeTab === "tracking"/);
+  assert.match(tracking, /usePessoalLdd/);
+  assert.match(tracking, /usePessoalSituations/);
+  assert.match(tracking, /LDD/);
+  assert.match(tracking, /Situacoes/);
+  assert.match(tracking, /confirm/);
+  assert.match(tracking, /type: "date"/);
+  assert.match(tracking, /type: "number"/);
   assert.match(overview, /text-4xl/);
   assert.match(overview, /text-3xl/);
   assert.match(unions, /border-spacing-y-2/);

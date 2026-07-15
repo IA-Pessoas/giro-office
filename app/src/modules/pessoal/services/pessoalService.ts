@@ -6,6 +6,15 @@ import type {
   PessoalObligationUpdatePayload,
 } from "../types/obligations";
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
+import type {
+  PessoalLdd,
+  PessoalLddListParams,
+  PessoalLddPayload,
+  PessoalLddUpdatePayload,
+  PessoalSituation,
+  PessoalSituationPayload,
+  PessoalSituationUpdatePayload,
+} from "../types/tracking";
 import type { PessoalUnion, PessoalUnionPayload } from "../types/unions";
 
 async function getPessoalHttp() {
@@ -71,6 +80,12 @@ export function buildPessoalObligationParams(
     client_id: clientId,
     competence,
   };
+}
+
+export function buildPessoalLddListParams(clientId?: string): PessoalLddListParams {
+  const trimmedClientId = clientId?.trim();
+
+  return trimmedClientId ? { client_id: trimmedClientId } : {};
 }
 
 function isNotFoundError(error: unknown): boolean {
@@ -200,5 +215,72 @@ export const pessoalService = {
     const response = await api.post(PESSOAL_ENDPOINTS.obligationGenerate(competence));
 
     return unwrapPessoalEnvelope<PessoalObligationGenerationResult>(response.data);
+  },
+
+  async listLdd(clientId?: string): Promise<PessoalLdd[]> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.ldd, {
+      params: buildPessoalLddListParams(clientId),
+    });
+
+    return unwrapPessoalEnvelope<PessoalLdd[]>(response.data);
+  },
+
+  async createLdd(payload: PessoalLddPayload): Promise<PessoalLdd> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(PESSOAL_ENDPOINTS.ldd, payload);
+
+    return unwrapPessoalEnvelope<PessoalLdd>(response.data);
+  },
+
+  async updateLdd(id: string, payload: PessoalLddUpdatePayload): Promise<PessoalLdd> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.patch(PESSOAL_ENDPOINTS.lddDetail(id), payload);
+
+    return unwrapPessoalEnvelope<PessoalLdd>(response.data);
+  },
+
+  async deleteLdd(id: string): Promise<PessoalLdd> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.delete(PESSOAL_ENDPOINTS.lddDetail(id));
+
+    return unwrapPessoalEnvelope<PessoalLdd>(response.data);
+  },
+
+  async listSituations(clientId: string): Promise<PessoalSituation[]> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.situations, {
+      params: { client_id: clientId },
+    });
+
+    return unwrapPessoalEnvelope<PessoalSituation[]>(response.data);
+  },
+
+  async detailSituation(id: string): Promise<PessoalSituation> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.situationDetail(id));
+
+    return unwrapPessoalEnvelope<PessoalSituation>(response.data);
+  },
+
+  async createSituation(payload: PessoalSituationPayload): Promise<PessoalSituation> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(PESSOAL_ENDPOINTS.situations, {
+      client_id: payload.client_id,
+      title: payload.title,
+      description: payload.description,
+    });
+
+    return unwrapPessoalEnvelope<PessoalSituation>(response.data);
+  },
+
+  async updateSituation(
+    id: string,
+    payload: PessoalSituationUpdatePayload,
+  ): Promise<PessoalSituation> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.patch(PESSOAL_ENDPOINTS.situationDetail(id), payload);
+
+    return unwrapPessoalEnvelope<PessoalSituation>(response.data);
   },
 };
