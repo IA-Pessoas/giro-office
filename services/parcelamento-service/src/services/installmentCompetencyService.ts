@@ -10,11 +10,17 @@ import type {
 } from "../schemas/installmentCompetency.schemas.js";
 import { createPage, getPaginationParams } from "../schemas/pagination.schemas.js";
 import type { InstallmentService, ParcelamentoPage } from "./installmentService.js";
+import {
+  createAuditDiff,
+  type ParcelamentoAuditAction,
+  type RecordParcelamentoChangeInput,
+  withoutOrganizationId,
+} from "./parcelamentoAuditService.js";
 
 export type InstallmentCompetencyServiceDependencies = {
   prisma: ParcelamentoPrismaClient;
   installmentService: Pick<InstallmentService, "recalculateAggregates">;
-  auditService: { recordChange(input: unknown): Promise<void> };
+  auditService: { recordChange(input: RecordParcelamentoChangeInput): Promise<void> };
 };
 
 const competencySelect = {
@@ -77,7 +83,9 @@ function isPrismaUniqueError(err: unknown): boolean {
 export class InstallmentCompetencyService {
   private readonly prisma: ParcelamentoPrismaClient;
   private readonly installmentService: Pick<InstallmentService, "recalculateAggregates">;
-  private readonly auditService: { recordChange(input: unknown): Promise<void> };
+  private readonly auditService: {
+    recordChange(input: RecordParcelamentoChangeInput): Promise<void>;
+  };
 
   constructor({
     prisma,
@@ -152,8 +160,7 @@ export class InstallmentCompetencyService {
         context,
         action: "Cadastro",
         referringId: created.id,
-        changes: created,
-        path: `/parcelamento/installments/${installmentId}/competencies/${created.id}`,
+        changes: withoutOrganizationId(created),
       });
 
       return toCompetencyDto(created);
@@ -201,8 +208,7 @@ export class InstallmentCompetencyService {
         context,
         action: "Atualizacao",
         referringId: id,
-        changes: data,
-        path: `/parcelamento/installment-competencies/${id}`,
+        changes: createAuditDiff(existing, data as Record<string, unknown>),
       });
 
       return toCompetencyDto(updated);
@@ -267,22 +273,22 @@ export class InstallmentCompetencyService {
 
   private async recordAudit(input: {
     context: ParcelamentoRequestContext;
-    action: string;
+    action: ParcelamentoAuditAction;
     referringId: string;
-    changes: unknown;
-    path: string;
+    changes: Record<string, unknown>;
   }): Promise<void> {
+    const { organizationId, userId } = requireContext(input.context);
+
     try {
       await this.auditService.recordChange({
         requestId: input.context.requestId,
-        organizationId: input.context.organizationId,
-        userId: input.context.userId,
-        permission: input.context.permission,
+        organizationId,
+        userId,
+        permission: input.context.permission ?? null,
         action: input.action,
         referring: "parcelamento.installmentsCompetencies",
         referringId: input.referringId,
         changes: input.changes,
-        path: input.path,
       });
     } catch (err: unknown) {
       logError("Falha ao auditar competencia de parcelamento", { err });

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PanoramaService } from "../services/panoramaService.js";
 import {
   clientId,
+  createAuditMock,
   createCreatePanoramaBody,
   createPanoramaFixture,
   createPrismaMock,
@@ -21,9 +22,10 @@ describe("PanoramaService", () => {
   });
 
   function createService(prisma = createPrismaMock()) {
-    const service = new PanoramaService({ prisma: prisma as never });
+    const audit = createAuditMock();
+    const service = new PanoramaService({ prisma: prisma as never, auditService: audit });
 
-    return { service, prisma };
+    return { service, prisma, audit };
   }
 
   it("lists panoramas scoped by organization with filters and pagination", async () => {
@@ -66,7 +68,7 @@ describe("PanoramaService", () => {
       organization_id: organizationId,
     });
     prisma.panoramaParcelameto.findFirst.mockResolvedValueOnce(null);
-    const { service } = createService(prisma);
+    const { service, audit } = createService(prisma);
 
     const result = await service.create(parcelamentoContext, createCreatePanoramaBody());
 
@@ -89,6 +91,14 @@ describe("PanoramaService", () => {
     );
     expect(result).toMatchObject({ id: panoramaId, client_id: clientId, competence: "2026-07" });
     expect(result).not.toHaveProperty("organization_id");
+    expect(audit.recordChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Cadastro",
+        referring: "parcelamento.panorama",
+        referringId: panoramaId,
+      }),
+    );
+    expect(audit.recordChange.mock.calls[0]?.[0].changes).not.toHaveProperty("organization_id");
   });
 
   it("blocks duplicate client and competence inside organization", async () => {
@@ -116,7 +126,7 @@ describe("PanoramaService", () => {
       id: responsavelId,
       organization_id: organizationId,
     });
-    const { service } = createService(prisma);
+    const { service, audit } = createService(prisma);
 
     await service.patch(parcelamentoContext, panoramaId, {
       cnd_fgts: true,
@@ -133,6 +143,17 @@ describe("PanoramaService", () => {
       }),
     );
     expect(prisma.panoramaParcelameto.update).not.toHaveBeenCalled();
+    expect(audit.recordChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Atualizacao",
+        referring: "parcelamento.panorama",
+        referringId: panoramaId,
+        changes: {
+          cnd_fgts: { from: false, to: true },
+          responsavel_id: { from: null, to: responsavelId },
+        },
+      }),
+    );
   });
 
   it("validates responsavel_id inside organization when provided", async () => {
@@ -153,7 +174,7 @@ describe("PanoramaService", () => {
       createPanoramaFixture({ client_id: clientId }),
     ]);
     prisma.panoramaParcelameto.createMany.mockResolvedValueOnce({ count: 1 });
-    const { service } = createService(prisma);
+    const { service, audit } = createService(prisma);
 
     const result = await service.generateForCompetence(parcelamentoContext, "2026-07");
 
@@ -181,6 +202,19 @@ describe("PanoramaService", () => {
       skipDuplicates: true,
     });
     expect(result).toEqual({ created: 1, existing: 1, totalActiveClients: 2 });
+    expect(audit.recordChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Geracao",
+        referring: "parcelamento.panorama",
+        referringId: "2026-07",
+        changes: {
+          competence: "2026-07",
+          created: 1,
+          existing: 1,
+          totalActiveClients: 2,
+        },
+      }),
+    );
   });
 
   it("does not overwrite existing panorama rows during generation", async () => {
