@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Save,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { cn } from "@shared/ui/newLayout/utils";
@@ -76,7 +77,7 @@ const emptySituationFormValues: SituationFormValues = {
 
 const lddFields = [
   { name: "type", label: "Tipo", type: "text" },
-  { name: "period", label: "Periodo", type: "text" },
+  { name: "period", label: "Período", type: "text" },
   { name: "due_date", label: "Vencimento", type: "date" },
   { name: "balance_amount", label: "Saldo", type: "number" },
   { name: "registration_status", label: "Cadastro", type: "text" },
@@ -168,12 +169,14 @@ export function PessoalTrackingSection({
   const deleteLddMutation = useDeletePessoalLddMutation(selectedClientId);
   const createSituationMutation = useCreatePessoalSituationMutation();
   const [selectedLdd, setSelectedLdd] = useState<PessoalLdd | null>(null);
+  const [isLddFormOpen, setIsLddFormOpen] = useState(false);
   const [lddFormValues, setLddFormValues] = useState<LddFormValues>(emptyLddFormValues);
   const updateLddMutation = useUpdatePessoalLddMutation(
     selectedLdd?.id ?? "",
     selectedClientId,
   );
   const [selectedSituationId, setSelectedSituationId] = useState("");
+  const [isSituationFormOpen, setIsSituationFormOpen] = useState(false);
   const situationDetailQuery = usePessoalSituationDetail(
     selectedSituationId,
     hasClient && selectedSituationId.length > 0,
@@ -197,8 +200,10 @@ export function PessoalTrackingSection({
 
   useEffect(() => {
     setSelectedLdd(null);
+    setIsLddFormOpen(false);
     setLddFormValues(emptyLddFormValues);
     setSelectedSituationId("");
+    setIsSituationFormOpen(false);
     setSituationFormValues(emptySituationFormValues);
     setFormError(null);
     setSuccessMessage(null);
@@ -231,12 +236,14 @@ export function PessoalTrackingSection({
     clearFeedback();
     setSelectedLdd(null);
     setLddFormValues(emptyLddFormValues);
+    setIsLddFormOpen(true);
   }
 
   function startEditLdd(ldd: PessoalLdd) {
     clearFeedback();
     setSelectedLdd(ldd);
     setLddFormValues(buildLddFormValues(ldd));
+    setIsLddFormOpen(true);
   }
 
   function buildLddPayload(): PessoalLddPayload {
@@ -274,16 +281,18 @@ export function PessoalTrackingSection({
 
         setSelectedLdd(savedLdd);
         setLddFormValues(buildLddFormValues(savedLdd));
+        setIsLddFormOpen(false);
         setSuccessMessage("LDD atualizado.");
       } else {
         const savedLdd = await createLddMutation.mutateAsync(payload);
 
         setSelectedLdd(savedLdd);
         setLddFormValues(buildLddFormValues(savedLdd));
+        setIsLddFormOpen(false);
         setSuccessMessage("LDD criado.");
       }
     } catch (error) {
-      setFormError(getPessoalErrorMessage(error, "Nao foi possivel salvar o LDD."));
+      setFormError(getPessoalErrorMessage(error, "Não foi possível salvar o LDD."));
     }
   }
 
@@ -299,11 +308,12 @@ export function PessoalTrackingSection({
 
       if (selectedLdd?.id === ldd.id) {
         startNewLdd();
+        setIsLddFormOpen(false);
       }
 
       setSuccessMessage("LDD removido.");
     } catch (error) {
-      setFormError(getPessoalErrorMessage(error, "Nao foi possivel remover o LDD."));
+      setFormError(getPessoalErrorMessage(error, "Não foi possível remover o LDD."));
     }
   }
 
@@ -311,12 +321,14 @@ export function PessoalTrackingSection({
     clearFeedback();
     setSelectedSituationId("");
     setSituationFormValues(emptySituationFormValues);
+    setIsSituationFormOpen(true);
   }
 
   function startSituationDetail(situation: PessoalSituation) {
     clearFeedback();
     setSelectedSituationId(situation.id);
     setSituationFormValues(buildSituationFormValues(situation));
+    setIsSituationFormOpen(true);
   }
 
   async function handleSituationSubmit(event: FormEvent<HTMLFormElement>) {
@@ -334,7 +346,7 @@ export function PessoalTrackingSection({
     };
 
     if (!payload.title || !payload.description) {
-      setFormError("Informe titulo e descricao.");
+      setFormError("Informe título e descrição.");
       return;
     }
 
@@ -347,15 +359,17 @@ export function PessoalTrackingSection({
           description: payload.description,
           status: payload.status,
         });
-        setSuccessMessage("Situacao atualizada.");
+        setIsSituationFormOpen(false);
+        setSuccessMessage("Situação atualizada.");
       } else {
         const created = await createSituationMutation.mutateAsync(payload);
 
         setSelectedSituationId(created.id);
-        setSuccessMessage("Situacao criada.");
+        setIsSituationFormOpen(false);
+        setSuccessMessage("Situação criada.");
       }
     } catch (error) {
-      setFormError(getPessoalErrorMessage(error, "Nao foi possivel salvar a situacao."));
+      setFormError(getPessoalErrorMessage(error, "Não foi possível salvar a situação."));
     }
   }
 
@@ -371,7 +385,7 @@ export function PessoalTrackingSection({
               </h2>
             </div>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              LDD e Situacoes vinculados ao cliente selecionado.
+              LDD e Situações vinculados ao cliente selecionado.
             </p>
           </div>
 
@@ -388,9 +402,19 @@ export function PessoalTrackingSection({
                     : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700",
                 )}
               >
-                {tab === "ldd" ? "LDD" : "Situacoes"}
+                {tab === "ldd" ? "LDD" : "Situações"}
               </button>
             ))}
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={activeTrackingTab === "ldd" ? startNewLdd : startNewSituation}
+                className={pessoalPrimaryButtonClassName}
+              >
+                <Plus className="h-4 w-4" />
+                {activeTrackingTab === "ldd" ? "Criar LDD" : "Criar situação"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() =>
@@ -411,7 +435,12 @@ export function PessoalTrackingSection({
       </div>
 
       {activeTrackingTab === "ldd" ? (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+        <div
+          className={cn(
+            "grid gap-6",
+            isLddFormOpen && "xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]",
+          )}
+        >
           <TrackingListCard
             icon={FileText}
             title="LDD"
@@ -464,56 +493,55 @@ export function PessoalTrackingSection({
             ))}
           </TrackingListCard>
 
-          <form
-            onSubmit={handleLddSubmit}
-            className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
-          >
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                  {selectedLdd ? "Editar LDD" : "Novo LDD"}
-                </h3>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  Campos seguem o contrato do pessoal-service.
-                </p>
-              </div>
-              {canEdit ? (
+          {isLddFormOpen ? (
+            <form
+              onSubmit={handleLddSubmit}
+              className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                    {selectedLdd ? "Editar LDD" : "Criar LDD"}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    Campos seguem o contrato do pessoal-service.
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={startNewLdd}
+                  onClick={() => setIsLddFormOpen(false)}
+                  disabled={isLddSubmitting}
                   className={pessoalSecondaryButtonClassName}
                 >
-                  <Plus className="h-4 w-4" />
-                  Novo
+                  <X className="h-4 w-4" />
+                  Cancelar
                 </button>
-              ) : null}
-            </div>
+              </div>
 
-            <div className="space-y-3">
-              {lddFields.map((field) => (
-                <label
-                  key={field.name}
-                  className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
-                >
-                  {field.label}
-                  <input
-                    type={field.type}
-                    step={field.name === "balance_amount" ? "0.01" : undefined}
-                    value={lddFormValues[field.name]}
-                    onChange={(event) =>
-                      setLddFormValues((current) => ({
-                        ...current,
-                        [field.name]: event.target.value,
-                      }))
-                    }
-                    disabled={!canEdit || isLddSubmitting}
-                    className={pessoalTextFieldClassName}
-                  />
-                </label>
-              ))}
-            </div>
+              <div className="space-y-3">
+                {lddFields.map((field) => (
+                  <label
+                    key={field.name}
+                    className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    {field.label}
+                    <input
+                      type={field.type}
+                      step={field.name === "balance_amount" ? "0.01" : undefined}
+                      value={lddFormValues[field.name]}
+                      onChange={(event) =>
+                        setLddFormValues((current) => ({
+                          ...current,
+                          [field.name]: event.target.value,
+                        }))
+                      }
+                      disabled={!canEdit || isLddSubmitting}
+                      className={pessoalTextFieldClassName}
+                    />
+                  </label>
+                ))}
+              </div>
 
-            {canEdit ? (
               <button
                 type="submit"
                 disabled={isLddSubmitting}
@@ -526,18 +554,23 @@ export function PessoalTrackingSection({
                 )}
                 Salvar LDD
               </button>
-            ) : null}
-          </form>
+            </form>
+          ) : null}
         </div>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+        <div
+          className={cn(
+            "grid gap-6",
+            isSituationFormOpen && "xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]",
+          )}
+        >
           <TrackingListCard
             icon={ClipboardList}
-            title="Situacoes"
+            title="Situações"
             loading={situationsQuery.isLoading}
             error={situationsQuery.isError ? situationsQuery.error : null}
             empty={situationRows.length === 0}
-            emptyMessage="Nenhuma situacao cadastrada para este cliente."
+            emptyMessage="Nenhuma situação cadastrada para este cliente."
           >
             {situationRows.map((situation) => (
               <div
@@ -570,94 +603,93 @@ export function PessoalTrackingSection({
             ))}
           </TrackingListCard>
 
-          <form
-            onSubmit={handleSituationSubmit}
-            className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
-          >
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                  {selectedSituationId ? "Editar situacao" : "Nova situacao"}
-                </h3>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  O detalhe carrega pelo endpoint individual antes da edicao.
-                </p>
-              </div>
-              {canEdit ? (
+          {isSituationFormOpen ? (
+            <form
+              onSubmit={handleSituationSubmit}
+              className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                    {selectedSituationId ? "Editar situação" : "Criar situação"}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    O detalhe carrega pelo endpoint individual antes da edição.
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={startNewSituation}
+                  onClick={() => setIsSituationFormOpen(false)}
+                  disabled={isSituationSubmitting}
                   className={pessoalSecondaryButtonClassName}
                 >
-                  <Plus className="h-4 w-4" />
-                  Nova
+                  <X className="h-4 w-4" />
+                  Cancelar
                 </button>
+              </div>
+
+              {situationDetailQuery.isFetching ? (
+                <StateMessage icon={Loader2} title="Carregando detalhe" tone="loading">
+                  Buscando situação selecionada.
+                </StateMessage>
               ) : null}
-            </div>
 
-            {situationDetailQuery.isFetching ? (
-              <StateMessage icon={Loader2} title="Carregando detalhe" tone="loading">
-                Buscando situacao selecionada.
-              </StateMessage>
-            ) : null}
+              <div className="mt-3 space-y-3">
+                <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  Título
+                  <input
+                    type="text"
+                    value={situationFormValues.title}
+                    onChange={(event) =>
+                      setSituationFormValues((current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
+                    }
+                    disabled={!canEdit || isSituationSubmitting}
+                    className={pessoalTextFieldClassName}
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  Descrição
+                  <textarea
+                    value={situationFormValues.description}
+                    onChange={(event) =>
+                      setSituationFormValues((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                    disabled={!canEdit || isSituationSubmitting}
+                    className={`${pessoalTextFieldClassName} min-h-28 resize-y`}
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  Status
+                  <select
+                    value={situationFormValues.status}
+                    onChange={(event) =>
+                      setSituationFormValues((current) => ({
+                        ...current,
+                        status: event.target.value as PessoalSituationStatus,
+                      }))
+                    }
+                    disabled={!canEdit || isSituationSubmitting}
+                    className={pessoalTextFieldClassName}
+                  >
+                    <option value="Em andamento">Em andamento</option>
+                    <option value="Finalizado">Finalizado</option>
+                  </select>
+                </label>
 
-            <div className="mt-3 space-y-3">
-              <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-                Titulo
-                <input
-                  type="text"
-                  value={situationFormValues.title}
-                  onChange={(event) =>
-                    setSituationFormValues((current) => ({
-                      ...current,
-                      title: event.target.value,
-                    }))
-                  }
-                  disabled={!canEdit || isSituationSubmitting}
-                  className={pessoalTextFieldClassName}
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-                Descricao
-                <textarea
-                  value={situationFormValues.description}
-                  onChange={(event) =>
-                    setSituationFormValues((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                  disabled={!canEdit || isSituationSubmitting}
-                  className={`${pessoalTextFieldClassName} min-h-28 resize-y`}
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-                Status
-                <select
-                  value={situationFormValues.status}
-                  onChange={(event) =>
-                    setSituationFormValues((current) => ({
-                      ...current,
-                      status: event.target.value as PessoalSituationStatus,
-                    }))
-                  }
-                  disabled={!canEdit || isSituationSubmitting}
-                  className={pessoalTextFieldClassName}
-                >
-                  <option value="Em andamento">Em andamento</option>
-                  <option value="Finalizado">Finalizado</option>
-                </select>
-              </label>
+                {selectedSituation ? (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-300">
+                    <p>Registrada em {formatDate(selectedSituation.registration_date)}</p>
+                    <p>Concluída em {formatDate(selectedSituation.completion_date)}</p>
+                  </div>
+                ) : null}
+              </div>
 
-              {selectedSituation ? (
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-300">
-                  <p>Registrada em {formatDate(selectedSituation.registration_date)}</p>
-                  <p>Concluida em {formatDate(selectedSituation.completion_date)}</p>
-                </div>
-              ) : null}
-            </div>
-
-            {canEdit ? (
               <button
                 type="submit"
                 disabled={isSituationSubmitting}
@@ -668,10 +700,10 @@ export function PessoalTrackingSection({
                 ) : (
                   <Save className="h-4 w-4" />
                 )}
-                Salvar situacao
+                Salvar situação
               </button>
-            ) : null}
-          </form>
+            </form>
+          ) : null}
         </div>
       )}
 
@@ -722,7 +754,7 @@ function TrackingListCard({
         ) : null}
 
         {error ? (
-          <StateMessage icon={AlertCircle} title="Nao foi possivel carregar" tone="danger">
+          <StateMessage icon={AlertCircle} title="Não foi possível carregar" tone="danger">
             {getPessoalErrorMessage(error, "Falha ao carregar acompanhamentos.")}
           </StateMessage>
         ) : null}
