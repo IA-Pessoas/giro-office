@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, CheckSquare, Loader2, PlusCircle, RefreshCw, Save } from "lucide-react";
 
 import { cn } from "@shared/ui/newLayout/utils";
@@ -27,10 +27,10 @@ const booleanFields = [
   { name: "advance", label: "Adiantamento" },
   { name: "payroll", label: "Folha" },
   { name: "charges", label: "Encargos" },
-  { name: "assistance_fee", label: "Contribuicao assistencial" },
+  { name: "assistance_fee", label: "Contribuição assistencial" },
   { name: "bem_mais", label: "Bem Mais" },
   { name: "bsf", label: "BSF" },
-  { name: "va", label: "Vale-alimentacao" },
+  { name: "va", label: "Vale-alimentação" },
   { name: "vt", label: "Vale-transporte" },
 ] as const;
 
@@ -84,21 +84,43 @@ export function PessoalObligationsSection({
   const [responsibleId, setResponsibleId] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMutating =
     createMutation.isPending || updateMutation.isPending || generateMutation.isPending;
   const isFormDisabled = !canEdit || obligationQuery.isLoading || isMutating;
 
+  function clearSuccessTimeout() {
+    if (successTimeoutRef.current !== null) {
+      clearTimeout(successTimeoutRef.current);
+      successTimeoutRef.current = null;
+    }
+  }
+
+  function showTemporarySuccess(message: string) {
+    clearSuccessTimeout();
+    setSuccessMessage(message);
+    successTimeoutRef.current = setTimeout(() => {
+      setSuccessMessage(null);
+      successTimeoutRef.current = null;
+    }, 3000);
+  }
+
   useEffect(() => {
+    clearSuccessTimeout();
     setResponsibleId(obligation?.responsavel_id ?? "");
     setFormError(null);
     setSuccessMessage(null);
   }, [obligation?.id, obligation?.responsavel_id, selectedClientId, competence]);
 
+  useEffect(() => {
+    return () => clearSuccessTimeout();
+  }, []);
+
   if (!hasClient) {
     return (
       <PessoalPlaceholderSection
         icon={CheckSquare}
-        title="Obrigacoes"
+        title="Obrigações"
         description="Selecione um cliente para continuar."
         requiresClient
         hasClient={false}
@@ -112,6 +134,7 @@ export function PessoalObligationsSection({
     }
 
     setFormError(null);
+    clearSuccessTimeout();
     setSuccessMessage(null);
 
     try {
@@ -120,9 +143,9 @@ export function PessoalObligationsSection({
         competence,
       });
 
-      setSuccessMessage(result.created ? "Obrigacao criada." : "Obrigacao ja existia.");
+      showTemporarySuccess(result.created ? "Obrigação criada." : "Obrigação já existia.");
     } catch (error) {
-      setFormError(getPessoalErrorMessage(error, "Nao foi possivel criar a obrigacao."));
+      setFormError(getPessoalErrorMessage(error, "Não foi possível criar a obrigação."));
     }
   }
 
@@ -132,19 +155,21 @@ export function PessoalObligationsSection({
     }
 
     setFormError(null);
+    clearSuccessTimeout();
     setSuccessMessage(null);
 
     try {
       const result = await generateMutation.mutateAsync();
-      const summary = [
-        `Geracao concluida: ${result.created} criadas`,
-        `${result.skippedExisting} existentes`,
-        `${result.skippedNoPayroll} sem folha`,
-      ].join(", ");
 
-      setSuccessMessage(summary);
+      showTemporarySuccess(
+        [
+          `Geração concluída: ${result.created} criadas`,
+          `${result.skippedExisting} existentes`,
+          `${result.skippedNoPayroll} sem folha.`,
+        ].join(", "),
+      );
     } catch (error) {
-      setFormError(getPessoalErrorMessage(error, "Nao foi possivel gerar as obrigacoes."));
+      setFormError(getPessoalErrorMessage(error, "Não foi possível gerar as obrigações."));
     }
   }
 
@@ -154,13 +179,14 @@ export function PessoalObligationsSection({
     }
 
     setFormError(null);
+    clearSuccessTimeout();
     setSuccessMessage(null);
 
     try {
       await updateMutation.mutateAsync(payload);
-      setSuccessMessage("Obrigacao atualizada.");
+      showTemporarySuccess("Obrigação atualizada.");
     } catch (error) {
-      setFormError(getPessoalErrorMessage(error, "Nao foi possivel atualizar a obrigacao."));
+      setFormError(getPessoalErrorMessage(error, "Não foi possível atualizar a obrigação."));
     }
   }
 
@@ -186,17 +212,17 @@ export function PessoalObligationsSection({
             <div className="flex items-center gap-2">
               <CheckSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Obrigacoes
+                Obrigações
               </h2>
             </div>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Controle mensal gerado a partir da configuracao de folha do cliente.
+              Controle mensal gerado a partir da configuração de folha do cliente.
             </p>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-              Competencia
+              Competência
               <input
                 type="month"
                 value={competence}
@@ -251,20 +277,20 @@ export function PessoalObligationsSection({
         </div>
 
         {obligationQuery.isLoading ? (
-          <StateMessage icon={Loader2} title="Carregando obrigacao" tone="loading">
-            Buscando a competencia selecionada.
+          <StateMessage icon={Loader2} title="Carregando obrigação" tone="loading">
+            Buscando a competência selecionada.
           </StateMessage>
         ) : null}
 
         {obligationQuery.isError ? (
-          <StateMessage icon={AlertCircle} title="Nao foi possivel carregar" tone="danger">
-            {getPessoalErrorMessage(obligationQuery.error, "Falha ao carregar obrigacao.")}
+          <StateMessage icon={AlertCircle} title="Não foi possível carregar" tone="danger">
+            {getPessoalErrorMessage(obligationQuery.error, "Falha ao carregar obrigação.")}
           </StateMessage>
         ) : null}
 
         {!obligationQuery.isLoading && !obligationQuery.isError && !obligation ? (
-          <StateMessage icon={CheckSquare} title="Obrigacao nao cadastrada">
-            Nenhuma obrigacao cadastrada para este cliente nesta competencia.
+          <StateMessage icon={CheckSquare} title="Obrigação não cadastrada">
+            Nenhuma obrigação cadastrada para este cliente nesta competência.
           </StateMessage>
         ) : null}
 
@@ -290,7 +316,7 @@ export function PessoalObligationsSection({
               className="grid gap-3 md:grid-cols-[1fr_auto]"
             >
               <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-                Responsavel ID
+                Responsável ID
                 <input
                   type="text"
                   value={responsibleId}
@@ -310,7 +336,7 @@ export function PessoalObligationsSection({
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  Salvar responsavel
+                  Salvar responsável
                 </button>
               ) : null}
             </form>

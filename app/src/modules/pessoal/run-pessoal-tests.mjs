@@ -54,6 +54,7 @@ runTest("pessoal tabs stay stable for branch integration", () => {
     PESSOAL_TABS.map((tab) => tab.id),
     ["overview", "unions", "payroll", "obligations", "tracking", "passwords"],
   );
+  assert.equal(PESSOAL_TABS.find((tab) => tab.id === "obligations")?.label, "Obrigações");
 });
 
 runTest("unwrapPessoalEnvelope extracts data and accepts raw fallback", () => {
@@ -174,7 +175,7 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(overview, /from-blue-700 via-sky-700 to-blue-800/);
   assert.match(overview, /featureCards/);
   assert.match(overview, /Folha/);
-  assert.match(overview, /Obrigacoes/);
+  assert.match(overview, /Obrigações/);
   assert.match(overview, /Acompanhamentos/);
   assert.doesNotMatch(overview, /label: "Senhas"/);
   assert.match(overview, /com data-base/);
@@ -235,6 +236,12 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(obligations, /type="month"/);
   assert.match(obligations, /type="checkbox"/);
   assert.match(obligations, /Gerar/);
+  assert.match(obligations, /Obrigações/);
+  assert.match(obligations, /Competência/);
+  assert.match(obligations, /Não foi possível/);
+  assert.match(obligations, /Geração concluída/);
+  assert.match(obligations, /setTimeout\(\(\) => \{/);
+  assert.match(obligations, /}, 3000\)/);
   assert.match(overview, /text-4xl/);
   assert.match(overview, /text-3xl/);
   assert.match(unions, /border-spacing-y-2/);

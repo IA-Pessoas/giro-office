@@ -70,7 +70,7 @@ const emptyPayrollFormValues: PayrollFormValues = {
 const textFields = [
   { name: "info", label: "Informações", type: "text", required: true },
   { name: "group", label: "Grupo", type: "text", required: true },
-  { name: "responsible_id", label: "Responsavel ID", type: "text", required: false },
+  { name: "responsible_id", label: "Responsável ID", type: "text", required: false },
   { name: "advance_type", label: "Tipo de adiantamento", type: "text", required: false },
   { name: "vt_type", label: "Tipo de VT", type: "text", required: false },
   { name: "contact", label: "Contato", type: "text", required: false },
