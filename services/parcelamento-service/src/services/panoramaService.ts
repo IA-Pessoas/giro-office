@@ -10,11 +10,18 @@ import type {
   PatchPanoramaBody,
 } from "../schemas/panorama.schemas.js";
 import type { ParcelamentoPage } from "./installmentService.js";
+import {
+  createAuditDiff,
+  type ParcelamentoAuditAction,
+  type RecordParcelamentoChangeInput,
+  withoutOrganizationId,
+} from "./parcelamentoAuditService.js";
 
 const ACTIVE_CLIENT_STATUS = "Ativo";
 
 export type PanoramaServiceDependencies = {
   prisma: ParcelamentoPrismaClient;
+  auditService: { recordChange(input: RecordParcelamentoChangeInput): Promise<void> };
 };
 
 export type GeneratePanoramasResult = {
@@ -102,9 +109,13 @@ function panoramaDefaults(): {
 
 export class PanoramaService {
   private readonly prisma: ParcelamentoPrismaClient;
+  private readonly auditService: {
+    recordChange(input: RecordParcelamentoChangeInput): Promise<void>;
+  };
 
-  constructor({ prisma }: PanoramaServiceDependencies) {
+  constructor({ prisma, auditService }: PanoramaServiceDependencies) {
     this.prisma = prisma;
+    this.auditService = auditService;
   }
 
   async list(
@@ -171,6 +182,13 @@ export class PanoramaService {
         select: panoramaSelect,
       });
 
+      await this.recordAudit({
+        context,
+        action: "Cadastro",
+        referringId: created.id,
+        changes: withoutOrganizationId(created),
+      });
+
       return toPanoramaDto(created);
     } catch (err: unknown) {
       logError("Erro ao criar panorama de parcelamento", { err });
@@ -205,7 +223,7 @@ export class PanoramaService {
   ): Promise<PanoramaDto> {
     try {
       const { organizationId } = requireContext(context);
-      await this.findByIdOrThrow(organizationId, id);
+      const existing = await this.findByIdOrThrow(organizationId, id);
       if (input.responsavel_id) {
         await this.ensureResponsavel(organizationId, input.responsavel_id);
       }
@@ -228,6 +246,13 @@ export class PanoramaService {
       });
       const updated = await this.findByIdOrThrow(organizationId, id);
 
+      await this.recordAudit({
+        context,
+        action: "Atualizacao",
+        referringId: id,
+        changes: createAuditDiff(existing, data as Record<string, unknown>),
+      });
+
       return toPanoramaDto(updated);
     } catch (err: unknown) {
       logError("Erro ao atualizar panorama de parcelamento", { err });
@@ -249,7 +274,15 @@ export class PanoramaService {
       const clientIds = activeClients.map((client) => client.id);
 
       if (clientIds.length === 0) {
-        return { created: 0, existing: 0, totalActiveClients: 0 };
+        const emptyResult = { created: 0, existing: 0, totalActiveClients: 0 };
+        await this.recordAudit({
+          context,
+          action: "Geracao",
+          referringId: competence,
+          changes: { competence, ...emptyResult },
+        });
+
+        return emptyResult;
       }
 
       const existingRows = await this.prisma.panoramaParcelameto.findMany({
@@ -275,11 +308,20 @@ export class PanoramaService {
           ? await this.prisma.panoramaParcelameto.createMany({ data, skipDuplicates: true })
           : { count: 0 };
 
-      return {
+      const generateResult = {
         created: result.count,
         existing: existingRows.length,
         totalActiveClients: activeClients.length,
       };
+
+      await this.recordAudit({
+        context,
+        action: "Geracao",
+        referringId: competence,
+        changes: { competence, ...generateResult },
+      });
+
+      return generateResult;
     } catch (err: unknown) {
       logError("Erro ao gerar panoramas de parcelamento", { err });
       if (err instanceof ServiceError) throw err;
@@ -336,5 +378,29 @@ export class PanoramaService {
     }
 
     return panorama;
+  }
+
+  private async recordAudit(input: {
+    context: ParcelamentoRequestContext;
+    action: ParcelamentoAuditAction;
+    referringId: string;
+    changes: Record<string, unknown>;
+  }): Promise<void> {
+    const { organizationId, userId } = requireContext(input.context);
+
+    try {
+      await this.auditService.recordChange({
+        requestId: input.context.requestId,
+        organizationId,
+        userId,
+        permission: input.context.permission ?? null,
+        action: input.action,
+        referring: "parcelamento.panorama",
+        referringId: input.referringId,
+        changes: input.changes,
+      });
+    } catch (err: unknown) {
+      logError("Falha ao auditar panorama de parcelamento", { err });
+    }
   }
 }

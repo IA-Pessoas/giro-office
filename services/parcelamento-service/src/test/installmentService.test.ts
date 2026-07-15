@@ -57,6 +57,7 @@ describe("InstallmentService", () => {
         referringId: installmentId,
       }),
     );
+    expect(audit.recordChange.mock.calls[0]?.[0].changes).not.toHaveProperty("organization_id");
     expect(result).toMatchObject({ id: installmentId, agreement_number: "AC-123" });
     expect(result).not.toHaveProperty("organization_id");
   });
@@ -167,6 +168,10 @@ describe("InstallmentService", () => {
       expect.objectContaining({
         action: "Atualizacao",
         referringId: installmentId,
+        changes: {
+          agreement_number: { from: null, to: "AC-456" },
+          current_month_installment_amount: { from: 120, to: 130 },
+        },
       }),
     );
   });

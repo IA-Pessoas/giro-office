@@ -104,6 +104,7 @@ describe("InstallmentCompetencyService", () => {
         referringId: competencyId,
       }),
     );
+    expect(audit.recordChange.mock.calls[0]?.[0].changes).not.toHaveProperty("organization_id");
     expect(result).toMatchObject({ id: competencyId, installment_id: installmentId });
     expect(result).not.toHaveProperty("organization_id");
   });
@@ -126,7 +127,7 @@ describe("InstallmentCompetencyService", () => {
     prisma.installmentCompetencies.findFirst
       .mockResolvedValueOnce(createInstallmentCompetencyFixture({ how_many_paid: 1 }))
       .mockResolvedValueOnce(createInstallmentCompetencyFixture({ how_many_paid: 2 }));
-    const { service, installmentService } = createService(prisma);
+    const { service, installmentService, audit } = createService(prisma);
 
     await service.patch(parcelamentoContext, competencyId, { how_many_paid: 2 });
 
@@ -140,6 +141,16 @@ describe("InstallmentCompetencyService", () => {
     expect(installmentService.recalculateAggregates).toHaveBeenCalledWith(
       parcelamentoContext,
       installmentId,
+    );
+    expect(audit.recordChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Atualizacao",
+        referring: "parcelamento.installmentsCompetencies",
+        referringId: competencyId,
+        changes: {
+          how_many_paid: { from: 1, to: 2 },
+        },
+      }),
     );
   });
 
