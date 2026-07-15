@@ -7,6 +7,7 @@ import type { PessoalClientOption } from "../types";
 import { pessoalTextFieldClassName } from "./pessoalFormControls";
 
 const CLIENT_PICKER_LIMIT = 50;
+const FIRST_CLIENT_PAGE = 1;
 
 interface PessoalClientSelectorProps {
   selectedClient: PessoalClientOption | null;
@@ -19,7 +20,7 @@ export function PessoalClientSelector({
 }: PessoalClientSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(FIRST_CLIENT_PAGE);
   const deferredSearch = useDeferredValue(search.trim());
   const clientsQuery = useClients({
     status: "Ativo",
@@ -34,13 +35,13 @@ export function PessoalClientSelector({
   }));
   const total = clientsQuery.data?.total ?? 0;
   const pageSize = clientsQuery.data?.pageSize ?? CLIENT_PICKER_LIMIT;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const hasPreviousPage = page > 1;
+  const totalPages = Math.max(FIRST_CLIENT_PAGE, Math.ceil(total / pageSize));
+  const hasPreviousPage = page > FIRST_CLIENT_PAGE;
   const hasNextPage = Boolean(clientsQuery.data?.hasMore) || page < totalPages;
 
   function handleSearchChange(value: string) {
     setSearch(value);
-    setPage(1);
+    setPage(FIRST_CLIENT_PAGE);
   }
 
   function handlePageChange(value: string) {
@@ -50,7 +51,7 @@ export function PessoalClientSelector({
       return;
     }
 
-    setPage(Math.min(totalPages, Math.max(1, nextPage)));
+    setPage(Math.min(totalPages, Math.max(FIRST_CLIENT_PAGE, nextPage)));
   }
 
   function handleSelect(client: PessoalClientOption | null) {
@@ -183,7 +184,7 @@ export function PessoalClientSelector({
                 Página
                 <input
                   type="number"
-                  min={1}
+                  min={FIRST_CLIENT_PAGE}
                   max={totalPages}
                   value={page}
                   onChange={(event) => handlePageChange(event.target.value)}
@@ -194,7 +195,9 @@ export function PessoalClientSelector({
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  onClick={() =>
+                    setPage((current) => Math.max(FIRST_CLIENT_PAGE, current - 1))
+                  }
                   disabled={!hasPreviousPage || clientsQuery.isFetching}
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
