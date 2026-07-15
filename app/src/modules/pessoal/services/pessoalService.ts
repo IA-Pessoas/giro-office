@@ -1,3 +1,10 @@
+import type {
+  PessoalObligation,
+  PessoalObligationCreatePayload,
+  PessoalObligationCreateResult,
+  PessoalObligationGenerationResult,
+  PessoalObligationUpdatePayload,
+} from "../types/obligations";
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import type { PessoalUnion, PessoalUnionPayload } from "../types/unions";
 
@@ -54,6 +61,16 @@ export function buildPessoalPayrollUpdatePayload(
   const { client_id: _clientId, ...body } = buildPessoalPayrollPayload(payload);
 
   return body;
+}
+
+export function buildPessoalObligationParams(
+  clientId: string,
+  competence: string,
+): PessoalObligationCreatePayload {
+  return {
+    client_id: clientId,
+    competence,
+  };
 }
 
 function isNotFoundError(error: unknown): boolean {
@@ -134,5 +151,54 @@ export const pessoalService = {
     );
 
     return unwrapPessoalEnvelope<PessoalPayroll>(response.data);
+  },
+
+  async detailObligation(
+    clientId: string,
+    competence: string,
+  ): Promise<PessoalObligation | null> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+
+    try {
+      const response = await api.get(PESSOAL_ENDPOINTS.obligations, {
+        params: buildPessoalObligationParams(clientId, competence),
+      });
+
+      return unwrapPessoalEnvelope<PessoalObligation>(response.data);
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return null;
+      }
+
+      throw error;
+    }
+  },
+
+  async createObligation(
+    payload: PessoalObligationCreatePayload,
+  ): Promise<PessoalObligationCreateResult> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(PESSOAL_ENDPOINTS.obligations, payload);
+
+    return unwrapPessoalEnvelope<PessoalObligationCreateResult>(response.data);
+  },
+
+  async updateObligationField(
+    id: string,
+    payload: PessoalObligationUpdatePayload,
+  ): Promise<PessoalObligation> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.patch(PESSOAL_ENDPOINTS.obligationDetail(id), payload);
+
+    return unwrapPessoalEnvelope<PessoalObligation>(response.data);
+  },
+
+  async generateObligations(
+    competence: string,
+  ): Promise<PessoalObligationGenerationResult> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(PESSOAL_ENDPOINTS.obligationGenerate(competence));
+
+    return unwrapPessoalEnvelope<PessoalObligationGenerationResult>(response.data);
   },
 };

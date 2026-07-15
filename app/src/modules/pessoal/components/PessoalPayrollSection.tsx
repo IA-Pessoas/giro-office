@@ -11,6 +11,7 @@ import {
 import { usePessoalUnions } from "../hooks/usePessoalUnions";
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import {
+  pessoalCheckboxCardClassName,
   pessoalPrimaryButtonClassName,
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
@@ -383,10 +384,7 @@ export function PessoalPayrollSection({
           {checkboxFields.map((field) => (
             <label
               key={field.name}
-              className={cn(
-                "flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 text-sm",
-                "text-gray-700 dark:border-gray-700 dark:text-gray-300",
-              )}
+              className={pessoalCheckboxCardClassName}
             >
               <input
                 type="checkbox"

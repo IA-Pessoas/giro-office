@@ -7,6 +7,7 @@ import {
   unwrapPessoalEnvelope,
 } from "./services/pessoalService.contract.ts";
 import {
+  buildPessoalObligationParams,
   buildPessoalPayrollPayload,
   buildPessoalPayrollUpdatePayload,
   buildPessoalUnionPayload,
@@ -123,6 +124,13 @@ runTest("payroll payload builder keeps backend payroll fields", () => {
   assert.equal("client_id" in buildPessoalPayrollUpdatePayload(payload), false);
 });
 
+runTest("obligation params map client and competence", () => {
+  assert.deepEqual(buildPessoalObligationParams("client-1", "2026-07"), {
+    client_id: "client-1",
+    competence: "2026-07",
+  });
+});
+
 runTest("pessoal UI follows tecnologia-style system accent and centered tabs", () => {
   const shell = readFileSync("src/modules/pessoal/components/PessoalShell.tsx", "utf8");
   const overview = readFileSync("src/modules/pessoal/components/PessoalOverviewSection.tsx", "utf8");
@@ -133,13 +141,24 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   const controls = readFileSync("src/modules/pessoal/components/pessoalFormControls.ts", "utf8");
   const unions = readFileSync("src/modules/pessoal/components/PessoalUnionsSection.tsx", "utf8");
   const payroll = readFileSync("src/modules/pessoal/components/PessoalPayrollSection.tsx", "utf8");
+  const obligations = readFileSync(
+    "src/modules/pessoal/components/PessoalObligationsSection.tsx",
+    "utf8",
+  );
   const clientSelector = readFileSync(
     "src/modules/pessoal/components/PessoalClientSelector.tsx",
     "utf8",
   );
-  const source = [shell, overview, placeholder, controls, unions, payroll, clientSelector].join(
-    "\n",
-  );
+  const source = [
+    shell,
+    overview,
+    placeholder,
+    controls,
+    unions,
+    payroll,
+    obligations,
+    clientSelector,
+  ].join("\n");
 
   assert.match(shell, /justify-center/);
   assert.match(shell, /dark:bg-gray-800/);
@@ -209,6 +228,13 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(payroll, /right-4/);
   assert.match(payroll, /type="checkbox"/);
   assert.match(payroll, /type="number"/);
+  assert.match(shell, /PessoalObligationsSection/);
+  assert.match(shell, /activeTab === "obligations"/);
+  assert.match(obligations, /usePessoalObligation/);
+  assert.match(obligations, /useGeneratePessoalObligationsMutation/);
+  assert.match(obligations, /type="month"/);
+  assert.match(obligations, /type="checkbox"/);
+  assert.match(obligations, /Gerar/);
   assert.match(overview, /text-4xl/);
   assert.match(overview, /text-3xl/);
   assert.match(unions, /border-spacing-y-2/);
