@@ -194,6 +194,9 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(shell, /activeTab === "payroll"/);
   assert.match(payroll, /usePessoalPayroll/);
   assert.match(payroll, /Nenhuma configuração de folha cadastrada para este cliente/);
+  assert.match(payroll, /ChevronDown/);
+  assert.match(payroll, /appearance-none pr-12/);
+  assert.match(payroll, /right-4/);
   assert.match(payroll, /type="checkbox"/);
   assert.match(payroll, /type="number"/);
   assert.match(overview, /text-4xl/);

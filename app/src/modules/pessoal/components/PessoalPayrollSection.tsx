@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { AlertCircle, Loader2, RefreshCw, Save, WalletCards } from "lucide-react";
+import { AlertCircle, ChevronDown, Loader2, RefreshCw, Save, WalletCards } from "lucide-react";
 
 import { cn } from "@shared/ui/newLayout/utils";
 
@@ -360,19 +360,22 @@ export function PessoalPayrollSection({
 
           <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
             Sindicato
-            <select
-              value={formValues.union_id}
-              onChange={(event) => handleFieldChange("union_id", event.target.value)}
-              disabled={isFormDisabled || unionsQuery.isLoading}
-              className={pessoalTextFieldClassName}
-            >
-              <option value="">Sem sindicato</option>
-              {(unionsQuery.data ?? []).map((union) => (
-                <option key={union.id} value={union.id}>
-                  {union.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={formValues.union_id}
+                onChange={(event) => handleFieldChange("union_id", event.target.value)}
+                disabled={isFormDisabled || unionsQuery.isLoading}
+                className={`${pessoalTextFieldClassName} appearance-none pr-12`}
+              >
+                <option value="">Sem sindicato</option>
+                {(unionsQuery.data ?? []).map((union) => (
+                  <option key={union.id} value={union.id}>
+                    {union.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+            </div>
           </label>
         </div>
 
