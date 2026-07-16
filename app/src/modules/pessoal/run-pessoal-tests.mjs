@@ -12,6 +12,7 @@ import {
   buildPessoalPayrollPayload,
   buildPessoalPayrollUpdatePayload,
   buildPessoalUnionPayload,
+  hasPessoalPasswordSecretFields,
 } from "./services/pessoalService.ts";
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
 
@@ -138,6 +139,22 @@ runTest("ldd list params include optional client id only when present", () => {
   assert.deepEqual(buildPessoalLddListParams(""), {});
 });
 
+runTest("password list items are treated as non-secret summaries", () => {
+  assert.equal(
+    hasPessoalPasswordSecretFields({ id: "p1", service_name: "Gov", client_id: "c1" }),
+    false,
+  );
+  assert.equal(
+    hasPessoalPasswordSecretFields({
+      id: "p1",
+      service_name: "Gov",
+      client_id: "c1",
+      senha_main: "secret",
+    }),
+    true,
+  );
+});
+
 runTest("pessoal UI follows tecnologia-style system accent and centered tabs", () => {
   const shell = readFileSync("src/modules/pessoal/components/PessoalShell.tsx", "utf8");
   const overview = readFileSync("src/modules/pessoal/components/PessoalOverviewSection.tsx", "utf8");
@@ -156,6 +173,10 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
     "src/modules/pessoal/components/PessoalTrackingSection.tsx",
     "utf8",
   );
+  const passwords = readFileSync(
+    "src/modules/pessoal/components/PessoalPasswordsSection.tsx",
+    "utf8",
+  );
   const clientSelector = readFileSync(
     "src/modules/pessoal/components/PessoalClientSelector.tsx",
     "utf8",
@@ -169,6 +190,7 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
     payroll,
     obligations,
     tracking,
+    passwords,
     clientSelector,
   ].join("\n");
 
@@ -304,6 +326,44 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(tracking, /confirm/);
   assert.match(tracking, /type: "date"/);
   assert.match(tracking, /type: "number"/);
+  assert.match(shell, /PessoalPasswordsSection/);
+  assert.match(shell, /activeTab === "passwords"/);
+  assert.match(passwords, /usePessoalPasswords/);
+  assert.match(passwords, /usePessoalPasswordDetail/);
+  assert.match(passwords, /hasPessoalPasswordSecretFields/);
+  assert.match(passwords, /normalizeSearch/);
+  assert.match(passwords, /type="search"/);
+  assert.match(passwords, /Buscar por serviço ou responsável/);
+  assert.match(passwords, /const hasPasswords = passwords\.length > 0/);
+  assert.match(passwords, /\{hasPasswords \? \(/);
+  assert.match(passwords, /revealedFields/);
+  assert.match(passwords, /toggleSecretField/);
+  assert.match(passwords, /navigator\.clipboard/);
+  assert.match(passwords, /confirm/);
+  assert.match(passwords, /pessoalPasswordServiceOptions/);
+  assert.match(passwords, /Outro serviço/);
+  assert.match(passwords, /listAdminUsers/);
+  assert.match(passwords, /usersQuery/);
+  assert.match(passwords, /<select/);
+  assert.match(passwords, /ChevronDown/);
+  assert.match(passwords, /appearance-none pr-12/);
+  assert.match(passwords, /absolute right-4/);
+  assert.match(passwords, /max-w-xl/);
+  assert.match(passwords, /p-4 shadow-2xl/);
+  assert.match(passwords, /className="space-y-3"/);
+  assert.match(passwords, /grid gap-3 md:grid-cols-2/);
+  assert.match(passwords, /min-h-20/);
+  assert.match(passwords, /role="dialog"/);
+  assert.match(passwords, /aria-modal="true"/);
+  assert.match(passwords, /aria-labelledby="pessoal-password-form-title"/);
+  assert.match(passwords, /backdrop-blur-sm/);
+  assert.match(passwords, /aria-label="Fechar senha"/);
+  assert.match(passwords, /type="password"/);
+  assert.match(passwords, /senha_main/);
+  assert.match(passwords, /senha_secondary/);
+  assert.doesNotMatch(passwords, /max-w-2xl/);
+  assert.doesNotMatch(passwords, />\s*Fechar\s*</);
+  assert.doesNotMatch(passwords, />\s*Cancelar\s*</);
   assert.match(overview, /text-4xl/);
   assert.match(overview, /text-3xl/);
   assert.match(unions, /border-spacing-y-2/);
