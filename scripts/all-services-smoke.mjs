@@ -2191,6 +2191,12 @@ const handlers = {
     });
   },
 
+  async projectMetrics(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+    });
+  },
+
   async projectCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],
