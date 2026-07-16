@@ -4,6 +4,7 @@ import type {
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
+  ProjectMetrics,
   ProjectProgressResponse,
 } from "../types";
 import { unwrapServiceEnvelope } from "./envelope.contract.js";
@@ -12,6 +13,7 @@ export const PROJECT_ENDPOINTS = {
   list: "/project/list",
   crud: "/project",
   progress: "/project/progress",
+  metrics: "/project/metrics",
 } as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -66,6 +68,11 @@ export function unwrapProjectDetail(body: unknown): ProjectDetail {
 
 export function unwrapUpdatedProject(body: unknown): ProjectDetail {
   return unwrapProjectEnvelope<ProjectDetail>(body);
+}
+
+
+export function unwrapProjectMetrics(body: unknown): ProjectMetrics {
+  return unwrapProjectEnvelope<ProjectMetrics>(body);
 }
 
 export function unwrapProjectProgress(body: unknown): ProjectProgressResponse {

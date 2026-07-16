@@ -101,6 +101,25 @@ export interface RecalculateProjectProgressData {
   project_id: string;
 }
 
+
+export interface ProjectTaskMetrics {
+  total: number;
+  completed: number;
+  open: number;
+  paused: number;
+  emptyStatus: number;
+}
+
+export interface ProjectMetrics {
+  total: number;
+  completed: number;
+  inProgress: number;
+  paused: number;
+  toDo: number;
+  notContracted: number;
+  taskMetrics: ProjectTaskMetrics;
+}
+
 export interface ProjectProgressResponse {
   id?: string;
   porcentage: number;
