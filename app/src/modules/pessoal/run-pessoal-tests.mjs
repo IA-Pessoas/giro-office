@@ -342,6 +342,11 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(passwords, /confirm/);
   assert.match(passwords, /pessoalPasswordServiceOptions/);
   assert.match(passwords, /Outro serviço/);
+  assert.match(passwords, /isCustomService/);
+  assert.match(passwords, /setIsCustomService\(true\)/);
+  assert.match(passwords, /clearedSecretFields/);
+  assert.match(passwords, /payload\[field\.name\] = null/);
+  assert.match(passwords, /Limpar/);
   assert.match(passwords, /listAdminUsers/);
   assert.match(passwords, /usersQuery/);
   assert.match(passwords, /<select/);

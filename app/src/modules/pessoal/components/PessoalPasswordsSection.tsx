@@ -147,7 +147,10 @@ function buildPasswordCreatePayload(
   };
 }
 
-function buildPasswordUpdatePayload(values: PasswordFormValues): PessoalPasswordUpdatePayload {
+function buildPasswordUpdatePayload(
+  values: PasswordFormValues,
+  clearedSecretFields: Set<SecretFieldName>,
+): PessoalPasswordUpdatePayload {
   const payload: PessoalPasswordUpdatePayload = {
     service_name: values.service_name.trim(),
     responsavel_id: optional(values.responsavel_id),
@@ -155,6 +158,11 @@ function buildPasswordUpdatePayload(values: PasswordFormValues): PessoalPassword
   };
 
   for (const field of secretFields) {
+    if (clearedSecretFields.has(field.name)) {
+      payload[field.name] = null;
+      continue;
+    }
+
     const value = optional(values[field.name]);
 
     if (value !== null) {
@@ -238,6 +246,10 @@ export function PessoalPasswordsSection({
   const [formValues, setFormValues] = useState<PasswordFormValues>(
     emptyPasswordFormValues,
   );
+  const [isCustomService, setIsCustomService] = useState(false);
+  const [clearedSecretFields, setClearedSecretFields] = useState<Set<SecretFieldName>>(
+    new Set(),
+  );
   const [isFormOpen, setIsFormOpen] = useState(false);
   const usersQuery = useFetch<UserItem[]>(
     pessoalQueryKey("passwords", "users", "active"),
@@ -279,6 +291,8 @@ export function PessoalPasswordsSection({
     setSelectedPasswordId("");
     setEditingPasswordId("");
     setFormValues(emptyPasswordFormValues);
+    setIsCustomService(false);
+    setClearedSecretFields(new Set());
     setIsFormOpen(false);
     setFormError(null);
     setSuccessMessage(null);
@@ -313,6 +327,8 @@ export function PessoalPasswordsSection({
     clearFeedback();
     setEditingPasswordId("");
     setFormValues(emptyPasswordFormValues);
+    setIsCustomService(false);
+    setClearedSecretFields(new Set());
     setIsFormOpen(true);
   }
 
@@ -324,6 +340,8 @@ export function PessoalPasswordsSection({
     clearFeedback();
     setEditingPasswordId(selectedPasswordId);
     setFormValues(buildPasswordFormValues(detail ?? selectedPassword));
+    setIsCustomService(!isPessoalPasswordKnownService((detail ?? selectedPassword).service_name));
+    setClearedSecretFields(new Set());
     setIsFormOpen(true);
   }
 
@@ -331,6 +349,8 @@ export function PessoalPasswordsSection({
     setIsFormOpen(false);
     setEditingPasswordId("");
     setFormValues(emptyPasswordFormValues);
+    setIsCustomService(false);
+    setClearedSecretFields(new Set());
     setFormError(null);
   }
 
@@ -342,6 +362,10 @@ export function PessoalPasswordsSection({
   }
 
   function getServiceSelectValue() {
+    if (isCustomService) {
+      return PESSOAL_PASSWORD_OTHER_SERVICE;
+    }
+
     if (!formValues.service_name) {
       return "";
     }
@@ -353,6 +377,7 @@ export function PessoalPasswordsSection({
 
   function handleServiceSelectChange(value: string) {
     if (value === PESSOAL_PASSWORD_OTHER_SERVICE) {
+      setIsCustomService(true);
       setFormValues((current) => ({
         ...current,
         service_name: isPessoalPasswordKnownService(current.service_name)
@@ -362,6 +387,7 @@ export function PessoalPasswordsSection({
       return;
     }
 
+    setIsCustomService(false);
     handleFieldChange("service_name", value);
   }
 
@@ -395,6 +421,24 @@ export function PessoalPasswordsSection({
     });
   }
 
+  function toggleClearedSecretField(field: SecretFieldName) {
+    setClearedSecretFields((current) => {
+      const next = new Set(current);
+
+      if (next.has(field)) {
+        next.delete(field);
+      } else {
+        next.add(field);
+        setFormValues((values) => ({
+          ...values,
+          [field]: "",
+        }));
+      }
+
+      return next;
+    });
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -412,7 +456,9 @@ export function PessoalPasswordsSection({
 
     try {
       const savedPassword = editingPasswordId
-        ? await updateMutation.mutateAsync(buildPasswordUpdatePayload(formValues))
+        ? await updateMutation.mutateAsync(
+            buildPasswordUpdatePayload(formValues, clearedSecretFields),
+          )
         : await createMutation.mutateAsync(
             buildPasswordCreatePayload(selectedClientId, formValues),
           );
@@ -809,22 +855,37 @@ export function PessoalPasswordsSection({
                   </label>
                 ) : null}
 
-                {secretFields.map((field) => (
-                  <label
-                    key={field.name}
-                    className="flex flex-col gap-1.5 text-sm text-gray-700 dark:text-gray-300"
-                  >
-                    {field.label}
-                    <input
-                      type="password"
-                      value={formValues[field.name]}
-                      onChange={(event) => handleFieldChange(field.name, event.target.value)}
-                      disabled={isSubmitting}
-                      autoComplete="off"
-                      className={pessoalTextFieldClassName}
-                    />
-                  </label>
-                ))}
+                {secretFields.map((field) => {
+                  const isCleared = clearedSecretFields.has(field.name);
+
+                  return (
+                    <div key={field.name} className="space-y-1.5">
+                      <label className="flex flex-col gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+                        {field.label}
+                        <input
+                          type="password"
+                          value={formValues[field.name]}
+                          onChange={(event) => handleFieldChange(field.name, event.target.value)}
+                          disabled={isSubmitting || isCleared}
+                          autoComplete="off"
+                          className={pessoalTextFieldClassName}
+                        />
+                      </label>
+                      {editingPasswordId ? (
+                        <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                          <input
+                            type="checkbox"
+                            checked={isCleared}
+                            onChange={() => toggleClearedSecretField(field.name)}
+                            disabled={isSubmitting}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          Limpar
+                        </label>
+                      ) : null}
+                    </div>
+                  );
+                })}
 
                 <label className="flex flex-col gap-1.5 text-sm text-gray-700 dark:text-gray-300 md:col-span-2">
                   Observações
