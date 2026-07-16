@@ -1,5 +1,6 @@
 import type { AuthPolicy } from "@workspace/shared";
 
+const platformOnlyPolicy: AuthPolicy = { special: "platformOnly" };
 const userManagementPolicy: AuthPolicy = { special: "manageUsers" };
 const moduleAccessPermission = 1;
 
@@ -45,6 +46,7 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
+  { method: "ANY", path: /^\/platform(?:\/|$)/, policy: platformOnlyPolicy },
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },

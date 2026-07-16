@@ -129,6 +129,11 @@ export function buildAuditLifecycleMiddleware({
         metadata: {
           responseSizeBytes: getResponseSizeBytes(response) ?? null,
           routeTarget: getRouteTarget(env, request),
+          authKind: request.auth?.actorKind ?? null,
+          platformRole: request.auth?.claims.platform_role ?? null,
+          supportMode: request.auth?.isSupportMode ?? false,
+          supportSessionId: request.auth?.supportSessionId ?? null,
+          supportOrganizationId: request.auth?.supportOrganizationId ?? null,
         },
       };
 

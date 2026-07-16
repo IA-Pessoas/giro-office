@@ -1,9 +1,14 @@
 import { Readable } from "node:stream";
 
 import {
+  FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+  FORWARDED_AUTH_SUPPORT_MODE_HEADER,
+  FORWARDED_AUTH_SUPPORT_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_SUPPORT_SESSION_ID_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -115,6 +120,11 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     FORWARDED_AUTH_PERMISSION_HEADER,
     FORWARDED_AUTH_TYPE_HEADER,
     FORWARDED_AUTH_MODULES_HEADER,
+    FORWARDED_AUTH_KIND_HEADER,
+    FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+    FORWARDED_AUTH_SUPPORT_MODE_HEADER,
+    FORWARDED_AUTH_SUPPORT_SESSION_ID_HEADER,
+    FORWARDED_AUTH_SUPPORT_ORGANIZATION_ID_HEADER,
   ]);
 
   Object.entries(request.headers).forEach(([key, value]) => {
@@ -143,7 +153,11 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
 
   if (request.auth) {
     headers.set(FORWARDED_AUTH_USER_ID_HEADER, request.auth.userId);
-    headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, request.auth.organizationId);
+    headers.set(FORWARDED_AUTH_KIND_HEADER, request.auth.actorKind);
+
+    if (request.auth.organizationId) {
+      headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, request.auth.organizationId);
+    }
 
     const modules = request.auth.claims.modules as Record<string, number | null> | undefined;
     const forwardedPermission = resolveForwardedPermission(
@@ -164,6 +178,25 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
 
     if (modules) {
       headers.set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify(modules));
+    }
+
+    if (request.auth.claims.platform_role === "super_admin") {
+      headers.set(FORWARDED_AUTH_PLATFORM_ROLE_HEADER, "super_admin");
+    }
+
+    if (request.auth.isSupportMode) {
+      headers.set(FORWARDED_AUTH_SUPPORT_MODE_HEADER, "true");
+    }
+
+    if (request.auth.supportSessionId) {
+      headers.set(FORWARDED_AUTH_SUPPORT_SESSION_ID_HEADER, request.auth.supportSessionId);
+    }
+
+    if (request.auth.supportOrganizationId) {
+      headers.set(
+        FORWARDED_AUTH_SUPPORT_ORGANIZATION_ID_HEADER,
+        request.auth.supportOrganizationId,
+      );
     }
   }
 

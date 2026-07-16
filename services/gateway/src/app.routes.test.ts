@@ -5,9 +5,14 @@ import { Writable } from "node:stream";
 import type { CreateAuditRequestPayload } from "@workspace/shared";
 import {
   createLogger,
+  FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+  FORWARDED_AUTH_SUPPORT_MODE_HEADER,
+  FORWARDED_AUTH_SUPPORT_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_SUPPORT_SESSION_ID_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -190,15 +195,344 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
 function createToken(
   claims: {
     user_id: string;
-    organization_id: string;
-    permission: number;
+    organization_id?: string;
+    permission?: number;
     type?: "owner" | "admin" | "user";
     modules?: Record<string, number | null>;
+    auth_kind?: "organization" | "platform";
+    platform_role?: "super_admin";
+    support_mode?: boolean;
+    support_session_id?: string;
+    support_organization_id?: string;
   },
   secret = "test-secret",
 ): string {
   return jwt.sign(claims, secret);
 }
+
+it("proxies public platform session requests to the user service", async () => {
+  let seenUrl = "";
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { token: "platform-token" } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/platform/session`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "dev@example.com", password: "secret" }),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl).toBe("/platform/session");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("blocks organization users from platform routes before proxying", async () => {
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "owner-1",
+    organization_id: "org-1",
+    permission: 2,
+    type: "owner",
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/platform/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(403);
+    expect(body.code).toBe("FORBIDDEN");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("forwards platform auth headers to platform user routes", async () => {
+  let seenHeaders: {
+    authKind?: string;
+    platformRole?: string;
+    userId?: string;
+    organizationId?: string;
+  } = {};
+  const upstream = createServer((request, response) => {
+    seenHeaders = {
+      authKind: request.headers[FORWARDED_AUTH_KIND_HEADER] as string | undefined,
+      platformRole: request.headers[FORWARDED_AUTH_PLATFORM_ROLE_HEADER] as string | undefined,
+      userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
+      organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined,
+    };
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { id: "platform-1" } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "platform-1",
+    auth_kind: "platform",
+    platform_role: "super_admin",
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/platform/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenHeaders.authKind).toBe("platform");
+    expect(seenHeaders.platformRole).toBe("super_admin");
+    expect(seenHeaders.userId).toBe("platform-1");
+    expect(seenHeaders.organizationId).toBeUndefined();
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("routes platform organization user management to user-service before organization-service", async () => {
+  let userServiceHits = 0;
+  let organizationServiceHits = 0;
+  const userService = createServer((request, response) => {
+    userServiceHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { service: "user", path: request.url } }));
+  });
+  const organizationService = createServer((_request, response) => {
+    organizationServiceHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { service: "organization" } }));
+  });
+  const userServiceUrl = await startServer(userService);
+  const organizationServiceUrl = await startServer(organizationService);
+  const app = createApp(createEnv({ organizationServiceUrl, userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "platform-1",
+    auth_kind: "platform",
+    platform_role: "super_admin",
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/platform/organizations/org-1/users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as {
+      data?: { service?: string; path?: string };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.data?.service).toBe("user");
+    expect(body.data?.path).toBe("/platform/organizations/org-1/users");
+    expect(userServiceHits).toBe(1);
+    expect(organizationServiceHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(userService);
+    await stopServer(organizationService);
+  }
+});
+
+it("routes platform organization directory to organization-service", async () => {
+  let seenUrl = "";
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { service: "organization" } }));
+  });
+  const organizationServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ organizationServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "platform-1",
+    auth_kind: "platform",
+    platform_role: "super_admin",
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/platform/organizations`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenUrl).toBe("/platform/organizations");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("blocks platform tokens without support mode from organization routes", async () => {
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const taskServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ taskServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "platform-1",
+    auth_kind: "platform",
+    platform_role: "super_admin",
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/task/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Selecione uma organizacao em modo suporte.");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("uses support organization and forwards support headers in support mode", async () => {
+  let seenHeaders: {
+    authKind?: string;
+    organizationId?: string;
+    supportMode?: string;
+    supportSessionId?: string;
+    supportOrganizationId?: string;
+  } = {};
+  const upstream = createServer((request, response) => {
+    seenHeaders = {
+      authKind: request.headers[FORWARDED_AUTH_KIND_HEADER] as string | undefined,
+      organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined,
+      supportMode: request.headers[FORWARDED_AUTH_SUPPORT_MODE_HEADER] as string | undefined,
+      supportSessionId: request.headers[FORWARDED_AUTH_SUPPORT_SESSION_ID_HEADER] as
+        | string
+        | undefined,
+      supportOrganizationId: request.headers[FORWARDED_AUTH_SUPPORT_ORGANIZATION_ID_HEADER] as
+        | string
+        | undefined,
+    };
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "platform-1",
+    auth_kind: "platform",
+    platform_role: "super_admin",
+    support_mode: true,
+    support_session_id: "support-1",
+    support_organization_id: "org-support",
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenHeaders.authKind).toBe("platform");
+    expect(seenHeaders.organizationId).toBe("org-support");
+    expect(seenHeaders.supportMode).toBe("true");
+    expect(seenHeaders.supportSessionId).toBe("support-1");
+    expect(seenHeaders.supportOrganizationId).toBe("org-support");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("records platform support metadata when audit is enabled", async () => {
+  const auditService = await startAuditIngestServer();
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      clientServiceUrl,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "platform-1",
+    auth_kind: "platform",
+    platform_role: "super_admin",
+    support_mode: true,
+    support_session_id: "support-1",
+    support_organization_id: "org-support",
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    await waitForRecords(auditService.records, 1);
+
+    expect(auditService.records[0]?.organizationId).toBe("org-support");
+    expect(auditService.records[0]?.userId).toBe("platform-1");
+    expect(auditService.records[0]?.metadata).toMatchObject({
+      authKind: "platform",
+      platformRole: "super_admin",
+      routeTarget: "client-service",
+      supportMode: true,
+      supportOrganizationId: "org-support",
+      supportSessionId: "support-1",
+    });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+    await stopServer(auditService.server);
+  }
+});
 
 it("returns shared unauthorized response when token is missing", async () => {
   const app = createApp(createEnv(), createTestLogger());

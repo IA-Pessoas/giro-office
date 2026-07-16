@@ -1,6 +1,10 @@
 const publicPathsAnyMethod = new Set<string>(["/health", "/ready"]);
 
-const publicRoutesWithMethod = new Set<string>(["POST /user/session", "POST /user/start-config"]);
+const publicRoutesWithMethod = new Set<string>([
+  "POST /platform/session",
+  "POST /user/session",
+  "POST /user/start-config",
+]);
 
 function isSocketIoPath(path: string): boolean {
   return path === "/socket.io" || path.startsWith("/socket.io/");
