@@ -293,6 +293,8 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(tracking, /lddRegistrationStatusOptions/);
   assert.match(tracking, /lddStatusOptions/);
   assert.match(tracking, /field\.options/);
+  assert.match(tracking, /border-t border-gray-200 pt-5/);
+  assert.doesNotMatch(tracking, /<div className="grid gap-6">\s*<TrackingListCard/);
   assert.match(tracking, /actions\?: ReactNode/);
   assert.match(tracking, /actions=\{\s*canEdit \? \(/);
   assert.doesNotMatch(

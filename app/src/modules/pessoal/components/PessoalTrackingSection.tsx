@@ -427,128 +427,127 @@ export function PessoalTrackingSection({
             </button>
           </div>
         </div>
-      </div>
 
-      {activeTrackingTab === "ldd" ? (
-        <div className="grid gap-6">
-          <TrackingListCard
-            icon={FileText}
-            title="LDD"
-            loading={lddQuery.isLoading}
-            error={lddQuery.isError ? lddQuery.error : null}
-            empty={lddRows.length === 0}
-            emptyMessage="Nenhum LDD cadastrado para este cliente."
-            actions={
-              canEdit ? (
-                <button
-                  type="button"
-                  onClick={startNewLdd}
-                  className={pessoalPrimaryButtonClassName}
-                >
-                  <Plus className="h-4 w-4" />
-                  Criar LDD
-                </button>
-              ) : null
-            }
-          >
-            {lddRows.map((ldd) => (
-              <div
-                key={ldd.id}
-                className={cn(
-                  "rounded-lg border border-gray-200 p-4 dark:border-gray-700",
-                  selectedLdd?.id === ldd.id && "border-blue-300 bg-blue-50 dark:bg-blue-950/20",
-                )}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{ldd.type}</p>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                      Vencimento: {formatDate(ldd.due_date)}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                      Status: {ldd.status || "-"} | Cadastro: {ldd.registration_status || "-"}
-                    </p>
-                  </div>
-                  {canEdit ? (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEditLdd(ldd)}
-                        className={pessoalSecondaryButtonClassName}
-                      >
-                        <Pencil className="h-4 w-4" />
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDeleteLdd(ldd)}
-                        disabled={deleteLddMutation.isPending}
-                        className={pessoalSecondaryButtonClassName}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Remover
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </TrackingListCard>
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          <TrackingListCard
-            icon={ClipboardList}
-            title="Situações"
-            loading={situationsQuery.isLoading}
-            error={situationsQuery.isError ? situationsQuery.error : null}
-            empty={situationRows.length === 0}
-            emptyMessage="Nenhuma situação cadastrada para este cliente."
-            actions={
-              canEdit ? (
-                <button
-                  type="button"
-                  onClick={startNewSituation}
-                  className={pessoalPrimaryButtonClassName}
-                >
-                  <Plus className="h-4 w-4" />
-                  Criar situação
-                </button>
-              ) : null
-            }
-          >
-            {situationRows.map((situation) => (
-              <div
-                key={situation.id}
-                className={cn(
-                  "rounded-lg border border-gray-200 p-4 dark:border-gray-700",
-                  selectedSituationId === situation.id &&
-                    "border-blue-300 bg-blue-50 dark:bg-blue-950/20",
-                )}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {situation.title}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                      {situation.status} desde {formatDate(situation.registration_date)}
-                    </p>
-                  </div>
+        <div className="mt-6 border-t border-gray-200 pt-5 dark:border-gray-700">
+          {activeTrackingTab === "ldd" ? (
+            <TrackingListCard
+              icon={FileText}
+              title="LDD"
+              loading={lddQuery.isLoading}
+              error={lddQuery.isError ? lddQuery.error : null}
+              empty={lddRows.length === 0}
+              emptyMessage="Nenhum LDD cadastrado para este cliente."
+              actions={
+                canEdit ? (
                   <button
                     type="button"
-                    onClick={() => startSituationDetail(situation)}
-                    className={pessoalSecondaryButtonClassName}
+                    onClick={startNewLdd}
+                    className={pessoalPrimaryButtonClassName}
                   >
-                    <FileText className="h-4 w-4" />
-                    Detalhar
+                    <Plus className="h-4 w-4" />
+                    Criar LDD
                   </button>
+                ) : null
+              }
+            >
+              {lddRows.map((ldd) => (
+                <div
+                  key={ldd.id}
+                  className={cn(
+                    "rounded-lg border border-gray-200 p-4 dark:border-gray-700",
+                    selectedLdd?.id === ldd.id &&
+                      "border-blue-300 bg-blue-50 dark:bg-blue-950/20",
+                  )}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-white">{ldd.type}</p>
+                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        Vencimento: {formatDate(ldd.due_date)}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        Status: {ldd.status || "-"} | Cadastro: {ldd.registration_status || "-"}
+                      </p>
+                    </div>
+                    {canEdit ? (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEditLdd(ldd)}
+                          className={pessoalSecondaryButtonClassName}
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteLdd(ldd)}
+                          disabled={deleteLddMutation.isPending}
+                          className={pessoalSecondaryButtonClassName}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Remover
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </TrackingListCard>
+              ))}
+            </TrackingListCard>
+          ) : (
+            <TrackingListCard
+              icon={ClipboardList}
+              title="Situações"
+              loading={situationsQuery.isLoading}
+              error={situationsQuery.isError ? situationsQuery.error : null}
+              empty={situationRows.length === 0}
+              emptyMessage="Nenhuma situação cadastrada para este cliente."
+              actions={
+                canEdit ? (
+                  <button
+                    type="button"
+                    onClick={startNewSituation}
+                    className={pessoalPrimaryButtonClassName}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Criar situação
+                  </button>
+                ) : null
+              }
+            >
+              {situationRows.map((situation) => (
+                <div
+                  key={situation.id}
+                  className={cn(
+                    "rounded-lg border border-gray-200 p-4 dark:border-gray-700",
+                    selectedSituationId === situation.id &&
+                      "border-blue-300 bg-blue-50 dark:bg-blue-950/20",
+                  )}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        {situation.title}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        {situation.status} desde {formatDate(situation.registration_date)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => startSituationDetail(situation)}
+                      className={pessoalSecondaryButtonClassName}
+                    >
+                      <FileText className="h-4 w-4" />
+                      Detalhar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </TrackingListCard>
+          )}
         </div>
-      )}
+      </div>
 
       {isLddFormOpen ? (
         <div
@@ -828,7 +827,7 @@ function TrackingListCard({
   const Icon = icon;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+    <div>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
