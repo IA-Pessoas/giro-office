@@ -37,6 +37,25 @@ export const updateOrganizationLogoUrlBodySchema = z
   })
   .strict();
 
+export const updatePlatformOrganizationBodySchema = z
+  .object({
+    status: z
+      .nativeEnum(statusEnum, {
+        message: "status deve ser trial, past_due, active, suspended ou cancelled.",
+      })
+      .optional(),
+    subscription_plan: zNonEmptyText("subscription_plan").optional(),
+    logo_url: z.union([z.string(), z.null()]).optional(),
+  })
+  .strict()
+  .refine(
+    (data) =>
+      data.status !== undefined || data.subscription_plan !== undefined || "logo_url" in data,
+    {
+      message: "Informe ao menos um campo para atualizar.",
+    },
+  );
+
 export const listOrganizationsQuerySchema = z
   .object({
     page: z.preprocess(
