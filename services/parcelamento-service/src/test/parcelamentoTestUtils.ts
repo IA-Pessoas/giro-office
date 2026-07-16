@@ -136,7 +136,7 @@ export function createCreatePanoramaBody(overrides: Record<string, unknown> = {}
 export function createPrismaMock() {
   const fixture = createInstallmentFixture();
 
-  return {
+  const prisma = {
     client: {
       findFirst: vi.fn(async () => ({ id: clientId, organization_id: organizationId })),
       findMany: vi.fn(async () => [{ id: clientId }]),
@@ -170,7 +170,10 @@ export function createPrismaMock() {
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     $queryRaw: vi.fn(async () => [{ ok: 1 }]),
+    $transaction: vi.fn(async (callback) => callback(prisma)),
   };
+
+  return prisma;
 }
 
 export function createAuditMock() {

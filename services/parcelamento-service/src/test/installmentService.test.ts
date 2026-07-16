@@ -344,4 +344,22 @@ describe("InstallmentService", () => {
       }),
     );
   });
+
+  it("create usa transacao serializable para fallback sem numero de acordo", async () => {
+    const prisma = createPrismaMock();
+    const service = new InstallmentService({
+      prisma: prisma as never,
+      auditService: createAuditMock(),
+    });
+
+    await service.create(
+      parcelamentoContext,
+      createCreateInstallmentBody({ agreement_number: null }),
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    });
+    expect(prisma.installment.create).toHaveBeenCalled();
+  });
 });

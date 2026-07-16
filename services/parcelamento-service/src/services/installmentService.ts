@@ -74,6 +74,7 @@ const installmentSelect = {
 } as const;
 
 type InstallmentRecord = Prisma.InstallmentGetPayload<{ select: typeof installmentSelect }>;
+type InstallmentRepository = Pick<ParcelamentoPrismaClient, "installment">;
 
 export type InstallmentDto = Omit<InstallmentRecord, "organization_id">;
 
@@ -194,7 +195,7 @@ export class InstallmentService {
       const agreementNumber = normalizeAgreementNumber(input.agreement_number);
       const enrollmentDate = toDateOrNull(input.enrollment_date);
 
-      await this.ensureUniqueIdentity({
+      const identityInput = {
         organizationId,
         agreementNumber,
         clientId: input.client_id,
@@ -202,34 +203,44 @@ export class InstallmentService {
         legalNature: input.legal_nature,
         jurisdiction: input.jurisdiction,
         enrollmentDate,
-      });
+      };
 
-      const created = await this.prisma.installment.create({
-        data: {
-          client_id: input.client_id,
-          type: input.type,
-          jurisdiction: input.jurisdiction,
-          is_automatic_debit: input.is_automatic_debit,
-          consolidated_total_amount: 0,
-          first_installment_amount: input.first_installment_amount,
-          current_month_installment_amount: input.current_month_installment_amount,
-          outstanding_balance: 0,
-          paid_installments_count: 0,
-          agreed_installments_count: input.agreed_installments_count,
-          remaining_installments_count: input.agreed_installments_count,
-          overdue_installments_count: 0,
-          enrollment_date: enrollmentDate,
-          document_url: "",
-          status: ACTIVE_INSTALLMENT_STATUS,
-          completion_date: null,
-          down_payment_installments_count: 0,
-          legal_nature: input.legal_nature,
-          situation_shutdown: null,
-          agreement_number: agreementNumber,
-          organization_id: organizationId,
-        },
-        select: installmentSelect,
-      });
+      const data = {
+        client_id: input.client_id,
+        type: input.type,
+        jurisdiction: input.jurisdiction,
+        is_automatic_debit: input.is_automatic_debit,
+        consolidated_total_amount: 0,
+        first_installment_amount: input.first_installment_amount,
+        current_month_installment_amount: input.current_month_installment_amount,
+        outstanding_balance: 0,
+        paid_installments_count: 0,
+        agreed_installments_count: input.agreed_installments_count,
+        remaining_installments_count: input.agreed_installments_count,
+        overdue_installments_count: 0,
+        enrollment_date: enrollmentDate,
+        document_url: "",
+        status: ACTIVE_INSTALLMENT_STATUS,
+        completion_date: null,
+        down_payment_installments_count: 0,
+        legal_nature: input.legal_nature,
+        situation_shutdown: null,
+        agreement_number: agreementNumber,
+        organization_id: organizationId,
+      };
+
+      const createRecord = async (db: InstallmentRepository) => {
+        await this.ensureUniqueIdentity(db, identityInput);
+
+        return db.installment.create({
+          data,
+          select: installmentSelect,
+        });
+      };
+
+      const created = agreementNumber
+        ? await createRecord(this.prisma)
+        : await this.prisma.$transaction(createRecord, { isolationLevel: "Serializable" });
 
       await this.recordAudit({
         context,
@@ -284,7 +295,7 @@ export class InstallmentService {
         ? toDateOrNull(input.enrollment_date)
         : existing.enrollment_date;
 
-      await this.ensureUniqueIdentity({
+      const identityInput = {
         organizationId,
         agreementNumber: nextAgreementNumber,
         clientId: existing.client_id,
@@ -293,7 +304,7 @@ export class InstallmentService {
         jurisdiction: input.jurisdiction ?? existing.jurisdiction,
         enrollmentDate: nextEnrollmentDate,
         excludeId: id,
-      });
+      };
 
       const data = omitUndefined({
         agreement_number: hasOwn(input, "agreement_number") ? nextAgreementNumber : undefined,
@@ -316,10 +327,20 @@ export class InstallmentService {
           : undefined,
       });
 
-      await this.prisma.installment.updateMany({
-        where: { id, organization_id: organizationId },
-        data,
-      });
+      const updateRecord = async (db: InstallmentRepository) => {
+        await this.ensureUniqueIdentity(db, identityInput);
+
+        await db.installment.updateMany({
+          where: { id, organization_id: organizationId },
+          data,
+        });
+      };
+
+      if (nextAgreementNumber) {
+        await updateRecord(this.prisma);
+      } else {
+        await this.prisma.$transaction(updateRecord, { isolationLevel: "Serializable" });
+      }
 
       await this.recordAudit({
         context,
@@ -425,18 +446,21 @@ export class InstallmentService {
     return installment;
   }
 
-  private async ensureUniqueIdentity(input: {
-    organizationId: string;
-    agreementNumber: string | null;
-    clientId: string;
-    type: string;
-    legalNature: string;
-    jurisdiction: string;
-    enrollmentDate: Date | null;
-    excludeId?: string;
-  }): Promise<void> {
+  private async ensureUniqueIdentity(
+    db: InstallmentRepository,
+    input: {
+      organizationId: string;
+      agreementNumber: string | null;
+      clientId: string;
+      type: string;
+      legalNature: string;
+      jurisdiction: string;
+      enrollmentDate: Date | null;
+      excludeId?: string;
+    },
+  ): Promise<void> {
     if (input.agreementNumber) {
-      const existingAgreement = await this.prisma.installment.findFirst({
+      const existingAgreement = await db.installment.findFirst({
         where: {
           organization_id: input.organizationId,
           agreement_number: input.agreementNumber,
@@ -451,7 +475,7 @@ export class InstallmentService {
       return;
     }
 
-    const existingFallback = await this.prisma.installment.findFirst({
+    const existingFallback = await db.installment.findFirst({
       where: {
         organization_id: input.organizationId,
         client_id: input.clientId,

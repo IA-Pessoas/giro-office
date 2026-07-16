@@ -231,4 +231,16 @@ describe("PanoramaService", () => {
     expect(createdRows).toHaveLength(1);
     expect(createdRows[0]).toMatchObject({ client_id: otherClientId });
   });
+
+  it("reports existing rows consistently when concurrent generation wins the insert race", async () => {
+    const prisma = createPrismaMock();
+    prisma.client.findMany.mockResolvedValueOnce([{ id: clientId }, { id: otherClientId }]);
+    prisma.panoramaParcelameto.findMany.mockResolvedValueOnce([]);
+    prisma.panoramaParcelameto.createMany.mockResolvedValueOnce({ count: 0 });
+    const { service } = createService(prisma);
+
+    const result = await service.generateForCompetence(parcelamentoContext, "2026-07");
+
+    expect(result).toEqual({ created: 0, existing: 2, totalActiveClients: 2 });
+  });
 });
