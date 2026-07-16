@@ -21,6 +21,7 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
     tags: [
       { name: "Health", description: "Saúde do serviço" },
       { name: "Organizações", description: "Listagem e gestão" },
+      { name: "Platform", description: "Gestao global de organizacoes pela plataforma" },
     ],
     components: {
       securitySchemes: {
@@ -133,6 +134,136 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
           responses: {
             "200": {
               description: "Organização",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/platform/organizations": {
+        get: {
+          tags: ["Platform"],
+          summary: "Listar organizacoes via plataforma",
+          description: "Uso interno via gateway para super admin de plataforma.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "page",
+              in: "query",
+              schema: { type: "integer", minimum: 1 },
+            },
+            {
+              name: "pageSize",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+            {
+              name: "status",
+              in: "query",
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Lista paginada",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        post: {
+          tags: ["Platform"],
+          summary: "Criar organizacao via plataforma",
+          description: "Uso interno via gateway para super admin de plataforma.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    email_created_by: { type: "string" },
+                    cnpj: { type: "string" },
+                  },
+                  required: ["name", "email_created_by", "cnpj"],
+                  additionalProperties: true,
+                  example: createOrganizationExample,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Criada",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/platform/organizations/{id}": {
+        get: {
+          tags: ["Platform"],
+          summary: "Buscar organizacao via plataforma",
+          description: "Uso interno via gateway para super admin de plataforma.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Organizacao",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        patch: {
+          tags: ["Platform"],
+          summary: "Atualizar organizacao via plataforma",
+          description: "Atualiza status, plano de assinatura e/ou URL de logo.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    status: { type: "string" },
+                    subscription_plan: { type: "string" },
+                    logo_url: { type: ["string", "null"] },
+                  },
+                  additionalProperties: true,
+                  example: {
+                    status: "active",
+                    subscription_plan: "enterprise",
+                    logo_url: "https://cdn.castelo.com/logos/organization.png",
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizada",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/SuccessEnvelope" },

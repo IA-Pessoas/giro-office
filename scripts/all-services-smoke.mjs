@@ -158,6 +158,7 @@ const state = {
   departmentId: env.smokeDepartmentId,
   tempUserId: "",
   tempOrganizationId: "",
+  tempPlatformOrganizationId: "",
   primaryClientId: "",
   secondaryClientId: "",
   clientHistoryPendingId: "",
@@ -365,6 +366,15 @@ function getAuthHeaders(auth, service) {
 
 function getTiAdminHeaders() {
   return { Authorization: `Bearer ${createAdminToken(TiPermissionLevel.Admin)}` };
+}
+
+function getPlatformInternalHeaders() {
+  return {
+    "x-internal-service-token": env.AUDIT_SERVICE_TOKEN || "audit-service-token",
+    "x-auth-user-id": "platform-smoke",
+    "x-auth-kind": "platform",
+    "x-auth-platform-role": "super_admin",
+  };
 }
 
 function ensureSuccessEnvelope(op, body) {
@@ -1897,6 +1907,61 @@ const handlers = {
       expectedStatus: [200],
       path: `/organizations/${requireState("tempOrganizationId")}/logo-url`,
       json: { logo_url: "https://example.com/smoke-logo.png" },
+    });
+  },
+
+  async platformOrganizationList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      auth: "public",
+      headers: getPlatformInternalHeaders(),
+      query: { page: 1, pageSize: 5 },
+    });
+  },
+
+  async platformOrganizationCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      auth: "public",
+      headers: getPlatformInternalHeaders(),
+      json: {
+        name: uniqueText("Smoke Platform Organization"),
+        email_created_by: uniqueEmail("smoke-platform-org"),
+        cnpj: uniqueDigits(14),
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.tempPlatformOrganizationId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async platformOrganizationGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      auth: "public",
+      headers: getPlatformInternalHeaders(),
+      path: `/platform/organizations/${requireState("tempPlatformOrganizationId")}`,
+    });
+  },
+
+  async platformOrganizationPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      auth: "public",
+      headers: getPlatformInternalHeaders(),
+      path: `/platform/organizations/${requireState("tempPlatformOrganizationId")}`,
+      json: { status: "active", subscription_plan: "enterprise", logo_url: null },
+    });
+  },
+
+  async platformOrganizationUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+      expectEnvelope: false,
     });
   },
 

@@ -15,6 +15,7 @@ import type { OrganizationEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildOrganizationServiceOpenApiSpec } from "./openapi/spec.js";
 import organizationRoutes from "./routes/organization.routes.js";
+import { platformOrganizationRoutes } from "./routes/platformOrganization.routes.js";
 
 function organizationErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -50,6 +51,7 @@ export function createOrganizationApp(env: OrganizationEnv, logger: Logger): exp
     });
   }
 
+  app.use("/platform/organizations", platformOrganizationRoutes);
   app.use("/organizations", organizationRoutes);
 
   app.use(

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   createTestApp,
+  gatewayAuthHeaders,
   organizationServiceMock,
   resetOrganizationRouteMocks,
 } from "./organizationTestUtils.js";
@@ -18,7 +19,10 @@ describe("organization routes", () => {
     organizationServiceMock.list.mockResolvedValue([{ id: organizationId }]);
     const app = createTestApp();
 
-    const res = await request(app).get("/organizations").query({ page: 2, pageSize: 10 });
+    const res = await request(app)
+      .get("/organizations")
+      .set(gatewayAuthHeaders())
+      .query({ page: 2, pageSize: 10 });
 
     expect(res.status).toBe(200);
     expect(organizationServiceMock.list).toHaveBeenCalledWith({
@@ -32,7 +36,7 @@ describe("organization routes", () => {
     organizationServiceMock.create.mockResolvedValue({ id: organizationId });
     const app = createTestApp();
 
-    const res = await request(app).post("/organizations").send({
+    const res = await request(app).post("/organizations").set(gatewayAuthHeaders()).send({
       name: "Org Teste",
       email_created_by: "admin@example.com",
       cnpj: "12345678000199",
@@ -50,7 +54,9 @@ describe("organization routes", () => {
     organizationServiceMock.findById.mockResolvedValue({ id: organizationId });
     const app = createTestApp();
 
-    const res = await request(app).get(`/organizations/${organizationId}`);
+    const res = await request(app)
+      .get(`/organizations/${organizationId}`)
+      .set(gatewayAuthHeaders());
 
     expect(res.status).toBe(200);
     expect(organizationServiceMock.findById).toHaveBeenCalledWith(organizationId);
@@ -65,6 +71,7 @@ describe("organization routes", () => {
 
     const res = await request(app)
       .patch(`/organizations/${organizationId}/status`)
+      .set(gatewayAuthHeaders())
       .send({ status: "active" });
 
     expect(res.status).toBe(200);
@@ -77,6 +84,7 @@ describe("organization routes", () => {
 
     const res = await request(app)
       .patch(`/organizations/${organizationId}/subscription-plan`)
+      .set(gatewayAuthHeaders())
       .send({ subscription_plan: "pro" });
 
     expect(res.status).toBe(200);
@@ -92,6 +100,7 @@ describe("organization routes", () => {
 
     const res = await request(app)
       .patch(`/organizations/${organizationId}/logo-url`)
+      .set(gatewayAuthHeaders())
       .send({ logo_url: "https://cdn/logo.png" });
 
     expect(res.status).toBe(200);
