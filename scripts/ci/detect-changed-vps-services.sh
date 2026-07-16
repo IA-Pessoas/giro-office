@@ -134,6 +134,9 @@ for f in "${files[@]}"; do
     services/pessoal-service/* )
       add_service pessoal-service
       ;;
+    services/parcelamento-service/* )
+      add_service parcelamento-service
+      ;;
     services/audit-service/* )
       add_service audit-service
       ;;
