@@ -16,6 +16,7 @@ import {
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
+import { finiteNumber, optional } from "./pessoalFormValueHelpers";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 
 interface PessoalPayrollSectionProps {
@@ -125,18 +126,6 @@ function buildPayrollFormValues(
   };
 }
 
-function optional(value: string): string | null;
-function optional<T>(value: string, transform: (value: string) => T): T | null;
-function optional<T>(value: string, transform?: (value: string) => T): string | T | null {
-  const trimmed = value.trim();
-
-  if (!trimmed) {
-    return null;
-  }
-
-  return transform ? transform(trimmed) : trimmed;
-}
-
 function buildPayrollFormPayload(
   selectedClientId: string,
   values: PayrollFormValues,
@@ -146,13 +135,13 @@ function buildPayrollFormPayload(
     responsible_id: optional(values.responsible_id),
     advance: values.advance,
     advance_type: optional(values.advance_type),
-    advance_amount: optional(values.advance_amount, Number),
+    advance_amount: optional(values.advance_amount, finiteNumber),
     info: values.info.trim(),
     previous: values.previous,
     onvio: values.onvio,
     group: values.group.trim(),
     vt: values.vt,
-    vt_value: optional(values.vt_value, Number),
+    vt_value: optional(values.vt_value, finiteNumber),
     vt_type: optional(values.vt_type),
     va: values.va,
     assistance_fee: values.assistance_fee,

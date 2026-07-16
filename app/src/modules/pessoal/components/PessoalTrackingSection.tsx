@@ -37,6 +37,7 @@ import {
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
+import { finiteNumber, optional } from "./pessoalFormValueHelpers";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 
 interface PessoalTrackingSectionProps {
@@ -88,24 +89,6 @@ const lddFields = [
   { name: "registration_status", label: "Cadastro", options: lddRegistrationStatusOptions },
   { name: "status", label: "Status", options: lddStatusOptions },
 ] as const;
-
-function optional(value: string): string | null;
-function optional<T>(value: string, transform: (value: string) => T | null): T | null;
-function optional<T>(value: string, transform?: (value: string) => T | null): string | T | null {
-  const trimmed = value.trim();
-
-  if (!trimmed) {
-    return null;
-  }
-
-  return transform ? transform(trimmed) : trimmed;
-}
-
-function finiteNumber(value: string): number | null {
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) {
