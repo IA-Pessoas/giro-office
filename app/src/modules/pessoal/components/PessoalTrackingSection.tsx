@@ -405,16 +405,6 @@ export function PessoalTrackingSection({
                 {tab === "ldd" ? "LDD" : "Situações"}
               </button>
             ))}
-            {canEdit ? (
-              <button
-                type="button"
-                onClick={activeTrackingTab === "ldd" ? startNewLdd : startNewSituation}
-                className={pessoalPrimaryButtonClassName}
-              >
-                <Plus className="h-4 w-4" />
-                {activeTrackingTab === "ldd" ? "Criar LDD" : "Criar situação"}
-              </button>
-            ) : null}
             <button
               type="button"
               onClick={() =>
@@ -435,12 +425,7 @@ export function PessoalTrackingSection({
       </div>
 
       {activeTrackingTab === "ldd" ? (
-        <div
-          className={cn(
-            "grid gap-6",
-            isLddFormOpen && "xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]",
-          )}
-        >
+        <div className="grid gap-6">
           <TrackingListCard
             icon={FileText}
             title="LDD"
@@ -448,6 +433,18 @@ export function PessoalTrackingSection({
             error={lddQuery.isError ? lddQuery.error : null}
             empty={lddRows.length === 0}
             emptyMessage="Nenhum LDD cadastrado para este cliente."
+            actions={
+              canEdit ? (
+                <button
+                  type="button"
+                  onClick={startNewLdd}
+                  className={pessoalPrimaryButtonClassName}
+                >
+                  <Plus className="h-4 w-4" />
+                  Criar LDD
+                </button>
+              ) : null
+            }
           >
             {lddRows.map((ldd) => (
               <div
@@ -492,78 +489,9 @@ export function PessoalTrackingSection({
               </div>
             ))}
           </TrackingListCard>
-
-          {isLddFormOpen ? (
-            <form
-              onSubmit={handleLddSubmit}
-              className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
-            >
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                    {selectedLdd ? "Editar LDD" : "Criar LDD"}
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Campos seguem o contrato do pessoal-service.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsLddFormOpen(false)}
-                  disabled={isLddSubmitting}
-                  className={pessoalSecondaryButtonClassName}
-                >
-                  <X className="h-4 w-4" />
-                  Cancelar
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {lddFields.map((field) => (
-                  <label
-                    key={field.name}
-                    className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
-                  >
-                    {field.label}
-                    <input
-                      type={field.type}
-                      step={field.name === "balance_amount" ? "0.01" : undefined}
-                      value={lddFormValues[field.name]}
-                      onChange={(event) =>
-                        setLddFormValues((current) => ({
-                          ...current,
-                          [field.name]: event.target.value,
-                        }))
-                      }
-                      disabled={!canEdit || isLddSubmitting}
-                      className={pessoalTextFieldClassName}
-                    />
-                  </label>
-                ))}
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLddSubmitting}
-                className={`${pessoalPrimaryButtonClassName} mt-4 w-full`}
-              >
-                {isLddSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                Salvar LDD
-              </button>
-            </form>
-          ) : null}
         </div>
       ) : (
-        <div
-          className={cn(
-            "grid gap-6",
-            isSituationFormOpen && "xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]",
-          )}
-        >
+        <div className="grid gap-6">
           <TrackingListCard
             icon={ClipboardList}
             title="Situações"
@@ -571,6 +499,18 @@ export function PessoalTrackingSection({
             error={situationsQuery.isError ? situationsQuery.error : null}
             empty={situationRows.length === 0}
             emptyMessage="Nenhuma situação cadastrada para este cliente."
+            actions={
+              canEdit ? (
+                <button
+                  type="button"
+                  onClick={startNewSituation}
+                  className={pessoalPrimaryButtonClassName}
+                >
+                  <Plus className="h-4 w-4" />
+                  Criar situação
+                </button>
+              ) : null
+            }
           >
             {situationRows.map((situation) => (
               <div
@@ -602,15 +542,111 @@ export function PessoalTrackingSection({
               </div>
             ))}
           </TrackingListCard>
+        </div>
+      )}
 
-          {isSituationFormOpen ? (
-            <form
-              onSubmit={handleSituationSubmit}
-              className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
-            >
-              <div className="mb-4 flex items-start justify-between gap-3">
+      {isLddFormOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 p-4 backdrop-blur-sm"
+          onClick={() => setIsLddFormOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pessoal-ldd-form-title"
+            onClick={(event) => event.stopPropagation()}
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
+          >
+            <form onSubmit={handleLddSubmit} className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                  <h3
+                    id="pessoal-ldd-form-title"
+                    className="text-base font-semibold text-gray-900 dark:text-white"
+                  >
+                    {selectedLdd ? "Editar LDD" : "Criar LDD"}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    Campos seguem o contrato do pessoal-service.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsLddFormOpen(false)}
+                  disabled={isLddSubmitting}
+                  className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-60 dark:text-gray-400 dark:hover:bg-gray-700"
+                  aria-label="Fechar LDD"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {lddFields.map((field) => (
+                  <label
+                    key={field.name}
+                    className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    {field.label}
+                    <input
+                      type={field.type}
+                      step={field.name === "balance_amount" ? "0.01" : undefined}
+                      value={lddFormValues[field.name]}
+                      onChange={(event) =>
+                        setLddFormValues((current) => ({
+                          ...current,
+                          [field.name]: event.target.value,
+                        }))
+                      }
+                      disabled={!canEdit || isLddSubmitting}
+                      className={pessoalTextFieldClassName}
+                    />
+                  </label>
+                ))}
+              </div>
+
+              {formError ? (
+                <p role="alert" className="text-sm text-red-600 dark:text-red-300">
+                  {formError}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isLddSubmitting}
+                className={`${pessoalPrimaryButtonClassName} w-full`}
+              >
+                {isLddSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Salvar LDD
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {isSituationFormOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 p-4 backdrop-blur-sm"
+          onClick={() => setIsSituationFormOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pessoal-situation-form-title"
+            onClick={(event) => event.stopPropagation()}
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
+          >
+            <form onSubmit={handleSituationSubmit} className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3
+                    id="pessoal-situation-form-title"
+                    className="text-base font-semibold text-gray-900 dark:text-white"
+                  >
                     {selectedSituationId ? "Editar situação" : "Criar situação"}
                   </h3>
                   <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
@@ -621,10 +657,10 @@ export function PessoalTrackingSection({
                   type="button"
                   onClick={() => setIsSituationFormOpen(false)}
                   disabled={isSituationSubmitting}
-                  className={pessoalSecondaryButtonClassName}
+                  className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-60 dark:text-gray-400 dark:hover:bg-gray-700"
+                  aria-label="Fechar situação"
                 >
                   <X className="h-4 w-4" />
-                  Cancelar
                 </button>
               </div>
 
@@ -634,66 +670,70 @@ export function PessoalTrackingSection({
                 </StateMessage>
               ) : null}
 
-              <div className="mt-3 space-y-3">
-                <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-                  Título
-                  <input
-                    type="text"
-                    value={situationFormValues.title}
-                    onChange={(event) =>
-                      setSituationFormValues((current) => ({
-                        ...current,
-                        title: event.target.value,
-                      }))
-                    }
-                    disabled={!canEdit || isSituationSubmitting}
-                    className={pessoalTextFieldClassName}
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-                  Descrição
-                  <textarea
-                    value={situationFormValues.description}
-                    onChange={(event) =>
-                      setSituationFormValues((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                    disabled={!canEdit || isSituationSubmitting}
-                    className={`${pessoalTextFieldClassName} min-h-28 resize-y`}
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-                  Status
-                  <select
-                    value={situationFormValues.status}
-                    onChange={(event) =>
-                      setSituationFormValues((current) => ({
-                        ...current,
-                        status: event.target.value as PessoalSituationStatus,
-                      }))
-                    }
-                    disabled={!canEdit || isSituationSubmitting}
-                    className={pessoalTextFieldClassName}
-                  >
-                    <option value="Em andamento">Em andamento</option>
-                    <option value="Finalizado">Finalizado</option>
-                  </select>
-                </label>
+              <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+                Título
+                <input
+                  type="text"
+                  value={situationFormValues.title}
+                  onChange={(event) =>
+                    setSituationFormValues((current) => ({
+                      ...current,
+                      title: event.target.value,
+                    }))
+                  }
+                  disabled={!canEdit || isSituationSubmitting}
+                  className={pessoalTextFieldClassName}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+                Descrição
+                <textarea
+                  value={situationFormValues.description}
+                  onChange={(event) =>
+                    setSituationFormValues((current) => ({
+                      ...current,
+                      description: event.target.value,
+                    }))
+                  }
+                  disabled={!canEdit || isSituationSubmitting}
+                  className={`${pessoalTextFieldClassName} min-h-28 resize-y`}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+                Status
+                <select
+                  value={situationFormValues.status}
+                  onChange={(event) =>
+                    setSituationFormValues((current) => ({
+                      ...current,
+                      status: event.target.value as PessoalSituationStatus,
+                    }))
+                  }
+                  disabled={!canEdit || isSituationSubmitting}
+                  className={pessoalTextFieldClassName}
+                >
+                  <option value="Em andamento">Em andamento</option>
+                  <option value="Finalizado">Finalizado</option>
+                </select>
+              </label>
 
-                {selectedSituation ? (
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-300">
-                    <p>Registrada em {formatDate(selectedSituation.registration_date)}</p>
-                    <p>Concluída em {formatDate(selectedSituation.completion_date)}</p>
-                  </div>
-                ) : null}
-              </div>
+              {selectedSituation ? (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-300">
+                  <p>Registrada em {formatDate(selectedSituation.registration_date)}</p>
+                  <p>Concluída em {formatDate(selectedSituation.completion_date)}</p>
+                </div>
+              ) : null}
+
+              {formError ? (
+                <p role="alert" className="text-sm text-red-600 dark:text-red-300">
+                  {formError}
+                </p>
+              ) : null}
 
               <button
                 type="submit"
                 disabled={isSituationSubmitting}
-                className={`${pessoalPrimaryButtonClassName} mt-4 w-full`}
+                className={`${pessoalPrimaryButtonClassName} w-full`}
               >
                 {isSituationSubmitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -703,9 +743,9 @@ export function PessoalTrackingSection({
                 Salvar situação
               </button>
             </form>
-          ) : null}
+          </div>
         </div>
-      )}
+      ) : null}
 
       {formError ? (
         <p role="alert" className="text-sm text-red-600 dark:text-red-300">
@@ -721,6 +761,7 @@ export function PessoalTrackingSection({
 }
 
 function TrackingListCard({
+  actions,
   children,
   empty,
   emptyMessage,
@@ -729,6 +770,7 @@ function TrackingListCard({
   loading,
   title,
 }: {
+  actions?: ReactNode;
   children: ReactNode;
   empty: boolean;
   emptyMessage: string;
@@ -741,9 +783,12 @@ function TrackingListCard({
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-      <div className="mb-4 flex items-center gap-2">
-        <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h3>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h3>
+        </div>
+        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>
 
       <div className="space-y-3">

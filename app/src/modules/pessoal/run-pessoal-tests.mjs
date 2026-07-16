@@ -270,6 +270,27 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(tracking, /isSituationFormOpen/);
   assert.match(tracking, /setIsLddFormOpen\(true\)/);
   assert.match(tracking, /setIsSituationFormOpen\(true\)/);
+  assert.match(tracking, /role="dialog"/);
+  assert.match(tracking, /aria-modal="true"/);
+  assert.match(tracking, /backdrop-blur-sm/);
+  assert.match(
+    tracking,
+    /\{isLddFormOpen \? \(\s*<div\s+className="fixed inset-0[^"]+"\s+onClick=\{\(\) => setIsLddFormOpen\(false\)\}[\s\S]*aria-labelledby="pessoal-ldd-form-title"/,
+  );
+  assert.match(
+    tracking,
+    /\{isSituationFormOpen \? \(\s*<div\s+className="fixed inset-0[^"]+"\s+onClick=\{\(\) => setIsSituationFormOpen\(false\)\}[\s\S]*aria-labelledby="pessoal-situation-form-title"/,
+  );
+  assert.equal(
+    tracking.match(/onClick=\{\(event\) => event\.stopPropagation\(\)\}/g)?.length,
+    2,
+  );
+  assert.match(tracking, /actions\?: ReactNode/);
+  assert.match(tracking, /actions=\{\s*canEdit \? \(/);
+  assert.doesNotMatch(
+    tracking,
+    /onClick=\{activeTrackingTab === "ldd" \? startNewLdd : startNewSituation\}/,
+  );
   assert.match(tracking, /confirm/);
   assert.match(tracking, /type: "date"/);
   assert.match(tracking, /type: "number"/);
