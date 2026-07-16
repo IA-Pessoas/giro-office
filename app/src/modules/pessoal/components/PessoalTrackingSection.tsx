@@ -89,20 +89,20 @@ const lddFields = [
   { name: "status", label: "Status", options: lddStatusOptions },
 ] as const;
 
-function optional(value: string): string | null {
-  const trimmed = value.trim();
-
-  return trimmed ? trimmed : null;
-}
-
-function optionalNumber(value: string): number | null {
+function optional(value: string): string | null;
+function optional<T>(value: string, transform: (value: string) => T | null): T | null;
+function optional<T>(value: string, transform?: (value: string) => T | null): string | T | null {
   const trimmed = value.trim();
 
   if (!trimmed) {
     return null;
   }
 
-  const parsed = Number(trimmed);
+  return transform ? transform(trimmed) : trimmed;
+}
+
+function finiteNumber(value: string): number | null {
+  const parsed = Number(value);
 
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -186,10 +186,7 @@ export function PessoalTrackingSection({
     selectedSituationId,
     hasClient && selectedSituationId.length > 0,
   );
-  const updateSituationMutation = useUpdatePessoalSituationMutation(
-    selectedSituationId,
-    selectedClientId,
-  );
+  const updateSituationMutation = useUpdatePessoalSituationMutation(selectedClientId);
   const [situationFormValues, setSituationFormValues] = useState<SituationFormValues>(
     emptySituationFormValues,
   );
@@ -257,7 +254,7 @@ export function PessoalTrackingSection({
       type: lddFormValues.type.trim(),
       period: optional(lddFormValues.period),
       due_date: optional(lddFormValues.due_date),
-      balance_amount: optionalNumber(lddFormValues.balance_amount),
+      balance_amount: optional(lddFormValues.balance_amount, finiteNumber),
       registration_status: optional(lddFormValues.registration_status),
       status: optional(lddFormValues.status),
     };
@@ -360,9 +357,12 @@ export function PessoalTrackingSection({
     try {
       if (selectedSituationId) {
         await updateSituationMutation.mutateAsync({
-          title: payload.title,
-          description: payload.description,
-          status: payload.status,
+          id: selectedSituationId,
+          payload: {
+            title: payload.title,
+            description: payload.description,
+            status: payload.status,
+          },
         });
         setIsSituationFormOpen(false);
         setSuccessMessage("Situação atualizada.");

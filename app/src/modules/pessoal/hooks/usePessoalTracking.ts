@@ -18,20 +18,20 @@ import type {
 } from "../types/tracking";
 import { pessoalQueryKey } from "./queryKeys";
 
-function trackingKey(clientId: string) {
-  return pessoalQueryKey("tracking", clientId || "missing");
+function trackingKey(...parts: string[]) {
+  return pessoalQueryKey("tracking", ...parts.map((part) => part || "missing"));
 }
 
 function lddKey(clientId: string) {
-  return pessoalQueryKey("tracking", clientId || "missing", "ldd");
+  return trackingKey(clientId, "ldd");
 }
 
 function situationsKey(clientId: string) {
-  return pessoalQueryKey("tracking", clientId || "missing", "situations");
+  return trackingKey(clientId, "situations");
 }
 
 function situationDetailKey(id: string) {
-  return pessoalQueryKey("tracking", "situations", id || "missing");
+  return trackingKey("situations", id);
 }
 
 export function usePessoalLdd(
@@ -119,14 +119,17 @@ export function useCreatePessoalSituationMutation(): UseMutationResult<
 }
 
 export function useUpdatePessoalSituationMutation(
-  id: string,
   clientId: string,
-): UseMutationResult<PessoalSituation, Error, PessoalSituationUpdatePayload> {
+): UseMutationResult<
+  PessoalSituation,
+  Error,
+  { id: string; payload: PessoalSituationUpdatePayload }
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload) => pessoalService.updateSituation(id, payload),
-    onSuccess: async () => {
+    mutationFn: ({ id, payload }) => pessoalService.updateSituation(id, payload),
+    onSuccess: async (_situation, { id }) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: trackingKey(clientId) }),
         queryClient.invalidateQueries({ queryKey: situationDetailKey(id) }),
