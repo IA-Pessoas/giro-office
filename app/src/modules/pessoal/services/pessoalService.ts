@@ -5,6 +5,12 @@ import type {
   PessoalObligationGenerationResult,
   PessoalObligationUpdatePayload,
 } from "../types/obligations";
+import type {
+  PessoalPasswordDetail,
+  PessoalPasswordListItem,
+  PessoalPasswordPayload,
+  PessoalPasswordUpdatePayload,
+} from "../types/passwords";
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import type {
   PessoalLdd,
@@ -86,6 +92,21 @@ export function buildPessoalLddListParams(clientId?: string): PessoalLddListPara
   const trimmedClientId = clientId?.trim();
 
   return trimmedClientId ? { client_id: trimmedClientId } : {};
+}
+
+const PESSOAL_PASSWORD_SECRET_FIELDS = [
+  "login_main",
+  "senha_main",
+  "login_secondary",
+  "senha_secondary",
+] as const;
+
+export function hasPessoalPasswordSecretFields(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    PESSOAL_PASSWORD_SECRET_FIELDS.some((field) => field in value)
+  );
 }
 
 function isNotFoundError(error: unknown): boolean {
@@ -282,5 +303,45 @@ export const pessoalService = {
     const response = await api.patch(PESSOAL_ENDPOINTS.situationDetail(id), payload);
 
     return unwrapPessoalEnvelope<PessoalSituation>(response.data);
+  },
+
+  async listPasswords(clientId: string): Promise<PessoalPasswordListItem[]> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.passwords, {
+      params: { client_id: clientId },
+    });
+
+    return unwrapPessoalEnvelope<PessoalPasswordListItem[]>(response.data);
+  },
+
+  async detailPassword(id: string): Promise<PessoalPasswordDetail> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.passwordDetail(id));
+
+    return unwrapPessoalEnvelope<PessoalPasswordDetail>(response.data);
+  },
+
+  async createPassword(payload: PessoalPasswordPayload): Promise<PessoalPasswordListItem> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(PESSOAL_ENDPOINTS.passwords, payload);
+
+    return unwrapPessoalEnvelope<PessoalPasswordListItem>(response.data);
+  },
+
+  async updatePassword(
+    id: string,
+    payload: PessoalPasswordUpdatePayload,
+  ): Promise<PessoalPasswordListItem> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.patch(PESSOAL_ENDPOINTS.passwordDetail(id), payload);
+
+    return unwrapPessoalEnvelope<PessoalPasswordListItem>(response.data);
+  },
+
+  async deletePassword(id: string): Promise<PessoalPasswordListItem> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.delete(PESSOAL_ENDPOINTS.passwordDetail(id));
+
+    return unwrapPessoalEnvelope<PessoalPasswordListItem>(response.data);
   },
 };
