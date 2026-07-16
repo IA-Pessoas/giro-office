@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
+  ChevronDown,
   ClipboardList,
   FileText,
   Loader2,
@@ -75,13 +76,17 @@ const emptySituationFormValues: SituationFormValues = {
   status: "Em andamento",
 };
 
+const lddTypeOptions = ["INSS", "FGTS", "IRRF", "ISS"] as const;
+const lddRegistrationStatusOptions = ["Pendente", "Cadastrado"] as const;
+const lddStatusOptions = ["Pendente", "Pago", "Vencido"] as const;
+
 const lddFields = [
-  { name: "type", label: "Tipo", type: "text" },
+  { name: "type", label: "Tipo", options: lddTypeOptions },
   { name: "period", label: "Período", type: "text" },
   { name: "due_date", label: "Vencimento", type: "date" },
   { name: "balance_amount", label: "Saldo", type: "number" },
-  { name: "registration_status", label: "Cadastro", type: "text" },
-  { name: "status", label: "Status", type: "text" },
+  { name: "registration_status", label: "Cadastro", options: lddRegistrationStatusOptions },
+  { name: "status", label: "Status", options: lddStatusOptions },
 ] as const;
 
 function optional(value: string): string | null {
@@ -555,9 +560,9 @@ export function PessoalTrackingSection({
             aria-modal="true"
             aria-labelledby="pessoal-ldd-form-title"
             onClick={(event) => event.stopPropagation()}
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
           >
-            <form onSubmit={handleLddSubmit} className="space-y-4">
+            <form onSubmit={handleLddSubmit} className="space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3
@@ -581,28 +586,66 @@ export function PessoalTrackingSection({
                 </button>
               </div>
 
-              <div className="space-y-3">
-                {lddFields.map((field) => (
-                  <label
-                    key={field.name}
-                    className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
-                  >
-                    {field.label}
-                    <input
-                      type={field.type}
-                      step={field.name === "balance_amount" ? "0.01" : undefined}
-                      value={lddFormValues[field.name]}
-                      onChange={(event) =>
-                        setLddFormValues((current) => ({
-                          ...current,
-                          [field.name]: event.target.value,
-                        }))
-                      }
-                      disabled={!canEdit || isLddSubmitting}
-                      className={pessoalTextFieldClassName}
-                    />
-                  </label>
-                ))}
+              <div className="grid gap-3 sm:grid-cols-2">
+                {lddFields.map((field) => {
+                  const fieldValue = lddFormValues[field.name];
+                  const fieldOptions = "options" in field ? field.options : null;
+                  const customOption =
+                    fieldOptions &&
+                    fieldValue &&
+                    !fieldOptions.some((option) => option === fieldValue)
+                      ? fieldValue
+                      : null;
+
+                  return (
+                    <label
+                      key={field.name}
+                      className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
+                    >
+                      {field.label}
+                      {fieldOptions ? (
+                        <div className="relative">
+                          <select
+                            value={fieldValue}
+                            onChange={(event) =>
+                              setLddFormValues((current) => ({
+                                ...current,
+                                [field.name]: event.target.value,
+                              }))
+                            }
+                            disabled={!canEdit || isLddSubmitting}
+                            className={`${pessoalTextFieldClassName} appearance-none pr-12`}
+                          >
+                            <option value="">Selecione</option>
+                            {fieldOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                            {customOption ? (
+                              <option value={customOption}>{customOption}</option>
+                            ) : null}
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        </div>
+                      ) : (
+                        <input
+                          type={"type" in field ? field.type : "text"}
+                          step={field.name === "balance_amount" ? "0.01" : undefined}
+                          value={fieldValue}
+                          onChange={(event) =>
+                            setLddFormValues((current) => ({
+                              ...current,
+                              [field.name]: event.target.value,
+                            }))
+                          }
+                          disabled={!canEdit || isLddSubmitting}
+                          className={pessoalTextFieldClassName}
+                        />
+                      )}
+                    </label>
+                  );
+                })}
               </div>
 
               {formError ? (
@@ -701,20 +744,23 @@ export function PessoalTrackingSection({
               </label>
               <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
                 Status
-                <select
-                  value={situationFormValues.status}
-                  onChange={(event) =>
-                    setSituationFormValues((current) => ({
-                      ...current,
-                      status: event.target.value as PessoalSituationStatus,
-                    }))
-                  }
-                  disabled={!canEdit || isSituationSubmitting}
-                  className={pessoalTextFieldClassName}
-                >
-                  <option value="Em andamento">Em andamento</option>
-                  <option value="Finalizado">Finalizado</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={situationFormValues.status}
+                    onChange={(event) =>
+                      setSituationFormValues((current) => ({
+                        ...current,
+                        status: event.target.value as PessoalSituationStatus,
+                      }))
+                    }
+                    disabled={!canEdit || isSituationSubmitting}
+                    className={`${pessoalTextFieldClassName} appearance-none pr-12`}
+                  >
+                    <option value="Em andamento">Em andamento</option>
+                    <option value="Finalizado">Finalizado</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                </div>
               </label>
 
               {selectedSituation ? (

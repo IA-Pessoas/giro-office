@@ -285,6 +285,14 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
     tracking.match(/onClick=\{\(event\) => event\.stopPropagation\(\)\}/g)?.length,
     2,
   );
+  assert.match(tracking, /grid gap-3 sm:grid-cols-2/);
+  assert.match(tracking, /ChevronDown/);
+  assert.match(tracking, /appearance-none pr-12/);
+  assert.match(tracking, /absolute right-4/);
+  assert.match(tracking, /lddTypeOptions/);
+  assert.match(tracking, /lddRegistrationStatusOptions/);
+  assert.match(tracking, /lddStatusOptions/);
+  assert.match(tracking, /field\.options/);
   assert.match(tracking, /actions\?: ReactNode/);
   assert.match(tracking, /actions=\{\s*canEdit \? \(/);
   assert.doesNotMatch(
