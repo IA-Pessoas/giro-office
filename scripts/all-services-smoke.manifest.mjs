@@ -974,6 +974,14 @@ const baseManifest = [
   }),
   op({
     service: "project-service",
+    method: "GET",
+    path: "/project/metrics",
+    action: "projectMetrics",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "project-service",
     method: "POST",
     path: "/project",
     action: "projectCreate",
