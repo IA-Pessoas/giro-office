@@ -8,6 +8,7 @@ import {
 } from "./services/pessoalService.contract.ts";
 import {
   buildPessoalObligationParams,
+  buildPessoalLddListParams,
   buildPessoalPayrollPayload,
   buildPessoalPayrollUpdatePayload,
   buildPessoalUnionPayload,
@@ -132,6 +133,11 @@ runTest("obligation params map client and competence", () => {
   });
 });
 
+runTest("ldd list params include optional client id only when present", () => {
+  assert.deepEqual(buildPessoalLddListParams("client-1"), { client_id: "client-1" });
+  assert.deepEqual(buildPessoalLddListParams(""), {});
+});
+
 runTest("pessoal UI follows tecnologia-style system accent and centered tabs", () => {
   const shell = readFileSync("src/modules/pessoal/components/PessoalShell.tsx", "utf8");
   const overview = readFileSync("src/modules/pessoal/components/PessoalOverviewSection.tsx", "utf8");
@@ -140,10 +146,18 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
     "utf8",
   );
   const controls = readFileSync("src/modules/pessoal/components/pessoalFormControls.ts", "utf8");
+  const formValueHelpers = readFileSync(
+    "src/modules/pessoal/components/pessoalFormValueHelpers.ts",
+    "utf8",
+  );
   const unions = readFileSync("src/modules/pessoal/components/PessoalUnionsSection.tsx", "utf8");
   const payroll = readFileSync("src/modules/pessoal/components/PessoalPayrollSection.tsx", "utf8");
   const obligations = readFileSync(
     "src/modules/pessoal/components/PessoalObligationsSection.tsx",
+    "utf8",
+  );
+  const tracking = readFileSync(
+    "src/modules/pessoal/components/PessoalTrackingSection.tsx",
     "utf8",
   );
   const clientSelector = readFileSync(
@@ -158,6 +172,7 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
     unions,
     payroll,
     obligations,
+    tracking,
     clientSelector,
   ].join("\n");
 
@@ -217,11 +232,13 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(shell, /PessoalPayrollSection/);
   assert.match(shell, /activeTab === "payroll"/);
   assert.match(payroll, /usePessoalPayroll/);
-  assert.match(payroll, /function optional\(value: string\): string \| null/);
+  assert.match(payroll, /pessoalFormValueHelpers/);
+  assert.match(formValueHelpers, /function optional\(value: string\): string \| null/);
   assert.match(
-    payroll,
-    /function optional<T>\(value: string, transform: \(value: string\) => T\): T \| null/,
+    formValueHelpers,
+    /function optional<T>\(value: string, transform: \(value: string\) => T \| null\): T \| null/,
   );
+  assert.match(formValueHelpers, /Number\.isFinite/);
   assert.doesNotMatch(payroll, /optionalText|optionalNumber/);
   assert.match(payroll, /Nenhuma configuração de folha cadastrada para este cliente/);
   assert.match(payroll, /ChevronDown/);
@@ -242,6 +259,57 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(obligations, /Geração concluída/);
   assert.match(obligations, /setTimeout\(\(\) => \{/);
   assert.match(obligations, /}, 3000\)/);
+  assert.match(shell, /PessoalTrackingSection/);
+  assert.match(shell, /activeTab === "tracking"/);
+  assert.match(tracking, /usePessoalLdd/);
+  assert.match(tracking, /usePessoalSituations/);
+  assert.match(tracking, /LDD/);
+  assert.match(tracking, /Situações/);
+  assert.match(tracking, /Período/);
+  assert.match(tracking, /Título/);
+  assert.match(tracking, /Descrição/);
+  assert.match(tracking, /Concluída/);
+  assert.match(tracking, /Não foi possível/);
+  assert.match(tracking, /Criar LDD/);
+  assert.match(tracking, /Criar situação/);
+  assert.match(tracking, /isLddFormOpen/);
+  assert.match(tracking, /isSituationFormOpen/);
+  assert.match(tracking, /setIsLddFormOpen\(true\)/);
+  assert.match(tracking, /setIsSituationFormOpen\(true\)/);
+  assert.match(tracking, /role="dialog"/);
+  assert.match(tracking, /aria-modal="true"/);
+  assert.match(tracking, /backdrop-blur-sm/);
+  assert.match(
+    tracking,
+    /\{isLddFormOpen \? \(\s*<div\s+className="fixed inset-0[^"]+"\s+onClick=\{\(\) => setIsLddFormOpen\(false\)\}[\s\S]*aria-labelledby="pessoal-ldd-form-title"/,
+  );
+  assert.match(
+    tracking,
+    /\{isSituationFormOpen \? \(\s*<div\s+className="fixed inset-0[^"]+"\s+onClick=\{\(\) => setIsSituationFormOpen\(false\)\}[\s\S]*aria-labelledby="pessoal-situation-form-title"/,
+  );
+  assert.equal(
+    tracking.match(/onClick=\{\(event\) => event\.stopPropagation\(\)\}/g)?.length,
+    2,
+  );
+  assert.match(tracking, /grid gap-3 sm:grid-cols-2/);
+  assert.match(tracking, /ChevronDown/);
+  assert.match(tracking, /appearance-none pr-12/);
+  assert.match(tracking, /absolute right-4/);
+  assert.match(tracking, /lddTypeOptions/);
+  assert.match(tracking, /lddRegistrationStatusOptions/);
+  assert.match(tracking, /lddStatusOptions/);
+  assert.match(tracking, /field\.options/);
+  assert.doesNotMatch(tracking, /border-t border-gray-200 pt-5/);
+  assert.doesNotMatch(tracking, /<div className="grid gap-6">\s*<TrackingListCard/);
+  assert.match(tracking, /actions\?: ReactNode/);
+  assert.match(tracking, /actions=\{\s*canEdit \? \(/);
+  assert.doesNotMatch(
+    tracking,
+    /onClick=\{activeTrackingTab === "ldd" \? startNewLdd : startNewSituation\}/,
+  );
+  assert.match(tracking, /confirm/);
+  assert.match(tracking, /type: "date"/);
+  assert.match(tracking, /type: "number"/);
   assert.match(overview, /text-4xl/);
   assert.match(overview, /text-3xl/);
   assert.match(unions, /border-spacing-y-2/);

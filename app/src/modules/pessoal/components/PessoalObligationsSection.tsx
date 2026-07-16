@@ -16,6 +16,7 @@ import {
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
+import { optional } from "./pessoalFormValueHelpers";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 
 interface PessoalObligationsSectionProps {
@@ -40,12 +41,6 @@ function currentCompetence() {
   const now = new Date();
 
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function optional(value: string): string | null {
-  const trimmed = value.trim();
-
-  return trimmed ? trimmed : null;
 }
 
 function getPessoalErrorMessage(error: unknown, fallback: string): string {
