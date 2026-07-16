@@ -1,0 +1,231 @@
+{
+  "generatedAt": "2026-07-07T12:34:41.416Z",
+  "tenant": {
+    "organization_id": "e8048d1c-0830-45d7-84de-68e20abd685b",
+    "slug": "castelo-contabilidade"
+  },
+  "source": "backup MariaDB local em /home/bruno-e-andreia/Documentos/06.07.2026; sem escrita no Supabase",
+  "load": {
+    "clients": 2622,
+    "departments": 48,
+    "users": 298,
+    "projects": 2299,
+    "taskModels": 416,
+    "legacyExpressTaskModels": 384,
+    "legacyAdHocTaskModels": 32,
+    "projectPlans": 6,
+    "projectPlanTasks": 47,
+    "tasks": 24799
+  },
+  "sourceRows": {
+    "integracaoClients": 2296,
+    "regularizeClients": 1309,
+    "adminUsers": 297,
+    "rhCollaborators": 286,
+    "projects": 2298,
+    "taskModels": 384,
+    "projectPlans": 6,
+    "projectPlanTasks": 47,
+    "tasks": 24799
+  },
+  "transformations": {
+    "total": 26498,
+    "byScope": {
+      "tasks": 26399,
+      "clients": 98,
+      "projects": 1
+    },
+    "byRule": {
+      "datas-zeradas-convertidas-null": 22152,
+      "modelo-nao-mapeado-avulso": 3600,
+      "modelo-nome-ambiguo-avulso": 631,
+      "cpf_cnpj ausente/invalido migrado como string vazia": 95,
+      "responsavel-zero-fallback": 11,
+      "departamento-zero-fallback": 3,
+      "projeto legado referenciava cliente sem cadastro base em tb_integracao.clientes": 2,
+      "departamento-nao-mapeado-fallback": 1,
+      "task legada referenciava cliente sem cadastro base em tb_integracao.clientes": 1,
+      "projeto tecnico criado para task sem projeto legado correspondente": 1,
+      "cliente-tecnico-criado": 1
+    }
+  },
+  "pendingMapping": {
+    "tablesWithoutConfirmedDestination": 296
+  },
+  "taskStatusLoad": {
+    "Concluída": 11402,
+    "Não Contratado": 6105,
+    "Paralisado": 4384,
+    "Em Espera": 1301,
+    "Em andamento": 892,
+    "A Realizar": 575,
+    "Pendente": 140
+  },
+  "taskModelTypes": {
+    "legacy-express": 384,
+    "legacy-ad-hoc": 32
+  },
+  "validation": {
+    "checks": {
+      "projectsClient": 0,
+      "tasksClient": 0,
+      "tasksProject": 0,
+      "tasksDepartment": 0,
+      "tasksModel": 0,
+      "tasksResponsible": 0,
+      "taskModelsDepartment": 0,
+      "taskModelsResponsible": 0,
+      "projectPlanTasksPlan": 0,
+      "projectPlanTasksModel": 0
+    },
+    "orgBad": 0
+  },
+  "localTransformedLoad": {
+    "generatedAt": "2026-07-07T19:50:11.981Z",
+    "script": "scripts/migration-v2-build-load.mjs",
+    "outputDir": "/tmp/giro-office-migration-v2/load",
+    "note": "Carga transformada local; nao escreve no Supabase.",
+    "counts": {
+      "departments": 48,
+      "users": 298,
+      "clients": 3606,
+      "projects": 2299,
+      "taskModels": 416,
+      "projectPlans": 6,
+      "projectPlanTasks": 47,
+      "tasks": 24799,
+      "licenses": 338,
+      "processes": 1330,
+      "proceduralGuidances": 432,
+      "clientPFs": 343,
+      "partners": 521,
+      "municipalTaxes": 8,
+      "passwordSites": 17,
+      "passwordsRegularize": 5665,
+      "transformations": 6653
+    },
+    "validation": {
+      "orgBad": 0,
+      "missingDepartment": 0,
+      "missingUser": 0,
+      "missingClient": 0,
+      "missingProject": 0,
+      "missingTaskModel": 0,
+      "missingPlan": 0,
+      "missingProcess": 0,
+      "missingClientPF": 0,
+      "all": 0
+    },
+    "reviewBeforeSupabaseWrite": [
+      "CPF/CNPJ e um campo migrado, nao uma regra de identidade.",
+      "Cada linha distinta de cliente no banco legado deve virar registro distinto no banco novo.",
+      "tb_regularize.clientes.cliente_id e rastreabilidade/vinculo legado, nao motivo para eliminar a linha de tb_regularize.clientes.",
+      "Nenhuma escrita no Supabase sem confirmacao explicita."
+    ]
+  },
+  "phase1Applied": {
+    "appliedAt": "2026-07-07T20:09:27Z",
+    "script": "scripts/migration-v2-phase1-load.mjs",
+    "sqlFile": "/tmp/giro-office-migration-v2/phase1/apply-phase1.sql",
+    "scope": [
+      "departments",
+      "users",
+      "clients",
+      "clients.pf",
+      "integracao.tasksModel",
+      "integracao.projectPlan",
+      "integracao.projectPlanTasks",
+      "integracao.projects"
+    ],
+    "counts": {
+      "departments": 48,
+      "users": 298,
+      "clients": 3606,
+      "clientPFs": 343,
+      "taskModels": 416,
+      "projectPlans": 6,
+      "projectPlanTasks": 47,
+      "projects": 2299
+    },
+    "validation": {
+      "orgBadClientPFs": 0,
+      "orgBadClients": 0,
+      "orgBadDepartments": 0,
+      "orgBadProjectPlans": 0,
+      "orgBadProjectPlanTasks": 0,
+      "orgBadProjects": 0,
+      "orgBadTaskModels": 0,
+      "orgBadUsers": 0,
+      "projectPlanTasksModel": 0,
+      "projectPlanTasksPlan": 0,
+      "projectsClient": 0,
+      "projectsSponsor": 0,
+      "taskModelsDepartment": 0,
+      "taskModelsResponsible": 0,
+      "taskModelsResponsible2": 0,
+      "taskModelsResponsible3": 0,
+      "usersDepartment": 0
+    },
+    "notes": [
+      "Primeira tentativa revertida antes do COMMIT por organizations.updated_at obrigatorio.",
+      "Segunda execucao concluiu com COMMIT apos preencher created_at e updated_at."
+    ]
+  },
+  "phase2Applied": {
+    "appliedAt": "2026-07-07T20:26:32Z",
+    "script": "scripts/migration-v2-phase2-load.mjs",
+    "sqlFile": "/tmp/giro-office-migration-v2/phase2/apply-phase2.sql",
+    "scope": [
+      "integracao.tasks",
+      "regularize.license",
+      "regularize.process",
+      "regularize.proceduralGuidances",
+      "regularize.partners",
+      "regularize.municipalTaxes",
+      "regularize.passowordsSites",
+      "regularize.passwordsRegularize"
+    ],
+    "counts": {
+      "tasks": 24799,
+      "licenses": 338,
+      "processes": 1330,
+      "proceduralGuidances": 432,
+      "partners": 521,
+      "municipalTaxes": 8,
+      "passwordSites": 17,
+      "passwordsRegularize": 5665
+    },
+    "validation": {
+      "guidanceProcess": 0,
+      "licenseClient": 0,
+      "licenseResponsible": 0,
+      "licenseTask": 0,
+      "municipalTaxesClient": 0,
+      "orgBadGuidance": 0,
+      "orgBadLicense": 0,
+      "orgBadMunicipalTaxes": 0,
+      "orgBadPartners": 0,
+      "orgBadPasswords": 0,
+      "orgBadPasswordSites": 0,
+      "orgBadProcess": 0,
+      "orgBadTasks": 0,
+      "partnersPF": 0,
+      "partnersPJ": 0,
+      "passwordsClient": 0,
+      "passwordsSite": 0,
+      "processClientPF": 0,
+      "processClientPJ": 0,
+      "processResponsible1": 0,
+      "processResponsible2": 0,
+      "processResponsible3": 0,
+      "processTask": 0,
+      "tasksClient": 0,
+      "tasksDepartment": 0,
+      "tasksModel": 0,
+      "tasksProject": 0,
+      "tasksResponsible": 0,
+      "tasksResponsible2": 0,
+      "tasksResponsible3": 0
+    }
+  }
+}

@@ -1,0 +1,1186 @@
+[
+  {
+    "legacy_table": "tb_admin.logs",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_atendimento",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_certificado",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_comercial",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_contabil",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_financeiro",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_fiscal",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_integracao",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_marketing",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_parcelamento",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_pec",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_pessoal",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_regularize",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_rh",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_triagem",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.permissoes_wiki",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.ps",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.responsaveis",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.responsaveis_contatos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.responsaveis_ps",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_admin.updates",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_atendimento.atendimentos_opa",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_atendimento.contatos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_atendimento.motoboy",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_atendimento.psc",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_atendimento.satisfacao",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_atendimento.uber",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_atendimento.uber_clientes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_atendimento.visitas_clientes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.atas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.configs",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.emails",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.keep_clientes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.keep_tags",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.notificacoes_popup",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.orcamentos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.orcamentos_categorias",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.panorama_clientes_parcelamento",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.panorama_parcelamentos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.preferencias",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbc.sininhos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbs.estoque",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbs.estoque_andares",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbs.estoque_categorias",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbs.estoque_categorias_itens",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbs.estoque_entradas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbs.estoque_inventario",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbs.estoque_itens",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbs.estoque_localizacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbs.estoque_saidas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_cbs.ramais",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_certificados.notificacoes.vencimento_certificados",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_certificados.pf",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_certificados.pj",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_comercial.cobrancas_descricao",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.alteracoes_contabil",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.bancos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.clientes_bancos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.clientes_bancos_erros",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.clientes_bancos_temp",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.clientes_mov",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.clientes_observacao",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.controle",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.documentos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.documentos_bancos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.documentos_padrao",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.movimentacao",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.nuvens",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_contabil.relacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_financeiro.contratos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.aliquota_interestadual",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.antecipacao",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.antecipacao_envolvidos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.clientes_atacadistas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.clientes_sn",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.controle_impostos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.controle_impostos_anual",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.controle_impostos_mei",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.controle_impostos_normal",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.controle_impostos_npossui",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.controle_impostos_sn",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.documentos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.icms",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.ipi",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.iss",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.malhas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.mva",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.portes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.sn_completo_sn",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_fiscal.tributacao_pis_cofins",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.admin",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.admin_departamentos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.admin_usuarios",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.atendimento",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.cbs_estoque",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.certificado",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.comercial",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.contabil",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.financeiro",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.fiscal",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_agenda",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_clientes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_clientes_dominio",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_exclusoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_grupos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_objetivos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_pas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_pas_historicos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_planos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_prospeccao_comercial",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_tarefas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_tarefas_distrato",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_tarefas_express",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.integracao_tarefas_express_distrato",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.keep",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.marketing",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.parcelamento",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.permissoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.pessoal",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.regularize",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.rh",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.tecnologia",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.triagem",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.wiki",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_historico.workspace",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.admin_tarefas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.admin_urgencias",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.agenda",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.agenda_horas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.agenda_locais",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.agenda_status",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.bloqueio",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.cobradores_solucoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.cobrancas_novas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.cobrancas_solucoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.cronograma",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.envios",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.fluxos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.fluxos_clientes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.grupos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.metricas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.objetivos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.pa",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.pa_historicos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.pa_historicos_pendentes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.padrinhos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.portes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.prospeccao_metricas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.prospeccao_metricas_periodo",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.prospeccao_paralisacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.prospeccoes_reset",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.responsaveis_projeto",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.segmentos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_concluir",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_contratadas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_dependentes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_distrato",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_distrato_imagens",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_docs",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_express_distrato",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_imagens",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_indicadores",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_justificativa",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_ordem",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_parceiros",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_regularize",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_integracao.tarefas_total",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_mkt.controle_ia",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_mkt.eventos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_mkt.eventos_edicoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_mkt.eventos_feedbacks",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_mkt.eventos_feedbacks_periodos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_mkt.redes_sociais",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_mkt.senhas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_mkt.solicitacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_parcelamento.clientes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_parcelamento.competencia",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_parcelamento.parcelamentos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_parcelamento.simulacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_parcelamento.simulacoes_parcelamentos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pec.notas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.atividades",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.bem",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.bsf",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.clientes_situacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.codigos_acesso",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.contri_assis",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.empregador_web",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.folhas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.grupos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.ldd",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.obrigacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_pessoal.sindicato",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.agenda",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.agenda_controle",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.agenda_status",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.alvaras_vencimentos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.atividades",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.clientes_competencia",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.clientes_dominio_logos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.clientes_licitacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.controle_inativar",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.coringa",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.coringa_status",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.distrato_checklist",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.dte",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.dte_status",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.grupos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.grupos_integrantes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.orientaoes_checklist",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.orientaoes_filiais",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.orientaoes_processual.atividades",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.permissoes_senhas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.pf",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.pf_empresas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.processos_dias",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.regimes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.sites_estado",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.sites_prefeituras",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_regularize.vencimento",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.alergias",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.andares",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.cargos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.cce",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.cce_avaliacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.colaboradores_atas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.contatos_emergencia",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.feedbacks",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.feriados",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.ferias_datas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.ferias_periodos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.intercorrencias",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.intercorrencias_tipos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.pontos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.pontos_adicionais_folhas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.pontos_folhas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.pontos_registros",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.pontos_solicitacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.provas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.provas_inscritos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.provas_questoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.provas_respostas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.pv",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.pv_objetivos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.pv_tarefas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.pv_tarefas_express",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.score",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.score_avaliacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.score_nitro",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.score_nitro.avaliacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.score_nitro.avaliacoes_periodos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.score_nitro.ch",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.score_nitro.erros",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.score_perguntas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.solicitacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.solicitacoes_categorias",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_rh.solicitacoes_mensagens",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.atualizacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.atualizacoes_previsao",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.estoque",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.estoque_entradas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.estoque_saidas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.inventario",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.inventario_fotos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.inventario_itens",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.inventario_loc",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.opcoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.reset",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.robos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.robos_controles",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.senhas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_tecnologia.termos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_triagem.campos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_triagem.justificativas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_triagem.prioridade",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_triagem.qtdnotas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_triagem.solicitacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_wiki.agenda",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_wiki.destaques",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_wiki.wikis",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_wiki.wikis_categorias",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_wiki.wikis_topicos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_workspace.alteracao_regimes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_workspace.alteracao_regimes_tarefas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_workspace.alteracao_regimes_tarefas_express",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_workspace.alteracao_regimes_tipos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_workspace.mapas",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_workspace.mapas_clientes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_workspace.natal",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_workspace.solicitacoes",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_workspace.solicitacoes_categorias",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb_workspace.solicitacoes_mensagens",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  },
+  {
+    "legacy_table": "tb.atendimento_documentos",
+    "reason": "sem tabela destino confirmada no mapeamento v2"
+  }
+]
