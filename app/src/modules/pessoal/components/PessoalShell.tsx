@@ -17,6 +17,7 @@ import { PessoalClientSelector } from "./PessoalClientSelector";
 import { PessoalObligationsSection } from "./PessoalObligationsSection";
 import { PessoalOverviewSection } from "./PessoalOverviewSection";
 import { PessoalPayrollSection } from "./PessoalPayrollSection";
+import { PessoalPasswordsSection } from "./PessoalPasswordsSection";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 import { PessoalTrackingSection } from "./PessoalTrackingSection";
 import { PessoalUnionsSection } from "./PessoalUnionsSection";
@@ -122,6 +123,8 @@ export function PessoalShell() {
         <PessoalObligationsSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
       ) : activeTab === "tracking" ? (
         <PessoalTrackingSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
+      ) : activeTab === "passwords" ? (
+        <PessoalPasswordsSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
       ) : (
         <PessoalPlaceholderSection
           icon={ActiveIcon}
