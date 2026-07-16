@@ -20,5 +20,14 @@ export const startSupportSessionBodySchema = z
   })
   .strict();
 
+export const platformOrganizationParamsSchema = z.object({
+  organizationId: z.string().trim().min(1, "organizationId e obrigatorio."),
+});
+
+export const platformOrganizationUserParamsSchema = z.object({
+  organizationId: z.string().trim().min(1, "organizationId e obrigatorio."),
+  userId: z.string().trim().min(1, "userId e obrigatorio."),
+});
+
 export type PlatformLoginBody = z.infer<typeof platformLoginBodySchema>;
 export type StartSupportSessionBody = z.infer<typeof startSupportSessionBodySchema>;
