@@ -428,7 +428,7 @@ export function PessoalTrackingSection({
           </div>
         </div>
 
-        <div className="mt-6 border-t border-gray-200 pt-5 dark:border-gray-700">
+        <div className="mt-6">
           {activeTrackingTab === "ldd" ? (
             <TrackingListCard
               icon={FileText}
