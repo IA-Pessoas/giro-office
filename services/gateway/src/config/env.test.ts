@@ -67,6 +67,15 @@ describe("gateway env security validation", () => {
     expect(env.jsonBodyLimit).toBe("1mb");
   });
 
+  it("uses parcelamento service default URL", () => {
+    setGatewayEnv({});
+    delete process.env.PARCELAMENTO_SERVICE_URL;
+
+    const env = getGatewayEnv();
+
+    expect(env.parcelamentoServiceUrl).toBe("http://localhost:3043");
+  });
+
   it("parses optional gateway public URL and JSON body limit overrides", () => {
     setGatewayEnv({
       GATEWAY_PUBLIC_URL: "https://api.example.com",

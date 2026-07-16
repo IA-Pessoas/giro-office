@@ -28,6 +28,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `TI_SERVICE_URL`, `TI_SERVICE_INTERNAL_TOKEN`
 - `CERTIFICATE_SERVICE_URL`, `CERTIFICATE_SERVICE_INTERNAL_TOKEN`
 - `PESSOAL_SERVICE_URL`
+- `PARCELAMENTO_SERVICE_URL`
 - `WEBSOCKET_UPSTREAM_URL`
 
 ## Upstreams
@@ -47,6 +48,13 @@ O gateway encaminha estes prefixos para os servicos configurados no env:
 - `/ti` -> `TI_SERVICE_URL`
 - `/certificate` -> `CERTIFICATE_SERVICE_URL`
 - `/pessoal` -> `PESSOAL_SERVICE_URL`
+- `/parcelamento` -> `PARCELAMENTO_SERVICE_URL`
+
+### Parcelamento
+
+- Public prefix: `/parcelamento`
+- Upstream env: `PARCELAMENTO_SERVICE_URL`
+- Default upstream: `http://localhost:3043`
 
 Para servicos que validam contexto autenticado encaminhado internamente, o gateway injeta tokens internos por upstream:
 

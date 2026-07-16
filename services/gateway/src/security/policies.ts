@@ -17,6 +17,13 @@ const pessoalModulePolicy: AuthPolicy = {
   },
 };
 
+const parcelamentoModulePolicy: AuthPolicy = {
+  modulePermission: {
+    module: "parcelamento",
+    minPermission: moduleAccessPermission,
+  },
+};
+
 const clientRelatedModules = [
   "atendimento",
   "comercial",
@@ -46,6 +53,7 @@ const routePolicyMatchers: Array<{
   policy: AuthPolicy;
 }> = [
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
+  { method: "ANY", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },
