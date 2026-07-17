@@ -11,7 +11,7 @@ export function buildAuditServiceOpenApiSpec(env: AuditServiceEnv): OpenApiDocum
       title: "audit-service",
       version: "1.0.0",
       description:
-        "Auditoria interna. Rotas /internal/* e /audit/* exigem token de serviço (header configurado no gateway/serviços).",
+        "Auditoria interna. Rotas /internal/* e /audit/* exigem token de serviço (header configurado no gateway/serviços). Leituras aceitam administrador organizacional encaminhado ou platform super admin encaminhado pelo gateway.",
     },
     servers: [{ url: baseUrl }],
     tags: [
@@ -173,8 +173,23 @@ export function buildAuditServiceOpenApiSpec(env: AuditServiceEnv): OpenApiDocum
         get: {
           tags: ["Audit"],
           summary: "Buscar requisições de auditoria (paginação / filtros via query)",
+          description:
+            "Administradores organizacionais recebem resultados escopados pela organização encaminhada. Platform super admins podem filtrar por organizationId ou omitir o filtro para busca global. Via gateway, o contrato platform usa /platform/audit/requests.",
           security: [{ internalServiceToken: [] }],
           parameters: [
+            {
+              name: "organizationId",
+              in: "query",
+              schema: { type: "string" },
+              description: "Filtro opcional para platform super admin.",
+            },
+            { name: "requestId", in: "query", schema: { type: "string" } },
+            { name: "userId", in: "query", schema: { type: "string" } },
+            { name: "method", in: "query", schema: { type: "string" } },
+            { name: "path", in: "query", schema: { type: "string" } },
+            { name: "statusCode", in: "query", schema: { type: "integer" } },
+            { name: "dateFrom", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "dateTo", in: "query", schema: { type: "string", format: "date-time" } },
             { name: "page", in: "query", schema: { type: "integer" } },
             { name: "pageSize", in: "query", schema: { type: "integer" } },
           ],
@@ -194,6 +209,8 @@ export function buildAuditServiceOpenApiSpec(env: AuditServiceEnv): OpenApiDocum
         get: {
           tags: ["Audit"],
           summary: "Detalhe de uma requisição de auditoria",
+          description:
+            "Administradores organizacionais só leem registros da organização encaminhada. Platform super admins podem ler por requestId sem filtro de organização. Via gateway, o contrato platform usa /platform/audit/requests/{requestId}.",
           security: [{ internalServiceToken: [] }],
           parameters: [
             {

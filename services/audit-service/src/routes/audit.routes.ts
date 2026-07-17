@@ -108,7 +108,7 @@ export function createAuditPublicRouter(options: CreateAuditRouterOptions): Rout
       assertAuditAdminOrLog(options.logger, request, auth);
       const result = await auditRequestService.search(
         request.query as Record<string, unknown>,
-        auth.organizationId,
+        auth,
       );
 
       options.logger.info({
@@ -138,10 +138,7 @@ export function createAuditPublicRouter(options: CreateAuditRouterOptions): Rout
     asyncRoute(async (request, response) => {
       const auth = getAuthFromHeaders(request);
       assertAuditAdminOrLog(options.logger, request, auth);
-      const item = await auditRequestService.findByRequestId(
-        request.params.requestId,
-        auth.organizationId,
-      );
+      const item = await auditRequestService.findByRequestId(request.params.requestId, auth);
 
       if (!item) {
         options.logger.warn({

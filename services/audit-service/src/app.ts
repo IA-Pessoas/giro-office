@@ -69,6 +69,7 @@ export function createApp({ env, logger, repository }: CreateAppOptions): expres
   }
 
   app.use("/audit", createAuditPublicRouter({ env, logger, repository }));
+  app.use("/platform/audit", createAuditPublicRouter({ env, logger, repository }));
   app.use("/internal", createAuditInternalRouter({ env, logger, repository }));
   app.use(
     createExpressErrorHandler({

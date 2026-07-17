@@ -17,7 +17,7 @@ import { getPrismaClient } from "./prismaClient.js";
 export interface AuditRequestRepository {
   create(payload: CreateAuditRequestPayload): Promise<void>;
   search(filters: AuditSearchFilters): Promise<AuditSearchResult>;
-  findByRequestId(requestId: string, organizationId: string): Promise<AuditRequestRecord | null>;
+  findByRequestId(requestId: string, organizationId?: string): Promise<AuditRequestRecord | null>;
 }
 
 function toJsonValue(
@@ -129,9 +129,11 @@ function toAuditRequest(record: PrismaAuditRequest): AuditRequestRecord {
 }
 
 function buildWhere(filters: AuditSearchFilters): Prisma.AuditRequestWhereInput {
-  const where: Prisma.AuditRequestWhereInput = {
-    organization_id: filters.organizationId,
-  };
+  const where: Prisma.AuditRequestWhereInput = {};
+
+  if (filters.organizationId) {
+    where.organization_id = filters.organizationId;
+  }
 
   if (filters.requestId) {
     where.request_id = filters.requestId;
@@ -246,7 +248,7 @@ export function createAuditRequestRepository(
       const item = await client.auditRequest.findFirst({
         where: {
           request_id: requestId,
-          organization_id: organizationId,
+          ...(organizationId ? { organization_id: organizationId } : {}),
         },
       });
 

@@ -4,6 +4,7 @@ import {
   type AuditSearchResult,
   type CreateAuditRequestPayload,
   DEFAULT_AUDIT_PAGE_SIZE,
+  type ForwardedAuditAuthContext,
   MAX_AUDIT_PAGE_SIZE,
 } from "@workspace/shared/audit";
 import {
@@ -19,8 +20,14 @@ import type { AuditRequestRepository } from "../integrations/prisma/auditRequest
 
 export interface AuditRequestService {
   create(body: unknown): Promise<string>;
-  search(query: Record<string, unknown>, organizationId: string): Promise<AuditSearchResult>;
-  findByRequestId(requestId: string, organizationId: string): Promise<AuditRequestRecord | null>;
+  search(
+    query: Record<string, unknown>,
+    auth: ForwardedAuditAuthContext,
+  ): Promise<AuditSearchResult>;
+  findByRequestId(
+    requestId: string,
+    auth: ForwardedAuditAuthContext,
+  ): Promise<AuditRequestRecord | null>;
 }
 
 const createAuditRequestPayloadSchema = z.object({
@@ -63,13 +70,20 @@ function parseCreateAuditRequestPayload(body: unknown): CreateAuditRequestPayloa
 
 function buildAuditSearchFilters(
   query: Record<string, unknown>,
-  organizationId: string,
+  auth: ForwardedAuditAuthContext,
 ): AuditSearchFilters {
   const dateFrom = parseOptionalDate(query.dateFrom, "dateFrom");
   const dateTo = parseOptionalDate(query.dateTo, "dateTo");
+  const isPlatformAdmin = auth.authKind === "platform" && auth.platformRole === "super_admin";
+  const requestedOrganizationId = getSingleQueryValue(query.organizationId);
+  const organizationId = isPlatformAdmin ? requestedOrganizationId : auth.organizationId;
 
   if (dateFrom && dateTo && new Date(dateFrom) > new Date(dateTo)) {
     throw new ServiceError(400, "Parâmetros de data inválidos.");
+  }
+
+  if (!isPlatformAdmin && !organizationId) {
+    throw new ServiceError(401, "Não autenticado.");
   }
 
   return {
@@ -103,16 +117,25 @@ export function createAuditRequestService(repository: AuditRequestRepository): A
     },
     async search(
       query: Record<string, unknown>,
-      organizationId: string,
+      auth: ForwardedAuditAuthContext,
     ): Promise<AuditSearchResult> {
-      const filters = buildAuditSearchFilters(query, organizationId);
+      const filters = buildAuditSearchFilters(query, auth);
       return repository.search(filters);
     },
     async findByRequestId(
       requestId: string,
-      organizationId: string,
+      auth: ForwardedAuditAuthContext,
     ): Promise<AuditRequestRecord | null> {
-      return repository.findByRequestId(requestId, organizationId);
+      const isPlatformAdmin = auth.authKind === "platform" && auth.platformRole === "super_admin";
+
+      if (!isPlatformAdmin && !auth.organizationId) {
+        throw new ServiceError(401, "Não autenticado.");
+      }
+
+      return repository.findByRequestId(
+        requestId,
+        isPlatformAdmin ? undefined : auth.organizationId,
+      );
     },
   };
 }
