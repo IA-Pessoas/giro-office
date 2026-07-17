@@ -313,6 +313,42 @@ function createAdminToken(permission = WorkspacePermissionLevel.Admin, options =
   return `${content}.${signature}`;
 }
 
+function createPlatformToken() {
+  if (!env.jwtSecret) {
+    throw new Error("JWT_SECRET is required to mint platform bearer token.");
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: "HS256", typ: "JWT" };
+  const payload = {
+    user_id: "platform-smoke",
+    auth_kind: "platform",
+    platform_role: "super_admin",
+    sub: "platform-smoke",
+    iat: now,
+    exp: now + 60 * 60,
+  };
+
+  const base64Url = (input) =>
+    Buffer.from(JSON.stringify(input))
+      .toString("base64")
+      .replace(/=/g, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+
+  const encodedHeader = base64Url(header);
+  const encodedPayload = base64Url(payload);
+  const content = `${encodedHeader}.${encodedPayload}`;
+  const signature = crypto
+    .createHmac("sha256", env.jwtSecret)
+    .update(content)
+    .digest("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+
+  return `${content}.${signature}`;
+}
+
 function getAuthHeaders(auth, service) {
   if (auth === "public") {
     return {};
@@ -368,13 +404,8 @@ function getTiAdminHeaders() {
   return { Authorization: `Bearer ${createAdminToken(TiPermissionLevel.Admin)}` };
 }
 
-function getPlatformInternalHeaders() {
-  return {
-    "x-internal-service-token": env.AUDIT_SERVICE_TOKEN || "audit-service-token",
-    "x-auth-user-id": "platform-smoke",
-    "x-auth-kind": "platform",
-    "x-auth-platform-role": "super_admin",
-  };
+function getPlatformGatewayHeaders() {
+  return { Authorization: `Bearer ${createPlatformToken()}` };
 }
 
 function ensureSuccessEnvelope(op, body) {
@@ -1914,7 +1945,7 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       auth: "public",
-      headers: getPlatformInternalHeaders(),
+      headers: getPlatformGatewayHeaders(),
       query: { page: 1, pageSize: 5 },
     });
   },
@@ -1923,7 +1954,7 @@ const handlers = {
     const response = await httpRequest(op, {
       expectedStatus: [201],
       auth: "public",
-      headers: getPlatformInternalHeaders(),
+      headers: getPlatformGatewayHeaders(),
       json: {
         name: uniqueText("Smoke Platform Organization"),
         email_created_by: uniqueEmail("smoke-platform-org"),
@@ -1941,7 +1972,7 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       auth: "public",
-      headers: getPlatformInternalHeaders(),
+      headers: getPlatformGatewayHeaders(),
       path: `/platform/organizations/${requireState("tempPlatformOrganizationId")}`,
     });
   },
@@ -1950,7 +1981,7 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       auth: "public",
-      headers: getPlatformInternalHeaders(),
+      headers: getPlatformGatewayHeaders(),
       path: `/platform/organizations/${requireState("tempPlatformOrganizationId")}`,
       json: { status: "active", subscription_plan: "enterprise", logo_url: null },
     });

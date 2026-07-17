@@ -15,7 +15,11 @@ import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
 import type { GatewayEnv } from "./config/env.js";
-import { getGatewayServiceDefinitions, resolveGatewayService } from "./config/serviceRegistry.js";
+import {
+  type GatewayServiceDefinition,
+  getGatewayServiceDefinitions,
+  resolveGatewayService,
+} from "./config/serviceRegistry.js";
 import {
   buildAuditErrorCaptureMiddleware,
   buildAuditLifecycleMiddleware,
@@ -288,6 +292,7 @@ function mountAuthRateLimits(app: express.Express, env: GatewayEnv): void {
     methods: ["POST"],
   });
 
+  app.use("/platform/session", authRateLimit);
   app.use("/user/session", authRateLimit);
   app.use("/user/start-config", authRateLimit);
 }
@@ -331,14 +336,54 @@ function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
     );
   }
 
+  if (env.auditEnabled) {
+    proxyByServiceKey.set(
+      "audit-service",
+      buildHttpProxyMiddleware(env.auditServiceUrl, {
+        internalServiceToken: env.auditServiceToken,
+      }),
+    );
+  }
+
   return proxyByServiceKey;
+}
+
+function getMappedServiceProxy(
+  proxyByServiceKey: Map<string, GatewayProxy>,
+  service: GatewayServiceDefinition,
+): GatewayProxy {
+  return (
+    proxyByServiceKey.get(service.key) ??
+    ((_request, _response, next) => {
+      next(new ServiceError(502, "Servico mapeado sem proxy configurado."));
+    })
+  );
+}
+
+function mountPlatformServiceRoutes(
+  app: express.Express,
+  env: GatewayEnv,
+  proxyByServiceKey: Map<string, GatewayProxy>,
+): void {
+  app.use("/platform", (request, response, next) => {
+    const service = resolveGatewayService(env, request.originalUrl);
+
+    if (!service) {
+      next(new ServiceError(404, "Rota nao mapeada no gateway."));
+      return;
+    }
+
+    getMappedServiceProxy(proxyByServiceKey, service)(request, response, next);
+  });
 }
 
 function mountServiceRoutes(app: express.Express, env: GatewayEnv): void {
   const proxyByServiceKey = buildServiceProxyMap(env);
 
+  mountPlatformServiceRoutes(app, env, proxyByServiceKey);
+
   for (const service of getGatewayServiceDefinitions(env)) {
-    const proxy = proxyByServiceKey.get(service.key);
+    const proxy = getMappedServiceProxy(proxyByServiceKey, service);
 
     for (const routePrefix of service.routePrefixes) {
       app.use(
