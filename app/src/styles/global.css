@@ -35,15 +35,11 @@ html:not(.dark) .border-gray-200 {
 
 @keyframes session-load {
     0% {
-        transform: translateX(-110%);
-    }
-
-    55% {
-        transform: translateX(115%);
+        transform: translateX(-100%);
     }
 
     100% {
-        transform: translateX(115%);
+        transform: translateX(300%);
     }
 }
 

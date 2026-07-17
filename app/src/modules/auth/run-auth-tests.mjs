@@ -74,6 +74,15 @@ const rhPermissionsSource = await readFile(
   new URL("../rh/hooks/useRhPermissions.ts", import.meta.url),
   "utf8",
 );
+const canSSRAuthSource = await readFile(
+  new URL("./utils/canSSRAuth.ts", import.meta.url),
+  "utf8",
+);
+const rootPageSource = await readFile(new URL("../../pages/index.tsx", import.meta.url), "utf8");
+const globalStylesSource = await readFile(
+  new URL("../../styles/global.css", import.meta.url),
+  "utf8",
+);
 
 await (async () => {
   await runTest("isAdminPermission allows administrative levels from 2 and above", () => {
@@ -314,6 +323,26 @@ await (async () => {
     assert.match(appShellSource, /shouldRenderModuleNavLoading/);
     assert.equal(appShellSource.includes("isModuleAccessLoading) {\n      return false;"), false);
     assert.equal(appShellSource.includes("isModuleAccessLoading) {\n          return false;"), false);
+  });
+
+  await runTest("canSSRAuth redirects unauthenticated users to login", () => {
+    assert.match(canSSRAuthSource, /if\s*\(\s*!token\s*\)/);
+    assert.match(canSSRAuthSource, /destination:\s*["']\/login["']/);
+  });
+
+  await runTest("root route validates the session before redirecting to dashboard", () => {
+    assert.match(rootPageSource, /canSSRAuth/);
+    assert.match(rootPageSource, /setupAPIClient\(ctx\)/);
+    assert.match(rootPageSource, /apiClient\.get\(["']\/user\/me["']\)/);
+    assert.match(rootPageSource, /destination:\s*["']\/dashboard["']/);
+    assert.equal(rootPageSource.includes("Home"), false);
+  });
+
+  await runTest("session transition loader crosses the full track", () => {
+    assert.match(globalStylesSource, /@keyframes session-load/);
+    assert.match(globalStylesSource, /translateX\(-100%\)/);
+    assert.match(globalStylesSource, /translateX\(300%\)/);
+    assert.equal(globalStylesSource.includes("translateX(115%)"), false);
   });
 
   await runTest("canSSRAdmin redirects unauthenticated users to login", async () => {
