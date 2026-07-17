@@ -8,8 +8,10 @@ import type {
   CreateAuditRequestPayload,
 } from "@workspace/shared/audit";
 import {
+  FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared/http";
@@ -49,7 +51,9 @@ function createTestRepository(): AuditRequestRepository {
     },
     async search(filters: AuditSearchFilters): Promise<AuditSearchResult> {
       const items = [...records.values()]
-        .filter((record) => record.organizationId === filters.organizationId)
+        .filter((record) =>
+          filters.organizationId ? record.organizationId === filters.organizationId : true,
+        )
         .filter((record) => (filters.requestId ? record.requestId === filters.requestId : true))
         .filter((record) => (filters.userId ? record.userId === filters.userId : true))
         .filter((record) => (filters.method ? record.method === filters.method : true))
@@ -70,11 +74,11 @@ function createTestRepository(): AuditRequestRepository {
     },
     async findByRequestId(
       requestId: string,
-      organizationId: string,
+      organizationId?: string,
     ): Promise<AuditRequestRecord | null> {
       const record = records.get(requestId);
 
-      if (!record || record.organizationId !== organizationId) {
+      if (!record || (organizationId && record.organizationId !== organizationId)) {
         return null;
       }
 
@@ -142,6 +146,14 @@ function withReadHeaders(permission = "2", organizationId = "org-1"): HeadersIni
     [FORWARDED_AUTH_USER_ID_HEADER]: "user-1",
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: organizationId,
     [FORWARDED_AUTH_PERMISSION_HEADER]: permission,
+  });
+}
+
+function withPlatformHeaders(): HeadersInit {
+  return withInternalHeaders({
+    [FORWARDED_AUTH_USER_ID_HEADER]: "platform-1",
+    [FORWARDED_AUTH_KIND_HEADER]: "platform",
+    [FORWARDED_AUTH_PLATFORM_ROLE_HEADER]: "super_admin",
   });
 }
 
@@ -292,6 +304,163 @@ it("scopes audit search results to the forwarded organization", async () => {
     expect(response.status).toBe(200);
     expect(body.data.total).toBe(1);
     expect(body.data.items[0]?.requestId).toBe("req-1");
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("allows platform super admin to search audit records by organizationId", async () => {
+  const repository = createTestRepository();
+  await repository.create({
+    requestId: "req-1",
+    organizationId: "org-1",
+    userId: "user-1",
+    permission: 2,
+    method: "GET",
+    path: "/users",
+    outcome: "success",
+    statusCode: 200,
+    durationMs: 10,
+    serviceSource: "gateway",
+    createdAt: new Date("2026-03-10T10:00:00.000Z").toISOString(),
+    finishedAt: new Date("2026-03-10T10:00:00.010Z").toISOString(),
+  });
+  await repository.create({
+    requestId: "req-2",
+    organizationId: "org-2",
+    userId: "user-2",
+    permission: 2,
+    method: "GET",
+    path: "/organizations",
+    outcome: "success",
+    statusCode: 200,
+    durationMs: 10,
+    serviceSource: "gateway",
+    createdAt: new Date("2026-03-10T11:00:00.000Z").toISOString(),
+    finishedAt: new Date("2026-03-10T11:00:00.010Z").toISOString(),
+  });
+
+  const app = createApp({
+    env: createEnv(),
+    logger: createTestLogger(),
+    repository,
+  });
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(
+      `${baseUrl}/platform/audit/requests?organizationId=org-1&pageSize=20`,
+      {
+        headers: withPlatformHeaders(),
+      },
+    );
+    const body = (await response.json()) as {
+      success: true;
+      data: AuditSearchResult;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.data.total).toBe(1);
+    expect(body.data.items[0]?.requestId).toBe("req-1");
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("allows platform super admin to search audit records globally", async () => {
+  const repository = createTestRepository();
+  await repository.create({
+    requestId: "req-1",
+    organizationId: "org-1",
+    userId: "user-1",
+    permission: 2,
+    method: "GET",
+    path: "/users",
+    outcome: "success",
+    statusCode: 200,
+    durationMs: 10,
+    serviceSource: "gateway",
+    createdAt: new Date("2026-03-10T10:00:00.000Z").toISOString(),
+    finishedAt: new Date("2026-03-10T10:00:00.010Z").toISOString(),
+  });
+  await repository.create({
+    requestId: "req-2",
+    organizationId: "org-2",
+    userId: "user-2",
+    permission: 2,
+    method: "GET",
+    path: "/organizations",
+    outcome: "success",
+    statusCode: 200,
+    durationMs: 10,
+    serviceSource: "gateway",
+    createdAt: new Date("2026-03-10T11:00:00.000Z").toISOString(),
+    finishedAt: new Date("2026-03-10T11:00:00.010Z").toISOString(),
+  });
+
+  const app = createApp({
+    env: createEnv(),
+    logger: createTestLogger(),
+    repository,
+  });
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/audit/requests?pageSize=20`, {
+      headers: withPlatformHeaders(),
+    });
+    const body = (await response.json()) as {
+      success: true;
+      data: AuditSearchResult;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.data.total).toBe(2);
+    expect(body.data.items.map((item) => item.requestId)).toEqual(["req-2", "req-1"]);
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("allows platform super admin to read audit records by requestId", async () => {
+  const repository = createTestRepository();
+  await repository.create({
+    requestId: "req-2",
+    organizationId: "org-2",
+    userId: "user-2",
+    permission: 2,
+    method: "GET",
+    path: "/organizations",
+    outcome: "success",
+    statusCode: 200,
+    durationMs: 10,
+    serviceSource: "gateway",
+    createdAt: new Date("2026-03-10T11:00:00.000Z").toISOString(),
+    finishedAt: new Date("2026-03-10T11:00:00.010Z").toISOString(),
+  });
+
+  const app = createApp({
+    env: createEnv(),
+    logger: createTestLogger(),
+    repository,
+  });
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(`${baseUrl}/audit/requests/req-2`, {
+      headers: withPlatformHeaders(),
+    });
+    const body = (await response.json()) as {
+      success: true;
+      data: { item: AuditRequestRecord };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.data.item.requestId).toBe("req-2");
+    expect(body.data.item.organizationId).toBe("org-2");
   } finally {
     await stopServer(server);
   }
