@@ -1,4 +1,6 @@
+import type { LucideIcon } from "lucide-react";
 import {
+  AlertCircle,
   CheckSquare,
   ClipboardList,
   Landmark,
@@ -6,132 +8,165 @@ import {
   WalletCards,
 } from "lucide-react";
 
+import { usePessoalLdd } from "../hooks/usePessoalTracking";
 import { usePessoalUnions } from "../hooks/usePessoalUnions";
+import type { PessoalTabId } from "../types";
+
+type OverviewCard = {
+  label: string;
+  value?: string;
+  description: string;
+  details: string[];
+  icon: LucideIcon;
+  tabId: PessoalTabId;
+};
+
+interface PessoalOverviewSectionProps {
+  onSelectTab: (tabId: PessoalTabId) => void;
+}
 
 function formatCount(value: number, isLoading: boolean) {
   return isLoading ? "..." : String(value);
 }
 
-export function PessoalOverviewSection() {
-  const { data: unions = [], isError, isLoading } = usePessoalUnions();
+function normalizeStatus(value: string | null) {
+  return value
+    ?.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+export function PessoalOverviewSection({ onSelectTab }: PessoalOverviewSectionProps) {
+  const {
+    data: unions = [],
+    isError: isUnionsError,
+    isLoading: isUnionsLoading,
+  } = usePessoalUnions();
+  const { data: ldd = [], isError: isLddError, isLoading: isLddLoading } = usePessoalLdd("", true);
   const withBaseDateCount = unions.filter((union) => Boolean(union.base_date)).length;
   const withoutBaseDateCount = unions.length - withBaseDateCount;
   const cnpjCount = unions.filter((union) => Boolean(union.cnpj)).length;
-  const featureCards = [
+  const paidLddCount = ldd.filter((item) => normalizeStatus(item.status) === "pago").length;
+  const overdueLddCount = ldd.filter((item) => normalizeStatus(item.status) === "vencido").length;
+  const openLddCount = Math.max(ldd.length - paidLddCount - overdueLddCount, 0);
+  const featureCards: OverviewCard[] = [
     {
       label: "Sindicatos",
-      value: formatCount(unions.length, isLoading),
-      description: "Cadastros recebidos para folha e data-base.",
+      value: formatCount(unions.length, isUnionsLoading),
+      description: "Folha e data-base.",
       details: [
-        `${formatCount(withBaseDateCount, isLoading)} com data-base`,
-        `${formatCount(withoutBaseDateCount, isLoading)} sem data-base`,
-        `${formatCount(cnpjCount, isLoading)} CNPJs cadastrados`,
+        `${formatCount(withBaseDateCount, isUnionsLoading)} com base`,
+        `${formatCount(withoutBaseDateCount, isUnionsLoading)} sem base`,
+        `${formatCount(cnpjCount, isUnionsLoading)} CNPJs`,
       ],
       icon: Landmark,
-      tone: "blue",
-    },
-    {
-      label: "Folha",
-      description: "Rotinas por cliente e competência.",
-      icon: WalletCards,
-      tone: "gray",
-      details: [],
-    },
-    {
-      label: "Obrigações",
-      description: "Geração e conferência mensal.",
-      icon: CheckSquare,
-      tone: "gray",
-      details: [],
+      tabId: "unions",
     },
     {
       label: "Acompanhamentos",
-      description: "LDD e situacoes do modulo.",
+      value: formatCount(ldd.length, isLddLoading),
+      description: "LDD do departamento.",
+      details: [
+        `${formatCount(openLddCount, isLddLoading)} abertos`,
+        `${formatCount(overdueLddCount, isLddLoading)} vencidos`,
+        `${formatCount(paidLddCount, isLddLoading)} pagos`,
+      ],
       icon: ClipboardList,
-      tone: "gray",
-      details: [],
+      tabId: "tracking",
+    },
+    {
+      label: "Folha",
+      description: "Por cliente.",
+      details: ["Cadastro", "Parâmetros"],
+      icon: WalletCards,
+      tabId: "payroll",
+    },
+    {
+      label: "Obrigações",
+      description: "Conferência mensal.",
+      details: ["Competência", "Checklist"],
+      icon: CheckSquare,
+      tabId: "obligations",
     },
   ];
+  const hasError = isUnionsError || isLddError;
+
+  function renderCard(card: OverviewCard) {
+    const Icon = card.icon;
+
+    return (
+      <button
+        key={card.label}
+        type="button"
+        onClick={() => onSelectTab(card.tabId)}
+        className="rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-700 dark:hover:bg-blue-900/10"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+              {card.label}
+            </p>
+            {card.value ? (
+              <p className="mt-1.5 text-2xl font-bold leading-none text-gray-900 dark:text-white">
+                {card.value}
+              </p>
+            ) : null}
+          </div>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+            <Icon className="h-4 w-4" />
+          </span>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-gray-600 dark:text-gray-400">
+          {card.description}
+        </p>
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {card.details.map((detail) => (
+            <span
+              key={detail}
+              className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+            >
+              {detail}
+            </span>
+          ))}
+        </div>
+      </button>
+    );
+  }
 
   return (
-    <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-      <div className="relative min-h-[320px] overflow-hidden rounded-xl border border-blue-500/40 bg-gradient-to-br from-blue-700 via-sky-700 to-blue-800 p-6 text-white shadow-lg">
-        <div className="absolute right-6 top-6 flex h-12 w-12 items-center justify-center rounded-xl bg-white/15">
-          <UserRoundCog className="h-6 w-6" />
+    <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+      <div className="relative min-h-[260px] overflow-hidden rounded-xl border border-blue-500/40 bg-gradient-to-br from-blue-700 via-sky-700 to-blue-800 p-5 text-white shadow-lg">
+        <div className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-lg bg-white/15">
+          <UserRoundCog className="h-5 w-5" />
         </div>
 
-        <div className="flex min-h-[270px] max-w-xl flex-col justify-between">
+        <div className="flex min-h-[210px] max-w-xl flex-col justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-blue-100">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-100">
               Resumo operacional
             </p>
-            <h2 className="mt-5 max-w-lg text-4xl font-bold leading-tight">
+            <h2 className="mt-4 max-w-lg text-3xl font-bold leading-tight">
               Departamento Pessoal
             </h2>
-            <p className="mt-5 max-w-lg text-base leading-7 text-blue-100">
+            <p className="mt-4 max-w-lg text-sm leading-6 text-blue-100">
               Rotinas de folha, obrigações, sindicatos, acompanhamentos e acessos no mesmo fluxo.
             </p>
           </div>
-        </div>
 
-        {isError ? (
-          <p className="mt-5 rounded-lg bg-white/15 px-3 py-2 text-sm text-white">
-            Não foi possível carregar os indicadores de sindicatos agora.
-          </p>
-        ) : null}
+          {hasError ? (
+            <div className="flex items-center gap-2 rounded-lg bg-white/15 px-3 py-1.5 text-xs text-white">
+              <AlertCircle className="h-4 w-4" />
+              Não foi possível carregar todos os indicadores agora.
+            </div>
+          ) : null}
+        </div>
       </div>
 
-      <div className="grid gap-5">
-        {featureCards.map((card) => {
-          const Icon = card.icon;
-          const isPrimary = card.tone === "blue";
-
-          return (
-            <div
-              key={card.label}
-              className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800"
-            >
-              <div className="flex items-start gap-4">
-                <span
-                  className={`flex h-11 w-11 items-center justify-center rounded-xl ${
-                    isPrimary
-                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                      : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <p className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      {card.label}
-                    </p>
-                    {card.value ? (
-                      <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                        {card.value}
-                      </p>
-                    ) : null}
-                  </div>
-                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    {card.description}
-                  </p>
-                  {card.details.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {card.details.map((detail) => (
-                        <span
-                          key={detail}
-                          className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                        >
-                          {detail}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      <div className="grid gap-3">
+        {featureCards.slice(0, 2).map(renderCard)}
+        <div className="grid grid-cols-2 gap-3">
+          {featureCards.slice(2).map(renderCard)}
+        </div>
       </div>
     </section>
   );

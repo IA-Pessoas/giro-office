@@ -188,6 +188,7 @@ runTest("pessoal shell wires access, client selector, and functional tabs", () =
   assert.match(shell, /PessoalTrackingSection selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalPasswordsSection[\s\S]*selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalPasswordsSection\s+key=\{selectedClientId\}/);
+  assert.match(shell, /PessoalOverviewSection onSelectTab=\{setActiveTab\}/);
   assert.match(clientSelector, /useClients\(/);
   assert.match(clientSelector, /handleSelect\(null\)/);
   assert.match(clientSelector, /role="dialog"/);
@@ -205,6 +206,33 @@ runTest("client-scoped sections block requests without selected client", () => {
     assert.match(source, /if \(!hasClient\)/);
     assert.match(source, /PessoalPlaceholderSection/);
   }
+});
+
+runTest("pessoal overview reads available dashboard data", () => {
+  const overview = readFileSync("src/modules/pessoal/components/PessoalOverviewSection.tsx", "utf8");
+  const trackingHook = readFileSync("src/modules/pessoal/hooks/usePessoalTracking.ts", "utf8");
+
+  assert.match(overview, /usePessoalUnions\(\)/);
+  assert.match(overview, /usePessoalLdd\("", true\)/);
+  assert.match(overview, /lg:grid-cols-\[minmax\(0,2fr\)_minmax\(280px,1fr\)\]/);
+  assert.match(overview, /bg-gradient-to-br from-blue-700/);
+  assert.match(overview, /min-h-\[260px\]/);
+  assert.match(overview, /text-3xl font-bold/);
+  assert.match(overview, /className="rounded-lg border border-gray-200 bg-white p-3/);
+  assert.match(overview, /text-xs font-bold uppercase/);
+  assert.match(overview, /onSelectTab\(card\.tabId\)/);
+  assert.match(overview, /tabId: "payroll"/);
+  assert.match(overview, /tabId: "obligations"/);
+  assert.match(overview, /grid grid-cols-2 gap-3/);
+  assert.match(overview, /featureCards\.slice\(2\)/);
+  assert.doesNotMatch(overview, /const splitCards|divide-y|divide-x/);
+  assert.doesNotMatch(overview, /details:\s*\[\]/);
+  assert.doesNotMatch(overview, /value: "Por cliente"|value: "Mensal"/);
+  assert.match(
+    trackingHook,
+    /export function usePessoalLdd[\s\S]*?pessoalService\.listLdd\(clientId\)[\s\S]*?enabled,/,
+  );
+  assert.match(trackingHook, /lddKey\(""\)/);
 });
 
 runTest("password UI keeps secrets behind detail and explicit reveal", () => {

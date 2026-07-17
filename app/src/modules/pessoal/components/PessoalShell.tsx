@@ -102,7 +102,7 @@ export function PessoalShell() {
       </nav>
 
       {activeTab === "overview" ? (
-        <PessoalOverviewSection />
+        <PessoalOverviewSection onSelectTab={setActiveTab} />
       ) : activeTab === "unions" ? (
         <PessoalUnionsSection canEdit={access.canEdit} />
       ) : activeTab === "payroll" ? (

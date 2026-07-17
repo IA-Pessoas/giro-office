@@ -23,7 +23,7 @@ function trackingKey(...parts: string[]) {
 }
 
 function lddKey(clientId: string) {
-  return trackingKey(clientId, "ldd");
+  return trackingKey(clientId || "all", "ldd");
 }
 
 function situationsKey(clientId: string) {
@@ -39,7 +39,7 @@ export function usePessoalLdd(
   enabled: boolean,
 ): UseQueryResult<PessoalLdd[], Error> {
   return useFetch(lddKey(clientId), () => pessoalService.listLdd(clientId), {
-    enabled: enabled && clientId.length > 0,
+    enabled,
   });
 }
 
@@ -53,7 +53,10 @@ export function useCreatePessoalLddMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (payload) => pessoalService.createLdd(payload),
     onSuccess: async (ldd) => {
-      await queryClient.invalidateQueries({ queryKey: trackingKey(ldd.client_id) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: trackingKey(ldd.client_id) }),
+        queryClient.invalidateQueries({ queryKey: lddKey("") }),
+      ]);
     },
   });
 }
@@ -67,7 +70,10 @@ export function useUpdatePessoalLddMutation(
   return useMutation({
     mutationFn: (payload) => pessoalService.updateLdd(id, payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: trackingKey(clientId) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: trackingKey(clientId) }),
+        queryClient.invalidateQueries({ queryKey: lddKey("") }),
+      ]);
     },
   });
 }
@@ -80,7 +86,10 @@ export function useDeletePessoalLddMutation(
   return useMutation({
     mutationFn: (id) => pessoalService.deleteLdd(id),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: trackingKey(clientId) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: trackingKey(clientId) }),
+        queryClient.invalidateQueries({ queryKey: lddKey("") }),
+      ]);
     },
   });
 }
