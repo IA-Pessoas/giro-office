@@ -91,10 +91,11 @@ runTest("client endpoints use only /client contract", () => {
   assert.equal(CLIENT_ENDPOINTS.updatePa("123"), "/client/123/pa");
 });
 
-runTest("buildClientListParams forwards search, status, page and limit", () => {
+runTest("buildClientListParams forwards search, ref, status, page and limit", () => {
   const filters = {
     search: "acme",
-    status: "Prospect",
+    ref: "deps",
+    status: "Departamento contabil",
     page: 2,
     limit: 15,
   };
