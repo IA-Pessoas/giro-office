@@ -329,7 +329,9 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
     tracking,
     /onClick=\{activeTrackingTab === "ldd" \? startNewLdd : startNewSituation\}/,
   );
-  assert.match(tracking, /confirm/);
+  assert.match(tracking, /<Dialog/);
+  assert.match(tracking, /handleConfirmDeleteLdd/);
+  assert.doesNotMatch(tracking, /\bconfirm\s*\(/);
   assert.match(tracking, /type: "date"/);
   assert.match(tracking, /type: "number"/);
   assert.match(shell, /PessoalPasswordsSection/);
@@ -344,7 +346,9 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(passwords, /revealedFields/);
   assert.match(passwords, /toggleSecretField/);
   assert.match(passwords, /navigator\.clipboard/);
-  assert.match(passwords, /confirm/);
+  assert.match(passwords, /<Dialog/);
+  assert.match(passwords, /handleConfirmDelete/);
+  assert.doesNotMatch(passwords, /\bconfirm\s*\(/);
   assert.match(passwords, /Outro serviço/);
   assert.match(passwords, /isCustomService/);
   assert.match(passwords, /setIsCustomService\(true\)/);
@@ -361,7 +365,8 @@ runTest("pessoal UI follows tecnologia-style system accent and centered tabs", (
   assert.match(passwords, /senha_main/);
   assert.match(passwords, /senha_secondary/);
   assert.doesNotMatch(passwords, />\s*Fechar\s*</);
-  assert.doesNotMatch(passwords, />\s*Cancelar\s*</);
+  assert.match(passwords, />\s*Cancelar\s*</);
+  assert.match(passwords, /Confirmar remoção/);
   assert.match(overview, /text-4xl/);
   assert.match(overview, /text-3xl/);
   assert.match(unions, /border-spacing-y-2/);

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { listAdminUsers, type UserItem } from "@modules/users";
+import { Dialog } from "@shared/components";
 import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
@@ -37,10 +38,12 @@ import type {
   PessoalPasswordUpdatePayload,
 } from "../types/passwords";
 import {
+  pessoalDangerButtonClassName,
   pessoalPrimaryButtonClassName,
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
+import { optional } from "./pessoalFormValueHelpers";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 
 interface PessoalPasswordsSectionProps {
@@ -81,7 +84,7 @@ const secretFields = [
   { name: "senha_secondary", label: "Senha secundária" },
 ] as const satisfies ReadonlyArray<{ name: SecretFieldName; label: string }>;
 
-const PESSOAL_PASSWORD_OTHER_SERVICE = "__other__";
+const PESSOAL_PASSWORD_CUSTOM_SERVICE_OPTION = "__custom_service__";
 
 const pessoalPasswordServiceOptions = [
   "Portal eSocial",
@@ -93,12 +96,6 @@ const pessoalPasswordServiceOptions = [
   "BSF",
   "Onvio",
 ] as const;
-
-function optional(value: string): string | null {
-  const trimmed = value.trim();
-
-  return trimmed ? trimmed : null;
-}
 
 function normalizeSearch(value: string): string {
   return value
@@ -251,6 +248,7 @@ export function PessoalPasswordsSection({
     new Set(),
   );
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const usersQuery = useFetch<UserItem[]>(
     pessoalQueryKey("passwords", "users", "active"),
     () => listAdminUsers("active"),
@@ -294,6 +292,7 @@ export function PessoalPasswordsSection({
     setIsCustomService(false);
     setClearedSecretFields(new Set());
     setIsFormOpen(false);
+    setIsDeleteDialogOpen(false);
     setFormError(null);
     setSuccessMessage(null);
     setRevealedFields(new Set());
@@ -303,6 +302,7 @@ export function PessoalPasswordsSection({
     setRevealedFields(new Set());
     setEditingPasswordId("");
     setIsFormOpen(false);
+    setIsDeleteDialogOpen(false);
     setFormError(null);
   }, [selectedPasswordId]);
 
@@ -363,7 +363,7 @@ export function PessoalPasswordsSection({
 
   function getServiceSelectValue() {
     if (isCustomService) {
-      return PESSOAL_PASSWORD_OTHER_SERVICE;
+      return PESSOAL_PASSWORD_CUSTOM_SERVICE_OPTION;
     }
 
     if (!formValues.service_name) {
@@ -372,11 +372,11 @@ export function PessoalPasswordsSection({
 
     return isPessoalPasswordKnownService(formValues.service_name)
       ? formValues.service_name
-      : PESSOAL_PASSWORD_OTHER_SERVICE;
+      : PESSOAL_PASSWORD_CUSTOM_SERVICE_OPTION;
   }
 
   function handleServiceSelectChange(value: string) {
-    if (value === PESSOAL_PASSWORD_OTHER_SERVICE) {
+    if (value === PESSOAL_PASSWORD_CUSTOM_SERVICE_OPTION) {
       setIsCustomService(true);
       setFormValues((current) => ({
         ...current,
@@ -471,8 +471,16 @@ export function PessoalPasswordsSection({
     }
   }
 
-  async function handleDelete() {
-    if (!canEdit || !selectedPasswordId || !confirm("Remover esta senha?")) {
+  function openDeleteDialog() {
+    if (!canEdit || !selectedPasswordId) {
+      return;
+    }
+
+    setIsDeleteDialogOpen(true);
+  }
+
+  async function handleConfirmDelete() {
+    if (!canEdit || !selectedPasswordId) {
       return;
     }
 
@@ -482,9 +490,11 @@ export function PessoalPasswordsSection({
     try {
       await deleteMutation.mutateAsync(selectedPasswordId);
       setSelectedPasswordId("");
+      setIsDeleteDialogOpen(false);
       setSuccessMessage("Senha removida.");
     } catch (error) {
       setFormError(getPessoalErrorMessage(error, "Não foi possível remover a senha."));
+      setIsDeleteDialogOpen(false);
     }
   }
 
@@ -666,7 +676,7 @@ export function PessoalPasswordsSection({
                         </button>
                         <button
                           type="button"
-                          onClick={handleDelete}
+                          onClick={openDeleteDialog}
                           disabled={deleteMutation.isPending}
                           className={pessoalSecondaryButtonClassName}
                         >
@@ -759,6 +769,50 @@ export function PessoalPasswordsSection({
         ) : null}
       </div>
 
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        title="Remover senha"
+        description="Confirmação de remoção de senha"
+        contentClassName="w-[min(92vw,520px)]"
+        bodyClassName="space-y-3"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={deleteMutation.isPending}
+              className={pessoalSecondaryButtonClassName}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={deleteMutation.isPending}
+              className={pessoalDangerButtonClassName}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Confirmar remoção
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-700 dark:text-slate-300">
+          Esta ação remove o acesso selecionado. Os campos sensíveis vinculados a esta senha
+          deixarão de ficar disponíveis para o cliente.
+        </p>
+        {detail ? (
+          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
+            {detail.service_name}
+          </p>
+        ) : null}
+      </Dialog>
+
       {isFormOpen && canEdit ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 p-4 backdrop-blur-sm"
@@ -812,7 +866,7 @@ export function PessoalPasswordsSection({
                           {serviceName}
                         </option>
                       ))}
-                      <option value={PESSOAL_PASSWORD_OTHER_SERVICE}>Outro serviço</option>
+                      <option value={PESSOAL_PASSWORD_CUSTOM_SERVICE_OPTION}>Outro serviço</option>
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                   </div>
@@ -841,7 +895,7 @@ export function PessoalPasswordsSection({
                   </div>
                 </label>
 
-                {getServiceSelectValue() === PESSOAL_PASSWORD_OTHER_SERVICE ? (
+                {getServiceSelectValue() === PESSOAL_PASSWORD_CUSTOM_SERVICE_OPTION ? (
                   <label className="flex flex-col gap-1.5 text-sm text-gray-700 dark:text-gray-300 md:col-span-2">
                     Outro serviço
                     <input
