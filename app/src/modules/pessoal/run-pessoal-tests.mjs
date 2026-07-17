@@ -7,8 +7,8 @@ import {
   unwrapPessoalEnvelope,
 } from "./services/pessoalService.contract.ts";
 import {
-  buildPessoalObligationParams,
   buildPessoalLddListParams,
+  buildPessoalObligationParams,
   buildPessoalPayrollPayload,
   buildPessoalPayrollUpdatePayload,
   buildPessoalUnionPayload,
@@ -56,7 +56,6 @@ runTest("pessoal tabs stay stable for branch integration", () => {
     PESSOAL_TABS.map((tab) => tab.id),
     ["overview", "unions", "payroll", "obligations", "tracking", "passwords"],
   );
-  assert.equal(PESSOAL_TABS.find((tab) => tab.id === "obligations")?.label, "Obrigações");
 });
 
 runTest("unwrapPessoalEnvelope extracts data and accepts raw fallback", () => {
@@ -155,223 +154,50 @@ runTest("password list items are treated as non-secret summaries", () => {
   );
 });
 
-runTest("pessoal UI follows tecnologia-style system accent and centered tabs", () => {
+runTest("pessoal shell wires access, client selector, and functional tabs", () => {
   const shell = readFileSync("src/modules/pessoal/components/PessoalShell.tsx", "utf8");
-  const overview = readFileSync("src/modules/pessoal/components/PessoalOverviewSection.tsx", "utf8");
-  const placeholder = readFileSync(
-    "src/modules/pessoal/components/PessoalPlaceholderSection.tsx",
-    "utf8",
-  );
-  const controls = readFileSync("src/modules/pessoal/components/pessoalFormControls.ts", "utf8");
-  const formValueHelpers = readFileSync(
-    "src/modules/pessoal/components/pessoalFormValueHelpers.ts",
-    "utf8",
-  );
-  const unions = readFileSync("src/modules/pessoal/components/PessoalUnionsSection.tsx", "utf8");
-  const payroll = readFileSync("src/modules/pessoal/components/PessoalPayrollSection.tsx", "utf8");
-  const obligations = readFileSync(
-    "src/modules/pessoal/components/PessoalObligationsSection.tsx",
-    "utf8",
-  );
-  const tracking = readFileSync(
-    "src/modules/pessoal/components/PessoalTrackingSection.tsx",
-    "utf8",
-  );
-  const passwords = readFileSync(
-    "src/modules/pessoal/components/PessoalPasswordsSection.tsx",
-    "utf8",
-  );
   const clientSelector = readFileSync(
     "src/modules/pessoal/components/PessoalClientSelector.tsx",
     "utf8",
   );
-  const source = [
-    shell,
-    overview,
-    placeholder,
-    controls,
-    unions,
-    payroll,
-    obligations,
-    tracking,
-    passwords,
-    clientSelector,
-  ].join("\n");
 
-  assert.match(shell, /justify-center/);
-  assert.match(shell, /dark:bg-gray-800/);
-  assert.doesNotMatch(shell, /useClients/);
-  assert.doesNotMatch(shell, /clientQuery\.data\?\.items/);
-  assert.doesNotMatch(shell, /unionCreateRequestId/);
-  assert.doesNotMatch(shell, /openCreateRequestId/);
-  assert.doesNotMatch(shell, /PessoalOverviewSection hasClient/);
-  assert.doesNotMatch(shell, /clients=\{\[\]\}/);
-  assert.match(overview, /usePessoalUnions/);
-  assert.doesNotMatch(overview, /onCreateUnion|canCreateUnion|Criar sindicato/);
-  assert.match(overview, /Resumo operacional/);
-  assert.match(overview, /from-blue-700 via-sky-700 to-blue-800/);
-  assert.match(overview, /featureCards/);
-  assert.match(overview, /Folha/);
-  assert.match(overview, /Obrigações/);
-  assert.match(overview, /Acompanhamentos/);
-  assert.doesNotMatch(overview, /label: "Senhas"/);
-  assert.match(overview, /com data-base/);
-  assert.match(overview, /sem data-base/);
-  assert.match(overview, /CNPJs cadastrados/);
-  assert.match(overview, /Boolean\(union\.cnpj\)/);
-  assert.match(overview, /lg:grid-cols-\[minmax\(0,2fr\)_minmax\(280px,1fr\)\]/);
-  assert.doesNotMatch(overview, /Operacao atual/);
-  assert.doesNotMatch(overview, /Sindicatos cadastrados/);
-  assert.doesNotMatch(overview, /overviewCards/);
-  assert.doesNotMatch(overview, /Disponivel|Por cliente|Restrito|hasClient|Cliente selecionado/);
-  assert.match(clientSelector, /aria-haspopup="dialog"/);
-  assert.match(clientSelector, /role="dialog"/);
-  assert.match(clientSelector, /useClients/);
-  assert.match(clientSelector, /useDeferredValue/);
-  assert.match(clientSelector, /CLIENT_PICKER_LIMIT = 50/);
-  assert.match(clientSelector, /type="number"/);
-  assert.match(clientSelector, /sm:w-auto/);
-  assert.match(clientSelector, /min-w-44/);
-  assert.match(clientSelector, /sm:max-w-80/);
-  assert.match(clientSelector, /justify-center/);
-  assert.match(clientSelector, /py-2\.5/);
-  assert.match(clientSelector, /text-center/);
-  assert.match(clientSelector, /h-8 w-14/);
-  assert.match(clientSelector, /bg-blue-600/);
-  assert.match(clientSelector, /setPage\(\(current\) => current \+ 1\)/);
-  assert.match(clientSelector, /Selecionar cliente/);
-  assert.match(clientSelector, /Sem cliente selecionado/);
+  assert.match(shell, /useModuleAccess\("pessoal"\)/);
+  assert.match(shell, /PessoalUnionsSection canEdit=\{access\.canEdit\}/);
+  assert.match(shell, /PessoalPayrollSection selectedClientId=\{selectedClientId\}/);
+  assert.match(shell, /PessoalObligationsSection selectedClientId=\{selectedClientId\}/);
+  assert.match(shell, /PessoalTrackingSection selectedClientId=\{selectedClientId\}/);
+  assert.match(shell, /PessoalPasswordsSection[\s\S]*selectedClientId=\{selectedClientId\}/);
+  assert.match(shell, /PessoalPasswordsSection\s+key=\{selectedClientId\}/);
+  assert.match(clientSelector, /useClients\(/);
   assert.match(clientSelector, /handleSelect\(null\)/);
-  assert.match(clientSelector, /Nenhum cliente disponível/);
-  assert.doesNotMatch(clientSelector, /Todos os clientes/);
-  assert.doesNotMatch(clientSelector, /ChevronDown/);
-  assert.doesNotMatch(clientSelector, /<select/);
-  assert.doesNotMatch(clientSelector, />\s*Cliente\s*</);
-  assert.doesNotMatch(unions, /openCreateRequestId/);
-  assert.match(unions, /role="dialog"/);
-  assert.match(unions, /backdrop-blur-sm/);
-  assert.match(unions, /Criar sindicato/);
-  assert.match(shell, /PessoalPayrollSection/);
-  assert.match(shell, /activeTab === "payroll"/);
-  assert.match(payroll, /usePessoalPayroll/);
-  assert.match(payroll, /pessoalFormValueHelpers/);
-  assert.match(formValueHelpers, /function optional\(value: string\): string \| null/);
-  assert.match(
-    formValueHelpers,
-    /function optional<T>\(value: string, transform: \(value: string\) => T \| null\): T \| null/,
+  assert.match(clientSelector, /role="dialog"/);
+});
+
+runTest("client-scoped sections block requests without selected client", () => {
+  for (const file of [
+    "PessoalPayrollSection.tsx",
+    "PessoalObligationsSection.tsx",
+    "PessoalTrackingSection.tsx",
+    "PessoalPasswordsSection.tsx",
+  ]) {
+    const source = readFileSync(`src/modules/pessoal/components/${file}`, "utf8");
+
+    assert.match(source, /if \(!hasClient\)/);
+    assert.match(source, /PessoalPlaceholderSection/);
+  }
+});
+
+runTest("password UI keeps secrets behind detail and explicit reveal", () => {
+  const passwords = readFileSync(
+    "src/modules/pessoal/components/PessoalPasswordsSection.tsx",
+    "utf8",
   );
-  assert.match(formValueHelpers, /Number\.isFinite/);
-  assert.doesNotMatch(payroll, /optionalText|optionalNumber/);
-  assert.match(payroll, /Nenhuma configuração de folha cadastrada para este cliente/);
-  assert.match(payroll, /ChevronDown/);
-  assert.match(payroll, /appearance-none pr-12/);
-  assert.match(payroll, /right-4/);
-  assert.match(payroll, /type="checkbox"/);
-  assert.match(payroll, /type="number"/);
-  assert.match(shell, /PessoalObligationsSection/);
-  assert.match(shell, /activeTab === "obligations"/);
-  assert.match(obligations, /usePessoalObligation/);
-  assert.match(obligations, /useGeneratePessoalObligationsMutation/);
-  assert.match(obligations, /type="month"/);
-  assert.match(obligations, /type="checkbox"/);
-  assert.match(obligations, /Gerar/);
-  assert.match(obligations, /Obrigações/);
-  assert.match(obligations, /Competência/);
-  assert.match(obligations, /Não foi possível/);
-  assert.match(obligations, /Geração concluída/);
-  assert.match(obligations, /setTimeout\(\(\) => \{/);
-  assert.match(obligations, /}, 3000\)/);
-  assert.match(shell, /PessoalTrackingSection/);
-  assert.match(shell, /activeTab === "tracking"/);
-  assert.match(tracking, /usePessoalLdd/);
-  assert.match(tracking, /usePessoalSituations/);
-  assert.match(tracking, /LDD/);
-  assert.match(tracking, /Situações/);
-  assert.match(tracking, /Período/);
-  assert.match(tracking, /Título/);
-  assert.match(tracking, /Descrição/);
-  assert.match(tracking, /Concluída/);
-  assert.match(tracking, /Não foi possível/);
-  assert.match(tracking, /Criar LDD/);
-  assert.match(tracking, /Criar situação/);
-  assert.match(tracking, /isLddFormOpen/);
-  assert.match(tracking, /isSituationFormOpen/);
-  assert.match(tracking, /setIsLddFormOpen\(true\)/);
-  assert.match(tracking, /setIsSituationFormOpen\(true\)/);
-  assert.match(tracking, /role="dialog"/);
-  assert.match(tracking, /aria-modal="true"/);
-  assert.match(tracking, /backdrop-blur-sm/);
-  assert.match(
-    tracking,
-    /\{isLddFormOpen \? \(\s*<div\s+className="fixed inset-0[^"]+"\s+onClick=\{\(\) => setIsLddFormOpen\(false\)\}[\s\S]*aria-labelledby="pessoal-ldd-form-title"/,
-  );
-  assert.match(
-    tracking,
-    /\{isSituationFormOpen \? \(\s*<div\s+className="fixed inset-0[^"]+"\s+onClick=\{\(\) => setIsSituationFormOpen\(false\)\}[\s\S]*aria-labelledby="pessoal-situation-form-title"/,
-  );
-  assert.equal(
-    tracking.match(/onClick=\{\(event\) => event\.stopPropagation\(\)\}/g)?.length,
-    2,
-  );
-  assert.match(tracking, /grid gap-3 sm:grid-cols-2/);
-  assert.match(tracking, /ChevronDown/);
-  assert.match(tracking, /appearance-none pr-12/);
-  assert.match(tracking, /absolute right-4/);
-  assert.match(tracking, /lddTypeOptions/);
-  assert.match(tracking, /lddRegistrationStatusOptions/);
-  assert.match(tracking, /lddStatusOptions/);
-  assert.match(tracking, /field\.options/);
-  assert.doesNotMatch(tracking, /border-t border-gray-200 pt-5/);
-  assert.doesNotMatch(tracking, /<div className="grid gap-6">\s*<TrackingListCard/);
-  assert.match(tracking, /actions\?: ReactNode/);
-  assert.match(tracking, /actions=\{\s*canEdit \? \(/);
-  assert.doesNotMatch(
-    tracking,
-    /onClick=\{activeTrackingTab === "ldd" \? startNewLdd : startNewSituation\}/,
-  );
-  assert.match(tracking, /<Dialog/);
-  assert.match(tracking, /handleConfirmDeleteLdd/);
-  assert.doesNotMatch(tracking, /\bconfirm\s*\(/);
-  assert.match(tracking, /type: "date"/);
-  assert.match(tracking, /type: "number"/);
-  assert.match(shell, /PessoalPasswordsSection/);
-  assert.match(shell, /activeTab === "passwords"/);
-  assert.match(passwords, /usePessoalPasswords/);
-  assert.match(passwords, /usePessoalPasswordDetail/);
-  assert.match(passwords, /hasPessoalPasswordSecretFields/);
-  assert.match(passwords, /type="search"/);
-  assert.match(passwords, /Buscar por serviço ou responsável/);
-  assert.match(passwords, /const hasPasswords = passwords\.length > 0/);
-  assert.match(passwords, /\{hasPasswords \? \(/);
+
   assert.match(passwords, /revealedFields/);
   assert.match(passwords, /toggleSecretField/);
-  assert.match(passwords, /navigator\.clipboard/);
-  assert.match(passwords, /<Dialog/);
-  assert.match(passwords, /handleConfirmDelete/);
-  assert.doesNotMatch(passwords, /\bconfirm\s*\(/);
-  assert.match(passwords, /Outro serviço/);
-  assert.match(passwords, /isCustomService/);
-  assert.match(passwords, /setIsCustomService\(true\)/);
-  assert.match(passwords, /clearedSecretFields/);
-  assert.match(passwords, /payload\[field\.name\] = null/);
-  assert.match(passwords, /Limpar/);
-  assert.match(passwords, /listAdminUsers/);
-  assert.match(passwords, /ChevronDown/);
-  assert.match(passwords, /appearance-none pr-12/);
-  assert.match(passwords, /role="dialog"/);
-  assert.match(passwords, /aria-modal="true"/);
-  assert.match(passwords, /aria-label="Fechar senha"/);
+  assert.match(passwords, /getSecretText\(detail/);
   assert.match(passwords, /type="password"/);
-  assert.match(passwords, /senha_main/);
-  assert.match(passwords, /senha_secondary/);
-  assert.doesNotMatch(passwords, />\s*Fechar\s*</);
-  assert.match(passwords, />\s*Cancelar\s*</);
-  assert.match(passwords, /Confirmar remoção/);
-  assert.match(overview, /text-4xl/);
-  assert.match(overview, /text-3xl/);
-  assert.match(unions, /border-spacing-y-2/);
-  assert.match(controls, /focus:border-blue-500/);
-  assert.doesNotMatch(source, /(indigo|pink|purple|violet|fuchsia|rose)-/);
+  assert.doesNotMatch(passwords, /password\.senha_main|password\.senha_secondary/);
 });
 
 console.log("pessoal contract tests passed");

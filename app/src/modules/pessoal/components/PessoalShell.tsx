@@ -18,7 +18,6 @@ import { PessoalObligationsSection } from "./PessoalObligationsSection";
 import { PessoalOverviewSection } from "./PessoalOverviewSection";
 import { PessoalPayrollSection } from "./PessoalPayrollSection";
 import { PessoalPasswordsSection } from "./PessoalPasswordsSection";
-import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 import { PessoalTrackingSection } from "./PessoalTrackingSection";
 import { PessoalUnionsSection } from "./PessoalUnionsSection";
 
@@ -31,20 +30,11 @@ const tabIcons = {
   passwords: KeyRound,
 } satisfies Record<PessoalTabId, typeof BarChart3>;
 
-const clientRequiredTabs = new Set<PessoalTabId>([
-  "payroll",
-  "obligations",
-  "tracking",
-  "passwords",
-]);
-
 export function PessoalShell() {
   const { access, isLoading } = useModuleAccess("pessoal");
   const [activeTab, setActiveTab] = useState<PessoalTabId>("overview");
   const [selectedClient, setSelectedClient] = useState<PessoalClientOption | null>(null);
   const selectedClientId = selectedClient?.id ?? "";
-  const hasClient = selectedClientId.length > 0;
-  const activeTabLabel = PESSOAL_TABS.find((tab) => tab.id === activeTab)?.label;
 
   if (isLoading) {
     return (
@@ -63,8 +53,6 @@ export function PessoalShell() {
       </div>
     );
   }
-
-  const ActiveIcon = tabIcons[activeTab];
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
@@ -124,15 +112,13 @@ export function PessoalShell() {
       ) : activeTab === "tracking" ? (
         <PessoalTrackingSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
       ) : activeTab === "passwords" ? (
-        <PessoalPasswordsSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
-      ) : (
-        <PessoalPlaceholderSection
-          icon={ActiveIcon}
-          title={activeTabLabel || "Departamento Pessoal"}
-          description="Esta área será entregue em uma branch funcional própria."
-          requiresClient={clientRequiredTabs.has(activeTab)}
-          hasClient={hasClient}
+        <PessoalPasswordsSection
+          key={selectedClientId}
+          selectedClientId={selectedClientId}
+          canEdit={access.canEdit}
         />
+      ) : (
+        null
       )}
     </div>
   );
