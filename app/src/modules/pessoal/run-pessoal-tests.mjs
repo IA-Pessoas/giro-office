@@ -15,6 +15,7 @@ import {
   hasPessoalPasswordSecretFields,
 } from "./services/pessoalService.ts";
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
+import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
 
 function runTest(name, fn) {
   try {
@@ -73,6 +74,25 @@ runTest("pessoal query keys include domain and optional params", () => {
     "payroll",
     "client-1",
   ]);
+});
+
+runTest("pessoal error message prefers api fields before local fallback", () => {
+  assert.equal(
+    getPessoalErrorMessage(
+      { response: { data: { error: "Erro retornado pela API", message: "Mensagem da API" } } },
+      "Fallback",
+    ),
+    "Erro retornado pela API",
+  );
+  assert.equal(
+    getPessoalErrorMessage({ response: { data: { message: "Mensagem da API" } } }, "Fallback"),
+    "Mensagem da API",
+  );
+  assert.equal(getPessoalErrorMessage(new Error("Erro local"), "Fallback"), "Erro local");
+  assert.equal(
+    getPessoalErrorMessage({ response: { data: { error: "   " } } }, "Fallback"),
+    "Fallback",
+  );
 });
 
 runTest("departamento pessoal page uses the pessoal module instead of the old mock", () => {
