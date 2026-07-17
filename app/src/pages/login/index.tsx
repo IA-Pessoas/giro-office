@@ -2,7 +2,6 @@ import { useContext, useState } from "react";
 import type { FormEvent } from "react";
 import Head from "next/head";
 import Link from "next/link";
-import { useRouter } from "next/router";
 import {
   AlertCircle,
   ArrowRight,
@@ -22,7 +21,6 @@ const LOGIN_CARD_LABEL_TEXT_CLASSNAME = "text-[#374151]";
 
 export default function Login() {
   const { signIn } = useContext(AuthContext);
-  const router = useRouter();
 
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
@@ -56,16 +54,8 @@ export default function Login() {
 
     try {
       await signIn({ login, password });
-      // Em geral o fluxo ja redireciona, mas garantimos um destino padrao.
-      if (router.pathname === "/login") {
-        await router.push("/dashboard");
-      }
     } catch (error: any) {
-      if (error?.response?.status === 400 || error?.response?.status === 401) {
-        setError("Login ou senha invalidos");
-      } else {
-        setError("Nao foi possivel entrar agora. Tente novamente.");
-      }
+      setError("Login ou senha invalidos");
       setLogin("");
       setPassword("");
     } finally {

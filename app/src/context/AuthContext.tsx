@@ -10,7 +10,10 @@ import {
     AUTH_COOKIE_NAME,
     getAuthCookieOptions,
 } from "@modules/auth/utils/authCookie";
-import { getModulePermissionsFromToken } from "@modules/auth/utils/sessionToken";
+import {
+    getSessionContextFromToken,
+} from "@modules/auth/utils/sessionToken";
+import { platformService } from "@modules/superAdmin";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
 import { ME_QUERY_KEY } from "@shared/hooks";
@@ -25,6 +28,12 @@ interface UserProps {
     organization_id?: string | null;
     type?: "owner" | "admin" | "user" | null;
     modules?: Record<string, number | null> | null;
+    auth_kind?: "organization" | "platform";
+    platform_role?: "super_admin" | null;
+    support_mode?: boolean;
+    support_session_id?: string | null;
+    support_organization_id?: string | null;
+    support_reason?: string | null;
 }
 
 interface SignInProps {
@@ -42,6 +51,8 @@ interface AuthContextData {
     signIn: (credentials: SignInProps) => Promise<void>;
     logoutUser: () => Promise<void>;
     refreshSession: () => Promise<UserProps | null>;
+    enterSupportMode: (input: { organization_id: string; reason: string }) => Promise<void>;
+    exitSupportMode: () => Promise<void>;
     loading: boolean;
 }
 
@@ -116,6 +127,38 @@ function buildCurrentUser(
     };
 }
 
+function isValidPlatformUser(data: unknown): data is {
+    id: string;
+    name: string;
+    email: string;
+    platform_role: "super_admin";
+} {
+    return !!data &&
+        typeof data === "object" &&
+        typeof (data as { id?: unknown }).id === "string" &&
+        typeof (data as { name?: unknown }).name === "string" &&
+        typeof (data as { email?: unknown }).email === "string" &&
+        (data as { platform_role?: unknown }).platform_role === "super_admin";
+}
+
+function buildPlatformUser(
+    data: { id: string; name: string; email: string; platform_role: "super_admin" },
+    supportMode = false,
+): UserProps {
+    return {
+        id: data.id,
+        name: data.name,
+        login: data.email,
+        email: data.email,
+        permission: 0,
+        organization_id: null,
+        auth_kind: "platform",
+        platform_role: data.platform_role,
+        support_mode: supportMode,
+        modules: null,
+    };
+}
+
 export function signOut() {
     try {
         clearAuthCookie();
@@ -130,6 +173,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const isAuthenticated = !!user;
     const [loading, setLoading] = useState(true);
     const authRequestVersionRef = useRef(0);
+    const platformTokenRef = useRef<string | null>(null);
     const queryClient = useQueryClient();
 
     function beginAuthTransition() {
@@ -161,16 +205,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
             return null;
         }
 
-        const fallbackModules = getModulePermissionsFromToken(token);
+        const sessionContext = getSessionContextFromToken(token);
 
         try {
-            const response = await api.get("/user/me");
+            const userData = sessionContext.platformSession.auth_kind === "platform"
+                ? await platformService.me()
+                : (await api.get("/user/me")).data?.data;
 
             if (!isCurrentAuthTransition(requestVersion, token)) {
                 return null;
             }
 
-            const userData = response.data?.data;
+            if (
+                sessionContext.platformSession.auth_kind === "platform" &&
+                isValidPlatformUser(userData)
+            ) {
+                const currentUser = buildPlatformUser(
+                    userData,
+                    sessionContext.platformSession.support_mode,
+                );
+                setUser(currentUser);
+                api.defaults.headers.common.Authorization = `Bearer ${token}`;
+                await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
+
+                return currentUser;
+            }
 
             if (!isValidAuthUser(userData)) {
                 clearAuthCookie();
@@ -179,7 +238,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 return null;
             }
 
-            const currentUser = buildCurrentUser(userData, fallbackModules);
+            const currentUser = buildCurrentUser(userData, sessionContext.modules);
             setUser(currentUser);
             api.defaults.headers.common.Authorization = `Bearer ${token}`;
             await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
@@ -196,19 +255,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     useEffect(() => {
         const { "cw.token": token } = parseCookies();
-        const fallbackModules = getModulePermissionsFromToken(token);
+        const sessionContext = getSessionContextFromToken(token);
         const requestVersion = beginAuthTransition();
 
         if (token) {
-            api.get("/user/me").then((response) => {
+            const request = sessionContext.platformSession.auth_kind === "platform"
+                ? platformService.me()
+                : api.get("/user/me").then((response) => response.data?.data);
+
+            request.then((userData) => {
                 if (!isCurrentAuthTransition(requestVersion, token)) {
                     return;
                 }
 
-                const userData = response.data?.data;
+                if (
+                    sessionContext.platformSession.auth_kind === "platform" &&
+                    isValidPlatformUser(userData)
+                ) {
+                    const currentUser = buildPlatformUser(
+                        userData,
+                        sessionContext.platformSession.support_mode,
+                    );
+                    setUser(currentUser);
+                    api.defaults.headers.common.Authorization = `Bearer ${token}`;
+                    return;
+                }
 
                 if (isValidAuthUser(userData)) {
-                    const currentUser = buildCurrentUser(userData, fallbackModules);
+                    const currentUser = buildCurrentUser(userData, sessionContext.modules);
                     setUser(currentUser);
                     api.defaults.headers.common.Authorization = `Bearer ${token}`;
                 } else {
@@ -268,6 +342,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
             toast.success("Login Feito!");
             await Router.push("/dashboard");
         } catch (error: any) {
+            const canTryPlatform =
+                error?.response?.status === 400 || error?.response?.status === 401;
+
+            if (canTryPlatform) {
+                const platformSession = await platformService.login({ email: login, password });
+                setCookie(undefined, AUTH_COOKIE_NAME, platformSession.token, getAuthCookieOptions());
+
+                if (!isCurrentAuthTransition(requestVersion)) {
+                    return;
+                }
+
+                setUser(buildPlatformUser(platformSession));
+                queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+                api.defaults.headers.common.Authorization = `Bearer ${platformSession.token}`;
+                toast.success("Login Feito!");
+                await Router.push("/super-admin");
+                return;
+            }
+
             if (error.message === "Invalid authentication response") {
                 throw error;
             }
@@ -320,6 +413,52 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
     }
 
+    async function enterSupportMode(input: { organization_id: string; reason: string }) {
+        const requestVersion = beginAuthTransition();
+        const { [AUTH_COOKIE_NAME]: currentToken } = parseCookies();
+        platformTokenRef.current = currentToken ?? null;
+        const supportSession = await platformService.startSupportSession(input);
+
+        setCookie(undefined, AUTH_COOKIE_NAME, supportSession.token, getAuthCookieOptions());
+        if (!isCurrentAuthTransition(requestVersion)) {
+            return;
+        }
+
+        api.defaults.headers.common.Authorization = `Bearer ${supportSession.token}`;
+        setUser((currentUser) => currentUser ? {
+            ...currentUser,
+            support_mode: true,
+            support_session_id: supportSession.support_session_id,
+            support_organization_id: supportSession.organization_id,
+            support_reason: supportSession.reason,
+        } : currentUser);
+    }
+
+    async function exitSupportMode() {
+        await platformService.endSupportSession();
+        const platformToken = platformTokenRef.current;
+
+        if (!platformToken) {
+            clearAuthCookie();
+            setUser(null);
+            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            await Router.push("/login");
+            return;
+        }
+
+        setCookie(undefined, AUTH_COOKIE_NAME, platformToken, getAuthCookieOptions());
+        api.defaults.headers.common.Authorization = `Bearer ${platformToken}`;
+        platformTokenRef.current = null;
+
+        setUser((currentUser) => currentUser ? {
+            ...currentUser,
+            support_mode: false,
+            support_session_id: null,
+            support_organization_id: null,
+            support_reason: null,
+        } : currentUser);
+    }
+
     if (loading) {
         return (
             <SessionTransitionScreen
@@ -330,7 +469,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading }}>
+        <AuthContext.Provider value={{
+            user,
+            isAuthenticated,
+            signIn,
+            logoutUser,
+            refreshSession,
+            enterSupportMode,
+            exitSupportMode,
+            loading,
+        }}>
             {children}
         </AuthContext.Provider>
     );
