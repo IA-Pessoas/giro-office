@@ -83,6 +83,16 @@ export const serviceRegistry = [
     prismaOutputPath: "services/pessoal-service/src/generated/prisma",
   },
   {
+    name: "parcelamento-service",
+    packagePath: "services/parcelamento-service",
+    defaultUrl: "http://localhost:3043",
+    urlEnvKey: "PARCELAMENTO_SERVICE_URL",
+    openapiSpecPath: "services/parcelamento-service/src/openapi/spec.ts",
+    authModes: ["public", "bearer"],
+    internalTokenEnvKey: null,
+    prismaOutputPath: "services/parcelamento-service/src/generated/prisma",
+  },
+  {
     name: "organization-service",
     packagePath: "services/organization-service",
     defaultUrl: "http://localhost:3031",

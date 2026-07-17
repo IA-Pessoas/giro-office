@@ -100,6 +100,13 @@ test("detect-changed-vps-services emits pessoal-service for pessoal changes", as
   );
 });
 
+test("detect-changed-vps-services emits parcelamento-service for parcelamento changes", async () => {
+  assert.equal(
+    await detectChangedServices("services/parcelamento-service/src/routes/installment.routes.ts"),
+    "parcelamento-service",
+  );
+});
+
 test("detect-changed-vps-services emits web for app changes", async () => {
   assert.equal(await detectChangedServices("app/src/app/page.tsx"), "web");
 });
@@ -189,6 +196,19 @@ test("compose-vps-buildx-push plans cached service build for pessoal-service", a
     /--cache-from type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-pessoal-service:buildcache/,
   );
   assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/pessoal-service:abc1234/);
+});
+
+test("compose-vps-buildx-push plans cached service build for parcelamento-service", async () => {
+  const output = await dryRunBuildxPush("parcelamento-service");
+  assert.match(output, /docker buildx build/);
+  assert.match(output, /--file docker\/service\.Dockerfile/);
+  assert.match(output, /--build-arg WORKSPACE_PACKAGE=@workspace\/parcelamento-service/);
+  assert.match(output, /--build-arg SERVICE_DIR=services\/parcelamento-service/);
+  assert.match(
+    output,
+    /--cache-from type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-parcelamento-service:buildcache/,
+  );
+  assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/parcelamento-service:abc1234/);
 });
 
 test("compose-vps-buildx-push plans cached web build with Next.js build args", async () => {
@@ -399,6 +419,27 @@ test("pessoal-service is part of the default VPS compose stack", async () => {
   assert.match(gatewayBlock, /depends_on:[\s\S]*pessoal-service:[\s\S]*condition: service_healthy/);
 });
 
+test("parcelamento-service is part of the default VPS compose stack", async () => {
+  const composeContents = await readFile(composeVpsFile, "utf8");
+  const parcelamentoBlock = extractComposeServiceBlock(composeContents, "parcelamento-service");
+  const gatewayBlock = extractComposeServiceBlock(composeContents, "gateway");
+
+  assert.doesNotMatch(parcelamentoBlock, /^\s+profiles:/m);
+  assert.match(
+    parcelamentoBlock,
+    /image: workspace-parcelamento-service:\$\{WORKSPACE_VPS_IMAGE_TAG:-vps\}/,
+  );
+  assert.match(parcelamentoBlock, /WORKSPACE_PACKAGE: "@workspace\/parcelamento-service"/);
+  assert.match(parcelamentoBlock, /SERVICE_DIR: services\/parcelamento-service/);
+  assert.match(parcelamentoBlock, /env_file:[\s\S]*\.env\.vps\.parcelamento-service/);
+  assert.match(parcelamentoBlock, /expose:[\s\S]*- "3043"/);
+  assert.match(parcelamentoBlock, /fetch\('http:\/\/127\.0\.0\.1:3043\/health'\)/);
+  assert.match(
+    gatewayBlock,
+    /depends_on:[\s\S]*parcelamento-service:[\s\S]*condition: service_healthy/,
+  );
+});
+
 test("certificate-service is accepted by VPS selective deploy scope", async () => {
   assert.equal(
     await runDeployScopeFunction("vps_validate_service_token", "certificate-service"),
@@ -418,6 +459,17 @@ test("ti-service remains accepted by VPS selective deploy scope", async () => {
   );
 });
 
+test("parcelamento-service is accepted by VPS selective deploy scope", async () => {
+  assert.equal(
+    await runDeployScopeFunction("vps_validate_service_token", "parcelamento-service"),
+    "",
+  );
+  assert.equal(
+    await runDeployScopeFunction("vps_compose_service_args", "parcelamento-service"),
+    "parcelamento-service",
+  );
+});
+
 test("certificate-service is covered by VPS endpoint wait checks", async () => {
   const script = await readFile(vpsWaitEndpointsScript, "utf8");
 
@@ -426,6 +478,16 @@ test("certificate-service is covered by VPS endpoint wait checks", async () => {
     /certificate-service\)\s+printf "%s\\n" "http:\/\/certificate-service:3041\/health"/,
   );
   assert.match(script, /ALL_BACKEND_SERVICES=\([\s\S]*certificate-service[\s\S]*\)/);
+});
+
+test("parcelamento-service is covered by VPS endpoint wait checks", async () => {
+  const script = await readFile(vpsWaitEndpointsScript, "utf8");
+
+  assert.match(
+    script,
+    /parcelamento-service\)\s+printf "%s\\n" "http:\/\/parcelamento-service:3043\/health"/,
+  );
+  assert.match(script, /ALL_BACKEND_SERVICES=\([\s\S]*parcelamento-service[\s\S]*\)/);
 });
 
 test("certificate-service is covered by VPS runtime override", async () => {
@@ -441,6 +503,21 @@ test("certificate-service is covered by VPS runtime override", async () => {
     /depends_on:[\s\S]*certificate-service:[\s\S]*condition: service_started/,
   );
   assert.match(certificateBlock, /healthcheck:[\s\S]*disable: true/);
+});
+
+test("parcelamento-service is covered by VPS runtime override", async () => {
+  const runtimeOverrideContents = await readFile(composeVpsRuntimeOverrideFile, "utf8");
+  const gatewayBlock = extractComposeServiceBlock(runtimeOverrideContents, "gateway");
+  const parcelamentoBlock = extractComposeServiceBlock(
+    runtimeOverrideContents,
+    "parcelamento-service",
+  );
+
+  assert.match(
+    gatewayBlock,
+    /depends_on:[\s\S]*parcelamento-service:[\s\S]*condition: service_started/,
+  );
+  assert.match(parcelamentoBlock, /healthcheck:[\s\S]*disable: true/);
 });
 
 test("VPS env materialization includes audit-service in active workflows", async () => {
@@ -520,6 +597,33 @@ test("VPS env materialization includes pessoal-service in active workflows", asy
         envWindow,
         /^\s+ENV_VPS_PESSOAL_SERVICE:\s+\$\{\{ secrets\.ENV_VPS_PESSOAL_SERVICE \}\}/m,
         `${path.relative(repoRoot, workflowFile)} materialize step at line ${index + 1} should map ENV_VPS_PESSOAL_SERVICE`,
+      );
+    }
+  }
+});
+
+test("VPS env materialization includes parcelamento-service in manifest", async () => {
+  const manifest = await readFile(vpsSecretsManifest, "utf8");
+  assert.match(manifest, /^ENV_VPS_PARCELAMENTO_SERVICE\|\.env\.vps\.parcelamento-service$/m);
+
+  const workflowsDir = path.join(repoRoot, ".github", "workflows");
+  const workflowFiles = (await readdir(workflowsDir))
+    .filter((file) => file.endsWith(".yml"))
+    .map((file) => path.join(workflowsDir, file));
+
+  for (const workflowFile of workflowFiles) {
+    const contents = await readFile(workflowFile, "utf8");
+    const lines = contents.split(/\r?\n/);
+    for (const [index, line] of lines.entries()) {
+      if (!/^\s*run:\s+bash scripts\/ci\/materialize-vps-env\.sh\s*$/.test(line)) {
+        continue;
+      }
+
+      const envWindow = lines.slice(Math.max(0, index - 30), index).join("\n");
+      assert.match(
+        envWindow,
+        /^\s+ENV_VPS_PARCELAMENTO_SERVICE:\s+\$\{\{ secrets\.ENV_VPS_PARCELAMENTO_SERVICE \}\}/m,
+        `${path.relative(repoRoot, workflowFile)} materialize step at line ${index + 1} should map ENV_VPS_PARCELAMENTO_SERVICE`,
       );
     }
   }

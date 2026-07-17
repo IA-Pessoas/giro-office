@@ -19,7 +19,7 @@ vps_deploy_mode() {
 vps_validate_service_token() {
   local service="$1"
   case "$service" in
-    gateway | web | organization-service | user-service | task-service | project-service | client-service | department-service | fiscal-service | contabil-service | regularize-service | rh-service | ti-service | certificate-service | pessoal-service | audit-service)
+    gateway | web | organization-service | user-service | task-service | project-service | client-service | department-service | fiscal-service | contabil-service | regularize-service | rh-service | ti-service | certificate-service | pessoal-service | parcelamento-service | audit-service)
       return 0
       ;;
     *)

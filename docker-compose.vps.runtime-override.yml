@@ -47,6 +47,8 @@ services:
         condition: service_started
       pessoal-service:
         condition: service_started
+      parcelamento-service:
+        condition: service_started
       audit-service:
         condition: service_started
     healthcheck:
@@ -101,6 +103,10 @@ services:
       disable: true
 
   pessoal-service:
+    healthcheck:
+      disable: true
+
+  parcelamento-service:
     healthcheck:
       disable: true
 

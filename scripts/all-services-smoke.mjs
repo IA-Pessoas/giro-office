@@ -112,6 +112,9 @@ const env = {
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
     process.env.REGULARIZE_SMOKE_ENABLED === "true" || process.env.REGULARIZE_SMOKE_ENABLED === "1",
+  parcelamentoSmokeEnabled:
+    process.env.PARCELAMENTO_SMOKE_ENABLED === "true" ||
+    process.env.PARCELAMENTO_SMOKE_ENABLED === "1",
   namespace:
     process.env.SMOKE_NAMESPACE?.trim() ||
     `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -4325,6 +4328,10 @@ function disabledConditionReason(condition) {
 
   if (condition === "regularizeSmokeEnabled" && !env.regularizeSmokeEnabled) {
     return "REGULARIZE_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "parcelamentoSmokeEnabled" && !env.parcelamentoSmokeEnabled) {
+    return "PARCELAMENTO_SMOKE_ENABLED is false";
   }
 
   return "";
