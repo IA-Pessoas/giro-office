@@ -66,6 +66,7 @@ describe("ParcelamentoAuditService", () => {
         "x-request-id": requestId,
       },
       body: expect.any(String),
+      signal: expect.any(AbortSignal),
     });
     expect(lastAuditBody()).toMatchObject({
       requestId: "audit-event-1",
@@ -232,7 +233,7 @@ describe("ParcelamentoAuditService", () => {
     );
   });
 
-  it("returns before audit-service response settles", async () => {
+  it("waits for audit-service response to settle", async () => {
     let resolveFetch: ((response: Response) => void) | undefined;
     vi.stubGlobal(
       "fetch",
@@ -262,9 +263,12 @@ describe("ParcelamentoAuditService", () => {
     await Promise.resolve();
 
     expect(fetch).toHaveBeenCalled();
-    expect(settled).toBe(true);
+    expect(settled).toBe(false);
 
     resolveFetch?.(new Response(null, { status: 201 }));
+    await recordPromise;
+
+    expect(settled).toBe(true);
   });
 
   it("does not send when audit is disabled", async () => {

@@ -16,6 +16,7 @@ export type ParcelamentoAuditServiceDependencies = {
   logger: Pick<Logger, "warn" | "error" | "debug">;
   clock?: () => Date;
   requestIdFactory?: () => string;
+  timeoutMs?: number;
 };
 
 export type RecordParcelamentoChangeInput = {
@@ -75,6 +76,7 @@ export class ParcelamentoAuditService {
   private readonly clock: () => Date;
   private readonly requestIdFactory: () => string;
   private readonly url: string;
+  private readonly timeoutMs: number;
 
   constructor({
     enabled,
@@ -83,6 +85,7 @@ export class ParcelamentoAuditService {
     logger,
     clock,
     requestIdFactory,
+    timeoutMs,
   }: ParcelamentoAuditServiceDependencies) {
     this.enabled = enabled;
     this.serviceToken = serviceToken;
@@ -90,6 +93,7 @@ export class ParcelamentoAuditService {
     this.clock = clock ?? (() => new Date());
     this.requestIdFactory = requestIdFactory ?? randomUUID;
     this.url = buildAuditUrl(serviceUrl);
+    this.timeoutMs = timeoutMs ?? 2_000;
   }
 
   async recordChange(input: RecordParcelamentoChangeInput): Promise<void> {
@@ -124,8 +128,11 @@ export class ParcelamentoAuditService {
       department: "parcelamento",
     };
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+
     try {
-      void fetch(this.url, {
+      const response = await fetch(this.url, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -133,29 +140,19 @@ export class ParcelamentoAuditService {
           "x-request-id": input.requestId,
         },
         body: JSON.stringify(payload),
-      })
-        .then((response) => {
-          if (!response.ok) {
-            this.logger.warn(
-              {
-                err: new Error(`audit-service respondeu ${response.status}`),
-                referring: input.referring,
-                referringId: input.referringId,
-              },
-              "Falha ao registrar auditoria de parcelamento.",
-            );
-          }
-        })
-        .catch((err: unknown) => {
-          this.logger.warn(
-            {
-              err,
-              referring: input.referring,
-              referringId: input.referringId,
-            },
-            "Falha ao registrar auditoria de parcelamento.",
-          );
-        });
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        this.logger.warn(
+          {
+            err: new Error(`audit-service respondeu ${response.status}`),
+            referring: input.referring,
+            referringId: input.referringId,
+          },
+          "Falha ao registrar auditoria de parcelamento.",
+        );
+      }
     } catch (err: unknown) {
       this.logger.warn(
         {
@@ -165,6 +162,8 @@ export class ParcelamentoAuditService {
         },
         "Falha ao registrar auditoria de parcelamento.",
       );
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }

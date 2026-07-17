@@ -79,6 +79,8 @@ services:
         SERVICE_DIR: services/gateway
     env_file:
       - .env.vps.gateway
+    environment:
+      PARCELAMENTO_SERVICE_URL: http://parcelamento-service:3043
     ports:
       - "3010:3010"
     depends_on:

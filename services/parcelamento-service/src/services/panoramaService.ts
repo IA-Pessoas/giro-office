@@ -310,7 +310,7 @@ export class PanoramaService {
 
       const generateResult = {
         created: result.count,
-        existing: existingRows.length,
+        existing: activeClients.length - result.count,
         totalActiveClients: activeClients.length,
       };
 
