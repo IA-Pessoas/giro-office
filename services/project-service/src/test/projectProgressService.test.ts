@@ -112,6 +112,34 @@ describe("ProjectProgressService", () => {
     expect((prisma.$transaction as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
   });
 
+  it("recalculateFromTasks aceita Em andamento e Em Andamento no cálculo", async () => {
+    const { prisma } = createMockPrisma();
+    prisma.project.findFirst = vi.fn(async () => ({
+      id: PROJECT_ID,
+      client_id: CLIENT_ID,
+    }));
+    prisma.task.groupBy = vi.fn(
+      async () =>
+        [
+          { status: "Concluída", _count: { status: 1 } },
+          { status: "Em andamento", _count: { status: 1 } },
+          { status: "Em Andamento", _count: { status: 1 } },
+        ] as { status: string; _count: { status: number } }[],
+    );
+    const updated = { ...progressRow, porcentage: 33.33, status: "Em andamento" };
+    prisma.project.update = vi.fn(async () => updated);
+    const service = new ProjectProgressService(prisma);
+
+    const result = await service.recalculateFromTasks(PROJECT_ID, ORG_ID);
+
+    expect(result).toEqual({ project: updated });
+    const groupByArg = (prisma.task.groupBy as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
+      where: { status: { in: string[] } };
+    };
+    expect(groupByArg.where.status.in).toContain("Em andamento");
+    expect(groupByArg.where.status.in).toContain("Em Andamento");
+  });
+
   it("recalculateFromTasks em 100% usa transação e inativa cliente service_unique", async () => {
     const { prisma, tx } = createMockPrisma();
     prisma.project.findFirst = vi.fn(async () => ({

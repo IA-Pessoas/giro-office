@@ -27,6 +27,7 @@ export {
   unwrapProjectDetail,
   unwrapProjectEnvelope,
   unwrapProjectList,
+  unwrapProjectMetrics,
   unwrapProjectProgress,
   unwrapUpdatedProject,
 } from "./projectService.contract";

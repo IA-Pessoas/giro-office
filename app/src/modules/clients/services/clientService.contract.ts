@@ -24,6 +24,7 @@ export const CLIENT_ENDPOINTS = {
 export function buildClientListParams(filters: ClientListFilters) {
   return {
     search: filters.search,
+    ref: filters.ref,
     status: filters.status,
     page: filters.page,
     limit: filters.limit,

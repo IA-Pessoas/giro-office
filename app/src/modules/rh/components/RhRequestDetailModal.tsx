@@ -1,6 +1,7 @@
 import { Dialog } from "@shared/components";
 
 import { useRhRequest } from "../hooks/useRhRequests";
+import type { RhRequest } from "../types";
 import {
   getRhRequestStatusClassName,
   getRhRequestStatusLabel,
@@ -15,7 +16,7 @@ interface RhRequestDetailModalProps {
   requestId: string | null;
   getCategoryLabel: (categoryId: string) => string;
   getAssignedUserLabel: (userId: string) => string;
-  getRequesterLabel: (userId: string) => string;
+  getRequesterLabel: (request: RhRequest) => string;
   canManageRequest: boolean;
   isDeleting: boolean;
   onClose: () => void;
@@ -145,7 +146,7 @@ export function RhRequestDetailModal({
                   Solicitante
                 </p>
                 <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                  {getRequesterLabel(request.requester_user_id)}
+                  {getRequesterLabel(request)}
                 </p>
               </div>
 
