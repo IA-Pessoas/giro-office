@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 
+import { Dialog } from "@shared/components";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -33,6 +34,7 @@ import type {
   PessoalSituationStatus,
 } from "../types/tracking";
 import {
+  pessoalDangerButtonClassName,
   pessoalPrimaryButtonClassName,
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
@@ -157,6 +159,7 @@ export function PessoalTrackingSection({
   const deleteLddMutation = useDeletePessoalLddMutation(selectedClientId);
   const createSituationMutation = useCreatePessoalSituationMutation();
   const [selectedLdd, setSelectedLdd] = useState<PessoalLdd | null>(null);
+  const [lddToDelete, setLddToDelete] = useState<PessoalLdd | null>(null);
   const [isLddFormOpen, setIsLddFormOpen] = useState(false);
   const [lddFormValues, setLddFormValues] = useState<LddFormValues>(emptyLddFormValues);
   const updateLddMutation = useUpdatePessoalLddMutation(
@@ -185,6 +188,7 @@ export function PessoalTrackingSection({
 
   useEffect(() => {
     setSelectedLdd(null);
+    setLddToDelete(null);
     setIsLddFormOpen(false);
     setLddFormValues(emptyLddFormValues);
     setSelectedSituationId("");
@@ -281,10 +285,20 @@ export function PessoalTrackingSection({
     }
   }
 
-  async function handleDeleteLdd(ldd: PessoalLdd) {
-    if (!canEdit || !confirm("Remover este LDD?")) {
+  function openDeleteLddDialog(ldd: PessoalLdd) {
+    if (!canEdit) {
       return;
     }
+
+    setLddToDelete(ldd);
+  }
+
+  async function handleConfirmDeleteLdd() {
+    if (!canEdit || !lddToDelete) {
+      return;
+    }
+
+    const ldd = lddToDelete;
 
     clearFeedback();
 
@@ -296,9 +310,11 @@ export function PessoalTrackingSection({
         setIsLddFormOpen(false);
       }
 
+      setLddToDelete(null);
       setSuccessMessage("LDD removido.");
     } catch (error) {
       setFormError(getPessoalErrorMessage(error, "Não foi possível remover o LDD."));
+      setLddToDelete(null);
     }
   }
 
@@ -464,7 +480,7 @@ export function PessoalTrackingSection({
                         </button>
                         <button
                           type="button"
-                          onClick={() => void handleDeleteLdd(ldd)}
+                          onClick={() => openDeleteLddDialog(ldd)}
                           disabled={deleteLddMutation.isPending}
                           className={pessoalSecondaryButtonClassName}
                         >
@@ -531,6 +547,54 @@ export function PessoalTrackingSection({
           )}
         </div>
       </div>
+
+      <Dialog
+        open={Boolean(lddToDelete)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLddToDelete(null);
+          }
+        }}
+        title="Remover LDD"
+        description="Confirmação de remoção de LDD"
+        contentClassName="w-[min(92vw,520px)]"
+        bodyClassName="space-y-3"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setLddToDelete(null)}
+              disabled={deleteLddMutation.isPending}
+              className={pessoalSecondaryButtonClassName}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDeleteLdd}
+              disabled={deleteLddMutation.isPending}
+              className={pessoalDangerButtonClassName}
+            >
+              {deleteLddMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Confirmar remoção
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-700 dark:text-slate-300">
+          Esta ação remove o LDD selecionado do cliente. O registro precisará ser cadastrado
+          novamente se ainda for necessário.
+        </p>
+        {lddToDelete ? (
+          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
+            {lddToDelete.type} - {formatDate(lddToDelete.due_date)}
+          </p>
+        ) : null}
+      </Dialog>
 
       {isLddFormOpen ? (
         <div
