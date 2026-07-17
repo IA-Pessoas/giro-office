@@ -20,6 +20,11 @@ paths = ["app/**/*.tsx", "app/**/*.jsx"]
 files = [".codex/rules/frontend-ui-patterns.rules.md"]
 
 [[rules.scoped]]
+name = "frontend-validation"
+paths = ["app/**/*.ts", "app/**/*.tsx", "app/**/*.jsx", "app/**/*.js", "app/**/*.mjs", "app/**/*.css"]
+files = [".codex/rules/frontend-validation.rules.md"]
+
+[[rules.scoped]]
 name = "gateway"
 paths = ["services/gateway/**/*.ts"]
 files = [".codex/rules/gateway-routing-standards.rules.md"]
@@ -48,4 +53,3 @@ files = [".codex/rules/tests.rules.md"]
 name = "typescript-services"
 paths = ["services/**/*.ts"]
 files = [".codex/rules/typescript-services.rules.md"]
-

@@ -1,29 +1,18 @@
-import Head from "next/head"
-import styles from "./LandingPage.module.css"
+import { canSSRAuth } from "@modules/auth";
+import { setupAPIClient } from "@shared/services/api";
 
-import { canSSRGuest } from "@modules/auth"
-
-export default function Home() {
-    return(
-        <>
-            <Head>
-                <title>Office</title>
-            </Head>
-            <div className={styles.page}>
-                <p className={styles.title}>Home</p>
-            </div>
-        </>
-    )
+export default function RootRedirect() {
+  return null;
 }
 
-// Verificação se esta logado
-export const getServerSideProps = canSSRGuest(async(ctx) => {
-    try {
-        return {
-            props: {}
-        }
-    } catch (error) {
-        console.log(error);
-        return { props: {} };
-    }
-})
+export const getServerSideProps = canSSRAuth(async (ctx) => {
+  const apiClient = setupAPIClient(ctx);
+  await apiClient.get("/user/me");
+
+  return {
+    redirect: {
+      destination: "/dashboard",
+      permanent: false,
+    },
+  };
+});
