@@ -8,6 +8,13 @@ const REQUEST_SELECT = {
   title: true,
   description: true,
   requester_user_id: true,
+  requester: {
+    select: {
+      id: true,
+      name: true,
+      status: true,
+    },
+  },
   category_id: true,
   assigned_to_user_id: true,
   urgency: true,
@@ -207,7 +214,10 @@ class RequestService {
         data.status = input.status;
       }
 
-      const assigneeAfterUpdate = data.assigned_to_user_id ?? existing.assigned_to_user_id;
+      const assigneeAfterUpdate = assertNonEmptyString(
+        data.assigned_to_user_id ?? existing.assigned_to_user_id ?? undefined,
+        "assigned_to_user_id",
+      );
       this.ensureAssigneeIsNotRequester(existing.requester_user_id, assigneeAfterUpdate);
 
       const updated = await prismaClient.rhRequest.update({

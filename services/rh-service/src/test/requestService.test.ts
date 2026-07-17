@@ -92,12 +92,31 @@ describe("RequestService", () => {
     await expect(service.getById("req-1", "org-1")).rejects.toMatchObject({ statusCode: 404 });
   });
 
-  it("list retorna solicitações filtradas por organização", async () => {
-    prismaMock.rhRequest.findMany.mockResolvedValue([{ id: "req-1" }]);
+  it("list retorna o solicitante historico sem depender de usuarios ativos", async () => {
+    prismaMock.rhRequest.findMany.mockResolvedValue([
+      {
+        id: "req-1",
+        requester_user_id: "legacy-user-1",
+        requester: { id: "legacy-user-1", name: "Maria Legado", status: "inactive" },
+      },
+    ]);
     const service = new RequestService();
 
     const result = await service.list("org-1", { status: "New" });
 
-    expect(result).toEqual([{ id: "req-1" }]);
+    expect(prismaMock.rhRequest.findMany).toHaveBeenCalledWith({
+      where: { organization_id: "org-1", status: "New" },
+      orderBy: { created_at: "desc" },
+      select: expect.objectContaining({
+        requester: { select: { id: true, name: true, status: true } },
+      }),
+    });
+    expect(result).toEqual([
+      {
+        id: "req-1",
+        requester_user_id: "legacy-user-1",
+        requester: { id: "legacy-user-1", name: "Maria Legado", status: "inactive" },
+      },
+    ]);
   });
 });
