@@ -387,6 +387,22 @@ const baseManifest = [
     target: "gateway",
     auth: "bearer",
   }),
+  op({
+    service: "gateway",
+    method: "GET",
+    path: "/dashboard/commercial/stats",
+    action: "gatewayCommercialDashboardStats",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "gateway",
+    method: "GET",
+    path: "/dashboard/marketing/stats",
+    action: "gatewayMarketingDashboardStats",
+    target: "gateway",
+    auth: "bearer",
+  }),
 
   op({
     service: "user-service",

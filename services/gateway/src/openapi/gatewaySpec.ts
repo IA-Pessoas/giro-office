@@ -463,6 +463,57 @@ function addGatewayPaths(aggregateSpec: AggregatedOpenApiDocument): void {
       },
     },
   };
+
+  aggregateSpec.paths["/dashboard/commercial/stats"] = {
+    get: {
+      tags: ["Gateway"],
+      summary: "Dashboard comercial consolidado",
+      description:
+        "Agrega dados reais de clientes e tarefas de cobrança comercial para alimentar o dashboard Comercial.",
+      security: [{ bearerAuth: [] }],
+      responses: {
+        "200": {
+          description: "Resumo consolidado do dashboard Comercial",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+            },
+          },
+        },
+        "401": {
+          description: "Não autenticado",
+        },
+        "502": {
+          description: "Erro ao consultar upstreams do dashboard Comercial",
+        },
+      },
+    },
+  };
+
+  aggregateSpec.paths["/dashboard/marketing/stats"] = {
+    get: {
+      tags: ["Gateway"],
+      summary: "Dashboard de Marketing consolidado",
+      description: "Agrega dados reais de orçamentos e credenciais de Marketing do serviço legado.",
+      security: [{ bearerAuth: [] }],
+      responses: {
+        "200": {
+          description: "Resumo consolidado do dashboard de Marketing",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+            },
+          },
+        },
+        "401": {
+          description: "Não autenticado",
+        },
+        "502": {
+          description: "Erro ao consultar upstreams do dashboard de Marketing",
+        },
+      },
+    },
+  };
 }
 
 function mergeServicePaths(

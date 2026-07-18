@@ -958,6 +958,14 @@ const handlers = {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
+  async gatewayCommercialDashboardStats(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async gatewayMarketingDashboardStats(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
   async serviceHealth(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },

@@ -164,6 +164,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     taskServiceUrl: "http://127.0.0.1:3032",
     projectServiceUrl: "http://127.0.0.1:3033",
     clientServiceUrl: "http://127.0.0.1:3035",
+    legacyApiUrl: "http://127.0.0.1:3333",
     departmentServiceUrl: "http://127.0.0.1:3336",
     fiscalServiceUrl: "http://127.0.0.1:3037",
     contabilServiceUrl: "http://127.0.0.1:3038",
@@ -394,6 +395,319 @@ it("returns consolidated dashboard stats from real upstream services", async () 
     await stopServer(gateway);
     await stopServer(clientUpstream);
     await stopServer(projectUpstream);
+  }
+});
+
+it("returns consolidated commercial dashboard stats from real upstream services", async () => {
+  const clientTotalsByStatus = new Map<string, number>([
+    ["", 18],
+    ["Prospecção", 7],
+    ["Fechado", 5],
+    ["Ativo", 12],
+    ["Inativo", 2],
+  ]);
+  const requestedClientStatuses: string[] = [];
+
+  const clientUpstream = createServer((request, response) => {
+    const url = new URL(request.url ?? "/", "http://client-service.test");
+
+    if (request.method !== "GET" || url.pathname !== "/client/list") {
+      response.statusCode = 404;
+      response.end();
+      return;
+    }
+
+    const status = url.searchParams.get("status") ?? "";
+    requestedClientStatuses.push(status);
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: {
+          items:
+            status === "Prospecção"
+              ? [
+                  {
+                    id: "client-1",
+                    name: "Acme LTDA",
+                    status: "Prospecção",
+                    company_name: "Acme LTDA",
+                    fantasy_name: "Acme",
+                    created_at: "2026-07-01T10:00:00.000Z",
+                  },
+                ]
+              : [],
+          total: clientTotalsByStatus.get(status) ?? 0,
+          page: 1,
+          pageSize: 5,
+          hasMore: false,
+        },
+      }),
+    );
+  });
+  const taskUpstream = createServer((request, response) => {
+    const url = new URL(request.url ?? "/", "http://task-service.test");
+
+    if (request.method !== "GET" || url.pathname !== "/task/list") {
+      response.statusCode = 404;
+      response.end();
+      return;
+    }
+
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: {
+          data: [
+            {
+              id: "task-1",
+              name: "Enviar proposta",
+              status: "Em Andamento",
+              billing: "Realizar",
+              charge_comercial: true,
+              hiring_status: "A Realizar",
+              payment: null,
+              billing_description: null,
+              charge_financeiro: false,
+            },
+            {
+              id: "task-2",
+              name: "Contrato assinado",
+              status: "Concluída",
+              billing: "Realizar",
+              charge_comercial: true,
+              hiring_status: "Fechado",
+              payment: "Pago",
+              billing_description: null,
+              charge_financeiro: false,
+            },
+          ],
+          hasMore: false,
+        },
+      }),
+    );
+  });
+  const clientServiceUrl = await startServer(clientUpstream);
+  const taskServiceUrl = await startServer(taskUpstream);
+  const app = createApp(createEnv({ clientServiceUrl, taskServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/dashboard/commercial/stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as {
+      success: boolean;
+      data: {
+        summary: Record<string, number>;
+        funnel: Array<{ status: string; count: number }>;
+        commercialTasks: {
+          total: number;
+          open: number;
+          completed: number;
+        };
+        recentProspects: Array<{ id: string; name: string }>;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data.summary).toMatchObject({
+      totalClients: 18,
+      prospectingClients: 7,
+      closedClients: 5,
+      activeClients: 12,
+      inactiveClients: 2,
+    });
+    expect(body.data.funnel).toEqual([
+      { status: "Prospecção", count: 7 },
+      { status: "Fechado", count: 5 },
+      { status: "Ativo", count: 12 },
+      { status: "Inativo", count: 2 },
+    ]);
+    expect(body.data.commercialTasks).toMatchObject({
+      total: 2,
+      open: 1,
+      completed: 1,
+    });
+    expect(body.data.recentProspects).toEqual([
+      {
+        id: "client-1",
+        name: "Acme LTDA",
+        status: "Prospecção",
+        company: "Acme LTDA",
+      },
+    ]);
+    expect(requestedClientStatuses).toEqual(["", "Prospecção", "Fechado", "Ativo", "Inativo"]);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(clientUpstream);
+    await stopServer(taskUpstream);
+  }
+});
+
+it("returns consolidated marketing dashboard stats from real legacy upstream data", async () => {
+  const requestedLegacyPaths: string[] = [];
+
+  const legacyUpstream = createServer((request, response) => {
+    const url = new URL(request.url ?? "/", "http://legacy-api.test");
+    requestedLegacyPaths.push(url.pathname);
+
+    if (request.method === "GET" && url.pathname === "/budgets") {
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify([
+          {
+            id: "budget-1",
+            title: "Campanha institucional",
+            status: "approved",
+            department_id: "dept-marketing",
+            createdAt: "2026-07-01T10:00:00.000Z",
+            updatedAt: "2026-07-02T10:00:00.000Z",
+            items: [
+              {
+                description: "Mídia paga",
+                quantity: 1,
+                unit_price: 1200,
+                total_amount: 1200,
+                destination: "Campanha Externa",
+                purpose: "Leads",
+                vendor_name: "Ads Partner",
+                status: "approved",
+              },
+            ],
+          },
+          {
+            id: "budget-2",
+            title: "Brindes internos",
+            status: "pending",
+            department_id: "dept-marketing",
+            createdAt: "2026-07-03T10:00:00.000Z",
+            updatedAt: "2026-07-03T10:00:00.000Z",
+            items: [
+              {
+                description: "Canecas",
+                quantity: 10,
+                unit_price: 35,
+                total_amount: 350,
+                destination: "Endomarketing",
+                purpose: "Colaboradores",
+                vendor_name: "Brindes & Cia",
+                status: "pending",
+              },
+            ],
+          },
+        ]),
+      );
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/mkt/passwords/all") {
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify([
+          {
+            id: "password-1",
+            local: "Instagram",
+            user: "marketing@giro.test",
+            notes: "Conta social",
+            updatedAt: "2026-07-04T10:00:00.000Z",
+          },
+        ]),
+      );
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end();
+  });
+  const legacyApiUrl = await startServer(legacyUpstream);
+  const app = createApp(createEnv({ legacyApiUrl } as Partial<GatewayEnv>), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/dashboard/marketing/stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as {
+      success: boolean;
+      data: {
+        summary: Record<string, number>;
+        budgetsByStatus: Array<{ status: string; count: number }>;
+        spendingByDestination: Array<{ destination: string; total: number }>;
+        recentBudgets: Array<{ id: string; title: string }>;
+        marketingPasswords: {
+          total: number;
+          recent: Array<{ id: string; local: string }>;
+        };
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data.summary).toMatchObject({
+      totalBudgets: 2,
+      pendingBudgets: 1,
+      approvedBudgets: 1,
+      totalBudgetValue: 1550,
+      marketingPasswords: 1,
+    });
+    expect(body.data.budgetsByStatus).toEqual([
+      { status: "approved", count: 1 },
+      { status: "pending", count: 1 },
+    ]);
+    expect(body.data.spendingByDestination).toEqual([
+      { destination: "Campanha Externa", total: 1200 },
+      { destination: "Endomarketing", total: 350 },
+    ]);
+    expect(body.data.recentBudgets).toEqual([
+      {
+        id: "budget-2",
+        title: "Brindes internos",
+        status: "pending",
+        totalValue: 350,
+        createdAt: "2026-07-03T10:00:00.000Z",
+      },
+      {
+        id: "budget-1",
+        title: "Campanha institucional",
+        status: "approved",
+        totalValue: 1200,
+        createdAt: "2026-07-01T10:00:00.000Z",
+      },
+    ]);
+    expect(body.data.marketingPasswords).toEqual({
+      total: 1,
+      recent: [
+        {
+          id: "password-1",
+          local: "Instagram",
+          user: "marketing@giro.test",
+          updatedAt: "2026-07-04T10:00:00.000Z",
+        },
+      ],
+    });
+    expect(requestedLegacyPaths).toEqual(["/budgets", "/mkt/passwords/all"]);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(legacyUpstream);
   }
 });
 
