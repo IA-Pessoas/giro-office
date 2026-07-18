@@ -40,15 +40,20 @@ export function RhRequestsSection() {
   const categoriesQuery = useRhCategories({ activeOnly: true });
   const assignableUsersQuery = useAssignableUsers({ enabled: canManageRhRequests });
   const deleteRequestMutation = useDeleteRhRequestMutation();
-  const requestsQuery = useRhRequests({
-    status: statusFilter === "all" ? undefined : statusFilter,
-    category_id: categoryFilter || undefined,
-    requester_user_id: canManageRhRequests ? undefined : user?.id,
-  });
+  const shouldLoadRequests = canManageRhRequests || Boolean(user?.id);
+  const requestsQuery = useRhRequests(
+    {
+      status: statusFilter === "all" ? undefined : statusFilter,
+      category_id: categoryFilter || undefined,
+      requester_user_id: canManageRhRequests ? undefined : user?.id,
+    },
+    { enabled: shouldLoadRequests },
+  );
 
   const categories = categoriesQuery.data ?? [];
   const assignableUsers = assignableUsersQuery.data ?? [];
   const requests = requestsQuery.data ?? [];
+  const isWaitingForRequester = !canManageRhRequests && !user?.id;
 
   const categoryNameById = new Map(
     categories.map((category) => [category.id, formatRhCategoryLabel(category.name)]),
@@ -83,7 +88,7 @@ export function RhRequestsSection() {
     updatedAtLabel: formatRhDateTime(request.updated_at),
   }));
 
-  const isLoading = categoriesQuery.isLoading || requestsQuery.isLoading;
+  const isLoading = categoriesQuery.isLoading || requestsQuery.isLoading || isWaitingForRequester;
   const error = categoriesQuery.error || requestsQuery.error;
   const auxiliaryError = canManageRhRequests ? assignableUsersQuery.error : null;
   const deletingRequestId = deleteRequestMutation.variables?.id ?? null;

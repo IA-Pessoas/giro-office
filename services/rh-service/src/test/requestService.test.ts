@@ -7,6 +7,7 @@ const { prismaMock } = vi.hoisted(() => ({
     },
     user: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
     },
     rhRequest: {
       create: vi.fn(),
@@ -90,6 +91,40 @@ describe("RequestService", () => {
     const service = new RequestService();
 
     await expect(service.getById("req-1", "org-1")).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("canManageRequests retorna true para usuario com permissao RH administrativa", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      permission: 1,
+      permissions: [{ rh: 2 }],
+    });
+    const service = new RequestService();
+
+    const result = await service.canManageRequests("org-1", "user-1");
+
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      select: {
+        permission: true,
+        permissions: {
+          where: { organization_id: "org-1" },
+          select: { rh: true },
+          take: 1,
+          orderBy: { id: "asc" },
+        },
+      },
+    });
+    expect(result).toBe(true);
+  });
+
+  it("canManageRequests retorna false para usuario sem permissao RH administrativa", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      permission: 1,
+      permissions: [{ rh: 1 }],
+    });
+    const service = new RequestService();
+
+    await expect(service.canManageRequests("org-1", "user-1")).resolves.toBe(false);
   });
 
   it("list retorna o solicitante historico sem depender de usuarios ativos", async () => {
