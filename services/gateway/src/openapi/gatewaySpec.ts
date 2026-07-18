@@ -437,6 +437,32 @@ function addGatewayPaths(aggregateSpec: AggregatedOpenApiDocument): void {
       },
     },
   };
+
+  aggregateSpec.paths["/dashboard/stats"] = {
+    get: {
+      tags: ["Gateway"],
+      summary: "Dashboard consolidado",
+      description:
+        "Agrega dados reais de clientes e projetos para alimentar o dashboard principal.",
+      security: [{ bearerAuth: [] }],
+      responses: {
+        "200": {
+          description: "Resumo consolidado do dashboard",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+            },
+          },
+        },
+        "401": {
+          description: "Não autenticado",
+        },
+        "502": {
+          description: "Erro ao consultar upstreams do dashboard",
+        },
+      },
+    },
+  };
 }
 
 function mergeServicePaths(

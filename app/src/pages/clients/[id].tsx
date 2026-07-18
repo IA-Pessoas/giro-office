@@ -398,7 +398,7 @@ export default function ClientDetailPage() {
                   actionLabel="Abrir inativação"
                   icon={XCircle}
                   blockedMessage={
-                    terminationAccess.canOpen ? undefined : terminationAccess.message
+                    "message" in terminationAccess ? terminationAccess.message : undefined
                   }
                 />
               </div>

@@ -954,6 +954,10 @@ const handlers = {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
+  async gatewayDashboardStats(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
   async serviceHealth(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },

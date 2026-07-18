@@ -249,6 +249,154 @@ it("returns shared forbidden response when permission is insufficient", async ()
   }
 });
 
+it("returns consolidated dashboard stats from real upstream services", async () => {
+  const clientTotalsByStatus = new Map<string, number>([
+    ["", 12],
+    ["Departamento contabil", 7],
+    ["Departamento fiscal", 5],
+    ["Departamento pessoal", 4],
+    ["Departamento infoproduto", 3],
+    ["Departamento consultoria", 2],
+    ["Departamento castelo_med", 1],
+  ]);
+  const requestedClientStatuses: string[] = [];
+
+  const clientUpstream = createServer((request, response) => {
+    const url = new URL(request.url ?? "/", "http://client-service.test");
+
+    if (request.method !== "GET" || url.pathname !== "/client/list") {
+      response.statusCode = 404;
+      response.end();
+      return;
+    }
+
+    const status = url.searchParams.get("status") ?? "";
+    requestedClientStatuses.push(status);
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: {
+          items:
+            status === ""
+              ? [
+                  {
+                    id: "client-1",
+                    name: "Acme LTDA",
+                    status: "Ativo",
+                    company_name: "Acme LTDA",
+                    fantasy_name: "Acme",
+                    created_at: "2026-07-01T10:00:00.000Z",
+                  },
+                ]
+              : [],
+          total: clientTotalsByStatus.get(status) ?? 0,
+          page: 1,
+          pageSize: 5,
+          hasMore: false,
+        },
+      }),
+    );
+  });
+  const projectUpstream = createServer((request, response) => {
+    if (request.method !== "GET" || request.url !== "/project/metrics") {
+      response.statusCode = 404;
+      response.end();
+      return;
+    }
+
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: {
+          total: 10,
+          completed: 6,
+          inProgress: 3,
+          paused: 1,
+          toDo: 2,
+          notContracted: 0,
+          taskMetrics: {
+            total: 20,
+            completed: 12,
+            open: 7,
+            paused: 1,
+            emptyStatus: 0,
+          },
+        },
+      }),
+    );
+  });
+  const clientServiceUrl = await startServer(clientUpstream);
+  const projectServiceUrl = await startServer(projectUpstream);
+  const app = createApp(createEnv({ clientServiceUrl, projectServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/dashboard/stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as {
+      success: boolean;
+      data: {
+        totalClients: number;
+        clientsByService: Record<string, number>;
+        projectMetrics: Record<string, number>;
+        recentClients: Array<{ id: string; name: string }>;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data.totalClients).toBe(12);
+    expect(body.data.clientsByService).toMatchObject({
+      contabil: 7,
+      fiscal: 5,
+      pessoal: 4,
+      infoproduto: 3,
+      consultoria: 2,
+      castelo_med: 1,
+    });
+    expect(body.data.projectMetrics).toMatchObject({
+      total: 10,
+      completed: 6,
+      inProgress: 3,
+      paused: 1,
+      toDo: 2,
+    });
+    expect(body.data.recentClients).toEqual([
+      {
+        id: "client-1",
+        name: "Acme LTDA",
+        status: "Ativo",
+        segmento: "Não informado",
+        entryDate: "2026-07-01T10:00:00.000Z",
+      },
+    ]);
+    expect(requestedClientStatuses).toEqual([
+      "",
+      "Departamento contabil",
+      "Departamento fiscal",
+      "Departamento pessoal",
+      "Departamento infoproduto",
+      "Departamento consultoria",
+      "Departamento castelo_med",
+    ]);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(clientUpstream);
+    await stopServer(projectUpstream);
+  }
+});
+
 it("requires admin permission for user-management routes", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
