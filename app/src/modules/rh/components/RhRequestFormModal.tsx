@@ -72,7 +72,7 @@ export function RhRequestFormModal({
 
   const isEditing = Boolean(request);
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
-  const isSelfServiceCreateBlocked = !canManageRequests && !isEditing;
+  const isAssigneeRequired = isEditing && canManageRequests;
 
   useEffect(() => {
     setFormState(buildFormState(request));
@@ -94,16 +94,11 @@ export function RhRequestFormModal({
   }
 
   async function handleSubmit() {
-    if (isSelfServiceCreateBlocked) {
-      toast.info("Você poderá abrir solicitações assim que esse fluxo for liberado.");
-      return;
-    }
-
     if (
       !formState.title.trim() ||
       !formState.description.trim() ||
       !formState.category_id ||
-      !formState.assigned_to_user_id
+      (isAssigneeRequired && !formState.assigned_to_user_id)
     ) {
       toast.warn("Preencha os campos obrigatórios.");
       return;
@@ -122,13 +117,18 @@ export function RhRequestFormModal({
         });
         toast.success("Solicitação atualizada com sucesso.");
       } else {
-        await createMutation.mutateAsync({
+        const createPayload = {
           title: formState.title.trim(),
           description: formState.description.trim(),
           category_id: formState.category_id,
-          assigned_to_user_id: formState.assigned_to_user_id,
           urgency: formState.urgency,
-        });
+        };
+
+        await createMutation.mutateAsync(
+          formState.assigned_to_user_id
+            ? { ...createPayload, assigned_to_user_id: formState.assigned_to_user_id }
+            : createPayload,
+        );
         toast.success("Solicitação criada com sucesso.");
       }
 
@@ -163,28 +163,20 @@ export function RhRequestFormModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting || isSelfServiceCreateBlocked}
+            disabled={isSubmitting}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting
               ? "Salvando..."
-              : isSelfServiceCreateBlocked
-                ? "Indisponível no momento"
-                : isEditing
-                  ? "Salvar alterações"
-                  : "Criar solicitação"}
+              : isEditing
+                ? "Salvar alterações"
+                : "Criar solicitação"}
           </button>
         </>
       }
       contentClassName="w-[min(92vw,720px)]"
       bodyClassName="space-y-4"
     >
-      {isSelfServiceCreateBlocked ? (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
-          Você poderá abrir solicitações assim que esse fluxo for liberado.
-        </div>
-      ) : null}
-
       {canManageRequests && assignableUsersUnavailableMessage ? (
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
           Não foi possível carregar os responsáveis agora.
@@ -223,14 +215,16 @@ export function RhRequestFormModal({
 
         {canManageRequests ? (
           <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <span>Responsável</span>
+            <span>{isEditing ? "Responsável" : "Responsável (opcional)"}</span>
             <div className="relative">
               <select
                 value={formState.assigned_to_user_id}
                 onChange={(event) => handleChange("assigned_to_user_id", event.target.value)}
                 className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               >
-                <option value="">Selecione</option>
+                <option value="">
+                  {isEditing ? "Selecione" : "Atribuir automaticamente"}
+                </option>
                 {assignableUsers.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.name}
