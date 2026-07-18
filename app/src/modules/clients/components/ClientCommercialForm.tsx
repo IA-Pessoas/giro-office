@@ -32,7 +32,7 @@ export function ClientCommercialForm({
     <div className="space-y-6">
       <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
         Alterar o status de prospecção pode impactar o status geral do cliente conforme as
-        regras do backend.
+        regras.
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
