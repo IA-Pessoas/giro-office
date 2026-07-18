@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import Head from "next/head";
+import Link from "next/link";
 import {
+  ArrowLeft,
   Edit3,
   LoaderCircle,
   Plus,
@@ -169,12 +171,22 @@ export default function TaskModelsConfig() {
             </p>
           </div>
 
-          {canManageTaskModels ? (
-            <button type="button" onClick={handleOpenCreate} className={PROJECT_PRIMARY_BUTTON_CLASSNAME}>
-              <Plus className="h-4 w-4" />
-              Novo modelo
-            </button>
-          ) : null}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link href="/tasks" className={PROJECT_COMPACT_BUTTON_CLASSNAME}>
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Voltar para tarefas
+            </Link>
+            {canManageTaskModels ? (
+              <button
+                type="button"
+                onClick={handleOpenCreate}
+                className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
+              >
+                <Plus className="h-4 w-4" />
+                Novo modelo
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {!canManageTaskModels && !meQuery.isLoading ? (
