@@ -16,6 +16,7 @@ import {
   installmentId,
   organizationId,
   parcelamentoHeaders,
+  requestId,
   userId,
 } from "./parcelamentoTestUtils.js";
 
@@ -91,6 +92,52 @@ describe("installment routes", () => {
     );
   });
 
+  it("aceita contexto autenticado encaminhado pelo gateway em headers x-auth", async () => {
+    const prisma = createPrismaMock();
+    prisma.installment.count.mockResolvedValueOnce(1);
+    prisma.installment.findMany.mockResolvedValueOnce([
+      createInstallmentFixture({ id: installmentId }),
+    ]);
+    const app = createTestApp(prisma);
+
+    const response = await request(app).get("/parcelamento/installments").set({
+      "x-request-id": requestId,
+      "x-auth-user-id": userId,
+      "x-auth-organization-id": organizationId,
+      "x-auth-permission": "2",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        items: [expect.objectContaining({ id: installmentId })],
+      },
+    });
+    expect(prisma.installment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organization_id: organizationId }),
+      }),
+    );
+  });
+
+  it("rejeita contexto fora do contrato x-auth", async () => {
+    const app = createTestApp();
+
+    const response = await request(app).get("/parcelamento/installments").set({
+      "x-request-id": requestId,
+      "x-user-id": userId,
+      "x-organization-id": organizationId,
+      "x-permission": "2",
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Contexto de organizacao ausente.",
+    });
+  });
+
   it("GET /parcelamento/installments/:id valida params e detalha", async () => {
     const prisma = createPrismaMock();
     prisma.installment.findFirst.mockResolvedValueOnce(createInstallmentFixture());
@@ -136,7 +183,7 @@ describe("installment routes", () => {
 
     const response = await request(app)
       .get("/parcelamento/installments")
-      .set(parcelamentoHeaders({ "x-organization-id": "" }));
+      .set(parcelamentoHeaders({ "x-auth-organization-id": "" }));
 
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
@@ -150,7 +197,7 @@ describe("installment routes", () => {
 
     const response = await request(app)
       .get("/parcelamento/installments")
-      .set(parcelamentoHeaders({ "x-user-id": "" }));
+      .set(parcelamentoHeaders({ "x-auth-user-id": "" }));
 
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
@@ -165,7 +212,7 @@ describe("installment routes", () => {
     const response = await request(app)
       .post("/parcelamento/installments")
       .set("Content-Type", "application/json")
-      .set(parcelamentoHeaders({ "x-organization-id": "" }))
+      .set(parcelamentoHeaders({ "x-auth-organization-id": "" }))
       .send(createCreateInstallmentBody());
 
     expect(response.status).toBe(400);

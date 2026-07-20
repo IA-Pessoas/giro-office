@@ -213,9 +213,9 @@ export function parcelamentoHeaders(
 ): Record<string, string> {
   return {
     "x-request-id": requestId,
-    "x-user-id": userId,
-    "x-organization-id": organizationId,
-    "x-permission": "2",
+    "x-auth-user-id": userId,
+    "x-auth-organization-id": organizationId,
+    "x-auth-permission": "2",
     ...overrides,
   };
 }
