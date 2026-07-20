@@ -38,6 +38,8 @@ Thumbs.db
 # docs
 docs/*
 !docs/vps-deploy.md
+!docs/migration/
+!docs/migration/**
 !docs/security/
 !docs/security/*.md
 # Figma reference project (local only)
