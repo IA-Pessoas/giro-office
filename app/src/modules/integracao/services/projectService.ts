@@ -5,7 +5,6 @@ import type {
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
-  ProjectMetrics,
   ProjectProgressResponse,
   UpdateProjectData,
 } from "../types";
@@ -17,7 +16,6 @@ import {
   unwrapCreatedProject,
   unwrapProjectDetail,
   unwrapProjectList,
-  unwrapProjectMetrics,
   unwrapProjectProgress,
   unwrapUpdatedProject,
 } from "./projectService.contract";
@@ -30,14 +28,6 @@ export const projectService = {
     });
 
     return unwrapProjectList(response.data);
-  },
-
-
-  async metrics(): Promise<ProjectMetrics> {
-    const api = setupAPIClient();
-    const response = await api.get(PROJECT_ENDPOINTS.metrics);
-
-    return unwrapProjectMetrics(response.data);
   },
 
   async detail(projectId: string): Promise<ProjectDetail> {

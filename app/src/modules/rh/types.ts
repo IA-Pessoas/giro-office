@@ -34,18 +34,11 @@ export interface DeleteRhCategoryPayload {
   id: string;
 }
 
-export interface RhRequestRequester {
-  id: string;
-  name: string;
-  status: string | null;
-}
-
 export interface RhRequest {
   id: string;
   title: string;
   description: string;
   requester_user_id: string;
-  requester?: RhRequestRequester | null;
   category_id: string;
   assigned_to_user_id: string;
   urgency: RhRequestUrgency;

@@ -4,7 +4,6 @@ import prismaClient from "../integrations/prisma.js";
 
 /** Status de tarefa considerados no cálculo de progresso (legado ProjectService). */
 export const TASK_STATUSES_FOR_PROGRESS = [
-  "Em andamento",
   "Em Andamento",
   "A Realizar",
   "Em Espera",

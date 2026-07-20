@@ -35,7 +35,6 @@ export function clientListQueryKey(filters: ClientListFilters) {
     ...CLIENTS_QUERY_KEY,
     "list",
     filters.search ?? "",
-    filters.ref ?? "",
     filters.status ?? "",
     filters.page ?? 1,
     filters.limit ?? 20,

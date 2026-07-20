@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import {
   buildContabilControlParams,
   CONTABIL_ENDPOINTS,
@@ -55,13 +54,6 @@ async function runTest(name, fn) {
 }
 
 await (async () => {
-  await runTest("contabil page filters the client picker by accounting department", () => {
-    const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
-
-    assert.match(source, /useClients\(\{[\s\S]*ref:\s*"deps"/);
-    assert.match(source, /useClients\(\{[\s\S]*status:\s*"Departamento contabil"/);
-  });
-
   await runTest("contabil endpoints use the expected contract", () => {
     assert.equal(CONTABIL_ENDPOINTS.controls, "/contabil/controls");
     assert.equal(CONTABIL_ENDPOINTS.controlById("10"), "/contabil/controls/10");

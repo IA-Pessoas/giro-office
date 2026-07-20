@@ -12,17 +12,11 @@ import type {
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
-  ProjectMetrics,
   ProjectProgressResponse,
   UpdateProjectData,
 } from "../types";
 import { projectService } from "../services/projectService";
-import {
-  projectDetailQueryKey,
-  projectListQueryKey,
-  projectMetricsQueryKey,
-  PROJECTS_QUERY_KEY,
-} from "./queryKeys";
+import { projectDetailQueryKey, projectListQueryKey, PROJECTS_QUERY_KEY } from "./queryKeys";
 
 export function useProjectsList(
   params: ProjectListParams | null,
@@ -35,10 +29,6 @@ export function useProjectsList(
       placeholderData: (previousData) => previousData,
     },
   );
-}
-
-export function useProjectMetrics(): UseQueryResult<ProjectMetrics, Error> {
-  return useFetch(projectMetricsQueryKey(), () => projectService.metrics());
 }
 
 export function useProjectDetail(projectId: string | undefined): UseQueryResult<ProjectDetail, Error> {

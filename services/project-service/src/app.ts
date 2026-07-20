@@ -15,15 +15,10 @@ import { requestContext } from "./middlewares/requestContext.js";
 import { buildProjectServiceOpenApiSpec } from "./openapi/spec.js";
 import { createProjectCrudRoutes, type ProjectCrudRouteDeps } from "./routes/projectCrud.routes.js";
 import {
-  createProjectMetricsRoutes,
-  type ProjectMetricsRouteDeps,
-} from "./routes/projectMetrics.routes.js";
-import {
   createProjectProgressRoutes,
   type ProjectProgressRouteDeps,
 } from "./routes/projectProgress.routes.js";
 import { ProjectCrudService } from "./services/projectCrudService.js";
-import { ProjectMetricsService } from "./services/projectMetricsService.js";
 import { ProjectProgressService } from "./services/projectProgressService.js";
 
 function projectServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -47,12 +42,10 @@ export function createProjectApplication(options: {
   env: ProjectServiceEnv;
   logger: Logger;
   projectCrudService?: ProjectCrudRouteDeps;
-  projectMetricsService?: ProjectMetricsRouteDeps;
   projectProgressService?: ProjectProgressRouteDeps;
 }): express.Express {
   const { env, logger } = options;
   const projectCrudService = options?.projectCrudService ?? new ProjectCrudService();
-  const projectMetricsService = options?.projectMetricsService ?? new ProjectMetricsService();
   const projectProgressService = options?.projectProgressService ?? new ProjectProgressService();
 
   const app = express();
@@ -74,7 +67,6 @@ export function createProjectApplication(options: {
   }
 
   app.use("/project", createProjectCrudRoutes(projectCrudService));
-  app.use("/project", createProjectMetricsRoutes(projectMetricsService));
   app.use("/project", createProjectProgressRoutes(projectProgressService));
 
   app.use(

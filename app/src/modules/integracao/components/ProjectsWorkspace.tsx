@@ -21,7 +21,6 @@ import { useMe } from "@shared/hooks";
 
 import {
   useDeleteProjectMutation,
-  useProjectMetrics,
   useProjectsList,
   useRecalculateProjectProgressMutation,
 } from "../hooks/useProjects";
@@ -132,7 +131,6 @@ export function ProjectsWorkspace() {
   const projectsQuery = useProjectsList(
     selectedClientId ? { ref: "client", id: selectedClientId } : null,
   );
-  const projectMetricsQuery = useProjectMetrics();
 
   const deleteProjectMutation = useDeleteProjectMutation();
   const recalculateProgressMutation = useRecalculateProjectProgressMutation();
@@ -201,53 +199,22 @@ export function ProjectsWorkspace() {
     [projects],
   );
 
-  const globalMetricCards = useMemo(() => {
-    const metrics = projectMetricsQuery.data;
-
-    return [
-      {
-        label: "Projetos concluídos",
-        value: metrics?.completed ?? 0,
-        icon: Target,
-        description: "Total global concluído na Integração.",
-      },
-      {
-        label: "Projetos em andamento",
-        value: metrics?.inProgress ?? 0,
-        icon: TrendingUp,
-        description: "Total global ativo na Integração.",
-      },
-      {
-        label: "Projetos paralisados",
-        value: metrics?.paused ?? 0,
-        icon: RefreshCcw,
-        description: "Total global aguardando destravamento.",
-      },
-      {
-        label: "Projetos a realizar",
-        value: metrics?.toDo ?? 0,
-        icon: Clock3,
-        description: "Total global em análise ou proposta.",
-      },
-    ];
-  }, [projectMetricsQuery.data]);
-
   const stats = useMemo(
     () => [
       {
-        label: "Projetos do cliente",
+        label: "Projetos",
         value: projects.length,
         icon: FolderKanban,
         description: "Volume atual da carteira carregada para este cliente.",
       },
       {
-        label: "Em andamento no cliente",
+        label: "Em andamento",
         value: countByStatus(projects, (status) => status.includes("andamento")),
         icon: TrendingUp,
-        description: "Projetos ativos da carteira selecionada.",
+        description: "Projetos ativos que pedem acompanhamento mais frequente.",
       },
       {
-        label: "Concluídos no cliente",
+        label: "Concluídos",
         value: countByStatus(projects, (status) => status.includes("concl")),
         icon: Target,
         description: "Projetos encerrados com sucesso na carteira visível.",
@@ -382,58 +349,6 @@ export function ProjectsWorkspace() {
           </button>
         </div>
       </div>
-
-
-      <section className={`${PROJECT_PANEL_CLASSNAME} p-5`}>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-              Resumo geral
-            </p>
-            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
-              Projetos da Integração
-            </h2>
-          </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {projectMetricsQuery.isLoading
-              ? "Carregando métricas globais..."
-              : projectMetricsQuery.isError
-                ? "Não foi possível carregar as métricas globais."
-                : `${projectMetricsQuery.data?.total ?? 0} projeto(s) no total global.`}
-          </p>
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {globalMetricCards.map((metric) => {
-            const Icon = metric.icon;
-            const valueLabel = projectMetricsQuery.isLoading ? "..." : metric.value;
-
-            return (
-              <article
-                key={metric.label}
-                className="min-h-[138px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                      {metric.label}
-                    </p>
-                    <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">
-                      {valueLabel}
-                    </p>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-[var(--colors-brand-gradient-end)] dark:bg-slate-800 dark:text-[var(--colors-brand-gradient-start)]">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                </div>
-                <p className="mt-3 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                  {metric.description}
-                </p>
-              </article>
-            );
-          })}
-        </div>
-      </section>
 
       <section
         className={`${PROJECT_PANEL_CLASSNAME} overflow-hidden border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-[color:var(--colors-brand-gradient-end)]/85 text-white dark:border-slate-700`}

@@ -1,7 +1,6 @@
 export {
   projectDetailQueryKey,
   projectListQueryKey,
-  projectMetricsQueryKey,
   TASK_MODELS_QUERY_KEY,
   taskModelsListQueryKey,
   INTEGRACAO_TASKS_QUERY_KEY,
@@ -14,7 +13,6 @@ export {
   useCreateProjectMutation,
   useDeleteProjectMutation,
   useProjectDetail,
-  useProjectMetrics,
   useProjectsList,
   useRecalculateProjectProgressMutation,
   useUpdateProjectMutation,

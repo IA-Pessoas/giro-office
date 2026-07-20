@@ -21,8 +21,6 @@ export default function ContabilPage() {
 
   const clientsQuery = useClients({
     search: deferredSearch,
-    ref: "deps",
-    status: "Departamento contabil",
     page: 1,
     limit: CONTABIL_CLIENT_PICKER_LIMIT,
   });
