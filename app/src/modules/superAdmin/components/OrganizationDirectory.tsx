@@ -1,4 +1,12 @@
-import { Building2, ChevronLeft, ChevronRight, RefreshCw, Search } from "lucide-react";
+import {
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  RefreshCw,
+  Search,
+} from "lucide-react";
 
 import type { PlatformOrganization } from "../types";
 
@@ -16,8 +24,10 @@ interface OrganizationDirectoryProps {
   onSearchTermChange: (value: string) => void;
   onStatusFilterChange: (value: string) => void;
   onSelectOrganization: (organizationId: string) => void;
+  onFirstPage: () => void;
   onPreviousPage: () => void;
   onNextPage: () => void;
+  onLastPage: () => void;
   onRetry: () => void;
 }
 
@@ -70,24 +80,28 @@ export function OrganizationDirectory({
   onSearchTermChange,
   onStatusFilterChange,
   onSelectOrganization,
+  onFirstPage,
   onPreviousPage,
   onNextPage,
+  onLastPage,
   onRetry,
 }: OrganizationDirectoryProps) {
   const totalPages = Math.max(1, Math.ceil(totalOrganizations / pageSize));
+  const canGoToFirstPage = page > 1 && !isFetching;
   const canGoToPreviousPage = page > 1 && !isFetching;
   const canGoToNextPage = page < totalPages && !isFetching;
+  const canGoToLastPage = page < totalPages && !isFetching;
 
   return (
     <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 max-xl:h-[620px] xl:h-full">
       <div className="flex h-full min-h-0 flex-col space-y-4">
         <div className="space-y-1">
           <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-            Organizacoes
+            Organizações
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">
             {organizations.length} de {totalOrganizations}{" "}
-            {totalOrganizations === 1 ? "organizacao" : "organizacoes"}
+            {totalOrganizations === 1 ? "organização" : "organizações"}
           </p>
         </div>
 
@@ -126,13 +140,13 @@ export function OrganizationDirectory({
           {isLoading ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
               <p className="text-sm text-slate-600 dark:text-slate-300">
-                Carregando organizacoes...
+                Carregando organizações...
               </p>
             </div>
           ) : isError ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
               <p className="text-sm text-slate-700 dark:text-white">
-                A listagem nao esta disponivel.
+                A listagem não está disponível.
               </p>
               <button
                 type="button"
@@ -147,7 +161,7 @@ export function OrganizationDirectory({
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
               <Building2 className="mx-auto mb-3 h-6 w-6 text-slate-400" />
               <p className="text-sm font-medium text-slate-700 dark:text-white">
-                Nenhuma organizacao encontrada.
+                Nenhuma organização encontrada.
               </p>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
                 Ajuste a busca ou o filtro.
@@ -191,28 +205,50 @@ export function OrganizationDirectory({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">
-          <button
-            type="button"
-            onClick={onPreviousPage}
-            disabled={!canGoToPreviousPage}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-            aria-label="Pagina anterior de organizacoes"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-            Pagina {page} de {totalPages}
+        <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onFirstPage}
+              disabled={!canGoToFirstPage}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              aria-label="Primeira página de organizações"
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onPreviousPage}
+              disabled={!canGoToPreviousPage}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              aria-label="Página anterior de organizações"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="shrink-0 text-sm font-medium text-slate-600 dark:text-slate-300">
+            Página {page} de {totalPages}
           </p>
-          <button
-            type="button"
-            onClick={onNextPage}
-            disabled={!canGoToNextPage}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-            aria-label="Proxima pagina de organizacoes"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onNextPage}
+              disabled={!canGoToNextPage}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              aria-label="Próxima página de organizações"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onLastPage}
+              disabled={!canGoToLastPage}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              aria-label="Última página de organizações"
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </aside>

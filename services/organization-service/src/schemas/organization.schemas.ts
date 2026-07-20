@@ -89,5 +89,14 @@ export const listOrganizationsQuerySchema = z
       }
       return raw;
     }, z.nativeEnum(statusEnum).optional()),
+    search: z.preprocess((v) => {
+      const raw = getSingleQueryValue(v);
+      if (raw === undefined || raw === "") {
+        return undefined;
+      }
+
+      const search = String(raw).trim();
+      return search === "" ? undefined : search;
+    }, z.string().max(120, "search deve ter no máximo 120 caracteres.").optional()),
   })
   .strict();

@@ -1,4 +1,12 @@
-import { ChevronLeft, ChevronRight, RefreshCw, Search, UserRound } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  RefreshCw,
+  Search,
+  UserRound,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { usePlatformUsers } from "../hooks/usePlatformUsers";
@@ -20,7 +28,7 @@ function getUserLogin(user: PlatformOrganizationUser): string {
 
 function getUserProfileLabel(user: PlatformOrganizationUser): string {
   if (user.type === "owner") {
-    return "Proprietario";
+    return "Proprietário";
   }
 
   if (user.type === "admin") {
@@ -28,11 +36,11 @@ function getUserProfileLabel(user: PlatformOrganizationUser): string {
   }
 
   if (user.type === "user") {
-    return "Usuario";
+    return "Usuário";
   }
 
   if (typeof user.permission === "number") {
-    return `Permissao ${user.permission}`;
+    return `Permissão ${user.permission}`;
   }
 
   return "Sem perfil";
@@ -85,8 +93,10 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const filteredUsers = useMemo(() => filterUsers(users, searchTerm), [searchTerm, users]);
   const totalUsers = usersQuery.data?.total ?? users.length;
   const totalPages = Math.max(1, Math.ceil(totalUsers / USERS_PAGE_SIZE));
+  const canGoToFirstPage = userPage > 1 && !usersQuery.isFetching;
   const canGoToPreviousPage = userPage > 1 && !usersQuery.isFetching;
   const canGoToNextPage = userPage < totalPages && !usersQuery.isFetching;
+  const canGoToLastPage = userPage < totalPages && !usersQuery.isFetching;
 
   useEffect(() => {
     setSearchTerm("");
@@ -98,10 +108,10 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-            Usuarios da organizacao
+            Usuários da organização
           </h3>
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            {filteredUsers.length} de {totalUsers} usuario{totalUsers === 1 ? "" : "s"}
+            {filteredUsers.length} de {totalUsers} usuário{totalUsers === 1 ? "" : "s"}
           </p>
         </div>
         <button
@@ -110,7 +120,7 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
           className="inline-flex w-fit items-center gap-2 rounded-xl bg-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400"
         >
           <UserRound className="h-4 w-4" />
-          Novo usuario
+          Novo usuário
         </button>
       </div>
 
@@ -132,12 +142,12 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
 
       {usersQuery.isLoading ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center dark:border-slate-700 dark:bg-slate-950/40">
-          <p className="text-sm text-slate-600 dark:text-slate-300">Carregando usuarios...</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Carregando usuários...</p>
         </div>
       ) : usersQuery.isError ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-medium">Nao foi possivel carregar usuarios.</p>
+            <p className="text-sm font-medium">Não foi possível carregar usuários.</p>
             <button
               type="button"
               onClick={() => void usersQuery.refetch()}
@@ -151,13 +161,13 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
       ) : users.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center dark:border-slate-700 dark:bg-slate-950/40">
           <p className="text-sm font-medium text-slate-900 dark:text-white">
-            Nenhum usuario retornado para esta organizacao.
+            Nenhum usuário retornado para esta organização.
           </p>
         </div>
       ) : filteredUsers.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center dark:border-slate-700 dark:bg-slate-950/40">
           <p className="text-sm font-medium text-slate-900 dark:text-white">
-            Nenhum usuario corresponde a busca.
+            Nenhum usuário corresponde à busca.
           </p>
         </div>
       ) : (
@@ -195,28 +205,50 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">
-        <button
-          type="button"
-          onClick={() => setUserPage((currentPage) => Math.max(1, currentPage - 1))}
-          disabled={!canGoToPreviousPage}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          aria-label="Pagina anterior de usuarios"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-          Pagina {userPage} de {totalPages}
+      <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setUserPage(1)}
+            disabled={!canGoToFirstPage}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            aria-label="Primeira página de usuários"
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setUserPage((currentPage) => Math.max(1, currentPage - 1))}
+            disabled={!canGoToPreviousPage}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            aria-label="Página anterior de usuários"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        </div>
+        <p className="shrink-0 text-sm font-medium text-slate-600 dark:text-slate-300">
+          Página {userPage} de {totalPages}
         </p>
-        <button
-          type="button"
-          onClick={() => setUserPage((currentPage) => currentPage + 1)}
-          disabled={!canGoToNextPage}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          aria-label="Proxima pagina de usuarios"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setUserPage((currentPage) => currentPage + 1)}
+            disabled={!canGoToNextPage}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            aria-label="Próxima página de usuários"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setUserPage(totalPages)}
+            disabled={!canGoToLastPage}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            aria-label="Última página de usuários"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </section>
   );

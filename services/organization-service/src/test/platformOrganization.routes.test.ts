@@ -38,6 +38,29 @@ describe("platform organization routes", () => {
     });
   });
 
+  it("GET /platform/organizations repassa busca para a listagem global", async () => {
+    organizationServiceMock.list.mockResolvedValue({
+      organizations: [{ id: organizationId, name: "Giro Office" }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    });
+
+    const app = createTestApp();
+    const res = await request(app)
+      .get("/platform/organizations")
+      .set(gatewayPlatformAuthHeaders())
+      .query({ page: 1, pageSize: 20, search: " giro " });
+
+    expect(res.status).toBe(200);
+    expect(organizationServiceMock.list).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 20,
+      search: "giro",
+      status: undefined,
+    });
+  });
+
   it("POST /platform/organizations cria organizacao para super admin", async () => {
     organizationServiceMock.create.mockResolvedValue({ id: organizationId });
 

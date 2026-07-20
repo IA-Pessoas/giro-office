@@ -19,7 +19,9 @@ export function setupAPIClient(ctx = undefined, onUnauthorized?: () => void) {
     onUnauthorized,
     getUnauthorizedErrorForSsr: () => new AuthTokenError(),
     onServerError: () => {
-      toast.error(SERVER_ERROR_TOAST_MESSAGE);
+      toast.error(SERVER_ERROR_TOAST_MESSAGE, {
+        toastId: "shared-server-error",
+      });
     },
   });
 }

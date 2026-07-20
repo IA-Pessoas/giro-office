@@ -7,6 +7,7 @@ export interface UsePlatformOrganizationsParams {
   page: number;
   pageSize: number;
   status?: string;
+  search?: string;
 }
 
 export function usePlatformOrganizations(

@@ -38,6 +38,40 @@ describe("OrganizationService", () => {
     });
   });
 
+  it("list aplica busca no banco antes de paginar", async () => {
+    prismaMock.organization.findMany.mockResolvedValue([{ id: "org-1", name: "Giro Office" }]);
+    prismaMock.organization.count.mockResolvedValue(1);
+    const service = new OrganizationService();
+
+    const result = await service.list({
+      page: 2,
+      pageSize: 10,
+      search: "giro",
+      status: "active",
+    });
+
+    const expectedWhere = {
+      status: "active",
+      OR: [
+        { name: { contains: "giro", mode: "insensitive" } },
+        { slug: { contains: "giro", mode: "insensitive" } },
+        { cnpj: { contains: "giro", mode: "insensitive" } },
+        { email_created_by: { contains: "giro", mode: "insensitive" } },
+        { subscription_plan: { contains: "giro", mode: "insensitive" } },
+      ],
+    };
+
+    expect(prismaMock.organization.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expectedWhere,
+        skip: 10,
+        take: 10,
+      }),
+    );
+    expect(prismaMock.organization.count).toHaveBeenCalledWith({ where: expectedWhere });
+    expect(result.total).toBe(1);
+  });
+
   it("create lança 409 quando slug já existe", async () => {
     prismaMock.organization.findUnique.mockResolvedValue({ id: "org-1" });
     const service = new OrganizationService();

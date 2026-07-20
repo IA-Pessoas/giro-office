@@ -71,6 +71,10 @@ const appShellSource = await readFile(
   new URL("../../shared/components/newLayout/AppShell.tsx", import.meta.url),
   "utf8",
 );
+const apiSource = await readFile(
+  new URL("../../shared/services/api.ts", import.meta.url),
+  "utf8",
+);
 const administracaoSource = await readFile(
   new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
   "utf8",
@@ -214,7 +218,7 @@ await (async () => {
   });
 
   await runTest("app shell checks full user access for administration navigation", () => {
-    assert.match(appShellSource, /const accessUser = meQuery\.data \?\? user;/);
+    assert.match(appShellSource, /const accessUser = isPlatformSuperAdmin \? user : meQuery\.data \?\? user;/);
     assert.match(appShellSource, /canAccessAdministration\(accessUser, \{ rhAccess \}\)/);
   });
 
@@ -377,7 +381,7 @@ await (async () => {
   await runTest("app shell uses module hook for menu visibility instead of raw access store", () => {
     assert.match(appShellSource, /useModuleAccessMap\(MODULE_KEYS\)/);
     assert.equal(appShellSource.includes("useAccessStore("), false);
-    assert.match(appShellSource, /const accessUser = meQuery\.data \?\? user/);
+    assert.match(appShellSource, /const accessUser = isPlatformSuperAdmin \? user : meQuery\.data \?\? user/);
     assert.match(appShellSource, /canAccessAdministration\(accessUser,\s*\{\s*rhAccess\s*\}\)/);
     assert.match(appShellSource, /const rhAccess = moduleAccessMap\.rh/);
   });
@@ -402,6 +406,11 @@ await (async () => {
     assert.match(appShellSource, /shouldRenderModuleNavLoading/);
     assert.equal(appShellSource.includes("isModuleAccessLoading) {\n      return false;"), false);
     assert.equal(appShellSource.includes("isModuleAccessLoading) {\n          return false;"), false);
+  });
+
+  await runTest("shared api deduplicates generic server error toasts", () => {
+    assert.match(apiSource, /toast\.error\(SERVER_ERROR_TOAST_MESSAGE,\s*\{/);
+    assert.match(apiSource, /toastId:\s*"shared-server-error"/);
   });
 
   await runTest("canSSRAdmin redirects unauthenticated users to login", async () => {

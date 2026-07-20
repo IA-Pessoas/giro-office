@@ -22,6 +22,14 @@ export interface ListOrganizationsParams {
   page: number;
   pageSize: number;
   status?: status;
+  search?: string;
+}
+
+export interface ListOrganizationsResult {
+  organizations: OrganizationRow[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 const ORGANIZATION_SELECT = {
@@ -87,11 +95,40 @@ export type OrganizationLogoUpdatedRow = Prisma.OrganizationGetPayload<{
   select: typeof ORGANIZATION_LOGO_UPDATE_SELECT;
 }>;
 
+function buildOrganizationListWhere(
+  params: ListOrganizationsParams,
+): Prisma.OrganizationWhereInput {
+  const { status: statusFilter, search } = params;
+  const where: Prisma.OrganizationWhereInput = {};
+
+  if (statusFilter !== undefined) {
+    where.status = statusFilter;
+  }
+
+  const normalizedSearch = search?.trim();
+  if (normalizedSearch) {
+    const containsSearch = {
+      contains: normalizedSearch,
+      mode: "insensitive" as const,
+    };
+
+    where.OR = [
+      { name: containsSearch },
+      { slug: containsSearch },
+      { cnpj: containsSearch },
+      { email_created_by: containsSearch },
+      { subscription_plan: containsSearch },
+    ];
+  }
+
+  return where;
+}
+
 class OrganizationService {
-  async list(params: ListOrganizationsParams) {
+  async list(params: ListOrganizationsParams): Promise<ListOrganizationsResult> {
     try {
-      const { page, pageSize, status: statusFilter } = params;
-      const where = statusFilter !== undefined ? { status: statusFilter } : {};
+      const { page, pageSize } = params;
+      const where = buildOrganizationListWhere(params);
 
       const [organizations, total] = await Promise.all([
         prismaClient.organization.findMany({

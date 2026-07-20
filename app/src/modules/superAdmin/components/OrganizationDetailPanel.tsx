@@ -12,8 +12,8 @@ interface OrganizationDetailPanelProps {
 }
 
 const DETAIL_TABS = [
-  { key: "overview", label: "Visao geral", icon: Info },
-  { key: "users", label: "Usuarios", icon: Users },
+  { key: "overview", label: "Visão geral", icon: Info },
+  { key: "users", label: "Usuários", icon: Users },
   { key: "audit", label: "Auditoria", icon: Activity },
   { key: "support", label: "Suporte", icon: Headphones },
 ] as const;
@@ -91,10 +91,10 @@ export function OrganizationDetailPanel({
         <div className="max-w-md">
           <Building2 className="mx-auto mb-3 h-8 w-8 text-slate-400" />
           <p className="text-sm font-semibold text-slate-900 dark:text-white">
-            Nenhuma organizacao selecionada.
+            Nenhuma organização selecionada.
           </p>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Selecione uma organizacao no diretorio para abrir os detalhes.
+            Selecione uma organização no diretório para abrir os detalhes.
           </p>
         </div>
       </section>
@@ -156,7 +156,7 @@ export function OrganizationDetailPanel({
             <div className="grid gap-4 lg:grid-cols-2">
               <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                  Identificacao
+                  Identificação
                 </h3>
                 <div className="mt-3">
                   <DetailItem label="Nome" value={organization.name} />
@@ -167,7 +167,7 @@ export function OrganizationDetailPanel({
               </section>
               <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                  Operacao
+                  Operação
                 </h3>
                 <div className="mt-3">
                   <DetailItem label="Status" value={getStatusLabel(organization.status)} />
@@ -183,15 +183,15 @@ export function OrganizationDetailPanel({
 
           {activeTab === "audit" ? (
             <FutureScopeState
-              title="Auditoria entra na proxima etapa de frontend."
-              description="A aba fica reservada para consumir os registros do audit-service sem misturar esse escopo com a listagem inicial de organizacoes e usuarios."
+              title="Auditoria entra na próxima etapa de frontend."
+              description="A aba fica reservada para consumir os registros do audit-service sem misturar esse escopo com a listagem inicial de organizações e usuários."
             />
           ) : null}
 
           {activeTab === "support" ? (
             <FutureScopeState
-              title="Suporte assistido entra na proxima etapa de frontend."
-              description="A troca de token e o banner persistente ficam fora desta task para preservar a revisao por PR."
+              title="Suporte assistido entra na próxima etapa de frontend."
+              description="A troca de token e o banner persistente ficam fora desta task para preservar a revisão por PR."
             />
           ) : null}
         </div>

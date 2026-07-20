@@ -102,6 +102,7 @@ type NavigationModule = {
   name: string;
   icon: typeof LayoutDashboard;
   moduleKey?: ModuleKey;
+  platformOnly?: boolean;
 };
 
 type NavigationCategory = {
@@ -144,13 +145,16 @@ const moduleCategories: NavigationCategory[] = [
   },
   {
     name: "Admin",
-    modules: [{ path: "/administracao", name: "Administração", icon: Shield }],
+    modules: [
+      { path: "/super-admin", name: "Super Admin", icon: ShieldCheck, platformOnly: true },
+      { path: "/administracao", name: "Administração", icon: Shield },
+    ],
   },
 ];
 
 const MODULE_ACCESS_DENIED_MESSAGE = "Você não tem acesso a este módulo no perfil atual.";
-const MODULE_ACCESS_LOADING_MESSAGE = "Carregando acesso ao modulo.";
-const MODULE_NAV_LOADING_MESSAGE = "Carregando modulos";
+const MODULE_ACCESS_LOADING_MESSAGE = "Carregando acesso ao módulo.";
+const MODULE_NAV_LOADING_MESSAGE = "Carregando módulos";
 const NOTIFICATIONS_PANEL_ID = "app-shell-notifications-panel";
 const USER_MENU_PANEL_ID = "app-shell-user-menu";
 const AI_CHAT_DIALOG_DESCRIPTION_ID = "app-shell-ai-chat-description";
@@ -258,7 +262,9 @@ type ChatMessage = {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
-  const meQuery = useMe();
+  const isPlatformSuperAdmin =
+    user?.auth_kind === "platform" && user.platform_role === "super_admin";
+  const meQuery = useMe({ enabled: !isPlatformSuperAdmin });
   const { accessMap: moduleAccessMap, isLoading: isModuleAccessLoading } =
     useModuleAccessMap(MODULE_KEYS);
 
@@ -304,9 +310,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = router.asPath.split("?")[0] ?? "";
   const displayUserName = user?.name ?? meQuery.data?.name ?? "Admin";
   const displayUserLogin = user?.email ?? user?.login ?? meQuery.data?.login ?? "";
-  const displayUserPhoto = resolvePhotoUrl(meQuery.data?.photo_url ?? null);
+  const displayUserPhoto = resolvePhotoUrl(
+    isPlatformSuperAdmin ? null : meQuery.data?.photo_url ?? null,
+  );
   const displayUserInitials = getInitials(displayUserName);
-  const accessUser = meQuery.data ?? user;
+  const accessUser = isPlatformSuperAdmin ? user : meQuery.data ?? user;
   const rhAccess = moduleAccessMap.rh;
   const canManageOrganization = canCreateOrganizationOwner(accessUser);
   const canManageUsers = canAccessAdministration(accessUser, { rhAccess });
@@ -359,6 +367,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       return {
         ...category,
         modules: category.modules.filter((module) => {
+          if (module.platformOnly) {
+            return isPlatformSuperAdmin;
+          }
+
           const moduleKey =
             ("moduleKey" in module ? module.moduleKey : undefined) ??
             APP_ROUTE_MODULE_MAP[module.path];

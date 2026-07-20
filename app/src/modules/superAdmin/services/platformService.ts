@@ -31,6 +31,7 @@ export const platformService = {
     page: number;
     pageSize: number;
     status?: string;
+    search?: string;
   }): Promise<PlatformOrganizationsListResponse> {
     const response = await api.get("/platform/organizations", { params });
     return unwrapData<PlatformOrganizationsListResponse>(response);

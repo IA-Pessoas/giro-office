@@ -77,6 +77,12 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
               in: "query",
               schema: { type: "string" },
             },
+            {
+              name: "search",
+              in: "query",
+              description: "Busca por nome, slug, CNPJ, e-mail criador ou plano.",
+              schema: { type: "string", maxLength: 120 },
+            },
           ],
           responses: {
             "200": {
@@ -164,6 +170,12 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
               name: "status",
               in: "query",
               schema: { type: "string" },
+            },
+            {
+              name: "search",
+              in: "query",
+              description: "Busca por nome, slug, CNPJ, e-mail criador ou plano.",
+              schema: { type: "string", maxLength: 120 },
             },
           ],
           responses: {
