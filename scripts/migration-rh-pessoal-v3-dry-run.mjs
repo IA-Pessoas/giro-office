@@ -3,6 +3,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 
 const ROOT = process.cwd();
 
@@ -591,6 +592,7 @@ const SOURCE_TABLES = [
   "tb_admin.permissoes_rh",
   "tb_admin.permissoes_pessoal",
   "tb_integracao.clientes",
+  "tb_regularize.coringa",
   "tb_rh.alergias",
   "tb_rh.andares",
   "tb_rh.cargos",
@@ -740,6 +742,36 @@ function legacyDatePart(value) {
 
 function boolLegacy(value) {
   return Number(value ?? 0) === 1;
+}
+
+const CLIENT_DEPARTMENT_FLAG_FIELDS = [
+  "contabil",
+  "fiscal",
+  "pessoal",
+  "infoproduto",
+  "consultoria",
+  "castelo_med",
+];
+
+function emptyClientDepartmentFlags() {
+  return Object.fromEntries(CLIENT_DEPARTMENT_FLAG_FIELDS.map((field) => [field, false]));
+}
+
+function buildClientDepartmentFlags(rows) {
+  const flagsByClient = new Map();
+
+  for (const row of rows["tb_regularize.coringa"] ?? []) {
+    const clientLegacyId = cleanText(row.empresa);
+    if (!clientLegacyId) continue;
+
+    const flags = flagsByClient.get(clientLegacyId) ?? emptyClientDepartmentFlags();
+    for (const field of CLIENT_DEPARTMENT_FLAG_FIELDS) {
+      flags[field] = flags[field] || boolLegacy(row[field]);
+    }
+    flagsByClient.set(clientLegacyId, flags);
+  }
+
+  return flagsByClient;
 }
 
 function parseScalar(raw) {
@@ -985,6 +1017,7 @@ function buildBaseMaps(rows) {
 function buildLoad(rows, maps) {
   const load = {};
   const quarantine = [];
+  const clientDepartmentFlagsByLegacy = buildClientDepartmentFlags(rows);
 
   load.departments = rows["tb_admin.departamentos"].map((row) => ({
     id: maps.departmentByLegacy.get(String(row.id)),
@@ -997,6 +1030,8 @@ function buildLoad(rows, maps) {
 
   load.clients = rows["tb_integracao.clientes"].map((row) => {
     const type = normalizeKey(row.tipo).includes("fis") ? "PF" : "PJ";
+    const departmentFlags =
+      clientDepartmentFlagsByLegacy.get(String(row.id)) ?? emptyClientDepartmentFlags();
     return {
       id: maps.clientByLegacy.get(String(row.id)),
       dominio_code: null,
@@ -1039,12 +1074,12 @@ function buildLoad(rows, maps) {
       meet_type: null,
       closing_date: null,
       register_date_prospecting: "1970-01-01T00:00:00",
-      contabil: null,
-      fiscal: null,
-      pessoal: null,
-      infoproduto: null,
-      consultoria: null,
-      castelo_med: null,
+      contabil: departmentFlags.contabil,
+      fiscal: departmentFlags.fiscal,
+      pessoal: departmentFlags.pessoal,
+      infoproduto: departmentFlags.infoproduto,
+      consultoria: departmentFlags.consultoria,
+      castelo_med: departmentFlags.castelo_med,
       cnae_secondary: null,
       service_unique: null,
       cpf_cnpj: digits(row.cpf_cnpj),
@@ -2632,7 +2667,17 @@ async function main() {
   console.log(JSON.stringify(manifest, null, 2));
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+export {
+  buildBaseMaps,
+  buildClientDepartmentFlags,
+  buildLoad,
+  generatedId,
+  SOURCE_TABLES,
+};
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+}
