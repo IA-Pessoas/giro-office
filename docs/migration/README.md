@@ -25,8 +25,8 @@ backup mais atualizado sem repetir decisoes ja tomadas.
   - migrado para tabela destino confirmada;
   - mantido em quarentena com motivo e, quando existir, decisao operacional.
 - Senhas e segredos nao devem ser documentados em claro.
-- Scripts usados para executar cargas sao artefatos operacionais e nao fazem parte
-  da documentacao versionada.
+- Scripts reaproveitaveis de carga ficam versionados em `scripts/`; os artefatos
+  gerados por eles em `/tmp` nao devem ser versionados.
 
 ## V2
 
@@ -146,6 +146,57 @@ Decisoes de Tecnologia:
   tecnico padrao legado `1` como `requester_id`, com observacao no registro
   migrado.
 
+## Certificados
+
+A migracao de Certificados foi aplicada no tenant Castelo a partir do backup
+legado de 06/07/2026.
+
+Scripts versionados:
+
+- `scripts/migration-certificates-v1-dry-run.mjs`
+- `scripts/apply-certificates-v1-current-tenant.mjs`
+- `scripts/migration-certificates-v1-dry-run.test.mjs`
+
+Mapeamento principal:
+
+- `tb_certificados.pj` -> `certificate.pj`
+- `tb_certificados.pf` -> `certificate.pf`
+- `cliente` -> `client_castelo_status`
+- `possui` -> `has_certificate`
+- `pagamento` -> `was_paid`
+- `validade` -> `expiration_date`
+- `data_pagamento` -> `payment_date`, com `0000-00-00` convertido para nulo
+- documentos PF/PJ sao normalizados para digitos quando possivel
+- campos obrigatorios vazios recebem `NAO INFORMADO`
+- `client_focus_status` fica `false`, pois nao existe coluna equivalente no
+  legado de certificados
+
+Resultado da carga final de Certificados:
+
+- origem `tb_certificados.pj`: 772 registros
+- origem `tb_certificados.pf`: 790 registros
+- `certificate.pj`: 762 registros
+- `certificate.pf`: 724 registros
+- quarentena: 76 registros
+
+Quarentena de Certificados:
+
+- `certificate.pj` com validade invalida: 5
+- `certificate.pj` duplicado por identidade unica: 5
+- `certificate.pf` com validade invalida: 45
+- `certificate.pf` duplicado por identidade unica: 21
+
+Decisoes de Certificados:
+
+- Registros com `validade = '0000-00-00'` ficam em quarentena porque
+  `expiration_date` e obrigatorio no schema atual.
+- Duplicados por `organization_id + name + documento + model` ficam em
+  quarentena para respeitar os indices unicos do schema atual.
+- O nome de arquivo legado em `arquivo` nao foi migrado para os metadados de
+  storage, porque o novo servico espera arquivo armazenado e metadados
+  criptograficos proprios. Os dados cadastrais e a flag `has_certificate` foram
+  preservados.
+
 ## Parcelamento
 
 Parcelamento foi deixado em segundo plano porque o backend do novo sistema ainda
@@ -174,9 +225,10 @@ Decisao:
 Panorama apos a carga final de RH/DP:
 
 - RH/DP: 0
+- Certificados: 76
 - Tecnologia: 219
 - Parcelamento: 49325
-- Total geral: 49544
+- Total geral: 49620
 
 A quarentena restante nao deve ser tratada automaticamente como erro. Parte dela
 ja representa decisao operacional documentada:
@@ -195,11 +247,13 @@ ja representa decisao operacional documentada:
    e a regra especial de cliente duplicado por `dominio_code` unico.
 6. Para Tecnologia, manter `tb_tecnologia.senhas` sem `password` e
    `tb_tecnologia.reset` em quarentena com observacao operacional.
-7. Para Parcelamento, so retirar da quarentena quando o backend novo tiver destino
+7. Para Certificados, manter `validade = '0000-00-00'` e identidades duplicadas
+   em quarentena ate decisao operacional explicita.
+8. Para Parcelamento, so retirar da quarentena quando o backend novo tiver destino
    confirmado.
-8. Validar contagens finais, orfaos de FK, criptografia de senhas e total de
+9. Validar contagens finais, orfaos de FK, criptografia de senhas e total de
    quarentena.
-9. Atualizar este README com novas contagens, decisoes e diretorios de artefatos
+10. Atualizar este README com novas contagens, decisoes e diretorios de artefatos
    gerados.
 
 ## O que nao versionar
@@ -208,5 +262,4 @@ ja representa decisao operacional documentada:
 - Arquivos `.env`.
 - Chaves de criptografia.
 - Senhas ou segredos em claro.
-- Scripts temporarios de execucao de carga, salvo decisao explicita posterior.
 - Diretorios temporarios em `/tmp`.
