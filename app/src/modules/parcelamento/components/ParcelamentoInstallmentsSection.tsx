@@ -108,7 +108,9 @@ export function ParcelamentoInstallmentsSection({
     }),
     [deferredSearch, filters, jurisdiction, page, pageSize, selectedClient?.id, status, type],
   );
-  const installmentsQuery = useParcelamentoInstallments(listFilters);
+  const installmentsQuery = useParcelamentoInstallments(listFilters, {
+    enabled: Boolean(selectedClient),
+  });
   const createMutation = useCreateParcelamentoInstallmentMutation(listFilters);
   const updateMutation = useUpdateParcelamentoInstallmentMutation(
     editingInstallment?.id ?? "",
@@ -220,7 +222,9 @@ export function ParcelamentoInstallmentsSection({
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Parcelamentos</h2>
           </div>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            {total} registros encontrados.
+            {selectedClient
+              ? `${total} registros encontrados.`
+              : "Selecione um cliente para listar os parcelamentos."}
           </p>
         </div>
 
@@ -228,7 +232,7 @@ export function ParcelamentoInstallmentsSection({
           <button
             type="button"
             onClick={() => installmentsQuery.refetch()}
-            disabled={installmentsQuery.isFetching}
+            disabled={!selectedClient || installmentsQuery.isFetching}
             className={parcelamentoSecondaryButtonClassName}
           >
             {installmentsQuery.isFetching ? (
@@ -418,7 +422,13 @@ export function ParcelamentoInstallmentsSection({
       </Dialog>
 
       <div className="mt-4">
-        {installmentsQuery.isLoading ? (
+        {!selectedClient ? (
+          <ParcelamentoStateBox
+            icon={BadgeDollarSign}
+            title="Selecione um cliente para ver os parcelamentos"
+            description="Escolha um cliente no topo da tela para carregar somente os parcelamentos dele."
+          />
+        ) : installmentsQuery.isLoading ? (
           <ParcelamentoStateBox
             icon={Loader2}
             title="Carregando parcelamentos"

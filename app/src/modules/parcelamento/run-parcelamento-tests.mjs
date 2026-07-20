@@ -407,6 +407,24 @@ runTest("parcelamento installments pagination exposes page jump and last page", 
   assert.match(section, /setPage\(totalPages\)/);
 });
 
+runTest("parcelamento installments requires selected client before listing", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  );
+
+  assert.match(
+    section,
+    /useParcelamentoInstallments\(\s*listFilters,\s*\{\s*enabled: Boolean\(selectedClient\),\s*\}\s*\)/,
+  );
+  assert.match(section, /disabled=\{!selectedClient \|\| installmentsQuery\.isFetching\}/);
+  assert.match(section, /!selectedClient \? \(/);
+  assert.match(section, /title="Selecione um cliente para ver os parcelamentos"/);
+  assert.match(
+    section,
+    /description="Escolha um cliente no topo da tela para carregar somente os parcelamentos dele\."/,
+  );
+});
+
 runTest("parcelamento installments filters and form use compact controls", () => {
   const section = readWorkspaceFile(
     "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
