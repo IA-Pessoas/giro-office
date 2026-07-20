@@ -45,6 +45,7 @@ const rhMocks: {
   },
   requestServiceMock: {
     create: vi.fn(),
+    canManageRequests: vi.fn(),
     list: vi.fn(),
     getById: vi.fn(),
     update: vi.fn(),
@@ -268,6 +269,7 @@ export function resetRhRouteMocks() {
   categoryServiceMock.list.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
   categoryServiceMock.delete.mockResolvedValue({ ok: true });
   requestServiceMock.create.mockResolvedValue({ ok: true });
+  requestServiceMock.canManageRequests.mockResolvedValue(true);
   requestServiceMock.list.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
   requestServiceMock.getById.mockResolvedValue({ id: "00000000-0000-4000-8000-000000000010" });
   requestServiceMock.update.mockResolvedValue({ ok: true });

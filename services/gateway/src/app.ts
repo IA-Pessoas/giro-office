@@ -25,6 +25,7 @@ import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
+import { createDashboardStatsRoutes } from "./routes/dashboardStats.routes.js";
 
 type GatewayOpenApiSpec = ReturnType<typeof buildGatewayOpenApiSpec>;
 type AuditRecorder = ReturnType<typeof createAuditRecorder>;
@@ -318,6 +319,10 @@ function mountProtectedBlockedRoutes(app: express.Express): void {
   });
 }
 
+function mountGatewayOwnedRoutes(app: express.Express, env: GatewayEnv): void {
+  app.use("/dashboard", createDashboardStatsRoutes(env));
+}
+
 function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
   const proxyByServiceKey = new Map<string, GatewayProxy>();
 
@@ -403,6 +408,7 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   mountPublicBlockedRoutes(app, env);
   mountAuthenticationBoundary(app, env);
   mountProtectedBlockedRoutes(app);
+  mountGatewayOwnedRoutes(app, env);
   mountServiceRoutes(app, env);
   mountFallbackRoute(app);
   mountErrorHandlers(app, env, logger);

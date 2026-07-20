@@ -25,6 +25,8 @@ const REQUEST_SELECT = {
 } as const;
 
 const RH_OPERATION_PERMISSION = 1;
+const RH_MANAGE_REQUESTS_PERMISSION = 2;
+const USER_GLOBAL_ADMIN_PERMISSION = 2;
 
 export type RhRequestSnapshot = Prisma.RhRequestGetPayload<{
   select: typeof REQUEST_SELECT;
@@ -64,6 +66,41 @@ export interface RequestListOptions {
 }
 
 class RequestService {
+  async canManageRequests(organizationId: string, userId: string): Promise<boolean> {
+    try {
+      const orgId = assertNonEmptyString(organizationId, "organization_id");
+      const uid = assertNonEmptyString(userId, "user_id");
+
+      const user = await prismaClient.user.findUnique({
+        where: { id: uid },
+        select: {
+          permission: true,
+          permissions: {
+            where: { organization_id: orgId },
+            select: { rh: true },
+            take: 1,
+            orderBy: { id: "asc" },
+          },
+        },
+      });
+
+      if (!user) {
+        throw new ServiceError(404, "Usuário não encontrado.");
+      }
+
+      const rhPermission = user.permissions[0]?.rh ?? null;
+      return (
+        user.permission === USER_GLOBAL_ADMIN_PERMISSION ||
+        (rhPermission !== null && rhPermission >= RH_MANAGE_REQUESTS_PERMISSION)
+      );
+    } catch (err: unknown) {
+      logError("Erro ao verificar permissão para gerenciar solicitações RH", { err });
+      if (err instanceof ServiceError) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao verificar permissão RH. ${msg}`, err);
+    }
+  }
+
   private ensureAssigneeIsNotRequester(requesterUserId: string, assignedToUserId: string): void {
     if (requesterUserId === assignedToUserId) {
       throw new ServiceError(

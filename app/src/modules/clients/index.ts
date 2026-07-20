@@ -36,6 +36,11 @@ export {
   type ClientStatusApi,
   type ClientStatusForm,
 } from './utils/statusMapper';
+export {
+  CLIENT_ALREADY_INACTIVE_MESSAGE,
+  getClientTerminationAccess,
+  type ClientTerminationAccess,
+} from './utils/terminationAccess';
 
 export type {
   Client,
