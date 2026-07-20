@@ -15,6 +15,7 @@ import {
   parcelamentoSecondaryButtonClassName,
   parcelamentoTextFieldClassName,
 } from "./parcelamentoFormControls";
+import { ParcelamentoNativeSelect } from "./ParcelamentoNativeSelect";
 
 type ParcelamentoInstallmentFormMode = "create" | "edit";
 
@@ -45,7 +46,13 @@ interface ParcelamentoInstallmentFormState {
   completion_date: string;
 }
 
-const INSTALLMENT_STATUS_OPTIONS = ["Ativo", "Liquidado", "Cancelado", "Encerrado", "Inativo"];
+export const INSTALLMENT_STATUS_OPTIONS = [
+  "Ativo",
+  "Liquidado",
+  "Cancelado",
+  "Encerrado",
+  "Inativo",
+];
 
 const emptyInstallmentFormState: ParcelamentoInstallmentFormState = {
   agreement_number: "",
@@ -287,27 +294,12 @@ export function ParcelamentoInstallmentForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900/30 dark:bg-blue-900/10"
-    >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-            {isEditing ? "Editar parcelamento" : "Novo parcelamento"}
-          </h3>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            {selectedClient?.name ?? "Selecione um cliente antes de criar."}
-          </p>
-        </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        {selectedClient?.name ?? "Selecione um cliente antes de criar."}
+      </p>
 
-        <button type="button" onClick={onCancel} className={parcelamentoSecondaryButtonClassName}>
-          <X className="h-4 w-4" />
-          Cancelar
-        </button>
-      </div>
-
-      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <TextField
           label="Número do acordo"
           value={formState.agreement_number}
@@ -377,18 +369,17 @@ export function ParcelamentoInstallmentForm({
           <>
             <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
               Status
-              <select
+              <ParcelamentoNativeSelect
                 value={formState.status}
                 onChange={(event) => handleFieldChange("status", event.target.value)}
                 disabled={isDisabled}
-                className={parcelamentoTextFieldClassName}
               >
                 {INSTALLMENT_STATUS_OPTIONS.map((status) => (
                   <option key={status} value={status}>
                     {status}
                   </option>
                 ))}
-              </select>
+              </ParcelamentoNativeSelect>
             </label>
             <TextField
               label="URL do documento"
@@ -414,7 +405,7 @@ export function ParcelamentoInstallmentForm({
         ) : null}
       </div>
 
-      <label className={`${parcelamentoCheckboxCardClassName} mt-4 w-fit`}>
+      <label className={`${parcelamentoCheckboxCardClassName} w-fit`}>
         <input
           type="checkbox"
           checked={formState.is_automatic_debit}
@@ -435,7 +426,11 @@ export function ParcelamentoInstallmentForm({
         </p>
       ) : null}
 
-      <div className="mt-4 flex justify-end">
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button type="button" onClick={onCancel} className={parcelamentoSecondaryButtonClassName}>
+          <X className="h-4 w-4" />
+          Cancelar
+        </button>
         <button type="submit" disabled={isDisabled} className={parcelamentoPrimaryButtonClassName}>
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {isEditing ? "Salvar alterações" : "Criar parcelamento"}
