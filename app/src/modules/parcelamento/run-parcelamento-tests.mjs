@@ -244,4 +244,16 @@ runTest("parcelamento shell wires access, client selector and dashboard", () => 
   assert.doesNotMatch(dashboard, /const\s+(cards|metrics|installments|panoramas)\s*=\s*\[/);
 });
 
+runTest("parcelamento dashboard follows the module dashboard layout pattern", () => {
+  const dashboard = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoDashboard.tsx",
+  );
+
+  assert.match(dashboard, /DashboardHeroCard/);
+  assert.match(dashboard, /MetricTile/);
+  assert.match(dashboard, /DashboardSectionCard/);
+  assert.match(dashboard, /DashboardSummaryRow/);
+  assert.doesNotMatch(dashboard, /DashboardKpi/);
+});
+
 console.log("parcelamento frontend tests passed");
