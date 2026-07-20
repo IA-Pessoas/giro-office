@@ -181,6 +181,26 @@ runTest("parcelamento shell gates access and stays free of primary mock arrays",
   assert.doesNotMatch(shell, /const\s+(certificates|debts|installments|reminders)\s*=\s*\[/);
 });
 
+runTest("parcelamento panorama completion badge uses named check fields", () => {
+  const shell = readWorkspaceFile("src/modules/parcelamento/components/ParcelamentoShell.tsx");
+
+  for (const field of [
+    "cnd_municipal",
+    "cnd_state",
+    "cnd_federal",
+    "cnd_fgts",
+    "cnd_labor",
+    "protests",
+    "state_tax_situation",
+    "federal_tax_situation",
+  ]) {
+    assert.match(shell, new RegExp(field));
+  }
+
+  assert.match(shell, /PANORAMA_CHECK_FIELDS\.length/);
+  assert.doesNotMatch(shell, /\/8 itens/);
+});
+
 runTest("parcelamento api calls stay inside the domain service", () => {
   const moduleFiles = listSourceFiles(path.join(process.cwd(), "src/modules/parcelamento"));
   const apiCallPattern = /api\.(get|post|patch|put|delete)\(/;

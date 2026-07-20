@@ -33,6 +33,17 @@ const tabIcons = {
   panoramas: WalletCards,
 } satisfies Record<ParcelamentoTabId, typeof BarChart3>;
 
+const PANORAMA_CHECK_FIELDS = [
+  "cnd_municipal",
+  "cnd_state",
+  "cnd_federal",
+  "cnd_fgts",
+  "cnd_labor",
+  "protests",
+  "state_tax_situation",
+  "federal_tax_situation",
+] as const satisfies readonly (keyof ParcelamentoPanorama)[];
+
 interface ParcelamentoReadPanelProps<T> {
   title: string;
   emptyTitle: string;
@@ -171,16 +182,7 @@ function renderInstallment(item: ParcelamentoInstallment) {
 }
 
 function renderPanorama(item: ParcelamentoPanorama) {
-  const completedCount = [
-    item.cnd_municipal,
-    item.cnd_state,
-    item.cnd_federal,
-    item.cnd_fgts,
-    item.cnd_labor,
-    item.protests,
-    item.state_tax_situation,
-    item.federal_tax_situation,
-  ].filter(Boolean).length;
+  const completedCount = PANORAMA_CHECK_FIELDS.filter((field) => item[field]).length;
 
   return (
     <article
@@ -197,7 +199,7 @@ function renderPanorama(item: ParcelamentoPanorama) {
           </p>
         </div>
         <span className="w-fit rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-          {completedCount}/8 itens
+          {completedCount}/{PANORAMA_CHECK_FIELDS.length} itens
         </span>
       </div>
     </article>
