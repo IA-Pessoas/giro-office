@@ -88,7 +88,7 @@ export function ParcelamentoClientSelector({
         open={isOpen}
         onOpenChange={setIsOpen}
         title="Selecionar cliente"
-        description="Busque por nome, razao social ou CPF/CNPJ."
+        description="Busque por nome, razão social ou CPF/CNPJ."
         bodyClassName="space-y-4"
       >
         <div className="relative">
@@ -126,11 +126,11 @@ export function ParcelamentoClientSelector({
           ) : clientsQuery.isError ? (
             <p className="flex items-center gap-2 px-4 py-3 text-sm text-red-600 dark:text-red-300">
               <X className="h-4 w-4" />
-              Nao foi possivel carregar clientes.
+              Não foi possível carregar clientes.
             </p>
           ) : clients.length === 0 ? (
             <p className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-              Nenhum cliente disponivel.
+              Nenhum cliente disponível.
             </p>
           ) : (
             <div role="listbox" className="max-h-80 overflow-y-auto">
@@ -164,7 +164,7 @@ export function ParcelamentoClientSelector({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            Pagina
+            Página
             <input
               type="number"
               min={FIRST_CLIENT_PAGE}
@@ -191,7 +191,7 @@ export function ParcelamentoClientSelector({
               disabled={!hasNextPage || clientsQuery.isFetching}
               className={parcelamentoSecondaryButtonClassName}
             >
-              Proxima
+              Próxima
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
