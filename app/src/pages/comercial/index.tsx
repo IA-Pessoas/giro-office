@@ -2,24 +2,15 @@ import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { CommercialDashboard, useCommercialDashboard } from "@modules/comercial";
+import { Commercial } from "../../shared/components/newLayout/Commercial";
 
 export default function CommercialPage() {
-  const commercialDashboardQuery = useCommercialDashboard();
-
   return (
     <>
       <Head>
         <title>Comercial</title>
       </Head>
-      <CommercialDashboard
-        stats={commercialDashboardQuery.data ?? null}
-        isLoading={commercialDashboardQuery.isLoading || commercialDashboardQuery.isFetching}
-        isError={commercialDashboardQuery.isError}
-        onRetry={() => {
-          void commercialDashboardQuery.refetch();
-        }}
-      />
+      <Commercial />
     </>
   );
 }
@@ -27,3 +18,4 @@ export default function CommercialPage() {
 export const getServerSideProps = canSSRAuth(async () => {
   return { props: {} };
 });
+

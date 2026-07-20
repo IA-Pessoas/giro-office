@@ -31,21 +31,6 @@ export interface DashboardStats {
     consultoria: number;
     castelo_med: number;
   };
-  projectMetrics: {
-    total: number;
-    completed: number;
-    inProgress: number;
-    paused: number;
-    toDo: number;
-    notContracted: number;
-    taskMetrics: {
-      total: number;
-      completed: number;
-      open: number;
-      paused: number;
-      emptyStatus: number;
-    };
-  };
   monthlyTrends: Array<{
     month: string;
     newClients: number;

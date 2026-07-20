@@ -529,17 +529,6 @@ runTest("task model config table locks visible column alignment", () => {
   assert.equal(TASK_MODEL_TABLE_ACTION_COLUMN_CLASSNAME, "w-24");
 });
 
-runTest("task model config page links back to tarefas", () => {
-  const source = readFileSync(
-    new URL("../../pages/configs/integracao/tasks/index.tsx", import.meta.url),
-    "utf8",
-  );
-
-  assert.match(source, /from "next\/link"/);
-  assert.match(source, /href="\/tasks"/);
-  assert.match(source, /Voltar para tarefas/);
-});
-
 await runAsyncTest("active users for task selects are loaded without unsupported user query params", async () => {
   const calls = [];
   const users = await collectAdminUsersFromPages({
@@ -598,20 +587,4 @@ await runAsyncTest("task models still load when department enrichment fails", as
   assert.equal(models[0].name, "Revisar documentos");
   assert.equal(models[0].department, undefined);
   assert.equal(capturedError instanceof Error, true);
-});
-
-await runAsyncTest("task models preserve department returned by model API", async () => {
-  const models = await fetchTaskModelsWithOptionalDepartments({
-    listModels: async () => [
-      {
-        id: "model-1",
-        name: "Revisar documentos",
-        department_id: "dep-1",
-        department: { id: "dep-1", name: "Fiscal" },
-      },
-    ],
-    listDepartments: async () => [],
-  });
-
-  assert.equal(models[0].department?.name, "Fiscal");
 });

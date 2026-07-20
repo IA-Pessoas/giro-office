@@ -29,7 +29,6 @@ import {
 import type { ClientFormValues } from "@modules/clients/types";
 import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
 import { mapClientStatusFromApi, mapClientStatusToApi } from "@modules/clients/utils/statusMapper";
-import { getClientTerminationAccess } from "@modules/clients/utils/terminationAccess";
 import { useAuth } from "@/context/AuthContext";
 
 const PANEL_CLASSNAME =
@@ -81,7 +80,6 @@ export default function ClientDetailPage() {
   const isAdmin = isAdminPermission(user?.permission);
   const client = clientQuery.data;
   const uiStatus = mapClientStatusFromApi(client?.status);
-  const terminationAccess = getClientTerminationAccess(client?.status);
   const contabilCardState = getContabilCardState(client?.contabil, canViewContabil);
   const organizationName =
     (client as { organization?: { name?: string } } | null)?.organization?.name ??
@@ -397,9 +395,6 @@ export default function ClientDetailPage() {
                   href={`/clients/${client.id}/termination`}
                   actionLabel="Abrir inativação"
                   icon={XCircle}
-                  blockedMessage={
-                    "message" in terminationAccess ? terminationAccess.message : undefined
-                  }
                 />
               </div>
             </section>
@@ -448,7 +443,6 @@ function ClientAccessCard({
   icon: Icon,
   disabled = false,
   disabledMessage,
-  blockedMessage,
 }: {
   title: string;
   description: string;
@@ -457,7 +451,6 @@ function ClientAccessCard({
   icon: typeof FileText;
   disabled?: boolean;
   disabledMessage?: string;
-  blockedMessage?: string;
 }) {
   return (
     <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40">
@@ -477,15 +470,6 @@ function ClientAccessCard({
             <Icon className="h-4 w-4" />
             Indisponível
           </span>
-        ) : blockedMessage ? (
-          <button
-            type="button"
-            onClick={() => toast.error(blockedMessage)}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 self-start rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] sm:w-auto sm:min-w-[176px]"
-          >
-            <Icon className="h-4 w-4" />
-            {actionLabel}
-          </button>
         ) : (
           <Link
             href={href}

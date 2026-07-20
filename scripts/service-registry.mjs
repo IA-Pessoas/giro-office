@@ -7,7 +7,7 @@ export const serviceRegistry = [
     packagePath: "services/gateway",
     defaultUrl: "http://localhost:3010",
     urlEnvKey: "GATEWAY_URL",
-    openapiSpecPath: "services/gateway/src/openapi/gatewaySpec.ts",
+    openapiSpecPath: null,
     authModes: ["public", "bearer"],
     internalTokenEnvKey: null,
     prismaOutputPath: null,

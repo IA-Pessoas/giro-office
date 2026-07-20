@@ -56,26 +56,12 @@ describe("TaskModelService", () => {
   });
 
   it("listModel lista todos os modelos da organizacao quando filtros nao sao informados", async () => {
-    prismaMock.taskModel.findMany.mockResolvedValue([
-      {
-        id: "model-1",
-        name: "Modelo",
-        department_id: "dep-1",
-        department: { id: "dep-1", name: "Fiscal" },
-      },
-    ]);
+    prismaMock.taskModel.findMany.mockResolvedValue([{ id: "model-1", name: "Modelo" }]);
     const service = new TaskModelService();
 
     const result = await service.listModel(undefined, undefined, "org-1");
 
-    expect(result).toEqual([
-      {
-        id: "model-1",
-        name: "Modelo",
-        department_id: "dep-1",
-        department: { id: "dep-1", name: "Fiscal" },
-      },
-    ]);
+    expect(result).toEqual([{ id: "model-1", name: "Modelo" }]);
     expect(prismaMock.taskModel.findMany).toHaveBeenCalledWith({
       where: {
         organization_id: "org-1",
@@ -84,12 +70,6 @@ describe("TaskModelService", () => {
         id: true,
         name: true,
         department_id: true,
-        department: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
       },
       orderBy: { name: "asc" },
     });

@@ -370,6 +370,7 @@ const baseManifest = [
     action: "gatewayHealth",
     target: "gateway",
     auth: "public",
+    specOperation: false,
   }),
   op({
     service: "gateway",
@@ -378,30 +379,7 @@ const baseManifest = [
     action: "gatewayReady",
     target: "gateway",
     auth: "public",
-  }),
-  op({
-    service: "gateway",
-    method: "GET",
-    path: "/dashboard/stats",
-    action: "gatewayDashboardStats",
-    target: "gateway",
-    auth: "bearer",
-  }),
-  op({
-    service: "gateway",
-    method: "GET",
-    path: "/dashboard/commercial/stats",
-    action: "gatewayCommercialDashboardStats",
-    target: "gateway",
-    auth: "bearer",
-  }),
-  op({
-    service: "gateway",
-    method: "GET",
-    path: "/dashboard/marketing/stats",
-    action: "gatewayMarketingDashboardStats",
-    target: "gateway",
-    auth: "bearer",
+    specOperation: false,
   }),
 
   op({

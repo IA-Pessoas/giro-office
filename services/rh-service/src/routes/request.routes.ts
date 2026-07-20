@@ -56,9 +56,7 @@ router.post("/", isAuthenticated, async (req: Request, res: Response, next: Next
 
 router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
-      statusCode: 400,
-    });
+    const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
     const queryInput = {
       status: getSingleTrimmedQueryValue(req.query.status),
       category_id: getSingleTrimmedQueryValue(req.query.category_id),
@@ -74,10 +72,7 @@ router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextF
     if (parsed.category_id !== undefined) {
       listOptions.category_id = parsed.category_id;
     }
-    const canManageRequests = await requestService.canManageRequests(organization_id, user_id);
-    if (!canManageRequests) {
-      listOptions.requester_user_id = user_id;
-    } else if (parsed.requester_user_id !== undefined) {
+    if (parsed.requester_user_id !== undefined) {
       listOptions.requester_user_id = parsed.requester_user_id;
     }
     if (parsed.assigned_to_user_id !== undefined) {

@@ -96,9 +96,7 @@ export function extractOpenApiOperationsFromSource(source) {
   let currentPath = null;
 
   for (const line of String(source).split(/\r?\n/)) {
-    const pathMatch =
-      line.match(/^\s*"([^"]+)":\s*{/) ??
-      line.match(/^\s*[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\.paths\["([^"]+)"\]\s*=\s*{/);
+    const pathMatch = line.match(/^\s*"([^"]+)":\s*{/);
     if (pathMatch?.[1].startsWith("/")) {
       currentPath = pathMatch[1];
       continue;

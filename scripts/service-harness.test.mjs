@@ -117,18 +117,6 @@ test("extractOpenApiOperationsFromSource discovers path operations from spec sou
   ]);
 });
 
-test("extractOpenApiOperationsFromSource discovers gateway path assignments", () => {
-  const operations = extractOpenApiOperationsFromSource(`
-    function addGatewayPaths(aggregateSpec) {
-      aggregateSpec.paths["/dashboard/stats"] = {
-        get: { responses: {} },
-      };
-    }
-  `);
-
-  assert.deepEqual(operations, [{ method: "GET", path: "/dashboard/stats" }]);
-});
-
 test("buildGeneratedSmokeOperations creates runnable probes and route placeholders", () => {
   const config = deriveServiceHarnessConfig({
     service: "billing-service",

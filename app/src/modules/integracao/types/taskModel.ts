@@ -2,10 +2,6 @@ export interface TaskModelListItem {
   id: string;
   name: string;
   department_id: string;
-  department?: {
-    id: string;
-    name: string;
-  };
 }
 
 export interface TaskModelDetail {

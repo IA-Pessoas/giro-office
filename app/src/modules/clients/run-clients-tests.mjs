@@ -37,10 +37,6 @@ import {
   mapClientStatusToApi,
 } from "./utils/statusMapper.ts";
 import {
-  CLIENT_ALREADY_INACTIVE_MESSAGE,
-  getClientTerminationAccess,
-} from "./utils/terminationAccess.ts";
-import {
   buildTerminationPayload,
   createTerminationInitialValues,
   isValidCompetenceOutput,
@@ -77,26 +73,6 @@ runTest("status mapper converts API active and inactive values to UI labels", ()
 runTest("status mapper preserves already-normalized inactive values from mixed environments", () => {
   assert.equal(mapClientStatusFromApi("Inativo"), "Inativo");
   assert.equal(mapClientStatusFromApi("Ativo"), "Ativo");
-});
-
-runTest("termination access blocks inactive clients with explicit message", () => {
-  assert.deepEqual(getClientTerminationAccess("Inativo"), {
-    canOpen: false,
-    message: CLIENT_ALREADY_INACTIVE_MESSAGE,
-  });
-  assert.deepEqual(getClientTerminationAccess("inactive"), {
-    canOpen: false,
-    message: CLIENT_ALREADY_INACTIVE_MESSAGE,
-  });
-  assert.deepEqual(getClientTerminationAccess("Inativo PJ"), {
-    canOpen: false,
-    message: CLIENT_ALREADY_INACTIVE_MESSAGE,
-  });
-});
-
-runTest("termination access allows clients that are not inactive", () => {
-  assert.deepEqual(getClientTerminationAccess("Ativo"), { canOpen: true });
-  assert.deepEqual(getClientTerminationAccess("Prospect"), { canOpen: true });
 });
 
 runTest("client endpoints use only /client contract", () => {

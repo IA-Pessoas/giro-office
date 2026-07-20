@@ -56,12 +56,6 @@ const TASK_MODEL_LIST_SELECT = {
   id: true,
   name: true,
   department_id: true,
-  department: {
-    select: {
-      id: true,
-      name: true,
-    },
-  },
 } as const;
 
 export type TaskModelRow = TaskModelGetPayload<{ select: typeof TASK_MODEL_SELECT }>;

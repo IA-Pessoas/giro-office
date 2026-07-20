@@ -90,7 +90,6 @@ const gatewayEnvSchema = z
     taskServiceUrl: z.string().url().default("http://localhost:3032"),
     projectServiceUrl: z.string().url().default("http://localhost:3033"),
     clientServiceUrl: z.string().url().default("http://localhost:3035"),
-    legacyApiUrl: z.string().url().default("http://localhost:3333"),
     fiscalServiceUrl: z.string().url().default("http://localhost:3037"),
     contabilServiceUrl: z.string().url().default("http://localhost:3038"),
     regularizeServiceUrl: z.string().url().default("http://localhost:3039"),
@@ -184,7 +183,6 @@ export interface GatewayEnv {
   taskServiceUrl: string;
   projectServiceUrl: string;
   clientServiceUrl: string;
-  legacyApiUrl: string;
   fiscalServiceUrl: string;
   contabilServiceUrl: string;
   regularizeServiceUrl: string;
@@ -221,7 +219,6 @@ export function getGatewayEnv(): GatewayEnv {
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
     clientServiceUrl: process.env.CLIENT_SERVICE_URL,
-    legacyApiUrl: process.env.LEGACY_API_URL,
     fiscalServiceUrl: process.env.FISCAL_SERVICE_URL,
     contabilServiceUrl: process.env.CONTABIL_SERVICE_URL,
     regularizeServiceUrl: process.env.REGULARIZE_SERVICE_URL,

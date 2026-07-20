@@ -47,7 +47,7 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
     <section className="space-y-6">
       <QuickActions />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <StatCard
           data={{
             title: 'Total de Clientes',
@@ -75,16 +75,6 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
             color: cardColor,
           }}
           delay={0.2}
-        />
-        <StatCard
-          data={{
-            title: 'Projetos Ativos',
-            value: stats.projectMetrics.inProgress,
-            icon: FiTrendingUp,
-            changeLabel: `${stats.projectMetrics.completed} concluídos`,
-            color: cardColor,
-          }}
-          delay={0.3}
         />
       </div>
 

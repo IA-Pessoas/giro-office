@@ -5,10 +5,8 @@ export type TaskModelDepartment = {
   name: string;
 };
 
-type TaskModelListSource = Pick<TaskModel, "id" | "department_id" | "name" | "department">;
-
 export function enrichTaskModelsWithDepartments(
-  models: TaskModelListSource[],
+  models: Array<Pick<TaskModel, "id" | "department_id" | "name">>,
   departments: TaskModelDepartment[],
 ): TaskModel[] {
   const departmentById = new Map(departments.map((department) => [department.id, department]));
@@ -18,11 +16,11 @@ export function enrichTaskModelsWithDepartments(
 
     return {
       ...model,
-      ...(department || model.department
+      ...(department
         ? {
             department: {
-              id: department?.id ?? model.department?.id ?? model.department_id,
-              name: department?.name ?? model.department?.name ?? "",
+              id: department.id,
+              name: department.name,
             },
           }
         : {}),
@@ -31,7 +29,7 @@ export function enrichTaskModelsWithDepartments(
 }
 
 interface FetchTaskModelsWithOptionalDepartmentsParams {
-  listModels: () => Promise<TaskModelListSource[]>;
+  listModels: () => Promise<Array<Pick<TaskModel, "id" | "department_id" | "name">>>;
   listDepartments: () => Promise<TaskModelDepartment[]>;
   onDepartmentError?: (error: unknown) => void;
 }
