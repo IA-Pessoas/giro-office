@@ -1,8 +1,7 @@
-import React from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { Parcelamento } from "../../shared/components/newLayout/Parcelamento";
+import { ParcelamentoShell } from "@modules/parcelamento";
 
 export default function ParcelamentoPage() {
   return (
@@ -10,7 +9,7 @@ export default function ParcelamentoPage() {
       <Head>
         <title>Parcelamento</title>
       </Head>
-      <Parcelamento />
+      <ParcelamentoShell />
     </>
   );
 }
