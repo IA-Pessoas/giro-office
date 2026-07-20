@@ -394,6 +394,74 @@ runTest("parcelamento shell mounts real installments section", () => {
   assert.doesNotMatch(form, /api\.(get|post|patch|put|delete)\(/);
 });
 
+runTest("parcelamento installments pagination exposes page jump and last page", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  );
+
+  assert.match(section, /const totalPages = Math\.max\(FIRST_PAGE, Math\.ceil\(total \/ pageSize\)\)/);
+  assert.match(section, /function handlePageChange/);
+  assert.match(section, /aria-label="Página atual"/);
+  assert.match(section, /de \{totalPages\}/);
+  assert.match(section, /aria-label="Última página"/);
+  assert.match(section, /setPage\(totalPages\)/);
+});
+
+runTest("parcelamento installments filters and form use compact controls", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  );
+  const form = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentForm.tsx",
+  );
+  const nativeSelect = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoNativeSelect.tsx",
+  );
+
+  assert.match(section, /<SelectFilter\s+label="Status"/);
+  assert.match(section, /<SelectFilter\s+label="Tipo"/);
+  assert.match(section, /<SelectFilter\s+label="Jurisdição"/);
+  assert.match(section, /<ParcelamentoNativeSelect/);
+  assert.match(section, /<Dialog[\s\S]*open=\{formMode !== null\}/);
+  assert.match(section, /title=\{formMode === "edit" \? "Editar parcelamento" : "Novo parcelamento"\}/);
+  assert.match(section, /isClientRequiredDialogOpen/);
+  assert.match(section, /function handleCreateButtonClick/);
+  assert.match(section, /setIsClientRequiredDialogOpen\(true\)/);
+  assert.match(section, /aria-disabled=\{!selectedClient \|\| isSubmitting\}/);
+  assert.match(section, /title="Selecione um cliente"/);
+  assert.match(section, /Selecione um cliente antes de criar um parcelamento\./);
+  assert.match(section, /disabled=\{isSubmitting\}/);
+  assert.doesNotMatch(section, /\n\s+disabled=\{!selectedClient \|\| isSubmitting\}/);
+  assert.match(section, /className="mt-3 flex flex-wrap justify-between gap-2"/);
+  assert.match(section, /sm:w-72/);
+  assert.match(section, /className=\{`\$\{parcelamentoTextFieldClassName\} !h-8 !py-1 !pl-8 shadow-none`\}/);
+  assert.match(section, /sm:w-40/);
+  assert.match(section, /selectClassName="!h-8 !py-1 !pl-2 !pr-8 shadow-none"/);
+  assert.match(section, /className="flex w-24 flex-col gap-1 text-sm text-gray-700 dark:text-gray-300"/);
+  assert.match(section, /wrapperClassName="w-full"/);
+  assert.match(section, /rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700/);
+  assert.match(
+    section,
+    /className="grid gap-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 sm:grid-cols-\[minmax\(0,1fr\)_auto\] sm:items-end"/,
+  );
+  assert.match(
+    section,
+    /<dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-\[minmax\(6rem,1fr\)_minmax\(4rem,0\.7fr\)_minmax\(5rem,0\.8fr\)_minmax\(7rem,1fr\)_minmax\(5rem,0\.75fr\)_minmax\(5rem,0\.75fr\)\]">/,
+  );
+  assert.match(section, /<DataPoint label="Adesão" value=\{formatDate\(installment\.enrollment_date\)\} \/>/);
+  assert.match(section, /<DataPoint label="Adesão"[\s\S]*>Status<\/dt>[\s\S]*<\/dl>/);
+  assert.match(section, /<div className="text-center">\s*<dt/);
+  assert.match(section, /<dd className="mt-0\.5 flex justify-center">/);
+  assert.match(section, /className="flex justify-start sm:min-w-24 sm:justify-end"/);
+  assert.match(section, /className="inline-flex h-8 items-center justify-center gap-1\.5 rounded-lg border/);
+  assert.match(form, /export const INSTALLMENT_STATUS_OPTIONS/);
+  assert.match(form, /<ParcelamentoNativeSelect/);
+  assert.match(form, /<form onSubmit=\{handleSubmit\} className="space-y-4"/);
+  assert.doesNotMatch(form, /border-blue-100 bg-blue-50/);
+  assert.match(nativeSelect, /ChevronDown/);
+  assert.match(nativeSelect, /appearance-none pr-9/);
+});
+
 runTest("parcelamento dashboard follows the module dashboard layout pattern", () => {
   const dashboard = readWorkspaceFile(
     "src/modules/parcelamento/components/ParcelamentoDashboard.tsx",
