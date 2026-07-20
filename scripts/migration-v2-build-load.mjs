@@ -255,7 +255,7 @@ function buildDepartments(rows, adHocModels, fallback, ctx) {
       id,
       name,
       color: cleanText(row.color) || "#64748b",
-      status: String(row.status ?? "1"),
+      status: normalizeStatus(row.status),
       solution: Boolean(Number(row.parceiros ?? 0)),
       organization_id: ctx.organizationId,
     };

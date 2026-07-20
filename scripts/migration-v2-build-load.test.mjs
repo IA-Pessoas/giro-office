@@ -38,7 +38,10 @@ test("buildLoad gera manifest e valida relacoes principais", async () => {
   await import("node:fs/promises").then(({ mkdir }) => mkdir(docsDir, { recursive: true }));
 
   const rows = {
-    "tb_admin.departamentos": [{ id: 10, nome: "Fiscal", color: "#abcdef", status: 1 }],
+    "tb_admin.departamentos": [
+      { id: 10, nome: "Fiscal", color: "#abcdef", status: 1 },
+      { id: 11, nome: "Inativo", color: "#fedcba", status: 0 },
+    ],
     "tb_admin.usuarios": [
       {
         id: 20,
@@ -113,13 +116,24 @@ test("buildLoad gera manifest e valida relacoes principais", async () => {
     });
 
     assert.equal(manifest.validation.all, 0);
-    assert.equal(manifest.counts.departments, 2);
+    assert.equal(manifest.counts.departments, 3);
     assert.equal(manifest.counts.users, 2);
     assert.equal(manifest.counts.clients, 2);
     assert.equal(manifest.counts.projects, 2);
     assert.equal(manifest.counts.taskModels, 2);
     assert.equal(manifest.counts.projectPlanTasks, 1);
     assert.equal(manifest.counts.tasks, 1);
+
+    const departments = JSON.parse(
+      await import("node:fs/promises").then(({ readFile }) =>
+        readFile(path.join(outputDir, "departments.json"), "utf8"),
+      ),
+    );
+    assert.equal(departments.find((department) => department.name === "Fiscal")?.status, "Ativo");
+    assert.equal(
+      departments.find((department) => department.name === "Inativo")?.status,
+      "Inativo",
+    );
   } finally {
     await rm(baseDir, { recursive: true, force: true });
   }
