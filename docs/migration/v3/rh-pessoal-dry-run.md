@@ -35,6 +35,34 @@ Nenhuma escrita foi feita no Supabase durante esta análise.
 - Senhas ou segredos do legado nao devem ser gravados em claro nos artefatos. No dry-run, foram
   mascarados como `<redacted:requiresEncryption>`.
 
+## Regra corrigida para solicitacoes RH
+
+O campo legado `tb_rh.solicitacoes.requerente` representa
+`tb_rh.colaboradores.id`, nao `tb_admin.usuarios.id`.
+
+Por isso, ao preparar `rh.requests`, o solicitante deve ser resolvido pelo mapa de
+colaboradores:
+
+```js
+const requesterId = maps.collaboratorByLegacy.get(String(row.requerente));
+```
+
+Essa regra alimenta `rh.requests.requester_user_id`.
+
+O campo legado `tb_rh.solicitacoes.atribuido` continua representando usuario administrativo,
+entao `rh.requests.assigned_to_user_id` deve continuar usando o mapa de usuarios:
+
+```js
+const assignedToId = maps.adminUserByLegacy.get(String(row.atribuido));
+```
+
+Anti-regressao: nao resolver `row.requerente` diretamente pelo mapa de usuarios administrativos.
+Isso troca o solicitante quando o ID do colaborador coincide com outro `tb_admin.usuarios.id`.
+Exemplo validado em 2026-07-20: `rh.requests` id
+`08802a97-27fd-5f8b-b1b2-11a54e7cf2ce` vem da solicitacao legada `174`; `requerente = 145`
+deve resolver para a colaboradora Hosana Jennifer Souza Palmeira, nao para a usuaria
+administrativa Islaine Souza.
+
 ## Resultado do dry-run
 
 Registros lidos no legado:
