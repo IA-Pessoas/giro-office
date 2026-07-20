@@ -101,6 +101,7 @@ export interface ClientListPage {
 
 export interface ClientListFilters {
   search?: string;
+  ref?: "integracao" | "deps";
   status?: string;
   page?: number;
   limit?: number;

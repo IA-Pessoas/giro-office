@@ -30,6 +30,7 @@ import {
   unwrapProjectDetail,
   unwrapProjectEnvelope,
   unwrapProjectList,
+  unwrapProjectMetrics,
   unwrapProjectProgress,
   unwrapUpdatedProject,
 } from "./services/projectService.contract.ts";
@@ -75,6 +76,7 @@ import {
 import {
   fetchTaskModelsWithOptionalDepartments,
 } from "./hooks/useTaskModels.helpers.ts";
+import { projectMetricsQueryKey } from "./hooks/queryKeys.ts";
 import {
   collectAdminUsersFromPages,
 } from "../users/services/adminUsersService.helpers.ts";
@@ -103,6 +105,12 @@ runTest("project endpoints use only the v1 project contract", () => {
   assert.equal(PROJECT_ENDPOINTS.list, "/project/list");
   assert.equal(PROJECT_ENDPOINTS.crud, "/project");
   assert.equal(PROJECT_ENDPOINTS.progress, "/project/progress");
+  assert.equal(PROJECT_ENDPOINTS.metrics, "/project/metrics");
+});
+
+
+runTest("project metrics query key is stable and global", () => {
+  assert.deepEqual(projectMetricsQueryKey(), ["projects", "metrics"]);
 });
 
 runTest("buildProjectListParams keeps strict client-scoped params", () => {
@@ -165,6 +173,27 @@ runTest("unwrapUpdatedProject accepts direct object payload", () => {
   const project = { id: "project-1", name: "Projeto 1 atualizado" };
   assert.deepEqual(unwrapUpdatedProject(project), project);
   assert.deepEqual(unwrapUpdatedProject({ success: true, data: project }), project);
+});
+
+
+runTest("unwrapProjectMetrics returns global metrics from envelope", () => {
+  const metrics = {
+    total: 10,
+    completed: 3,
+    inProgress: 4,
+    paused: 1,
+    toDo: 2,
+    notContracted: 0,
+    taskMetrics: {
+      total: 28,
+      completed: 12,
+      open: 11,
+      paused: 3,
+      emptyStatus: 2,
+    },
+  };
+
+  assert.deepEqual(unwrapProjectMetrics({ success: true, data: metrics }), metrics);
 });
 
 runTest("unwrapProjectProgress extracts nested project envelope", () => {

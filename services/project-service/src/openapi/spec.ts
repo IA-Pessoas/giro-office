@@ -22,6 +22,21 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
   const progressExample = {
     project_id: "project-uuid",
   };
+  const metricsExample = {
+    total: 42,
+    completed: 12,
+    inProgress: 18,
+    paused: 4,
+    toDo: 6,
+    notContracted: 2,
+    taskMetrics: {
+      total: 128,
+      completed: 76,
+      open: 44,
+      paused: 5,
+      emptyStatus: 3,
+    },
+  };
 
   return {
     openapi: "3.0.3",
@@ -34,6 +49,7 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
     tags: [
       { name: "Health", description: "Saúde do serviço" },
       { name: "Projetos", description: "CRUD de projetos de integração" },
+      { name: "Métricas", description: "Métricas globais de projetos de integração" },
       { name: "Progresso", description: "Progresso do projeto" },
     ],
     components: {
@@ -214,6 +230,26 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/project/metrics": {
+        get: {
+          tags: ["Métricas"],
+          summary: "Métricas globais de projetos da Integração",
+          description:
+            "Calcula os cards globais de projetos da Integração em tempo de consulta, sem tabela materializada.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Métricas globais calculadas",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  example: { success: true, data: metricsExample },
                 },
               },
             },

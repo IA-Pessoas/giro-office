@@ -68,6 +68,7 @@ export function RhRequestsSection() {
     description: request.description,
     requesterUserId: request.requester_user_id,
     requesterUserLabel:
+      request.requester?.name ??
       userNameById.get(request.requester_user_id) ??
       (request.requester_user_id === user?.id ? user?.name ?? "Você" : MISSING_REQUESTER_LABEL),
     categoryId: request.category_id,
@@ -100,12 +101,16 @@ export function RhRequestsSection() {
     return userNameById.get(userId) ?? MISSING_ASSIGNEE_LABEL;
   }
 
-  function getRequesterLabel(userId: string) {
-    if (userId === user?.id) {
+  function getRequesterLabel(request: RhRequest) {
+    if (request.requester?.name) {
+      return request.requester.name;
+    }
+
+    if (request.requester_user_id === user?.id) {
       return user?.name ?? "Você";
     }
 
-    return userNameById.get(userId) ?? MISSING_REQUESTER_LABEL;
+    return userNameById.get(request.requester_user_id) ?? MISSING_REQUESTER_LABEL;
   }
 
   function handleOpenCreate() {
