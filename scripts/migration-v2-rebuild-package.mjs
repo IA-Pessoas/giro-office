@@ -43,13 +43,13 @@ function parseCsvLine(line) {
     const char = line[index];
     const next = line[index + 1];
 
-    if (char === "\"" && quoted && next === "\"") {
-      current += "\"";
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
       index += 1;
       continue;
     }
 
-    if (char === "\"") {
+    if (char === '"') {
       quoted = !quoted;
       continue;
     }
@@ -234,9 +234,9 @@ function parseSqlValue(rawValue) {
 function parseInsertRows(sql) {
   const insertRegex = /INSERT INTO `([^`]+)` \(([^)]+)\) VALUES\s*/g;
   const rows = [];
-  let match;
+  let match = insertRegex.exec(sql);
 
-  while ((match = insertRegex.exec(sql)) !== null) {
+  while (match !== null) {
     const columns = [...match[2].matchAll(/`([^`]+)`/g)].map((columnMatch) => columnMatch[1]);
     const insertEnd = findInsertEnd(sql, insertRegex.lastIndex);
     const valuesSql = sql.slice(insertRegex.lastIndex, insertEnd);
@@ -252,6 +252,7 @@ function parseInsertRows(sql) {
     }
 
     insertRegex.lastIndex = insertEnd + 1;
+    match = insertRegex.exec(sql);
   }
 
   return rows;
@@ -305,7 +306,7 @@ async function rebuildPackage({ sourceDir, outputDir }) {
   };
 
   const csvLines = [
-    "\"legacy_table\",\"target_table\",\"row_count\",\"status\",\"source_file\",\"output_file\",\"error\"",
+    '"legacy_table","target_table","row_count","status","source_file","output_file","error"',
     ...tableSummaries.map((summary) =>
       [
         summary.legacy_table,
@@ -316,13 +317,21 @@ async function rebuildPackage({ sourceDir, outputDir }) {
         summary.output_file ?? "",
         summary.error ?? "",
       ]
-        .map((cell) => `"${cell.replace(/"/g, "\"\"")}"`)
+        .map((cell) => `"${cell.replace(/"/g, '""')}"`)
         .join(","),
     ),
   ];
 
-  await writeFile(path.join(outputDir, "manifest.raw-confirmed.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-  await writeFile(path.join(outputDir, "confirmed-table-row-counts.csv"), `${csvLines.join("\n")}\n`, "utf8");
+  await writeFile(
+    path.join(outputDir, "manifest.raw-confirmed.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8",
+  );
+  await writeFile(
+    path.join(outputDir, "confirmed-table-row-counts.csv"),
+    `${csvLines.join("\n")}\n`,
+    "utf8",
+  );
 
   const errors = tableSummaries.filter((summary) => summary.status !== "ok");
   console.log(

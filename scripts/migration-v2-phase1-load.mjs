@@ -83,7 +83,7 @@ export const PHASE1_TABLES = [
   },
   {
     source: "clients.pf",
-    relation: "public.\"clients.pf\"",
+    relation: 'public."clients.pf"',
     columns: [
       "id",
       "code",
@@ -115,7 +115,7 @@ export const PHASE1_TABLES = [
   },
   {
     source: "integracao.tasksModel",
-    relation: "public.\"integracao.tasksModel\"",
+    relation: 'public."integracao.tasksModel"',
     columns: [
       "id",
       "name",
@@ -132,17 +132,17 @@ export const PHASE1_TABLES = [
   },
   {
     source: "integracao.projectPlan",
-    relation: "public.\"integracao.projectPlan\"",
+    relation: 'public."integracao.projectPlan"',
     columns: ["id", "name", "color", "organization_id"],
   },
   {
     source: "integracao.projectPlanTasks",
-    relation: "public.\"integracao.projectPlanTasks\"",
+    relation: 'public."integracao.projectPlanTasks"',
     columns: ["id", "plan_id", "task_id", "order", "organization_id"],
   },
   {
     source: "integracao.projects",
-    relation: "public.\"integracao.projects\"",
+    relation: 'public."integracao.projects"',
     columns: [
       "id",
       "name",
@@ -159,11 +159,11 @@ export const PHASE1_TABLES = [
 ];
 
 const TRUNCATE_RELATIONS = [
-  "public.\"integracao.projectPlanTasks\"",
-  "public.\"integracao.projects\"",
-  "public.\"integracao.tasksModel\"",
-  "public.\"integracao.projectPlan\"",
-  "public.\"clients.pf\"",
+  'public."integracao.projectPlanTasks"',
+  'public."integracao.projects"',
+  'public."integracao.tasksModel"',
+  'public."integracao.projectPlan"',
+  'public."clients.pf"',
   "public.clients",
   "public.users",
   "public.departments",
@@ -202,7 +202,10 @@ export async function preparePhase1Load({
     counts: Object.fromEntries(tables.map((table) => [table.source, table.rowCount])),
   };
 
-  await writeFile(manifest.sqlFile, renderApplySql({ tables: PHASE1_TABLES, outputDir, organizationId }));
+  await writeFile(
+    manifest.sqlFile,
+    renderApplySql({ tables: PHASE1_TABLES, outputDir, organizationId }),
+  );
   await writeJson(path.join(outputDir, "manifest.phase1.json"), manifest);
 
   return manifest;
@@ -379,11 +382,11 @@ function csvValue(value) {
 
   const text = String(value);
   if (text === "\\N") {
-    return "\"\\\\N\"";
+    return '"\\\\N"';
   }
 
   if (/[",\n\r]/.test(text)) {
-    return `"${text.replaceAll("\"", "\"\"")}"`;
+    return `"${text.replaceAll('"', '""')}"`;
   }
 
   return text;
@@ -454,7 +457,7 @@ function parseEnvFile(content) {
     const key = trimmed.slice(0, separatorIndex);
     let value = trimmed.slice(separatorIndex + 1).trim();
     if (
-      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
     ) {
       value = value.slice(1, -1);
@@ -473,7 +476,7 @@ async function writeJson(file, data) {
 }
 
 function quoteIdent(value) {
-  return `"${String(value).replaceAll("\"", "\"\"")}"`;
+  return `"${String(value).replaceAll('"', '""')}"`;
 }
 
 function sqlLiteral(value) {

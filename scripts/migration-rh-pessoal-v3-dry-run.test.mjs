@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  buildBaseMaps,
-  buildLoad,
-  SOURCE_TABLES,
-} from "./migration-rh-pessoal-v3-dry-run.mjs";
+import { buildBaseMaps, buildLoad, SOURCE_TABLES } from "./migration-rh-pessoal-v3-dry-run.mjs";
 
 function emptyRows() {
   return Object.fromEntries(SOURCE_TABLES.map((table) => [table, []]));

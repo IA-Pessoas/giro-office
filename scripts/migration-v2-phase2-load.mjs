@@ -12,7 +12,7 @@ const DEFAULT_ENV_FILE = ".env";
 export const PHASE2_TABLES = [
   {
     source: "integracao.tasks",
-    relation: "public.\"integracao.tasks\"",
+    relation: 'public."integracao.tasks"',
     columns: [
       "id",
       "model_id",
@@ -38,7 +38,7 @@ export const PHASE2_TABLES = [
   },
   {
     source: "regularize.license",
-    relation: "public.\"regularize.license\"",
+    relation: 'public."regularize.license"',
     columns: [
       "id",
       "client_id",
@@ -61,7 +61,7 @@ export const PHASE2_TABLES = [
   },
   {
     source: "regularize.process",
-    relation: "public.\"regularize.process\"",
+    relation: 'public."regularize.process"',
     columns: [
       "id",
       "client_pj_id",
@@ -85,7 +85,7 @@ export const PHASE2_TABLES = [
   },
   {
     source: "regularize.proceduralGuidances",
-    relation: "public.\"regularize.proceduralGuidances\"",
+    relation: 'public."regularize.proceduralGuidances"',
     columns: [
       "id",
       "process_id",
@@ -111,12 +111,12 @@ export const PHASE2_TABLES = [
   },
   {
     source: "regularize.partners",
-    relation: "public.\"regularize.partners\"",
+    relation: 'public."regularize.partners"',
     columns: ["id", "pj_id", "pf_id", "part", "entry", "exit", "organization_id"],
   },
   {
     source: "regularize.municipalTaxes",
-    relation: "public.\"regularize.municipalTaxes\"",
+    relation: 'public."regularize.municipalTaxes"',
     columns: [
       "id",
       "client_id",
@@ -148,25 +148,25 @@ export const PHASE2_TABLES = [
   },
   {
     source: "regularize.passowordsSites",
-    relation: "public.\"regularize.passowordsSites\"",
+    relation: 'public."regularize.passowordsSites"',
     columns: ["id", "name", "sphere", "link", "user", "password", "status", "organization_id"],
   },
   {
     source: "regularize.passwordsRegularize",
-    relation: "public.\"regularize.passwordsRegularize\"",
+    relation: 'public."regularize.passwordsRegularize"',
     columns: ["id", "client_id", "site_id", "login", "password", "notes", "organization_id"],
   },
 ];
 
 const TRUNCATE_RELATIONS = [
-  "public.\"regularize.passwordsRegularize\"",
-  "public.\"regularize.municipalTaxes\"",
-  "public.\"regularize.partners\"",
-  "public.\"regularize.proceduralGuidances\"",
-  "public.\"regularize.process\"",
-  "public.\"regularize.license\"",
-  "public.\"regularize.passowordsSites\"",
-  "public.\"integracao.tasks\"",
+  'public."regularize.passwordsRegularize"',
+  'public."regularize.municipalTaxes"',
+  'public."regularize.partners"',
+  'public."regularize.proceduralGuidances"',
+  'public."regularize.process"',
+  'public."regularize.license"',
+  'public."regularize.passowordsSites"',
+  'public."integracao.tasks"',
 ];
 
 export async function preparePhase2Load({
@@ -413,10 +413,10 @@ function csvValue(value) {
   }
   const text = typeof value === "object" ? JSON.stringify(value) : String(value);
   if (text === "\\N") {
-    return "\"\\\\N\"";
+    return '"\\\\N"';
   }
   if (/[",\n\r]/.test(text)) {
-    return `"${text.replaceAll("\"", "\"\"")}"`;
+    return `"${text.replaceAll('"', '""')}"`;
   }
   return text;
 }
@@ -481,7 +481,7 @@ function parseEnvFile(content) {
     const key = trimmed.slice(0, separatorIndex);
     let value = trimmed.slice(separatorIndex + 1).trim();
     if (
-      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
     ) {
       value = value.slice(1, -1);
@@ -500,7 +500,7 @@ async function writeJson(file, data) {
 }
 
 function quoteIdent(value) {
-  return `"${String(value).replaceAll("\"", "\"\"")}"`;
+  return `"${String(value).replaceAll('"', '""')}"`;
 }
 
 function sqlLiteral(value) {

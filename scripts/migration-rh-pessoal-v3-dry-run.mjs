@@ -2667,13 +2667,7 @@ async function main() {
   console.log(JSON.stringify(manifest, null, 2));
 }
 
-export {
-  buildBaseMaps,
-  buildClientDepartmentFlags,
-  buildLoad,
-  generatedId,
-  SOURCE_TABLES,
-};
+export { buildBaseMaps, buildClientDepartmentFlags, buildLoad, generatedId, SOURCE_TABLES };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
