@@ -3,8 +3,13 @@ import { api } from "@shared/services/apiClient";
 import type {
   PlatformAuditRecord,
   PlatformOrganization,
+  PlatformOrganizationsListResponse,
+  PlatformOrganizationUser,
   PlatformSupportSession,
+  PlatformUserDeleteResponse,
+  PlatformUserMutationInput,
   PlatformUserSession,
+  PlatformUsersListResponse,
 } from "../types";
 
 function unwrapData<T>(response: { data?: { data?: T } }): T {
@@ -26,9 +31,45 @@ export const platformService = {
     page: number;
     pageSize: number;
     status?: string;
-  }): Promise<{ organizations: PlatformOrganization[]; total: number; page: number; pageSize: number }> {
+  }): Promise<PlatformOrganizationsListResponse> {
     const response = await api.get("/platform/organizations", { params });
-    return unwrapData(response);
+    return unwrapData<PlatformOrganizationsListResponse>(response);
+  },
+
+  async listUsers(
+    organizationId: string,
+    params: { skip: number; take: number },
+  ): Promise<PlatformUsersListResponse> {
+    const response = await api.get(`/platform/organizations/${organizationId}/users`, { params });
+    return unwrapData<PlatformUsersListResponse>(response);
+  },
+
+  async createUser(
+    organizationId: string,
+    input: PlatformUserMutationInput,
+  ): Promise<PlatformOrganizationUser> {
+    const response = await api.post(`/platform/organizations/${organizationId}/users`, input);
+    return unwrapData<PlatformOrganizationUser>(response);
+  },
+
+  async updateUser(
+    organizationId: string,
+    userId: string,
+    input: PlatformUserMutationInput,
+  ): Promise<PlatformOrganizationUser> {
+    const response = await api.patch(
+      `/platform/organizations/${organizationId}/users/${userId}`,
+      input,
+    );
+    return unwrapData<PlatformOrganizationUser>(response);
+  },
+
+  async deleteUser(
+    organizationId: string,
+    userId: string,
+  ): Promise<PlatformUserDeleteResponse> {
+    const response = await api.delete(`/platform/organizations/${organizationId}/users/${userId}`);
+    return unwrapData<PlatformUserDeleteResponse>(response);
   },
 
   async startSupportSession(input: {

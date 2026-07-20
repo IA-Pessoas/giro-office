@@ -21,12 +21,45 @@ export interface PlatformOrganization {
   updated_at?: string;
 }
 
+export interface PlatformOrganizationsListResponse {
+  organizations: PlatformOrganization[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface PlatformSupportSession {
   support_session_id: string;
   organization_id: string;
   reason: string;
   token: string;
   expires_at: string;
+}
+
+export interface PlatformOrganizationUser {
+  id: string;
+  name: string;
+  login?: string | null;
+  email?: string | null;
+  department_id?: string | null;
+  permission?: number | null;
+  type?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface PlatformUsersListResponse {
+  users: PlatformOrganizationUser[];
+  total: number;
+  skip?: number;
+  take?: number;
+}
+
+export type PlatformUserMutationInput = Record<string, unknown>;
+
+export interface PlatformUserDeleteResponse {
+  message: string;
 }
 
 export interface PlatformAuditRecord {
