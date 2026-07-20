@@ -1,6 +1,7 @@
 export { canSSRAuth } from './utils/canSSRAuth';
 export { canSSRAdmin } from "./utils/canSSRAdmin";
 export { canSSRGuest } from './utils/canSSRGuest';
+export { canSSRPlatformAdmin } from "./utils/canSSRPlatformAdmin";
 export { useAccessStoreSync } from "./hooks/useAccessStoreSync";
 export { useModuleAccess, useModuleAccessMap } from "./hooks/useModuleAccess";
 export { useAccessStore } from "./store/accessStore";

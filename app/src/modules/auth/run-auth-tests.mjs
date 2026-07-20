@@ -10,6 +10,11 @@ import {
 } from "./utils/authCookie.ts";
 import { createBearerAuthHeaders, getAuthTokenValue } from "./utils/authHeaders.ts";
 import {
+  canAccessPlatformAdminToken,
+  getPlatformSessionFromToken,
+  getSessionContextFromToken,
+} from "./utils/sessionToken.ts";
+import {
   canAccessAdministration,
   canCreateOrganizationOwner,
   canCreateUsers,
@@ -74,8 +79,91 @@ const rhPermissionsSource = await readFile(
   new URL("../rh/hooks/useRhPermissions.ts", import.meta.url),
   "utf8",
 );
+const canSSRPlatformAdminSource = await readFile(
+  new URL("./utils/canSSRPlatformAdmin.ts", import.meta.url),
+  "utf8",
+);
+const authIndexSource = await readFile(new URL("./index.ts", import.meta.url), "utf8");
 
 await (async () => {
+  await runTest("getPlatformSessionFromToken extracts platform role from a platform token", () => {
+    const token = createToken({
+      user_id: "platform-1",
+      auth_kind: "platform",
+      platform_role: "super_admin",
+    });
+
+    assert.deepEqual(getPlatformSessionFromToken(token), {
+      auth_kind: "platform",
+      platform_role: "super_admin",
+      support_mode: false,
+    });
+  });
+
+  await runTest("getSessionContextFromToken decodes modules and platform claims together", () => {
+    const token = createToken({
+      auth_kind: "platform",
+      platform_role: "super_admin",
+      support_mode: true,
+      modules: {
+        rh: 2,
+        comercial: 1,
+        unknown: 999,
+      },
+    });
+
+    assert.deepEqual(getSessionContextFromToken(token), {
+      modules: {
+        rh: 2,
+        comercial: 1,
+        unknown: null,
+      },
+      platformSession: {
+        auth_kind: "platform",
+        platform_role: "super_admin",
+        support_mode: true,
+      },
+    });
+  });
+
+  await runTest("getPlatformSessionFromToken ignores platform role without platform auth kind", () => {
+    const token = createToken({
+      platform_role: "super_admin",
+    });
+
+    assert.deepEqual(getPlatformSessionFromToken(token), {
+      auth_kind: null,
+      platform_role: null,
+      support_mode: false,
+    });
+  });
+
+  await runTest("canAccessPlatformAdminToken allows only platform super admin tokens", () => {
+    assert.equal(
+      canAccessPlatformAdminToken(
+        createToken({ auth_kind: "platform", platform_role: "super_admin" }),
+      ),
+      true,
+    );
+    assert.equal(canAccessPlatformAdminToken(createToken({ permission: 999 })), false);
+    assert.equal(canAccessPlatformAdminToken(createToken({ platform_role: "super_admin" })), false);
+    assert.equal(canAccessPlatformAdminToken("invalid-token"), false);
+  });
+
+  await runTest("canSSRPlatformAdmin uses platform token access for the route guard", () => {
+    assert.match(canSSRPlatformAdminSource, /canAccessPlatformAdminToken\(token\)/);
+    assert.match(canSSRPlatformAdminSource, /destination: "\/login"/);
+    assert.match(canSSRPlatformAdminSource, /return \{ props: \{\} \}/);
+    assert.match(authIndexSource, /canSSRPlatformAdmin/);
+  });
+
+  await runTest("exitSupportMode clears support token when platform token cannot be restored", () => {
+    assert.match(
+      authContextSource,
+      /if \(!platformToken\) \{[\s\S]*clearAuthCookie\(\);[\s\S]*setUser\(null\);[\s\S]*queryClient\.removeQueries\(\{ queryKey: ME_QUERY_KEY \}\);[\s\S]*await Router\.push\("\/login"\);[\s\S]*return;/,
+    );
+  });
+
   await runTest("isAdminPermission allows administrative levels from 2 and above", () => {
     assert.equal(isAdminPermission(2), true);
     assert.equal(isAdminPermission(100), true);
@@ -477,10 +565,8 @@ await (async () => {
   await runTest("admin permission updates refresh the authenticated session when editing self", () => {
     assert.match(authContextSource, /refreshSession:\s*\(\)\s*=>\s*Promise<UserProps \| null>/);
     assert.match(authContextSource, /async function refreshSession\(\)/);
-    assert.match(
-      authContextSource,
-      /<AuthContext\.Provider value=\{\{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading \}\}/,
-    );
+    assert.match(authContextSource, /enterSupportMode,/);
+    assert.match(authContextSource, /exitSupportMode,/);
     assert.match(administracaoSource, /const \{ user, refreshSession \} = useAuth\(\);/);
     assert.match(
       administracaoSource,
