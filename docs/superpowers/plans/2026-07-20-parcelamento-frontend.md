@@ -22,6 +22,8 @@
 - Usar `useClients` para seletor/filtro de cliente.
 - Services sao o unico ponto do modulo com `api.get`, `api.post` e `api.patch`.
 - A pagina `/parcelamento` nao pode importar `shared/components/newLayout/Parcelamento`.
+- Se precisar de modal, usar o `Dialog` compartilhado ou padrao Radix existente; preferir fluxo inline quando isso for suficiente.
+- Nao usar `style={...}` em componentes de feature; padroes visuais repetidos ficam em componente base ou classes exportadas do dominio.
 - Nao stagear `app/next-env.d.ts` se ele aparecer como alteracao local preexistente.
 
 ---
@@ -853,7 +855,7 @@ Required behavior:
 - allow clearing selection with "Sem cliente selecionado";
 - search by name, company name or CPF/CNPJ through the existing `search` filter;
 - paginate with previous and next buttons;
-- close the dialog after selection.
+- close the existing `Dialog`/Radix wrapper after selection when the selector opens in a modal.
 
 - [ ] **Step 6: Add dashboard with real derived metrics**
 
@@ -1244,7 +1246,7 @@ Create `ParcelamentoInstallmentsSection.tsx`:
 - renders loading, error, empty and success states;
 - provides filters for `search`, `status`, `type`, `jurisdiction`;
 - paginates with `page` and `page_size`;
-- shows create/edit form in the same section or a local dialog;
+- shows create/edit form inline; use the existing `Dialog`/Radix pattern only if inline gets cramped;
 - never calls `api` directly.
 
 - [ ] **Step 8: Mount the tab**
@@ -1956,6 +1958,7 @@ Use this checklist for every child PR:
 [ ] No dashboard or primary tab depends on local mock arrays.
 [ ] useModuleAccess("parcelamento") gates the shell.
 [ ] useClients powers the client selector.
+[ ] No feature component adds manual modal code or inline style when existing UI patterns cover it.
 ```
 
 ---
