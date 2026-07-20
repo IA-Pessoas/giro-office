@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import Head from "next/head";
+import Link from "next/link";
 import {
+  ArrowLeft,
   Edit3,
   LoaderCircle,
   Plus,
@@ -157,16 +159,25 @@ export default function TaskModelsConfig() {
 
       <div className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-slate-900 dark:text-white">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20">
-                <Settings2 className="h-6 w-6 text-white" />
-              </div>
-              Modelos de tarefas
-            </h1>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Configure os templates usados pela criação de tarefas da integração.
-            </p>
+          <div className="min-w-0 space-y-2">
+            <Link
+              href="/tasks"
+              className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para tarefas
+            </Link>
+            <div>
+              <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-slate-900 dark:text-white">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20">
+                  <Settings2 className="h-6 w-6 text-white" />
+                </div>
+                Modelos de tarefas
+              </h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Configure os templates usados pela criação de tarefas da integração.
+              </p>
+            </div>
           </div>
 
           {canManageTaskModels ? (

@@ -36,7 +36,8 @@
     "graphify:postprocess:ui": "node scripts/graphify-postprocess.mjs ui",
     "graphify:postprocess:services": "node scripts/graphify-postprocess.mjs services",
     "graphify:refresh": "node scripts/graphify-refresh.mjs",
-    "security:compose": "node scripts/check-compose-security.mjs"
+    "security:compose": "node scripts/check-compose-security.mjs",
+    "migration:test": "node --test scripts/migration-v2-build-load.test.mjs scripts/migration-v2-phase1-load.test.mjs scripts/migration-v2-phase2-load.test.mjs scripts/migration-v3-docs.test.mjs scripts/fix-rh-request-requesters.test.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.5",

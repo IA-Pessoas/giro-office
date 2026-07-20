@@ -28,6 +28,9 @@ Tenant destino: castelo-contabilidade (e8048d1c-0830-45d7-84de-68e20abd685b)
 - tasks: 26399
 - clients: 98
 - projects: 1
+- departments: status legado de `tb_admin.departamentos.status` e normalizado para o contrato novo:
+  - `1` ou `A` -> `Ativo`
+  - `0` ou `I` -> `Inativo`
 
 ## Pendencias sem tabela destino confirmada
 - tabelas: 296
@@ -85,12 +88,28 @@ Tenant destino: castelo-contabilidade (e8048d1c-0830-45d7-84de-68e20abd685b)
   - regularize.passwordsRegularize: 5665
 - Regra aplicada: CPF/CNPJ e migrado como campo de dados, nao como chave de identidade.
 - Regra aplicada: cada linha distinta de cliente no banco legado e migrada como registro distinto no banco novo.
+- Regra aplicada: departamentos gerados por `scripts/migration-v2-build-load.mjs` usam
+  `Ativo`/`Inativo`, nao `1`/`0`, porque o `department-service` novo filtra e
+  valida esses valores.
 - `tb_regularize.clientes.cliente_id` e preservado como rastreabilidade/vinculo legado, mas nao elimina a linha propria de `tb_regularize.clientes`.
 
 ## Backup Supabase antes da escrita real
 - Backup JSONL read-only criado em `/tmp/giro-office-supabase-backups/supabase-before-real-migration-20260707T182229Z`.
 - `pg_dump` local nao foi usado porque a versao local era 16.14 e o Supabase estava em Postgres 17.6.
 - Nenhuma escrita foi feita no Supabase durante essa preparacao.
+
+## Correcao pos-carga - status de departamentos
+- Aplicada em: 2026-07-20.
+- Escopo: Supabase do sistema novo, tabela `public.departments`.
+- Motivo: a carga v2 havia preservado `1`/`0` do legado, mas o contrato atual do
+  `department-service` usa `Ativo`/`Inativo`.
+- Atualizacao executada:
+  - `status = '1'` -> `'Ativo'`: 43 registros.
+  - `status = '0'` -> `'Inativo'`: 5 registros.
+- Resultado apos correcao: 44 departamentos `Ativo` e 5 departamentos `Inativo`.
+- Validacao direta: 416 modelos em `public."integracao.tasksModel"` mantiveram
+  departamento valido; 412 ficaram ligados a departamentos ativos carregaveis pela tela de
+  Modelos de tarefas. Os 4 restantes apontam para departamentos inativos do legado.
 
 ## Aplicacao parcial - Fase 1
 - Aplicada em: 2026-07-07T20:09:27Z.

@@ -388,6 +388,18 @@ runTest("task model config entry is discoverable in product workflows", () => {
   assert.equal(canManageTaskModelConfig(3), true);
 });
 
+runTest("task model config links back to the tasks workspace", () => {
+  const source = readFileSync(
+    new URL("../../pages/configs/integracao/tasks/index.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.equal(source.includes('import Link from "next/link";'), true);
+  assert.equal(source.includes("ArrowLeft"), true);
+  assert.equal(source.includes('href="/tasks"'), true);
+  assert.equal(source.includes("Voltar para tarefas"), true);
+});
+
 runTest("tasks footer summary uses natural Portuguese copy", () => {
   assert.equal(formatTasksFooterSummary({ page: 1, count: 0 }), "Nenhuma tarefa carregada.");
   assert.equal(formatTasksFooterSummary({ page: 1, count: 1 }), "1 tarefa carregada.");

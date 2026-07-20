@@ -35,6 +35,34 @@ Nenhuma escrita foi feita no Supabase durante esta análise.
 - Senhas ou segredos do legado nao devem ser gravados em claro nos artefatos. No dry-run, foram
   mascarados como `<redacted:requiresEncryption>`.
 
+## Regra corrigida para solicitacoes RH
+
+O campo legado `tb_rh.solicitacoes.requerente` representa
+`tb_rh.colaboradores.id`, nao `tb_admin.usuarios.id`.
+
+Por isso, ao preparar `rh.requests`, o solicitante deve ser resolvido pelo mapa de
+colaboradores:
+
+```js
+const requesterId = maps.collaboratorByLegacy.get(String(row.requerente));
+```
+
+Essa regra alimenta `rh.requests.requester_user_id`.
+
+O campo legado `tb_rh.solicitacoes.atribuido` continua representando usuario administrativo,
+entao `rh.requests.assigned_to_user_id` deve continuar usando o mapa de usuarios:
+
+```js
+const assignedToId = maps.adminUserByLegacy.get(String(row.atribuido));
+```
+
+Anti-regressao: nao resolver `row.requerente` diretamente pelo mapa de usuarios administrativos.
+Isso troca o solicitante quando o ID do colaborador coincide com outro `tb_admin.usuarios.id`.
+Exemplo validado em 2026-07-20: `rh.requests` id
+`08802a97-27fd-5f8b-b1b2-11a54e7cf2ce` vem da solicitacao legada `174`; `requerente = 145`
+deve resolver para a colaboradora Hosana Jennifer Souza Palmeira, nao para a usuaria
+administrativa Islaine Souza.
+
 ## Resultado do dry-run
 
 Registros lidos no legado:
@@ -46,6 +74,7 @@ Registros lidos no legado:
 | `tb_admin.permissoes_rh` | 234 |
 | `tb_admin.permissoes_pessoal` | 32 |
 | `tb_integracao.clientes` | 2296 |
+| `tb_regularize.coringa` | 1150 |
 | `tb_rh.colaboradores` | 286 |
 | `tb_rh.alergias` | 24 |
 | `tb_rh.contatos_emergencia` | 185 |
@@ -68,6 +97,12 @@ Registros lidos no legado:
 | `tb_pessoal.codigos_acesso` | 15 |
 | `tb_pessoal.contri_assis` | 10 |
 | `tb_pessoal.empregador_web` | 156 |
+
+Mapeamento adicional de clientes:
+
+- Os flags `clients.contabil`, `clients.fiscal`, `clients.pessoal`, `clients.infoproduto`, `clients.consultoria` e `clients.castelo_med` usam `tb_regularize.coringa` como fonte de verdade, seguindo a regra do legado para listar clientes por departamento.
+- Distribuicao por cliente/empresa unico no backup de 2026-07-06: `contabil=1` em 452 registros, `fiscal=1` em 792, `pessoal=1` em 836, `infoproduto=1` em 30, `consultoria=1` em 7 e `castelo_med=1` em 23.
+- Clientes sem linha em `tb_regularize.coringa` recebem esses flags como `false`, evitando valores nulos que quebram filtros como `Departamento contabil` no sistema novo.
 
 Registros preparados para carga:
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 import { closeSync, mkdirSync, openSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 
 const DEFAULT_ENV_FILE = ".env";
 const DEFAULT_OUTPUT_ROOT = "/tmp/giro-office-supabase-backups";
@@ -73,7 +73,7 @@ function parseEnvFile(file) {
     const key = trimmed.slice(0, separatorIndex);
     let value = trimmed.slice(separatorIndex + 1).trim();
     if (
-      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
     ) {
       value = value.slice(1, -1);
@@ -85,7 +85,7 @@ function parseEnvFile(file) {
 }
 
 function quoteIdent(identifier) {
-  return `"${String(identifier).replaceAll("\"", "\"\"")}"`;
+  return `"${String(identifier).replaceAll('"', '""')}"`;
 }
 
 function runPsql({ url, user, password, database, args, maxBuffer = 1024 * 1024 * 200 }) {
@@ -164,7 +164,10 @@ function safeFileName(value) {
 }
 
 function timestamp() {
-  return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  return new Date()
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
 }
 
 function main() {
@@ -229,7 +232,11 @@ function main() {
         user,
         password,
         database,
-        args: ["-At", "-c", `copy (select row_to_json(t) from (select * from ${relation}) t) to stdout`],
+        args: [
+          "-At",
+          "-c",
+          `copy (select row_to_json(t) from (select * from ${relation}) t) to stdout`,
+        ],
         file,
       });
     } else {
@@ -251,7 +258,11 @@ function main() {
     scope: args.migrationV2Only ? "migration-v2-target-tables" : "all-public-base-tables",
     tables: tableBackups,
   };
-  writeFileSync(path.join(backupDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  writeFileSync(
+    path.join(backupDir, "manifest.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8",
+  );
 
   console.log(
     JSON.stringify(

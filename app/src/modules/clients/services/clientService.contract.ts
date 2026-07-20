@@ -21,14 +21,22 @@ export const CLIENT_ENDPOINTS = {
   deleteHistoryPending: (pendingId: string) => `/client/histories/pending/${pendingId}`,
 } as const;
 
+const LEGACY_CLIENT_STATUS_FILTERS = new Set(["Ativo", "Inativo"]);
+
 export function buildClientListParams(filters: ClientListFilters) {
-  return {
-    search: filters.search,
-    ref: filters.ref,
-    status: filters.status,
-    page: filters.page,
-    limit: filters.limit,
-  };
+  const ref =
+    filters.ref ??
+    (filters.status && LEGACY_CLIENT_STATUS_FILTERS.has(filters.status) ? "integracao" : undefined);
+
+  return Object.fromEntries(
+    Object.entries({
+      search: filters.search,
+      ref,
+      status: filters.status,
+      page: filters.page,
+      limit: filters.limit,
+    }).filter(([, value]) => value !== undefined),
+  );
 }
 
 export function unwrapClientEnvelope<T>(body: unknown): T {
