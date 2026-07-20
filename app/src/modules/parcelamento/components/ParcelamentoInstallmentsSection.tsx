@@ -4,12 +4,16 @@ import {
   BadgeDollarSign,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Edit3,
   Loader2,
   Plus,
   RefreshCw,
   Search,
 } from "lucide-react";
+
+import { Dialog } from "@shared/components/ui/Dialog";
 
 import {
   useCreateParcelamentoInstallmentMutation,
@@ -24,7 +28,11 @@ import type {
   PatchParcelamentoInstallmentPayload,
 } from "../types";
 import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
-import { ParcelamentoInstallmentForm } from "./ParcelamentoInstallmentForm";
+import {
+  INSTALLMENT_STATUS_OPTIONS,
+  ParcelamentoInstallmentForm,
+} from "./ParcelamentoInstallmentForm";
+import { ParcelamentoNativeSelect } from "./ParcelamentoNativeSelect";
 import { ParcelamentoStateBox } from "./ParcelamentoStateBox";
 import {
   parcelamentoPrimaryButtonClassName,
@@ -40,6 +48,10 @@ interface ParcelamentoInstallmentsSectionProps {
 
 const FIRST_PAGE = 1;
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
+const INSTALLMENT_TYPE_OPTIONS = ["Federal", "Estadual", "Municipal", "Simplificado", "SIMPLES"];
+const INSTALLMENT_JURISDICTION_OPTIONS = ["PGFN", "RFB", "Federal", "Estadual", "Municipal"];
+const paginationButtonClassName =
+  "inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border border-gray-300 px-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -50,6 +62,20 @@ function formatCurrency(value: number) {
 
 function formatDate(value: string | null) {
   return value ? new Intl.DateTimeFormat("pt-BR").format(new Date(value)) : "-";
+}
+
+function getSelectOptions(
+  presetOptions: readonly string[],
+  currentValue: string,
+  itemValues: readonly string[],
+) {
+  return Array.from(
+    new Set(
+      [currentValue, ...presetOptions, ...itemValues].filter(
+        (value) => value.trim().length > 0,
+      ),
+    ),
+  );
 }
 
 export function ParcelamentoInstallmentsSection({
@@ -64,6 +90,7 @@ export function ParcelamentoInstallmentsSection({
   const [page, setPage] = useState(FIRST_PAGE);
   const [pageSize, setPageSize] = useState(filters.page_size ?? 50);
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
+  const [isClientRequiredDialogOpen, setIsClientRequiredDialogOpen] = useState(false);
   const [editingInstallment, setEditingInstallment] = useState<ParcelamentoInstallment | null>(
     null,
   );
@@ -89,8 +116,25 @@ export function ParcelamentoInstallmentsSection({
   );
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const installments = installmentsQuery.data?.items ?? [];
-  const hasNextPage = Boolean(installmentsQuery.data?.has_more);
+  const total = installmentsQuery.data?.total ?? installments.length;
+  const totalPages = Math.max(FIRST_PAGE, Math.ceil(total / pageSize));
+  const hasNextPage = Boolean(installmentsQuery.data?.has_more) || page < totalPages;
   const hasPreviousPage = page > FIRST_PAGE;
+  const statusOptions = getSelectOptions(
+    INSTALLMENT_STATUS_OPTIONS,
+    status,
+    installments.map((installment) => installment.status),
+  );
+  const typeOptions = getSelectOptions(
+    INSTALLMENT_TYPE_OPTIONS,
+    type,
+    installments.map((installment) => installment.type),
+  );
+  const jurisdictionOptions = getSelectOptions(
+    INSTALLMENT_JURISDICTION_OPTIONS,
+    jurisdiction,
+    installments.map((installment) => installment.jurisdiction),
+  );
 
   useEffect(() => {
     setPage(FIRST_PAGE);
@@ -98,6 +142,20 @@ export function ParcelamentoInstallmentsSection({
 
   function resetToFirstPage() {
     setPage(FIRST_PAGE);
+  }
+
+  function setSafePage(nextPage: number) {
+    setPage(Math.min(totalPages, Math.max(FIRST_PAGE, nextPage)));
+  }
+
+  function handlePageChange(value: string) {
+    const nextPage = Math.trunc(Number(value));
+
+    if (!Number.isFinite(nextPage)) {
+      return;
+    }
+
+    setSafePage(nextPage);
   }
 
   function handleFiltersSubmit(event: FormEvent<HTMLFormElement>) {
@@ -110,6 +168,19 @@ export function ParcelamentoInstallmentsSection({
     updateMutation.reset();
     setEditingInstallment(null);
     setFormMode("create");
+  }
+
+  function handleCreateButtonClick() {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!selectedClient) {
+      setIsClientRequiredDialogOpen(true);
+      return;
+    }
+
+    openCreateForm();
   }
 
   function openEditForm(installment: ParcelamentoInstallment) {
@@ -149,7 +220,7 @@ export function ParcelamentoInstallmentsSection({
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Parcelamentos</h2>
           </div>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            {installmentsQuery.data?.total ?? installments.length} registros encontrados.
+            {total} registros encontrados.
           </p>
         </div>
 
@@ -170,9 +241,12 @@ export function ParcelamentoInstallmentsSection({
           {canEdit ? (
             <button
               type="button"
-              onClick={openCreateForm}
-              disabled={!selectedClient || isSubmitting}
-              className={parcelamentoPrimaryButtonClassName}
+              onClick={handleCreateButtonClick}
+              disabled={isSubmitting}
+              aria-disabled={!selectedClient || isSubmitting}
+              className={`${parcelamentoPrimaryButtonClassName} ${
+                !selectedClient ? "cursor-not-allowed opacity-60" : ""
+              }`}
             >
               <Plus className="h-4 w-4" />
               Novo
@@ -181,8 +255,8 @@ export function ParcelamentoInstallmentsSection({
         </div>
       </div>
 
-      <form onSubmit={handleFiltersSubmit} className="mt-4 grid gap-3 lg:grid-cols-5">
-        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300 lg:col-span-2">
+      <form onSubmit={handleFiltersSubmit} className="mt-3 flex flex-wrap justify-between gap-2">
+        <label className="flex w-full flex-col gap-1 text-sm text-gray-700 dark:text-gray-300 sm:w-72">
           Busca
           <span className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -193,64 +267,121 @@ export function ParcelamentoInstallmentsSection({
                 setSearch(event.target.value);
                 resetToFirstPage();
               }}
-              className={`${parcelamentoTextFieldClassName} pl-9`}
+              className={`${parcelamentoTextFieldClassName} !h-8 !py-1 !pl-8 shadow-none`}
             />
           </span>
         </label>
-        <TextFilter label="Status" value={status} onChange={setStatus} onReset={resetToFirstPage} />
-        <TextFilter label="Tipo" value={type} onChange={setType} onReset={resetToFirstPage} />
-        <TextFilter
+        <SelectFilter
+          label="Status"
+          value={status}
+          options={statusOptions}
+          emptyLabel="Todos"
+          onChange={setStatus}
+          onReset={resetToFirstPage}
+        />
+        <SelectFilter
+          label="Tipo"
+          value={type}
+          options={typeOptions}
+          emptyLabel="Todos"
+          onChange={setType}
+          onReset={resetToFirstPage}
+        />
+        <SelectFilter
           label="Jurisdição"
           value={jurisdiction}
+          options={jurisdictionOptions}
+          emptyLabel="Todas"
           onChange={setJurisdiction}
           onReset={resetToFirstPage}
         />
-      </form>
-
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+        <label className="flex w-24 flex-col gap-1 text-sm text-gray-700 dark:text-gray-300">
           Itens
-          <select
+          <ParcelamentoNativeSelect
             value={pageSize}
             onChange={(event) => {
               setPageSize(Number(event.target.value));
               resetToFirstPage();
             }}
-            className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            selectClassName="!h-8 !py-1 !pl-2 !pr-8 shadow-none"
+            wrapperClassName="w-full"
           >
             {PAGE_SIZE_OPTIONS.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
-          </select>
+          </ParcelamentoNativeSelect>
         </label>
+      </form>
 
-        <div className="flex items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
-            onClick={() => setPage((current) => Math.max(FIRST_PAGE, current - 1))}
+            aria-label="Primeira página"
+            title="Primeira página"
+            onClick={() => setPage(FIRST_PAGE)}
             disabled={!hasPreviousPage || installmentsQuery.isFetching}
-            className={parcelamentoSecondaryButtonClassName}
+            className={paginationButtonClassName}
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setSafePage(page - 1)}
+            disabled={!hasPreviousPage || installmentsQuery.isFetching}
+            className={paginationButtonClassName}
           >
             <ChevronLeft className="h-4 w-4" />
             Anterior
           </button>
-          <span className="text-sm text-gray-600 dark:text-gray-400">Página {page}</span>
+          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            Página
+            <input
+              type="number"
+              min={FIRST_PAGE}
+              max={totalPages}
+              value={page}
+              onChange={(event) => handlePageChange(event.target.value)}
+              aria-label="Página atual"
+              className="h-8 w-9 [appearance:textfield] rounded-lg border border-gray-300 bg-white px-0.5 text-center text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+            de {totalPages}
+          </label>
           <button
             type="button"
-            onClick={() => setPage((current) => current + 1)}
+            onClick={() => setSafePage(page + 1)}
             disabled={!hasNextPage || installmentsQuery.isFetching}
-            className={parcelamentoSecondaryButtonClassName}
+            className={paginationButtonClassName}
           >
             Próxima
             <ChevronRight className="h-4 w-4" />
           </button>
-        </div>
+          <button
+            type="button"
+            aria-label="Última página"
+            title="Última página"
+            onClick={() => setPage(totalPages)}
+            disabled={page >= totalPages || installmentsQuery.isFetching}
+            className={paginationButtonClassName}
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </button>
       </div>
 
-      {formMode ? (
-        <div className="mt-4">
+      <Dialog
+        open={formMode !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            closeForm();
+          }
+        }}
+        title={formMode === "edit" ? "Editar parcelamento" : "Novo parcelamento"}
+        description="Formulário de parcelamento."
+        contentClassName="w-[min(94vw,920px)]"
+        bodyClassName="max-h-[72vh] overflow-y-auto"
+      >
+        {formMode ? (
           <ParcelamentoInstallmentForm
             mode={formMode}
             installment={editingInstallment}
@@ -261,8 +392,30 @@ export function ParcelamentoInstallmentsSection({
             onCreate={handleCreate}
             onUpdate={handleUpdate}
           />
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={isClientRequiredDialogOpen}
+        onOpenChange={setIsClientRequiredDialogOpen}
+        title="Selecione um cliente"
+        description="Selecione um cliente antes de criar um parcelamento."
+        contentClassName="w-[min(92vw,420px)]"
+        bodyClassName="space-y-4"
+      >
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Para criar um parcelamento, primeiro selecione o cliente no topo da tela.
+        </p>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setIsClientRequiredDialogOpen(false)}
+            className={parcelamentoPrimaryButtonClassName}
+          >
+            Entendi
+          </button>
         </div>
-      ) : null}
+      </Dialog>
 
       <div className="mt-4">
         {installmentsQuery.isLoading ? (
@@ -292,50 +445,56 @@ export function ParcelamentoInstallmentsSection({
             {installments.map((installment) => (
               <article
                 key={installment.id}
-                className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+                className="grid gap-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
               >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                       {installment.type} - {installment.jurisdiction}
                     </h3>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                       {installment.agreement_number || "Sem número de acordo"}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                      {installment.status}
-                    </span>
-                    {canEdit ? (
-                      <button
-                        type="button"
-                        onClick={() => openEditForm(installment)}
-                        className={parcelamentoSecondaryButtonClassName}
-                      >
-                        <Edit3 className="h-4 w-4" />
-                        Editar
-                      </button>
-                    ) : null}
-                  </div>
+
+                  <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-[minmax(6rem,1fr)_minmax(4rem,0.7fr)_minmax(5rem,0.8fr)_minmax(7rem,1fr)_minmax(5rem,0.75fr)_minmax(5rem,0.75fr)]">
+                    <DataPoint
+                      label="Parcela atual"
+                      value={formatCurrency(installment.current_month_installment_amount)}
+                    />
+                    <DataPoint
+                      label="Pagas"
+                      value={`${installment.paid_installments_count}/${installment.agreed_installments_count}`}
+                    />
+                    <DataPoint label="Vencidas" value={installment.overdue_installments_count} />
+                    <DataPoint
+                      label="Saldo"
+                      value={formatCurrency(installment.outstanding_balance)}
+                    />
+                    <DataPoint label="Adesão" value={formatDate(installment.enrollment_date)} />
+                    <div className="text-center">
+                      <dt className="text-xs text-gray-500 dark:text-gray-400">Status</dt>
+                      <dd className="mt-0.5 flex justify-center">
+                        <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                          {installment.status}
+                        </span>
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
 
-                <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-5">
-                  <DataPoint
-                    label="Parcela atual"
-                    value={formatCurrency(installment.current_month_installment_amount)}
-                  />
-                  <DataPoint
-                    label="Pagas"
-                    value={`${installment.paid_installments_count}/${installment.agreed_installments_count}`}
-                  />
-                  <DataPoint label="Vencidas" value={installment.overdue_installments_count} />
-                  <DataPoint
-                    label="Saldo"
-                    value={formatCurrency(installment.outstanding_balance)}
-                  />
-                  <DataPoint label="Adesão" value={formatDate(installment.enrollment_date)} />
-                </dl>
+                {canEdit ? (
+                  <div className="flex justify-start sm:min-w-24 sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => openEditForm(installment)}
+                      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                      Editar
+                    </button>
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>
@@ -345,35 +504,46 @@ export function ParcelamentoInstallmentsSection({
   );
 }
 
-function TextFilter({
+function SelectFilter({
+  emptyLabel,
   label,
   onChange,
   onReset,
+  options,
   value,
 }: {
+  emptyLabel: string;
   label: string;
   onChange: (value: string) => void;
   onReset: () => void;
+  options: string[];
   value: string;
 }) {
   return (
-    <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+    <label className="flex w-full flex-col gap-1 text-sm text-gray-700 dark:text-gray-300 sm:w-40">
       {label}
-      <input
+      <ParcelamentoNativeSelect
         value={value}
         onChange={(event) => {
           onChange(event.target.value);
           onReset();
         }}
-        className={parcelamentoTextFieldClassName}
-      />
+        selectClassName="!h-8 !py-1 !pl-2 !pr-8 shadow-none"
+      >
+        <option value="">{emptyLabel}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </ParcelamentoNativeSelect>
     </label>
   );
 }
 
 function DataPoint({ label, value }: { label: string; value: number | string }) {
   return (
-    <div>
+    <div className="text-center">
       <dt className="text-xs text-gray-500 dark:text-gray-400">{label}</dt>
       <dd className="font-medium text-gray-900 dark:text-white">{value}</dd>
     </div>
