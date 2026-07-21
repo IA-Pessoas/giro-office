@@ -4,7 +4,6 @@ import {
   BadgeDollarSign,
   BarChart3,
   ClipboardList,
-  FileText,
   Loader2,
   WalletCards,
 } from "lucide-react";
@@ -16,15 +15,13 @@ import { PARCELAMENTO_TABS } from "../services";
 import type {
   ParcelamentoClientOption,
   ParcelamentoListFilters,
-  ParcelamentoListPage,
-  ParcelamentoPanorama,
   ParcelamentoTabId,
 } from "../types";
-import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
 import { ParcelamentoClientSelector } from "./ParcelamentoClientSelector";
 import { ParcelamentoCompetenciesSection } from "./ParcelamentoCompetenciesSection";
 import { ParcelamentoDashboard } from "./ParcelamentoDashboard";
 import { ParcelamentoInstallmentsSection } from "./ParcelamentoInstallmentsSection";
+import { ParcelamentoPanoramasSection } from "./ParcelamentoPanoramasSection";
 import { ParcelamentoStateBox } from "./ParcelamentoStateBox";
 
 const tabIcons = {
@@ -33,115 +30,6 @@ const tabIcons = {
   competencies: ClipboardList,
   panoramas: WalletCards,
 } satisfies Record<ParcelamentoTabId, typeof BarChart3>;
-
-const PANORAMA_CHECK_FIELDS = [
-  "cnd_municipal",
-  "cnd_state",
-  "cnd_federal",
-  "cnd_fgts",
-  "cnd_labor",
-  "protests",
-  "state_tax_situation",
-  "federal_tax_situation",
-] as const satisfies readonly (keyof ParcelamentoPanorama)[];
-
-interface ParcelamentoReadPanelProps<T> {
-  title: string;
-  emptyTitle: string;
-  emptyDescription: string;
-  data?: ParcelamentoListPage<T>;
-  isLoading: boolean;
-  isError: boolean;
-  error: unknown;
-  renderItem: (item: T) => JSX.Element;
-}
-
-function ParcelamentoReadPanel<T,>({
-  title,
-  emptyTitle,
-  emptyDescription,
-  data,
-  isLoading,
-  isError,
-  error,
-  renderItem,
-}: ParcelamentoReadPanelProps<T>) {
-  if (isLoading) {
-    return (
-      <ParcelamentoStateBox
-        icon={Loader2}
-        title="Carregando dados"
-        description="Buscando informações reais do módulo."
-      />
-    );
-  }
-
-  if (isError) {
-    return (
-      <ParcelamentoStateBox
-        icon={AlertCircle}
-        title="Não foi possível carregar"
-        description={getParcelamentoErrorMessage(error, "Tente novamente em alguns instantes.")}
-        tone="error"
-      />
-    );
-  }
-
-  const items = data?.items ?? [];
-
-  if (items.length === 0) {
-    return (
-      <ParcelamentoStateBox
-        icon={FileText}
-        title={emptyTitle}
-        description={emptyDescription}
-      />
-    );
-  }
-
-  return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {data?.total ?? items.length} registros encontrados.
-          </p>
-        </div>
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-          Página {data?.page ?? 1}
-        </p>
-      </div>
-
-      <div className="mt-4 grid gap-3">{items.map(renderItem)}</div>
-    </section>
-  );
-}
-
-function renderPanorama(item: ParcelamentoPanorama) {
-  const completedCount = PANORAMA_CHECK_FIELDS.filter((field) => item[field]).length;
-
-  return (
-    <article
-      key={item.id}
-      className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
-    >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-            Competência {item.competence}
-          </h3>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Cliente {item.client_id}
-          </p>
-        </div>
-        <span className="w-fit rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-          {completedCount}/{PANORAMA_CHECK_FIELDS.length} itens
-        </span>
-      </div>
-    </article>
-  );
-}
 
 export function ParcelamentoShell() {
   const { access, isLoading } = useModuleAccess("parcelamento");
@@ -250,15 +138,9 @@ export function ParcelamentoShell() {
           canEdit={access.canEdit}
         />
       ) : (
-        <ParcelamentoReadPanel
-          title="Panoramas"
-          emptyTitle="Nenhum panorama encontrado"
-          emptyDescription="A lista será exibida assim que houver dados reais para o filtro atual."
-          data={panoramasQuery.data}
-          isLoading={panoramasQuery.isLoading}
-          isError={panoramasQuery.isError}
-          error={panoramasQuery.error}
-          renderItem={renderPanorama}
+        <ParcelamentoPanoramasSection
+          selectedClient={selectedClient}
+          canEdit={access.canEdit}
         />
       )}
     </div>
