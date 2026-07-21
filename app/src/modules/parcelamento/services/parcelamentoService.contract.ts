@@ -1,4 +1,6 @@
 import type {
+  CreateParcelamentoInstallmentPayload,
+  PatchParcelamentoInstallmentPayload,
   ParcelamentoListFilters,
   ParcelamentoListPage,
   ParcelamentoPage,
@@ -25,7 +27,7 @@ export const PARCELAMENTO_ENDPOINTS = {
 export const PARCELAMENTO_TABS: ParcelamentoTab[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "installments", label: "Parcelamentos" },
-  { id: "competencies", label: "Competencias" },
+  { id: "competencies", label: "Competências" },
   { id: "panoramas", label: "Panoramas" },
 ];
 
@@ -104,4 +106,34 @@ export function buildParcelamentoPatchPayload<T extends Record<string, unknown>>
   }
 
   return nextPayload;
+}
+
+function normalizeNullableText(value: string | null | undefined) {
+  if (typeof value === "undefined") {
+    return undefined;
+  }
+
+  if (value === null || value.trim().length === 0) {
+    return null;
+  }
+
+  return value.trim();
+}
+
+export function buildCreateInstallmentPayload(payload: CreateParcelamentoInstallmentPayload) {
+  return {
+    ...payload,
+    agreement_number: normalizeNullableText(payload.agreement_number) ?? null,
+    enrollment_date: normalizeNullableText(payload.enrollment_date) ?? null,
+  };
+}
+
+export function buildPatchInstallmentPayload(payload: PatchParcelamentoInstallmentPayload) {
+  return buildParcelamentoPatchPayload({
+    ...payload,
+    agreement_number: normalizeNullableText(payload.agreement_number),
+    enrollment_date: normalizeNullableText(payload.enrollment_date),
+    situation_shutdown: normalizeNullableText(payload.situation_shutdown),
+    completion_date: normalizeNullableText(payload.completion_date),
+  });
 }

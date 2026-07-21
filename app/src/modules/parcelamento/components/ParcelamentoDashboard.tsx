@@ -193,8 +193,8 @@ export function ParcelamentoDashboard({
     return (
       <ParcelamentoStateBox
         icon={AlertCircle}
-        title="Nao foi possivel carregar o dashboard."
-        description="Tente atualizar a pagina ou ajustar os filtros."
+        title="Não foi possível carregar o dashboard."
+        description="Tente atualizar a página ou ajustar os filtros."
         tone="error"
       />
     );
@@ -215,19 +215,19 @@ export function ParcelamentoDashboard({
             icon={CheckCircle2}
             label="Ativos"
             value={formatCount(activeInstallments, isLoading)}
-            supporting="Parcelamentos ativos na pagina."
+            supporting="Parcelamentos ativos na página."
           />
           <MetricTile
             icon={Clock3}
             label="Em atraso"
             value={formatCount(overdueInstallments, isLoading)}
-            supporting="Com parcelas vencidas na pagina."
+            supporting="Com parcelas vencidas na página."
           />
           <MetricTile
             icon={WalletCards}
             label="Panoramas"
             value={totalPanoramas}
-            supporting={`${pagePanoramas} nesta pagina.`}
+            supporting={`${pagePanoramas} nesta página.`}
           />
           <MetricTile icon={BarChart3} label="Progresso" value={progressValue} />
         </div>
@@ -236,7 +236,7 @@ export function ParcelamentoDashboard({
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
         <DashboardSectionCard
           title="Parcelamentos"
-          description="Leitura rapida dos acordos carregados para o filtro atual."
+          description="Leitura rápida dos acordos carregados para o filtro atual."
           actionLabel="Ver lista"
           onAction={() => onSelectTab("installments")}
         >
@@ -263,8 +263,8 @@ export function ParcelamentoDashboard({
         >
           <div className="space-y-3">
             <DashboardSummaryRow icon={WalletCards} label="Total" value={totalPanoramas} />
-            <DashboardSummaryRow icon={BarChart3} label="Pagina atual" value={pagePanoramas} />
-            <DashboardSummaryRow icon={CheckCircle2} label="Progresso medio" value={progressValue} />
+            <DashboardSummaryRow icon={BarChart3} label="Página atual" value={pagePanoramas} />
+            <DashboardSummaryRow icon={CheckCircle2} label="Progresso médio" value={progressValue} />
           </div>
         </DashboardSectionCard>
       </div>

@@ -15,7 +15,6 @@ import { useParcelamentoInstallments, useParcelamentoPanoramas } from "../hooks"
 import { PARCELAMENTO_TABS } from "../services";
 import type {
   ParcelamentoClientOption,
-  ParcelamentoInstallment,
   ParcelamentoListFilters,
   ParcelamentoListPage,
   ParcelamentoPanorama,
@@ -24,6 +23,7 @@ import type {
 import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
 import { ParcelamentoClientSelector } from "./ParcelamentoClientSelector";
 import { ParcelamentoDashboard } from "./ParcelamentoDashboard";
+import { ParcelamentoInstallmentsSection } from "./ParcelamentoInstallmentsSection";
 import { ParcelamentoStateBox } from "./ParcelamentoStateBox";
 
 const tabIcons = {
@@ -55,21 +55,6 @@ interface ParcelamentoReadPanelProps<T> {
   renderItem: (item: T) => JSX.Element;
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-}
-
-function formatDate(value: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(value));
-}
-
 function ParcelamentoReadPanel<T,>({
   title,
   emptyTitle,
@@ -85,7 +70,7 @@ function ParcelamentoReadPanel<T,>({
       <ParcelamentoStateBox
         icon={Loader2}
         title="Carregando dados"
-        description="Buscando informacoes reais do modulo."
+        description="Buscando informações reais do módulo."
       />
     );
   }
@@ -94,7 +79,7 @@ function ParcelamentoReadPanel<T,>({
     return (
       <ParcelamentoStateBox
         icon={AlertCircle}
-        title="Nao foi possivel carregar"
+        title="Não foi possível carregar"
         description={getParcelamentoErrorMessage(error, "Tente novamente em alguns instantes.")}
         tone="error"
       />
@@ -123,61 +108,12 @@ function ParcelamentoReadPanel<T,>({
           </p>
         </div>
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-          Pagina {data?.page ?? 1}
+          Página {data?.page ?? 1}
         </p>
       </div>
 
       <div className="mt-4 grid gap-3">{items.map(renderItem)}</div>
     </section>
-  );
-}
-
-function renderInstallment(item: ParcelamentoInstallment) {
-  return (
-    <article
-      key={item.id}
-      className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
-    >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-            {item.type} - {item.jurisdiction}
-          </h3>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {item.agreement_number || "Sem numero de acordo"}
-          </p>
-        </div>
-        <span className="w-fit rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-          {item.status}
-        </span>
-      </div>
-      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-4">
-        <div>
-          <dt className="text-xs text-gray-500 dark:text-gray-400">Parcela atual</dt>
-          <dd className="font-medium text-gray-900 dark:text-white">
-            {formatCurrency(item.current_month_installment_amount)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-gray-500 dark:text-gray-400">Pagas</dt>
-          <dd className="font-medium text-gray-900 dark:text-white">
-            {item.paid_installments_count}/{item.agreed_installments_count}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-gray-500 dark:text-gray-400">Vencidas</dt>
-          <dd className="font-medium text-gray-900 dark:text-white">
-            {item.overdue_installments_count}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-gray-500 dark:text-gray-400">Adesao</dt>
-          <dd className="font-medium text-gray-900 dark:text-white">
-            {formatDate(item.enrollment_date)}
-          </dd>
-        </div>
-      </dl>
-    </article>
   );
 }
 
@@ -192,7 +128,7 @@ function renderPanorama(item: ParcelamentoPanorama) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-            Competencia {item.competence}
+            Competência {item.competence}
           </h3>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Cliente {item.client_id}
@@ -227,7 +163,7 @@ export function ParcelamentoShell() {
         <ParcelamentoStateBox
           icon={Loader2}
           title="Carregando acesso"
-          description="Validando permissoes do modulo."
+          description="Validando permissões do módulo."
         />
       </div>
     );
@@ -239,7 +175,7 @@ export function ParcelamentoShell() {
         <ParcelamentoStateBox
           icon={AlertCircle}
           title="Acesso negado"
-          description="Seu usuario nao possui visualizacao para o modulo de Parcelamento."
+          description="Seu usuário não possui visualização para o módulo de Parcelamento."
           tone="warning"
         />
       </div>
@@ -257,7 +193,7 @@ export function ParcelamentoShell() {
             Parcelamento
           </h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">
-            Acompanhamento de parcelamentos, competencias e panoramas mensais.
+            Acompanhamento de parcelamentos, competências e panoramas mensais.
           </p>
         </div>
         <ParcelamentoClientSelector
@@ -302,27 +238,22 @@ export function ParcelamentoShell() {
           onSelectTab={setActiveTab}
         />
       ) : activeTab === "installments" ? (
-        <ParcelamentoReadPanel
-          title="Parcelamentos"
-          emptyTitle="Nenhum parcelamento encontrado"
-          emptyDescription="A lista sera exibida assim que houver dados reais para o filtro atual."
-          data={installmentsQuery.data}
-          isLoading={installmentsQuery.isLoading}
-          isError={installmentsQuery.isError}
-          error={installmentsQuery.error}
-          renderItem={renderInstallment}
+        <ParcelamentoInstallmentsSection
+          selectedClient={selectedClient}
+          canEdit={access.canEdit}
+          filters={filters}
         />
       ) : activeTab === "competencies" ? (
         <ParcelamentoStateBox
           icon={ClipboardList}
-          title="Competencias"
-          description="Esta operacao entra na branch de competencias, usando um parcelamento selecionado."
+          title="Competências"
+          description="Esta operação entra na branch de competências, usando um parcelamento selecionado."
         />
       ) : (
         <ParcelamentoReadPanel
           title="Panoramas"
           emptyTitle="Nenhum panorama encontrado"
-          emptyDescription="A lista sera exibida assim que houver dados reais para o filtro atual."
+          emptyDescription="A lista será exibida assim que houver dados reais para o filtro atual."
           data={panoramasQuery.data}
           isLoading={panoramasQuery.isLoading}
           isError={panoramasQuery.isError}
