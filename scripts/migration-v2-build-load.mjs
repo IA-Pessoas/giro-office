@@ -48,9 +48,18 @@ const PASSWORD_SITE_COLUMNS = [
 ];
 
 export function uuidV5(namespace, value) {
-  const namespaceBytes = crypto.createHash("sha1").update(String(namespace)).digest().subarray(0, 16);
+  const namespaceBytes = crypto
+    .createHash("sha1")
+    .update(String(namespace))
+    .digest()
+    .subarray(0, 16);
   const valueBytes = Buffer.from(String(value));
-  const bytes = crypto.createHash("sha1").update(namespaceBytes).update(valueBytes).digest().subarray(0, 16);
+  const bytes = crypto
+    .createHash("sha1")
+    .update(namespaceBytes)
+    .update(valueBytes)
+    .digest()
+    .subarray(0, 16);
 
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
@@ -72,9 +81,7 @@ export function normalizeDate(value) {
     return null;
   }
 
-  const match = text.match(
-    /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/,
-  );
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
 
   if (!match) {
     return null;
@@ -128,10 +135,26 @@ export async function buildLoad({
   const users = buildUsers(raw.adminUsers, raw.rhUsers, departments.map, fallback, ctx);
   const clients = buildClients(raw.integracaoClients, raw.regularizeClients, ctx);
   const projects = buildProjects(raw.projects, clients, fallback, ctx);
-  const taskModels = buildTaskModels(raw.taskModels, adHocModels, departments.map, users.map, fallback, ctx);
+  const taskModels = buildTaskModels(
+    raw.taskModels,
+    adHocModels,
+    departments.map,
+    users.map,
+    fallback,
+    ctx,
+  );
   const plans = buildPlans(raw.plans, ctx);
   const planTasks = buildPlanTasks(raw.planTasks, plans.map, taskModels.map, ctx);
-  const tasks = buildTasks(raw.tasks, clients, projects, taskModels, departments.map, users.map, fallback, ctx);
+  const tasks = buildTasks(
+    raw.tasks,
+    clients,
+    projects,
+    taskModels,
+    departments.map,
+    users.map,
+    fallback,
+    ctx,
+  );
   const regularize = buildRegularize(raw, clients, users.map, tasks.byLegacyId, ctx);
   const validation = validateLoad({
     departments: departments.rows,
@@ -166,9 +189,7 @@ export async function buildLoad({
   };
 
   await Promise.all(
-    Object.entries(outputs).map(([name, rows]) =>
-      writeJson(path.join(outputDir, name), rows),
-    ),
+    Object.entries(outputs).map(([name, rows]) => writeJson(path.join(outputDir, name), rows)),
   );
 
   const maps = {
@@ -182,7 +203,9 @@ export async function buildLoad({
     "maps/tasks.json": tasks.legacyMap,
   };
 
-  await Promise.all(Object.entries(maps).map(([name, data]) => writeJson(path.join(outputDir, name), data)));
+  await Promise.all(
+    Object.entries(maps).map(([name, data]) => writeJson(path.join(outputDir, name), data)),
+  );
 
   const manifest = {
     generatedAt: new Date().toISOString(),
@@ -222,14 +245,18 @@ export async function buildLoad({
 
 async function readRawTables(inputDir) {
   const entries = await Promise.all(
-    Object.entries(TABLE_FILES).map(async ([key, name]) => [key, await readJson(path.join(inputDir, `${name}.json`))]),
+    Object.entries(TABLE_FILES).map(async ([key, name]) => [
+      key,
+      await readJson(path.join(inputDir, `${name}.json`)),
+    ]),
   );
 
   return Object.fromEntries(entries);
 }
 
 function buildFallbacks(adHocModels, ctx) {
-  const fallbackModel = adHocModels.find((row) => row.name?.includes("Sem departamento legado")) ?? adHocModels[0];
+  const fallbackModel =
+    adHocModels.find((row) => row.name?.includes("Sem departamento legado")) ?? adHocModels[0];
   return {
     departmentId: fallbackModel?.department_id || ctx.ids("department", "fallback"),
     userId: fallbackModel?.responsible_id || ctx.ids("user", "fallback"),
@@ -242,7 +269,9 @@ function buildFallbacks(adHocModels, ctx) {
 function buildDepartments(rows, adHocModels, fallback, ctx) {
   const adHocDepartmentIds = new Map();
   for (const row of adHocModels) {
-    const name = String(row.name ?? "").replace(/^Tarefa legada avulsa - /, "").trim();
+    const name = String(row.name ?? "")
+      .replace(/^Tarefa legada avulsa - /, "")
+      .trim();
     if (name && row.department_id) {
       adHocDepartmentIds.set(normalizeName(name), row.department_id);
     }
@@ -255,7 +284,7 @@ function buildDepartments(rows, adHocModels, fallback, ctx) {
       id,
       name,
       color: cleanText(row.color) || "#64748b",
-      status: String(row.status ?? "1"),
+      status: normalizeStatus(row.status),
       solution: Boolean(Number(row.parceiros ?? 0)),
       organization_id: ctx.organizationId,
     };
@@ -272,7 +301,9 @@ function buildDepartments(rows, adHocModels, fallback, ctx) {
     });
   }
 
-  const legacyMap = Object.fromEntries(rows.map((row, index) => [String(row.id), output[index].id]));
+  const legacyMap = Object.fromEntries(
+    rows.map((row, index) => [String(row.id), output[index].id]),
+  );
   legacyMap["0"] = fallback.departmentId;
   legacyMap.null = fallback.departmentId;
 
@@ -280,7 +311,9 @@ function buildDepartments(rows, adHocModels, fallback, ctx) {
 }
 
 function buildUsers(adminRows, rhRows, departmentMap, fallback, ctx) {
-  const rhByUserId = new Map(rhRows.filter((row) => row.user_id).map((row) => [String(row.user_id), row]));
+  const rhByUserId = new Map(
+    rhRows.filter((row) => row.user_id).map((row) => [String(row.user_id), row]),
+  );
   const seenCpf = new Set();
   const seenRg = new Set();
   const output = [];
@@ -294,7 +327,9 @@ function buildUsers(adminRows, rhRows, departmentMap, fallback, ctx) {
     const departmentId = departmentMap.get(String(row.departamento_id)) ?? fallback.departmentId;
 
     if (departmentId === fallback.departmentId && Number(row.departamento_id ?? 0) !== 0) {
-      ctx.transformations.push(transformation("users", row.id, "department-fallback", row.departamento_id));
+      ctx.transformations.push(
+        transformation("users", row.id, "department-fallback", row.departamento_id),
+      );
     }
 
     output.push({
@@ -386,7 +421,8 @@ function buildClients(integracaoRows, regularizeRows, ctx) {
 
     regularizeMap[String(row.codigo)] = client.id;
     if (Number(row.cliente_id ?? 0) > 0) {
-      regularizeMap[`legacy_cliente_id:${row.cliente_id}`] = integracaoMap[String(row.cliente_id)] ?? null;
+      regularizeMap[`legacy_cliente_id:${row.cliente_id}`] =
+        integracaoMap[String(row.cliente_id)] ?? null;
     }
   }
 
@@ -433,7 +469,9 @@ function buildClients(integracaoRows, regularizeRows, ctx) {
 
 function makeClient(row, source, legacyId, ctx) {
   const doc = validCpfCnpj(row.cpf_cnpj ?? row.cnpj) ?? cleanDigits(row.cpf_cnpj ?? row.cnpj);
-  const name = cleanText(row.nome || row.razao_social || row.nome_fantasia) || `Cliente legado ${source} ${legacyId}`;
+  const name =
+    cleanText(row.nome || row.razao_social || row.nome_fantasia) ||
+    `Cliente legado ${source} ${legacyId}`;
 
   return {
     id: ctx.ids("client", `${source}:${legacyId}`),
@@ -478,7 +516,11 @@ function mergeClient(client, row, source) {
   });
 
   for (const [key, value] of Object.entries(incoming)) {
-    if ((client[key] === null || client[key] === "" || client[key] === undefined) && value !== null && value !== "") {
+    if (
+      (client[key] === null || client[key] === "" || client[key] === undefined) &&
+      value !== null &&
+      value !== ""
+    ) {
       client[key] = value;
     }
   }
@@ -591,7 +633,9 @@ function buildPlans(rows, ctx) {
     color: cleanText(row.color) || "#64748b",
     organization_id: ctx.organizationId,
   }));
-  const legacyMap = Object.fromEntries(rows.map((row, index) => [String(row.id), output[index].id]));
+  const legacyMap = Object.fromEntries(
+    rows.map((row, index) => [String(row.id), output[index].id]),
+  );
   return { rows: output, legacyMap, map: new Map(Object.entries(legacyMap)) };
 }
 
@@ -602,7 +646,9 @@ function buildPlanTasks(rows, planMap, taskModelMap, ctx) {
         const planId = planMap.get(String(row.plano_id));
         const taskId = taskModelMap.get(String(row.tarefa_express_id));
         if (!planId || !taskId) {
-          ctx.transformations.push(transformation("projectPlanTasks", row.id, "relation-skipped", row));
+          ctx.transformations.push(
+            transformation("projectPlanTasks", row.id, "relation-skipped", row),
+          );
           return null;
         }
         return {
@@ -628,7 +674,9 @@ function buildTasks(rows, clients, projects, taskModels, departmentMap, userMap,
     let model = modelCandidates.length === 1 ? modelCandidates[0] : null;
 
     if (!model) {
-      model = taskModels.adHocByDepartment.get(departmentId) ?? taskModels.rows.find((item) => item.id === fallback.taskModelId);
+      model =
+        taskModels.adHocByDepartment.get(departmentId) ??
+        taskModels.rows.find((item) => item.id === fallback.taskModelId);
       ctx.transformations.push(
         transformation(
           "tasks",
@@ -713,12 +761,15 @@ function buildRegularize(raw, clients, userMap, taskMap, ctx) {
         client_pf_id: null,
         cpf_cnpj: cleanDigits(guidance.cnpj) || "",
         process_type: "Processo tecnico para orientacao legada",
-        description: cleanText(guidance.solicitacao) || "Processo tecnico criado para preservar orientacao sem processo legado correspondente.",
+        description:
+          cleanText(guidance.solicitacao) ||
+          "Processo tecnico criado para preservar orientacao sem processo legado correspondente.",
         entry_date: null,
         completion_date: null,
         expected_date: null,
         status: "Migrado",
-        observation: "Criado durante a migracao v2 porque a orientacao processual nao tinha processo legado correspondente.",
+        observation:
+          "Criado durante a migracao v2 porque a orientacao processual nao tinha processo legado correspondente.",
         responsible1_id: null,
         responsible2_id: null,
         responsible3_id: null,
@@ -728,7 +779,14 @@ function buildRegularize(raw, clients, userMap, taskMap, ctx) {
         organization_id: ctx.organizationId,
       });
       processIds.add(technicalId);
-      ctx.transformations.push(transformation("proceduralGuidances", guidance.id, "processo-tecnico-criado", guidance.processo_id));
+      ctx.transformations.push(
+        transformation(
+          "proceduralGuidances",
+          guidance.id,
+          "processo-tecnico-criado",
+          guidance.processo_id,
+        ),
+      );
     }
 
     return technicalId;
@@ -781,9 +839,12 @@ function buildRegularize(raw, clients, userMap, taskMap, ctx) {
     partners,
     municipalTaxes: raw.municipalTaxes
       .map((row) => {
-        const clientId = clients.regularizeMap[String(row.cliente)] ?? clients.integracaoMap[String(row.cliente)];
+        const clientId =
+          clients.regularizeMap[String(row.cliente)] ?? clients.integracaoMap[String(row.cliente)];
         if (!clientId) {
-          ctx.transformations.push(transformation("municipalTaxes", row.id, "client-missing-skipped", row.cliente));
+          ctx.transformations.push(
+            transformation("municipalTaxes", row.id, "client-missing-skipped", row.cliente),
+          );
           return null;
         }
         return {
@@ -893,9 +954,12 @@ function buildRegularize(raw, clients, userMap, taskMap, ctx) {
   );
   const passwordsRegularize = [];
   for (const row of raw.passwords) {
-    const clientId = clients.regularizeMap[String(row.empresa)] ?? clients.integracaoMap[String(row.empresa)];
+    const clientId =
+      clients.regularizeMap[String(row.empresa)] ?? clients.integracaoMap[String(row.empresa)];
     if (!clientId) {
-      ctx.transformations.push(transformation("passwordsRegularize", row.id, "client-missing-skipped", row.empresa));
+      ctx.transformations.push(
+        transformation("passwordsRegularize", row.id, "client-missing-skipped", row.empresa),
+      );
       continue;
     }
     for (const [column] of PASSWORD_SITE_COLUMNS) {
@@ -935,8 +999,15 @@ function validateLoad(data) {
     missingProcess: 0,
     missingClientPF: 0,
   };
-  const orgIds = new Set(Object.values(data).flat().map((row) => row.organization_id).filter(Boolean));
-  counts.orgBad = [...orgIds].filter((id) => id !== DEFAULT_ORGANIZATION_ID && id !== "org-id").length;
+  const orgIds = new Set(
+    Object.values(data)
+      .flat()
+      .map((row) => row.organization_id)
+      .filter(Boolean),
+  );
+  counts.orgBad = [...orgIds].filter(
+    (id) => id !== DEFAULT_ORGANIZATION_ID && id !== "org-id",
+  ).length;
 
   const departments = new Set(data.departments.map((row) => row.id));
   const users = new Set(data.users.map((row) => row.id));
@@ -1007,7 +1078,10 @@ function findClientByDocumentOrName(clients, document, name) {
 
   const normalized = normalizeName(name);
   if (normalized) {
-    const client = clients.find((row) => normalizeName(row.name) === normalized || normalizeName(row.company_name) === normalized);
+    const client = clients.find(
+      (row) =>
+        normalizeName(row.name) === normalized || normalizeName(row.company_name) === normalized,
+    );
     if (client) return client.id;
   }
 
@@ -1101,10 +1175,10 @@ function parseCsvLine(line) {
   for (let index = 0; index < line.length; index++) {
     const char = line[index];
     const next = line[index + 1];
-    if (char === "\"" && quoted && next === "\"") {
-      current += "\"";
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
       index++;
-    } else if (char === "\"") {
+    } else if (char === '"') {
       quoted = !quoted;
     } else if (char === "," && !quoted) {
       values.push(current);

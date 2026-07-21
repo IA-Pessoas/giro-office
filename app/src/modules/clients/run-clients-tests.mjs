@@ -103,6 +103,21 @@ runTest("buildClientListParams forwards search, ref, status, page and limit", ()
   assert.deepEqual(buildClientListParams(filters), filters);
 });
 
+runTest("buildClientListParams uses legacy integration filter for active and inactive clients", () => {
+  assert.deepEqual(buildClientListParams({ status: "Ativo", page: 1, limit: 10 }), {
+    status: "Ativo",
+    ref: "integracao",
+    page: 1,
+    limit: 10,
+  });
+  assert.deepEqual(buildClientListParams({ status: "Inativo", page: 1, limit: 10 }), {
+    status: "Inativo",
+    ref: "integracao",
+    page: 1,
+    limit: 10,
+  });
+});
+
 runTest("unwrapClientEnvelope normalizes response.data.data", () => {
   const payload = { items: [], total: 0, page: 1, pageSize: 20, hasMore: false };
 
