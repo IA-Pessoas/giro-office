@@ -48,6 +48,7 @@ const installmentMenuOptionClassName =
 interface ParcelamentoCompetenciesSectionProps {
   selectedClient: ParcelamentoClientOption | null;
   canEdit: boolean;
+  onSelectClientId: (clientId: string) => void;
 }
 
 function formatCurrency(value: number) {
@@ -94,6 +95,7 @@ function getInstallmentMenuOptionClassName(isSelected: boolean) {
 export function ParcelamentoCompetenciesSection({
   selectedClient,
   canEdit,
+  onSelectClientId,
 }: ParcelamentoCompetenciesSectionProps) {
   const [selectedInstallmentId, setSelectedInstallmentId] = useState("");
   const [isInstallmentMenuOpen, setIsInstallmentMenuOpen] = useState(false);
@@ -137,12 +139,41 @@ export function ParcelamentoCompetenciesSection({
   );
   const selectedInstallmentLabel = selectedInstallment
     ? installmentLabel(selectedInstallment)
-    : "Selecionar parcelamento";
+    : installmentsQuery.isLoading
+      ? "Carregando parcelamentos..."
+      : installments.length === 0
+        ? "Nenhum parcelamento disponível"
+        : "Selecionar parcelamento";
   const isInstallmentMenuDisabled = installmentsQuery.isLoading || installments.length === 0;
   const shouldShowInstallmentMenu = isInstallmentMenuOpen && !isInstallmentMenuDisabled;
+  const emptyInstallmentTitle = installmentsQuery.isLoading
+    ? "Carregando parcelamentos"
+    : installments.length === 0
+      ? selectedClient
+        ? "Este cliente não possui parcelamentos"
+        : "Nenhum parcelamento disponível"
+      : "Selecione um parcelamento";
+  const emptyInstallmentDescription = installmentsQuery.isLoading
+    ? "Buscando parcelamentos disponíveis."
+    : installments.length === 0
+      ? selectedClient
+        ? "Crie um parcelamento para habilitar competências deste cliente."
+        : "Crie um parcelamento ou selecione um cliente com parcelamentos."
+      : "As competências aparecem depois da seleção do parcelamento.";
 
   useEffect(() => {
-    setSelectedInstallmentId("");
+    setSelectedInstallmentId((currentId) => {
+      const currentInstallment = installments.find((installment) => installment.id === currentId);
+
+      if (
+        currentInstallment &&
+        (!selectedClient || currentInstallment.client_id === selectedClient.id)
+      ) {
+        return currentId;
+      }
+
+      return "";
+    });
     setIsInstallmentMenuOpen(false);
     setIsInstallmentRequiredDialogOpen(false);
     setPage(FIRST_PAGE);
@@ -156,13 +187,19 @@ export function ParcelamentoCompetenciesSection({
     updateMutation.reset();
   }
 
-  function handleInstallmentChange(value: string) {
+  function handleInstallmentChange(installment: ParcelamentoInstallment | null) {
     setIsInstallmentMenuOpen(false);
-    if (value === selectedInstallmentId) {
+    const nextInstallmentId = installment?.id ?? "";
+
+    if (nextInstallmentId === selectedInstallmentId) {
       return;
     }
 
-    setSelectedInstallmentId(value);
+    if (installment) {
+      onSelectClientId(installment.client_id);
+    }
+
+    setSelectedInstallmentId(nextInstallmentId);
     setPage(FIRST_PAGE);
     closeForm();
   }
@@ -289,7 +326,7 @@ export function ParcelamentoCompetenciesSection({
                 type="button"
                 role="option"
                 aria-selected={selectedInstallmentId === ""}
-                onClick={() => handleInstallmentChange("")}
+                onClick={() => handleInstallmentChange(null)}
                 className={getInstallmentMenuOptionClassName(selectedInstallmentId === "")}
               >
                 Selecionar parcelamento
@@ -303,7 +340,7 @@ export function ParcelamentoCompetenciesSection({
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    onClick={() => handleInstallmentChange(installment.id)}
+                    onClick={() => handleInstallmentChange(installment)}
                     className={getInstallmentMenuOptionClassName(isSelected)}
                   >
                     <span className="truncate">{installmentLabel(installment)}</span>
@@ -419,8 +456,8 @@ export function ParcelamentoCompetenciesSection({
         {!selectedInstallmentId ? (
           <ParcelamentoStateBox
             icon={FileText}
-            title="Selecione um parcelamento"
-            description="As competências aparecem depois da seleção do parcelamento."
+            title={emptyInstallmentTitle}
+            description={emptyInstallmentDescription}
           />
         ) : competenciesQuery.isLoading ? (
           <ParcelamentoStateBox

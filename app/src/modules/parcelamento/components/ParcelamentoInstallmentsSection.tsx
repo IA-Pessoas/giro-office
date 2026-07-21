@@ -44,6 +44,7 @@ interface ParcelamentoInstallmentsSectionProps {
   selectedClient: ParcelamentoClientOption | null;
   canEdit: boolean;
   filters: ParcelamentoListFilters;
+  onSelectClientId: (clientId: string) => void;
 }
 
 const FIRST_PAGE = 1;
@@ -89,6 +90,7 @@ export function ParcelamentoInstallmentsSection({
   selectedClient,
   canEdit,
   filters,
+  onSelectClientId,
 }: ParcelamentoInstallmentsSectionProps) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -116,7 +118,7 @@ export function ParcelamentoInstallmentsSection({
     [deferredSearch, filters, jurisdiction, page, pageSize, selectedClient?.id, status, type],
   );
   const installmentsQuery = useParcelamentoInstallments(listFilters, {
-    enabled: Boolean(selectedClient),
+    enabled: true,
   });
   const createMutation = useCreateParcelamentoInstallmentMutation(listFilters);
   const updateMutation = useUpdateParcelamentoInstallmentMutation(
@@ -195,6 +197,7 @@ export function ParcelamentoInstallmentsSection({
   function openEditForm(installment: ParcelamentoInstallment) {
     createMutation.reset();
     updateMutation.reset();
+    onSelectClientId(installment.client_id);
     setEditingInstallment(installment);
     setFormMode("edit");
   }
@@ -231,7 +234,7 @@ export function ParcelamentoInstallmentsSection({
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             {selectedClient
               ? `${total} registros encontrados.`
-              : "Selecione um cliente para listar os parcelamentos."}
+              : `${total} registros encontrados em todos os clientes.`}
           </p>
         </div>
 
@@ -239,7 +242,7 @@ export function ParcelamentoInstallmentsSection({
           <button
             type="button"
             onClick={() => installmentsQuery.refetch()}
-            disabled={!selectedClient || installmentsQuery.isFetching}
+            disabled={installmentsQuery.isFetching}
             className={parcelamentoSecondaryButtonClassName}
           >
             {installmentsQuery.isFetching ? (
@@ -429,13 +432,7 @@ export function ParcelamentoInstallmentsSection({
       </Dialog>
 
       <div className="mt-4">
-        {!selectedClient ? (
-          <ParcelamentoStateBox
-            icon={BadgeDollarSign}
-            title="Selecione um cliente para ver os parcelamentos"
-            description="Escolha um cliente no topo da tela para carregar somente os parcelamentos dele."
-          />
-        ) : installmentsQuery.isLoading ? (
+        {installmentsQuery.isLoading ? (
           <ParcelamentoStateBox
             icon={Loader2}
             title="Carregando parcelamentos"
@@ -455,7 +452,11 @@ export function ParcelamentoInstallmentsSection({
           <ParcelamentoStateBox
             icon={BadgeDollarSign}
             title="Nenhum parcelamento encontrado"
-            description="A lista será exibida assim que houver dados reais para o filtro atual."
+            description={
+              selectedClient
+                ? "Este cliente ainda não possui parcelamentos para o filtro atual."
+                : "A lista geral será exibida assim que houver dados reais para o filtro atual."
+            }
           />
         ) : (
           <div className="grid gap-3">

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
+import { clientService, type Client } from "@modules/clients";
 
 import { useParcelamentoInstallments, useParcelamentoPanoramas } from "../hooks";
 import { PARCELAMENTO_TABS } from "../services";
@@ -31,6 +32,14 @@ const tabIcons = {
   panoramas: WalletCards,
 } satisfies Record<ParcelamentoTabId, typeof BarChart3>;
 
+function toParcelamentoClientOption(client: Client): ParcelamentoClientOption {
+  return {
+    id: client.id,
+    name: client.company_name || client.name,
+    document: client.cpf_cnpj,
+  };
+}
+
 export function ParcelamentoShell() {
   const { access, isLoading } = useModuleAccess("parcelamento");
   const [activeTab, setActiveTab] = useState<ParcelamentoTabId>("dashboard");
@@ -45,6 +54,29 @@ export function ParcelamentoShell() {
   );
   const installmentsQuery = useParcelamentoInstallments(filters, { enabled: access.canView });
   const panoramasQuery = useParcelamentoPanoramas(filters, { enabled: access.canView });
+
+  function selectClientById(clientId: string) {
+    if (selectedClient?.id === clientId) {
+      return;
+    }
+
+    setSelectedClient({ id: clientId, name: "Cliente do parcelamento" });
+
+    void clientService
+      .getById(clientId)
+      .then((client) => {
+        if (!client) {
+          return;
+        }
+
+        const nextClient = toParcelamentoClientOption(client);
+
+        setSelectedClient((currentClient) =>
+          currentClient?.id === clientId ? nextClient : currentClient,
+        );
+      })
+      .catch(() => undefined);
+  }
 
   if (isLoading) {
     return (
@@ -131,11 +163,13 @@ export function ParcelamentoShell() {
           selectedClient={selectedClient}
           canEdit={access.canEdit}
           filters={filters}
+          onSelectClientId={selectClientById}
         />
       ) : activeTab === "competencies" ? (
         <ParcelamentoCompetenciesSection
           selectedClient={selectedClient}
           canEdit={access.canEdit}
+          onSelectClientId={selectClientById}
         />
       ) : (
         <ParcelamentoPanoramasSection

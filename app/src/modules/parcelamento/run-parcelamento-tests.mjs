@@ -515,6 +515,7 @@ runTest("parcelamento shell mounts real installments section", () => {
   assert.match(shell, /ParcelamentoInstallmentsSection/);
   assert.match(shell, /ParcelamentoCompetenciesSection/);
   assert.match(shell, /selectedClient=\{selectedClient\}/);
+  assert.match(shell, /onSelectClientId=\{selectClientById\}/);
   assert.match(shell, /canEdit=\{access\.canEdit\}/);
   assert.match(section, /useParcelamentoInstallments/);
   assert.match(section, /useCreateParcelamentoInstallmentMutation/);
@@ -537,22 +538,21 @@ runTest("parcelamento installments pagination exposes page jump and last page", 
   assert.match(section, /setPage\(totalPages\)/);
 });
 
-runTest("parcelamento installments requires selected client before listing", () => {
+runTest("parcelamento installments supports general list and client selection on edit", () => {
+  const shell = readWorkspaceFile("src/modules/parcelamento/components/ParcelamentoShell.tsx");
   const section = readWorkspaceFile(
     "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
   );
 
+  assert.match(shell, /clientService\s*\.\s*getById\(clientId\)/);
+  assert.match(section, /onSelectClientId: \(clientId: string\) => void/);
   assert.match(
     section,
-    /useParcelamentoInstallments\(\s*listFilters,\s*\{\s*enabled: Boolean\(selectedClient\),\s*\}\s*\)/,
+    /useParcelamentoInstallments\(\s*listFilters,\s*\{\s*enabled: true,\s*\}\s*\)/,
   );
-  assert.match(section, /disabled=\{!selectedClient \|\| installmentsQuery\.isFetching\}/);
-  assert.match(section, /!selectedClient \? \(/);
-  assert.match(section, /title="Selecione um cliente para ver os parcelamentos"/);
-  assert.match(
-    section,
-    /description="Escolha um cliente no topo da tela para carregar somente os parcelamentos dele\."/,
-  );
+  assert.match(section, /disabled=\{installmentsQuery\.isFetching\}/);
+  assert.match(section, /onSelectClientId\(installment\.client_id\)/);
+  assert.doesNotMatch(section, /!selectedClient \? \(\s*<ParcelamentoStateBox/);
 });
 
 runTest("parcelamento installments filters and form use compact controls", () => {
@@ -641,6 +641,10 @@ runTest("parcelamento competencies match installments modal and density patterns
   assert.match(section, /function handleCreateButtonClick/);
   assert.match(section, /isInstallmentRequiredDialogOpen/);
   assert.match(section, /setIsInstallmentRequiredDialogOpen\(true\)/);
+  assert.match(section, /onSelectClientId: \(clientId: string\) => void/);
+  assert.match(section, /onSelectClientId\(installment\.client_id\)/);
+  assert.match(section, /handleInstallmentChange\(installment\)/);
+  assert.match(section, /Nenhum parcelamento dispon/);
   assert.match(section, /aria-disabled=\{isSubmitting\}/);
   assert.match(section, /disabled=\{isSubmitting\}/);
   assert.doesNotMatch(section, /disabled=\{!selectedInstallmentId\}/);
