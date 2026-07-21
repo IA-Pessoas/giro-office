@@ -26,13 +26,10 @@ export const CREATE_USER_MODULE_OPTIONS = [
   { key: "financeiro", label: "Financeiro" },
   { key: "fiscal", label: "Fiscal" },
   { key: "integracao", label: "Integracao" },
-  { key: "marketing", label: "Marketing" },
-  { key: "parcelamento", label: "Parcelamento" },
   { key: "pec", label: "PEC" },
   { key: "pessoal", label: "Pessoal" },
   { key: "regularize", label: "Regularize" },
   { key: "rh", label: "RH" },
   { key: "ti", label: "Tecnologia" },
-  { key: "triagem", label: "Triagem" },
   { key: "wiki", label: "Wiki" },
 ] as const;

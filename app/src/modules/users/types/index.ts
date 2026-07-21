@@ -27,14 +27,11 @@ export type KnownPermissionModuleKey =
   | "financeiro"
   | "fiscal"
   | "integracao"
-  | "marketing"
-  | "parcelamento"
   | "pec"
   | "pessoal"
   | "regularize"
   | "rh"
   | "ti"
-  | "triagem"
   | "wiki";
 
 export type KnownPermissionRecord = Record<KnownPermissionModuleKey, number | null>;

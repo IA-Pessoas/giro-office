@@ -23,6 +23,9 @@ export const MODULE_KEYS = [
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
+export const DISABLED_MODULE_KEYS = ["marketing", "parcelamento", "triagem"] as const satisfies
+  readonly ModuleKey[];
+const DISABLED_MODULE_KEY_SET = new Set<ModuleKey>(DISABLED_MODULE_KEYS);
 export type AccessLevel = "none" | "view" | "edit" | "admin";
 export type AccessSource = "admin" | "department" | "additional-module" | "none";
 
@@ -46,7 +49,6 @@ export interface ResolveModuleAccessParams {
 
 export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/comercial": "comercial",
-  "/marketing": "marketing",
   "/certificados": "certificado",
   "/regularize": "regularize",
   "/fiscal": "fiscal",
@@ -54,8 +56,6 @@ export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/rh": "rh",
   "/departamento-pessoal": "pessoal",
   "/tecnologia": "ti",
-  "/triagem": "triagem",
-  "/parcelamento": "parcelamento",
 };
 
 const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
@@ -95,6 +95,10 @@ function createModuleAccess(level: AccessLevel, source: AccessSource): ModuleAcc
     isAdmin: level === "admin",
     source,
   };
+}
+
+export function isModuleDisabled(module: ModuleKey): boolean {
+  return DISABLED_MODULE_KEY_SET.has(module);
 }
 
 const ACCESS_LEVEL_RANK: Record<AccessLevel, number> = {
@@ -173,6 +177,10 @@ export function resolveModuleAccess({
   additionalModulePermissions,
   isGlobalAdmin = false,
 }: ResolveModuleAccessParams): ModuleAccess {
+  if (isModuleDisabled(module)) {
+    return createModuleAccess("none", "none");
+  }
+
   if (isGlobalAdmin) {
     return createModuleAccess("admin", "admin");
   }

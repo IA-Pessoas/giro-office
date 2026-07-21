@@ -20,6 +20,8 @@ import {
   resolveAccessLevelFromAdditionalPermission,
   resolveDepartmentModuleKey,
   resolveModuleAccess,
+  DISABLED_MODULE_KEYS,
+  isModuleDisabled,
 } from "./utils/moduleAccess.ts";
 
 async function runTest(name, fn) {
@@ -112,6 +114,27 @@ const canSSRAuthSource = await readFile(
 const rootPageSource = await readFile(new URL("../../pages/index.tsx", import.meta.url), "utf8");
 const globalStylesSource = await readFile(
   new URL("../../styles/global.css", import.meta.url),
+  "utf8",
+);
+const quickActionsSource = await readFile(
+  new URL("../dashboard/components/QuickActions.tsx", import.meta.url),
+  "utf8",
+);
+const marketingPageSource = await readFile(
+  new URL("../../pages/marketing/index.tsx", import.meta.url),
+  "utf8",
+);
+const parcelamentoPageSource = await readFile(
+  new URL("../../pages/parcelamento/index.tsx", import.meta.url),
+  "utf8",
+);
+const triagemPageSource = await readFile(new URL("../../pages/triagem.tsx", import.meta.url), "utf8");
+const permissionConfigSource = await readFile(
+  new URL("../users/constants/permissionConfig.ts", import.meta.url),
+  "utf8",
+);
+const createUserConfigSource = await readFile(
+  new URL("../users/constants/createUserConfig.ts", import.meta.url),
   "utf8",
 );
 
@@ -317,6 +340,28 @@ await (async () => {
     );
   });
 
+  await runTest("disabled modules are blocked even for global admins", () => {
+    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["marketing", "parcelamento", "triagem"]);
+
+    for (const moduleKey of DISABLED_MODULE_KEYS) {
+      assert.equal(isModuleDisabled(moduleKey), true);
+      assert.deepEqual(
+        resolveModuleAccess({
+          module: moduleKey,
+          isGlobalAdmin: true,
+          additionalModulePermissions: { [moduleKey]: 2 },
+        }),
+        {
+          level: "none",
+          canView: false,
+          canEdit: false,
+          isAdmin: false,
+          source: "none",
+        },
+      );
+    }
+  });
+
   await runTest("module access helpers normalize aliases and additional permission levels", () => {
     assert.equal(resolveDepartmentModuleKey("Departamento Pessoal"), "pessoal");
     assert.equal(resolveDepartmentModuleKey("Tecnologia"), "ti");
@@ -332,6 +377,30 @@ await (async () => {
     assert.match(appShellSource, /const accessUser = meQuery\.data \?\? user/);
     assert.match(appShellSource, /canAccessAdministration\(accessUser,\s*\{\s*rhAccess\s*\}\)/);
     assert.match(appShellSource, /const rhAccess = moduleAccessMap\.rh/);
+  });
+
+  await runTest("disabled modules are not registered in navigation or quick actions", () => {
+    for (const blockedPath of ["/marketing", "/parcelamento", "/triagem"]) {
+      assert.equal(appShellSource.includes(`path: "${blockedPath}"`), false);
+      assert.equal(quickActionsSource.includes(`href: "${blockedPath}"`), false);
+    }
+  });
+
+  await runTest("disabled module pages return not found without importing module implementations", () => {
+    for (const source of [marketingPageSource, parcelamentoPageSource, triagemPageSource]) {
+      assert.match(source, /notFound:\s*true/);
+    }
+
+    assert.equal(marketingPageSource.includes("newLayout/Marketing"), false);
+    assert.equal(parcelamentoPageSource.includes("newLayout/Parcelamento"), false);
+    assert.equal(triagemPageSource.includes("newLayout/Triagem"), false);
+  });
+
+  await runTest("disabled modules are hidden from user permission configuration", () => {
+    for (const moduleKey of DISABLED_MODULE_KEYS) {
+      assert.equal(permissionConfigSource.includes(`"${moduleKey}"`), false);
+      assert.equal(createUserConfigSource.includes(`key: "${moduleKey}"`), false);
+    }
   });
 
   await runTest("app shell renders an explicit forbidden state for inaccessible module routes", () => {

@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
-  BadgeDollarSign,
   Bot,
   Bell,
   Building2,
@@ -14,11 +13,9 @@ import {
   ChevronRight,
   Code,
   FileText,
-  Filter,
   FileCheck,
   LayoutDashboard,
   Loader2,
-  Megaphone,
   Menu,
   Receipt,
   Search,
@@ -127,15 +124,12 @@ const moduleCategories: NavigationCategory[] = [
     modules: [
       { path: "/comercial", name: "Comercial", icon: BriefcaseBusiness, moduleKey: "comercial" as ModuleKey },
       { path: "/certificados", name: "Certificados", icon: FileCheck, moduleKey: "certificado" as ModuleKey },
-      { path: "/marketing", name: "Marketing", icon: Megaphone, moduleKey: "marketing" as ModuleKey },
       { path: "/regularize", name: "Regularize", icon: ShieldCheck, moduleKey: "regularize" as ModuleKey },
       { path: "/fiscal", name: "Fiscal", icon: Receipt, moduleKey: "fiscal" as ModuleKey },
       { path: "/contabil", name: "Contábil", icon: Calculator },
       { path: "/rh", name: "RH", icon: Users, moduleKey: "rh" as ModuleKey },
       { path: "/departamento-pessoal", name: "Dep. Pessoal", icon: UserRoundCog, moduleKey: "pessoal" as ModuleKey },
       { path: "/tecnologia", name: "Tecnologia", icon: Code, moduleKey: "ti" as ModuleKey },
-      { path: "/triagem", name: "Triagem", icon: Filter, moduleKey: "triagem" as ModuleKey },
-      { path: "/parcelamento", name: "Parcelamento", icon: BadgeDollarSign, moduleKey: "parcelamento" as ModuleKey },
     ],
   },
   {
