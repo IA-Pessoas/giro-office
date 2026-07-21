@@ -1,5 +1,7 @@
 import type {
   CreateParcelamentoInstallmentPayload,
+  CreateParcelamentoInstallmentCompetencyPayload,
+  PatchParcelamentoInstallmentCompetencyPayload,
   PatchParcelamentoInstallmentPayload,
   ParcelamentoListFilters,
   ParcelamentoListPage,
@@ -135,5 +137,29 @@ export function buildPatchInstallmentPayload(payload: PatchParcelamentoInstallme
     enrollment_date: normalizeNullableText(payload.enrollment_date),
     situation_shutdown: normalizeNullableText(payload.situation_shutdown),
     completion_date: normalizeNullableText(payload.completion_date),
+  });
+}
+
+export function buildCreateInstallmentCompetencyPayload(
+  payload: CreateParcelamentoInstallmentCompetencyPayload,
+) {
+  return {
+    ...payload,
+    download_notes: normalizeNullableText(payload.download_notes) ?? null,
+    upload_file: payload.upload_file ?? null,
+    is_sent: payload.is_sent ?? null,
+    submission_type: normalizeNullableText(payload.submission_type) ?? null,
+    notes: normalizeNullableText(payload.notes) ?? null,
+  };
+}
+
+export function buildPatchInstallmentCompetencyPayload(
+  payload: PatchParcelamentoInstallmentCompetencyPayload,
+) {
+  return buildParcelamentoPatchPayload({
+    ...payload,
+    download_notes: normalizeNullableText(payload.download_notes),
+    submission_type: normalizeNullableText(payload.submission_type),
+    notes: normalizeNullableText(payload.notes),
   });
 }
