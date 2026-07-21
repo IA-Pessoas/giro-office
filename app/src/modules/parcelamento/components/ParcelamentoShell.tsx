@@ -15,7 +15,6 @@ import { useParcelamentoInstallments, useParcelamentoPanoramas } from "../hooks"
 import { PARCELAMENTO_TABS } from "../services";
 import type {
   ParcelamentoClientOption,
-  ParcelamentoInstallment,
   ParcelamentoListFilters,
   ParcelamentoListPage,
   ParcelamentoPanorama,
@@ -25,6 +24,7 @@ import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
 import { ParcelamentoClientSelector } from "./ParcelamentoClientSelector";
 import { ParcelamentoCompetenciesSection } from "./ParcelamentoCompetenciesSection";
 import { ParcelamentoDashboard } from "./ParcelamentoDashboard";
+import { ParcelamentoInstallmentsSection } from "./ParcelamentoInstallmentsSection";
 import { ParcelamentoStateBox } from "./ParcelamentoStateBox";
 
 const tabIcons = {
@@ -54,21 +54,6 @@ interface ParcelamentoReadPanelProps<T> {
   isError: boolean;
   error: unknown;
   renderItem: (item: T) => JSX.Element;
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-}
-
-function formatDate(value: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(value));
 }
 
 function ParcelamentoReadPanel<T,>({
@@ -130,55 +115,6 @@ function ParcelamentoReadPanel<T,>({
 
       <div className="mt-4 grid gap-3">{items.map(renderItem)}</div>
     </section>
-  );
-}
-
-function renderInstallment(item: ParcelamentoInstallment) {
-  return (
-    <article
-      key={item.id}
-      className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
-    >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-            {item.type} - {item.jurisdiction}
-          </h3>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {item.agreement_number || "Sem número de acordo"}
-          </p>
-        </div>
-        <span className="w-fit rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-          {item.status}
-        </span>
-      </div>
-      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-4">
-        <div>
-          <dt className="text-xs text-gray-500 dark:text-gray-400">Parcela atual</dt>
-          <dd className="font-medium text-gray-900 dark:text-white">
-            {formatCurrency(item.current_month_installment_amount)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-gray-500 dark:text-gray-400">Pagas</dt>
-          <dd className="font-medium text-gray-900 dark:text-white">
-            {item.paid_installments_count}/{item.agreed_installments_count}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-gray-500 dark:text-gray-400">Vencidas</dt>
-          <dd className="font-medium text-gray-900 dark:text-white">
-            {item.overdue_installments_count}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-gray-500 dark:text-gray-400">Adesão</dt>
-          <dd className="font-medium text-gray-900 dark:text-white">
-            {formatDate(item.enrollment_date)}
-          </dd>
-        </div>
-      </dl>
-    </article>
   );
 }
 
@@ -303,15 +239,10 @@ export function ParcelamentoShell() {
           onSelectTab={setActiveTab}
         />
       ) : activeTab === "installments" ? (
-        <ParcelamentoReadPanel
-          title="Parcelamentos"
-          emptyTitle="Nenhum parcelamento encontrado"
-          emptyDescription="A lista será exibida assim que houver dados reais para o filtro atual."
-          data={installmentsQuery.data}
-          isLoading={installmentsQuery.isLoading}
-          isError={installmentsQuery.isError}
-          error={installmentsQuery.error}
-          renderItem={renderInstallment}
+        <ParcelamentoInstallmentsSection
+          selectedClient={selectedClient}
+          canEdit={access.canEdit}
+          filters={filters}
         />
       ) : activeTab === "competencies" ? (
         <ParcelamentoCompetenciesSection

@@ -1,16 +1,20 @@
 import type {
   CreateParcelamentoInstallmentCompetencyPayload,
+  CreateParcelamentoInstallmentPayload,
   ParcelamentoInstallmentCompetency,
   ParcelamentoInstallment,
   ParcelamentoListFilters,
   ParcelamentoPanorama,
   PatchParcelamentoInstallmentCompetencyPayload,
+  PatchParcelamentoInstallmentPayload,
 } from "../types";
 import {
   PARCELAMENTO_ENDPOINTS,
   buildCreateInstallmentCompetencyPayload,
-  buildPatchInstallmentCompetencyPayload,
+  buildCreateInstallmentPayload,
   buildParcelamentoListParams,
+  buildPatchInstallmentCompetencyPayload,
+  buildPatchInstallmentPayload,
   unwrapParcelamentoEnvelope,
   unwrapParcelamentoPage,
 } from "./parcelamentoService.contract";
@@ -34,6 +38,26 @@ export const parcelamentoService = {
   async detailInstallment(id: string) {
     const api = await getParcelamentoApi();
     const response = await api.get(PARCELAMENTO_ENDPOINTS.installmentDetail(id));
+
+    return unwrapParcelamentoEnvelope<ParcelamentoInstallment>(response.data);
+  },
+
+  async createInstallment(payload: CreateParcelamentoInstallmentPayload) {
+    const api = await getParcelamentoApi();
+    const response = await api.post(
+      PARCELAMENTO_ENDPOINTS.installments,
+      buildCreateInstallmentPayload(payload),
+    );
+
+    return unwrapParcelamentoEnvelope<ParcelamentoInstallment>(response.data);
+  },
+
+  async updateInstallment(id: string, payload: PatchParcelamentoInstallmentPayload) {
+    const api = await getParcelamentoApi();
+    const response = await api.patch(
+      PARCELAMENTO_ENDPOINTS.installmentDetail(id),
+      buildPatchInstallmentPayload(payload),
+    );
 
     return unwrapParcelamentoEnvelope<ParcelamentoInstallment>(response.data);
   },

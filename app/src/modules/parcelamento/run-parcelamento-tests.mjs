@@ -9,7 +9,9 @@ import {
   PARCELAMENTO_MAX_PAGE_SIZE,
   PARCELAMENTO_TABS,
   buildCreateInstallmentCompetencyPayload,
+  buildCreateInstallmentPayload,
   buildPatchInstallmentCompetencyPayload,
+  buildPatchInstallmentPayload,
   buildParcelamentoListParams,
   buildParcelamentoPatchPayload,
   unwrapParcelamentoEnvelope,
@@ -47,6 +49,50 @@ function listSourceFiles(directory) {
     return /\.(ts|tsx)$/.test(entry) ? [fullPath] : [];
   });
 }
+
+const parcelamentoUserTextFiles = [
+  "src/modules/parcelamento/services/parcelamentoService.contract.ts",
+  "src/modules/parcelamento/components/ParcelamentoClientSelector.tsx",
+  "src/modules/parcelamento/components/ParcelamentoCompetenciesSection.tsx",
+  "src/modules/parcelamento/components/ParcelamentoCompetencyForm.tsx",
+  "src/modules/parcelamento/components/ParcelamentoDashboard.tsx",
+  "src/modules/parcelamento/components/ParcelamentoInstallmentForm.tsx",
+  "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  "src/modules/parcelamento/components/ParcelamentoShell.tsx",
+];
+
+const unaccentedPortugueseText = [
+  { pattern: /\bAdesao\b/, replacement: "Adesão" },
+  { pattern: /\balteracoes\b/, replacement: "alterações" },
+  { pattern: /\bCompetencia\b/, replacement: "Competência" },
+  { pattern: /\bcompetencias\b/, replacement: "competências" },
+  { pattern: /\bCompetencias\b/, replacement: "Competências" },
+  { pattern: /\bconclusao\b/, replacement: "conclusão" },
+  { pattern: /\bDebito\b/, replacement: "Débito" },
+  { pattern: /\bdisponivel\b/, replacement: "disponível" },
+  { pattern: /\binformacoes\b/, replacement: "informações" },
+  { pattern: /\bjuridica\b/, replacement: "jurídica" },
+  { pattern: /\bjurisdicao\b/, replacement: "jurisdição" },
+  { pattern: /\bJurisdicao\b/, replacement: "Jurisdição" },
+  { pattern: /\bmedio\b/, replacement: "médio" },
+  { pattern: /\bmodulo\b/, replacement: "módulo" },
+  { pattern: /\bNao\b/, replacement: "Não" },
+  { pattern: /\bnumero\b/, replacement: "número" },
+  { pattern: /\bNumero\b/, replacement: "Número" },
+  { pattern: /\bnumericos\b/, replacement: "numéricos" },
+  { pattern: /\boperacao\b/, replacement: "operação" },
+  { pattern: /\bPagina\b/, replacement: "Página" },
+  { pattern: /\bpagina\b/, replacement: "página" },
+  { pattern: /\bpermissoes\b/, replacement: "permissões" },
+  { pattern: /\bpossivel\b/, replacement: "possível" },
+  { pattern: /\bProxima\b/, replacement: "Próxima" },
+  { pattern: /\brazao\b/, replacement: "razão" },
+  { pattern: /\brapida\b/, replacement: "rápida" },
+  { pattern: /\bsera\b/, replacement: "será" },
+  { pattern: /\bSituacao\b/, replacement: "Situação" },
+  { pattern: /\busuario\b/, replacement: "usuário" },
+  { pattern: /\bvisualizacao\b/, replacement: "visualização" },
+];
 
 runTest("parcelamento endpoints match the gateway public contract", () => {
   assert.equal(PARCELAMENTO_ENDPOINTS.installments, "/parcelamento/installments");
@@ -150,6 +196,73 @@ runTest("patch payload removes empty values and rejects empty patch", () => {
   assert.throws(() => buildParcelamentoPatchPayload({ document_url: "" }), /ao menos um campo/i);
 });
 
+runTest("installment payload builders keep backend field names", () => {
+  assert.deepEqual(
+    buildCreateInstallmentPayload({
+      client_id: "client-1",
+      agreement_number: "",
+      type: "PGFN",
+      legal_nature: "Federal",
+      jurisdiction: "Federal",
+      is_automatic_debit: false,
+      first_installment_amount: 100,
+      current_month_installment_amount: 120,
+      agreed_installments_count: 10,
+      enrollment_date: "",
+    }),
+    {
+      client_id: "client-1",
+      agreement_number: null,
+      type: "PGFN",
+      legal_nature: "Federal",
+      jurisdiction: "Federal",
+      is_automatic_debit: false,
+      first_installment_amount: 100,
+      current_month_installment_amount: 120,
+      agreed_installments_count: 10,
+      enrollment_date: null,
+    },
+  );
+
+  assert.deepEqual(buildPatchInstallmentPayload({ status: "Ativo", document_url: "" }), {
+    status: "Ativo",
+  });
+});
+
+runTest("competency payload builders keep backend field names", () => {
+  assert.deepEqual(
+    buildCreateInstallmentCompetencyPayload({
+      competence: "2026-07",
+      how_many_paid: 1,
+      how_many_overdue: 0,
+      download: true,
+      download_notes: "",
+      upload_file: null,
+      is_sent: false,
+      submission_type: "",
+      notes: "",
+      installment_amount: 250,
+    }),
+    {
+      competence: "2026-07",
+      how_many_paid: 1,
+      how_many_overdue: 0,
+      download: true,
+      download_notes: null,
+      upload_file: null,
+      is_sent: false,
+      submission_type: null,
+      notes: null,
+      installment_amount: 250,
+    },
+  );
+
+  assert.deepEqual(buildPatchInstallmentCompetencyPayload({ how_many_paid: 2, notes: "" }), {
+    how_many_paid: 2,
+    notes: null,
+  });
+});
+
 runTest("parcelamento query keys include domain and optional params", () => {
   assert.deepEqual(PARCELAMENTO_QUERY_KEY, ["parcelamento"]);
   assert.deepEqual(parcelamentoQueryKey("installments"), ["parcelamento", "installments"]);
@@ -167,6 +280,16 @@ runTest("parcelamento package script is wired into app tests", () => {
     "node --experimental-strip-types src/modules/parcelamento/run-parcelamento-tests.mjs",
   );
   assert.match(packageJson.scripts.test, /pnpm run test:parcelamento/);
+});
+
+runTest("parcelamento user-facing Portuguese text keeps accents", () => {
+  for (const file of parcelamentoUserTextFiles) {
+    const source = readWorkspaceFile(file);
+
+    for (const { pattern, replacement } of unaccentedPortugueseText) {
+      assert.doesNotMatch(source, pattern, `${file} should use ${replacement}`);
+    }
+  }
 });
 
 runTest("parcelamento page uses the new module", () => {
@@ -232,48 +355,52 @@ runTest("parcelamento service exposes real read endpoints", () => {
   assert.match(service, /api\.get\(PARCELAMENTO_ENDPOINTS\.panoramaDetail\(id\)\)/);
 });
 
-runTest("competency payload builders keep backend field names", () => {
-  assert.deepEqual(
-    buildCreateInstallmentCompetencyPayload({
-      competence: "2026-07",
-      how_many_paid: 1,
-      how_many_overdue: 0,
-      download: true,
-      download_notes: "",
-      upload_file: null,
-      is_sent: false,
-      submission_type: "",
-      notes: "",
-      installment_amount: 250,
-    }),
-    {
-      competence: "2026-07",
-      how_many_paid: 1,
-      how_many_overdue: 0,
-      download: true,
-      download_notes: null,
-      upload_file: null,
-      is_sent: false,
-      submission_type: null,
-      notes: null,
-      installment_amount: 250,
-    },
-  );
+runTest("parcelamento service exposes installment write endpoints", () => {
+  const service = readWorkspaceFile("src/modules/parcelamento/services/parcelamentoService.ts");
 
-  assert.deepEqual(buildPatchInstallmentCompetencyPayload({ how_many_paid: 2, notes: "" }), {
-    how_many_paid: 2,
-    notes: null,
-  });
+  assert.match(service, /async createInstallment/);
+  assert.match(service, /api\.post\(\s*PARCELAMENTO_ENDPOINTS\.installments/);
+  assert.match(service, /buildCreateInstallmentPayload\(payload\)/);
+  assert.match(service, /async updateInstallment/);
+  assert.match(service, /api\.patch\(\s*PARCELAMENTO_ENDPOINTS\.installmentDetail\(id\)/);
+  assert.match(service, /buildPatchInstallmentPayload\(payload\)/);
+});
+
+runTest("parcelamento service exposes competency write endpoints", () => {
+  const service = readWorkspaceFile("src/modules/parcelamento/services/parcelamentoService.ts");
+
+  assert.match(service, /async listInstallmentCompetencies/);
+  assert.match(service, /api\.get\(PARCELAMENTO_ENDPOINTS\.installmentCompetencies\(installmentId\)/);
+  assert.match(service, /async createInstallmentCompetency/);
+  assert.match(service, /buildCreateInstallmentCompetencyPayload\(payload\)/);
+  assert.match(service, /async updateInstallmentCompetency/);
+  assert.match(service, /buildPatchInstallmentCompetencyPayload\(payload\)/);
 });
 
 runTest("parcelamento hooks use domain query keys and useFetch", () => {
-  for (const file of ["useParcelamentoInstallments.ts", "useParcelamentoPanoramas.ts"]) {
+  for (const file of [
+    "useParcelamentoCompetencies.ts",
+    "useParcelamentoInstallments.ts",
+    "useParcelamentoPanoramas.ts",
+  ]) {
     const source = readWorkspaceFile(`src/modules/parcelamento/hooks/${file}`);
 
     assert.match(source, /useFetch/);
     assert.match(source, /parcelamentoQueryKey/);
     assert.match(source, /placeholderData/);
   }
+});
+
+runTest("parcelamento installment hooks expose mutations", () => {
+  const hooks = readWorkspaceFile("src/modules/parcelamento/hooks/useParcelamentoInstallments.ts");
+
+  assert.match(hooks, /useMutation/);
+  assert.match(hooks, /useQueryClient/);
+  assert.match(hooks, /useCreateParcelamentoInstallmentMutation/);
+  assert.match(hooks, /parcelamentoService\.createInstallment/);
+  assert.match(hooks, /useUpdateParcelamentoInstallmentMutation/);
+  assert.match(hooks, /parcelamentoService\.updateInstallment/);
+  assert.match(hooks, /invalidateQueries\(\{\s*queryKey: parcelamentoQueryKey\("installments"\)/);
 });
 
 runTest("parcelamento shell wires access, client selector and dashboard", () => {
@@ -293,11 +420,120 @@ runTest("parcelamento shell wires access, client selector and dashboard", () => 
   assert.match(shell, /enabled: access\.canView/);
   assert.match(clientSelector, /useClients\(/);
   assert.match(clientSelector, /Dialog/);
+  assert.match(clientSelector, /contentClassName="w-\[min\(92vw,520px\)\]"/);
+  assert.match(clientSelector, /bodyClassName="max-h-\[72vh\] overflow-y-auto space-y-4"/);
   assert.match(clientSelector, /handleSelect\(null\)/);
   assert.match(dashboard, /overdue_installments_count/);
   assert.match(dashboard, /paid_installments_count/);
   assert.match(dashboard, /agreed_installments_count/);
   assert.doesNotMatch(dashboard, /const\s+(cards|metrics|installments|panoramas)\s*=\s*\[/);
+});
+
+runTest("parcelamento shell mounts real installments section", () => {
+  const shell = readWorkspaceFile("src/modules/parcelamento/components/ParcelamentoShell.tsx");
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  );
+  const form = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentForm.tsx",
+  );
+
+  assert.match(shell, /ParcelamentoInstallmentsSection/);
+  assert.match(shell, /ParcelamentoCompetenciesSection/);
+  assert.match(shell, /selectedClient=\{selectedClient\}/);
+  assert.match(shell, /canEdit=\{access\.canEdit\}/);
+  assert.match(section, /useParcelamentoInstallments/);
+  assert.match(section, /useCreateParcelamentoInstallmentMutation/);
+  assert.match(section, /useUpdateParcelamentoInstallmentMutation/);
+  assert.match(form, /Altere ao menos um campo para salvar\./);
+  assert.doesNotMatch(section, /api\.(get|post|patch|put|delete)\(/);
+  assert.doesNotMatch(form, /api\.(get|post|patch|put|delete)\(/);
+});
+
+runTest("parcelamento installments pagination exposes page jump and last page", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  );
+
+  assert.match(section, /const totalPages = Math\.max\(FIRST_PAGE, Math\.ceil\(total \/ pageSize\)\)/);
+  assert.match(section, /function handlePageChange/);
+  assert.match(section, /aria-label="Página atual"/);
+  assert.match(section, /de \{totalPages\}/);
+  assert.match(section, /aria-label="Última página"/);
+  assert.match(section, /setPage\(totalPages\)/);
+});
+
+runTest("parcelamento installments requires selected client before listing", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  );
+
+  assert.match(
+    section,
+    /useParcelamentoInstallments\(\s*listFilters,\s*\{\s*enabled: Boolean\(selectedClient\),\s*\}\s*\)/,
+  );
+  assert.match(section, /disabled=\{!selectedClient \|\| installmentsQuery\.isFetching\}/);
+  assert.match(section, /!selectedClient \? \(/);
+  assert.match(section, /title="Selecione um cliente para ver os parcelamentos"/);
+  assert.match(
+    section,
+    /description="Escolha um cliente no topo da tela para carregar somente os parcelamentos dele\."/,
+  );
+});
+
+runTest("parcelamento installments filters and form use compact controls", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  );
+  const form = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentForm.tsx",
+  );
+  const nativeSelect = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoNativeSelect.tsx",
+  );
+
+  assert.match(section, /<SelectFilter\s+label="Status"/);
+  assert.match(section, /<SelectFilter\s+label="Tipo"/);
+  assert.match(section, /<SelectFilter\s+label="Jurisdição"/);
+  assert.match(section, /<ParcelamentoNativeSelect/);
+  assert.match(section, /<Dialog[\s\S]*open=\{formMode !== null\}/);
+  assert.match(section, /title=\{formMode === "edit" \? "Editar parcelamento" : "Novo parcelamento"\}/);
+  assert.match(section, /isClientRequiredDialogOpen/);
+  assert.match(section, /function handleCreateButtonClick/);
+  assert.match(section, /setIsClientRequiredDialogOpen\(true\)/);
+  assert.match(section, /aria-disabled=\{!selectedClient \|\| isSubmitting\}/);
+  assert.match(section, /title="Selecione um cliente"/);
+  assert.match(section, /Selecione um cliente antes de criar um parcelamento\./);
+  assert.match(section, /disabled=\{isSubmitting\}/);
+  assert.doesNotMatch(section, /\n\s+disabled=\{!selectedClient \|\| isSubmitting\}/);
+  assert.match(section, /className="mt-3 flex flex-wrap justify-between gap-2"/);
+  assert.match(section, /sm:w-72/);
+  assert.match(section, /className=\{`\$\{parcelamentoTextFieldClassName\} !h-8 !py-1 !pl-8 shadow-none`\}/);
+  assert.match(section, /sm:w-40/);
+  assert.match(section, /selectClassName="!h-8 !py-1 !pl-2 !pr-8 shadow-none"/);
+  assert.match(section, /className="flex w-24 flex-col gap-1 text-sm text-gray-700 dark:text-gray-300"/);
+  assert.match(section, /wrapperClassName="w-full"/);
+  assert.match(section, /rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700/);
+  assert.match(
+    section,
+    /className="grid gap-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 sm:grid-cols-\[minmax\(0,1fr\)_auto\] sm:items-end"/,
+  );
+  assert.match(
+    section,
+    /<dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-\[minmax\(6rem,1fr\)_minmax\(4rem,0\.7fr\)_minmax\(5rem,0\.8fr\)_minmax\(7rem,1fr\)_minmax\(5rem,0\.75fr\)_minmax\(5rem,0\.75fr\)\]">/,
+  );
+  assert.match(section, /<DataPoint label="Adesão" value=\{formatDate\(installment\.enrollment_date\)\} \/>/);
+  assert.match(section, /<DataPoint label="Adesão"[\s\S]*>Status<\/dt>[\s\S]*<\/dl>/);
+  assert.match(section, /<div className="text-center">\s*<dt/);
+  assert.match(section, /<dd className="mt-0\.5 flex justify-center">/);
+  assert.match(section, /className="flex justify-start sm:min-w-24 sm:justify-end"/);
+  assert.match(section, /className="inline-flex h-8 items-center justify-center gap-1\.5 rounded-lg border/);
+  assert.match(form, /export const INSTALLMENT_STATUS_OPTIONS/);
+  assert.match(form, /<ParcelamentoNativeSelect/);
+  assert.match(form, /<form onSubmit=\{handleSubmit\} className="space-y-4"/);
+  assert.doesNotMatch(form, /border-blue-100 bg-blue-50/);
+  assert.match(nativeSelect, /ChevronDown/);
+  assert.match(nativeSelect, /appearance-none pr-9/);
 });
 
 runTest("parcelamento dashboard follows the module dashboard layout pattern", () => {
@@ -319,9 +555,6 @@ runTest("parcelamento competencies match installments modal and density patterns
   const form = readWorkspaceFile(
     "src/modules/parcelamento/components/ParcelamentoCompetencyForm.tsx",
   );
-  const clientSelector = readWorkspaceFile(
-    "src/modules/parcelamento/components/ParcelamentoClientSelector.tsx",
-  );
   const nativeSelect = readWorkspaceFile(
     "src/modules/parcelamento/components/ParcelamentoNativeSelect.tsx",
   );
@@ -342,8 +575,6 @@ runTest("parcelamento competencies match installments modal and density patterns
   assert.doesNotMatch(section, />\s*Cliente\s*</);
   assert.doesNotMatch(form, /<select/);
   assert.match(form, /ParcelamentoNativeSelect/);
-  assert.match(clientSelector, /contentClassName="w-\[min\(92vw,520px\)\]"/);
-  assert.match(clientSelector, /bodyClassName="max-h-\[72vh\] overflow-y-auto space-y-4"/);
   assert.match(nativeSelect, /ChevronDown/);
   assert.match(nativeSelect, /appearance-none/);
 });

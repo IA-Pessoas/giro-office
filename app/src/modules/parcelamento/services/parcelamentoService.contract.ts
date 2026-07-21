@@ -1,6 +1,8 @@
 import type {
   CreateParcelamentoInstallmentCompetencyPayload,
+  CreateParcelamentoInstallmentPayload,
   PatchParcelamentoInstallmentCompetencyPayload,
+  PatchParcelamentoInstallmentPayload,
   ParcelamentoListFilters,
   ParcelamentoListPage,
   ParcelamentoPage,
@@ -108,7 +110,7 @@ export function buildParcelamentoPatchPayload<T extends Record<string, unknown>>
   return nextPayload;
 }
 
-function normalizeNullableString(value: string | null | undefined) {
+function normalizeNullableText(value: string | null | undefined) {
   if (typeof value === "undefined") {
     return undefined;
   }
@@ -120,16 +122,34 @@ function normalizeNullableString(value: string | null | undefined) {
   return value.trim();
 }
 
+export function buildCreateInstallmentPayload(payload: CreateParcelamentoInstallmentPayload) {
+  return {
+    ...payload,
+    agreement_number: normalizeNullableText(payload.agreement_number) ?? null,
+    enrollment_date: normalizeNullableText(payload.enrollment_date) ?? null,
+  };
+}
+
+export function buildPatchInstallmentPayload(payload: PatchParcelamentoInstallmentPayload) {
+  return buildParcelamentoPatchPayload({
+    ...payload,
+    agreement_number: normalizeNullableText(payload.agreement_number),
+    enrollment_date: normalizeNullableText(payload.enrollment_date),
+    situation_shutdown: normalizeNullableText(payload.situation_shutdown),
+    completion_date: normalizeNullableText(payload.completion_date),
+  });
+}
+
 export function buildCreateInstallmentCompetencyPayload(
   payload: CreateParcelamentoInstallmentCompetencyPayload,
 ) {
   return {
     ...payload,
-    download_notes: normalizeNullableString(payload.download_notes) ?? null,
+    download_notes: normalizeNullableText(payload.download_notes) ?? null,
     upload_file: payload.upload_file ?? null,
     is_sent: payload.is_sent ?? null,
-    submission_type: normalizeNullableString(payload.submission_type) ?? null,
-    notes: normalizeNullableString(payload.notes) ?? null,
+    submission_type: normalizeNullableText(payload.submission_type) ?? null,
+    notes: normalizeNullableText(payload.notes) ?? null,
   };
 }
 
@@ -138,8 +158,8 @@ export function buildPatchInstallmentCompetencyPayload(
 ) {
   return buildParcelamentoPatchPayload({
     ...payload,
-    download_notes: normalizeNullableString(payload.download_notes),
-    submission_type: normalizeNullableString(payload.submission_type),
-    notes: normalizeNullableString(payload.notes),
+    download_notes: normalizeNullableText(payload.download_notes),
+    submission_type: normalizeNullableText(payload.submission_type),
+    notes: normalizeNullableText(payload.notes),
   });
 }

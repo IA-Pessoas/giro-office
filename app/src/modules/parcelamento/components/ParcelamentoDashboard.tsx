@@ -236,7 +236,7 @@ export function ParcelamentoDashboard({
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
         <DashboardSectionCard
           title="Parcelamentos"
-          description="Leitura rapida dos acordos carregados para o filtro atual."
+          description="Leitura rápida dos acordos carregados para o filtro atual."
           actionLabel="Ver lista"
           onAction={() => onSelectTab("installments")}
         >
@@ -264,7 +264,7 @@ export function ParcelamentoDashboard({
           <div className="space-y-3">
             <DashboardSummaryRow icon={WalletCards} label="Total" value={totalPanoramas} />
             <DashboardSummaryRow icon={BarChart3} label="Página atual" value={pagePanoramas} />
-            <DashboardSummaryRow icon={CheckCircle2} label="Progresso medio" value={progressValue} />
+            <DashboardSummaryRow icon={CheckCircle2} label="Progresso médio" value={progressValue} />
           </div>
         </DashboardSectionCard>
       </div>
