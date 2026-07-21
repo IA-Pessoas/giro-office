@@ -89,7 +89,8 @@ export function ParcelamentoClientSelector({
         onOpenChange={setIsOpen}
         title="Selecionar cliente"
         description="Busque por nome, razão social ou CPF/CNPJ."
-        bodyClassName="space-y-4"
+        contentClassName="w-[min(92vw,520px)]"
+        bodyClassName="max-h-[72vh] overflow-y-auto space-y-4"
       >
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />

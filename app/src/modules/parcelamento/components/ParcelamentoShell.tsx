@@ -22,6 +22,7 @@ import type {
 } from "../types";
 import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
 import { ParcelamentoClientSelector } from "./ParcelamentoClientSelector";
+import { ParcelamentoCompetenciesSection } from "./ParcelamentoCompetenciesSection";
 import { ParcelamentoDashboard } from "./ParcelamentoDashboard";
 import { ParcelamentoInstallmentsSection } from "./ParcelamentoInstallmentsSection";
 import { ParcelamentoStateBox } from "./ParcelamentoStateBox";
@@ -244,10 +245,9 @@ export function ParcelamentoShell() {
           filters={filters}
         />
       ) : activeTab === "competencies" ? (
-        <ParcelamentoStateBox
-          icon={ClipboardList}
-          title="Competências"
-          description="Esta operação entra na branch de competências, usando um parcelamento selecionado."
+        <ParcelamentoCompetenciesSection
+          selectedClient={selectedClient}
+          canEdit={access.canEdit}
         />
       ) : (
         <ParcelamentoReadPanel

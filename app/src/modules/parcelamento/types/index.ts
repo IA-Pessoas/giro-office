@@ -96,6 +96,38 @@ export interface PatchParcelamentoInstallmentPayload {
   completion_date?: string | null;
 }
 
+export interface ParcelamentoInstallmentCompetency {
+  id: string;
+  installment_id: string;
+  competence: string;
+  how_many_paid: number;
+  how_many_overdue: number;
+  download: boolean;
+  download_notes: string | null;
+  upload_file: boolean | null;
+  is_sent: boolean | null;
+  submission_type: string | null;
+  notes: string | null;
+  installment_amount: number;
+}
+
+export interface CreateParcelamentoInstallmentCompetencyPayload {
+  competence: string;
+  how_many_paid: number;
+  how_many_overdue: number;
+  download: boolean;
+  download_notes?: string | null;
+  upload_file?: boolean | null;
+  is_sent?: boolean | null;
+  submission_type?: string | null;
+  notes?: string | null;
+  installment_amount: number;
+}
+
+export type PatchParcelamentoInstallmentCompetencyPayload = Partial<
+  Omit<CreateParcelamentoInstallmentCompetencyPayload, "competence">
+>;
+
 export interface ParcelamentoPanorama {
   id: string;
   client_id: string;
