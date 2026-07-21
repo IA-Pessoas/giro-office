@@ -26,7 +26,6 @@ export function useParcelamentoPanoramas(
     () => parcelamentoService.listPanoramas(filters),
     {
       enabled: options.enabled ?? true,
-      placeholderData: (previousData) => previousData,
     },
   );
 }

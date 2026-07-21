@@ -26,7 +26,6 @@ export function useParcelamentoInstallments(
     () => parcelamentoService.listInstallments(filters),
     {
       enabled: options.enabled ?? true,
-      placeholderData: (previousData) => previousData,
     },
   );
 }

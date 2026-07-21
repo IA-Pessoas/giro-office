@@ -31,6 +31,7 @@ import type {
   PatchParcelamentoPanoramaPayload,
 } from "../types";
 import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
+import { getCurrentParcelamentoMonth } from "../utils/parcelamentoMonth";
 import { ParcelamentoPanoramaForm } from "./ParcelamentoPanoramaForm";
 import { ParcelamentoStateBox } from "./ParcelamentoStateBox";
 import {
@@ -58,10 +59,6 @@ const panoramaCheckFields = [
 interface ParcelamentoPanoramasSectionProps {
   selectedClient: ParcelamentoClientOption | null;
   canEdit: boolean;
-}
-
-function getCurrentMonth() {
-  return new Date().toISOString().slice(0, 7);
 }
 
 function getCompletedCount(panorama: ParcelamentoPanorama) {
@@ -100,7 +97,7 @@ export function ParcelamentoPanoramasSection({
   selectedClient,
   canEdit,
 }: ParcelamentoPanoramasSectionProps) {
-  const [competence, setCompetence] = useState(getCurrentMonth());
+  const [competence, setCompetence] = useState(getCurrentParcelamentoMonth());
   const [page, setPage] = useState(FIRST_PAGE);
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
   const [editingPanorama, setEditingPanorama] = useState<ParcelamentoPanorama | null>(null);
@@ -120,7 +117,9 @@ export function ParcelamentoPanoramasSection({
   const panoramasQuery = useParcelamentoPanoramas(listFilters, {
     enabled: Boolean(selectedClient),
   });
-  const responsibleUsersQuery = useParcelamentoResponsibleUsers({ enabled: canEdit });
+  const responsibleUsersQuery = useParcelamentoResponsibleUsers({
+    enabled: canEdit && Boolean(selectedClient),
+  });
   const createMutation = useCreateParcelamentoPanoramaMutation(listFilters);
   const updateMutation = useUpdateParcelamentoPanoramaMutation(
     editingPanorama?.id ?? "",

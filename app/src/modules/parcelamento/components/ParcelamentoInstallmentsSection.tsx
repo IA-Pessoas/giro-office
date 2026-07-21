@@ -61,7 +61,14 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(value: string | null) {
-  return value ? new Intl.DateTimeFormat("pt-BR").format(new Date(value)) : "-";
+  if (!value) {
+    return "-";
+  }
+
+  const date = value.slice(0, 10);
+  const [year, month, day] = date.split("-");
+
+  return year && month && day ? `${day}/${month}/${year}` : "-";
 }
 
 function getSelectOptions(

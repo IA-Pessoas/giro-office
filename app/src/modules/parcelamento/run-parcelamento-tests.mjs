@@ -447,7 +447,7 @@ runTest("parcelamento hooks use domain query keys and useFetch", () => {
 
     assert.match(source, /useFetch/);
     assert.match(source, /parcelamentoQueryKey/);
-    assert.match(source, /placeholderData/);
+    assert.doesNotMatch(source, /placeholderData/);
   }
 });
 
@@ -740,6 +740,7 @@ runTest("parcelamento panorama form keeps responsible select without create help
   assert.match(hook, /user\.type === "admin"/);
   assert.match(hooksIndex, /useParcelamentoResponsibleUsers/);
   assert.match(section, /useParcelamentoResponsibleUsers/);
+  assert.match(section, /useParcelamentoResponsibleUsers\(\{\s*enabled: canEdit && Boolean\(selectedClient\),\s*\}\)/);
   assert.match(section, /responsibleUsers=\{responsibleUsersQuery\.data \?\? \[\]\}/);
   assert.match(form, /responsibleUsers/);
   assert.match(form, /<ParcelamentoNativeSelect/);
@@ -748,6 +749,34 @@ runTest("parcelamento panorama form keeps responsible select without create help
   assert.doesNotMatch(form, /Responsável ID/);
   assert.doesNotMatch(form, /O panorama será criado para o cliente selecionado\./);
   assert.doesNotMatch(form, /type="text"[\s\S]{0,240}formState\.responsavel_id/);
+});
+
+runTest("parcelamento date defaults avoid timezone drift", () => {
+  const installmentsSection = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  );
+  const competencyForm = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoCompetencyForm.tsx",
+  );
+  const panoramaForm = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoPanoramaForm.tsx",
+  );
+  const panoramasSection = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoPanoramasSection.tsx",
+  );
+  const monthUtils = readWorkspaceFile("src/modules/parcelamento/utils/parcelamentoMonth.ts");
+
+  assert.doesNotMatch(installmentsSection, /new Date\(value\)/);
+  assert.match(installmentsSection, /value\.slice\(0, 10\)/);
+  assert.match(installmentsSection, /\$\{day\}\/\$\{month\}\/\$\{year\}/);
+  assert.match(monthUtils, /getFullYear\(\)/);
+  assert.match(monthUtils, /getMonth\(\) \+ 1/);
+  assert.doesNotMatch(competencyForm, /toISOString\(\)\.slice\(0, 7\)/);
+  assert.doesNotMatch(panoramaForm, /toISOString\(\)\.slice\(0, 7\)/);
+  assert.doesNotMatch(panoramasSection, /toISOString\(\)\.slice\(0, 7\)/);
+  assert.match(competencyForm, /getCurrentParcelamentoMonth\(\)/);
+  assert.match(panoramaForm, /getCurrentParcelamentoMonth\(\)/);
+  assert.match(panoramasSection, /getCurrentParcelamentoMonth\(\)/);
 });
 
 console.log("parcelamento frontend tests passed");

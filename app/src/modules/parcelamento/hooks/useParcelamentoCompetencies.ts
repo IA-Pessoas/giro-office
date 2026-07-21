@@ -54,7 +54,6 @@ export function useParcelamentoCompetencies(
     () => parcelamentoService.listInstallmentCompetencies(installmentId, filters),
     {
       enabled: Boolean(installmentId) && (options.enabled ?? true),
-      placeholderData: (previousData) => previousData,
     },
   );
 }

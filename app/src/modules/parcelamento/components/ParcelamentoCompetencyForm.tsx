@@ -7,6 +7,7 @@ import type {
   PatchParcelamentoInstallmentCompetencyPayload,
 } from "../types";
 import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
+import { getCurrentParcelamentoMonth } from "../utils/parcelamentoMonth";
 import { ParcelamentoNativeSelect } from "./ParcelamentoNativeSelect";
 import {
   parcelamentoCheckboxCardClassName,
@@ -38,10 +39,6 @@ interface ParcelamentoCompetencyFormProps {
   onCancel: () => void;
   onCreate: (payload: CreateParcelamentoInstallmentCompetencyPayload) => Promise<void>;
   onUpdate: (payload: PatchParcelamentoInstallmentCompetencyPayload) => Promise<void>;
-}
-
-function getCurrentMonth() {
-  return new Date().toISOString().slice(0, 7);
 }
 
 function toNullableBoolean(value: NullableBooleanInput) {
@@ -84,7 +81,7 @@ function getInitialState(
   initialValue?: ParcelamentoInstallmentCompetency | null,
 ): CompetencyFormState {
   return {
-    competence: initialValue?.competence ?? getCurrentMonth(),
+    competence: initialValue?.competence ?? getCurrentParcelamentoMonth(),
     how_many_paid: String(initialValue?.how_many_paid ?? 0),
     how_many_overdue: String(initialValue?.how_many_overdue ?? 0),
     download: initialValue?.download ?? false,

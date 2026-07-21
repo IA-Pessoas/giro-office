@@ -9,6 +9,7 @@ import type {
   PatchParcelamentoPanoramaPayload,
 } from "../types";
 import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
+import { getCurrentParcelamentoMonth } from "../utils/parcelamentoMonth";
 import {
   parcelamentoCheckboxCardClassName,
   parcelamentoPrimaryButtonClassName,
@@ -56,13 +57,9 @@ const panoramaBooleanFields: Array<{ key: PanoramaBooleanField; label: string }>
   { key: "federal_tax_situation", label: "Situação federal" },
 ];
 
-function getCurrentMonth() {
-  return new Date().toISOString().slice(0, 7);
-}
-
 function getInitialState(initialValue?: ParcelamentoPanorama | null): PanoramaFormState {
   return {
-    competence: initialValue?.competence ?? getCurrentMonth(),
+    competence: initialValue?.competence ?? getCurrentParcelamentoMonth(),
     cnd_municipal: initialValue?.cnd_municipal ?? false,
     cnd_state: initialValue?.cnd_state ?? false,
     cnd_federal: initialValue?.cnd_federal ?? false,
