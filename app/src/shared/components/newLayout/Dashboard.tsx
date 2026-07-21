@@ -22,7 +22,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -31,111 +30,138 @@ import {
   YAxis,
 } from "recharts";
 
+import { useDashboard } from "../../../modules/dashboard/hooks/useDashboard";
+import type { DashboardStats } from "../../../modules/dashboard/types";
+
+type DashboardProjectStats = DashboardStats["projects"];
+type DashboardActivity = DashboardStats["activities"][number] & {
+  bgColor: string;
+  textColor: string;
+};
+
+const ACTIVITY_TONE_CLASSES: Record<DashboardStats["activities"][number]["tone"], { bgColor: string; textColor: string }> = {
+  green: {
+    bgColor: "bg-green-100 dark:bg-green-900/30",
+    textColor: "text-green-700 dark:text-green-300",
+  },
+  blue: {
+    bgColor: "bg-blue-100 dark:bg-blue-900/30",
+    textColor: "text-blue-700 dark:text-blue-300",
+  },
+  yellow: {
+    bgColor: "bg-yellow-100 dark:bg-yellow-900/30",
+    textColor: "text-yellow-700 dark:text-yellow-300",
+  },
+  purple: {
+    bgColor: "bg-purple-100 dark:bg-purple-900/30",
+    textColor: "text-purple-700 dark:text-purple-300",
+  },
+  indigo: {
+    bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
+    textColor: "text-indigo-700 dark:text-indigo-300",
+  },
+};
+
+function formatCurrency(value: number): string {
+  if (value >= 1000) {
+    return `R$ ${Math.round(value / 1000)}k`;
+  }
+
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  });
+}
+
+function getPercent(value: number, total: number): number {
+  if (total <= 0) {
+    return 0;
+  }
+
+  return Math.round((value / total) * 100);
+}
+
+function buildProjectsData(projects: DashboardProjectStats) {
+  return [
+    { name: "Concluídos", value: projects.completed, color: "#10b981" },
+    { name: "Em Andamento", value: projects.inProgress, color: "#3b82f6" },
+    { name: "Atrasados", value: projects.delayed, color: "#ef4444" },
+    { name: "Aguardando", value: projects.waiting, color: "#f59e0b" },
+  ];
+}
+
+function getEmptyRevenueData(): DashboardStats["revenue"]["monthly"] {
+  return ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul"].map((month) => ({
+    month,
+    revenue: 0,
+    expenses: 0,
+  }));
+}
+
+function getEmptyPerformanceData(): DashboardStats["performance"] {
+  return ["Sem 1", "Sem 2", "Sem 3", "Sem 4"].map((week) => ({
+    week,
+    tasks: 0,
+    completed: 0,
+  }));
+}
+
+function formatLastUpdated(updatedAt: string | null | undefined): string {
+  if (!updatedAt) {
+    return "Sem atualização";
+  }
+
+  const date = new Date(updatedAt);
+  if (Number.isNaN(date.getTime()) || date.getTime() > Date.now()) {
+    return "Sem atualização";
+  }
+
+  return `${date.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })} - ${date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
 export function Dashboard() {
-  const activities = [
-    {
-      user: "João Silva",
-      action: "completou a tarefa",
-      item: "Revisão de Contratos",
-      time: "há 5 min",
-      avatar: "JS",
-      bgColor: "bg-green-100 dark:bg-green-900/30",
-      textColor: "text-green-700 dark:text-green-300",
-    },
-    {
-      user: "Maria Santos",
-      action: "criou um novo",
-      item: "Projeto Delta",
-      time: "há 15 min",
-      avatar: "MS",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30",
-      textColor: "text-blue-700 dark:text-blue-300",
-    },
-    {
-      user: "Carlos Oliveira",
-      action: "atualizou",
-      item: "Documento Fiscal #1234",
-      time: "há 1 hora",
-      avatar: "CO",
-      bgColor: "bg-yellow-100 dark:bg-yellow-900/30",
-      textColor: "text-yellow-700 dark:text-yellow-300",
-    },
-    {
-      user: "Ana Costa",
-      action: "aprovou",
-      item: "Solicitação de Férias",
-      time: "há 2 horas",
-      avatar: "AC",
-      bgColor: "bg-purple-100 dark:bg-purple-900/30",
-      textColor: "text-purple-700 dark:text-purple-300",
-    },
-    {
-      user: "Pedro Alves",
-      action: "enviou",
-      item: "Proposta Comercial #789",
-      time: "há 3 horas",
-      avatar: "PA",
-      bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
-      textColor: "text-indigo-700 dark:text-indigo-300",
-    },
-  ];
-
-  const tasks = [
-    {
-      title: "Finalizar Relatório Mensal",
-      priority: "Alta",
-      dueDate: "Hoje, 18:00",
-      status: "pending",
-    },
-    {
-      title: "Revisar Contratos Q1 2026",
-      priority: "Média",
-      dueDate: "Amanhã",
-      status: "pending",
-    },
-    {
-      title: "Aprovar Folha de Pagamento",
-      priority: "Alta",
-      dueDate: "Hoje, 15:00",
-      status: "urgent",
-    },
-    {
-      title: "Reunião com Cliente Delta",
-      priority: "Média",
-      dueDate: "19 Mar",
-      status: "pending",
-    },
-    {
-      title: "Atualizar Documentação Fiscal",
-      priority: "Baixa",
-      dueDate: "20 Mar",
-      status: "pending",
-    },
-  ];
-
-  const revenueData = [
-    { month: "Jan", revenue: 85, expenses: 62 },
-    { month: "Fev", revenue: 92, expenses: 68 },
-    { month: "Mar", revenue: 78, expenses: 58 },
-    { month: "Abr", revenue: 98, expenses: 72 },
-    { month: "Mai", revenue: 105, expenses: 75 },
-    { month: "Jun", revenue: 118, expenses: 82 },
-    { month: "Jul", revenue: 125, expenses: 88 },
-  ];
-
-  const projectsData = [
-    { name: "Concluídos", value: 42, color: "#10b981" },
-    { name: "Em Andamento", value: 28, color: "#3b82f6" },
-    { name: "Atrasados", value: 8, color: "#ef4444" },
-    { name: "Aguardando", value: 12, color: "#f59e0b" },
-  ];
-
-  const performanceData = [
-    { week: "Sem 1", tasks: 24, completed: 22 },
-    { week: "Sem 2", tasks: 28, completed: 26 },
-    { week: "Sem 3", tasks: 32, completed: 28 },
-    { week: "Sem 4", tasks: 26, completed: 24 },
-  ];
+  const { stats } = useDashboard();
+  const lastUpdated = formatLastUpdated(stats?.updatedAt);
+  const tasksSummary = stats?.tasks ?? {
+    today: 0,
+    completedToday: 0,
+    pending: 0,
+    urgent: 0,
+  };
+  const revenueSummary = stats?.revenue ?? {
+    currentMonth: 0,
+    target: 0,
+    monthly: getEmptyRevenueData(),
+  };
+  const notificationSummary = stats?.notifications ?? {
+    total: 0,
+    urgent: 0,
+    pending: 0,
+  };
+  const projectSummary = stats?.projects ?? {
+    active: 0,
+    completed: 0,
+    inProgress: 0,
+    delayed: 0,
+    waiting: 0,
+  };
+  const taskCompletionPercent = getPercent(tasksSummary.completedToday, tasksSummary.today);
+  const revenuePercent = getPercent(revenueSummary.currentMonth, revenueSummary.target);
+  const projectCompletionRate = getPercent(projectSummary.completed, projectSummary.completed + projectSummary.active);
+  const tasks = stats?.pendingTasks ?? [];
+  const revenueData = revenueSummary.monthly;
+  const projectsData = buildProjectsData(projectSummary);
+  const performanceData = stats?.performance ?? getEmptyPerformanceData();
+  const activities: DashboardActivity[] = (stats?.activities ?? []).map((activity) => ({
+    ...activity,
+    ...(ACTIVITY_TONE_CLASSES[activity.tone] ?? ACTIVITY_TONE_CLASSES.blue),
+  }));
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-4">
@@ -147,7 +173,7 @@ export function Dashboard() {
         <div className="text-right">
           <p className="text-sm text-gray-600 dark:text-gray-400">Última atualização</p>
           <p className="text-sm font-semibold text-gray-900 dark:text-white">
-            Terça, 17 Mar 2026 - 14:32
+            {lastUpdated}
           </p>
         </div>
       </div>
@@ -160,26 +186,26 @@ export function Dashboard() {
                 <CheckSquare className="h-7 w-7 text-white" />
               </div>
               <div className="min-w-0">
-                <p className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">24</p>
+                <p className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">{tasksSummary.today}</p>
                 <p className="text-xs text-gray-600 dark:text-gray-400">Tarefas Hoje</p>
               </div>
             </div>
             <div className="shrink-0 text-right">
               <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded-full flex items-center gap-1">
                 <ArrowUp className="w-3 h-3" />
-                12%
+                {taskCompletionPercent}%
               </span>
             </div>
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-              <span>Concluídas: 16</span>
-              <span>66%</span>
+              <span>Concluídas: {tasksSummary.completedToday}</span>
+              <span>{taskCompletionPercent}%</span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
                 className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all"
-                style={{ width: "66%" }}
+                style={{ width: `${taskCompletionPercent}%` }}
               />
             </div>
           </div>
@@ -192,17 +218,17 @@ export function Dashboard() {
             </div>
             <div className="min-w-0">
               <p className="text-2xl font-bold leading-tight whitespace-nowrap text-gray-900 dark:text-white">
-                R$ 125k
+                {formatCurrency(revenueSummary.currentMonth)}
               </p>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Receita Março</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Receita Mês</p>
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-gray-600 dark:text-gray-400">Meta: R$ 150k</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Meta: {formatCurrency(revenueSummary.target)}</p>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
                 className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full"
-                style={{ width: "83%" }}
+                style={{ width: `${revenuePercent}%` }}
               />
             </div>
           </div>
@@ -214,11 +240,11 @@ export function Dashboard() {
               <div className="relative h-[3.25rem] w-[3.25rem] shrink-0 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
                 <Bell className="h-7 w-7 text-white" />
                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                  3
+                  {notificationSummary.urgent}
                 </span>
               </div>
               <div className="min-w-0">
-                <p className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">8</p>
+                <p className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">{notificationSummary.total}</p>
                 <p className="text-xs text-gray-600 dark:text-gray-400">Notificações</p>
               </div>
             </div>
@@ -227,11 +253,11 @@ export function Dashboard() {
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs">
               <div className="w-2 h-2 bg-red-500 rounded-full" />
-              <span className="text-gray-700 dark:text-gray-300">3 urgentes</span>
+              <span className="text-gray-700 dark:text-gray-300">{notificationSummary.urgent} urgentes</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-              <span className="text-gray-700 dark:text-gray-300">5 pendentes</span>
+              <span className="text-gray-700 dark:text-gray-300">{notificationSummary.pending} pendentes</span>
             </div>
           </div>
         </div>
@@ -243,7 +269,7 @@ export function Dashboard() {
                 <Target className="h-7 w-7 text-white" />
               </div>
               <div className="min-w-0">
-                <p className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">42</p>
+                <p className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">{projectSummary.active}</p>
                 <p className="text-xs text-gray-600 dark:text-gray-400">Projetos Ativos</p>
               </div>
             </div>
@@ -251,7 +277,7 @@ export function Dashboard() {
           </div>
           <div className="space-y-1">
             <p className="text-xs text-gray-600 dark:text-gray-400">Taxa de conclusão:</p>
-            <p className="text-sm font-semibold text-gray-900 dark:text-white">87.5%</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">{projectCompletionRate}%</p>
           </div>
         </div>
       </div>

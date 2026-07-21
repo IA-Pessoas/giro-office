@@ -40,6 +40,39 @@ describe("TiRequestService", () => {
     );
   });
 
+  it("list includes safe requester and assignee fields", async () => {
+    const prisma = {
+      tIRequest: {
+        findMany: vi.fn(async () => []),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    await service.list(context, {});
+
+    expect(prisma.tIRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          category: true,
+          requester: {
+            select: expect.not.objectContaining({
+              password: true,
+              cpf: true,
+              rg: true,
+            }),
+          },
+          assigned_to: {
+            select: expect.not.objectContaining({
+              password: true,
+              cpf: true,
+              rg: true,
+            }),
+          },
+        }),
+      }),
+    );
+  });
+
   it("creates request for authenticated user when requester_id is omitted", async () => {
     const prisma = {
       tICategoryRequest: { findFirst: vi.fn(async () => ({ id: categoryId, active: true })) },

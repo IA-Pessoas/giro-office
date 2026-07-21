@@ -421,6 +421,27 @@ function addGatewayPaths(aggregateSpec: AggregatedOpenApiDocument): void {
     },
   };
 
+  aggregateSpec.paths["/dashboard/stats"] = {
+    get: {
+      tags: ["Gateway"],
+      summary: "Dashboard statistics",
+      security: [{ bearerAuth: [] }],
+      responses: {
+        "200": {
+          description: "Dashboard statistics loaded from the database",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+            },
+          },
+        },
+        "401": {
+          description: "Missing or invalid authentication",
+        },
+      },
+    },
+  };
+
   aggregateSpec.paths["/ready"] = {
     get: {
       tags: ["Gateway"],
@@ -517,7 +538,13 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
           additionalProperties: true,
         },
       },
-      securitySchemes: {},
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
     },
     paths: {},
   };

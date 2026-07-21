@@ -205,7 +205,7 @@
   },
   {
     "legacy_table": "tb_cbs.ramais",
-    "reason": "sem tabela destino confirmada no mapeamento v2"
+    "reason": "pendente de decisao: legado usa tipo, numero e usuario_id com numeros repetidos; tecnologia.extensions usa user_id e number com unicidade por organizacao+number"
   },
   {
     "legacy_table": "tb_certificados.notificacoes.vencimento_certificados",

@@ -50,7 +50,7 @@
 "tb_cbs.estoque_itens","sem tabela destino confirmada no mapeamento v2"
 "tb_cbs.estoque_localizacoes","sem tabela destino confirmada no mapeamento v2"
 "tb_cbs.estoque_saidas","sem tabela destino confirmada no mapeamento v2"
-"tb_cbs.ramais","sem tabela destino confirmada no mapeamento v2"
+"tb_cbs.ramais","pendente de decisao: legado usa tipo, numero e usuario_id com numeros repetidos; tecnologia.extensions usa user_id e number com unicidade por organizacao+number"
 "tb_certificados.notificacoes.vencimento_certificados","sem tabela destino confirmada no mapeamento v2"
 "tb_certificados.pf","sem tabela destino confirmada no mapeamento v2"
 "tb_certificados.pj","sem tabela destino confirmada no mapeamento v2"

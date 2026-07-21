@@ -1,7 +1,23 @@
 import type { TiId, TiStatus } from "./common";
 
+export interface TiInventoryRelatedUser {
+  id: TiId;
+  name?: string | null;
+  full_name?: string | null;
+  department_id?: TiId | null;
+  organization_id?: TiId | null;
+  [key: string]: unknown;
+}
+
 export interface TiInventoryAsset {
   id: TiId;
+  asset_code?: string | null;
+  user_id?: TiId | null;
+  user?: TiInventoryRelatedUser | null;
+  responsible_it_staff_id?: TiId | null;
+  responsible_it_staff?: TiInventoryRelatedUser | null;
+  delivery_date?: string | null;
+  return_date?: string | null;
   name?: string;
   description?: string | null;
   code?: string | null;
@@ -45,30 +61,25 @@ export interface TiInventoryLocation {
 }
 
 export interface TiInventoryPayload {
-  name?: string;
-  description?: string;
-  code?: string;
-  patrimony_code?: string;
-  serial_number?: string;
+  asset_code?: string;
   category_id?: TiId | "";
   location_id?: TiId | "";
-  brand?: string;
-  model?: string;
+  user_id?: TiId | "";
+  responsible_it_staff_id?: TiId | "";
   notes?: string;
-  status?: string;
+  delivery_date?: string;
   [key: string]: unknown;
 }
 
 export interface TiInventoryAssignUserPayload {
-  assigned_user_id?: TiId | "";
-  assigned_to_user_id?: TiId | "";
-  notes?: string;
+  user_id?: TiId | "";
+  delivery_date?: string;
   [key: string]: unknown;
 }
 
 export interface TiInventoryReturnPayload {
   notes?: string;
-  returned_at?: string;
+  return_date?: string;
   [key: string]: unknown;
 }
 
