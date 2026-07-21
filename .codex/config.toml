@@ -1,0 +1,55 @@
+﻿# Configuracao local de regras do Codex para este repositorio.
+# O AGENTS.md da raiz aponta para este arquivo e para os arquivos em .codex/rules/.
+
+[rules]
+default = [".codex/rules/default.rules.md"]
+
+[[rules.scoped]]
+name = "package-manager"
+paths = ["package.json", "pnpm-workspace.yaml", "pnpm-lock.yaml", "services/*/package.json"]
+files = [".codex/rules/package-manager.rules.md", ".codex/rules/deploy-service-build.rules.md"]
+
+[[rules.scoped]]
+name = "git"
+paths = [".gitignore", ".gitattributes", ".cursor/rules/*", ".codex/**/*"]
+files = [".codex/rules/git.rules.md"]
+
+[[rules.scoped]]
+name = "frontend-ui"
+paths = ["app/**/*.tsx", "app/**/*.jsx"]
+files = [".codex/rules/frontend-ui-patterns.rules.md"]
+
+[[rules.scoped]]
+name = "frontend-validation"
+paths = ["app/**/*.ts", "app/**/*.tsx", "app/**/*.jsx", "app/**/*.js", "app/**/*.mjs", "app/**/*.css"]
+files = [".codex/rules/frontend-validation.rules.md"]
+
+[[rules.scoped]]
+name = "gateway"
+paths = ["services/gateway/**/*.ts"]
+files = [".codex/rules/gateway-routing-standards.rules.md"]
+
+[[rules.scoped]]
+name = "express-routes"
+paths = ["**/routes/**/*.ts"]
+files = [".codex/rules/express-routes.rules.md"]
+
+[[rules.scoped]]
+name = "zod-schemas"
+paths = ["**/schemas/**/*.ts", "services/**/src/routes/**/*.ts"]
+files = [".codex/rules/zod-schemas.rules.md"]
+
+[[rules.scoped]]
+name = "service-app-composition"
+paths = ["services/*/src/app.ts"]
+files = [".codex/rules/service-app-composition.rules.md"]
+
+[[rules.scoped]]
+name = "tests"
+paths = ["**/*.test.ts"]
+files = [".codex/rules/tests.rules.md"]
+
+[[rules.scoped]]
+name = "typescript-services"
+paths = ["services/**/*.ts"]
+files = [".codex/rules/typescript-services.rules.md"]

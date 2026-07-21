@@ -1,0 +1,115 @@
+# Override para stacks persistentes na VPS (deploy CI via vps-remote-deploy.sh).
+#
+# - Desativa healthchecks contínuos do Docker (evita `runc exec` + `node -e fetch` a cada 30s).
+# - Troca `depends_on: service_healthy` por `service_started` (Compose não depende de HEALTHCHECK).
+#
+# O ficheiro base `docker-compose.vps.yml` mantém healthchecks para DAST/local (`--wait`).
+# A validação de saúde no deploy VPS fica em `scripts/ci/vps-wait-endpoints.sh` (pontual).
+
+services:
+  reverse-proxy:
+    depends_on:
+      gateway:
+        condition: service_started
+
+  web:
+    depends_on:
+      gateway:
+        condition: service_started
+    healthcheck:
+      disable: true
+
+  gateway:
+    depends_on:
+      organization-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+      department-service:
+        condition: service_started
+      task-service:
+        condition: service_started
+      project-service:
+        condition: service_started
+      client-service:
+        condition: service_started
+      fiscal-service:
+        condition: service_started
+      contabil-service:
+        condition: service_started
+      regularize-service:
+        condition: service_started
+      rh-service:
+        condition: service_started
+      ti-service:
+        condition: service_started
+      certificate-service:
+        condition: service_started
+      pessoal-service:
+        condition: service_started
+      parcelamento-service:
+        condition: service_started
+      audit-service:
+        condition: service_started
+    healthcheck:
+      disable: true
+
+  organization-service:
+    healthcheck:
+      disable: true
+
+  user-service:
+    healthcheck:
+      disable: true
+
+  department-service:
+    healthcheck:
+      disable: true
+
+  task-service:
+    healthcheck:
+      disable: true
+
+  project-service:
+    healthcheck:
+      disable: true
+
+  client-service:
+    healthcheck:
+      disable: true
+
+  fiscal-service:
+    healthcheck:
+      disable: true
+
+  contabil-service:
+    healthcheck:
+      disable: true
+
+  regularize-service:
+    healthcheck:
+      disable: true
+
+  rh-service:
+    healthcheck:
+      disable: true
+
+  ti-service:
+    healthcheck:
+      disable: true
+
+  certificate-service:
+    healthcheck:
+      disable: true
+
+  pessoal-service:
+    healthcheck:
+      disable: true
+
+  parcelamento-service:
+    healthcheck:
+      disable: true
+
+  audit-service:
+    healthcheck:
+      disable: true
