@@ -17,6 +17,7 @@ import {
   unwrapParcelamentoEnvelope,
   unwrapParcelamentoPage,
 } from "./services/parcelamentoService.contract.ts";
+import * as parcelamentoContract from "./services/parcelamentoService.contract.ts";
 import { PARCELAMENTO_QUERY_KEY, parcelamentoQueryKey } from "./hooks/queryKeys.ts";
 
 function runTest(name, fn) {
@@ -58,6 +59,8 @@ const parcelamentoUserTextFiles = [
   "src/modules/parcelamento/components/ParcelamentoDashboard.tsx",
   "src/modules/parcelamento/components/ParcelamentoInstallmentForm.tsx",
   "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  "src/modules/parcelamento/components/ParcelamentoPanoramaForm.tsx",
+  "src/modules/parcelamento/components/ParcelamentoPanoramasSection.tsx",
   "src/modules/parcelamento/components/ParcelamentoShell.tsx",
 ];
 
@@ -263,6 +266,48 @@ runTest("competency payload builders keep backend field names", () => {
   });
 });
 
+runTest("panorama payload builders keep backend field names", () => {
+  assert.equal(typeof parcelamentoContract.buildCreatePanoramaPayload, "function");
+  assert.equal(typeof parcelamentoContract.buildPatchPanoramaPayload, "function");
+
+  assert.deepEqual(
+    parcelamentoContract.buildCreatePanoramaPayload({
+      client_id: "client-1",
+      competence: "2026-07",
+      cnd_municipal: true,
+      cnd_state: false,
+      cnd_federal: false,
+      cnd_fgts: false,
+      cnd_labor: false,
+      protests: false,
+      state_tax_situation: false,
+      federal_tax_situation: false,
+      responsavel_id: "",
+    }),
+    {
+      client_id: "client-1",
+      competence: "2026-07",
+      cnd_municipal: true,
+      cnd_state: false,
+      cnd_federal: false,
+      cnd_fgts: false,
+      cnd_labor: false,
+      protests: false,
+      state_tax_situation: false,
+      federal_tax_situation: false,
+      responsavel_id: null,
+    },
+  );
+
+  assert.deepEqual(
+    parcelamentoContract.buildPatchPanoramaPayload({ cnd_fgts: true, responsavel_id: "" }),
+    {
+      cnd_fgts: true,
+      responsavel_id: null,
+    },
+  );
+});
+
 runTest("parcelamento query keys include domain and optional params", () => {
   assert.deepEqual(PARCELAMENTO_QUERY_KEY, ["parcelamento"]);
   assert.deepEqual(parcelamentoQueryKey("installments"), ["parcelamento", "installments"]);
@@ -307,7 +352,9 @@ runTest("parcelamento shell gates access and stays free of primary mock arrays",
 });
 
 runTest("parcelamento panorama completion badge uses named check fields", () => {
-  const shell = readWorkspaceFile("src/modules/parcelamento/components/ParcelamentoShell.tsx");
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoPanoramasSection.tsx",
+  );
 
   for (const field of [
     "cnd_municipal",
@@ -319,11 +366,11 @@ runTest("parcelamento panorama completion badge uses named check fields", () => 
     "state_tax_situation",
     "federal_tax_situation",
   ]) {
-    assert.match(shell, new RegExp(field));
+    assert.match(section, new RegExp(field));
   }
 
-  assert.match(shell, /PANORAMA_CHECK_FIELDS\.length/);
-  assert.doesNotMatch(shell, /\/8 itens/);
+  assert.match(section, /panoramaCheckFields\.length/);
+  assert.doesNotMatch(section, /\/8 itens/);
 });
 
 runTest("parcelamento api calls stay inside the domain service", () => {
@@ -377,6 +424,19 @@ runTest("parcelamento service exposes competency write endpoints", () => {
   assert.match(service, /buildPatchInstallmentCompetencyPayload\(payload\)/);
 });
 
+runTest("parcelamento service exposes panorama write endpoints", () => {
+  const service = readWorkspaceFile("src/modules/parcelamento/services/parcelamentoService.ts");
+
+  assert.match(service, /async createPanorama/);
+  assert.match(service, /api\.post\(\s*PARCELAMENTO_ENDPOINTS\.panoramas/);
+  assert.match(service, /buildCreatePanoramaPayload\(payload\)/);
+  assert.match(service, /async updatePanorama/);
+  assert.match(service, /api\.patch\(\s*PARCELAMENTO_ENDPOINTS\.panoramaDetail\(id\)/);
+  assert.match(service, /buildPatchPanoramaPayload\(payload\)/);
+  assert.match(service, /async generatePanoramas/);
+  assert.match(service, /PARCELAMENTO_ENDPOINTS\.panoramaGenerate\(competence\)/);
+});
+
 runTest("parcelamento hooks use domain query keys and useFetch", () => {
   for (const file of [
     "useParcelamentoCompetencies.ts",
@@ -401,6 +461,20 @@ runTest("parcelamento installment hooks expose mutations", () => {
   assert.match(hooks, /useUpdateParcelamentoInstallmentMutation/);
   assert.match(hooks, /parcelamentoService\.updateInstallment/);
   assert.match(hooks, /invalidateQueries\(\{\s*queryKey: parcelamentoQueryKey\("installments"\)/);
+});
+
+runTest("parcelamento panorama hooks expose mutations", () => {
+  const hooks = readWorkspaceFile("src/modules/parcelamento/hooks/useParcelamentoPanoramas.ts");
+
+  assert.match(hooks, /useMutation/);
+  assert.match(hooks, /useQueryClient/);
+  assert.match(hooks, /useCreateParcelamentoPanoramaMutation/);
+  assert.match(hooks, /parcelamentoService\.createPanorama/);
+  assert.match(hooks, /useUpdateParcelamentoPanoramaMutation/);
+  assert.match(hooks, /parcelamentoService\.updatePanorama/);
+  assert.match(hooks, /useGenerateParcelamentoPanoramasMutation/);
+  assert.match(hooks, /parcelamentoService\.generatePanoramas/);
+  assert.match(hooks, /invalidateQueries\(\{\s*queryKey: parcelamentoQueryKey\("panoramas"\)/);
 });
 
 runTest("parcelamento shell wires access, client selector and dashboard", () => {
@@ -617,6 +691,33 @@ runTest("parcelamento competencies match installments modal and density patterns
   );
   assert.match(nativeSelect, /ChevronDown/);
   assert.match(nativeSelect, /appearance-none/);
+});
+
+runTest("parcelamento panoramas mount final flow with generation and edit", () => {
+  const shell = readWorkspaceFile("src/modules/parcelamento/components/ParcelamentoShell.tsx");
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoPanoramasSection.tsx",
+  );
+  const form = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoPanoramaForm.tsx",
+  );
+
+  assert.match(shell, /ParcelamentoPanoramasSection/);
+  assert.doesNotMatch(shell, /ParcelamentoReadPanel/);
+  assert.match(section, /useParcelamentoPanoramas/);
+  assert.match(section, /useCreateParcelamentoPanoramaMutation/);
+  assert.match(section, /useUpdateParcelamentoPanoramaMutation/);
+  assert.match(section, /useGenerateParcelamentoPanoramasMutation/);
+  assert.match(section, /Gerar panoramas/);
+  assert.match(section, /created/);
+  assert.match(section, /existing/);
+  assert.match(section, /totalActiveClients/);
+  assert.match(section, /aria-label="Competência"/);
+  assert.match(form, /type="month"/);
+  assert.match(form, /cnd_municipal/);
+  assert.match(form, /responsavel_id/);
+  assert.doesNotMatch(section, /api\.(get|post|patch|put|delete)\(/);
+  assert.doesNotMatch(form, /api\.(get|post|patch|put|delete)\(/);
 });
 
 console.log("parcelamento frontend tests passed");

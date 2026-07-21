@@ -1,6 +1,8 @@
 import type {
+  CreateParcelamentoPanoramaPayload,
   CreateParcelamentoInstallmentCompetencyPayload,
   CreateParcelamentoInstallmentPayload,
+  PatchParcelamentoPanoramaPayload,
   PatchParcelamentoInstallmentCompetencyPayload,
   PatchParcelamentoInstallmentPayload,
   ParcelamentoListFilters,
@@ -161,5 +163,31 @@ export function buildPatchInstallmentCompetencyPayload(
     download_notes: normalizeNullableText(payload.download_notes),
     submission_type: normalizeNullableText(payload.submission_type),
     notes: normalizeNullableText(payload.notes),
+  });
+}
+
+const panoramaBooleanDefaults = {
+  cnd_municipal: false,
+  cnd_state: false,
+  cnd_federal: false,
+  cnd_fgts: false,
+  cnd_labor: false,
+  protests: false,
+  state_tax_situation: false,
+  federal_tax_situation: false,
+};
+
+export function buildCreatePanoramaPayload(payload: CreateParcelamentoPanoramaPayload) {
+  return {
+    ...panoramaBooleanDefaults,
+    ...payload,
+    responsavel_id: normalizeNullableText(payload.responsavel_id) ?? null,
+  };
+}
+
+export function buildPatchPanoramaPayload(payload: PatchParcelamentoPanoramaPayload) {
+  return buildParcelamentoPatchPayload({
+    ...payload,
+    responsavel_id: normalizeNullableText(payload.responsavel_id),
   });
 }
