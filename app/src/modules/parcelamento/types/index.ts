@@ -11,6 +11,11 @@ export interface ParcelamentoClientOption {
   document?: string | null;
 }
 
+export interface ParcelamentoResponsibleUser {
+  id: string;
+  name: string;
+}
+
 export interface ParcelamentoSuccessEnvelope<T> {
   success: true;
   data: T;
@@ -141,4 +146,28 @@ export interface ParcelamentoPanorama {
   state_tax_situation: boolean;
   federal_tax_situation: boolean;
   responsavel_id: string | null;
+}
+
+export interface CreateParcelamentoPanoramaPayload {
+  client_id: string;
+  competence: string;
+  cnd_municipal?: boolean;
+  cnd_state?: boolean;
+  cnd_federal?: boolean;
+  cnd_fgts?: boolean;
+  cnd_labor?: boolean;
+  protests?: boolean;
+  state_tax_situation?: boolean;
+  federal_tax_situation?: boolean;
+  responsavel_id?: string | null;
+}
+
+export type PatchParcelamentoPanoramaPayload = Partial<
+  Omit<CreateParcelamentoPanoramaPayload, "client_id" | "competence">
+>;
+
+export interface ParcelamentoPanoramaGenerateResult {
+  created: number;
+  existing: number;
+  totalActiveClients: number;
 }
