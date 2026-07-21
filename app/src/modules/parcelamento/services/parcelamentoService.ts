@@ -1,10 +1,15 @@
 import type {
+  CreateParcelamentoInstallmentCompetencyPayload,
+  ParcelamentoInstallmentCompetency,
   ParcelamentoInstallment,
   ParcelamentoListFilters,
   ParcelamentoPanorama,
+  PatchParcelamentoInstallmentCompetencyPayload,
 } from "../types";
 import {
   PARCELAMENTO_ENDPOINTS,
+  buildCreateInstallmentCompetencyPayload,
+  buildPatchInstallmentCompetencyPayload,
   buildParcelamentoListParams,
   unwrapParcelamentoEnvelope,
   unwrapParcelamentoPage,
@@ -31,6 +36,44 @@ export const parcelamentoService = {
     const response = await api.get(PARCELAMENTO_ENDPOINTS.installmentDetail(id));
 
     return unwrapParcelamentoEnvelope<ParcelamentoInstallment>(response.data);
+  },
+
+  async listInstallmentCompetencies(
+    installmentId: string,
+    filters: ParcelamentoListFilters = {},
+  ) {
+    const api = await getParcelamentoApi();
+    const response = await api.get(PARCELAMENTO_ENDPOINTS.installmentCompetencies(installmentId), {
+      params: buildParcelamentoListParams(filters),
+    });
+
+    return unwrapParcelamentoPage<ParcelamentoInstallmentCompetency>(response.data);
+  },
+
+  async createInstallmentCompetency(
+    installmentId: string,
+    payload: CreateParcelamentoInstallmentCompetencyPayload,
+  ) {
+    const api = await getParcelamentoApi();
+    const response = await api.post(
+      PARCELAMENTO_ENDPOINTS.installmentCompetencies(installmentId),
+      buildCreateInstallmentCompetencyPayload(payload),
+    );
+
+    return unwrapParcelamentoEnvelope<ParcelamentoInstallmentCompetency>(response.data);
+  },
+
+  async updateInstallmentCompetency(
+    id: string,
+    payload: PatchParcelamentoInstallmentCompetencyPayload,
+  ) {
+    const api = await getParcelamentoApi();
+    const response = await api.patch(
+      PARCELAMENTO_ENDPOINTS.installmentCompetencyDetail(id),
+      buildPatchInstallmentCompetencyPayload(payload),
+    );
+
+    return unwrapParcelamentoEnvelope<ParcelamentoInstallmentCompetency>(response.data);
   },
 
   async listPanoramas(filters: ParcelamentoListFilters = {}) {

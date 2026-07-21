@@ -1,4 +1,6 @@
 import type {
+  CreateParcelamentoInstallmentCompetencyPayload,
+  PatchParcelamentoInstallmentCompetencyPayload,
   ParcelamentoListFilters,
   ParcelamentoListPage,
   ParcelamentoPage,
@@ -25,7 +27,7 @@ export const PARCELAMENTO_ENDPOINTS = {
 export const PARCELAMENTO_TABS: ParcelamentoTab[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "installments", label: "Parcelamentos" },
-  { id: "competencies", label: "Competencias" },
+  { id: "competencies", label: "Competências" },
   { id: "panoramas", label: "Panoramas" },
 ];
 
@@ -104,4 +106,40 @@ export function buildParcelamentoPatchPayload<T extends Record<string, unknown>>
   }
 
   return nextPayload;
+}
+
+function normalizeNullableString(value: string | null | undefined) {
+  if (typeof value === "undefined") {
+    return undefined;
+  }
+
+  if (value === null || value.trim().length === 0) {
+    return null;
+  }
+
+  return value.trim();
+}
+
+export function buildCreateInstallmentCompetencyPayload(
+  payload: CreateParcelamentoInstallmentCompetencyPayload,
+) {
+  return {
+    ...payload,
+    download_notes: normalizeNullableString(payload.download_notes) ?? null,
+    upload_file: payload.upload_file ?? null,
+    is_sent: payload.is_sent ?? null,
+    submission_type: normalizeNullableString(payload.submission_type) ?? null,
+    notes: normalizeNullableString(payload.notes) ?? null,
+  };
+}
+
+export function buildPatchInstallmentCompetencyPayload(
+  payload: PatchParcelamentoInstallmentCompetencyPayload,
+) {
+  return buildParcelamentoPatchPayload({
+    ...payload,
+    download_notes: normalizeNullableString(payload.download_notes),
+    submission_type: normalizeNullableString(payload.submission_type),
+    notes: normalizeNullableString(payload.notes),
+  });
 }
