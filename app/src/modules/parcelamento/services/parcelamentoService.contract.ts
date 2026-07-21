@@ -1,6 +1,6 @@
 import type {
-  CreateParcelamentoInstallmentPayload,
   CreateParcelamentoInstallmentCompetencyPayload,
+  CreateParcelamentoInstallmentPayload,
   PatchParcelamentoInstallmentCompetencyPayload,
   PatchParcelamentoInstallmentPayload,
   ParcelamentoListFilters,
