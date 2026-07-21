@@ -8,7 +8,9 @@ import {
   PARCELAMENTO_ENDPOINTS,
   PARCELAMENTO_MAX_PAGE_SIZE,
   PARCELAMENTO_TABS,
+  buildCreateInstallmentCompetencyPayload,
   buildCreateInstallmentPayload,
+  buildPatchInstallmentCompetencyPayload,
   buildPatchInstallmentPayload,
   buildParcelamentoListParams,
   buildParcelamentoPatchPayload,
@@ -328,6 +330,40 @@ runTest("parcelamento service exposes installment write endpoints", () => {
   assert.match(service, /buildPatchInstallmentPayload\(payload\)/);
 });
 
+runTest("competency payload builders keep backend field names", () => {
+  assert.deepEqual(
+    buildCreateInstallmentCompetencyPayload({
+      competence: "2026-07",
+      how_many_paid: 1,
+      how_many_overdue: 0,
+      download: true,
+      download_notes: "",
+      upload_file: null,
+      is_sent: false,
+      submission_type: "",
+      notes: "",
+      installment_amount: 250,
+    }),
+    {
+      competence: "2026-07",
+      how_many_paid: 1,
+      how_many_overdue: 0,
+      download: true,
+      download_notes: null,
+      upload_file: null,
+      is_sent: false,
+      submission_type: null,
+      notes: null,
+      installment_amount: 250,
+    },
+  );
+
+  assert.deepEqual(buildPatchInstallmentCompetencyPayload({ how_many_paid: 2, notes: "" }), {
+    how_many_paid: 2,
+    notes: null,
+  });
+});
+
 runTest("parcelamento hooks use domain query keys and useFetch", () => {
   for (const file of ["useParcelamentoInstallments.ts", "useParcelamentoPanoramas.ts"]) {
     const source = readWorkspaceFile(`src/modules/parcelamento/hooks/${file}`);
@@ -490,6 +526,42 @@ runTest("parcelamento dashboard follows the module dashboard layout pattern", ()
   assert.match(dashboard, /DashboardSectionCard/);
   assert.match(dashboard, /DashboardSummaryRow/);
   assert.doesNotMatch(dashboard, /DashboardKpi/);
+});
+
+runTest("parcelamento competencies match installments modal and density patterns", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoCompetenciesSection.tsx",
+  );
+  const form = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoCompetencyForm.tsx",
+  );
+  const clientSelector = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoClientSelector.tsx",
+  );
+  const nativeSelect = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoNativeSelect.tsx",
+  );
+
+  assert.match(section, /Dialog/);
+  assert.match(section, /contentClassName="w-\[min\(94vw,920px\)\]"/);
+  assert.match(section, /bodyClassName="max-h-\[72vh\] overflow-y-auto"/);
+  assert.match(section, /sm:grid-cols-\[minmax\(0,1fr\)_auto\] sm:items-end/);
+  assert.match(section, /mt-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between/);
+  assert.match(section, /sm:w-80 lg:w-96/);
+  assert.match(section, /role="listbox"/);
+  assert.match(section, /max-h-56[^"]*overflow-y-auto/);
+  assert.match(section, /aria-haspopup="listbox"/);
+  assert.doesNotMatch(section, /ParcelamentoNativeSelect/);
+  assert.doesNotMatch(section, /<select/);
+  assert.doesNotMatch(section, /lg:w-\[min\(100%,42rem\)\]/);
+  assert.doesNotMatch(section, /min-w-44/);
+  assert.doesNotMatch(section, />\s*Cliente\s*</);
+  assert.doesNotMatch(form, /<select/);
+  assert.match(form, /ParcelamentoNativeSelect/);
+  assert.match(clientSelector, /contentClassName="w-\[min\(92vw,520px\)\]"/);
+  assert.match(clientSelector, /bodyClassName="max-h-\[72vh\] overflow-y-auto space-y-4"/);
+  assert.match(nativeSelect, /ChevronDown/);
+  assert.match(nativeSelect, /appearance-none/);
 });
 
 console.log("parcelamento frontend tests passed");
