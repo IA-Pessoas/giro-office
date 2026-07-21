@@ -39,21 +39,23 @@ export interface PlatformSupportSession {
 export interface PlatformOrganizationUser {
   id: string;
   name: string;
-  login?: string | null;
-  email?: string | null;
-  department_id?: string | null;
-  permission?: number | null;
-  type?: string | null;
-  status?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
+  login: string;
+  department_id: string;
+  permission: number;
+  type: "owner" | "admin" | "user" | null;
+  status: string;
+  photo_url: string | null;
+  joined_at: string | null;
+  organization_id: string;
+  first_owner_flag: boolean | null;
+  permission_id: string | null;
 }
 
 export interface PlatformUsersListResponse {
   users: PlatformOrganizationUser[];
   total: number;
-  skip?: number;
-  take?: number;
+  skip: number;
+  take: number;
 }
 
 export type PlatformUserMutationInput = Record<string, unknown>;

@@ -23,7 +23,7 @@ function normalizeSearchText(value: string): string {
 }
 
 function getUserLogin(user: PlatformOrganizationUser): string {
-  return user.email ?? user.login ?? "";
+  return user.login;
 }
 
 function getUserProfileLabel(user: PlatformOrganizationUser): string {
@@ -39,14 +39,10 @@ function getUserProfileLabel(user: PlatformOrganizationUser): string {
     return "Usuário";
   }
 
-  if (typeof user.permission === "number") {
-    return `Permissão ${user.permission}`;
-  }
-
-  return "Sem perfil";
+  return `Permissão ${user.permission}`;
 }
 
-function getStatusLabel(status?: string | null): string {
+function getStatusLabel(status: string): string {
   if (!status) {
     return "Sem status";
   }
@@ -72,8 +68,7 @@ function filterUsers(users: PlatformOrganizationUser[], searchTerm: string) {
   return users.filter((user) => {
     const searchableValues = [
       user.name,
-      user.login ?? "",
-      user.email ?? "",
+      user.login,
       getUserProfileLabel(user),
       getStatusLabel(user.status),
     ];

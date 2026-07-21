@@ -15,6 +15,7 @@ const platformServiceSource = await readFile(
   new URL("./services/platformService.ts", import.meta.url),
   "utf8",
 );
+const superAdminTypesSource = await readFile(new URL("./types.ts", import.meta.url), "utf8");
 const usePlatformOrganizationsSource = await readFile(
   new URL("./hooks/usePlatformOrganizations.ts", import.meta.url),
   "utf8",
@@ -39,6 +40,12 @@ const appShellSource = await readFile(
   new URL("../../shared/components/newLayout/AppShell.tsx", import.meta.url),
   "utf8",
 );
+
+function getInterfaceBlock(source, name) {
+  const match = source.match(new RegExp(`export interface ${name} \\{[\\s\\S]*?\\n\\}`));
+  assert.ok(match, `${name} interface not found`);
+  return match[0];
+}
 
 await runTest("platformService exposes organization user operations", () => {
   assert.match(platformServiceSource, /async listUsers\(/);
@@ -69,6 +76,29 @@ await runTest(
     assert.match(platformServiceSource, /unwrapData<PlatformUserDeleteResponse>/);
   },
 );
+
+await runTest("platform organization user DTO keeps selected response keys required", () => {
+  const userBlock = getInterfaceBlock(superAdminTypesSource, "PlatformOrganizationUser");
+  const listBlock = getInterfaceBlock(superAdminTypesSource, "PlatformUsersListResponse");
+
+  assert.doesNotMatch(userBlock, /\?:/);
+  assert.doesNotMatch(userBlock, /\bemail\b/);
+  assert.doesNotMatch(userBlock, /\bcreated_at\b/);
+  assert.doesNotMatch(userBlock, /\bupdated_at\b/);
+  assert.match(userBlock, /login: string;/);
+  assert.match(userBlock, /department_id: string;/);
+  assert.match(userBlock, /permission: number;/);
+  assert.match(userBlock, /type: "owner" \| "admin" \| "user" \| null;/);
+  assert.match(userBlock, /status: string;/);
+  assert.match(userBlock, /photo_url: string \| null;/);
+  assert.match(userBlock, /joined_at: string \| null;/);
+  assert.match(userBlock, /organization_id: string;/);
+  assert.match(userBlock, /first_owner_flag: boolean \| null;/);
+  assert.match(userBlock, /permission_id: string \| null;/);
+  assert.match(listBlock, /skip: number;/);
+  assert.match(listBlock, /take: number;/);
+  assert.doesNotMatch(listBlock, /skip\?:|take\?:/);
+});
 
 await runTest("organization filters use platform organization enum values", () => {
   assert.match(organizationDirectorySource, /value: "trial"/);
