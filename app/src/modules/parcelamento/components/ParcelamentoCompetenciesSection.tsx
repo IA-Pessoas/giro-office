@@ -77,8 +77,8 @@ function installmentLabel(installment: ParcelamentoInstallment) {
 function DataPoint({ label, value }: { label: string; value: string }) {
   return (
     <div className="text-center">
-      <dt className="text-xs text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className="font-medium text-gray-900 dark:text-white">{value}</dd>
+      <dt className="text-sm text-gray-500 dark:text-gray-400">{label}</dt>
+      <dd className="text-base font-semibold text-gray-900 dark:text-white">{value}</dd>
     </div>
   );
 }
@@ -97,6 +97,7 @@ export function ParcelamentoCompetenciesSection({
 }: ParcelamentoCompetenciesSectionProps) {
   const [selectedInstallmentId, setSelectedInstallmentId] = useState("");
   const [isInstallmentMenuOpen, setIsInstallmentMenuOpen] = useState(false);
+  const [isInstallmentRequiredDialogOpen, setIsInstallmentRequiredDialogOpen] = useState(false);
   const [page, setPage] = useState(FIRST_PAGE);
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
   const [editingCompetency, setEditingCompetency] =
@@ -125,6 +126,7 @@ export function ParcelamentoCompetenciesSection({
   );
   const createMutation = useCreateParcelamentoCompetency();
   const updateMutation = useUpdateParcelamentoCompetency();
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const competencies = competenciesQuery.data?.items ?? [];
   const total = competenciesQuery.data?.total ?? 0;
   const totalPages = Math.max(FIRST_PAGE, Math.ceil(total / PAGE_SIZE));
@@ -142,6 +144,7 @@ export function ParcelamentoCompetenciesSection({
   useEffect(() => {
     setSelectedInstallmentId("");
     setIsInstallmentMenuOpen(false);
+    setIsInstallmentRequiredDialogOpen(false);
     setPage(FIRST_PAGE);
     closeForm();
   }, [selectedClient?.id]);
@@ -173,6 +176,19 @@ export function ParcelamentoCompetenciesSection({
     updateMutation.reset();
     setEditingCompetency(null);
     setFormMode("create");
+  }
+
+  function handleCreateButtonClick() {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!selectedInstallmentId) {
+      setIsInstallmentRequiredDialogOpen(true);
+      return;
+    }
+
+    openCreateForm();
   }
 
   function openEditForm(competency: ParcelamentoInstallmentCompetency) {
@@ -218,12 +234,10 @@ export function ParcelamentoCompetenciesSection({
         {canEdit ? (
           <button
             type="button"
-            onClick={openCreateForm}
-            disabled={!selectedInstallmentId}
-            aria-disabled={!selectedInstallmentId}
-            className={`${parcelamentoPrimaryButtonClassName} ${
-              !selectedInstallmentId ? "cursor-not-allowed opacity-60" : ""
-            }`}
+            onClick={handleCreateButtonClick}
+            disabled={isSubmitting}
+            aria-disabled={isSubmitting}
+            className={parcelamentoPrimaryButtonClassName}
           >
             <Plus className="h-4 w-4" />
             Nova competência
@@ -363,8 +377,8 @@ export function ParcelamentoCompetenciesSection({
         }}
         title={formMode === "edit" ? "Editar competência" : "Nova competência"}
         description="Formulário de competência."
-        contentClassName="w-[min(94vw,920px)]"
-        bodyClassName="max-h-[72vh] overflow-y-auto"
+        contentClassName="w-[min(94vw,960px)]"
+        bodyClassName="py-3"
       >
         {formMode ? (
           <ParcelamentoCompetencyForm
@@ -377,6 +391,28 @@ export function ParcelamentoCompetenciesSection({
             onUpdate={handleUpdate}
           />
         ) : null}
+      </Dialog>
+
+      <Dialog
+        open={isInstallmentRequiredDialogOpen}
+        onOpenChange={setIsInstallmentRequiredDialogOpen}
+        title="Selecione um parcelamento"
+        description="Selecione um parcelamento antes de criar uma competência."
+        contentClassName="w-[min(92vw,420px)]"
+        bodyClassName="space-y-4"
+      >
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Para criar uma competência, primeiro selecione o parcelamento nesta seção.
+        </p>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setIsInstallmentRequiredDialogOpen(false)}
+            className={parcelamentoPrimaryButtonClassName}
+          >
+            Entendi
+          </button>
+        </div>
       </Dialog>
 
       <div className="mt-4">
@@ -410,52 +446,54 @@ export function ParcelamentoCompetenciesSection({
           />
         ) : (
           <div className="grid gap-3">
-            {competencies.map((competency) => (
-              <article
-                key={competency.id}
-                className="grid gap-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
-              >
-                <div className="min-w-0">
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+            {competencies.map((competency) => {
+              const competencyNote = competency.notes || competency.download_notes;
+              const competencyNoteLabel = competency.notes ? "Observação" : "Download";
+
+              return (
+                <article
+                  key={competency.id}
+                  className="grid gap-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-stretch"
+                >
+                  <div className="min-w-0">
+                    <h4 className="text-base font-semibold text-gray-900 dark:text-white">
                       Competência {competency.competence}
                     </h4>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+
+                    <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-[repeat(5,minmax(5rem,7rem))] sm:justify-start">
+                      <DataPoint label="Pagas" value={String(competency.how_many_paid)} />
+                      <DataPoint label="Vencidas" value={String(competency.how_many_overdue)} />
+                      <DataPoint label="Download" value={competency.download ? "Sim" : "Não"} />
+                      <DataPoint label="Upload" value={formatBoolean(competency.upload_file)} />
+                      <DataPoint label="Enviado" value={formatBoolean(competency.is_sent)} />
+                    </dl>
+
+                    {competencyNote ? (
+                      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        {competencyNoteLabel}: {competencyNote}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-col items-start gap-2 sm:min-w-32 sm:items-end sm:justify-between">
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       Valor {formatCurrency(competency.installment_amount)}
                     </p>
+
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => openEditForm(competency)}
+                        className={`${parcelamentoSecondaryButtonClassName} min-h-10 min-w-28`}
+                      >
+                        <Edit3 className="h-4 w-4" />
+                        Editar
+                      </button>
+                    ) : null}
                   </div>
-
-                  <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-[minmax(4rem,0.7fr)_minmax(5rem,0.8fr)_minmax(5rem,0.8fr)_minmax(5rem,0.8fr)_minmax(5rem,0.8fr)]">
-                    <DataPoint label="Pagas" value={String(competency.how_many_paid)} />
-                    <DataPoint label="Vencidas" value={String(competency.how_many_overdue)} />
-                    <DataPoint label="Download" value={competency.download ? "Sim" : "Não"} />
-                    <DataPoint label="Upload" value={formatBoolean(competency.upload_file)} />
-                    <DataPoint label="Enviado" value={formatBoolean(competency.is_sent)} />
-                  </dl>
-
-                  {competency.notes || competency.download_notes || competency.submission_type ? (
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                      {competency.notes ??
-                        competency.download_notes ??
-                        competency.submission_type}
-                    </p>
-                  ) : null}
-                </div>
-
-                {canEdit ? (
-                  <div className="flex justify-start sm:min-w-24 sm:justify-end">
-                    <button
-                      type="button"
-                      onClick={() => openEditForm(competency)}
-                      className={parcelamentoSecondaryButtonClassName}
-                    >
-                      <Edit3 className="h-4 w-4" />
-                      Editar
-                    </button>
-                  </div>
-                ) : null}
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

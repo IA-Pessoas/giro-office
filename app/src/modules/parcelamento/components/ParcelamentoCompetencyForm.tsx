@@ -107,7 +107,7 @@ function Field({
   required?: boolean;
 }) {
   return (
-    <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+    <label className="flex flex-col gap-1.5 text-sm text-gray-700 dark:text-gray-300">
       <span>
         {label}
         {required ? <span className="text-red-500"> *</span> : null}
@@ -189,7 +189,7 @@ export function ParcelamentoCompetencyForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-3">
       <p className="text-sm text-gray-600 dark:text-gray-400">
         {isEditing ? "A competência não pode ser alterada." : "Informe a competência mensal."}
       </p>
@@ -204,7 +204,7 @@ export function ParcelamentoCompetencyForm({
         </p>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
         <Field label="Competência" required={!isEditing}>
           <input
             type="month"
@@ -289,22 +289,22 @@ export function ParcelamentoCompetencyForm({
             className={parcelamentoTextFieldClassName}
           />
         </Field>
-      </div>
 
-      <label className={`${parcelamentoCheckboxCardClassName} w-fit`}>
-        <input
-          type="checkbox"
-          checked={formState.download}
-          onChange={(event) => updateField("download", event.target.checked)}
-          disabled={isDisabled}
-          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-        />
-        Arquivo baixado
-      </label>
+        <label className={`${parcelamentoCheckboxCardClassName} self-end w-fit`}>
+          <input
+            type="checkbox"
+            checked={formState.download}
+            onChange={(event) => updateField("download", event.target.checked)}
+            disabled={isDisabled}
+            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          Arquivo baixado
+        </label>
+      </div>
 
       <Field label="Notas">
         <textarea
-          rows={3}
+          rows={2}
           value={formState.notes}
           onChange={(event) => updateField("notes", event.target.value)}
           disabled={isDisabled}

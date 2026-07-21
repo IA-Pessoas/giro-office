@@ -560,9 +560,18 @@ runTest("parcelamento competencies match installments modal and density patterns
   );
 
   assert.match(section, /Dialog/);
-  assert.match(section, /contentClassName="w-\[min\(94vw,920px\)\]"/);
-  assert.match(section, /bodyClassName="max-h-\[72vh\] overflow-y-auto"/);
-  assert.match(section, /sm:grid-cols-\[minmax\(0,1fr\)_auto\] sm:items-end/);
+  assert.match(section, /contentClassName="w-\[min\(94vw,960px\)\]"/);
+  assert.match(section, /bodyClassName="py-3"/);
+  assert.doesNotMatch(section, /bodyClassName="max-h-\[72vh\] overflow-y-auto"/);
+  assert.match(section, /sm:grid-cols-\[minmax\(0,1fr\)_auto\] sm:items-stretch/);
+  assert.match(section, /function handleCreateButtonClick/);
+  assert.match(section, /isInstallmentRequiredDialogOpen/);
+  assert.match(section, /setIsInstallmentRequiredDialogOpen\(true\)/);
+  assert.match(section, /aria-disabled=\{isSubmitting\}/);
+  assert.match(section, /disabled=\{isSubmitting\}/);
+  assert.doesNotMatch(section, /disabled=\{!selectedInstallmentId\}/);
+  assert.doesNotMatch(section, /!selectedInstallmentId \? "cursor-not-allowed opacity-60" : ""/);
+  assert.match(section, /Selecione um parcelamento antes de criar uma competência\./);
   assert.match(section, /mt-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between/);
   assert.match(section, /sm:w-80 lg:w-96/);
   assert.match(section, /role="listbox"/);
@@ -573,8 +582,39 @@ runTest("parcelamento competencies match installments modal and density patterns
   assert.doesNotMatch(section, /lg:w-\[min\(100%,42rem\)\]/);
   assert.doesNotMatch(section, /min-w-44/);
   assert.doesNotMatch(section, />\s*Cliente\s*</);
+  assert.match(section, /<dt className="text-sm text-gray-500 dark:text-gray-400">/);
+  assert.match(section, /<dd className="text-base font-semibold text-gray-900 dark:text-white">/);
+  assert.match(section, /<h4 className="text-base font-semibold text-gray-900 dark:text-white">/);
+  assert.match(
+    section,
+    /<div className="flex flex-col items-start gap-2 sm:min-w-32 sm:items-end sm:justify-between">[\s\S]*Valor \{formatCurrency\(competency\.installment_amount\)\}[\s\S]*\{canEdit \? \(/,
+  );
+  assert.match(
+    section,
+    /className=\{`\$\{parcelamentoSecondaryButtonClassName\} min-h-10 min-w-28`\}/,
+  );
+  assert.doesNotMatch(
+    section,
+    /<p className="mt-0\.5 text-sm text-gray-500 dark:text-gray-400">\s*Valor/,
+  );
+  assert.match(section, /sm:grid-cols-\[repeat\(5,minmax\(5rem,7rem\)\)\] sm:justify-start/);
+  assert.match(section, /const competencyNote = competency\.notes \|\| competency\.download_notes/);
+  assert.doesNotMatch(section, /competency\.notes \|\| competency\.download_notes \|\| competency\.submission_type/);
+  assert.doesNotMatch(section, /competency\.notes \?\?[\s\S]*competency\.submission_type/);
   assert.doesNotMatch(form, /<select/);
   assert.match(form, /ParcelamentoNativeSelect/);
+  assert.match(form, /<form onSubmit=\{handleSubmit\} className="space-y-3">/);
+  assert.match(form, /<div className="grid gap-3 md:grid-cols-3">/);
+  assert.match(form, /rows=\{2\}/);
+  assert.doesNotMatch(form, /className="space-y-4"/);
+  assert.match(
+    form,
+    /<Field label="Tipo de envio">[\s\S]*<Field label="Observação do download">[\s\S]*<label className=\{`\$\{parcelamentoCheckboxCardClassName\} self-end w-fit`\}>[\s\S]*Arquivo baixado[\s\S]*<\/div>\s*<Field label="Notas">/,
+  );
+  assert.doesNotMatch(
+    form,
+    /<\/div>\s*<label className=\{`\$\{parcelamentoCheckboxCardClassName\} w-fit`\}>[\s\S]*Arquivo baixado/,
+  );
   assert.match(nativeSelect, /ChevronDown/);
   assert.match(nativeSelect, /appearance-none/);
 });
