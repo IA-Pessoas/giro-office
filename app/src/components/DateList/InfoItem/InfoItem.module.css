@@ -1,0 +1,14 @@
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.label {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.value {
+  color: #334155;
+}

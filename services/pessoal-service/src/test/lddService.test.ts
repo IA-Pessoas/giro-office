@@ -1,0 +1,142 @@
+import "./envBootstrap.js";
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LddService } from "../services/lddService.js";
+import {
+  clientId,
+  createAuditMock,
+  organizationId,
+  recordId,
+  userId,
+} from "./pessoalCoreTestUtils.js";
+
+function createPrismaMock() {
+  return {
+    client: {
+      findFirst: vi.fn(
+        async (): Promise<{ id: string; organization_id: string } | null> => ({
+          id: clientId,
+          organization_id: organizationId,
+        }),
+      ),
+    },
+    lddPessoal: {
+      create: vi.fn(async ({ data }) => ({ id: recordId, ...data })),
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async () => ({
+        id: recordId,
+        client_id: clientId,
+        organization_id: organizationId,
+      })),
+      update: vi.fn(async ({ data }) => ({ id: recordId, client_id: clientId, ...data })),
+      delete: vi.fn(async () => ({
+        id: recordId,
+        client_id: clientId,
+        organization_id: organizationId,
+      })),
+    },
+  };
+}
+
+describe("LddService", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("cria LDD com organization_id e registra auditoria", async () => {
+    const prisma = createPrismaMock();
+    const audit = createAuditMock();
+    const service = new LddService(prisma as never, audit);
+
+    const result = await service.create(
+      { organizationId, userId, permission: 2 },
+      { client_id: clientId, type: "FGTS", period: "Mensal" },
+    );
+
+    expect(prisma.client.findFirst).toHaveBeenCalledWith({
+      where: { id: clientId, organization_id: organizationId },
+      select: { id: true },
+    });
+    expect(prisma.lddPessoal.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ client_id: clientId, organization_id: organizationId }),
+      }),
+    );
+    expect(audit.recordChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Cadastro",
+        organizationId,
+        userId,
+        referring: "pessoal.ldd",
+        referringId: recordId,
+      }),
+    );
+    expect(result).toMatchObject({ id: recordId, client_id: clientId });
+  });
+
+  it("lista LDD apenas da organizacao autenticada", async () => {
+    const prisma = createPrismaMock();
+    const service = new LddService(prisma as never, createAuditMock());
+
+    await service.list({ organizationId }, { client_id: clientId });
+
+    expect(prisma.lddPessoal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: organizationId, client_id: clientId },
+      }),
+    );
+  });
+
+  it("lista LDD por organizacao quando client_id nao e informado", async () => {
+    const prisma = createPrismaMock();
+    const service = new LddService(prisma as never, createAuditMock());
+
+    await service.list({ organizationId }, {});
+
+    expect(prisma.lddPessoal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: organizationId },
+      }),
+    );
+  });
+
+  it("atualiza LDD escopado por organizacao", async () => {
+    const prisma = createPrismaMock();
+    const service = new LddService(prisma as never, createAuditMock());
+
+    await service.update({ organizationId, userId }, recordId, { status: "Regular" });
+
+    expect(prisma.lddPessoal.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: recordId, organization_id: organizationId } }),
+    );
+    expect(prisma.lddPessoal.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: recordId }, data: { status: "Regular" } }),
+    );
+  });
+
+  it("remove LDD e audita snapshot do registro", async () => {
+    const prisma = createPrismaMock();
+    const audit = createAuditMock();
+    const service = new LddService(prisma as never, audit);
+
+    await service.delete({ organizationId, userId }, recordId);
+
+    expect(prisma.lddPessoal.delete).toHaveBeenCalledWith({ where: { id: recordId } });
+    expect(audit.recordChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Exclusao",
+        changes: expect.objectContaining({ id: recordId, organization_id: organizationId }),
+      }),
+    );
+  });
+
+  it("rejeita cliente fora da organizacao", async () => {
+    const prisma = createPrismaMock();
+    prisma.client.findFirst.mockResolvedValueOnce(null);
+    const service = new LddService(prisma as never, createAuditMock());
+
+    await expect(
+      service.create({ organizationId, userId }, { client_id: clientId, type: "FGTS" }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
