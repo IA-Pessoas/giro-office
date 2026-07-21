@@ -54,8 +54,7 @@ export interface PlatformOrganizationUser {
 export interface PlatformUsersListResponse {
   users: PlatformOrganizationUser[];
   total: number;
-  skip: number;
-  take: number;
+  hasMore: boolean;
 }
 
 export type PlatformUserMutationInput = Record<string, unknown>;

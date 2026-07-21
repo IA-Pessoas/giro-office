@@ -220,8 +220,7 @@ class UserService {
   async list({ skip = 0, take = 20, organizationId }: ListUsersParams): Promise<{
     users: UserPublicRow[];
     total: number;
-    skip: number;
-    take: number;
+    hasMore: boolean;
   }> {
     const where = { organization_id: organizationId };
     const [users, total] = await Promise.all([
@@ -235,7 +234,7 @@ class UserService {
       prismaClient.user.count({ where }),
     ]);
 
-    return { users, total, skip, take };
+    return { users, total, hasMore: skip + users.length < total };
   }
 
   async getById(id: string, organizationId: string): Promise<UserPublicRow> {

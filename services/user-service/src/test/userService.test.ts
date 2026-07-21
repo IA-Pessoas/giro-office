@@ -95,18 +95,17 @@ describe("UserService", () => {
     );
   });
 
-  it("list retorna usuários da organização com paginação", async () => {
-    prismaMock.user.findMany.mockResolvedValue([{ id: "user-1" }]);
-    prismaMock.user.count.mockResolvedValue(1);
+  it("list retorna usuários da organização com hasMore", async () => {
+    prismaMock.user.findMany.mockResolvedValue([{ id: "user-1" }, { id: "user-2" }]);
+    prismaMock.user.count.mockResolvedValue(3);
     const service = new UserService();
 
-    const result = await service.list({ skip: 0, take: 10, organizationId: "org-1" });
+    const result = await service.list({ skip: 0, take: 2, organizationId: "org-1" });
 
     expect(result).toEqual({
-      users: [{ id: "user-1" }],
-      total: 1,
-      skip: 0,
-      take: 10,
+      users: [{ id: "user-1" }, { id: "user-2" }],
+      total: 3,
+      hasMore: true,
     });
     expect(prismaMock.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

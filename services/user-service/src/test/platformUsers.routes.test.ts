@@ -15,7 +15,7 @@ describe("platform organization user routes", () => {
   });
 
   it("GET /platform/organizations/:organizationId/users lista usuarios da organizacao alvo", async () => {
-    userServiceMock.list.mockResolvedValue({ users: [{ id: "user-1" }], total: 1 });
+    userServiceMock.list.mockResolvedValue({ users: [{ id: "user-1" }], total: 1, hasMore: false });
     const app = createTestApp();
 
     const res = await request(app)
@@ -24,6 +24,13 @@ describe("platform organization user routes", () => {
       .query({ skip: 0, take: 20 });
 
     expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({
+      users: [{ id: "user-1" }],
+      total: 1,
+      hasMore: false,
+    });
+    expect(res.body.data).not.toHaveProperty("skip");
+    expect(res.body.data).not.toHaveProperty("take");
     expect(userServiceMock.list).toHaveBeenCalledWith({
       skip: 0,
       take: 20,

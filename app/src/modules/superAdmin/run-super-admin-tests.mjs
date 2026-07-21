@@ -95,9 +95,8 @@ await runTest("platform organization user DTO keeps selected response keys requi
   assert.match(userBlock, /organization_id: string;/);
   assert.match(userBlock, /first_owner_flag: boolean \| null;/);
   assert.match(userBlock, /permission_id: string \| null;/);
-  assert.match(listBlock, /skip: number;/);
-  assert.match(listBlock, /take: number;/);
-  assert.doesNotMatch(listBlock, /skip\?:|take\?:/);
+  assert.match(listBlock, /hasMore: boolean;/);
+  assert.doesNotMatch(listBlock, /skip|take/);
 });
 
 await runTest("organization filters use platform organization enum values", () => {
