@@ -748,6 +748,26 @@ await runTest("ti inventory and terms tabs use shared controls for filters and d
   }
 });
 
+await runTest("ti inventory tab uses current backend field names", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+  const typeSource = await readModuleSource("types/inventory.ts");
+
+  assert.match(source, /asset\.asset_code/);
+  assert.match(source, /asset\.user/);
+  assert.match(source, /asset\.responsible_it_staff/);
+  assert.match(source, /asset_code: getFormText\(formData, "asset_code"\)/);
+  assert.match(source, /user_id: userId/);
+  assert.match(source, /name="asset_code"/);
+  assert.match(source, /name="user_id"/);
+  assert.match(typeSource, /asset_code\?: string/);
+  assert.match(typeSource, /user_id\?: TiId \| null/);
+  assert.match(typeSource, /responsible_it_staff\?:/);
+  assert.doesNotMatch(source, /code: getFormText\(formData, "code"\)/);
+  assert.doesNotMatch(source, /assigned_user_id: userId/);
+  assert.doesNotMatch(source, /status: getFormText\(formData, "status"\)/);
+  assert.doesNotMatch(source, /name="status"/);
+});
+
 await runTest("ti inventory tab exposes assets, categories, departments, assignment and return actions", async () => {
   const source = await readModuleSource("components/TiInventoryTab.tsx");
   const controlsSource = await readModuleSource("components/tiFormControls.tsx");
@@ -846,15 +866,20 @@ await runTest("ti inventory category form sends the backend category contract", 
   assert.doesNotMatch(categoryPayloadSource, /status\?: string \| boolean/);
 });
 
-await runTest("ti inventory copy uses department and serial number labels", async () => {
+await runTest("ti inventory copy uses backend inventory labels", async () => {
   const source = await readModuleSource("components/TiInventoryTab.tsx");
 
-  assert.match(source, /placeholder="Nome, código ou nº de série"/);
-  assert.match(source, /label="Nº de série"/);
+  assert.match(source, /placeholder="Código patrimonial"/);
+  assert.match(source, /label="Código patrimonial"/);
+  assert.match(source, /label="Responsável TI"/);
   assert.match(source, /label="Departamento"/);
-  assert.match(source, /headers=\{\["Ativo", "Categoria", "Departamento"/);
+  assert.match(source, /"Ativo"/);
+  assert.match(source, /"Categoria"/);
+  assert.match(source, /"Departamento"/);
+  assert.match(source, /"Usuário"/);
   assert.match(source, /Departamento sem nome/);
   assert.doesNotMatch(source, /placeholder="Nome, código ou serial"/);
+  assert.doesNotMatch(source, /label="Nº de série"/);
   assert.doesNotMatch(source, /label="Serial"/);
   assert.doesNotMatch(source, /label="Local"/);
   assert.doesNotMatch(source, /title="Locais"/);

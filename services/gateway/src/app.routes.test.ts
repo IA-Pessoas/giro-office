@@ -14,7 +14,7 @@ import {
 } from "@workspace/shared";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
 import jwt from "jsonwebtoken";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 
 import { createApp } from "./app.js";
 import type { GatewayEnv } from "./config/env.js";
@@ -174,6 +174,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     certificateServiceInternalToken: "certificate-service-token",
     pessoalServiceUrl: "http://127.0.0.1:3042",
     parcelamentoServiceUrl: "http://127.0.0.1:3043",
+    databaseUrl: "postgres://test:test@127.0.0.1:5432/gateway_test",
 
     jwtSecret: "test-secret",
     logLevel: "silent",
@@ -200,6 +201,87 @@ function createToken(
 ): string {
   return jwt.sign(claims, secret);
 }
+
+it("returns real dashboard stats for the authenticated organization", async () => {
+  const getStats = vi.fn(async (_organizationId: string) => ({
+    updatedAt: "2026-07-21T15:30:00.000Z",
+    totalClients: 1146,
+    clientsByService: {
+      contabil: 452,
+      fiscal: 792,
+      pessoal: 835,
+      infoproduto: 30,
+      consultoria: 7,
+      castelo_med: 23,
+    },
+    monthlyTrends: [{ month: "Jul", newClients: 1146 }],
+    fiscal: {
+      obligations: [
+        { status: "Pendente", count: 0 },
+        { status: "Emitida", count: 0 },
+        { status: "Atrasada", count: 0 },
+      ],
+    },
+    recentClients: [],
+    insights: [],
+    tasks: {
+      today: 0,
+      completedToday: 0,
+      pending: 13605,
+      urgent: 0,
+    },
+    notifications: {
+      total: 0,
+      urgent: 0,
+      pending: 0,
+    },
+    projects: {
+      active: 331,
+      completed: 749,
+      inProgress: 283,
+      delayed: 283,
+      waiting: 47,
+    },
+    revenue: {
+      currentMonth: 0,
+      target: 0,
+      monthly: [{ month: "Jul", revenue: 0, expenses: 0 }],
+    },
+    performance: [{ week: "Sem 1", tasks: 10, completed: 5 }],
+    pendingTasks: [],
+    activities: [],
+  }));
+  const app = createApp(createEnv(), createTestLogger(), {
+    dashboardStatsService: { getStats },
+  });
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-dashboard",
+    permission: 1,
+  });
+
+  try {
+    const response = await fetch(`${baseUrl}/dashboard/stats`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = (await response.json()) as {
+      success?: boolean;
+      data?: { totalClients?: number; revenue?: { currentMonth?: number } };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data?.totalClients).toBe(1146);
+    expect(body.data?.revenue?.currentMonth).toBe(0);
+    expect(getStats).toHaveBeenCalledWith("org-dashboard");
+  } finally {
+    await stopServer(server);
+  }
+});
 
 it("returns shared unauthorized response when token is missing", async () => {
   const app = createApp(createEnv(), createTestLogger());

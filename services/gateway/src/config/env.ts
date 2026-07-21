@@ -104,6 +104,10 @@ const gatewayEnvSchema = z
       .optional()
       .transform((value) => parseOptionalString(value))
       .pipe(z.union([z.string().url(), z.undefined()])),
+    databaseUrl: z
+      .string()
+      .optional()
+      .transform((value) => parseOptionalString(value)),
     publicGatewayUrl: optionalUrlEnvSchema,
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o gateway."),
     logLevel: loggerLevelSchema.optional().default("info"),
@@ -193,6 +197,7 @@ export interface GatewayEnv {
   pessoalServiceUrl: string;
   parcelamentoServiceUrl: string;
   websocketUpstreamUrl?: string;
+  databaseUrl?: string;
   publicGatewayUrl?: string;
   jwtSecret: string;
   logLevel: LoggerLevel;
@@ -229,6 +234,7 @@ export function getGatewayEnv(): GatewayEnv {
     pessoalServiceUrl: process.env.PESSOAL_SERVICE_URL,
     parcelamentoServiceUrl: process.env.PARCELAMENTO_SERVICE_URL,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
+    databaseUrl: process.env.DATABASE_URL,
     publicGatewayUrl: process.env.GATEWAY_PUBLIC_URL,
     jwtSecret: process.env.JWT_SECRET,
     logLevel: process.env.LOG_LEVEL,

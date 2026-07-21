@@ -25,10 +25,16 @@ import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
+import { createDashboardRoutes, type DashboardStatsProvider } from "./routes/dashboard.routes.js";
+import { DashboardStatsService } from "./services/dashboardStatsService.js";
 
 type GatewayOpenApiSpec = ReturnType<typeof buildGatewayOpenApiSpec>;
 type AuditRecorder = ReturnType<typeof createAuditRecorder>;
 type GatewayProxy = ReturnType<typeof buildHttpProxyMiddleware>;
+
+export interface GatewayAppDeps {
+  dashboardStatsService?: DashboardStatsProvider;
+}
 
 function getRequestLogger(request: Request, logger: Logger): Logger {
   return (
@@ -318,6 +324,13 @@ function mountProtectedBlockedRoutes(app: express.Express): void {
   });
 }
 
+function mountDashboardRoutes(
+  app: express.Express,
+  dashboardStatsService: DashboardStatsProvider,
+): void {
+  app.use("/dashboard", createDashboardRoutes(dashboardStatsService));
+}
+
 function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
   const proxyByServiceKey = new Map<string, GatewayProxy>();
 
@@ -385,9 +398,15 @@ function mountErrorHandlers(app: express.Express, env: GatewayEnv, logger: Logge
   );
 }
 
-export function createApp(env: GatewayEnv, logger: Logger): express.Express {
+export function createApp(
+  env: GatewayEnv,
+  logger: Logger,
+  deps: GatewayAppDeps = {},
+): express.Express {
   const app = express();
   const gatewayOpenApiSpec = buildGatewayOpenApiSpec(env);
+  const dashboardStatsService =
+    deps.dashboardStatsService ?? new DashboardStatsService({ databaseUrl: env.databaseUrl });
   const recordAuditRequest = createAuditRecorder({
     enabled: env.auditEnabled,
     serviceUrl: env.auditServiceUrl,
@@ -403,6 +422,7 @@ export function createApp(env: GatewayEnv, logger: Logger): express.Express {
   mountPublicBlockedRoutes(app, env);
   mountAuthenticationBoundary(app, env);
   mountProtectedBlockedRoutes(app);
+  mountDashboardRoutes(app, dashboardStatsService);
   mountServiceRoutes(app, env);
   mountFallbackRoute(app);
   mountErrorHandlers(app, env, logger);

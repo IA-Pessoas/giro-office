@@ -605,7 +605,6 @@ export function Administracao() {
           }),
           invalidateAdminUserLists(),
         ]);
-        await refetchPermissionUsers();
       } catch {
         toast.warn(
           "Permissões salvas, mas a lista de acessos não pôde ser atualizada agora.",
