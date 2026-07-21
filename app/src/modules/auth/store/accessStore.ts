@@ -1,0 +1,72 @@
+import { create } from "zustand";
+
+import {
+  MODULE_KEYS,
+  resolveModuleAccess,
+  type ModuleAccess,
+  type ModuleKey,
+} from "../utils/moduleAccess";
+
+type AccessStoreUser = {
+  id: string;
+  permission: number;
+  department_id?: string;
+  modules?: Record<string, number | null> | null;
+} | null;
+
+type ModuleAccessMap = Record<ModuleKey, ModuleAccess>;
+
+export interface AccessStoreState {
+  user: AccessStoreUser;
+  departmentName: string | null;
+  departmentModule: ModuleKey | null;
+  accessMap: ModuleAccessMap;
+  isLoading: boolean;
+  error: Error | null;
+  isInitialized: boolean;
+}
+
+function createEmptyAccessMap(): ModuleAccessMap {
+  return MODULE_KEYS.reduce<ModuleAccessMap>((acc, moduleKey) => {
+    acc[moduleKey] = resolveModuleAccess({ module: moduleKey });
+    return acc;
+  }, {} as ModuleAccessMap);
+}
+
+const INITIAL_ACCESS_STORE_STATE: AccessStoreState = {
+  user: null,
+  departmentName: null,
+  departmentModule: null,
+  accessMap: createEmptyAccessMap(),
+  isLoading: false,
+  error: null,
+  isInitialized: false,
+};
+
+type AccessStoreActions = {
+  setSnapshot: (nextState: AccessStoreState) => void;
+  resetSnapshot: () => void;
+};
+
+type AccessStoreSnapshot = AccessStoreState & AccessStoreActions;
+
+export const useAccessStore = create<AccessStoreSnapshot>((set) => ({
+  ...INITIAL_ACCESS_STORE_STATE,
+  setSnapshot: (nextState) => set(() => nextState),
+  resetSnapshot: () => set(() => INITIAL_ACCESS_STORE_STATE),
+}));
+
+export function getAccessStoreState(): AccessStoreState {
+  const { setSnapshot, resetSnapshot, ...snapshot } = useAccessStore.getState();
+  void setSnapshot;
+  void resetSnapshot;
+  return snapshot;
+}
+
+export function setAccessStoreState(nextState: AccessStoreState) {
+  useAccessStore.getState().setSnapshot(nextState);
+}
+
+export function resetAccessStoreState() {
+  useAccessStore.getState().resetSnapshot();
+}

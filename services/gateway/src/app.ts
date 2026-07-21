@@ -1,0 +1,456 @@
+import {
+  type AuthLogContext,
+  createAuditRecorder,
+  createExpressErrorHandler,
+  createRateLimitMiddleware,
+  createSecurityHeadersMiddleware,
+  createServiceCorsOptions,
+  createSuccessResponse,
+  type Logger,
+  type LogLevel,
+  ServiceError,
+} from "@workspace/shared";
+import { mountOpenApiDocs } from "@workspace/shared/http";
+import cors from "cors";
+import express, { type NextFunction, type Request, type Response } from "express";
+
+import type { GatewayEnv } from "./config/env.js";
+import {
+  type GatewayServiceDefinition,
+  getGatewayServiceDefinitions,
+  resolveGatewayService,
+} from "./config/serviceRegistry.js";
+import {
+  buildAuditErrorCaptureMiddleware,
+  buildAuditLifecycleMiddleware,
+} from "./middlewares/audit.js";
+import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
+import { authorizeRequest } from "./middlewares/authorize.js";
+import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
+import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
+import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
+
+type GatewayOpenApiSpec = ReturnType<typeof buildGatewayOpenApiSpec>;
+type AuditRecorder = ReturnType<typeof createAuditRecorder>;
+type GatewayProxy = ReturnType<typeof buildHttpProxyMiddleware>;
+
+function getRequestLogger(request: Request, logger: Logger): Logger {
+  return (
+    request.log ??
+    logger.child({
+      request: {
+        id: request.requestId,
+        method: request.method,
+        path: request.path,
+        ip: request.ip || undefined,
+      },
+    })
+  );
+}
+
+function getAuthLogContext(request: Request): AuthLogContext | undefined {
+  if (!request.auth) {
+    return undefined;
+  }
+
+  return {
+    userId: request.auth.userId,
+    organizationId: request.auth.organizationId,
+    permission:
+      typeof request.auth.claims.permission === "number"
+        ? request.auth.claims.permission
+        : undefined,
+  };
+}
+
+function getUpstreamContext(url: string, request: Request) {
+  try {
+    const upstreamUrl = new URL(request.originalUrl, url);
+
+    return {
+      host: upstreamUrl.host,
+      method: request.method,
+      path: upstreamUrl.pathname,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function getResponseSizeBytes(response: Response): number | undefined {
+  const header = response.getHeader("content-length");
+
+  if (typeof header === "number") {
+    return header;
+  }
+
+  if (typeof header === "string") {
+    const parsed = Number.parseInt(header, 10);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+
+  return undefined;
+}
+
+function getLevelForStatusCode(statusCode: number): LogLevel {
+  if (statusCode >= 500) {
+    return "error";
+  }
+
+  if (statusCode >= 400) {
+    return "warn";
+  }
+
+  return "info";
+}
+
+function getDurationMs(startedAt: bigint): number {
+  return Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+}
+
+function buildRequestLifecycleMiddleware(logger: Logger) {
+  return function requestLifecycle(request: Request, response: Response, next: NextFunction): void {
+    const startedAt = process.hrtime.bigint();
+    let logged = false;
+
+    const requestLogger = getRequestLogger(request, logger);
+
+    response.once("finish", () => {
+      if (logged) {
+        return;
+      }
+
+      logged = true;
+
+      requestLogger[getLevelForStatusCode(response.statusCode)]({
+        event: "http.request.completed",
+        message: "HTTP request completed",
+        auth: getAuthLogContext(request),
+        http: {
+          statusCode: response.statusCode,
+          durationMs: getDurationMs(startedAt),
+          responseSizeBytes: getResponseSizeBytes(response),
+        },
+      });
+    });
+
+    response.once("close", () => {
+      if (logged || response.writableEnded) {
+        return;
+      }
+
+      logged = true;
+
+      requestLogger.warn({
+        event: "http.request.aborted",
+        message: "HTTP request aborted by client",
+        auth: getAuthLogContext(request),
+        http: {
+          durationMs: getDurationMs(startedAt),
+        },
+      });
+    });
+
+    next();
+  };
+}
+
+function getPublicServerUrl(env: GatewayEnv, request: Request): string {
+  return env.publicGatewayUrl ?? `${request.protocol}://${request.get("host")}`;
+}
+
+function isJsonBodyLimitError(error: Error): boolean {
+  const candidate = error as Error & {
+    status?: unknown;
+    statusCode?: unknown;
+    type?: unknown;
+  };
+
+  return (
+    candidate.type === "entity.too.large" ||
+    candidate.status === 413 ||
+    candidate.statusCode === 413
+  );
+}
+
+function isJsonBodyParseError(error: Error): boolean {
+  const candidate = error as Error & {
+    status?: unknown;
+    statusCode?: unknown;
+    type?: unknown;
+  };
+
+  return (
+    candidate.type === "entity.parse.failed" &&
+    (candidate.status === 400 || candidate.statusCode === 400)
+  );
+}
+
+function normalizeJsonBodyError(
+  error: Error,
+  _request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  if (isJsonBodyParseError(error)) {
+    next(new ServiceError(400, "JSON malformado.", error));
+    return;
+  }
+
+  if (isJsonBodyLimitError(error)) {
+    next(new ServiceError(413, "Corpo da requisição excede o limite permitido.", error));
+    return;
+  }
+
+  next(error);
+}
+
+function configureExpress(app: express.Express, env: GatewayEnv): void {
+  app.set("trust proxy", true);
+  app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
+}
+
+function mountObservability(
+  app: express.Express,
+  env: GatewayEnv,
+  logger: Logger,
+  recordAuditRequest: AuditRecorder,
+): void {
+  app.use(buildRequestContextMiddleware(logger));
+  app.use(
+    buildAuditLifecycleMiddleware({
+      enabled: env.auditEnabled,
+      env,
+      logger,
+      recordAuditRequest,
+    }),
+  );
+  app.use(buildRequestLifecycleMiddleware(logger));
+}
+
+function mountCorsAndParsing(app: express.Express, env: GatewayEnv): void {
+  const corsOptions = createServiceCorsOptions(env.allowedOrigins, "gateway");
+
+  app.use(cors(corsOptions));
+  app.options("*", cors(corsOptions));
+  app.use(express.json({ limit: env.jsonBodyLimit ?? "1mb" }));
+  app.use(normalizeJsonBodyError);
+}
+
+function mountPublicRoutes(
+  app: express.Express,
+  env: GatewayEnv,
+  gatewayOpenApiSpec: GatewayOpenApiSpec,
+): void {
+  app.get("/openapi.json", (request: Request, response: Response) => {
+    response.json({
+      ...gatewayOpenApiSpec,
+      servers: [{ url: getPublicServerUrl(env, request) }],
+    });
+  });
+
+  mountOpenApiDocs(app, {
+    spec: gatewayOpenApiSpec,
+    docsPath: "/docs",
+    jsonPath: "/__gateway-openapi-static.json",
+    specUrl: "/openapi.json",
+    siteTitle: "gateway - OpenAPI",
+  });
+
+  app.get("/health", (_request, response) => {
+    response.status(200).json(
+      createSuccessResponse({
+        status: "ok",
+        service: "gateway",
+      }),
+    );
+  });
+
+  app.get("/ready", (_request, response, next) => {
+    const services = getGatewayServiceDefinitions(env);
+
+    if (services.length === 0) {
+      next(new ServiceError(503, "Gateway sem serviços configurados."));
+      return;
+    }
+
+    response.status(200).json(
+      createSuccessResponse({
+        status: "ready",
+        service: "gateway",
+        services: services.length,
+      }),
+    );
+  });
+}
+
+function mountAuthRateLimits(app: express.Express, env: GatewayEnv): void {
+  const authRateLimit = createRateLimitMiddleware({
+    key: "gateway:auth",
+    max: env.authRateLimitMax,
+    windowMs: env.authRateLimitWindowMs,
+    methods: ["POST"],
+  });
+
+  app.use("/platform/session", authRateLimit);
+  app.use("/user/session", authRateLimit);
+  app.use("/user/start-config", authRateLimit);
+}
+
+function mountPublicBlockedRoutes(app: express.Express, env: GatewayEnv): void {
+  if (!env.auditEnabled) {
+    app.use("/audit", (_request, _response, next) => {
+      next(new ServiceError(404, "Recurso não encontrado."));
+    });
+  }
+}
+
+function mountAuthenticationBoundary(app: express.Express, env: GatewayEnv): void {
+  const generalRateLimit = createRateLimitMiddleware({
+    key: "gateway:general",
+    max: env.rateLimitMax,
+    windowMs: env.rateLimitWindowMs,
+  });
+
+  app.use(buildAuthenticateMiddleware(env.jwtSecret));
+  app.use(generalRateLimit);
+  app.use(authorizeRequest);
+}
+
+function mountProtectedBlockedRoutes(app: express.Express): void {
+  app.use("/regularize/internal", (_request, _response, next) => {
+    next(new ServiceError(404, "Recurso não encontrado."));
+  });
+}
+
+function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
+  const proxyByServiceKey = new Map<string, GatewayProxy>();
+
+  for (const service of getGatewayServiceDefinitions(env)) {
+    proxyByServiceKey.set(
+      service.key,
+      buildHttpProxyMiddleware(service.targetUrl, {
+        internalServiceToken: service.internalServiceToken,
+        permissionModule: service.permissionModule,
+      }),
+    );
+  }
+
+  if (env.auditEnabled) {
+    proxyByServiceKey.set(
+      "audit-service",
+      buildHttpProxyMiddleware(env.auditServiceUrl, {
+        internalServiceToken: env.auditServiceToken,
+      }),
+    );
+  }
+
+  return proxyByServiceKey;
+}
+
+function getMappedServiceProxy(
+  proxyByServiceKey: Map<string, GatewayProxy>,
+  service: GatewayServiceDefinition,
+): GatewayProxy {
+  return (
+    proxyByServiceKey.get(service.key) ??
+    ((_request, _response, next) => {
+      next(new ServiceError(502, "Servico mapeado sem proxy configurado."));
+    })
+  );
+}
+
+function mountPlatformServiceRoutes(
+  app: express.Express,
+  env: GatewayEnv,
+  proxyByServiceKey: Map<string, GatewayProxy>,
+): void {
+  app.use("/platform", (request, response, next) => {
+    const service = resolveGatewayService(env, request.originalUrl);
+
+    if (!service) {
+      next(new ServiceError(404, "Rota nao mapeada no gateway."));
+      return;
+    }
+
+    getMappedServiceProxy(proxyByServiceKey, service)(request, response, next);
+  });
+}
+
+function mountServiceRoutes(app: express.Express, env: GatewayEnv): void {
+  const proxyByServiceKey = buildServiceProxyMap(env);
+
+  mountPlatformServiceRoutes(app, env, proxyByServiceKey);
+
+  for (const service of getGatewayServiceDefinitions(env)) {
+    const proxy = getMappedServiceProxy(proxyByServiceKey, service);
+
+    for (const routePrefix of service.routePrefixes) {
+      app.use(
+        routePrefix,
+        proxy ??
+          ((_request, _response, next) => {
+            next(new ServiceError(502, "Serviço mapeado sem proxy configurado."));
+          }),
+      );
+    }
+  }
+
+  if (env.auditEnabled) {
+    app.use(
+      "/audit",
+      buildHttpProxyMiddleware(env.auditServiceUrl, {
+        internalServiceToken: env.auditServiceToken,
+      }),
+    );
+  }
+}
+
+function mountFallbackRoute(app: express.Express): void {
+  app.use((_request, _response, next) => {
+    next(new ServiceError(404, "Rota não mapeada no gateway."));
+  });
+}
+
+function mountErrorHandlers(app: express.Express, env: GatewayEnv, logger: Logger): void {
+  app.use(buildAuditErrorCaptureMiddleware());
+  app.use(
+    createExpressErrorHandler({
+      logger,
+      event: "gateway.error",
+      fallbackMessage: "Erro interno no gateway.",
+      getContext: (request) => {
+        const service = resolveGatewayService(env, request.originalUrl);
+        return {
+          auth: getAuthLogContext(request),
+          upstream: service ? getUpstreamContext(service.targetUrl, request) : undefined,
+        };
+      },
+    }),
+  );
+}
+
+export function createApp(env: GatewayEnv, logger: Logger): express.Express {
+  const app = express();
+  const gatewayOpenApiSpec = buildGatewayOpenApiSpec(env);
+  const recordAuditRequest = createAuditRecorder({
+    enabled: env.auditEnabled,
+    serviceUrl: env.auditServiceUrl,
+    serviceToken: env.auditServiceToken,
+    logger,
+  });
+
+  configureExpress(app, env);
+  mountObservability(app, env, logger, recordAuditRequest);
+  mountCorsAndParsing(app, env);
+  mountPublicRoutes(app, env, gatewayOpenApiSpec);
+  mountAuthRateLimits(app, env);
+  mountPublicBlockedRoutes(app, env);
+  mountAuthenticationBoundary(app, env);
+  mountProtectedBlockedRoutes(app);
+  mountServiceRoutes(app, env);
+  mountFallbackRoute(app);
+  mountErrorHandlers(app, env, logger);
+
+  return app;
+}

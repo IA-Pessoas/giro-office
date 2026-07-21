@@ -1,0 +1,46 @@
+.link {
+  text-decoration: none;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--main-opacity, #64748b);
+  background: transparent;
+  color: var(--main-opacity, #64748b);
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.button:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+
+.button[data-color="colors.yellow"] {
+  color: #ca8a04;
+  border-color: #ca8a04;
+}
+
+.button[data-color="colors.green"] {
+  color: #16a34a;
+  border-color: #16a34a;
+}
+
+.button[data-color="colors.grey"] {
+  color: #6b7280;
+  border-color: #6b7280;
+}
