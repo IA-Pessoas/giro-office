@@ -5,6 +5,7 @@ import type {
   CreateParcelamentoPanoramaPayload,
   ParcelamentoClientOption,
   ParcelamentoPanorama,
+  ParcelamentoResponsibleUser,
   PatchParcelamentoPanoramaPayload,
 } from "../types";
 import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
@@ -14,6 +15,7 @@ import {
   parcelamentoSecondaryButtonClassName,
   parcelamentoTextFieldClassName,
 } from "./parcelamentoFormControls";
+import { ParcelamentoNativeSelect } from "./ParcelamentoNativeSelect";
 
 type PanoramaBooleanField =
   | "cnd_municipal"
@@ -33,6 +35,8 @@ type PanoramaFormState = Record<PanoramaBooleanField, boolean> & {
 interface ParcelamentoPanoramaFormProps {
   selectedClient: ParcelamentoClientOption | null;
   canEdit: boolean;
+  responsibleUsers?: ParcelamentoResponsibleUser[];
+  isResponsibleUsersLoading?: boolean;
   initialValue?: ParcelamentoPanorama | null;
   isSubmitting: boolean;
   submitError: unknown;
@@ -94,6 +98,8 @@ function Field({
 export function ParcelamentoPanoramaForm({
   selectedClient,
   canEdit,
+  responsibleUsers = [],
+  isResponsibleUsersLoading = false,
   initialValue,
   isSubmitting,
   submitError,
@@ -105,6 +111,10 @@ export function ParcelamentoPanoramaForm({
   const [localError, setLocalError] = useState<string | null>(null);
   const isEditing = Boolean(initialValue);
   const isDisabled = !canEdit || isSubmitting;
+  const currentResponsibleId = initialValue?.responsavel_id?.trim() ?? "";
+  const shouldShowCurrentResponsible =
+    currentResponsibleId.length > 0 &&
+    !responsibleUsers.some((responsibleUser) => responsibleUser.id === currentResponsibleId);
   const errorMessage =
     localError ??
     (submitError
@@ -172,11 +182,11 @@ export function ParcelamentoPanoramaForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        {isEditing
-          ? "Cliente e competência não podem ser alterados."
-          : "O panorama será criado para o cliente selecionado."}
-      </p>
+      {isEditing ? (
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Cliente e competência não podem ser alterados.
+        </p>
+      ) : null}
 
       {errorMessage ? (
         <p
@@ -206,14 +216,22 @@ export function ParcelamentoPanoramaForm({
             className={parcelamentoTextFieldClassName}
           />
         </Field>
-        <Field label="Responsável ID">
-          <input
-            type="text"
+        <Field label="Responsável">
+          <ParcelamentoNativeSelect
             value={formState.responsavel_id}
             onChange={(event) => updateField("responsavel_id", event.target.value)}
-            disabled={isDisabled}
-            className={parcelamentoTextFieldClassName}
-          />
+            disabled={isDisabled || isResponsibleUsersLoading}
+          >
+            <option value="">Sem responsável</option>
+            {shouldShowCurrentResponsible ? (
+              <option value={currentResponsibleId}>Responsável atual</option>
+            ) : null}
+            {responsibleUsers.map((responsibleUser) => (
+              <option key={responsibleUser.id} value={responsibleUser.id}>
+                {responsibleUser.name}
+              </option>
+            ))}
+          </ParcelamentoNativeSelect>
         </Field>
       </div>
 

@@ -720,4 +720,34 @@ runTest("parcelamento panoramas mount final flow with generation and edit", () =
   assert.doesNotMatch(form, /api\.(get|post|patch|put|delete)\(/);
 });
 
+runTest("parcelamento panorama form keeps responsible select without create helper text", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoPanoramasSection.tsx",
+  );
+  const form = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoPanoramaForm.tsx",
+  );
+  const hook = readWorkspaceFile(
+    "src/modules/parcelamento/hooks/useParcelamentoResponsibleUsers.ts",
+  );
+  const hooksIndex = readWorkspaceFile("src/modules/parcelamento/hooks/index.ts");
+
+  assert.match(hook, /listAdminUsers\("active"\)/);
+  assert.match(hook, /resolveDepartmentModuleKey/);
+  assert.match(hook, /"parcelamento"/);
+  assert.match(hook, /isAdminPermission\(user\.permission\)/);
+  assert.match(hook, /user\.type === "owner"/);
+  assert.match(hook, /user\.type === "admin"/);
+  assert.match(hooksIndex, /useParcelamentoResponsibleUsers/);
+  assert.match(section, /useParcelamentoResponsibleUsers/);
+  assert.match(section, /responsibleUsers=\{responsibleUsersQuery\.data \?\? \[\]\}/);
+  assert.match(form, /responsibleUsers/);
+  assert.match(form, /<ParcelamentoNativeSelect/);
+  assert.match(form, /<option value="">Sem responsável<\/option>/);
+  assert.match(form, /Responsável atual/);
+  assert.doesNotMatch(form, /Responsável ID/);
+  assert.doesNotMatch(form, /O panorama será criado para o cliente selecionado\./);
+  assert.doesNotMatch(form, /type="text"[\s\S]{0,240}formState\.responsavel_id/);
+});
+
 console.log("parcelamento frontend tests passed");

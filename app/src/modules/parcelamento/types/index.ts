@@ -11,6 +11,11 @@ export interface ParcelamentoClientOption {
   document?: string | null;
 }
 
+export interface ParcelamentoResponsibleUser {
+  id: string;
+  name: string;
+}
+
 export interface ParcelamentoSuccessEnvelope<T> {
   success: true;
   data: T;

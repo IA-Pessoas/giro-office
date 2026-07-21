@@ -19,6 +19,7 @@ import {
   useCreateParcelamentoPanoramaMutation,
   useGenerateParcelamentoPanoramasMutation,
   useParcelamentoPanoramas,
+  useParcelamentoResponsibleUsers,
   useUpdateParcelamentoPanoramaMutation,
 } from "../hooks";
 import type {
@@ -71,8 +72,12 @@ function formatBoolean(value: boolean) {
   return value ? "Sim" : "Não";
 }
 
-function formatResponsible(value: string | null) {
-  return value?.trim() ? value : "Sem responsável";
+function formatResponsible(value: string | null, responsibleUserNames: Map<string, string>) {
+  if (!value?.trim()) {
+    return "Sem responsável";
+  }
+
+  return responsibleUserNames.get(value) ?? value;
 }
 
 function GenerateResultSummary({ result }: { result: ParcelamentoPanoramaGenerateResult }) {
@@ -115,6 +120,7 @@ export function ParcelamentoPanoramasSection({
   const panoramasQuery = useParcelamentoPanoramas(listFilters, {
     enabled: Boolean(selectedClient),
   });
+  const responsibleUsersQuery = useParcelamentoResponsibleUsers({ enabled: canEdit });
   const createMutation = useCreateParcelamentoPanoramaMutation(listFilters);
   const updateMutation = useUpdateParcelamentoPanoramaMutation(
     editingPanorama?.id ?? "",
@@ -123,6 +129,16 @@ export function ParcelamentoPanoramasSection({
   const generateMutation = useGenerateParcelamentoPanoramasMutation(listFilters);
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const panoramas = panoramasQuery.data?.items ?? [];
+  const responsibleUserNames = useMemo(
+    () =>
+      new Map(
+        (responsibleUsersQuery.data ?? []).map((responsibleUser) => [
+          responsibleUser.id,
+          responsibleUser.name,
+        ]),
+      ),
+    [responsibleUsersQuery.data],
+  );
   const total = panoramasQuery.data?.total ?? 0;
   const totalPages = Math.max(FIRST_PAGE, Math.ceil(total / PAGE_SIZE));
   const hasPreviousPage = page > FIRST_PAGE;
@@ -348,6 +364,8 @@ export function ParcelamentoPanoramasSection({
           <ParcelamentoPanoramaForm
             selectedClient={selectedClient}
             canEdit={canEdit}
+            responsibleUsers={responsibleUsersQuery.data ?? []}
+            isResponsibleUsersLoading={responsibleUsersQuery.isLoading}
             initialValue={editingPanorama}
             isSubmitting={isSubmitting}
             submitError={formMode === "edit" ? updateMutation.error : createMutation.error}
@@ -426,7 +444,8 @@ export function ParcelamentoPanoramasSection({
                           Competência {panorama.competence}
                         </h4>
                         <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                          Responsável: {formatResponsible(panorama.responsavel_id)}
+                          Responsável:{" "}
+                          {formatResponsible(panorama.responsavel_id, responsibleUserNames)}
                         </p>
                       </div>
                       <span className="w-fit rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
