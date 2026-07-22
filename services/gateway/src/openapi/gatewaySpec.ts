@@ -7,7 +7,6 @@ import { buildContabilServiceOpenApiSpec } from "../../../contabil-service/src/o
 import { buildDepartmentServiceOpenApiSpec } from "../../../department-service/src/openapi/spec.js";
 import { buildFiscalServiceOpenApiSpec } from "../../../fiscal-service/src/openapi/spec.js";
 import { buildOrganizationServiceOpenApiSpec } from "../../../organization-service/src/openapi/spec.js";
-import { buildParcelamentoServiceOpenApiSpec } from "../../../parcelamento-service/src/openapi/spec.js";
 import { buildPessoalServiceOpenApiSpec } from "../../../pessoal-service/src/openapi/spec.js";
 import { buildProjectServiceOpenApiSpec } from "../../../project-service/src/openapi/spec.js";
 import { buildRegularizeServiceOpenApiSpec } from "../../../regularize-service/src/openapi/spec.js";
@@ -161,15 +160,6 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       includePath: (path) =>
         path !== "/health" && path !== "/ready" && !path.startsWith("/internal/"),
       isInternalPath: (path) => path.startsWith("/internal/"),
-    },
-    {
-      key: "parcelamento-service",
-      label: "Parcelamento Service",
-      buildSpec: () =>
-        buildParcelamentoServiceOpenApiSpec({
-          port: getPortFromUrl(env.parcelamentoServiceUrl),
-        } as never),
-      includePath: (path) => path !== "/health" && path !== "/ready",
     },
     {
       key: "audit-service",
@@ -521,7 +511,7 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
       title: "office-gateway",
       version: "1.0.0",
       description:
-        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service, fiscal-service, contabil-service, ti-service, certificate-service, pessoal-service, parcelamento-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
+        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service, fiscal-service, contabil-service, ti-service, certificate-service, pessoal-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
     },
     servers: [{ url: "http://localhost" }],
     tags: [

@@ -8,14 +8,12 @@ export const KNOWN_PERMISSION_MODULE_KEYS = [
   "financeiro",
   "fiscal",
   "integracao",
-  "marketing",
   "parcelamento",
   "pec",
   "pessoal",
   "regularize",
   "rh",
   "ti",
-  "triagem",
   "wiki",
 ] as const satisfies readonly KnownPermissionModuleKey[];
 
@@ -27,14 +25,12 @@ export const PERMISSION_MODULE_LABELS: Record<KnownPermissionModuleKey, string> 
   financeiro: "Financeiro",
   fiscal: "Fiscal",
   integracao: "Integração",
-  marketing: "Marketing",
   parcelamento: "Parcelamento",
   pec: "PEC",
   pessoal: "Pessoal",
   regularize: "Regularize",
   rh: "RH",
   ti: "Tecnologia",
-  triagem: "Triagem",
   wiki: "Wiki",
 };
 
@@ -45,11 +41,11 @@ export const PERMISSION_MODULE_GROUPS = [
   },
   {
     title: "Atendimento e Comercial",
-    keys: ["atendimento", "certificado", "comercial", "marketing"],
+    keys: ["atendimento", "certificado", "comercial"],
   },
   {
     title: "Pessoas e Operação",
-    keys: ["pessoal", "rh", "triagem", "pec"],
+    keys: ["pessoal", "rh", "pec"],
   },
   {
     title: "Plataforma e Conhecimento",

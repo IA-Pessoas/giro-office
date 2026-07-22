@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/router";
 import {
   Briefcase,
-  Layers,
   Plus,
   User,
   Users,
@@ -54,12 +53,6 @@ export function QuickActions() {
           },
         ]
       : []),
-    {
-      label: "Triagem",
-      icon: Layers,
-      href: "/triagem",
-      tone: "indigo",
-    },
   ];
 
   return (

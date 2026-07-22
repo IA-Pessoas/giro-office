@@ -26,8 +26,6 @@ const CERTIFICATE_SERVICE_PREFIXES = ["/certificate"] as const;
 
 const PESSOAL_SERVICE_PREFIXES = ["/pessoal"] as const;
 
-const PARCELAMENTO_SERVICE_PREFIXES = ["/parcelamento"] as const;
-
 function getNormalizedPath(path: string): string {
   try {
     return new URL(path, "http://localhost").pathname;
@@ -133,13 +131,6 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       auditTarget: "pessoal-service",
       routePrefixes: [...PESSOAL_SERVICE_PREFIXES],
       permissionModule: "pessoal",
-    },
-    {
-      key: "parcelamento-service",
-      targetUrl: env.parcelamentoServiceUrl,
-      auditTarget: "parcelamento-service",
-      routePrefixes: [...PARCELAMENTO_SERVICE_PREFIXES],
-      permissionModule: "parcelamento",
     },
   ];
 }

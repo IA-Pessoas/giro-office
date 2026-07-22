@@ -19,4 +19,3 @@ export const getServerSideProps = canSSRAuth(async () => {
     props: {},
   };
 });
-
