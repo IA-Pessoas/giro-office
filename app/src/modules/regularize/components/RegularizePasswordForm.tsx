@@ -21,6 +21,7 @@ import {
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
+import { RegularizeClientPickerField } from "./RegularizeClientPickerField";
 
 type RegularizePasswordFormState = {
   client_id: string;
@@ -61,7 +62,6 @@ function buildPasswordFormState(
 }
 
 export function RegularizePasswordForm({
-  clientOptions,
   defaultClientId,
   isLoadingInitialValue = false,
   isSubmitting,
@@ -72,7 +72,6 @@ export function RegularizePasswordForm({
   password,
   siteOptions,
 }: {
-  clientOptions: RegularizeFormOption[];
   defaultClientId: string;
   isLoadingInitialValue?: boolean;
   isSubmitting: boolean;
@@ -177,20 +176,12 @@ export function RegularizePasswordForm({
           <RegularizeFormError message={formError} />
 
           <div className="grid gap-4 md:grid-cols-2">
-            <RegularizeFormField label="Cliente" required>
-              <RegularizeNativeSelect
+          <RegularizeFormField label="Cliente" required>
+              <RegularizeClientPickerField
                 value={formState.client_id}
-                onChange={(event) => handleChange("client_id", event.target.value)}
-              >
-                <option value="">Selecione</option>
-                {clientOptions.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.label}
-                    {client.description ? `, ${client.description}` : ""}
-                  </option>
-                ))}
-              </RegularizeNativeSelect>
-            </RegularizeFormField>
+                onChange={(clientId) => handleChange("client_id", clientId)}
+              />
+          </RegularizeFormField>
 
             <RegularizeFormField label="Site" required>
               <RegularizeNativeSelect

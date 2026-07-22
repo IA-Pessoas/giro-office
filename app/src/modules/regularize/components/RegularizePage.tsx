@@ -25,12 +25,12 @@ import {
 import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
-import { useClients } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { cn } from "@shared/ui/newLayout/utils";
 import { formatCPF_CNPJ } from "@shared/utils/formatters";
 
 import { RegularizeClientPfForm } from "./RegularizeClientPfForm";
+import { RegularizeClientPickerField } from "./RegularizeClientPickerField";
 import { RegularizeGuidanceActivityForm } from "./RegularizeGuidanceActivityForm";
 import { RegularizeGuidanceForm } from "./RegularizeGuidanceForm";
 import { RegularizeGuidancePartnerForm } from "./RegularizeGuidancePartnerForm";
@@ -666,7 +666,6 @@ export function RegularizePage() {
   const canRevealCredentials = regularizeAccess.canEdit;
   const canManageRegularizeCore = regularizeAccess.canEdit;
 
-  const clientQuery = useClients({ status: "Ativo", page: 1, limit: 100 });
   const pfQuery = useRegularizeClientPfs({ status: "Ativo" });
   const siteQuery = useRegularizeSitePasswords({ status: true });
   const taxQuery = useRegularizeMunicipalTaxes({ year: currentYear });
@@ -694,10 +693,9 @@ export function RegularizePage() {
   const createLicenseMutation = useCreateRegularizeLicenseMutation();
   const updateLicenseMutation = useUpdateRegularizeLicenseMutation();
 
-  const firstCredentialClientId = clientQuery.data?.items[0]?.id;
   const firstClientPfId = pfQuery.data?.[0]?.id;
   const firstProcessId = processQuery.data?.[0]?.id;
-  const currentCredentialClientId = selectedCredentialClientId ?? firstCredentialClientId;
+  const currentCredentialClientId = selectedCredentialClientId;
   const currentClientPfId = selectedClientPfId ?? firstClientPfId;
   const currentProcessId = selectedProcessId ?? firstProcessId;
 
@@ -744,12 +742,6 @@ export function RegularizePage() {
   }, [firstClientPfId, selectedClientPfId]);
 
   useEffect(() => {
-    if (!selectedCredentialClientId && firstCredentialClientId) {
-      setSelectedCredentialClientId(firstCredentialClientId);
-    }
-  }, [firstCredentialClientId, selectedCredentialClientId]);
-
-  useEffect(() => {
     if (!selectedProcessId && firstProcessId) {
       setSelectedProcessId(firstProcessId);
     }
@@ -778,16 +770,6 @@ export function RegularizePage() {
   }, [licenseQuery.data, pfQuery.data, processQuery.data, siteQuery.data, taxQuery.data]);
   const hasProcessRows = (processQuery.data?.length ?? 0) > 0;
   const hasSiteRows = (siteQuery.data?.length ?? 0) > 0;
-
-  const clientOptions = useMemo<RegularizeFormOption[]>(
-    () =>
-      (clientQuery.data?.items ?? []).map((client) => ({
-        id: client.id,
-        label: client.name || client.company_name || client.id,
-        description: formatDocumentDescription(client.cpf_cnpj),
-      })),
-    [clientQuery.data],
-  );
 
   const pfOptions = useMemo<RegularizeFormOption[]>(
     () =>
@@ -824,7 +806,7 @@ export function RegularizePage() {
       ? municipalTaxDetailQuery.data ?? null
       : null;
   const activeMunicipalTaxDefaultClientId =
-    activeForm?.type === "municipal-tax" ? activeForm.clientId ?? clientOptions[0]?.id ?? "" : "";
+    activeForm?.type === "municipal-tax" ? activeForm.clientId ?? currentCredentialClientId ?? "" : "";
   const activeProcessForForm =
     activeForm?.type === "process" && activeForm.mode === "edit"
       ? processDetailQuery.data ?? null
@@ -856,7 +838,6 @@ export function RegularizePage() {
 
   function handleRefreshRegularize() {
     void Promise.all([
-      clientQuery.refetch(),
       pfQuery.refetch(),
       siteQuery.refetch(),
       taxQuery.refetch(),
@@ -1689,17 +1670,11 @@ export function RegularizePage() {
               <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                 <label className="flex w-full flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
                   <span>Cliente</span>
-                  <RegularizeNativeSelect
+                  <RegularizeClientPickerField
                     value={currentCredentialClientId ?? ""}
-                    onChange={(event) => setSelectedCredentialClientId(event.target.value)}
-                  >
-                    <option value="">Selecione</option>
-                    {clientOptions.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {formatOptionLabel(client.label, client.description)}
-                      </option>
-                    ))}
-                  </RegularizeNativeSelect>
+                    onChange={(clientId) => setSelectedCredentialClientId(clientId || undefined)}
+                    allowClearSelection
+                  />
                 </label>
               </div>
 
@@ -1869,7 +1844,7 @@ export function RegularizePage() {
                     setActiveForm({
                       type: "municipal-tax",
                       mode: "create",
-                      clientId: clientOptions[0]?.id,
+                      clientId: currentCredentialClientId,
                     })
                   }
                 />
@@ -1961,7 +1936,6 @@ export function RegularizePage() {
         open={activeForm?.type === "partner"}
         partner={activePartnerForForm}
         defaultPfId={currentClientPfId ?? ""}
-        clientOptions={clientOptions}
         pfOptions={pfOptions}
         isSubmitting={createPartnerMutation.isPending || updatePartnerMutation.isPending}
         onClose={closeCoreForm}
@@ -1973,7 +1947,6 @@ export function RegularizePage() {
         mode={activeForm?.type === "password" ? activeForm.mode : "create"}
         password={activePasswordForForm}
         defaultClientId={currentCredentialClientId ?? ""}
-        clientOptions={clientOptions}
         siteOptions={siteOptions}
         isLoadingInitialValue={
           activeForm?.type === "password" &&
@@ -2004,7 +1977,6 @@ export function RegularizePage() {
         mode={activeForm?.type === "municipal-tax" ? activeForm.mode : "create"}
         municipalTax={activeMunicipalTaxForForm}
         defaultClientId={activeMunicipalTaxDefaultClientId}
-        clientOptions={clientOptions}
         currentYear={currentYear}
         isLoadingInitialValue={
           activeForm?.type === "municipal-tax" &&
@@ -2020,8 +1992,7 @@ export function RegularizePage() {
         open={activeForm?.type === "process"}
         mode={activeForm?.type === "process" ? activeForm.mode : "create"}
         process={activeProcessForForm}
-        defaultClientId={clientOptions[0]?.id ?? ""}
-        clientOptions={clientOptions}
+        defaultClientId={currentCredentialClientId ?? ""}
         pfOptions={pfOptions}
         isLoadingInitialValue={
           activeForm?.type === "process" &&
@@ -2070,8 +2041,7 @@ export function RegularizePage() {
         open={activeForm?.type === "license"}
         mode={activeForm?.type === "license" ? activeForm.mode : "create"}
         license={activeLicenseForForm}
-        defaultClientId={clientOptions[0]?.id ?? ""}
-        clientOptions={clientOptions}
+        defaultClientId={currentCredentialClientId ?? ""}
         isLoadingInitialValue={
           activeForm?.type === "license" &&
           activeForm.mode === "edit" &&

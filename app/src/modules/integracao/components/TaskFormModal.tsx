@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, FileText, LoaderCircle, Save } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { useClients } from "@modules/clients";
+import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 import { departmentService, type DepItem } from "@modules/departments";
 import { listAdminUsers, type UserItem } from "@modules/users";
 import { Dialog } from "@shared/components/ui/Dialog";
@@ -133,11 +133,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
   const isEditing = Boolean(taskId);
   const [createValues, setCreateValues] = useState<CreateFormState>(CREATE_INITIAL_STATE);
   const [editValues, setEditValues] = useState<EditFormState>(EDIT_INITIAL_STATE);
-
-  const clientsQuery = useClients({
-    page: 1,
-    limit: 100,
-  });
+  const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
   const projectsQuery = useProjectsList(
     !isEditing && createValues.client_id ? { ref: "client", id: createValues.client_id } : null,
   );
@@ -597,22 +593,18 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
           }}
         >
           <div className={TASK_FORM_GRID_CLASSNAME}>
-            <label className={TASK_FORM_LABEL_CLASSNAME}>
+            <div className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Cliente</span>
-              <select
-                value={createValues.client_id}
-                onChange={(event) => updateCreateValue("client_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
-              >
-                <option value="">Selecione um cliente</option>
-                {(clientsQuery.data?.items ?? []).map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <ClientPickerModal
+                selectedClient={selectedClient}
+                onSelectClient={(client) => {
+                  setSelectedClient(client);
+                  updateCreateValue("client_id", client?.id ?? "");
+                }}
+                filters={{}}
+                allowClearSelection
+              />
+            </div>
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Projeto</span>

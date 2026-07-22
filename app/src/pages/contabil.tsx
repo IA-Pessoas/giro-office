@@ -1,35 +1,20 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Head from "next/head";
-import { Loader2, Search, Users } from "lucide-react";
+import { Users } from "lucide-react";
 
 import { canSSRAuth } from "@modules/auth";
-import { useClients } from "@modules/clients/hooks/useClients";
+import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 import {
   AccessDeniedPanel,
   ContabilShell,
   useContabilPermissions,
 } from "@modules/contabil";
 
-const CONTABIL_CLIENT_PICKER_LIMIT = 50;
-
 export default function ContabilPage() {
   const { canViewContabil, canEditContabil, isLoading } = useContabilPermissions();
-  const [search, setSearch] = useState("");
-  const [selectedClientId, setSelectedClientId] = useState<string>();
-  const [selectedClientName, setSelectedClientName] = useState<string>();
-  const deferredSearch = useDeferredValue(search.trim());
-
-  const clientsQuery = useClients({
-    search: deferredSearch,
-    ref: "deps",
-    status: "Departamento contabil",
-    page: 1,
-    limit: CONTABIL_CLIENT_PICKER_LIMIT,
-  });
-
-  const clientItems = clientsQuery.data?.items ?? [];
-  const hasSearchResults = clientItems.length > 0;
-  const shouldShowEmptySearch = !clientsQuery.isLoading && deferredSearch.length > 0 && !hasSearchResults;
+  const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
+  const selectedClientId = selectedClient?.id;
+  const selectedClientName = selectedClient?.name;
 
   const selectedClientSummary = useMemo(() => {
     if (!selectedClientId || !selectedClientName) {
@@ -41,11 +26,6 @@ export default function ContabilPage() {
       name: selectedClientName,
     };
   }, [selectedClientId, selectedClientName]);
-
-  function handleSelectClient(clientId: string, clientName: string) {
-    setSelectedClientId(clientId);
-    setSelectedClientName(clientName);
-  }
 
   return (
     <>
@@ -96,65 +76,12 @@ export default function ContabilPage() {
                 ) : null}
               </div>
 
-              <div className="mt-3 space-y-2.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
-                  Buscar cliente
-                </label>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Buscar por nome, razão social ou CPF/CNPJ"
-                    className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 dark:text-slate-400">
-                  Mostrando até {CONTABIL_CLIENT_PICKER_LIMIT} clientes por busca.
-                </p>
-              </div>
-
-              <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50/70 dark:border-slate-700 dark:bg-slate-950/30">
-                {clientsQuery.isLoading ? (
-                  <div className="flex items-center gap-2 px-4 py-3 text-sm text-gray-600 dark:text-slate-300">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Carregando clientes...
-                  </div>
-                ) : shouldShowEmptySearch ? (
-                  <div className="px-4 py-3 text-sm text-gray-600 dark:text-slate-300">
-                    Nenhum cliente encontrado para a busca informada.
-                  </div>
-                ) : (
-                  <div className="max-h-72 divide-y divide-gray-200 overflow-y-auto dark:divide-slate-700">
-                    {clientItems.map((client) => {
-                      const isActive = selectedClientId === client.id;
-
-                      return (
-                        <button
-                          key={client.id}
-                          type="button"
-                          onClick={() => handleSelectClient(client.id, client.name)}
-                          className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors ${
-                            isActive
-                              ? "bg-blue-50 text-blue-900 dark:bg-blue-900/20 dark:text-blue-100"
-                              : "hover:bg-white dark:hover:bg-slate-900/70"
-                          }`}
-                        >
-                          <div className="min-w-0 space-y-1">
-                            <p className="truncate text-sm font-semibold">{client.name}</p>
-                            <p className="truncate text-sm text-gray-600 dark:text-slate-400">
-                              {client.company_name || "Razão social não informada"}
-                            </p>
-                          </div>
-                          <span className="shrink-0 text-xs font-medium text-gray-500 dark:text-slate-400">
-                            {client.cpf_cnpj}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+              <div className="mt-4">
+                <ClientPickerModal
+                  selectedClient={selectedClient}
+                  onSelectClient={setSelectedClient}
+                  filters={{ ref: "deps", status: "Departamento contabil" }}
+                />
               </div>
             </section>
             }

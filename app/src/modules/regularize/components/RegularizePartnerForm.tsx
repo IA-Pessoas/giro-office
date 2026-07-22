@@ -20,6 +20,7 @@ import {
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
+import { RegularizeClientPickerField } from "./RegularizeClientPickerField";
 
 type RegularizePartnerFormState = {
   pj_id: string;
@@ -60,7 +61,6 @@ function buildPartnerFormState(
 }
 
 export function RegularizePartnerForm({
-  clientOptions,
   defaultPfId,
   isSubmitting,
   onClose,
@@ -69,7 +69,6 @@ export function RegularizePartnerForm({
   partner,
   pfOptions,
 }: {
-  clientOptions: RegularizeFormOption[];
   defaultPfId: string;
   isSubmitting: boolean;
   onClose: () => void;
@@ -80,7 +79,7 @@ export function RegularizePartnerForm({
   partner: RegularizePartner | null;
   pfOptions: RegularizeFormOption[];
 }) {
-  const defaultPjId = clientOptions[0]?.id ?? "";
+  const defaultPjId = "";
   const [formState, setFormState] = useState<RegularizePartnerFormState>(
     buildPartnerFormState(partner, defaultPfId, defaultPjId),
   );
@@ -162,18 +161,10 @@ export function RegularizePartnerForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <RegularizeFormField label="Cliente PJ" required>
-            <RegularizeNativeSelect
+            <RegularizeClientPickerField
               value={formState.pj_id}
-              onChange={(event) => handleChange("pj_id", event.target.value)}
-            >
-              <option value="">Selecione</option>
-              {clientOptions.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.label}
-                  {client.description ? `, ${client.description}` : ""}
-                </option>
-              ))}
-            </RegularizeNativeSelect>
+              onChange={(clientId) => handleChange("pj_id", clientId)}
+            />
           </RegularizeFormField>
 
           <RegularizeFormField label="Cliente PF" required>

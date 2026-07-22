@@ -16,7 +16,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
-import { useClients } from "@modules/clients";
+import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 import { useMe } from "@shared/hooks";
 
 import {
@@ -109,25 +109,25 @@ function formatDeadlineHint(daysUntil: number | null) {
 export function ProjectsWorkspace() {
   const router = useRouter();
   const meQuery = useMe();
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
   const [projectSearch, setProjectSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const clientsQuery = useClients({
-    page: 1,
-    limit: 100,
-  });
+  const selectedClientId = selectedClient?.id ?? null;
 
   useEffect(() => {
-    if (typeof router.query.clientId === "string") {
-      setSelectedClientId(router.query.clientId);
+    const routeClientId = router.query.clientId;
+
+    if (typeof routeClientId === "string") {
+      setSelectedClient((current) =>
+        current?.id === routeClientId
+          ? current
+          : { id: routeClientId, name: "Cliente selecionado" },
+      );
     }
   }, [router.query.clientId]);
-
-  const selectedClient =
-    clientsQuery.data?.items.find((client) => client.id === selectedClientId) ?? null;
 
   const projectsQuery = useProjectsList(
     selectedClientId ? { ref: "client", id: selectedClientId } : null,
@@ -305,8 +305,10 @@ export function ProjectsWorkspace() {
     }
   }
 
-  function handleClientChange(nextClientId: string) {
-    setSelectedClientId(nextClientId || null);
+  function handleClientChange(client: ClientPickerOption | null) {
+    const nextClientId = client?.id ?? "";
+
+    setSelectedClient(client);
     router
       .replace(
         {
@@ -354,22 +356,10 @@ export function ProjectsWorkspace() {
         <div
           className={`${PROJECT_SUBPANEL_CLASSNAME} flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between`}
         >
-          <label className="min-w-0 flex-1 space-y-2">
+          <div className="min-w-0 flex-1 space-y-2">
             <span className="block text-sm font-medium text-slate-700 dark:text-white">Cliente</span>
-            <select
-              value={selectedClientId ?? ""}
-              onChange={(event) => handleClientChange(event.target.value)}
-              className={PROJECT_SELECT_CLASSNAME}
-              style={PROJECT_SELECT_ARROW_STYLE}
-            >
-              <option value="">Selecione um cliente</option>
-              {(clientsQuery.data?.items ?? []).map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            <ClientPickerModal selectedClient={selectedClient} onSelectClient={handleClientChange} filters={{}} allowClearSelection />
+          </div>
 
           <button
             type="button"

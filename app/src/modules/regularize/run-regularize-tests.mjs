@@ -302,12 +302,10 @@ await runTest("regularize client documents are consistently formatted", async ()
 
   assert.match(pageSource, /import \{ formatCPF_CNPJ \} from "@shared\/utils\/formatters";/);
   assert.match(pageSource, /function formatDocument/);
-  assert.match(pageSource, /function formatDocumentDescription/);
   assert.deepEqual(rawDocumentMatches, []);
   assert.ok(formattedDocumentMatches.length >= 3);
   assert.doesNotMatch(pageSource, /description: client\.cpf_cnpj/);
   assert.doesNotMatch(pageSource, /description: clientPf\.cpf/);
-  assert.match(pageSource, /description: formatDocumentDescription\(client\.cpf_cnpj\)/);
   assert.match(pageSource, /description: formatDocumentDescription\(clientPf\.cpf\)/);
   assert.match(
     pageSource,
@@ -561,4 +559,14 @@ await runTest("RegularizePage does not define primary mock arrays", async () => 
 
   assert.doesNotMatch(pageSource, /const\s+(processes|permits|clients|passwords|partners)\s*=/);
   assert.doesNotMatch(pageSource, /api\.(get|post|put|delete)/);
+});
+
+await runTest("regularize client selectors use the paginated shared picker", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const pickerSource = await readModuleSource("components/RegularizeClientPickerField.tsx");
+
+  assert.match(pageSource, /RegularizeClientPickerField/);
+  assert.doesNotMatch(pageSource, /useClients\(/);
+  assert.match(pickerSource, /ClientPickerModal/);
+  assert.match(pickerSource, /filters=\{\{ status: "Ativo" \}\}/);
 });

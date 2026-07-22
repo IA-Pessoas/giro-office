@@ -5,6 +5,7 @@ export { ClientFilters } from './components/ClientFilters';
 export { ClientForm } from './components/ClientForm';
 export { ClientPASection } from './components/ClientPASection';
 export { ClientCreateModal } from './components/ClientCreateModal';
+export { ClientPickerModal, type ClientPickerOption } from './components/ClientPickerModal';
 
 export {
   useActivateClientMutation,

@@ -588,3 +588,16 @@ await runAsyncTest("task models still load when department enrichment fails", as
   assert.equal(models[0].department, undefined);
   assert.equal(capturedError instanceof Error, true);
 });
+
+runTest("integration client pickers use the paginated shared modal", () => {
+  const projects = readFileSync("src/modules/integracao/components/ProjectsWorkspace.tsx", "utf8");
+  const taskForm = readFileSync("src/modules/integracao/components/TaskFormModal.tsx", "utf8");
+
+  assert.match(projects, /ClientPickerModal/);
+  assert.match(taskForm, /ClientPickerModal/);
+  assert.match(taskForm, /updateCreateValue\("client_id", client\?\.id \?\? ""\)/);
+  assert.doesNotMatch(projects, /useClients\(/);
+  assert.doesNotMatch(taskForm, /useClients\(/);
+  assert.doesNotMatch(projects, /page:\s*1/);
+  assert.doesNotMatch(taskForm, /page:\s*1/);
+});

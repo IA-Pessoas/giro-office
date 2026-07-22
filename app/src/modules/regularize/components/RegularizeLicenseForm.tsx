@@ -18,7 +18,6 @@ import {
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
-  type RegularizeFormOption,
   getRegularizePresetOptions,
   regularizeLicenseStatusOptions,
   regularizeTextareaClassName,
@@ -26,6 +25,7 @@ import {
   regularizeUrgencyOptions,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
+import { RegularizeClientPickerField } from "./RegularizeClientPickerField";
 
 type RegularizeLicenseFormState = {
   client_id: string;
@@ -109,7 +109,6 @@ function buildLicensePayload(formState: RegularizeLicenseFormState): CreateRegul
 }
 
 export function RegularizeLicenseForm({
-  clientOptions,
   defaultClientId,
   isLoadingInitialValue = false,
   isSubmitting,
@@ -119,7 +118,6 @@ export function RegularizeLicenseForm({
   onSubmit,
   open,
 }: {
-  clientOptions: RegularizeFormOption[];
   defaultClientId: string;
   isLoadingInitialValue?: boolean;
   isSubmitting: boolean;
@@ -220,18 +218,11 @@ export function RegularizeLicenseForm({
 
           <div className="grid gap-4 md:grid-cols-3">
             <RegularizeFormField label="Cliente" className="md:col-span-2">
-              <RegularizeNativeSelect
+              <RegularizeClientPickerField
                 value={formState.client_id}
-                onChange={(event) => handleChange("client_id", event.target.value)}
-              >
-                <option value="">Sem cliente vinculado</option>
-                {clientOptions.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.label}
-                    {client.description ? `, ${client.description}` : ""}
-                  </option>
-                ))}
-              </RegularizeNativeSelect>
+                onChange={(clientId) => handleChange("client_id", clientId)}
+                allowClearSelection
+              />
             </RegularizeFormField>
 
             <RegularizeFormField label="Possui ?">
