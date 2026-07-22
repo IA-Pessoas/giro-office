@@ -114,6 +114,16 @@ describe("ObligationService", () => {
     expect(audit.recordChange).not.toHaveBeenCalled();
   });
 
+  it("retorna null ao detalhar competencia sem obrigacao cadastrada", async () => {
+    const prisma = createPrismaMock();
+    prisma.obrigationsPessoal.findFirst.mockResolvedValueOnce(null);
+    const service = new ObligationService(prisma as never, createAuditMock());
+
+    await expect(
+      service.detail({ organizationId }, { client_id: clientId, competence: "2026-07" }),
+    ).resolves.toBeNull();
+  });
+
   it("atualiza exatamente um campo da obrigacao", async () => {
     const prisma = createPrismaMock();
     prisma.obrigationsPessoal.findFirst.mockResolvedValueOnce({

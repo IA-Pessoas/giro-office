@@ -202,17 +202,15 @@ export class ClientService implements IClientService {
     const skip = (filters.page - 1) * filters.pageSize;
     const take = filters.pageSize;
 
-    const [organization, rows, total] = await Promise.all([
-      this.getOrganizationPublic(organizationId),
-      this.prisma.client.findMany({
-        where,
-        orderBy: { name: "asc" },
-        skip,
-        take,
-        select: clientSelect,
-      }),
-      this.prisma.client.count({ where }),
-    ]);
+    const organization = await this.getOrganizationPublic(organizationId);
+    const rows = await this.prisma.client.findMany({
+      where,
+      orderBy: { name: "asc" },
+      skip,
+      take,
+      select: clientSelect,
+    });
+    const total = await this.prisma.client.count({ where });
 
     const hasMore = filters.page * filters.pageSize < total;
 

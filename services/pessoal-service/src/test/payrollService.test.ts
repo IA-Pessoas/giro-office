@@ -78,6 +78,14 @@ describe("PayrollService", () => {
     });
   });
 
+  it("retorna null ao detalhar cliente sem folha cadastrada", async () => {
+    const prisma = createPrismaMock();
+    prisma.payroll.findFirst.mockResolvedValueOnce(null);
+    const service = new PayrollService(prisma as never, createAuditMock());
+
+    await expect(service.detail({ organizationId }, clientId)).resolves.toBeNull();
+  });
+
   it("atualiza folha escopada por cliente e organizacao", async () => {
     const prisma = createPrismaMock();
     prisma.payroll.findFirst.mockResolvedValueOnce({

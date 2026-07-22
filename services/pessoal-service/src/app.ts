@@ -18,6 +18,7 @@ import { prismaClient } from "./prisma/index.js";
 import { createLddRoutes } from "./routes/ldd.routes.js";
 import { createObligationRoutes } from "./routes/obligation.routes.js";
 import { createPasswordRoutes } from "./routes/password.routes.js";
+import { createPessoalOverviewRoutes } from "./routes/pessoalOverview.routes.js";
 import { createPayrollRoutes } from "./routes/payroll.routes.js";
 import { createSituationRoutes } from "./routes/situation.routes.js";
 import { createUnionRoutes } from "./routes/union.routes.js";
@@ -27,6 +28,7 @@ import { ObligationService } from "./services/obligationService.js";
 import { PasswordService } from "./services/passwordService.js";
 import { PayrollService } from "./services/payrollService.js";
 import { PessoalAuditService } from "./services/pessoalAuditService.js";
+import { PessoalOverviewService } from "./services/pessoalOverviewService.js";
 import {
   createPessoalPasswordCrypto,
   type PessoalPasswordCrypto,
@@ -80,6 +82,7 @@ export function createPessoalApp({
   const unionService = new UnionService(prisma, domainAuditService);
   const payrollService = new PayrollService(prisma, domainAuditService);
   const obligationService = new ObligationService(prisma, domainAuditService);
+  const overviewService = new PessoalOverviewService(prisma);
   const unionNotificationService = new UnionNotificationService(prisma);
   const pessoalPasswordCrypto =
     passwordCrypto ??
@@ -115,6 +118,7 @@ export function createPessoalApp({
   });
 
   app.use("/pessoal/ldd", createLddRoutes(lddService));
+  app.use("/pessoal/overview", createPessoalOverviewRoutes(overviewService));
   app.use("/pessoal/situations", createSituationRoutes(situationService));
   app.use("/pessoal/unions", createUnionRoutes(unionService));
   app.use("/pessoal/payroll", createPayrollRoutes(payrollService));

@@ -2305,6 +2305,14 @@ const baseManifest = [
   op({
     service: "pessoal-service",
     method: "GET",
+    path: "/pessoal/overview",
+    action: "pessoalOverviewGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "pessoal-service",
+    method: "GET",
     path: "/pessoal/situations",
     action: "pessoalSituationList",
     target: "gateway",

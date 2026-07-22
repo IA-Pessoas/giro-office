@@ -30,6 +30,7 @@ function runTest(name, fn) {
 runTest("pessoal endpoints match the gateway public contract", () => {
   assert.equal(PESSOAL_ENDPOINTS.ldd, "/pessoal/ldd");
   assert.equal(PESSOAL_ENDPOINTS.lddDetail("ldd-1"), "/pessoal/ldd/ldd-1");
+  assert.equal(PESSOAL_ENDPOINTS.overview, "/pessoal/overview");
   assert.equal(PESSOAL_ENDPOINTS.situations, "/pessoal/situations");
   assert.equal(
     PESSOAL_ENDPOINTS.situationDetail("situation-1"),
@@ -211,9 +212,15 @@ runTest("client-scoped sections block requests without selected client", () => {
 runTest("pessoal overview reads available dashboard data", () => {
   const overview = readFileSync("src/modules/pessoal/components/PessoalOverviewSection.tsx", "utf8");
   const trackingHook = readFileSync("src/modules/pessoal/hooks/usePessoalTracking.ts", "utf8");
+  const overviewHook = readFileSync("src/modules/pessoal/hooks/usePessoalOverview.ts", "utf8");
+  const service = readFileSync("src/modules/pessoal/services/pessoalService.ts", "utf8");
 
-  assert.match(overview, /usePessoalUnions\(\)/);
-  assert.match(overview, /usePessoalLdd\("", true\)/);
+  assert.match(overview, /usePessoalOverview\(\)/);
+  assert.doesNotMatch(overview, /usePessoalUnions\(\)/);
+  assert.doesNotMatch(overview, /usePessoalLdd\("", true\)/);
+  assert.match(overviewHook, /pessoalService\.getOverview\(\)/);
+  assert.match(service, /getOverview\(\)/);
+  assert.match(service, /PESSOAL_ENDPOINTS\.overview/);
   assert.match(overview, /lg:grid-cols-\[minmax\(0,2fr\)_minmax\(280px,1fr\)\]/);
   assert.match(overview, /bg-gradient-to-br from-blue-700/);
   assert.match(overview, /min-h-\[260px\]/);

@@ -17,6 +17,21 @@ export interface PessoalClientOption {
   document?: string | null;
 }
 
+export interface PessoalOverviewSummary {
+  unions: {
+    total: number;
+    withBaseDate: number;
+    withoutBaseDate: number;
+    withCnpj: number;
+  };
+  ldd: {
+    total: number;
+    open: number;
+    overdue: number;
+    paid: number;
+  };
+}
+
 export interface PessoalSuccessEnvelope<T> {
   success: true;
   data: T;

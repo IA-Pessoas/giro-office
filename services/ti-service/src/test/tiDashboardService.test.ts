@@ -12,6 +12,32 @@ const context = {
 const technologyDepartmentId = "50000000-0000-4000-8000-000000000001";
 
 describe("TiDashboardService", () => {
+  it("loads dashboard counters sequentially to avoid exhausting session pool connections", async () => {
+    let activeQueries = 0;
+    let maxActiveQueries = 0;
+    const trackCount = vi.fn(async () => {
+      activeQueries += 1;
+      maxActiveQueries = Math.max(maxActiveQueries, activeQueries);
+      await Promise.resolve();
+      activeQueries -= 1;
+
+      return 0;
+    });
+    const prisma = {
+      tIRequest: { count: trackCount },
+      inventoryTecnologia: { count: trackCount },
+      termTecnologia: { count: trackCount },
+      department: { findFirst: vi.fn(async () => ({ id: technologyDepartmentId })) },
+      stock: { count: trackCount },
+      tIRobot: { count: trackCount },
+    };
+    const service = new TiDashboardService(prisma as never);
+
+    await service.getSummary(context);
+
+    expect(maxActiveQueries).toBe(1);
+  });
+
   it("returns zeroed optional domains when stock and robots have no rows", async () => {
     const prisma = {
       tIRequest: { count: vi.fn(async () => 2) },

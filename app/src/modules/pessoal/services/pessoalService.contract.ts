@@ -3,6 +3,7 @@ import type { PessoalSuccessEnvelope, PessoalTab } from "../types";
 export const PESSOAL_ENDPOINTS = {
   ldd: "/pessoal/ldd",
   lddDetail: (id: string) => `/pessoal/ldd/${id}`,
+  overview: "/pessoal/overview",
   situations: "/pessoal/situations",
   situationDetail: (id: string) => `/pessoal/situations/${id}`,
   unions: "/pessoal/unions",

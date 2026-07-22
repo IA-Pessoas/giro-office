@@ -17,6 +17,7 @@ function runTest(name, fn) {
 
 const dashboardComponent = read("../../shared/components/newLayout/Dashboard.tsx");
 const dashboardService = read("./services/dashboardService.ts");
+const appShell = read("../../pages/_app.tsx");
 
 runTest("new layout dashboard consumes the real dashboard hook", () => {
   assert.match(dashboardComponent, /useDashboard/);
@@ -32,6 +33,11 @@ runTest("dashboard service only uses the real stats endpoint", () => {
   assert.doesNotMatch(dashboardService, /getMockStats/);
   assert.doesNotMatch(dashboardService, /Dashboard API not available, using mock data/);
   assert.doesNotMatch(dashboardService, /Math\.random/);
+});
+
+runTest("authenticated app shell does not mount legacy chat globally", () => {
+  assert.doesNotMatch(appShell, /ChatProvider/);
+  assert.doesNotMatch(appShell, /ChatControllerUI/);
 });
 
 

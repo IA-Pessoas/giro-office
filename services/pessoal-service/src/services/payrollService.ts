@@ -112,17 +112,11 @@ export class PayrollService {
   async detail(
     context: Pick<PessoalAuthContext, "organizationId">,
     clientId: string,
-  ): Promise<PayrollRecord> {
-    const detail = await this.prisma.payroll.findFirst({
+  ): Promise<PayrollRecord | null> {
+    return this.prisma.payroll.findFirst({
       where: { client_id: clientId, organization_id: context.organizationId },
       select: payrollSelect,
     });
-
-    if (!detail) {
-      throw new ServiceError(404, "Folha de pessoal nao encontrada.");
-    }
-
-    return detail;
   }
 
   async update(

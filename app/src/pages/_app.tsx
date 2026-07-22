@@ -9,14 +9,11 @@ import '../styles/global.css'
 
 import { useAccessStoreSync } from "@modules/auth";
 import { AuthProvider, useAuth } from "../context/AuthContext";
-import { ChatProvider } from "@modules/chat";
-import { ChatControllerUI } from '@shared/components/ChatControllerUI';
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { SocketProvider } from '../context/SocketContext'
 import { AppShell } from "../shared/components/newLayout/AppShell";
 
 function AppLayout({ children }) {
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const { user, loading } = useAuth();
   const router = useRouter();
   useAccessStoreSync();
@@ -43,10 +40,6 @@ function AppLayout({ children }) {
   return (
     <AppShell>
       {children}
-      <ChatControllerUI
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-      />
     </AppShell>
   );
 }
@@ -109,21 +102,19 @@ function MyApp({ Component, pageProps }: AppProps) {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <SocketProvider>
-            <ChatProvider>
-              {isIframeView ? (
+            {isIframeView ? (
+              <Component {...pageProps} />
+            ) : (
+              <AppLayout>
                 <Component {...pageProps} />
-              ) : (
-                <AppLayout>
-                  <Component {...pageProps} />
-                </AppLayout>
-              )}
-              <ToastContainer
-                position="bottom-right"
-                autoClose={5000}
-                pauseOnHover
-                closeOnClick={false}
-              />
-            </ChatProvider>
+              </AppLayout>
+            )}
+            <ToastContainer
+              position="bottom-right"
+              autoClose={5000}
+              pauseOnHover
+              closeOnClick={false}
+            />
           </SocketProvider>
         </AuthProvider>
       </QueryClientProvider>

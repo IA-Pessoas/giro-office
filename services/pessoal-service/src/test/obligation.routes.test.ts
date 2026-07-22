@@ -6,6 +6,19 @@ import { createObligationRoutes } from "../routes/obligation.routes.js";
 import { createRouteTestApp, gatewayHeaders, recordId } from "./pessoalCoreTestUtils.js";
 
 describe("obligation routes", () => {
+  it("retorna sucesso com data null quando obrigacao ainda nao existe", async () => {
+    const service = { detail: vi.fn(async () => null) };
+    const app = createRouteTestApp("/pessoal/obrigations", createObligationRoutes(service as never));
+
+    const response = await request(app)
+      .get("/pessoal/obrigations")
+      .query({ client_id: recordId, competence: "2026-07" })
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, data: null });
+  });
+
   it("rejeita competencia invalida", async () => {
     const app = createRouteTestApp(
       "/pessoal/obrigations",

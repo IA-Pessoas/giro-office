@@ -1,3 +1,4 @@
+import type { PessoalOverviewSummary } from "../types";
 import type {
   PessoalObligation,
   PessoalObligationCreatePayload,
@@ -119,6 +120,13 @@ function isNotFoundError(error: unknown): boolean {
 }
 
 export const pessoalService = {
+  async getOverview(): Promise<PessoalOverviewSummary> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.overview);
+
+    return unwrapPessoalEnvelope<PessoalOverviewSummary>(response.data);
+  },
+
   async listUnions(): Promise<PessoalUnion[]> {
     const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
     const response = await api.get(PESSOAL_ENDPOINTS.unions);

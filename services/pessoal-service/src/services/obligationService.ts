@@ -176,8 +176,8 @@ export class ObligationService {
   async detail(
     context: Pick<PessoalAuthContext, "organizationId">,
     query: DetailObligationQuery,
-  ): Promise<ObligationRecord> {
-    const obligation = await this.prisma.obrigationsPessoal.findFirst({
+  ): Promise<ObligationRecord | null> {
+    return this.prisma.obrigationsPessoal.findFirst({
       where: {
         organization_id: context.organizationId,
         client_id: query.client_id,
@@ -185,12 +185,6 @@ export class ObligationService {
       },
       select: obligationSelect,
     });
-
-    if (!obligation) {
-      throw new ServiceError(404, "Obrigacao de pessoal nao encontrada.");
-    }
-
-    return obligation;
   }
 
   async updateField(

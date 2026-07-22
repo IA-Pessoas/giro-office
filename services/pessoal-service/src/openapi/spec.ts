@@ -290,6 +290,48 @@ const passwordMutationResponses = {
   },
 } as const;
 
+const optionalDetailResponses = {
+  "200": {
+    description: "OK; data e null quando o registro ainda nao existe",
+    ...successJsonWithData({ type: "object", nullable: true, additionalProperties: true }),
+  },
+  "400": { description: "Bad request", ...errorJson },
+  "401": { description: "Unauthorized", ...errorJson },
+} as const;
+
+const pessoalOverviewResponses = {
+  "200": {
+    description: "Resumo consolidado da visao geral de pessoal",
+    ...successJsonWithData({
+      type: "object",
+      required: ["unions", "ldd"],
+      properties: {
+        unions: {
+          type: "object",
+          required: ["total", "withBaseDate", "withoutBaseDate", "withCnpj"],
+          properties: {
+            total: { type: "integer", minimum: 0 },
+            withBaseDate: { type: "integer", minimum: 0 },
+            withoutBaseDate: { type: "integer", minimum: 0 },
+            withCnpj: { type: "integer", minimum: 0 },
+          },
+        },
+        ldd: {
+          type: "object",
+          required: ["total", "open", "overdue", "paid"],
+          properties: {
+            total: { type: "integer", minimum: 0 },
+            open: { type: "integer", minimum: 0 },
+            overdue: { type: "integer", minimum: 0 },
+            paid: { type: "integer", minimum: 0 },
+          },
+        },
+      },
+    }),
+  },
+  "401": { description: "Unauthorized", ...errorJson },
+} as const;
+
 export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiDocument {
   return {
     openapi: "3.0.3",
@@ -428,6 +470,15 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           responses: mutationResponses,
         },
       },
+      "/pessoal/overview": {
+        get: {
+          tags: ["Pessoal Overview"],
+          security: bearerSecurity,
+          summary: "Resumo consolidado da visao geral",
+          operationId: "getPessoalOverview",
+          responses: pessoalOverviewResponses,
+        },
+      },
       "/pessoal/situations": {
         get: {
           tags: ["Pessoal Situations"],
@@ -518,7 +569,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Detalhar configuracao de folha",
           operationId: "getPessoalPayroll",
           parameters: [idParam("client_id")],
-          responses: readResponses,
+          responses: optionalDetailResponses,
         },
         patch: {
           tags: ["Pessoal Payroll"],
@@ -537,7 +588,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Detalhar obrigacao por cliente e competencia",
           operationId: "getPessoalObligation",
           parameters: [queryParam("client_id", "uuid"), queryParam("competence")],
-          responses: readResponses,
+          responses: optionalDetailResponses,
         },
         post: {
           tags: ["Pessoal Obligations"],

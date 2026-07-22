@@ -14,6 +14,20 @@ describe("pessoal-service OpenAPI", () => {
     expect(spec.info.title).toBe("pessoal-service");
     expect(paths["/health"]?.get).toBeDefined();
     expect(paths["/ready"]?.get).toBeDefined();
+    expect(paths["/pessoal/overview"]?.get).toBeDefined();
+  });
+
+  it("documenta detalhes opcionais de folha e obrigacao sem 404 esperado", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const paths = spec.paths as Record<
+      string,
+      Record<string, { responses?: Record<string, unknown> }>
+    >;
+
+    expect(paths["/pessoal/payroll/{client_id}"]?.get?.responses?.["200"]).toBeDefined();
+    expect(paths["/pessoal/payroll/{client_id}"]?.get?.responses?.["404"]).toBeUndefined();
+    expect(paths["/pessoal/obrigations"]?.get?.responses?.["200"]).toBeDefined();
+    expect(paths["/pessoal/obrigations"]?.get?.responses?.["404"]).toBeUndefined();
   });
 
   it("documenta gatilho interno de notificacoes de sindicato", () => {

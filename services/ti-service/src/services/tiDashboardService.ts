@@ -22,68 +22,57 @@ export class TiDashboardService {
       select: { id: true },
     });
 
-    const [
-      openRequests,
-      criticalRequests,
-      resolvedLastSevenDays,
-      inventoryAssets,
-      assignedInventoryAssets,
-      pendingTerms,
-      lowStockItems,
-      activeRobots,
-    ] = await Promise.all([
-      this.prisma.tIRequest.count({
-        where: {
-          ...organizationWhere,
-          status: { notIn: [...openRequestStatuses] },
-        },
-      }),
-      this.prisma.tIRequest.count({
-        where: {
-          ...organizationWhere,
-          urgency: { in: [...criticalRequestUrgencies] },
-          status: { notIn: [...openRequestStatuses] },
-        },
-      }),
-      this.prisma.tIRequest.count({
-        where: {
-          ...organizationWhere,
-          status: "Resolved",
-          updated_at: { gte: sevenDaysAgo() },
-        },
-      }),
-      this.prisma.inventoryTecnologia.count({
-        where: organizationWhere,
-      }),
-      this.prisma.inventoryTecnologia.count({
-        where: {
-          ...organizationWhere,
-          user_id: { not: null },
-        },
-      }),
-      this.prisma.termTecnologia.count({
-        where: {
-          ...organizationWhere,
-          reason: null,
-        },
-      }),
-      technologyDepartment
-        ? this.prisma.stock.count({
-            where: {
-              ...organizationWhere,
-              department_id: technologyDepartment.id,
-              status: true,
-              quantity: { lte: 0 },
-            },
-          })
-        : Promise.resolve(0),
-      this.prisma.tIRobot.count({
-        where: {
-          ...organizationWhere,
-          active: true,
-        },
-      }),
-    ]);
+    const openRequests = await this.prisma.tIRequest.count({
+      where: {
+        ...organizationWhere,
+        status: { notIn: [...openRequestStatuses] },
+      },
+    });
+    const criticalRequests = await this.prisma.tIRequest.count({
+      where: {
+        ...organizationWhere,
+        urgency: { in: [...criticalRequestUrgencies] },
+        status: { notIn: [...openRequestStatuses] },
+      },
+    });
+    const resolvedLastSevenDays = await this.prisma.tIRequest.count({
+      where: {
+        ...organizationWhere,
+        status: "Resolved",
+        updated_at: { gte: sevenDaysAgo() },
+      },
+    });
+    const inventoryAssets = await this.prisma.inventoryTecnologia.count({
+      where: organizationWhere,
+    });
+    const assignedInventoryAssets = await this.prisma.inventoryTecnologia.count({
+      where: {
+        ...organizationWhere,
+        user_id: { not: null },
+      },
+    });
+    const pendingTerms = await this.prisma.termTecnologia.count({
+      where: {
+        ...organizationWhere,
+        reason: null,
+      },
+    });
+    const lowStockItems = technologyDepartment
+      ? await this.prisma.stock.count({
+          where: {
+            ...organizationWhere,
+            department_id: technologyDepartment.id,
+            status: true,
+            quantity: { lte: 0 },
+          },
+        })
+      : 0;
+    const activeRobots = await this.prisma.tIRobot.count({
+      where: {
+        ...organizationWhere,
+        active: true,
+      },
+    });
 
     return {
       openRequests,
