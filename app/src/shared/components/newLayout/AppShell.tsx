@@ -6,7 +6,6 @@ import {
   Bot,
   Bell,
   Building2,
-  BriefcaseBusiness,
   Calculator,
   ChevronDown,
   ChevronLeft,
@@ -122,7 +121,6 @@ const moduleCategories: NavigationCategory[] = [
     name: "Módulos",
     isModuleAccessCategory: true,
     modules: [
-      { path: "/comercial", name: "Comercial", icon: BriefcaseBusiness, moduleKey: "comercial" as ModuleKey },
       { path: "/certificados", name: "Certificados", icon: FileCheck, moduleKey: "certificado" as ModuleKey },
       { path: "/regularize", name: "Regularize", icon: ShieldCheck, moduleKey: "regularize" as ModuleKey },
       { path: "/fiscal", name: "Fiscal", icon: Receipt, moduleKey: "fiscal" as ModuleKey },

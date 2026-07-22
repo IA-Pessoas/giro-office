@@ -3,7 +3,6 @@ import type { KnownPermissionModuleKey } from "../types";
 export const KNOWN_PERMISSION_MODULE_KEYS = [
   "atendimento",
   "certificado",
-  "comercial",
   "contabil",
   "financeiro",
   "fiscal",
@@ -19,7 +18,6 @@ export const KNOWN_PERMISSION_MODULE_KEYS = [
 export const PERMISSION_MODULE_LABELS: Record<KnownPermissionModuleKey, string> = {
   atendimento: "Atendimento",
   certificado: "Certificado",
-  comercial: "Comercial",
   contabil: "Contábil",
   financeiro: "Financeiro",
   fiscal: "Fiscal",
@@ -39,7 +37,7 @@ export const PERMISSION_MODULE_GROUPS = [
   },
   {
     title: "Atendimento e Comercial",
-    keys: ["atendimento", "certificado", "comercial"],
+    keys: ["atendimento", "certificado"],
   },
   {
     title: "Pessoas e Operação",

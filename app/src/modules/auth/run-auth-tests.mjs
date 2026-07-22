@@ -129,6 +129,18 @@ const parcelamentoPageSource = await readFile(
   "utf8",
 );
 const triagemPageSource = await readFile(new URL("../../pages/triagem.tsx", import.meta.url), "utf8");
+const commercialPageSource = await readFile(
+  new URL("../../pages/comercial/index.tsx", import.meta.url),
+  "utf8",
+);
+const clientCommercialPageSource = await readFile(
+  new URL("../../pages/clients/[id]/commercial.tsx", import.meta.url),
+  "utf8",
+);
+const clientDetailPageSource = await readFile(
+  new URL("../../pages/clients/[id].tsx", import.meta.url),
+  "utf8",
+);
 const permissionConfigSource = await readFile(
   new URL("../users/constants/permissionConfig.ts", import.meta.url),
   "utf8",
@@ -341,7 +353,12 @@ await (async () => {
   });
 
   await runTest("disabled modules are blocked even for global admins", () => {
-    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["marketing", "parcelamento", "triagem"]);
+    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), [
+      "comercial",
+      "marketing",
+      "parcelamento",
+      "triagem",
+    ]);
 
     for (const moduleKey of DISABLED_MODULE_KEYS) {
       assert.equal(isModuleDisabled(moduleKey), true);
@@ -380,20 +397,37 @@ await (async () => {
   });
 
   await runTest("disabled modules are not registered in navigation or quick actions", () => {
-    for (const blockedPath of ["/marketing", "/parcelamento", "/triagem"]) {
+    for (const blockedPath of ["/comercial", "/marketing", "/parcelamento", "/triagem"]) {
       assert.equal(appShellSource.includes(`path: "${blockedPath}"`), false);
       assert.equal(quickActionsSource.includes(`href: "${blockedPath}"`), false);
     }
   });
 
   await runTest("disabled module pages return not found without importing module implementations", () => {
-    for (const source of [marketingPageSource, parcelamentoPageSource, triagemPageSource]) {
+    for (const source of [
+      commercialPageSource,
+      clientCommercialPageSource,
+      marketingPageSource,
+      parcelamentoPageSource,
+      triagemPageSource,
+    ]) {
       assert.match(source, /notFound:\s*true/);
     }
 
+    assert.equal(commercialPageSource.includes("newLayout/Commercial"), false);
+    assert.equal(clientCommercialPageSource.includes("ClientCommercialForm"), false);
+    assert.equal(clientCommercialPageSource.includes("useUpdateClientCommercialMutation"), false);
     assert.equal(marketingPageSource.includes("newLayout/Marketing"), false);
     assert.equal(parcelamentoPageSource.includes("newLayout/Parcelamento"), false);
     assert.equal(triagemPageSource.includes("newLayout/Triagem"), false);
+  });
+
+  await runTest("disabled commercial flow is not linked from client details", () => {
+    assert.equal(
+      clientDetailPageSource.includes('href={`/clients/${client.id}/commercial`}'),
+      false,
+    );
+    assert.equal(clientDetailPageSource.includes("Abrir comercial"), false);
   });
 
   await runTest("disabled modules are hidden from user permission configuration", () => {

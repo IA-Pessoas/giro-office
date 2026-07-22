@@ -14,6 +14,7 @@ import { buildRhServiceOpenApiSpec } from "../../../rh-service/src/openapi/spec.
 import { buildTaskServiceOpenApiSpec } from "../../../task-service/src/openapi/spec.js";
 import { buildTiServiceOpenApiSpec } from "../../../ti-service/src/openapi/spec.js";
 import { buildUserServiceOpenApiSpec } from "../../../user-service/src/openapi/spec.js";
+import { isGatewayOpenApiPathDisabled } from "../config/disabledRoutes.js";
 import type { GatewayEnv } from "../config/env.js";
 
 interface ServiceSpecDefinition {
@@ -91,7 +92,8 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "Client Service",
       buildSpec: () =>
         buildClientServiceOpenApiSpec({ port: getPortFromUrl(env.clientServiceUrl) } as never),
-      includePath: (path) => path !== "/health" && path !== "/ready",
+      includePath: (path) =>
+        path !== "/health" && path !== "/ready" && !isGatewayOpenApiPathDisabled(path),
     },
     {
       key: "regularize-service",

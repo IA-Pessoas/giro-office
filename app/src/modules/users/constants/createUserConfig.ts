@@ -21,9 +21,7 @@ export const CREATE_USER_PERMISSION_OPTIONS: Array<{ value: UserPermission; labe
 export const CREATE_USER_MODULE_OPTIONS = [
   { key: "atendimento", label: "Atendimento" },
   { key: "certificado", label: "Certificado" },
-  { key: "comercial", label: "Comercial" },
   { key: "contabil", label: "Contábil" },
-  { key: "financeiro", label: "Financeiro" },
   { key: "fiscal", label: "Fiscal" },
   { key: "integracao", label: "Integracao" },
   { key: "pec", label: "PEC" },

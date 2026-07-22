@@ -38,6 +38,15 @@ const createUserModalSource = readFileSync(
   new URL("./components/CreateUserModal.tsx", import.meta.url),
   "utf8",
 );
+const createUserConfigSource = readFileSync(
+  new URL("./constants/createUserConfig.ts", import.meta.url),
+  "utf8",
+);
+
+runTest("create user additional modules hide unavailable services", () => {
+  assert.equal(createUserConfigSource.includes('key: "comercial"'), false);
+  assert.equal(createUserConfigSource.includes('key: "financeiro"'), false);
+});
 
 runTest("department admin is not created as organization owner", () => {
   const payload = buildAdminCreateUserPayload({

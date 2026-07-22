@@ -4,7 +4,6 @@ import { useRouter } from "next/router";
 import { useEffect, useState, type ChangeEvent } from "react";
 import {
   ArrowLeft,
-  BriefcaseBusiness,
   Calculator,
   CircleDollarSign,
   FileText,
@@ -351,14 +350,6 @@ export default function ClientDetailPage() {
                   href={`/clients/${client.id}/integration`}
                   actionLabel="Abrir integração"
                   icon={Workflow}
-                />
-
-                <ClientAccessCard
-                  title="Comercial"
-                  description="Atualize o status de prospecção e os dados comerciais do cliente."
-                  href={`/clients/${client.id}/commercial`}
-                  actionLabel="Abrir comercial"
-                  icon={BriefcaseBusiness}
                 />
 
                 <ClientAccessCard

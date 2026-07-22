@@ -15,6 +15,7 @@ import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 
 import type { GatewayEnv } from "./config/env.js";
+import { isGatewayRouteDisabled } from "./config/disabledRoutes.js";
 import { getGatewayServiceDefinitions, resolveGatewayService } from "./config/serviceRegistry.js";
 import {
   buildAuditErrorCaptureMiddleware,
@@ -315,10 +316,20 @@ function mountAuthenticationBoundary(app: express.Express, env: GatewayEnv): voi
 
   app.use(buildAuthenticateMiddleware(env.jwtSecret));
   app.use(generalRateLimit);
+  mountProtectedBlockedRoutes(app);
   app.use(authorizeRequest);
 }
 
 function mountProtectedBlockedRoutes(app: express.Express): void {
+  app.use((request, _response, next) => {
+    if (isGatewayRouteDisabled(request.path)) {
+      next(new ServiceError(404, "Recurso não encontrado."));
+      return;
+    }
+
+    next();
+  });
+
   app.use("/regularize/internal", (_request, _response, next) => {
     next(new ServiceError(404, "Recurso não encontrado."));
   });
@@ -421,7 +432,6 @@ export function createApp(
   mountAuthRateLimits(app, env);
   mountPublicBlockedRoutes(app, env);
   mountAuthenticationBoundary(app, env);
-  mountProtectedBlockedRoutes(app);
   mountDashboardRoutes(app, dashboardStatsService);
   mountServiceRoutes(app, env);
   mountFallbackRoute(app);

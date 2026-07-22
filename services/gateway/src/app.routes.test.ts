@@ -1018,6 +1018,8 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/task/list"]).toBeTruthy();
     expect(body.paths["/project/list"]).toBeTruthy();
     expect(body.paths["/client/list"]).toBeTruthy();
+    expect(body.paths["/client/commercial/overview"]).toBeUndefined();
+    expect(body.paths["/client/{id}/commercial"]).toBeUndefined();
     expect(body.paths["/organizations"]).toBeTruthy();
     expect(body.paths["/rh/point-config"]).toBeTruthy();
     expect(body.paths["/regularize/passwords"]).toBeTruthy();
@@ -2487,6 +2489,53 @@ it("proxies /client to the client microservice", async () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(seenUrl).toBe("/client/smoke");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("blocks disabled commercial routes before proxying even for global admins", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+    modules: { comercial: 2 },
+  });
+  const seenUrls: string[] = [];
+  const upstream = createServer((request, response) => {
+    seenUrls.push(request.url ?? "");
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const responses = await Promise.all([
+      fetch(`${gatewayUrl}/client/commercial/overview`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      fetch(`${gatewayUrl}/client/client-1/commercial`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ prospecting_status: "Prospect" }),
+      }),
+    ]);
+
+    for (const response of responses) {
+      const body = (await response.json()) as Record<string, unknown>;
+      expect(response.status).toBe(404);
+      expect(body.code).toBe("NOT_FOUND");
+    }
+
+    expect(seenUrls).toEqual([]);
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

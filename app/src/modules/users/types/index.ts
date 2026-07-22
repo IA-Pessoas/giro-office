@@ -22,7 +22,6 @@ export type UserPermission = -1 | 0 | 1 | 2;
 export type KnownPermissionModuleKey =
   | "atendimento"
   | "certificado"
-  | "comercial"
   | "contabil"
   | "financeiro"
   | "fiscal"
