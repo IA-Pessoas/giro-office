@@ -66,7 +66,6 @@ export default function ClientContabilPage() {
       <ContabilShell
         clientId={client.id}
         clientName={client.name}
-        lockedClient
         canEdit={canEditContabil}
       />
     );

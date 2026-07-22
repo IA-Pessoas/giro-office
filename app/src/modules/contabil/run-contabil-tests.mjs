@@ -59,6 +59,8 @@ await (async () => {
     const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
 
     assert.match(source, /ClientPickerModal/);
+    assert.match(source, /headerAction=\{/);
+    assert.doesNotMatch(source, /clientPickerContent=/);
     assert.match(source, /ref:\s*"deps"/);
     assert.match(source, /status:\s*"Departamento contabil"/);
     assert.doesNotMatch(source, /useClients\(/);
