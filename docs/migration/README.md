@@ -136,6 +136,15 @@ Quarentena de Tecnologia:
 
 Decisoes de Tecnologia:
 
+- `tb_cbs.ramais` nao foi migrada nesta etapa. O Supabase atual usa
+  `tecnologia.extensions` com o contrato `user_id + number` e indice unico por
+  `organization_id + number`; o legado guarda ramais em `tb_cbs.ramais` com os
+  campos `tipo`, `numero` e `usuario_id`, permitindo numeros repetidos e
+  classificacoes como `Fixo`, `Computador` e `Movel`. O backup de 06/07/2026
+  possui 194 registros nessa origem. A equipe precisa decidir se os ramais devem
+  ser migrados com perda/normalizacao de `tipo`, se o sistema novo deve ser
+  adaptado para preservar o modelo legado, ou se esses dados devem permanecer
+  fora da carga.
 - `tb_tecnologia.senhas` sem `password` nao deve ser migrada. O setor de TI
   informou que esses dados nao sao necessarios no novo sistema. Esses registros
   devem permanecer em quarentena com observacao operacional.

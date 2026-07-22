@@ -21,7 +21,61 @@ export interface DashboardInsight {
   description: string;
 }
 
+export interface DashboardTaskSummary {
+  today: number;
+  completedToday: number;
+  pending: number;
+  urgent: number;
+}
+
+export interface DashboardNotificationSummary {
+  total: number;
+  urgent: number;
+  pending: number;
+}
+
+export interface DashboardProjectSummary {
+  active: number;
+  completed: number;
+  inProgress: number;
+  delayed: number;
+  waiting: number;
+}
+
+export interface DashboardRevenueSummary {
+  currentMonth: number;
+  target: number;
+  monthly: Array<{
+    month: string;
+    revenue: number;
+    expenses: number;
+  }>;
+}
+
+export interface DashboardPerformanceEntry {
+  week: string;
+  tasks: number;
+  completed: number;
+}
+
+export interface DashboardPendingTask {
+  title: string;
+  priority: 'Alta' | 'Média' | 'Baixa';
+  dueDate: string;
+  status: 'pending' | 'urgent';
+}
+
+export interface DashboardActivity {
+  user: string;
+  action: string;
+  item: string;
+  time: string;
+  avatar: string;
+  tone: 'green' | 'blue' | 'yellow' | 'purple' | 'indigo';
+}
+
 export interface DashboardStats {
+  updatedAt: string | null;
   totalClients: number;
   clientsByService: {
     contabil: number;
@@ -40,6 +94,13 @@ export interface DashboardStats {
   };
   recentClients: RecentClientRow[];
   insights: DashboardInsight[];
+  tasks: DashboardTaskSummary;
+  notifications: DashboardNotificationSummary;
+  projects: DashboardProjectSummary;
+  revenue: DashboardRevenueSummary;
+  performance: DashboardPerformanceEntry[];
+  pendingTasks: DashboardPendingTask[];
+  activities: DashboardActivity[];
 }
 
 export interface StatCardData {

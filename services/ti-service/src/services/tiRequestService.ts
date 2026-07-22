@@ -56,6 +56,15 @@ export class TiRequestService {
             }
           : {}),
       },
+      include: {
+        category: true,
+        requester: {
+          select: SAFE_USER_SELECT,
+        },
+        assigned_to: {
+          select: SAFE_USER_SELECT,
+        },
+      },
       orderBy: { created_at: "desc" },
       skip,
       take,

@@ -32,6 +32,37 @@ async function runTest(name, fn) {
   }
 }
 
+function getFunctionSource(source, functionName) {
+  const start = source.indexOf(`const ${functionName} =`);
+  assert.notEqual(start, -1);
+
+  const bodyStart = source.indexOf("{", start);
+  assert.notEqual(bodyStart, -1);
+
+  let depth = 0;
+
+  for (let index = bodyStart; index < source.length; index += 1) {
+    const character = source[index];
+
+    if (character === "{") {
+      depth += 1;
+    }
+
+    if (character === "}") {
+      depth -= 1;
+
+      if (depth === 0) {
+        const end = source.indexOf(";", index);
+        assert.notEqual(end, -1);
+
+        return source.slice(start, end + 1);
+      }
+    }
+  }
+
+  assert.fail(`Function ${functionName} was not closed`);
+}
+
 function createToken(payload) {
   const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -526,7 +557,9 @@ await (async () => {
       /queryClient\.invalidateQueries\(\{[\s\S]*queryKey:\s*\["admin", "permissions", selectedPermissionUserId\],[\s\S]*\}\)/,
     );
     assert.match(administracaoSource, /invalidateAdminUserLists\(\)/);
-    assert.match(administracaoSource, /await refetchPermissionUsers\(\);/);
+    const handleSavePermissionsSource = getFunctionSource(administracaoSource, "handleSavePermissions");
+
+    assert.equal(handleSavePermissionsSource.includes("refetchPermissionUsers"), false);
   });
 
   await runTest("admin permissions tab is available to RH module admins", () => {

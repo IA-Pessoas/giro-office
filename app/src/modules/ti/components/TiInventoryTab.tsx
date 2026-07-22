@@ -53,11 +53,7 @@ const INVENTORY_STATUS_OPTIONS = [
   { value: "", label: "Todos" },
   { value: "available", label: "Disponível" },
   { value: "assigned", label: "Atribuído" },
-  { value: "maintenance", label: "Manutenção" },
-  { value: "retired", label: "Baixado" },
 ];
-
-const ASSET_FORM_STATUS_OPTIONS = INVENTORY_STATUS_OPTIONS.filter((option) => option.value);
 
 const ACTIVE_STATUS_OPTIONS = [
   { value: "active", label: "Ativo" },
@@ -152,18 +148,56 @@ function getCatalogStatus(
   return item.status ?? item.active ?? item.is_active;
 }
 
+function getRelatedUserName(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+
+  for (const key of ["full_name", "name", "login", "email"]) {
+    const field = record[key];
+
+    if (typeof field === "string" && field.trim()) {
+      return field;
+    }
+  }
+
+  return undefined;
+}
+
 function getAssetTitle(asset: TiInventoryAsset): string {
-  return getText(asset.name ?? asset.code ?? asset.patrimony_code, "Ativo sem nome");
+  return getText(
+    asset.asset_code ?? asset.name ?? asset.code ?? asset.patrimony_code,
+    "Ativo sem código",
+  );
 }
 
 function getAssetCode(asset: TiInventoryAsset): string {
-  return getText(asset.code ?? asset.patrimony_code ?? asset.serial_number);
+  return getText(asset.asset_code ?? asset.code ?? asset.patrimony_code ?? asset.serial_number);
 }
 
 function getAssignedUser(asset: TiInventoryAsset): string {
   return getText(
-    asset.assigned_user_name ?? asset.assigned_to_user_name ?? asset.assigned_user_id ?? asset.assigned_to_user_id,
+    getRelatedUserName(asset.user) ??
+      asset.user_id ??
+      asset.assigned_user_name ??
+      asset.assigned_to_user_name ??
+      asset.assigned_user_id ??
+      asset.assigned_to_user_id,
   );
+}
+
+function getItResponsible(asset: TiInventoryAsset): string {
+  return getText(getRelatedUserName(asset.responsible_it_staff) ?? asset.responsible_it_staff_id);
+}
+
+function getAssetStatus(asset: TiInventoryAsset): string {
+  if (asset.status) {
+    return String(asset.status);
+  }
+
+  return asset.user_id || asset.user ? "assigned" : "available";
 }
 
 function getMutationErrorMessage(error: unknown): string {
@@ -190,12 +224,11 @@ export function TiInventoryTab() {
   const filters = useMemo(
     () =>
       compactPayload({
-        search,
-        status,
+        asset_code: search,
         category_id: categoryId,
         location_id: departmentId,
       }),
-    [categoryId, departmentId, search, status],
+    [categoryId, departmentId, search],
   );
 
   const inventoryQuery = useTiInventory(filters);
@@ -254,13 +287,23 @@ export function TiInventoryTab() {
     [departmentOptions],
   );
 
+  const filteredInventory = useMemo(() => {
+    const assets = inventoryQuery.data ?? [];
+
+    if (!status) {
+      return assets;
+    }
+
+    return assets.filter((asset) => normalizeStatus(getAssetStatus(asset)) === status);
+  }, [inventoryQuery.data, status]);
+
   const selectedListAsset = (inventoryQuery.data ?? []).find(
     (asset) => String(asset.id) === String(selectedAssetId),
   );
   const selectedAsset = selectedAssetQuery.data ?? selectedListAsset;
 
-  function getCategoryName(id: unknown): string {
-    return getText(categoriesById.get(String(id))?.name);
+  function getCategoryName(id: unknown, fallback?: unknown): string {
+    return getText(categoriesById.get(String(id))?.name ?? fallback);
   }
 
   function getDepartmentName(id: unknown, fallback?: unknown): string {
@@ -297,14 +340,11 @@ export function TiInventoryTab() {
 
     const formData = new FormData(event.currentTarget);
     const payload = compactPayload({
-      name: getFormText(formData, "name"),
-      code: getFormText(formData, "code"),
-      serial_number: getFormText(formData, "serial_number"),
-      brand: getFormText(formData, "brand"),
-      model: getFormText(formData, "model"),
+      asset_code: getFormText(formData, "asset_code"),
       category_id: getFormText(formData, "category_id"),
       location_id: getFormText(formData, "location_id"),
-      status: getFormText(formData, "status"),
+      user_id: getFormText(formData, "user_id"),
+      responsible_it_staff_id: getFormText(formData, "responsible_it_staff_id"),
       notes: getFormText(formData, "notes"),
     });
 
@@ -333,7 +373,7 @@ export function TiInventoryTab() {
     }
 
     const formData = new FormData(event.currentTarget);
-    const userId = getFormText(formData, "assigned_user_id");
+    const userId = getFormText(formData, "user_id");
 
     if (!confirm("Confirmar atribuição deste ativo?")) {
       return;
@@ -344,9 +384,7 @@ export function TiInventoryTab() {
       await assignUserMutation.mutateAsync({
         id: dialogState.asset.id,
         payload: compactPayload({
-          assigned_user_id: userId,
-          assigned_to_user_id: userId,
-          notes: getFormText(formData, "notes"),
+          user_id: userId,
         }),
       });
       setSelectedAssetId(dialogState.asset.id);
@@ -456,7 +494,7 @@ export function TiInventoryTab() {
           label="Busca"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Nome, código ou nº de série"
+          placeholder="Código patrimonial"
         />
         <TiNativeSelect
           label="Status"
@@ -489,75 +527,96 @@ export function TiInventoryTab() {
             />
           }
         >
-          {(assets) => (
-            <TiDataTable headers={["Ativo", "Categoria", "Departamento", "Responsável", "Status", ""]}>
-              {assets.map((asset) => {
-                const isSelected = String(asset.id) === String(selectedAssetId);
+          {() =>
+            filteredInventory.length === 0 ? (
+              <TiEmptyState
+                icon={Boxes}
+                title="Nenhum ativo encontrado"
+                description="Ajuste os filtros para localizar os ativos de Tecnologia."
+              />
+            ) : (
+              <TiDataTable
+                headers={[
+                  "Ativo",
+                  "Categoria",
+                  "Departamento",
+                  "Usuário",
+                  "Responsável TI",
+                  "Status",
+                  "",
+                ]}
+              >
+                {filteredInventory.map((asset) => {
+                  const isSelected = String(asset.id) === String(selectedAssetId);
 
-                return (
-                  <tr
-                    key={asset.id}
-                    className={cn(
-                      "text-slate-700 dark:text-slate-200",
-                      isSelected ? "bg-blue-50/70 dark:bg-blue-950/20" : "",
-                    )}
-                  >
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
-                        onClick={() => openAssetDetail(asset.id)}
-                      >
-                        {getAssetTitle(asset)}
-                      </button>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        {getAssetCode(asset)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">{getCategoryName(asset.category_id)}</td>
-                    <td className="px-4 py-3">
-                      {getDepartmentName(asset.location_id, asset.location?.name)}
-                    </td>
-                    <td className="px-4 py-3">{getAssignedUser(asset)}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge
-                        config={getStatusBadgeConfig(asset.status)}
-                        className={tiStatusBadgeClassName}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        <TiTableAction
-                          icon={Eye}
-                          label="Detalhes"
+                  return (
+                    <tr
+                      key={asset.id}
+                      className={cn(
+                        "text-slate-700 dark:text-slate-200",
+                        isSelected ? "bg-blue-50/70 dark:bg-blue-950/20" : "",
+                      )}
+                    >
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
                           onClick={() => openAssetDetail(asset.id)}
+                        >
+                          {getAssetTitle(asset)}
+                        </button>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {getAssetCode(asset)}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        {getCategoryName(asset.category_id, asset.category?.name)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {getDepartmentName(asset.location_id, asset.location?.name)}
+                      </td>
+                      <td className="px-4 py-3">{getAssignedUser(asset)}</td>
+                      <td className="px-4 py-3">{getItResponsible(asset)}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge
+                          config={getStatusBadgeConfig(getAssetStatus(asset))}
+                          className={tiStatusBadgeClassName}
                         />
-                        {canManage ? (
-                          <>
-                            <TiTableAction
-                              icon={Pencil}
-                              label="Editar"
-                              onClick={() => openDialog({ type: "asset", mode: "edit", asset })}
-                            />
-                            <TiTableAction
-                              icon={UserPlus}
-                              label="Atribuir"
-                              onClick={() => openDialog({ type: "assign", asset })}
-                            />
-                            <TiTableAction
-                              icon={RotateCcw}
-                              label="Devolver"
-                              onClick={() => openDialog({ type: "return", asset })}
-                            />
-                          </>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </TiDataTable>
-          )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <TiTableAction
+                            icon={Eye}
+                            label="Detalhes"
+                            onClick={() => openAssetDetail(asset.id)}
+                          />
+                          {canManage ? (
+                            <>
+                              <TiTableAction
+                                icon={Pencil}
+                                label="Editar"
+                                onClick={() => openDialog({ type: "asset", mode: "edit", asset })}
+                              />
+                              <TiTableAction
+                                icon={UserPlus}
+                                label="Atribuir"
+                                onClick={() => openDialog({ type: "assign", asset })}
+                              />
+                              <TiTableAction
+                                icon={RotateCcw}
+                                label="Devolver"
+                                onClick={() => openDialog({ type: "return", asset })}
+                              />
+                            </>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </TiDataTable>
+            )
+          }
         </TiQueryStatePanel>
       </div>
 
@@ -580,23 +639,25 @@ export function TiInventoryTab() {
             <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
               <TiFieldLine label="Ativo" value={getAssetTitle(selectedAsset)} />
               <TiFieldLine label="Código" value={getAssetCode(selectedAsset)} />
-              <TiFieldLine label="Categoria" value={getCategoryName(selectedAsset.category_id)} />
+              <TiFieldLine
+                label="Categoria"
+                value={getCategoryName(selectedAsset.category_id, selectedAsset.category?.name)}
+              />
               <TiFieldLine
                 label="Departamento"
                 value={getDepartmentName(selectedAsset.location_id, selectedAsset.location?.name)}
               />
-              <TiFieldLine label="Responsável" value={getAssignedUser(selectedAsset)} />
+              <TiFieldLine label="Usuário" value={getAssignedUser(selectedAsset)} />
+              <TiFieldLine label="Responsável TI" value={getItResponsible(selectedAsset)} />
               <TiFieldLine
                 label="Status"
                 value={
                   <StatusBadge
-                    config={getStatusBadgeConfig(selectedAsset.status)}
+                    config={getStatusBadgeConfig(getAssetStatus(selectedAsset))}
                     className={tiStatusBadgeClassName}
                   />
                 }
               />
-              <TiFieldLine label="Marca" value={getText(selectedAsset.brand)} />
-              <TiFieldLine label="Modelo" value={getText(selectedAsset.model)} />
               <TiFieldLine label="Notas" value={getText(selectedAsset.notes)} />
             </div>
           ) : (
@@ -625,32 +686,12 @@ export function TiInventoryTab() {
           {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
           <div className="grid gap-3 md:grid-cols-2">
             <TiTextField
-              label="Nome"
-              name="name"
+              label="Código patrimonial"
+              name="asset_code"
               required
-              defaultValue={dialogState?.type === "asset" ? dialogState.asset?.name ?? "" : ""}
-            />
-            <TiTextField
-              label="Código"
-              name="code"
-              defaultValue={dialogState?.type === "asset" ? getText(dialogState.asset?.code, "") : ""}
-            />
-            <TiTextField
-              label="Nº de série"
-              name="serial_number"
               defaultValue={
-                dialogState?.type === "asset" ? getText(dialogState.asset?.serial_number, "") : ""
+                dialogState?.type === "asset" ? getText(dialogState.asset?.asset_code, "") : ""
               }
-            />
-            <TiNativeSelect
-              label="Status"
-              name="status"
-              defaultValue={
-                dialogState?.type === "asset"
-                  ? normalizeStatus(dialogState.asset?.status || "available")
-                  : "available"
-              }
-              options={ASSET_FORM_STATUS_OPTIONS}
             />
             <TiNativeSelect
               label="Categoria"
@@ -659,6 +700,7 @@ export function TiInventoryTab() {
                 dialogState?.type === "asset" ? getText(dialogState.asset?.category_id, "") : ""
               }
               options={categoryOptions}
+              required
             />
             <TiNativeSelect
               label="Departamento"
@@ -669,14 +711,20 @@ export function TiInventoryTab() {
               options={departmentFormOptions}
             />
             <TiTextField
-              label="Marca"
-              name="brand"
-              defaultValue={dialogState?.type === "asset" ? getText(dialogState.asset?.brand, "") : ""}
+              label="ID do usuário"
+              name="user_id"
+              defaultValue={
+                dialogState?.type === "asset" ? getText(dialogState.asset?.user_id, "") : ""
+              }
             />
             <TiTextField
-              label="Modelo"
-              name="model"
-              defaultValue={dialogState?.type === "asset" ? getText(dialogState.asset?.model, "") : ""}
+              label="ID do responsável TI"
+              name="responsible_it_staff_id"
+              defaultValue={
+                dialogState?.type === "asset"
+                  ? getText(dialogState.asset?.responsible_it_staff_id, "")
+                  : ""
+              }
             />
           </div>
           <TiTextarea
@@ -714,8 +762,7 @@ export function TiInventoryTab() {
           <TiInlineNotice tone="warning">
             A atribuição será registrada no ativo selecionado após a confirmação.
           </TiInlineNotice>
-          <TiTextField label="ID do usuário" name="assigned_user_id" required />
-          <TiTextarea label="Observação" name="notes" />
+          <TiTextField label="ID do usuário" name="user_id" required />
           <div className="flex justify-end gap-2">
             <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
               Cancelar
