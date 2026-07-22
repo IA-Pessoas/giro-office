@@ -27,6 +27,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
     tags: [
       { name: "Health", description: "Saude do servico" },
       { name: "Clients", description: "CRUD principal de clientes" },
+      { name: "Commercial", description: "Overview comercial baseado em clientes reais" },
       { name: "Integration", description: "Fluxos de integracao de clientes" },
       { name: "Verticals", description: "Atualizacoes por vertical do cliente" },
       { name: "Histories", description: "Historicos e pendencias do cliente" },
@@ -94,6 +95,21 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           responses: {
             "200": {
               description: "Lista paginada de clientes",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
+      },
+      "/client/commercial/overview": {
+        get: {
+          tags: ["Commercial"],
+          summary: "Overview comercial",
+          description:
+            "Retorna dados comerciais reais derivados de clientes. Dominios sem fonte real retornam zerados.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Overview comercial",
               ...successEnvelopeContent(),
             },
           },

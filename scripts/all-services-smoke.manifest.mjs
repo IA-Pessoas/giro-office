@@ -724,6 +724,14 @@ const baseManifest = [
   }),
   op({
     service: "client-service",
+    method: "GET",
+    path: "/client/commercial/overview",
+    action: "clientCommercialOverview",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
     method: "POST",
     path: "/client",
     action: "clientCreate",

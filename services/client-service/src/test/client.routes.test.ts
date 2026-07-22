@@ -161,6 +161,7 @@ describe("client-service", () => {
     expect(res.body.openapi).toBe("3.0.3");
     expect(res.body.info?.title).toBe("client-service");
     expect(res.body.paths?.["/client/list"]).toBeDefined();
+    expect(res.body.paths?.["/client/commercial/overview"]).toBeDefined();
     expect(res.body.paths?.["/client/{id}/pa"]).toBeDefined();
     expect(res.body.paths?.["/internal/competence-output-update"]).toBeDefined();
   });
@@ -222,6 +223,41 @@ describe("client-service", () => {
       page: 1,
       pageSize: 20,
       search: undefined,
+    });
+  });
+
+  it("GET /client/commercial/overview returns overview scoped to authenticated organization", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const prisma = {
+      organization: {
+        findUnique: vi.fn().mockResolvedValue({ id: TEST_ORG_ID }),
+      },
+      client: {
+        count: vi.fn().mockResolvedValue(0),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+    } as unknown as PrismaClient;
+    const app = buildTestApp(mock, { prisma });
+    const token = bearerToken(TEST_ORG_ID);
+
+    const res = await request(app)
+      .get("/client/commercial/overview")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.summary).toEqual({
+      totalLeads: 0,
+      activeLeads: 0,
+      wonLeads: 0,
+      totalValue: 0,
+      conversionRate: 0,
+      activeProposals: 0,
+      activeContracts: 0,
+    });
+    expect(prisma.organization.findUnique).toHaveBeenCalledWith({
+      where: { id: TEST_ORG_ID },
+      select: { id: true },
     });
   });
 

@@ -25,6 +25,7 @@ Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id`
 | Metodo | Caminho | Descricao |
 |--------|---------|-----------|
 | `GET` | `/client/list` | Listagem paginada. Query: `page`, `limit`, `search`, `status`, `ref` (`integracao` \| `deps`), `organization_id` opcional. |
+| `GET` | `/client/commercial/overview` | Overview comercial com dados reais de clientes e dominios sem fonte real zerados. |
 | `GET` | `/client/:id` | Detalhe. |
 | `POST` | `/client` | Criar (campos estendidos alinhados ao Prisma: endereco, fiscal, modulos, datas, etc.). |
 | `PATCH` | `/client/:id` | Atualizar parcial. |

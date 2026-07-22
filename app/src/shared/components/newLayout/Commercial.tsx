@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Activity,
   ArrowRight,
@@ -21,12 +22,10 @@ import {
   PauseCircle,
   Phone,
   PieChart as PieChartIcon,
-  Plus,
   Search,
   Send,
   Target,
   TrendingUp,
-  Upload,
   UserPlus,
   Users,
   XCircle,
@@ -45,56 +44,8 @@ import {
   YAxis,
 } from "recharts";
 
-interface Lead {
-  id: string;
-  name: string;
-  company: string;
-  cnpj: string;
-  email: string;
-  phone: string;
-  source: "Website" | "Indicação" | "WhatsApp" | "Onvio" | "Cold Call";
-  status:
-    | "new"
-    | "contacted"
-    | "qualified"
-    | "proposal"
-    | "negotiation"
-    | "won"
-    | "lost"
-    | "paused";
-  value: number;
-  priority: "low" | "medium" | "high" | "urgent";
-  assignee: string;
-  createdDate: string;
-  lastContact?: string;
-  nextFollowUp?: string;
-  notes?: string;
-}
-
-interface Proposal {
-  id: string;
-  lead: string;
-  company: string;
-  services: string[];
-  monthlyValue: number;
-  setupFee: number;
-  validUntil: string;
-  status: "draft" | "sent" | "viewed" | "approved" | "rejected";
-  sentDate?: string;
-  viewedDate?: string;
-}
-
-interface Contract {
-  id: string;
-  company: string;
-  cnpj: string;
-  type: "Contábil" | "Fiscal" | "Pessoal" | "Completo";
-  monthlyValue: number;
-  startDate: string;
-  endDate?: string;
-  status: "active" | "suspended" | "cancelled";
-  paymentDay: number;
-}
+import { useCommercialOverview } from "../../../modules/commercial/hooks/useCommercialOverview";
+import type { CommercialLead } from "../../../modules/commercial/types";
 
 export function Commercial() {
   const [activeTab, setActiveTab] = useState<
@@ -105,220 +56,30 @@ export function Commercial() {
   const [filterSource, setFilterSource] = useState<string>("all");
   const [pipelineView, setPipelineView] = useState<"kanban" | "table">("kanban");
 
-  const leads: Lead[] = [
-    {
-      id: "1",
-      name: "João Silva",
-      company: "Tech Solutions Ltda",
-      cnpj: "12.345.678/0001-90",
-      email: "joao@techsolutions.com",
-      phone: "(11) 98765-4321",
-      source: "Website",
-      status: "negotiation",
-      value: 4500,
-      priority: "high",
-      assignee: "Maria Santos",
-      createdDate: "2026-03-10",
-      lastContact: "2026-03-16",
-      nextFollowUp: "2026-03-18",
-      notes: "Interessado em serviços contábeis completos",
-    },
-    {
-      id: "2",
-      name: "Ana Costa",
-      company: "Comércio Beta ME",
-      cnpj: "98.765.432/0001-11",
-      email: "ana@comerciobeta.com",
-      phone: "(11) 91234-5678",
-      source: "Indicação",
-      status: "proposal",
-      value: 2800,
-      priority: "high",
-      assignee: "Carlos Oliveira",
-      createdDate: "2026-03-12",
-      lastContact: "2026-03-15",
-      nextFollowUp: "2026-03-19",
-      notes: "Precisa migrar do escritório anterior",
-    },
-    {
-      id: "3",
-      name: "Pedro Santos",
-      company: "Serviços Gamma Ltda",
-      cnpj: "11.222.333/0001-44",
-      email: "pedro@gamma.com",
-      phone: "(11) 99876-5432",
-      source: "WhatsApp",
-      status: "qualified",
-      value: 3200,
-      priority: "medium",
-      assignee: "Maria Santos",
-      createdDate: "2026-03-13",
-      lastContact: "2026-03-14",
-      nextFollowUp: "2026-03-20",
-    },
-    {
-      id: "4",
-      name: "Carla Mendes",
-      company: "Consultoria Delta S/A",
-      cnpj: "55.666.777/0001-88",
-      email: "carla@delta.com",
-      phone: "(11) 97654-3210",
-      source: "Onvio",
-      status: "contacted",
-      value: 5500,
-      priority: "urgent",
-      assignee: "Carlos Oliveira",
-      createdDate: "2026-03-14",
-      lastContact: "2026-03-15",
-      nextFollowUp: "2026-03-17",
-      notes: "Empresa de médio porte, precisa de atendimento urgente",
-    },
-    {
-      id: "5",
-      name: "Roberto Lima",
-      company: "Indústria Omega Ltda",
-      cnpj: "99.888.777/0001-66",
-      email: "roberto@omega.com",
-      phone: "(11) 96543-2109",
-      source: "Cold Call",
-      status: "new",
-      value: 6800,
-      priority: "medium",
-      assignee: "Maria Santos",
-      createdDate: "2026-03-16",
-      nextFollowUp: "2026-03-18",
-    },
-    {
-      id: "6",
-      name: "Juliana Souza",
-      company: "E-commerce Alpha ME",
-      cnpj: "44.555.666/0001-22",
-      email: "juliana@alpha.com",
-      phone: "(11) 95432-1098",
-      source: "Website",
-      status: "won",
-      value: 3500,
-      priority: "high",
-      assignee: "Carlos Oliveira",
-      createdDate: "2026-03-01",
-      lastContact: "2026-03-10",
-      notes: "Cliente fechado - iniciar onboarding",
-    },
-    {
-      id: "7",
-      name: "Marcos Pereira",
-      company: "Construções Sigma Ltda",
-      cnpj: "33.444.555/0001-99",
-      email: "marcos@sigma.com",
-      phone: "(11) 94321-0987",
-      source: "Indicação",
-      status: "lost",
-      value: 4200,
-      priority: "low",
-      assignee: "Maria Santos",
-      createdDate: "2026-02-25",
-      lastContact: "2026-03-05",
-      notes: "Optou por outro fornecedor - preço",
-    },
-    {
-      id: "8",
-      name: "Fernanda Alves",
-      company: "Marketing Epsilon ME",
-      cnpj: "22.333.444/0001-77",
-      email: "fernanda@epsilon.com",
-      phone: "(11) 93210-9876",
-      source: "WhatsApp",
-      status: "paused",
-      value: 2500,
-      priority: "low",
-      assignee: "Carlos Oliveira",
-      createdDate: "2026-03-08",
-      lastContact: "2026-03-12",
-      notes: "Aguardando definição interna da empresa",
-    },
-  ];
-
-  const proposals: Proposal[] = [
-    {
-      id: "1",
-      lead: "Ana Costa",
-      company: "Comércio Beta ME",
-      services: ["Contabilidade", "Fiscal", "Departamento Pessoal"],
-      monthlyValue: 2800,
-      setupFee: 1500,
-      validUntil: "2026-03-25",
-      status: "sent",
-      sentDate: "2026-03-15",
-    },
-    {
-      id: "2",
-      lead: "João Silva",
-      company: "Tech Solutions Ltda",
-      services: ["Contabilidade", "Fiscal"],
-      monthlyValue: 4500,
-      setupFee: 2000,
-      validUntil: "2026-03-22",
-      status: "viewed",
-      sentDate: "2026-03-12",
-      viewedDate: "2026-03-13",
-    },
-    {
-      id: "3",
-      lead: "Pedro Santos",
-      company: "Serviços Gamma Ltda",
-      services: ["Contabilidade"],
-      monthlyValue: 3200,
-      setupFee: 1200,
-      validUntil: "2026-03-28",
-      status: "draft",
-    },
-    {
-      id: "4",
-      lead: "Juliana Souza",
-      company: "E-commerce Alpha ME",
-      services: ["Contabilidade", "Fiscal", "Departamento Pessoal"],
-      monthlyValue: 3500,
-      setupFee: 1800,
-      validUntil: "2026-03-15",
-      status: "approved",
-      sentDate: "2026-03-05",
-      viewedDate: "2026-03-06",
-    },
-  ];
-
-  const contracts: Contract[] = [
-    {
-      id: "1",
-      company: "E-commerce Alpha ME",
-      cnpj: "44.555.666/0001-22",
-      type: "Completo",
-      monthlyValue: 3500,
-      startDate: "2026-03-15",
-      status: "active",
-      paymentDay: 10,
-    },
-    {
-      id: "2",
-      company: "Tech Prime Ltda",
-      cnpj: "77.888.999/0001-33",
-      type: "Contábil",
-      monthlyValue: 4200,
-      startDate: "2026-01-10",
-      status: "active",
-      paymentDay: 5,
-    },
-    {
-      id: "3",
-      company: "Serviços Pro ME",
-      cnpj: "66.777.888/0001-55",
-      type: "Fiscal",
-      monthlyValue: 1800,
-      startDate: "2025-11-20",
-      endDate: "2026-03-10",
-      status: "cancelled",
-      paymentDay: 15,
-    },
-  ];
+  const overviewQuery = useCommercialOverview();
+  const overview = overviewQuery.data;
+  const leads = useMemo(() => overview?.leads ?? [], [overview?.leads]);
+  const proposals = overview?.proposals ?? [];
+  const contracts = overview?.contracts ?? [];
+  const sourceData = overview?.sources ?? [];
+  const monthlyConversions = overview?.monthlyConversions ?? [];
+  const {
+    totalLeads,
+    activeLeads,
+    wonLeads,
+    totalValue,
+    conversionRate,
+    activeProposals,
+    activeContracts,
+  } = overview?.summary ?? {
+    totalLeads: 0,
+    activeLeads: 0,
+    wonLeads: 0,
+    totalValue: 0,
+    conversionRate: 0,
+    activeProposals: 0,
+    activeContracts: 0,
+  };
 
   const leadStatusConfig = {
     new: {
@@ -416,47 +177,6 @@ export function Commercial() {
     urgent: { label: "Urgente", color: "text-red-600 dark:text-red-400" },
   } as const;
 
-  const totalLeads = leads.length;
-  const activeLeads = leads.filter((l) => !["won", "lost"].includes(l.status)).length;
-  const wonLeads = leads.filter((l) => l.status === "won").length;
-  const totalValue = leads.filter((l) => l.status === "won").reduce((sum, l) => sum + l.value, 0);
-  const conversionRate = totalLeads > 0 ? ((wonLeads / totalLeads) * 100).toFixed(1) : "0";
-  const activeProposals = proposals.filter((p) => ["sent", "viewed"].includes(p.status)).length;
-  const activeContracts = contracts.filter((c) => c.status === "active").length;
-
-  const sourceData = [
-    {
-      name: "Website",
-      value: leads.filter((l) => l.source === "Website").length,
-      color: "#3b82f6",
-    },
-    {
-      name: "Indicação",
-      value: leads.filter((l) => l.source === "Indicação").length,
-      color: "#10b981",
-    },
-    {
-      name: "WhatsApp",
-      value: leads.filter((l) => l.source === "WhatsApp").length,
-      color: "#8b5cf6",
-    },
-    { name: "Onvio", value: leads.filter((l) => l.source === "Onvio").length, color: "#f59e0b" },
-    {
-      name: "Cold Call",
-      value: leads.filter((l) => l.source === "Cold Call").length,
-      color: "#ef4444",
-    },
-  ].filter((item) => item.value > 0);
-
-  const monthlyConversions = [
-    { month: "Out", leads: 12, won: 3, lost: 2 },
-    { month: "Nov", leads: 15, won: 4, lost: 3 },
-    { month: "Dez", leads: 18, won: 5, lost: 4 },
-    { month: "Jan", leads: 14, won: 3, lost: 2 },
-    { month: "Fev", leads: 16, won: 4, lost: 3 },
-    { month: "Mar", leads: 8, won: 1, lost: 1 },
-  ];
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -480,9 +200,12 @@ export function Commercial() {
     });
   }, [leads, searchTerm, filterStatus, filterSource]);
 
-  const getLeadsByStatus = (status: Lead["status"]) => {
+  const getLeadsByStatus = (status: CommercialLead["status"]) => {
     return leads.filter((l) => l.status === status);
   };
+
+  const isInitialLoading = overviewQuery.isLoading && !overview;
+  const hasOverviewError = overviewQuery.isError;
 
   return (
     <div className="w-full space-y-5">
@@ -497,22 +220,6 @@ export function Commercial() {
           <p className="text-gray-600 dark:text-slate-400">
             Gestão de leads, propostas, contratos e pipeline de vendas
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition-all"
-            type="button"
-          >
-            <Upload className="w-5 h-5" />
-            <span className="font-medium">Importar Leads</span>
-          </button>
-          <button
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg hover:from-emerald-700 hover:to-emerald-800 transition-all shadow-md hover:shadow-lg"
-            type="button"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="font-medium">Novo Lead</span>
-          </button>
         </div>
       </div>
 
@@ -596,7 +303,19 @@ export function Commercial() {
         </div>
       </div>
 
-      {activeTab === "dashboard" ? (
+      {isInitialLoading ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+          Carregando dados comerciais...
+        </section>
+      ) : null}
+
+      {hasOverviewError ? (
+        <section className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+          Não foi possível carregar os dados comerciais.
+        </section>
+      ) : null}
+
+      {!isInitialLoading && !hasOverviewError && activeTab === "dashboard" ? (
         <div className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5">
@@ -832,7 +551,7 @@ export function Commercial() {
         </div>
       ) : null}
 
-      {activeTab === "leads" ? (
+      {!isInitialLoading && !hasOverviewError && activeTab === "leads" ? (
         <div className="space-y-5">
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-4">
             <div className="flex flex-col md:flex-row gap-4">
@@ -871,11 +590,11 @@ export function Commercial() {
                   className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   <option value="all">Todas as Origens</option>
-                  <option value="Website">Website</option>
-                  <option value="Indicação">Indicação</option>
-                  <option value="WhatsApp">WhatsApp</option>
-                  <option value="Onvio">Onvio</option>
-                  <option value="Cold Call">Cold Call</option>
+                  {sourceData.map((source) => (
+                    <option key={source.name} value={source.name}>
+                      {source.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -930,11 +649,11 @@ export function Commercial() {
                           <div className="text-sm">
                             <p className="text-gray-900 dark:text-white flex items-center gap-1">
                               <Phone className="w-3 h-3" />
-                              {lead.phone}
+                              {lead.phone ?? "-"}
                             </p>
                             <p className="text-gray-600 dark:text-slate-400 flex items-center gap-1 mt-1">
                               <Mail className="w-3 h-3" />
-                              {lead.email}
+                              {lead.email ?? "-"}
                             </p>
                           </div>
                         </td>
@@ -966,29 +685,44 @@ export function Commercial() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-1">
-                            <button
+                            <Link
+                              href={`/clients/${lead.id}`}
                               className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                              type="button"
+                              title="Ver cliente"
                             >
                               <Eye className="w-4 h-4 text-gray-600 dark:text-slate-300" />
-                            </button>
-                            <button
+                            </Link>
+                            <Link
+                              href={`/clients/${lead.id}/commercial`}
                               className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-md transition-colors"
-                              type="button"
+                              title="Editar fluxo comercial"
                             >
                               <Edit className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                            </button>
-                            <button
-                              className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded-md transition-colors"
-                              type="button"
-                            >
-                              <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                            </button>
+                            </Link>
+                            {lead.phone ? (
+                              <a
+                                href={`tel:${lead.phone}`}
+                                className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded-md transition-colors"
+                                title="Ligar"
+                              >
+                                <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                              </a>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
                     );
                   })}
+                  {filteredLeads.length === 0 ? (
+                    <tr>
+                      <td
+                        className="px-6 py-8 text-center text-sm text-gray-500 dark:text-slate-400"
+                        colSpan={8}
+                      >
+                        Nenhum lead encontrado.
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -996,7 +730,7 @@ export function Commercial() {
         </div>
       ) : null}
 
-      {activeTab === "pipeline" ? (
+      {!isInitialLoading && !hasOverviewError && activeTab === "pipeline" ? (
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-800 p-1">
@@ -1028,7 +762,7 @@ export function Commercial() {
           {pipelineView === "kanban" ? (
             <div className="overflow-x-auto pb-4">
               <div className="flex gap-4 min-w-max">
-                {(["new", "contacted", "qualified", "proposal", "negotiation"] as Lead["status"][]).map(
+                {(["new", "contacted", "qualified", "proposal", "negotiation"] as CommercialLead["status"][]).map(
                   (status) => {
                     const statusLeads = getLeadsByStatus(status);
                     const StatusIcon = leadStatusConfig[status].icon;
@@ -1067,12 +801,6 @@ export function Commercial() {
                                     </h4>
                                     <p className="text-xs text-gray-600 dark:text-slate-400">{lead.company}</p>
                                   </div>
-                                  <button
-                                    className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md"
-                                    type="button"
-                                  >
-                                    <MoreVertical className="w-4 h-4 text-gray-400" />
-                                  </button>
                                 </div>
 
                                 <div className="space-y-2 mb-3">
@@ -1099,18 +827,24 @@ export function Commercial() {
                                     {priorityConfig[lead.priority].label}
                                   </span>
                                   <div className="flex items-center gap-1">
-                                    <button
-                                      className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md"
-                                      type="button"
-                                    >
-                                      <Phone className="w-3.5 h-3.5 text-gray-600 dark:text-slate-300" />
-                                    </button>
-                                    <button
-                                      className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md"
-                                      type="button"
-                                    >
-                                      <Mail className="w-3.5 h-3.5 text-gray-600 dark:text-slate-300" />
-                                    </button>
+                                    {lead.phone ? (
+                                      <a
+                                        href={`tel:${lead.phone}`}
+                                        className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md"
+                                        title="Ligar"
+                                      >
+                                        <Phone className="w-3.5 h-3.5 text-gray-600 dark:text-slate-300" />
+                                      </a>
+                                    ) : null}
+                                    {lead.email ? (
+                                      <a
+                                        href={`mailto:${lead.email}`}
+                                        className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md"
+                                        title="Enviar e-mail"
+                                      >
+                                        <Mail className="w-3.5 h-3.5 text-gray-600 dark:text-slate-300" />
+                                      </a>
+                                    ) : null}
                                   </div>
                                 </div>
                               </div>
@@ -1206,8 +940,13 @@ export function Commercial() {
         </div>
       ) : null}
 
-      {activeTab === "proposals" ? (
+      {!isInitialLoading && !hasOverviewError && activeTab === "proposals" ? (
         <div className="space-y-5">
+          {proposals.length === 0 ? (
+            <section className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+              Nenhuma proposta cadastrada.
+            </section>
+          ) : null}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {proposals.map((proposal) => {
               const StatusIcon = proposalStatusConfig[proposal.status].icon;
@@ -1300,7 +1039,7 @@ export function Commercial() {
         </div>
       ) : null}
 
-      {activeTab === "contracts" ? (
+      {!isInitialLoading && !hasOverviewError && activeTab === "contracts" ? (
         <div className="space-y-5">
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
@@ -1395,6 +1134,16 @@ export function Commercial() {
                       </tr>
                     );
                   })}
+                  {contracts.length === 0 ? (
+                    <tr>
+                      <td
+                        className="px-6 py-8 text-center text-sm text-gray-500 dark:text-slate-400"
+                        colSpan={7}
+                      >
+                        Nenhum contrato cadastrado.
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -1404,4 +1153,3 @@ export function Commercial() {
     </div>
   );
 }
-
