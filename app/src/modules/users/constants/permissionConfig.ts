@@ -4,7 +4,6 @@ export const KNOWN_PERMISSION_MODULE_KEYS = [
   "atendimento",
   "certificado",
   "contabil",
-  "financeiro",
   "fiscal",
   "integracao",
   "pec",
@@ -19,7 +18,6 @@ export const PERMISSION_MODULE_LABELS: Record<KnownPermissionModuleKey, string> 
   atendimento: "Atendimento",
   certificado: "Certificado",
   contabil: "Contábil",
-  financeiro: "Financeiro",
   fiscal: "Fiscal",
   integracao: "Integração",
   pec: "PEC",
@@ -32,8 +30,8 @@ export const PERMISSION_MODULE_LABELS: Record<KnownPermissionModuleKey, string> 
 
 export const PERMISSION_MODULE_GROUPS = [
   {
-    title: "Financeiro e Fiscal",
-    keys: ["contabil", "financeiro", "fiscal", "regularize"],
+    title: "Fiscal",
+    keys: ["contabil", "fiscal", "regularize"],
   },
   {
     title: "Atendimento e Comercial",

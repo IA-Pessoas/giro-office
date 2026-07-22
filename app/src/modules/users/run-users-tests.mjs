@@ -42,10 +42,23 @@ const createUserConfigSource = readFileSync(
   new URL("./constants/createUserConfig.ts", import.meta.url),
   "utf8",
 );
+const permissionConfigSource = readFileSync(
+  new URL("./constants/permissionConfig.ts", import.meta.url),
+  "utf8",
+);
+const userTypesSource = readFileSync(new URL("./types/index.ts", import.meta.url), "utf8");
 
 runTest("create user additional modules hide unavailable services", () => {
   assert.equal(createUserConfigSource.includes('key: "comercial"'), false);
   assert.equal(createUserConfigSource.includes('key: "financeiro"'), false);
+});
+
+runTest("admin permissions hide finance and use the Fiscal group title", () => {
+  assert.equal(permissionConfigSource.includes('"financeiro"'), false);
+  assert.equal(permissionConfigSource.includes('financeiro: "Financeiro"'), false);
+  assert.equal(permissionConfigSource.includes('title: "Financeiro e Fiscal"'), false);
+  assert.equal(permissionConfigSource.includes('title: "Fiscal"'), true);
+  assert.equal(userTypesSource.includes('| "financeiro"'), false);
 });
 
 runTest("department admin is not created as organization owner", () => {

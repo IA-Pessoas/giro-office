@@ -23,7 +23,6 @@ export type KnownPermissionModuleKey =
   | "atendimento"
   | "certificado"
   | "contabil"
-  | "financeiro"
   | "fiscal"
   | "integracao"
   | "pec"
