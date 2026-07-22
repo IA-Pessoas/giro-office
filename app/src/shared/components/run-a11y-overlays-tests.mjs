@@ -73,6 +73,16 @@ runTest("AppShell menu triggers expose expanded state and controlled panels", ()
   assert.match(appShellSource, /id=\{USER_MENU_PANEL_ID\}/);
 });
 
+runTest("AppShell header notifications do not embed mock notification rows", () => {
+  assert.equal(appShellSource.includes("Novo chamado crítico aberto"), false);
+  assert.equal(appShellSource.includes("Prazo de tarefa próximo do vencimento"), false);
+  assert.equal(appShellSource.includes("Backup diário finalizado"), false);
+  assert.match(appShellSource, /const notifications: AppShellNotification\[] = \[];/);
+  assert.match(appShellSource, /const hasUnreadNotifications = notifications\.some/);
+  assert.match(appShellSource, /hasUnreadNotifications \?/);
+  assert.match(appShellSource, /Nenhuma notificação encontrada\./);
+});
+
 runTest("AppShell AI chat uses Radix Dialog primitives", () => {
   assert.match(appShellSource, /import \* as DialogPrimitive from "@radix-ui\/react-dialog";/);
   assert.match(appShellSource, /<DialogPrimitive\.Root[\s\S]*open=\{showAiChat\}/);

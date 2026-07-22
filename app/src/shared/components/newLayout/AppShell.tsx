@@ -249,6 +249,14 @@ type ChatMessage = {
   time: string;
 };
 
+type AppShellNotification = {
+  id: string;
+  title: string;
+  description: string;
+  time: string;
+  unread: boolean;
+};
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
@@ -265,30 +273,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [hasUserPhotoLoadError, setHasUserPhotoLoadError] = useState(false);
-  const notifications = [
-    {
-      id: "1",
-      title: "Novo chamado crítico aberto",
-      description: "TI • Computador não liga (Financeiro)",
-      time: "há 5 min",
-      unread: true,
-    },
-    {
-      id: "2",
-      title: "Prazo de tarefa próximo do vencimento",
-      description: "Marketing • Aprovar orçamento de campanha",
-      time: "há 20 min",
-      unread: true,
-    },
-    {
-      id: "3",
-      title: "Backup diário finalizado",
-      description: "Tecnologia • Execução concluída com sucesso",
-      time: "há 1 h",
-      unread: false,
-    },
-  ];
-
+  const notifications: AppShellNotification[] = [];
+  const hasUnreadNotifications = notifications.some((item) => item.unread);
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
@@ -621,7 +607,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-label="Abrir notificações"
               >
                 <Bell className="w-5 h-5 text-gray-600 dark:text-slate-300" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                {hasUnreadNotifications ? (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                ) : null}
               </button>
 
               {showNotifications ? (
@@ -635,36 +623,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     id={NOTIFICATIONS_PANEL_ID}
                     className="absolute right-6 top-16 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
                   >
-                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notificações</h3>
-                      <button
-                        type="button"
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        Marcar todas como lidas
-                      </button>
                     </div>
                     <div className="max-h-96 overflow-y-auto">
-                      {notifications.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
-                        >
-                          <div className="flex items-start gap-3">
-                            <span
-                              className={`mt-1 h-2 w-2 rounded-full ${item.unread ? "bg-red-500" : "bg-gray-300 dark:bg-gray-600"}`}
-                            />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-gray-900 dark:text-white">{item.title}</p>
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{item.description}</p>
+                      {notifications.length > 0 ? (
+                        notifications.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
+                          >
+                            <div className="flex items-start gap-3">
+                              <span
+                                className={`mt-1 h-2 w-2 rounded-full ${item.unread ? "bg-red-500" : "bg-gray-300 dark:bg-gray-600"}`}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">{item.title}</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{item.description}</p>
+                              </div>
+                              <span className="text-[11px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                {item.time}
+                              </span>
                             </div>
-                            <span className="text-[11px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                              {item.time}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                          Nenhuma notificação encontrada.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </>
