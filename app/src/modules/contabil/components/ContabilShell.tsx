@@ -1,9 +1,8 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Calculator,
   CheckSquare,
   ReceiptText,
-  Users,
   UserCog,
   Waypoints,
   type LucideIcon,
@@ -14,77 +13,63 @@ import { ContabilResponsibleSection } from "./ContabilResponsibleSection";
 import { ContabilRelationshipSection } from "./ContabilRelationshipSection";
 import { ContabilStateBox } from "./ContabilStateBox";
 
-type ContabilTabId = "client" | "control" | "responsible" | "relationship";
+type ContabilTabId = "control" | "responsible" | "relationship";
 
 interface ContabilShellProps {
   clientId?: string;
   clientName?: string;
-  lockedClient?: boolean;
   canEdit: boolean;
-  clientPickerContent?: ReactNode;
   defaultTab?: ContabilTabId;
+  headerAction?: ReactNode;
 }
 
 export function ContabilShell({
   clientId,
   clientName,
-  lockedClient = false,
   canEdit,
-  clientPickerContent,
   defaultTab,
+  headerAction,
 }: ContabilShellProps) {
-  const [activeTab, setActiveTab] = useState<ContabilTabId>(
-    defaultTab ?? (lockedClient ? "control" : "client"),
-  );
+  const [activeTab, setActiveTab] = useState<ContabilTabId>(defaultTab ?? "control");
   const hasClient = Boolean(clientId);
-  const contabilTabs = useMemo<
-    Array<{
-      icon: LucideIcon;
-      id: ContabilTabId;
-      label: string;
-    }>
-  >(
-    () =>
-      [
-        !lockedClient
-          ? {
-              id: "client" as const,
-              label: "Cliente",
-              icon: Users,
-            }
-          : null,
-        {
-          id: "control" as const,
-          label: "Controle",
-          icon: CheckSquare,
-        },
-        {
-          id: "responsible" as const,
-          label: "Responsável",
-          icon: UserCog,
-        },
-        {
-          id: "relationship" as const,
-          label: "Relacionamento",
-          icon: Waypoints,
-        },
-      ].filter((tab): tab is NonNullable<typeof tab> => Boolean(tab)),
-    [lockedClient],
-  );
+  const contabilTabs: Array<{
+    icon: LucideIcon;
+    id: ContabilTabId;
+    label: string;
+  }> = [
+    {
+      id: "control",
+      label: "Controle",
+      icon: CheckSquare,
+    },
+    {
+      id: "responsible",
+      label: "Responsável",
+      icon: UserCog,
+    },
+    {
+      id: "relationship",
+      label: "Relacionamento",
+      icon: Waypoints,
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
-      <div className="space-y-2">
-        <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
-            <ReceiptText className="h-5 w-5 text-white" />
-          </div>
-          Contábil
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Controle mensal, responsáveis e relacionamento contábil por cliente.
-        </p>
-      </div>
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-2">
+          <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
+              <ReceiptText className="h-5 w-5 text-white" />
+            </div>
+            Contábil
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Controle mensal, responsáveis e relacionamento contábil por cliente.
+          </p>
+        </div>
+        {headerAction}
+      </header>
 
       <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
         <nav aria-label="Abas do módulo contábil" className="overflow-x-auto">
@@ -130,7 +115,6 @@ export function ContabilShell({
           activeTab={activeTab}
           clientId={clientId}
           canEdit={canEdit}
-          clientPickerContent={clientPickerContent}
         />
       </div>
     </div>
@@ -141,25 +125,11 @@ function ContabilActiveTabPanel({
   activeTab,
   clientId,
   canEdit,
-  clientPickerContent,
 }: {
   activeTab: ContabilTabId;
   clientId?: string;
   canEdit: boolean;
-  clientPickerContent?: ReactNode;
 }) {
-  if (activeTab === "client") {
-    return (
-      <div role="tabpanel" id="contabil-panel-client" aria-labelledby="contabil-tab-client">
-        {clientPickerContent ?? (
-          <ContabilStateBox icon={Users} title="Seleção de cliente indisponível">
-            Não há um seletor de cliente configurado para esta visualização.
-          </ContabilStateBox>
-        )}
-      </div>
-    );
-  }
-
   if (!clientId) {
     return (
       <div

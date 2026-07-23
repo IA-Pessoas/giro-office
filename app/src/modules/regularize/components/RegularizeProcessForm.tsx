@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { ClientSelectionField } from "@modules/clients";
 
 import type {
   CreateRegularizeProcessPayload,
@@ -105,16 +106,7 @@ function buildProcessPayload(formState: RegularizeProcessFormState): CreateRegul
   };
 }
 
-function getProcessClientOptions(
-  clientKind: RegularizeProcessClientKind,
-  clientOptions: RegularizeFormOption[],
-  pfOptions: RegularizeFormOption[],
-) {
-  return clientKind === "pj" ? clientOptions : pfOptions;
-}
-
 export function RegularizeProcessForm({
-  clientOptions,
   defaultClientId,
   isLoadingInitialValue = false,
   isSubmitting,
@@ -125,7 +117,6 @@ export function RegularizeProcessForm({
   pfOptions,
   process,
 }: {
-  clientOptions: RegularizeFormOption[];
   defaultClientId: string;
   isLoadingInitialValue?: boolean;
   isSubmitting: boolean;
@@ -143,11 +134,7 @@ export function RegularizeProcessForm({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const isEditing = mode === "edit";
-  const currentClientOptions = getProcessClientOptions(
-    formState.clientKind,
-    clientOptions,
-    pfOptions,
-  );
+  const currentClientOptions = pfOptions;
 
   useEffect(() => {
     if (open) {
@@ -167,7 +154,7 @@ export function RegularizeProcessForm({
   }
 
   function handleClientKindChange(value: RegularizeProcessClientKind) {
-    const options = getProcessClientOptions(value, clientOptions, pfOptions);
+    const options = value === "pf" ? pfOptions : [];
 
     setFormState((current) => ({
       ...current,
@@ -262,18 +249,22 @@ export function RegularizeProcessForm({
             </RegularizeFormField>
 
             <RegularizeFormField label="Cliente" required className="md:col-span-2">
-              <RegularizeNativeSelect
-                value={formState.client_id}
-                onChange={(event) => handleClientChange(event.target.value)}
-              >
-                <option value="">Selecione</option>
-                {currentClientOptions.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.label}
-                    {client.description ? `, ${client.description}` : ""}
-                  </option>
-                ))}
-              </RegularizeNativeSelect>
+              {formState.clientKind === "pj" ? (
+                <ClientSelectionField clientId={formState.client_id} />
+              ) : (
+                <RegularizeNativeSelect
+                  value={formState.client_id}
+                  onChange={(event) => handleClientChange(event.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {currentClientOptions.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.label}
+                      {client.description ? `, ${client.description}` : ""}
+                    </option>
+                  ))}
+                </RegularizeNativeSelect>
+              )}
             </RegularizeFormField>
 
             <RegularizeFormField label="CPF/CNPJ" required>

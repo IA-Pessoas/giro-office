@@ -58,8 +58,13 @@ await (async () => {
   await runTest("contabil page filters the client picker by accounting department", () => {
     const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
 
-    assert.match(source, /useClients\(\{[\s\S]*ref:\s*"deps"/);
-    assert.match(source, /useClients\(\{[\s\S]*status:\s*"Departamento contabil"/);
+    assert.match(source, /ClientPickerModal/);
+    assert.match(source, /headerAction=\{/);
+    assert.doesNotMatch(source, /clientPickerContent=/);
+    assert.match(source, /ref:\s*"deps"/);
+    assert.match(source, /status:\s*"Departamento contabil"/);
+    assert.doesNotMatch(source, /useClients\(/);
+    assert.doesNotMatch(source, /page:\s*1/);
   });
 
   await runTest("contabil endpoints use the expected contract", () => {

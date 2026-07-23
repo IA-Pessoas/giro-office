@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   buildClientListParams,
@@ -431,4 +432,19 @@ runTest("termination helpers validate competence_output and build payload", () =
       competence_output: "2026-05",
     },
   );
+});
+
+runTest("client picker keeps paginated remote search and accessible feedback", () => {
+  const picker = readFileSync("src/modules/clients/components/ClientPickerModal.tsx", "utf8");
+  const moduleIndex = readFileSync("src/modules/clients/index.ts", "utf8");
+
+  assert.match(moduleIndex, /ClientPickerModal/);
+  assert.match(picker, /useDeferredValue/);
+  assert.match(picker, /useClients\(\{[\s\S]*?\.\.\.filters,[\s\S]*?search: deferredSearch,[\s\S]*?page,[\s\S]*?limit: CLIENT_PICKER_LIMIT/);
+  assert.match(picker, /client\.company_name \|\| client\.name/);
+  assert.match(picker, /role="dialog"/);
+  assert.match(picker, /role="alert"/);
+  assert.match(picker, /htmlFor=\{searchInputId\}/);
+  assert.match(picker, /role="listbox"/);
+  assert.match(picker, /handleSelect\(null\)/);
 });

@@ -600,3 +600,20 @@ await runAsyncTest("task models still load when department enrichment fails", as
   assert.equal(models[0].department, undefined);
   assert.equal(capturedError instanceof Error, true);
 });
+
+runTest("integration client selection lives in workspace headers and forms show the selected client", () => {
+  const projects = readFileSync("src/modules/integracao/components/ProjectsWorkspace.tsx", "utf8");
+  const tasks = readFileSync("src/modules/integracao/components/TasksWorkspace.tsx", "utf8");
+  const taskForm = readFileSync("src/modules/integracao/components/TaskFormModal.tsx", "utf8");
+
+  assert.match(projects, /ClientPickerModal/);
+  assert.match(projects, /<header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">/);
+  assert.match(tasks, /ClientPickerModal/);
+  assert.match(tasks, /disabled=\{!selectedClient\}/);
+  assert.match(taskForm, /ClientSelectionField/);
+  assert.doesNotMatch(taskForm, /<ClientPickerModal/);
+  assert.doesNotMatch(projects, /useClients\(/);
+  assert.doesNotMatch(tasks, /useClients\(/);
+  assert.doesNotMatch(projects, /page:\s*1/);
+  assert.doesNotMatch(tasks, /page:\s*1/);
+});

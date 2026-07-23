@@ -190,9 +190,11 @@ runTest("pessoal shell wires access, client selector, and functional tabs", () =
   assert.match(shell, /PessoalPasswordsSection[\s\S]*selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalPasswordsSection\s+key=\{selectedClientId\}/);
   assert.match(shell, /PessoalOverviewSection onSelectTab=\{setActiveTab\}/);
-  assert.match(clientSelector, /useClients\(/);
-  assert.match(clientSelector, /handleSelect\(null\)/);
-  assert.match(clientSelector, /role="dialog"/);
+  assert.match(clientSelector, /ClientPickerModal/);
+  assert.match(clientSelector, /ref: "deps"/);
+  assert.match(clientSelector, /status: "Departamento pessoal"/);
+  assert.match(clientSelector, /allowClearSelection/);
+  assert.doesNotMatch(clientSelector, /useClients\(/);
 });
 
 runTest("client-scoped sections block requests without selected client", () => {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { ClientSelectionField } from "@modules/clients";
 
 import type {
   CreateRegularizeMunicipalTaxPayload,
@@ -17,7 +18,6 @@ import {
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
-  type RegularizeFormOption,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
@@ -196,7 +196,6 @@ function RegularizeBooleanField({
 }
 
 export function RegularizeMunicipalTaxesForm({
-  clientOptions,
   currentYear,
   defaultClientId,
   isLoadingInitialValue = false,
@@ -207,7 +206,6 @@ export function RegularizeMunicipalTaxesForm({
   onSubmit,
   open,
 }: {
-  clientOptions: RegularizeFormOption[];
   currentYear: number;
   defaultClientId: string;
   isLoadingInitialValue?: boolean;
@@ -309,18 +307,7 @@ export function RegularizeMunicipalTaxesForm({
 
           <div className="grid gap-4 md:grid-cols-3">
             <RegularizeFormField label="Cliente" required className="md:col-span-2">
-              <RegularizeNativeSelect
-                value={formState.client_id}
-                onChange={(event) => handleChange("client_id", event.target.value)}
-              >
-                <option value="">Selecione</option>
-                {clientOptions.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.label}
-                    {client.description ? `, ${client.description}` : ""}
-                  </option>
-                ))}
-              </RegularizeNativeSelect>
+              <ClientSelectionField clientId={formState.client_id} />
             </RegularizeFormField>
 
             <RegularizeFormField label="Ano" required>

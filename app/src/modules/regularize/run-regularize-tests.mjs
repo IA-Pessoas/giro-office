@@ -275,7 +275,7 @@ await runTest("regularize core forms are wired in the page", async () => {
   }
 });
 
-await runTest("regularize password creation opens the form before required field validation", async () => {
+await runTest("regularize password creation requires a selected client", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
   const passwordLabelIndex = pageSource.indexOf('label="Nova senha"');
   const passwordActionStart = pageSource.lastIndexOf("<PrimaryActionButton", passwordLabelIndex);
@@ -285,7 +285,7 @@ await runTest("regularize password creation opens the form before required field
   assert.notEqual(passwordLabelIndex, -1);
   assert.notEqual(passwordActionStart, -1);
   assert.notEqual(passwordActionEnd, -1);
-  assert.doesNotMatch(passwordActionSource, /disabled=\{/);
+  assert.match(passwordActionSource, /disabled=\{!currentCredentialClientId\}/);
 });
 
 await runTest("regularize process empty state is centered across the process view", async () => {
@@ -302,12 +302,10 @@ await runTest("regularize client documents are consistently formatted", async ()
 
   assert.match(pageSource, /import \{ formatCPF_CNPJ \} from "@shared\/utils\/formatters";/);
   assert.match(pageSource, /function formatDocument/);
-  assert.match(pageSource, /function formatDocumentDescription/);
   assert.deepEqual(rawDocumentMatches, []);
   assert.ok(formattedDocumentMatches.length >= 3);
   assert.doesNotMatch(pageSource, /description: client\.cpf_cnpj/);
   assert.doesNotMatch(pageSource, /description: clientPf\.cpf/);
-  assert.match(pageSource, /description: formatDocumentDescription\(client\.cpf_cnpj\)/);
   assert.match(pageSource, /description: formatDocumentDescription\(clientPf\.cpf\)/);
   assert.match(
     pageSource,
@@ -561,4 +559,28 @@ await runTest("RegularizePage does not define primary mock arrays", async () => 
 
   assert.doesNotMatch(pageSource, /const\s+(processes|permits|clients|passwords|partners)\s*=/);
   assert.doesNotMatch(pageSource, /api\.(get|post|put|delete)/);
+});
+
+await runTest("regularize selects clients in the header and shows the bound client in forms", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const formSources = await Promise.all(
+    [
+      "RegularizeLicenseForm.tsx",
+      "RegularizeMunicipalTaxesForm.tsx",
+      "RegularizePartnerForm.tsx",
+      "RegularizePasswordForm.tsx",
+      "RegularizeProcessForm.tsx",
+    ].map((fileName) => readModuleSource(`components/${fileName}`)),
+  );
+
+  assert.match(pageSource, /ClientPickerModal/);
+  assert.match(pageSource, /function openClientScopedForm/);
+  assert.match(pageSource, /Selecione um cliente no cabeçalho antes de iniciar este cadastro\./);
+  assert.equal((pageSource.match(/disabled=\{!currentCredentialClientId\}/g) ?? []).length, 7);
+  assert.doesNotMatch(pageSource, /RegularizeClientPickerField/);
+  assert.doesNotMatch(pageSource, /useClients\(/);
+  formSources.forEach((formSource) => {
+    assert.match(formSource, /ClientSelectionField/);
+    assert.doesNotMatch(formSource, /RegularizeClientPickerField/);
+  });
 });

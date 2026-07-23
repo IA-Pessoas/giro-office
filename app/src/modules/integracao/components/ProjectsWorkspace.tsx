@@ -16,7 +16,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
-import { useClients } from "@modules/clients";
+import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 import { useMe } from "@shared/hooks";
 
 import {
@@ -109,25 +109,25 @@ function formatDeadlineHint(daysUntil: number | null) {
 export function ProjectsWorkspace() {
   const router = useRouter();
   const meQuery = useMe();
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
   const [projectSearch, setProjectSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const clientsQuery = useClients({
-    page: 1,
-    limit: 100,
-  });
+  const selectedClientId = selectedClient?.id ?? null;
 
   useEffect(() => {
-    if (typeof router.query.clientId === "string") {
-      setSelectedClientId(router.query.clientId);
+    const routeClientId = router.query.clientId;
+
+    if (typeof routeClientId === "string") {
+      setSelectedClient((current) =>
+        current?.id === routeClientId
+          ? current
+          : { id: routeClientId, name: "Cliente selecionado" },
+      );
     }
   }, [router.query.clientId]);
-
-  const selectedClient =
-    clientsQuery.data?.items.find((client) => client.id === selectedClientId) ?? null;
 
   const projectsQuery = useProjectsList(
     selectedClientId ? { ref: "client", id: selectedClientId } : null,
@@ -305,8 +305,10 @@ export function ProjectsWorkspace() {
     }
   }
 
-  function handleClientChange(nextClientId: string) {
-    setSelectedClientId(nextClientId || null);
+  function handleClientChange(client: ClientPickerOption | null) {
+    const nextClientId = client?.id ?? "";
+
+    setSelectedClient(client);
     router
       .replace(
         {
@@ -338,7 +340,7 @@ export function ProjectsWorkspace() {
         projectId={editingProjectId}
       />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)] xl:items-end">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-slate-900 dark:text-white">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20">
@@ -351,26 +353,13 @@ export function ProjectsWorkspace() {
           </p>
         </div>
 
-        <div
-          className={`${PROJECT_SUBPANEL_CLASSNAME} flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between`}
-        >
-          <label className="min-w-0 flex-1 space-y-2">
-            <span className="block text-sm font-medium text-slate-700 dark:text-white">Cliente</span>
-            <select
-              value={selectedClientId ?? ""}
-              onChange={(event) => handleClientChange(event.target.value)}
-              className={PROJECT_SELECT_CLASSNAME}
-              style={PROJECT_SELECT_ARROW_STYLE}
-            >
-              <option value="">Selecione um cliente</option>
-              {(clientsQuery.data?.items ?? []).map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <ClientPickerModal
+            selectedClient={selectedClient}
+            onSelectClient={handleClientChange}
+            filters={{}}
+            allowClearSelection
+          />
           <button
             type="button"
             disabled={!selectedClientId}
@@ -381,7 +370,7 @@ export function ProjectsWorkspace() {
             Novo projeto
           </button>
         </div>
-      </div>
+      </header>
 
 
       <section className={`${PROJECT_PANEL_CLASSNAME} p-5`}>
