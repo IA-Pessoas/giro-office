@@ -124,7 +124,7 @@ describe("DashboardStatsService", () => {
         method: "GET",
         item: "a lista de tarefas",
         path: "/task/list",
-        created_at: new Date(),
+        created_at: new Date("2026-07-23T12:00:00.000Z"),
       },
     ]);
     const service = new DashboardStatsService({ pool: { query } as never });
@@ -135,7 +135,9 @@ describe("DashboardStatsService", () => {
       user: "Davi",
       action: "consultou",
       item: "a lista de tarefas",
+      createdAt: "2026-07-23T12:00:00.000Z",
     });
+    expect(stats.activities[0]).not.toHaveProperty("time");
   });
 
   it("filters new technical and unsuccessful events while keeping legacy rows eligible", async () => {
