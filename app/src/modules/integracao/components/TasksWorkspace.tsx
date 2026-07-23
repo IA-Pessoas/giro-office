@@ -14,6 +14,7 @@ import {
 import { toast } from "react-toastify";
 
 import { isAdminPermission } from "@modules/auth";
+import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 import { useMe } from "@shared/hooks";
 
 import { INTEGRACAO_TASK_STATUS_VALUES, type IntegracaoTaskListItem } from "../types";
@@ -98,6 +99,7 @@ export function TasksWorkspace() {
   const [visibleTasks, setVisibleTasks] = useState<IntegracaoTaskListItem[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
 
   const listParams = useMemo(
     () => ({
@@ -202,6 +204,7 @@ export function TasksWorkspace() {
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
         onSuccess={handleTaskSaved}
+        selectedClient={selectedClient}
       />
 
       <TaskFormModal
@@ -213,6 +216,7 @@ export function TasksWorkspace() {
         }}
         taskId={editingTaskId}
         onSuccess={handleTaskSaved}
+        selectedClient={selectedClient}
       />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -228,34 +232,44 @@ export function TasksWorkspace() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          {canManageTaskModels ? (
-            <Link href={TASK_MODEL_CONFIG_ENTRY.href} className={PROJECT_COMPACT_BUTTON_CLASSNAME}>
-              <Settings2 className="h-3.5 w-3.5" />
-              {TASK_MODEL_CONFIG_ENTRY.label}
-            </Link>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleRefetch}
-            className={PROJECT_COMPACT_BUTTON_CLASSNAME}
-            disabled={tasksQuery.isFetching}
-          >
-            {tasksQuery.isFetching ? (
-              <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCcw className="h-3.5 w-3.5" />
-            )}
-            Atualizar
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsCreateModalOpen(true)}
-            className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-          >
-            <Plus className="h-4 w-4" />
-            Nova tarefa
-          </button>
+        <div className="flex flex-col gap-2 sm:items-end">
+          <ClientPickerModal
+            selectedClient={selectedClient}
+            onSelectClient={setSelectedClient}
+            filters={{}}
+            allowClearSelection
+          />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {canManageTaskModels ? (
+              <Link href={TASK_MODEL_CONFIG_ENTRY.href} className={PROJECT_COMPACT_BUTTON_CLASSNAME}>
+                <Settings2 className="h-3.5 w-3.5" />
+                {TASK_MODEL_CONFIG_ENTRY.label}
+              </Link>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleRefetch}
+              className={PROJECT_COMPACT_BUTTON_CLASSNAME}
+              disabled={tasksQuery.isFetching}
+            >
+              {tasksQuery.isFetching ? (
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCcw className="h-3.5 w-3.5" />
+              )}
+              Atualizar
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(true)}
+              className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
+              disabled={!selectedClient}
+              title={!selectedClient ? "Selecione um cliente antes de criar uma tarefa." : undefined}
+            >
+              <Plus className="h-4 w-4" />
+              Nova tarefa
+            </button>
+          </div>
         </div>
       </div>
 

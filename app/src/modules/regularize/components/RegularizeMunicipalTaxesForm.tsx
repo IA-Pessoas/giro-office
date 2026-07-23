@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { ClientSelectionField } from "@modules/clients";
 
 import type {
   CreateRegularizeMunicipalTaxPayload,
@@ -21,7 +22,6 @@ import {
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
-import { RegularizeClientPickerField } from "./RegularizeClientPickerField";
 
 type RegularizeMunicipalTaxesFormState = {
   client_id: string;
@@ -307,10 +307,7 @@ export function RegularizeMunicipalTaxesForm({
 
           <div className="grid gap-4 md:grid-cols-3">
             <RegularizeFormField label="Cliente" required className="md:col-span-2">
-              <RegularizeClientPickerField
-                value={formState.client_id}
-                onChange={(clientId) => handleChange("client_id", clientId)}
-              />
+              <ClientSelectionField clientId={formState.client_id} />
             </RegularizeFormField>
 
             <RegularizeFormField label="Ano" required>

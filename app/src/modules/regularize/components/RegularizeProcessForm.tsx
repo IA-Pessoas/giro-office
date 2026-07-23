@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { ClientSelectionField } from "@modules/clients";
 
 import type {
   CreateRegularizeProcessPayload,
@@ -27,7 +28,6 @@ import {
   regularizeUrgencyOptions,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
-import { RegularizeClientPickerField } from "./RegularizeClientPickerField";
 
 type RegularizeProcessClientKind = "pj" | "pf";
 
@@ -250,10 +250,7 @@ export function RegularizeProcessForm({
 
             <RegularizeFormField label="Cliente" required className="md:col-span-2">
               {formState.clientKind === "pj" ? (
-                <RegularizeClientPickerField
-                  value={formState.client_id}
-                  onChange={(clientId) => handleChange("client_id", clientId)}
-                />
+                <ClientSelectionField clientId={formState.client_id} />
               ) : (
                 <RegularizeNativeSelect
                   value={formState.client_id}

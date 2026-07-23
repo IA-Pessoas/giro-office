@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { ClientSelectionField } from "@modules/clients";
 
 import type {
   CreateRegularizePasswordPayload,
@@ -21,7 +22,6 @@ import {
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
-import { RegularizeClientPickerField } from "./RegularizeClientPickerField";
 
 type RegularizePasswordFormState = {
   client_id: string;
@@ -177,10 +177,7 @@ export function RegularizePasswordForm({
 
           <div className="grid gap-4 md:grid-cols-2">
           <RegularizeFormField label="Cliente" required>
-              <RegularizeClientPickerField
-                value={formState.client_id}
-                onChange={(clientId) => handleChange("client_id", clientId)}
-              />
+              <ClientSelectionField clientId={formState.client_id} />
           </RegularizeFormField>
 
             <RegularizeFormField label="Site" required>

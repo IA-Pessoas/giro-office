@@ -25,12 +25,12 @@ import {
 import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
+import { ClientPickerModal, ClientSelectionField, type ClientPickerOption } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { cn } from "@shared/ui/newLayout/utils";
 import { formatCPF_CNPJ } from "@shared/utils/formatters";
 
 import { RegularizeClientPfForm } from "./RegularizeClientPfForm";
-import { RegularizeClientPickerField } from "./RegularizeClientPickerField";
 import { RegularizeGuidanceActivityForm } from "./RegularizeGuidanceActivityForm";
 import { RegularizeGuidanceForm } from "./RegularizeGuidanceForm";
 import { RegularizeGuidancePartnerForm } from "./RegularizeGuidancePartnerForm";
@@ -345,7 +345,8 @@ function PrimaryActionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={regularizePrimaryButtonClassName}
+      className={cn(regularizePrimaryButtonClassName, "disabled:cursor-not-allowed disabled:opacity-60")}
+      title={disabled ? "Selecione um cliente antes de iniciar este cadastro." : undefined}
     >
       <Icon className="h-4 w-4 shrink-0" />
       <span>{label}</span>
@@ -656,6 +657,8 @@ export function RegularizePage() {
   const [activeTab, setActiveTab] = useState<RegularizeTabId>("dashboard");
   const [selectedClientPfId, setSelectedClientPfId] = useState<RegularizeId>();
   const [selectedCredentialClientId, setSelectedCredentialClientId] = useState<RegularizeId>();
+  const [selectedCredentialClient, setSelectedCredentialClient] =
+    useState<ClientPickerOption | null>(null);
   const [selectedProcessId, setSelectedProcessId] = useState<RegularizeId>();
   const [activePasswordId, setActivePasswordId] = useState<RegularizeId>();
   const [activeSitePasswordId, setActiveSitePasswordId] = useState<RegularizeId>();
@@ -887,6 +890,9 @@ export function RegularizePage() {
       }
 
       setSelectedCredentialClientId(payload.client_id);
+      setSelectedCredentialClient((current) =>
+        current?.id === payload.client_id ? current : null,
+      );
       setActivePasswordId(undefined);
       closeCoreForm();
     } catch (error) {
@@ -1106,9 +1112,18 @@ export function RegularizePage() {
     }
   }
 
+  function openClientScopedForm(form: RegularizeFormState) {
+    if (!currentCredentialClientId) {
+      toast.info("Selecione um cliente no cabeçalho antes de iniciar este cadastro.");
+      return;
+    }
+
+    setActiveForm(form);
+  }
+
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
-      <header className="flex items-center justify-between gap-4">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
@@ -1121,14 +1136,25 @@ export function RegularizePage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleRefreshRegularize}
-          className="hidden items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:flex"
-        >
-          <RefreshCw className="h-4 w-4" />
-          <span>Atualizar dados</span>
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <ClientPickerModal
+            selectedClient={selectedCredentialClient}
+            onSelectClient={(client) => {
+              setSelectedCredentialClient(client);
+              setSelectedCredentialClientId(client?.id);
+            }}
+            filters={{ status: "Ativo" }}
+            allowClearSelection
+          />
+          <button
+            type="button"
+            onClick={handleRefreshRegularize}
+            className="hidden items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:flex"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span>Atualizar dados</span>
+          </button>
+        </div>
       </header>
 
       <nav
@@ -1253,6 +1279,7 @@ export function RegularizePage() {
                   icon={Plus}
                   label="Novo processo"
                   onClick={() => setActiveForm({ type: "process", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
@@ -1494,7 +1521,8 @@ export function RegularizePage() {
                 <PrimaryActionButton
                   icon={Plus}
                   label="Nova licença"
-                  onClick={() => setActiveForm({ type: "license", mode: "create" })}
+                  onClick={() => openClientScopedForm({ type: "license", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
@@ -1544,6 +1572,7 @@ export function RegularizePage() {
                   icon={Plus}
                   label="Novo PF"
                   onClick={() => setActiveForm({ type: "client-pf", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
@@ -1612,7 +1641,8 @@ export function RegularizePage() {
                 <PrimaryActionButton
                   icon={Plus}
                   label="Novo sócio"
-                  onClick={() => setActiveForm({ type: "partner", mode: "create" })}
+                  onClick={() => openClientScopedForm({ type: "partner", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
@@ -1659,7 +1689,8 @@ export function RegularizePage() {
                 <PrimaryActionButton
                   icon={Plus}
                   label="Nova senha"
-                  onClick={() => setActiveForm({ type: "password", mode: "create" })}
+                  onClick={() => openClientScopedForm({ type: "password", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
@@ -1670,10 +1701,9 @@ export function RegularizePage() {
               <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                 <label className="flex w-full flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
                   <span>Cliente</span>
-                  <RegularizeClientPickerField
-                    value={currentCredentialClientId ?? ""}
-                    onChange={(clientId) => setSelectedCredentialClientId(clientId || undefined)}
-                    allowClearSelection
+                  <ClientSelectionField
+                    client={selectedCredentialClient}
+                    clientId={currentCredentialClientId}
                   />
                 </label>
               </div>
@@ -1751,6 +1781,7 @@ export function RegularizePage() {
                   icon={Plus}
                   label="Novo site"
                   onClick={() => setActiveForm({ type: "site-password", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
@@ -1841,12 +1872,13 @@ export function RegularizePage() {
                   icon={Plus}
                   label="Novo tributo"
                   onClick={() =>
-                    setActiveForm({
+                    openClientScopedForm({
                       type: "municipal-tax",
                       mode: "create",
                       clientId: currentCredentialClientId,
                     })
                   }
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
@@ -1936,6 +1968,7 @@ export function RegularizePage() {
         open={activeForm?.type === "partner"}
         partner={activePartnerForForm}
         defaultPfId={currentClientPfId ?? ""}
+        defaultPjId={currentCredentialClientId ?? ""}
         pfOptions={pfOptions}
         isSubmitting={createPartnerMutation.isPending || updatePartnerMutation.isPending}
         onClose={closeCoreForm}

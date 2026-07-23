@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, FileText, LoaderCircle, Save } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
+import { ClientSelectionField, type ClientPickerOption } from "@modules/clients";
 import { departmentService, type DepItem } from "@modules/departments";
 import { listAdminUsers, type UserItem } from "@modules/users";
 import { Dialog } from "@shared/components/ui/Dialog";
@@ -53,6 +53,7 @@ interface TaskFormModalProps {
   onOpenChange: (open: boolean) => void;
   taskId?: string | null;
   onSuccess?: (task: IntegracaoTaskDetail) => void;
+  selectedClient: ClientPickerOption | null;
 }
 
 interface CreateFormState {
@@ -129,11 +130,16 @@ function getApiErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFormModalProps) {
+export function TaskFormModal({
+  open,
+  onOpenChange,
+  taskId,
+  onSuccess,
+  selectedClient,
+}: TaskFormModalProps) {
   const isEditing = Boolean(taskId);
   const [createValues, setCreateValues] = useState<CreateFormState>(CREATE_INITIAL_STATE);
   const [editValues, setEditValues] = useState<EditFormState>(EDIT_INITIAL_STATE);
-  const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
   const projectsQuery = useProjectsList(
     !isEditing && createValues.client_id ? { ref: "client", id: createValues.client_id } : null,
   );
@@ -166,8 +172,13 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
     if (!open) {
       setCreateValues(CREATE_INITIAL_STATE);
       setEditValues(EDIT_INITIAL_STATE);
+      return;
     }
-  }, [open]);
+
+    if (!isEditing) {
+      setCreateValues({ ...CREATE_INITIAL_STATE, client_id: selectedClient?.id ?? "" });
+    }
+  }, [isEditing, open, selectedClient?.id]);
 
   useEffect(() => {
     if (!open || !taskDetailQuery.data) {
@@ -595,15 +606,7 @@ export function TaskFormModal({ open, onOpenChange, taskId, onSuccess }: TaskFor
           <div className={TASK_FORM_GRID_CLASSNAME}>
             <div className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Cliente</span>
-              <ClientPickerModal
-                selectedClient={selectedClient}
-                onSelectClient={(client) => {
-                  setSelectedClient(client);
-                  updateCreateValue("client_id", client?.id ?? "");
-                }}
-                filters={{}}
-                allowClearSelection
-              />
+              <ClientSelectionField client={selectedClient} clientId={createValues.client_id} />
             </div>
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>

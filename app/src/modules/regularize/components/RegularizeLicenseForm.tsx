@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { ClientSelectionField } from "@modules/clients";
 
 import type {
   CreateRegularizeLicensePayload,
@@ -25,7 +26,6 @@ import {
   regularizeUrgencyOptions,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
-import { RegularizeClientPickerField } from "./RegularizeClientPickerField";
 
 type RegularizeLicenseFormState = {
   client_id: string;
@@ -218,11 +218,7 @@ export function RegularizeLicenseForm({
 
           <div className="grid gap-4 md:grid-cols-3">
             <RegularizeFormField label="Cliente" className="md:col-span-2">
-              <RegularizeClientPickerField
-                value={formState.client_id}
-                onChange={(clientId) => handleChange("client_id", clientId)}
-                allowClearSelection
-              />
+              <ClientSelectionField clientId={formState.client_id} />
             </RegularizeFormField>
 
             <RegularizeFormField label="Possui ?">

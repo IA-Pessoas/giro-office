@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { ClientSelectionField } from "@modules/clients";
 
 import type {
   CreateRegularizePartnerPayload,
@@ -20,7 +21,6 @@ import {
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
-import { RegularizeClientPickerField } from "./RegularizeClientPickerField";
 
 type RegularizePartnerFormState = {
   pj_id: string;
@@ -62,6 +62,7 @@ function buildPartnerFormState(
 
 export function RegularizePartnerForm({
   defaultPfId,
+  defaultPjId,
   isSubmitting,
   onClose,
   onSubmit,
@@ -70,6 +71,7 @@ export function RegularizePartnerForm({
   pfOptions,
 }: {
   defaultPfId: string;
+  defaultPjId: string;
   isSubmitting: boolean;
   onClose: () => void;
   onSubmit: (
@@ -79,7 +81,6 @@ export function RegularizePartnerForm({
   partner: RegularizePartner | null;
   pfOptions: RegularizeFormOption[];
 }) {
-  const defaultPjId = "";
   const [formState, setFormState] = useState<RegularizePartnerFormState>(
     buildPartnerFormState(partner, defaultPfId, defaultPjId),
   );
@@ -161,10 +162,7 @@ export function RegularizePartnerForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <RegularizeFormField label="Cliente PJ" required>
-            <RegularizeClientPickerField
-              value={formState.pj_id}
-              onChange={(clientId) => handleChange("pj_id", clientId)}
-            />
+            <ClientSelectionField clientId={formState.pj_id} />
           </RegularizeFormField>
 
           <RegularizeFormField label="Cliente PF" required>

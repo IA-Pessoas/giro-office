@@ -340,7 +340,7 @@ export function ProjectsWorkspace() {
         projectId={editingProjectId}
       />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)] xl:items-end">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-slate-900 dark:text-white">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20">
@@ -353,14 +353,13 @@ export function ProjectsWorkspace() {
           </p>
         </div>
 
-        <div
-          className={`${PROJECT_SUBPANEL_CLASSNAME} flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between`}
-        >
-          <div className="min-w-0 flex-1 space-y-2">
-            <span className="block text-sm font-medium text-slate-700 dark:text-white">Cliente</span>
-            <ClientPickerModal selectedClient={selectedClient} onSelectClient={handleClientChange} filters={{}} allowClearSelection />
-          </div>
-
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <ClientPickerModal
+            selectedClient={selectedClient}
+            onSelectClient={handleClientChange}
+            filters={{}}
+            allowClearSelection
+          />
           <button
             type="button"
             disabled={!selectedClientId}
@@ -371,7 +370,7 @@ export function ProjectsWorkspace() {
             Novo projeto
           </button>
         </div>
-      </div>
+      </header>
 
 
       <section className={`${PROJECT_PANEL_CLASSNAME} p-5`}>
