@@ -159,6 +159,56 @@ runTest("department module permission is always explicit for non-owner users", (
   );
 });
 
+runTest("eligible non-RH user receives RH self-service by default", () => {
+  assert.deepEqual(
+    buildCreateUserModulesPayload(
+      {
+        rh: { enabled: false, level: 0 },
+        fiscal: { enabled: false, level: 0 },
+      },
+      "fiscal",
+      1,
+    ),
+    {
+      fiscal: 1,
+      rh: 1,
+    },
+  );
+});
+
+runTest("explicit RH management is preserved on user creation", () => {
+  assert.deepEqual(
+    buildCreateUserModulesPayload(
+      {
+        rh: { enabled: true, level: 2 },
+        fiscal: { enabled: false, level: 0 },
+      },
+      "fiscal",
+      1,
+    ),
+    {
+      fiscal: 1,
+      rh: 2,
+    },
+  );
+});
+
+runTest("viewer does not receive RH self-service by default", () => {
+  assert.deepEqual(
+    buildCreateUserModulesPayload(
+      {
+        rh: { enabled: false, level: 0 },
+        fiscal: { enabled: false, level: 0 },
+      },
+      "fiscal",
+      0,
+    ),
+    {
+      fiscal: 0,
+    },
+  );
+});
+
 runTest("top-level permission no longer promotes department admin to global admin", () => {
   assert.equal(resolveCreateUserTopLevelPermission(0, false), 0);
   assert.equal(resolveCreateUserTopLevelPermission(1, false), 1);

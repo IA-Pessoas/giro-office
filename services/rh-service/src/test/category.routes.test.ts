@@ -1,4 +1,5 @@
 import request from "supertest";
+import { FORWARDED_AUTH_PERMISSION_HEADER } from "@workspace/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { categoryServiceMock, createTestApp, resetRhRouteMocks } from "./rhTestUtils.js";
@@ -17,6 +18,17 @@ describe("category routes", () => {
 
     expect(res.status).toBe(200);
     expect(categoryServiceMock.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /rh/categories bloqueia RH self-service", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .post("/rh/categories")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "1")
+      .send({ name: "Categoria" });
+
+    expect(res.status).toBe(403);
+    expect(categoryServiceMock.create).not.toHaveBeenCalled();
   });
 
   it("PUT /rh/categories atualiza categoria", async () => {
