@@ -140,7 +140,7 @@ describe("DashboardStatsService", () => {
     expect(stats.activities[0]).not.toHaveProperty("time");
   });
 
-  it("groups continuous duplicate activities while preserving visibility rules", async () => {
+  it("filters new technical and unsuccessful events while keeping legacy rows eligible", async () => {
     const query = dashboardQueryMock();
     const service = new DashboardStatsService({ pool: { query } as never });
 
@@ -150,14 +150,7 @@ describe("DashboardStatsService", () => {
     expect(activitiesSql).toContain("not coalesce(a.metadata_json ? 'activityVisible', false)");
     expect(activitiesSql).toContain("a.metadata_json @> '{\"activityVisible\": true}'::jsonb");
     expect(activitiesSql).toContain("a.outcome = 'success'");
-    expect(activitiesSql).toContain("lag(created_at) over");
-    expect(activitiesSql).toContain("interval '5 minutes'");
-    expect(activitiesSql).toContain("previous_created_at is null");
-    expect(activitiesSql).toContain("created_at - previous_created_at > interval '5 minutes'");
-    expect(activitiesSql).toContain("sum(starts_new_sequence) over");
-    expect(activitiesSql).toContain("min(created_at) as created_at");
-    expect(activitiesSql).toContain("max(created_at) as last_seen_at");
-    expect(activitiesSql).toContain("order by last_seen_at desc");
+    expect(activitiesSql).toContain("order by a.created_at desc");
     expect(activitiesSql).toContain("limit 5");
   });
 

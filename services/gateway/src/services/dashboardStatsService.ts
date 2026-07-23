@@ -696,84 +696,26 @@ const PERFORMANCE_SQL = `
 `;
 
 const ACTIVITIES_SQL = `
-  with eligible_activities as (
-    select
-      a.user_id,
-      coalesce(nullif(u.full_name, ''), nullif(u.name, ''), nullif(u.login, '')) as user_name,
-      a.action,
-      a.method,
-      coalesce(nullif(a.referring, ''), nullif(a.referring_id, '')) as item,
-      a.path,
-      a.created_at,
-      a.outcome,
-      (a.metadata_json ->> 'activityVisible')::boolean as activity_visible
-    from public.audit_requests a
-    left join public.users u on u.id = a.user_id
-    where a.organization_id = $1
-      and (
-        not coalesce(a.metadata_json ? 'activityVisible', false)
-        or (
-          a.metadata_json @> '{"activityVisible": true}'::jsonb
-          and a.outcome = 'success'
-        )
-      )
-  ),
-  activities_with_previous as (
-    select
-      *,
-      lag(created_at) over (
-        partition by user_id, user_name, method, path, action, item
-        order by created_at
-      ) as previous_created_at
-    from eligible_activities
-  ),
-  activity_gaps as (
-    select
-      *,
-      case
-        when previous_created_at is null then 1
-        when created_at - previous_created_at > interval '5 minutes' then 1
-        else 0
-      end as starts_new_sequence
-    from activities_with_previous
-  ),
-  sequenced_activities as (
-    select
-      *,
-      sum(starts_new_sequence) over (
-        partition by user_id, user_name, method, path, action, item
-        order by created_at
-        rows between unbounded preceding and current row
-      ) as sequence_id
-    from activity_gaps
-  ),
-  grouped_activities as (
-    select
-      user_id,
-      user_name,
-      action,
-      method,
-      item,
-      path,
-      sequence_id,
-      min(created_at) as created_at,
-      max(created_at) as last_seen_at,
-      case when bool_or(activity_visible is true) then 'success' else max(outcome) end as outcome,
-      case when bool_or(activity_visible is true) then true else null end as activity_visible
-    from sequenced_activities
-    group by user_id, user_name, action, method, item, path, sequence_id
-  )
   select
-    user_name,
-    action,
-    method,
-    item,
-    path,
-    created_at,
-    outcome,
-    activity_visible
-  from grouped_activities
-  order by last_seen_at desc
+    coalesce(nullif(u.full_name, ''), nullif(u.name, ''), nullif(u.login, '')) as user_name,
+    a.action,
+    a.method,
+    coalesce(nullif(a.referring, ''), nullif(a.referring_id, '')) as item,
+    a.path,
+    a.created_at,
+    a.outcome,
+    (a.metadata_json ->> 'activityVisible')::boolean as activity_visible
+  from public.audit_requests a
+  left join public.users u on u.id = a.user_id
+  where a.organization_id = $1
+    and (
+      not coalesce(a.metadata_json ? 'activityVisible', false)
+      or (
+        a.metadata_json @> '{"activityVisible": true}'::jsonb
+        and a.outcome = 'success'
+      )
+    )
+  order by a.created_at desc
   limit 5
 `;
 
