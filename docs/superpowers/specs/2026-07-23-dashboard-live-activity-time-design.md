@@ -1,6 +1,6 @@
 # Tempo relativo dinâmico nas atividades do dashboard
 
-**Data:** 2026-07-23
+**Data:** 2026-07-23  
 **Status:** aprovado para implementação
 
 ## Contexto
