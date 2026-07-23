@@ -17,6 +17,7 @@ function runTest(name, fn) {
 
 const dashboardComponent = read("../../shared/components/newLayout/Dashboard.tsx");
 const dashboardService = read("./services/dashboardService.ts");
+const dashboardHook = read("./hooks/useDashboard.ts");
 const appShell = read("../../pages/_app.tsx");
 
 runTest("new layout dashboard consumes the real dashboard hook", () => {
@@ -33,6 +34,24 @@ runTest("dashboard service only uses the real stats endpoint", () => {
   assert.doesNotMatch(dashboardService, /getMockStats/);
   assert.doesNotMatch(dashboardService, /Dashboard API not available, using mock data/);
   assert.doesNotMatch(dashboardService, /Math\.random/);
+});
+
+runTest("dashboard hook keeps cached data isolated and refreshes it in the background", () => {
+  assert.match(dashboardHook, /useQuery/);
+  assert.match(
+    dashboardHook,
+    /user\?\.organization_id\s*\?\?\s*user\?\.id\s*\?\?\s*["']anonymous["']/,
+  );
+  assert.match(dashboardHook, /refetchInterval:\s*60_000/);
+  assert.match(dashboardHook, /gcTime:\s*Infinity/);
+  assert.match(dashboardHook, /stats:\s*query\.data\s*\?\?\s*null/);
+  assert.doesNotMatch(dashboardHook, /useState|useEffect/);
+});
+
+runTest("dashboard distinguishes loading, retry and an empty activity feed", () => {
+  assert.match(dashboardComponent, /Carregando atividades/);
+  assert.match(dashboardComponent, /Tentar novamente/);
+  assert.match(dashboardComponent, /Nenhuma atividade recente/);
 });
 
 runTest("authenticated app shell does not mount legacy chat globally", () => {
