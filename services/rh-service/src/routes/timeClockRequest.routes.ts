@@ -11,6 +11,12 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
+  canManageRh,
+  RH_MANAGEMENT_PERMISSION,
+  RH_SELF_SERVICE_PERMISSION,
+  requireRhPermission,
+} from "../middlewares/requireRhPermission.js";
+import {
   approveAdjustmentBodySchema,
   createAdjustmentRequestBodySchema,
   listAdjustmentRequestsQuerySchema,
@@ -23,9 +29,12 @@ const timeClockRequestService = new TimeClockRequestService();
 router.get(
   "/adjustment/requests",
   isAuthenticated,
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
+      const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+        statusCode: 400,
+      });
       const queryInput = {
         status: getSingleTrimmedQueryValue(req.query.status),
         user_id: getSingleTrimmedQueryValue(req.query.user_id),
@@ -34,7 +43,7 @@ router.get(
 
       const result = await timeClockRequestService.list(organization_id, {
         status: query.status,
-        user_id: query.user_id,
+        user_id: canManageRh(req) ? query.user_id : user_id,
       });
 
       res.status(200).json(createSuccessResponse(result));
@@ -48,6 +57,7 @@ router.get(
 router.post(
   "/adjustment/request",
   isAuthenticated,
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
@@ -83,6 +93,7 @@ router.post(
 router.put(
   "/adjustment/approve",
   isAuthenticated,
+  requireRhPermission(RH_MANAGEMENT_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {

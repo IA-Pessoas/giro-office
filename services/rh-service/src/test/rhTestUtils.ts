@@ -202,6 +202,7 @@ vi.mock("../middlewares/isAuthenticated.js", () => ({
   isAuthenticated: (req: Express.Request, _res: Express.Response, next: NextFunction) => {
     req.user_id = "00000000-0000-4000-8000-000000000001";
     req.organization_id = "00000000-0000-4000-8000-000000000002";
+    req.rh_permission ??= 2;
     next();
   },
 }));

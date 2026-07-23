@@ -30,7 +30,7 @@ const USER_CREATE_SELECT = {
 
 const DEFAULT_NON_OWNER_PERMISSION = 1;
 const OWNER_MAX_MODULE_VALUE = 2;
-const TI_SELF_SERVICE_PERMISSION = 1;
+const SELF_SERVICE_PERMISSION = 1;
 const MODULE_FIELDS = [
   "atendimento",
   "certificado",
@@ -217,22 +217,21 @@ function withDepartmentAdminModule(
   };
 }
 
-function withDefaultTiSelfService(modules: ModulePatch, permission: number): ModulePatch {
+function withDefaultSelfServiceModules(modules: ModulePatch, permission: number): ModulePatch {
   if (permission < DEFAULT_NON_OWNER_PERMISSION) {
-    return modules;
-  }
-
-  const currentTiPermission = modules.ti;
-  if (
-    typeof currentTiPermission === "number" &&
-    currentTiPermission >= TI_SELF_SERVICE_PERMISSION
-  ) {
     return modules;
   }
 
   return {
     ...modules,
-    ti: TI_SELF_SERVICE_PERMISSION,
+    rh:
+      typeof modules.rh === "number" && modules.rh >= SELF_SERVICE_PERMISSION
+        ? modules.rh
+        : SELF_SERVICE_PERMISSION,
+    ti:
+      typeof modules.ti === "number" && modules.ti >= SELF_SERVICE_PERMISSION
+        ? modules.ti
+        : SELF_SERVICE_PERMISSION,
   };
 }
 
@@ -280,7 +279,7 @@ class UserService {
     const modulesToApply =
       normalizedType === "owner"
         ? MAX_MODULES
-        : withDefaultTiSelfService(
+        : withDefaultSelfServiceModules(
             withDepartmentAdminModule(
               pickKnownModules(data.modules),
               normalizedType,
@@ -438,20 +437,23 @@ class UserService {
     }
 
     const effectivePermission =
-      typeof updateData.permission === "number" ? updateData.permission : existingUser.permission;
-    const shouldProvisionTiSelfService =
+      typeof updateData.permission === "number"
+        ? updateData.permission
+        : typeof existingUser.permission === "number"
+          ? normalizePermissionForType(requestedType, existingUser.permission)
+          : 0;
+    const shouldProvisionSelfService =
       modulesToApply === null &&
       data.modules === undefined &&
       (data.permission !== undefined || data.type !== undefined) &&
       requestedType !== "owner" &&
-      typeof effectivePermission === "number" &&
       effectivePermission >= DEFAULT_NON_OWNER_PERMISSION;
-    if (shouldProvisionTiSelfService) {
+    if (shouldProvisionSelfService) {
       modulesToApply = {};
     }
 
     if (modulesToApply) {
-      modulesToApply = withDefaultTiSelfService(modulesToApply, effectivePermission);
+      modulesToApply = withDefaultSelfServiceModules(modulesToApply, effectivePermission);
     }
 
     try {

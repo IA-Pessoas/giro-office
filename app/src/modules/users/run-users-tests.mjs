@@ -162,13 +162,59 @@ runTest("department module permission is always explicit for non-owner users", (
   );
 });
 
-runTest("create user modules provision TI self-service for eligible users", () => {
-  assert.equal(buildCreateUserModulesPayload({}, "fiscal", 1).ti, 1);
-  assert.equal(
-    buildCreateUserModulesPayload({ ti: { enabled: true, level: 2 } }, "fiscal", 1).ti,
-    2,
+runTest("eligible non-RH user receives RH and TI self-service by default", () => {
+  assert.deepEqual(
+    buildCreateUserModulesPayload(
+      {
+        rh: { enabled: false, level: 0 },
+        ti: { enabled: false, level: 0 },
+        fiscal: { enabled: false, level: 0 },
+      },
+      "fiscal",
+      1,
+    ),
+    {
+      fiscal: 1,
+      rh: 1,
+      ti: 1,
+    },
   );
-  assert.equal(buildCreateUserModulesPayload({}, "fiscal", 0).ti, undefined);
+});
+
+runTest("explicit RH and TI management are preserved on user creation", () => {
+  assert.deepEqual(
+    buildCreateUserModulesPayload(
+      {
+        rh: { enabled: true, level: 2 },
+        ti: { enabled: true, level: 2 },
+        fiscal: { enabled: false, level: 0 },
+      },
+      "fiscal",
+      1,
+    ),
+    {
+      fiscal: 1,
+      rh: 2,
+      ti: 2,
+    },
+  );
+});
+
+runTest("viewer does not receive RH or TI self-service by default", () => {
+  assert.deepEqual(
+    buildCreateUserModulesPayload(
+      {
+        rh: { enabled: false, level: 0 },
+        ti: { enabled: false, level: 0 },
+        fiscal: { enabled: false, level: 0 },
+      },
+      "fiscal",
+      0,
+    ),
+    {
+      fiscal: 0,
+    },
+  );
 });
 
 runTest("top-level permission no longer promotes department admin to global admin", () => {

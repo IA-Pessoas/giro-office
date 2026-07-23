@@ -83,7 +83,7 @@ export interface DashboardStats {
     user: string;
     action: string;
     item: string;
-    time: string;
+    createdAt: string | null;
     avatar: string;
     tone: "green" | "blue" | "yellow" | "purple" | "indigo";
   }>;
@@ -281,32 +281,6 @@ function initials(name: string): string {
       .map((part) => part[0]?.toUpperCase() ?? "")
       .join("") || "US"
   );
-}
-
-function formatElapsedTime(value: Date | string | null): string {
-  if (!value) {
-    return "agora";
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-
-  if (seconds < 60) {
-    return "agora";
-  }
-
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    return `há ${minutes} min`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `há ${hours} hora${hours === 1 ? "" : "s"}`;
-  }
-
-  const days = Math.floor(hours / 24);
-  return `há ${days} dia${days === 1 ? "" : "s"}`;
 }
 
 function monthKey(date: Date): string {
@@ -552,7 +526,7 @@ export class DashboardStatsService {
             user,
             action: normalizeAction(activity),
             item: activity.item ?? activity.path ?? "registro",
-            time: formatElapsedTime(activity.created_at),
+            createdAt: formatNullableIsoDate(activity.created_at),
             avatar: initials(user),
             tone: ACTIVITY_TONES[index % ACTIVITY_TONES.length] ?? "blue",
           };

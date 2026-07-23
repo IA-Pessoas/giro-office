@@ -5,6 +5,18 @@ function read(path) {
   return readFileSync(new URL(path, import.meta.url), "utf8");
 }
 
+function readOptional(path) {
+  try {
+    return read(path);
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") {
+      return "";
+    }
+
+    throw error;
+  }
+}
+
 function runTest(name, fn) {
   try {
     fn();
@@ -18,7 +30,11 @@ function runTest(name, fn) {
 const dashboardComponent = read("../../shared/components/newLayout/Dashboard.tsx");
 const dashboardService = read("./services/dashboardService.ts");
 const dashboardHook = read("./hooks/useDashboard.ts");
+const dashboardTypes = read("./types/index.ts");
+const activityTimeSource = readOptional("./utils/activityTime.ts");
+const activityClockSource = readOptional("./hooks/useActivityClock.ts");
 const appShell = read("../../pages/_app.tsx");
+const activityTimeModule = activityTimeSource ? await import("./utils/activityTime.ts") : null;
 
 runTest("new layout dashboard consumes the real dashboard hook", () => {
   assert.match(dashboardComponent, /useDashboard/);
@@ -55,6 +71,29 @@ runTest("dashboard distinguishes loading, retry and an empty activity feed", () 
   assert.match(dashboardComponent, /Carregando atividades/);
   assert.match(dashboardComponent, /Tentar novamente/);
   assert.match(dashboardComponent, /Nenhuma atividade recente/);
+});
+
+runTest("dashboard derives activity time from createdAt and a local clock", () => {
+  assert.match(dashboardTypes, /createdAt:\s*string\s*\|\s*null/);
+  assert.match(dashboardComponent, /formatActivityTime/);
+  assert.match(dashboardComponent, /useActivityClock/);
+  assert.match(dashboardComponent, /activity\.createdAt/);
+  assert.doesNotMatch(dashboardComponent, /activity\.time/);
+  assert.match(activityClockSource, /30_000/);
+  assert.match(activityClockSource, /clearInterval/);
+});
+
+runTest("activity time formatter advances deterministically", () => {
+  assert.ok(activityTimeModule);
+  const now = new Date("2026-07-23T12:00:00.000Z").getTime();
+  const { formatActivityTime } = activityTimeModule;
+
+  assert.equal(formatActivityTime("2026-07-23T11:59:30.000Z", now), "agora");
+  assert.equal(formatActivityTime("2026-07-23T11:55:00.000Z", now), "há 5 min");
+  assert.equal(formatActivityTime("2026-07-23T10:00:00.000Z", now), "há 2 horas");
+  assert.equal(formatActivityTime("2026-07-21T12:00:00.000Z", now), "há 2 dias");
+  assert.equal(formatActivityTime("invalid", now), "agora");
+  assert.equal(formatActivityTime("2026-07-23T12:01:00.000Z", now), "agora");
 });
 
 runTest("authenticated app shell does not mount legacy chat globally", () => {

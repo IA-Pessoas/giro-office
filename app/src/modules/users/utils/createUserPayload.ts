@@ -70,8 +70,11 @@ export function buildCreateUserModulesPayload(
     }
   }
 
-  if (departmentPermission >= 1 && (modules.ti ?? 0) < 1) {
-    modules.ti = 1;
+  if (departmentPermission >= 1) {
+    if ((modules.ti ?? 0) < 1) {
+      modules.ti = 1;
+    }
+    modules.rh = typeof modules.rh === "number" && modules.rh > 1 ? modules.rh : 1;
   }
 
   return modules;

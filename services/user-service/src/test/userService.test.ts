@@ -157,22 +157,22 @@ describe("UserService", () => {
     expect(permissionServiceMock.create).toHaveBeenCalledWith("user-1", "org-1");
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
       "user-1",
-      { fiscal: 1, ti: 1 },
+      { fiscal: 1, rh: 1, ti: 1 },
       "org-1",
     );
     expect(result).toMatchObject({ id: "user-1", permission_id: "permission-1" });
   });
 
-  it("create provisiona TI self-service para usuario elegivel", async () => {
+  it("create concede RH e TI self-service para usuario elegivel", async () => {
     bcryptMock.hash.mockResolvedValue("hashed");
-    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1", name: "Fiscal" });
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-fiscal", name: "Fiscal" });
     prismaMock.user.create.mockResolvedValue({
-      id: "user-ti-self-service",
+      id: "user-self-service",
       name: "Usuario",
       login: "usuario",
       permission: 1,
       status: "active",
-      department_id: "dep-1",
+      department_id: "dep-fiscal",
       photo_url: null,
       joined_at: new Date("2025-01-01"),
       organization_id: "org-1",
@@ -188,30 +188,29 @@ describe("UserService", () => {
       name: "Usuario",
       login: "usuario",
       password: "secret",
-      department_id: "dep-1",
+      department_id: "dep-fiscal",
       permission: 1,
       organization_id: "org-1",
       type: "user",
-      modules: {},
     });
 
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
-      "user-ti-self-service",
-      expect.objectContaining({ ti: 1 }),
+      "user-self-service",
+      { rh: 1, ti: 1 },
       "org-1",
     );
   });
 
-  it("create preserva TI gestao explicito", async () => {
+  it("create preserva RH e TI gestao explicitos para usuario elegivel", async () => {
     bcryptMock.hash.mockResolvedValue("hashed");
-    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1", name: "Fiscal" });
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-fiscal", name: "Fiscal" });
     prismaMock.user.create.mockResolvedValue({
-      id: "user-ti-admin",
-      name: "Usuario",
-      login: "usuario.admin",
+      id: "user-management",
+      name: "Gestor",
+      login: "gestor",
       permission: 1,
       status: "active",
-      department_id: "dep-1",
+      department_id: "dep-fiscal",
       photo_url: null,
       joined_at: new Date("2025-01-01"),
       organization_id: "org-1",
@@ -224,33 +223,33 @@ describe("UserService", () => {
     const service = new UserService();
 
     await service.create({
-      name: "Usuario",
-      login: "usuario.admin",
+      name: "Gestor",
+      login: "gestor",
       password: "secret",
-      department_id: "dep-1",
+      department_id: "dep-fiscal",
       permission: 1,
       organization_id: "org-1",
       type: "user",
-      modules: { ti: 2 },
+      modules: { rh: 2, ti: 2 },
     });
 
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
-      "user-ti-admin",
-      expect.objectContaining({ ti: 2 }),
+      "user-management",
+      { rh: 2, ti: 2 },
       "org-1",
     );
   });
 
-  it("create nao provisiona TI para visualizador", async () => {
+  it("create nao concede RH ou TI automaticamente para visualizador", async () => {
     bcryptMock.hash.mockResolvedValue("hashed");
-    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1", name: "Fiscal" });
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-fiscal", name: "Fiscal" });
     prismaMock.user.create.mockResolvedValue({
-      id: "user-viewer",
+      id: "viewer-1",
       name: "Viewer",
       login: "viewer",
       permission: 0,
       status: "active",
-      department_id: "dep-1",
+      department_id: "dep-fiscal",
       photo_url: null,
       joined_at: new Date("2025-01-01"),
       organization_id: "org-1",
@@ -266,11 +265,10 @@ describe("UserService", () => {
       name: "Viewer",
       login: "viewer",
       password: "secret",
-      department_id: "dep-1",
+      department_id: "dep-fiscal",
       permission: 0,
       organization_id: "org-1",
       type: "user",
-      modules: {},
     });
 
     expect(permissionServiceMock.update).not.toHaveBeenCalled();
@@ -318,7 +316,7 @@ describe("UserService", () => {
     );
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
       "user-admin-contabil",
-      { financeiro: 1, contabil: 2, ti: 1 },
+      { financeiro: 1, contabil: 2, rh: 1, ti: 1 },
       "org-1",
     );
   });
@@ -404,7 +402,7 @@ describe("UserService", () => {
     expect(prismaMock.user.update).toHaveBeenCalled();
   });
 
-  it("update ao rebaixar para usuario limpa permissoes modulares antigas", async () => {
+  it("update ao rebaixar para usuario limpa permissoes modulares antigas e mantem RH self-service", async () => {
     prismaMock.user.findFirst.mockResolvedValue({
       id: "user-1",
       permission_id: "permission-1",
@@ -432,7 +430,7 @@ describe("UserService", () => {
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
       "user-1",
       expect.objectContaining({
-        rh: null,
+        rh: 1,
         ti: 1,
         contabil: null,
       }),
@@ -440,52 +438,30 @@ describe("UserService", () => {
     );
   });
 
-  it("update provisiona TI self-service ao manter usuario elegivel", async () => {
+  it("update concede RH e TI self-service para usuario elegivel sem modules explicito", async () => {
     prismaMock.user.findFirst.mockResolvedValue({
-      id: "user-1",
+      id: "user-viewer",
       permission_id: "permission-1",
-      department_id: "dep-rh",
-      permission: 1,
-      type: "user",
-    });
-    prismaMock.user.update.mockResolvedValue({
-      id: "user-1",
-      name: "Usuario",
-      permission: 1,
-      type: "user",
-    });
-    const service = new UserService();
-
-    await service.update("user-1", { permission: 1, type: "user" }, "org-1");
-
-    expect(permissionServiceMock.update).toHaveBeenCalledWith(
-      "user-1",
-      expect.objectContaining({ ti: 1 }),
-      "org-1",
-    );
-  });
-
-  it("update provisiona TI self-service quando permissao sobe sem modules", async () => {
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "user-1",
-      permission_id: "permission-1",
-      department_id: "dep-rh",
+      department_id: "dep-fiscal",
       permission: 0,
       type: "user",
     });
     prismaMock.user.update.mockResolvedValue({
-      id: "user-1",
-      name: "Usuario",
-      permission: 2,
+      id: "user-viewer",
+      name: "Viewer promovido",
+      permission: 1,
       type: "user",
     });
     const service = new UserService();
 
-    await service.update("user-1", { permission: 2 }, "org-1");
+    await service.update("user-viewer", { permission: 1 }, "org-1");
 
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
-      "user-1",
-      expect.objectContaining({ ti: 1 }),
+      "user-viewer",
+      expect.objectContaining({
+        rh: 1,
+        ti: 1,
+      }),
       "org-1",
     );
   });

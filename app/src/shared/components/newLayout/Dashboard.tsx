@@ -30,13 +30,16 @@ import {
   YAxis,
 } from "recharts";
 
+import { useActivityClock } from "../../../modules/dashboard/hooks/useActivityClock";
 import { useDashboard } from "../../../modules/dashboard/hooks/useDashboard";
 import type { DashboardStats } from "../../../modules/dashboard/types";
+import { formatActivityTime } from "../../../modules/dashboard/utils/activityTime";
 
 type DashboardProjectStats = DashboardStats["projects"];
 type DashboardActivity = DashboardStats["activities"][number] & {
   bgColor: string;
   textColor: string;
+  elapsedTime: string;
 };
 
 const ACTIVITY_TONE_CLASSES: Record<DashboardStats["activities"][number]["tone"], { bgColor: string; textColor: string }> = {
@@ -127,6 +130,7 @@ function formatLastUpdated(updatedAt: string | null | undefined): string {
 
 export function Dashboard() {
   const { stats, isLoading, error, refetch } = useDashboard();
+  const activityNow = useActivityClock();
   const lastUpdated = formatLastUpdated(stats?.updatedAt);
   const tasksSummary = stats?.tasks ?? {
     today: 0,
@@ -160,6 +164,7 @@ export function Dashboard() {
   const performanceData = stats?.performance ?? getEmptyPerformanceData();
   const activities: DashboardActivity[] = (stats?.activities ?? []).map((activity) => ({
     ...activity,
+    elapsedTime: formatActivityTime(activity.createdAt, activityNow),
     ...(ACTIVITY_TONE_CLASSES[activity.tone] ?? ACTIVITY_TONE_CLASSES.blue),
   }));
 
@@ -478,7 +483,9 @@ export function Dashboard() {
                       <span className="font-medium">{activity.user}</span> {activity.action}{" "}
                       <span className="font-medium">{activity.item}</span>
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{activity.time}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {activity.elapsedTime}
+                    </p>
                   </div>
                 </div>
               ))
