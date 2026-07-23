@@ -69,7 +69,7 @@ export interface DashboardActivity {
   user: string;
   action: string;
   item: string;
-  time: string;
+  createdAt: string | null;
   avatar: string;
   tone: 'green' | 'blue' | 'yellow' | 'purple' | 'indigo';
 }
