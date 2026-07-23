@@ -287,7 +287,7 @@ docker logs --tail 80 workspace-develop-gateway-1
 Esperado: `/ready` retorna `success: true`, o container permanece ativo e os logs não mostram
 falha de inicialização.
 
-- [ ] **Step 4: Concluir o plano e publicar**
+- [x] **Step 4: Concluir o plano e publicar**
 
 Marcar os checkboxes concluídos, criar o commit documental e enviar:
 
