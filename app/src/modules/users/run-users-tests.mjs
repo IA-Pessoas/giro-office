@@ -86,6 +86,7 @@ runTest("department admin is not created as organization owner", () => {
     modules: {
       rh: 2,
       comercial: 1,
+      ti: 1,
     },
     invited_by: "owner-1",
   });
@@ -138,6 +139,7 @@ runTest("non-owner creator cannot build organization owner payload", () => {
     modules: {
       rh: 2,
       comercial: 1,
+      ti: 1,
     },
   });
 });
@@ -155,8 +157,18 @@ runTest("department module permission is always explicit for non-owner users", (
     {
       rh: 2,
       fiscal: 0,
+      ti: 1,
     },
   );
+});
+
+runTest("create user modules provision TI self-service for eligible users", () => {
+  assert.equal(buildCreateUserModulesPayload({}, "fiscal", 1).ti, 1);
+  assert.equal(
+    buildCreateUserModulesPayload({ ti: { enabled: true, level: 2 } }, "fiscal", 1).ti,
+    2,
+  );
+  assert.equal(buildCreateUserModulesPayload({}, "fiscal", 0).ti, undefined);
 });
 
 runTest("top-level permission no longer promotes department admin to global admin", () => {

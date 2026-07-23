@@ -70,6 +70,10 @@ export function buildCreateUserModulesPayload(
     }
   }
 
+  if (departmentPermission >= 1 && (modules.ti ?? 0) < 1) {
+    modules.ti = 1;
+  }
+
   return modules;
 }
 

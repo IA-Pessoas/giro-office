@@ -30,6 +30,7 @@ const USER_CREATE_SELECT = {
 
 const DEFAULT_NON_OWNER_PERMISSION = 1;
 const OWNER_MAX_MODULE_VALUE = 2;
+const TI_SELF_SERVICE_PERMISSION = 1;
 const MODULE_FIELDS = [
   "atendimento",
   "certificado",
@@ -216,6 +217,25 @@ function withDepartmentAdminModule(
   };
 }
 
+function withDefaultTiSelfService(modules: ModulePatch, permission: number): ModulePatch {
+  if (permission < DEFAULT_NON_OWNER_PERMISSION) {
+    return modules;
+  }
+
+  const currentTiPermission = modules.ti;
+  if (
+    typeof currentTiPermission === "number" &&
+    currentTiPermission >= TI_SELF_SERVICE_PERMISSION
+  ) {
+    return modules;
+  }
+
+  return {
+    ...modules,
+    ti: TI_SELF_SERVICE_PERMISSION,
+  };
+}
+
 class UserService {
   async list({ skip = 0, take = 20, organizationId }: ListUsersParams): Promise<{
     users: UserPublicRow[];
@@ -260,10 +280,13 @@ class UserService {
     const modulesToApply =
       normalizedType === "owner"
         ? MAX_MODULES
-        : withDepartmentAdminModule(
-            pickKnownModules(data.modules),
-            normalizedType,
-            department?.name ?? null,
+        : withDefaultTiSelfService(
+            withDepartmentAdminModule(
+              pickKnownModules(data.modules),
+              normalizedType,
+              department?.name ?? null,
+            ),
+            normalizedPermission,
           );
 
     const passwordHash = await bcrypt.hash(data.password, 8);
@@ -412,6 +435,23 @@ class UserService {
           requestedType !== "admin"));
     if (shouldClearModules) {
       modulesToApply = EMPTY_MODULES;
+    }
+
+    const effectivePermission =
+      typeof updateData.permission === "number" ? updateData.permission : existingUser.permission;
+    const shouldProvisionTiSelfService =
+      modulesToApply === null &&
+      data.modules === undefined &&
+      (data.permission !== undefined || data.type !== undefined) &&
+      requestedType !== "owner" &&
+      typeof effectivePermission === "number" &&
+      effectivePermission >= DEFAULT_NON_OWNER_PERMISSION;
+    if (shouldProvisionTiSelfService) {
+      modulesToApply = {};
+    }
+
+    if (modulesToApply) {
+      modulesToApply = withDefaultTiSelfService(modulesToApply, effectivePermission);
     }
 
     try {
