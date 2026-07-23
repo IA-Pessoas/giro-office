@@ -28,7 +28,7 @@
 - Consumes: `ActivityRow.created_at: Date | string | null`.
 - Produces: `DashboardStats.activities[number].createdAt: string | null`.
 
-- [ ] **Step 1: Escrever o teste de contrato que falha**
+- [x] **Step 1: Escrever o teste de contrato que falha**
 
 No teste de atividade amigável, usar uma data fixa e exigir:
 
@@ -42,7 +42,7 @@ expect(stats.activities[0]).toMatchObject({
 expect(stats.activities[0]).not.toHaveProperty("time");
 ```
 
-- [ ] **Step 2: Confirmar o estado vermelho**
+- [x] **Step 2: Confirmar o estado vermelho**
 
 ```bash
 corepack pnpm --filter @workspace/gateway exec vitest run src/services/dashboardStatsService.test.ts
@@ -50,7 +50,7 @@ corepack pnpm --filter @workspace/gateway exec vitest run src/services/dashboard
 
 Esperado: falha porque a resposta ainda contém `time` e não contém `createdAt`.
 
-- [ ] **Step 3: Implementar o contrato mínimo**
+- [x] **Step 3: Implementar o contrato mínimo**
 
 Substituir no tipo e no mapeamento:
 
@@ -60,7 +60,7 @@ createdAt: formatNullableIsoDate(activity.created_at),
 
 Remover `formatElapsedTime`, pois o gateway não deve mais converter tempo relativo.
 
-- [ ] **Step 4: Confirmar o estado verde**
+- [x] **Step 4: Confirmar o estado verde**
 
 ```bash
 corepack pnpm --filter @workspace/gateway exec vitest run src/services/dashboardStatsService.test.ts
@@ -69,7 +69,7 @@ corepack pnpm --filter @workspace/gateway exec tsc --noEmit
 
 Esperado: teste e typecheck terminam com código zero.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/gateway/src/services/dashboardStatsService.ts services/gateway/src/services/dashboardStatsService.test.ts
@@ -90,7 +90,7 @@ git commit -m "fix(gateway): expose dashboard activity timestamp"
 - Produces: `formatActivityTime(createdAt: string | null, nowMs?: number): string`.
 - Produces: `useActivityClock(): number`.
 
-- [ ] **Step 1: Escrever testes determinísticos que falham**
+- [x] **Step 1: Escrever testes determinísticos que falham**
 
 Importar a função no runner do dashboard e validar:
 
@@ -109,7 +109,7 @@ assert.match(activityClockHook, /30_000/);
 assert.match(activityClockHook, /clearInterval/);
 ```
 
-- [ ] **Step 2: Confirmar o estado vermelho**
+- [x] **Step 2: Confirmar o estado vermelho**
 
 Executar o runner em Node.js 22:
 
@@ -119,7 +119,7 @@ docker run --rm -v "$PWD:/workspace" -w /workspace node:22-bookworm-slim node --
 
 Esperado: falha porque a função e o hook ainda não existem.
 
-- [ ] **Step 3: Implementar função pura e relógio local**
+- [x] **Step 3: Implementar função pura e relógio local**
 
 Criar:
 
@@ -154,7 +154,7 @@ export function useActivityClock(): number {
 
 Usar `createdAt` e o valor do relógio ao montar as atividades em `Dashboard.tsx`.
 
-- [ ] **Step 4: Confirmar o estado verde**
+- [x] **Step 4: Confirmar o estado verde**
 
 ```bash
 docker run --rm -v "$PWD:/workspace" -w /workspace node:22-bookworm-slim node --experimental-strip-types app/src/modules/dashboard/run-dashboard-tests.mjs
@@ -164,7 +164,7 @@ corepack pnpm --filter @workspace/app exec tsc -p tsconfig.usefetch-types.json -
 
 Esperado: testes e typechecks terminam com código zero.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/src/modules/dashboard/utils/activityTime.ts app/src/modules/dashboard/hooks/useActivityClock.ts app/src/modules/dashboard/types/index.ts app/src/modules/dashboard/run-dashboard-tests.mjs app/src/shared/components/newLayout/Dashboard.tsx
@@ -180,7 +180,7 @@ git commit -m "fix(app): refresh dashboard activity time locally"
 - Consumes: imagens `workspace-gateway:vps-develop` e `workspace-web:vps-develop`.
 - Produces: gateway e web atualizados no ambiente `develop`.
 
-- [ ] **Step 1: Rodar a validação final**
+- [x] **Step 1: Rodar a validação final**
 
 ```bash
 corepack pnpm --filter @workspace/gateway exec vitest run
@@ -192,7 +192,7 @@ git diff --check
 
 Esperado: zero falhas.
 
-- [ ] **Step 2: Atualizar Graphify quando disponível**
+- [x] **Step 2: Atualizar Graphify quando disponível**
 
 ```bash
 corepack pnpm graphify:update:ui
@@ -201,12 +201,12 @@ corepack pnpm graphify:update:services
 
 Se o Graphify continuar indisponível, aplicar o fallback manual com diff e busca de call sites.
 
-- [ ] **Step 3: Gerar as imagens e recriar os contêineres afetados**
+- [x] **Step 3: Gerar as imagens e recriar os contêineres afetados**
 
 Reconstruir `gateway` e `web` com os arquivos Compose do slot `workspace-develop` e executar
 `up -d --no-deps gateway web`.
 
-- [ ] **Step 4: Fazer smoke e push**
+- [x] **Step 4: Fazer smoke e push**
 
 Confirmar `/ready`, ausência de erros nos logs, criar os commits previstos e enviar `develop` para
 `origin`.
