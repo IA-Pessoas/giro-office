@@ -1,0 +1,32 @@
+{
+  "visual": [
+    "Preserve spacing hierarchy across containers, sections and cards",
+    "Preserve typography hierarchy for title, subtitle and body text",
+    "Preserve radius/shadow/contrast intent of existing surfaces",
+    "Preserve responsive layout behavior in mobile/tablet/desktop",
+    "Preserve light and dark mode parity"
+  ],
+  "interaction": [
+    "Keep hover state feedback on actionable elements",
+    "Keep focus-visible styles on all interactive elements",
+    "Keep keyboard navigation behavior (tab, shift+tab, enter, escape)",
+    "Keep disabled/loading/error visual and behavioral clarity"
+  ],
+  "accessibility": [
+    "Keep semantic landmarks and valid roles",
+    "Ensure form fields keep labels or accessible names",
+    "Ensure dialog-like components keep focus management",
+    "Ensure text and action contrast remains readable"
+  ],
+  "functional": [
+    "No route-level regressions in existing flows",
+    "No business logic or API behavior changes caused by style migration",
+    "No form validation or submit flow regressions"
+  ],
+  "definitionOfDone": [
+    "Visual baseline comparison checked for changed routes",
+    "Keyboard and focus checks completed for affected flows",
+    "Build/lint checks pass",
+    "No new Chakra import in touched files"
+  ]
+}
