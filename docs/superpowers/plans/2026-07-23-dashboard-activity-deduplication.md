@@ -32,7 +32,7 @@
 - Produces: linhas `ActivityRow` agrupadas, com `created_at` estável e ordenação por `last_seen_at`.
 - Preserves: `DashboardStats.activities[number].createdAt: string | null`.
 
-- [ ] **Step 1: Escrever o teste regressivo que falha**
+- [x] **Step 1: Escrever o teste regressivo que falha**
 
 No teste que inspeciona `ACTIVITIES_SQL`, manter as verificações de visibilidade e acrescentar:
 
@@ -54,7 +54,7 @@ Renomear o caso para:
 it("groups continuous duplicate activities while preserving visibility rules", async () => {
 ```
 
-- [ ] **Step 2: Confirmar o estado vermelho**
+- [x] **Step 2: Confirmar o estado vermelho**
 
 Executar:
 
@@ -65,7 +65,7 @@ corepack pnpm --filter @workspace/gateway exec vitest run src/services/dashboard
 Esperado: o caso falha porque a consulta atual não usa janelas, sequências nem timestamps
 agregados.
 
-- [ ] **Step 3: Implementar islands-and-gaps no SQL**
+- [x] **Step 3: Implementar islands-and-gaps no SQL**
 
 Substituir `ACTIVITIES_SQL` por uma consulta com estas etapas:
 
@@ -154,7 +154,7 @@ limit 5
 Não alterar `isEligibleActivity`, `normalizeAction` nem o mapeamento para `createdAt`. Eles
 continuam como defesa do contrato e serialização.
 
-- [ ] **Step 4: Confirmar o estado verde escopado**
+- [x] **Step 4: Confirmar o estado verde escopado**
 
 Executar:
 
@@ -165,7 +165,7 @@ corepack pnpm --filter @workspace/gateway exec tsc --noEmit
 
 Esperado: todos os casos do arquivo e o typecheck terminam com código zero.
 
-- [ ] **Step 5: Medir a consulta no ambiente develop**
+- [x] **Step 5: Medir a consulta no ambiente develop**
 
 Executar `EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)` para `ACTIVITIES_SQL`, substituindo `$1` apenas
 na execução diagnóstica por um parâmetro da organização autenticada. A consulta deve:
@@ -178,7 +178,7 @@ na execução diagnóstica por um parâmetro da organização autenticada. A con
 
 Se ultrapassar 500 ms, parar e revisar o desenho antes de publicar.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add services/gateway/src/services/dashboardStatsService.ts services/gateway/src/services/dashboardStatsService.test.ts
@@ -196,7 +196,7 @@ git commit -m "fix(gateway): group repeated dashboard activities"
 - Consumes: `DashboardStats.activities[number].createdAt`.
 - Produces: evidência de compatibilidade entre gateway e frontend.
 
-- [ ] **Step 1: Executar a validação completa**
+- [x] **Step 1: Executar a validação completa**
 
 ```bash
 corepack pnpm --filter @workspace/gateway exec vitest run
@@ -216,7 +216,7 @@ git diff --check
 Esperado: 123 ou mais testes do gateway, nove ou mais testes do dashboard e todos os typechecks
 terminam sem falha.
 
-- [ ] **Step 2: Atualizar Graphify ou aplicar fallback**
+- [x] **Step 2: Atualizar Graphify ou aplicar fallback**
 
 ```bash
 corepack pnpm graphify:update:services
@@ -243,7 +243,7 @@ Esperado: nenhum consumidor volta a depender de `activity.time`.
 - Consumes: imagem `workspace-gateway:vps-develop`.
 - Produces: gateway atualizado no slot `workspace-develop`.
 
-- [ ] **Step 1: Reconstruir somente o gateway**
+- [x] **Step 1: Reconstruir somente o gateway**
 
 Usar os mesmos valores do slot atual:
 
@@ -261,7 +261,7 @@ docker compose \
   build gateway
 ```
 
-- [ ] **Step 2: Recriar somente o gateway**
+- [x] **Step 2: Recriar somente o gateway**
 
 ```bash
 WORKSPACE_VPS_IMAGE_TAG=vps-develop \
@@ -277,7 +277,7 @@ docker compose \
   up -d --no-deps gateway
 ```
 
-- [ ] **Step 3: Fazer smoke**
+- [x] **Step 3: Fazer smoke**
 
 ```bash
 curl -fsS --max-time 10 http://127.0.0.1:3011/ready
