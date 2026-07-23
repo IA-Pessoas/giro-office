@@ -44,6 +44,78 @@ function dashboardQueryMock(activities: unknown[] = []) {
 }
 
 describe("DashboardStatsService", () => {
+  it("queues dashboard queries within the configured concurrency limit", async () => {
+    let activeQueries = 0;
+    let maxActiveQueries = 0;
+    const releases: Array<() => void> = [];
+    const query = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          activeQueries += 1;
+          maxActiveQueries = Math.max(maxActiveQueries, activeQueries);
+          releases.push(() => {
+            activeQueries -= 1;
+            resolve(result([]));
+          });
+        }),
+    );
+    const service = new DashboardStatsService({
+      pool: { query } as never,
+      maxConcurrentQueries: 2,
+    });
+
+    const statsPromise = service.getStats("org-1");
+
+    await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(2));
+
+    for (let expectedCalls = 3; expectedCalls <= 10; expectedCalls += 1) {
+      releases.shift()?.();
+      await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(expectedCalls));
+    }
+
+    while (releases.length > 0) {
+      releases.shift()?.();
+    }
+
+    await statsPromise;
+
+    expect(maxActiveQueries).toBe(2);
+  });
+
+  it("shares an in-flight dashboard load between users from the same organization", async () => {
+    const query = dashboardQueryMock();
+    const service = new DashboardStatsService({ pool: { query } as never });
+
+    await Promise.all([service.getStats("org-1"), service.getStats("org-1")]);
+
+    expect(query).toHaveBeenCalledTimes(10);
+  });
+
+  it("continues processing queued queries after a database failure", async () => {
+    const query = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("database unavailable"))
+      .mockResolvedValue(result([]));
+    const service = new DashboardStatsService({
+      pool: { query } as never,
+      maxConcurrentQueries: 1,
+    });
+
+    await expect(service.getStats("org-1")).rejects.toMatchObject({
+      statusCode: 500,
+    });
+    await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(10));
+    await expect(service.getStats("org-1")).resolves.toBeDefined();
+
+    expect(query).toHaveBeenCalledTimes(20);
+  });
+
+  it("limits the dashboard pool to the same number of concurrent queries", () => {
+    const source = readFileSync(new URL("./dashboardStatsService.ts", import.meta.url), "utf8");
+
+    expect(source).toContain("max: DASHBOARD_MAX_CONCURRENT_QUERIES");
+  });
+
   it("returns semantic audit fields as friendly dashboard activity", async () => {
     const query = dashboardQueryMock([
       {

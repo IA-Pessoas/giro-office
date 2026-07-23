@@ -4,6 +4,7 @@ import pg from "pg";
 const { Pool } = pg;
 
 type Queryable = Pick<pg.Pool, "query">;
+const DASHBOARD_MAX_CONCURRENT_QUERIES = 2;
 
 export interface FiscalObligationSummary {
   status: "Pendente" | "Emitida" | "Atrasada";
@@ -91,6 +92,7 @@ export interface DashboardStats {
 export interface DashboardStatsServiceOptions {
   databaseUrl?: string;
   pool?: Queryable;
+  maxConcurrentQueries?: number;
 }
 
 interface ClientSummaryRow {
@@ -360,14 +362,55 @@ function normalizeAction(row: ActivityRow): string {
   }
 }
 
+class DashboardQueryQueue {
+  private activeTasks = 0;
+  private readonly pendingTasks: Array<() => void> = [];
+
+  constructor(private readonly concurrency: number) {}
+
+  async run<T>(task: () => Promise<T>): Promise<T> {
+    await this.acquire();
+
+    try {
+      return await task();
+    } finally {
+      this.release();
+    }
+  }
+
+  private acquire(): Promise<void> {
+    if (this.activeTasks < this.concurrency) {
+      this.activeTasks += 1;
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      this.pendingTasks.push(() => {
+        this.activeTasks += 1;
+        resolve();
+      });
+    });
+  }
+
+  private release(): void {
+    this.activeTasks -= 1;
+    this.pendingTasks.shift()?.();
+  }
+}
+
 export class DashboardStatsService {
   private readonly databaseUrl?: string;
   private readonly injectedPool?: Queryable;
+  private readonly queryQueue: DashboardQueryQueue;
+  private readonly inFlightStats = new Map<string, Promise<DashboardStats>>();
   private pool?: pg.Pool;
 
   constructor(options: DashboardStatsServiceOptions) {
     this.databaseUrl = options.databaseUrl;
     this.injectedPool = options.pool;
+    this.queryQueue = new DashboardQueryQueue(
+      Math.max(1, Math.floor(options.maxConcurrentQueries ?? DASHBOARD_MAX_CONCURRENT_QUERIES)),
+    );
   }
 
   async getStats(organizationId: string): Promise<DashboardStats> {
@@ -375,8 +418,27 @@ export class DashboardStatsService {
       throw new ServiceError(400, "Organização autenticada não informada.");
     }
 
+    const currentLoad = this.inFlightStats.get(organizationId);
+    if (currentLoad) {
+      return currentLoad;
+    }
+
+    const load = this.loadStats(organizationId);
+    const trackedLoad = load.finally(() => {
+      if (this.inFlightStats.get(organizationId) === trackedLoad) {
+        this.inFlightStats.delete(organizationId);
+      }
+    });
+
+    this.inFlightStats.set(organizationId, trackedLoad);
+    return trackedLoad;
+  }
+
+  private async loadStats(organizationId: string): Promise<DashboardStats> {
     try {
       const pool = this.getPool();
+      const query = <Row extends pg.QueryResultRow>(sql: string): Promise<pg.QueryResult<Row>> =>
+        this.queryQueue.run(() => pool.query<Row>(sql, [organizationId]));
       const [
         clientSummaryResult,
         monthlyClientsResult,
@@ -389,16 +451,16 @@ export class DashboardStatsService {
         activitiesResult,
         updatedAtResult,
       ] = await Promise.all([
-        pool.query<ClientSummaryRow>(CLIENT_SUMMARY_SQL, [organizationId]),
-        pool.query<MonthlyClientRow>(MONTHLY_CLIENTS_SQL, [organizationId]),
-        pool.query<RecentClientRow>(RECENT_CLIENTS_SQL, [organizationId]),
-        pool.query<TaskSummaryRow>(TASK_SUMMARY_SQL, [organizationId]),
-        pool.query<PendingTaskRow>(PENDING_TASKS_SQL, [organizationId]),
-        pool.query<ProjectSummaryRow>(PROJECT_SUMMARY_SQL, [organizationId]),
-        pool.query<NotificationSummaryRow>(NOTIFICATION_SUMMARY_SQL, [organizationId]),
-        pool.query<PerformanceRow>(PERFORMANCE_SQL, [organizationId]),
-        pool.query<ActivityRow>(ACTIVITIES_SQL, [organizationId]),
-        pool.query<UpdatedAtRow>(UPDATED_AT_SQL, [organizationId]),
+        query<ClientSummaryRow>(CLIENT_SUMMARY_SQL),
+        query<MonthlyClientRow>(MONTHLY_CLIENTS_SQL),
+        query<RecentClientRow>(RECENT_CLIENTS_SQL),
+        query<TaskSummaryRow>(TASK_SUMMARY_SQL),
+        query<PendingTaskRow>(PENDING_TASKS_SQL),
+        query<ProjectSummaryRow>(PROJECT_SUMMARY_SQL),
+        query<NotificationSummaryRow>(NOTIFICATION_SUMMARY_SQL),
+        query<PerformanceRow>(PERFORMANCE_SQL),
+        query<ActivityRow>(ACTIVITIES_SQL),
+        query<UpdatedAtRow>(UPDATED_AT_SQL),
       ]);
 
       const clientSummary = clientSummaryResult.rows[0];
@@ -517,6 +579,7 @@ export class DashboardStatsService {
 
     this.pool ??= new Pool({
       connectionString: this.databaseUrl,
+      max: DASHBOARD_MAX_CONCURRENT_QUERIES,
       ssl: this.databaseUrl.includes("supabase.com")
         ? {
             rejectUnauthorized: false,
