@@ -662,6 +662,13 @@ const ACTIVITIES_SQL = `
   from public.audit_requests a
   left join public.users u on u.id = a.user_id
   where a.organization_id = $1
+    and (
+      not coalesce(a.metadata_json ? 'activityVisible', false)
+      or (
+        a.metadata_json @> '{"activityVisible": true}'::jsonb
+        and a.outcome = 'success'
+      )
+    )
   order by a.created_at desc
   limit 5
 `;
