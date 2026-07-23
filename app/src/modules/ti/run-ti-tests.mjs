@@ -510,6 +510,15 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.doesNotMatch(`${pageSource}\n${workspaceUiSource}`, /indigo-/);
 });
 
+await runTest("ti shell limits self-service tabs to chamados and meus termos", async () => {
+  const pageSource = await readModuleSource("components/TiPage.tsx");
+
+  assert.match(pageSource, /SELF_SERVICE_TI_TABS/);
+  assert.match(pageSource, /const canManageTi = access\.isAdmin/);
+  assert.match(pageSource, /const visibleTabs = canManageTi \? TI_TABS : SELF_SERVICE_TI_TABS/);
+  assert.match(pageSource, /label: "Meus termos"/);
+});
+
 await runTest("ti requests hooks expose mutations and invalidate requests plus dashboard caches", async () => {
   const hookSource = await readModuleSource("hooks/useTiRequests.ts");
 
@@ -572,6 +581,9 @@ await runTest("ti request detail opens in a dialog instead of a stretched side p
 await runTest("ti request detail keeps secondary actions compact", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 
+  assert.match(tabSource, /const canManageRequests = access\.isAdmin/);
+  assert.match(tabSource, /canManageRequests && !hasAssignee/);
+  assert.match(tabSource, /canManageRequests \? \(/);
   assert.doesNotMatch(tabSource, /<details/);
   assert.doesNotMatch(tabSource, /<summary/);
   assert.match(tabSource, /Editar chamado/);
@@ -904,6 +916,9 @@ await runTest("ti terms tab exposes term create, edit, detail and signing action
   assert.match(source, /useTiTerms\(/);
   assert.match(source, /useTiTerm\(/);
   assert.match(source, /useTiInventory\(/);
+  assert.match(source, /const canManage = access\.isAdmin/);
+  assert.match(source, /useTiInventory\(undefined, \{ enabled: canManage \}\)/);
+  assert.match(source, /departmentService\.list\(\),\s*\{ retry: false, enabled: canManage \}/);
   assert.match(source, /confirm\(/);
 });
 
