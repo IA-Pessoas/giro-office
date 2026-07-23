@@ -38,6 +38,9 @@ runTest("dashboard service only uses the real stats endpoint", () => {
 
 runTest("dashboard hook keeps cached data isolated and refreshes it in the background", () => {
   assert.match(dashboardHook, /useQuery/);
+  assert.match(dashboardHook, /interface\s+UseDashboardResult/);
+  assert.match(dashboardHook, /useDashboard\s*=\s*\(\):\s*UseDashboardResult/);
+  assert.match(dashboardHook, /refetch:\s*\(\)\s*=>\s*Promise<void>/);
   assert.match(
     dashboardHook,
     /user\?\.organization_id\s*\?\?\s*user\?\.id\s*\?\?\s*["']anonymous["']/,
