@@ -29,7 +29,7 @@
 - Consumes: `DashboardStatsService.getStats(organizationId: string): Promise<DashboardStats>`.
 - Produces: `DashboardQueryQueue.run<T>(task: () => Promise<T>): Promise<T>` e opção interna `maxConcurrentQueries`.
 
-- [ ] **Step 1: Escrever testes que falham**
+- [x] **Step 1: Escrever testes que falham**
 
 Adicionar casos que iniciam consultas controladas e comprovam:
 
@@ -53,7 +53,7 @@ expect(query).toHaveBeenCalledTimes(10);
 
 E um caso em que a primeira consulta rejeita, mas as consultas seguintes entram na fila.
 
-- [ ] **Step 2: Confirmar o estado vermelho**
+- [x] **Step 2: Confirmar o estado vermelho**
 
 Executar:
 
@@ -63,7 +63,7 @@ pnpm --filter @workspace/gateway exec vitest run src/services/dashboardStatsServ
 
 Esperado: falha porque `maxConcurrentQueries` ainda não existe e todas as consultas iniciam juntas.
 
-- [ ] **Step 3: Implementar a fila mínima**
+- [x] **Step 3: Implementar a fila mínima**
 
 Criar uma fila FIFO privada:
 
@@ -89,7 +89,7 @@ Fazer as dez consultas existentes passarem por `queue.run`, configurar `new Pool
 manter um `Map<string, Promise<DashboardStats>>` para compartilhar cargas por organização. Remover
 a entrada do mapa em `finally`.
 
-- [ ] **Step 4: Confirmar o estado verde**
+- [x] **Step 4: Confirmar o estado verde**
 
 Executar:
 
@@ -100,7 +100,7 @@ pnpm --filter @workspace/gateway typecheck
 
 Esperado: todos os testes passam e o typecheck termina com código zero.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/gateway/src/services/dashboardStatsService.ts services/gateway/src/services/dashboardStatsService.test.ts
@@ -118,7 +118,7 @@ git commit -m "fix(gateway): queue dashboard database queries"
 - Consumes: `dashboardService.getStats(): Promise<DashboardStats>` e `useAuth().user`.
 - Produces: `useDashboard()` com `stats`, `isLoading`, `error`, `isFetching` e `refetch`.
 
-- [ ] **Step 1: Escrever testes que falham**
+- [x] **Step 1: Escrever testes que falham**
 
 Estender o teste estático do módulo para exigir:
 
@@ -131,7 +131,7 @@ assert.match(dashboardComponent, /Carregando atividades/);
 assert.match(dashboardComponent, /Tentar novamente/);
 ```
 
-- [ ] **Step 2: Confirmar o estado vermelho**
+- [x] **Step 2: Confirmar o estado vermelho**
 
 Executar:
 
@@ -142,7 +142,7 @@ pnpm --filter @workspace/app test:dashboard
 Esperado: falha porque o hook ainda descarta os dados ao desmontar e o componente não apresenta os
 estados iniciais.
 
-- [ ] **Step 3: Implementar o React Query e os estados visuais**
+- [x] **Step 3: Implementar o React Query e os estados visuais**
 
 Substituir o estado manual por:
 
@@ -159,7 +159,7 @@ Retornar `stats: query.data ?? null`. No card de atividades, manter a lista quan
 sem dado válido, mostrar `Carregando atividades...` ou o erro com botão `Tentar novamente`. Quando
 a carga válida não tiver eventos, mostrar `Nenhuma atividade recente`.
 
-- [ ] **Step 4: Confirmar o estado verde**
+- [x] **Step 4: Confirmar o estado verde**
 
 Executar:
 
@@ -170,7 +170,7 @@ pnpm --filter @workspace/app typecheck
 
 Esperado: teste e typecheck encerram com código zero.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/src/modules/dashboard/run-dashboard-tests.mjs app/src/modules/dashboard/hooks/useDashboard.ts app/src/shared/components/newLayout/Dashboard.tsx
@@ -186,7 +186,7 @@ git commit -m "fix(app): preserve dashboard data during refresh"
 - Consumes: imagem de gateway e web do slot `develop`.
 - Produces: contêineres atualizados e endpoint pronto para teste manual.
 
-- [ ] **Step 1: Rodar verificações escopadas**
+- [x] **Step 1: Rodar verificações escopadas**
 
 ```bash
 pnpm --filter @workspace/gateway test
@@ -198,7 +198,7 @@ pnpm exec biome check services/gateway/src/services/dashboardStatsService.ts ser
 
 Esperado: zero falhas.
 
-- [ ] **Step 2: Revisar o diff e os call sites**
+- [x] **Step 2: Revisar o diff e os call sites**
 
 ```bash
 git diff --check
@@ -208,7 +208,7 @@ rg -n "useDashboard|DashboardStatsService" app/src services/gateway/src
 
 Esperado: somente arquivos desta correção e nenhum erro de whitespace.
 
-- [ ] **Step 3: Atualizar os grafos se disponíveis**
+- [x] **Step 3: Atualizar os grafos se disponíveis**
 
 ```bash
 pnpm graphify:update:ui
@@ -218,12 +218,12 @@ pnpm graphify:update:services
 Esperado: grafos atualizados; se os artefatos locais não existirem, registrar o fallback manual já
 executado.
 
-- [ ] **Step 4: Reconstruir e recriar somente gateway e web**
+- [x] **Step 4: Reconstruir e recriar somente gateway e web**
 
 Usar os mesmos arquivos Compose e variáveis do slot `workspace-develop`, reconstruindo `gateway` e
 `web` e executando `up -d --no-deps` somente para esses serviços.
 
-- [ ] **Step 5: Fazer smoke**
+- [x] **Step 5: Fazer smoke**
 
 Confirmar `GET /ready` do gateway e inspecionar os logs novos para garantir ausência de
 `EMAXCONNSESSION`. Navegar entre dashboard e outro menu e voltar, verificando que o cache aparece e
