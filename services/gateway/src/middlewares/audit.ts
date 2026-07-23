@@ -7,6 +7,7 @@ import type {
 } from "@workspace/shared";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
+import { describeActivity } from "../audit/activityCatalog.js";
 import type { GatewayEnv } from "../config/env.js";
 import { resolveGatewayService } from "../config/serviceRegistry.js";
 
@@ -63,6 +64,14 @@ function buildQueryFromUrl(url: string): AuditQuery {
   return query;
 }
 
+function getPublicPath(originalUrl: string, fallbackPath: string): string {
+  try {
+    return new URL(originalUrl, "http://localhost").pathname;
+  } catch {
+    return fallbackPath;
+  }
+}
+
 function getOutcome(statusCode: number): AuditOutcome {
   return statusCode >= 400 ? "error" : "success";
 }
@@ -90,6 +99,8 @@ export function buildAuditLifecycleMiddleware({
 
     const startedAt = process.hrtime.bigint();
     const createdAt = new Date();
+    const publicPath = getPublicPath(request.originalUrl, request.path);
+    const activity = describeActivity(request.method, publicPath);
     const requestLogger = request.log ?? logger;
     let recorded = false;
 
@@ -113,7 +124,7 @@ export function buildAuditLifecycleMiddleware({
             ? request.auth.claims.permission
             : undefined,
         method: request.method,
-        path: request.path,
+        path: publicPath,
         query: buildQueryFromUrl(request.originalUrl),
         statusCode,
         outcome,
@@ -129,7 +140,10 @@ export function buildAuditLifecycleMiddleware({
         metadata: {
           responseSizeBytes: getResponseSizeBytes(response) ?? null,
           routeTarget: getRouteTarget(env, request),
+          activityVisible: activity !== null,
         },
+        action: activity?.action,
+        referring: activity?.item,
       };
 
       void recordAuditRequest(payload);

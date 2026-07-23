@@ -1853,13 +1853,13 @@ it("records successful proxied requests when audit is enabled", async () => {
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ ok: true }));
   });
-  const userServiceUrl = await startServer(upstream);
+  const taskServiceUrl = await startServer(upstream);
 
   const app = createApp(
     createEnv({
       auditEnabled: true,
       auditServiceUrl: auditService.url,
-      userServiceUrl,
+      taskServiceUrl,
     }),
     createTestLogger(),
   );
@@ -1867,7 +1867,7 @@ it("records successful proxied requests when audit is enabled", async () => {
   const gatewayUrl = await startServer(gateway);
 
   try {
-    const response = await fetch(`${gatewayUrl}/user`, {
+    const response = await fetch(`${gatewayUrl}/task/list?page=2`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -1881,8 +1881,18 @@ it("records successful proxied requests when audit is enabled", async () => {
     expect(auditService.records[0]?.requestId.length > 0).toBe(true);
     expect(auditService.records[0]?.organizationId).toBe("org-1");
     expect(auditService.records[0]?.userId).toBe("user-1");
-    expect(auditService.records[0]?.statusCode).toBe(200);
-    expect(auditService.records[0]?.outcome).toBe("success");
+    expect(auditService.records[0]).toMatchObject({
+      method: "GET",
+      path: "/task/list",
+      query: { page: "2" },
+      outcome: "success",
+      action: "consultou",
+      referring: "a lista de tarefas",
+      metadata: {
+        routeTarget: "task-service",
+        activityVisible: true,
+      },
+    });
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -2173,6 +2183,9 @@ it("records bad gateway failures when audit is enabled", async () => {
     expect(auditService.records[0]?.statusCode).toBe(502);
     expect(auditService.records[0]?.outcome).toBe("error");
     expect(auditService.records[0]?.errorCode).toBe("BAD_GATEWAY");
+    expect(auditService.records[0]?.metadata?.activityVisible).toBe(false);
+    expect(auditService.records[0]?.action).toBe(undefined);
+    expect(auditService.records[0]?.referring).toBe(undefined);
   } finally {
     await stopServer(gateway);
     await stopServer(auditService.server);
