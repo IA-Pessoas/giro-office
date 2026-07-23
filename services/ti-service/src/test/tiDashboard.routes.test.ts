@@ -24,8 +24,8 @@ function gatewayHeaders(permission: number): Record<string, string> {
 }
 
 describe("ti dashboard routes", () => {
-  it("GET /ti/dashboard returns dashboard summary with permission 1", async () => {
-    const response = await request(createTestApp()).get("/ti/dashboard").set(gatewayHeaders(1));
+  it("GET /ti/dashboard returns dashboard summary with permission 2", async () => {
+    const response = await request(createTestApp()).get("/ti/dashboard").set(gatewayHeaders(2));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -43,8 +43,8 @@ describe("ti dashboard routes", () => {
     });
   });
 
-  it("GET /ti/dashboard requires permission 1", async () => {
-    const response = await request(createTestApp()).get("/ti/dashboard").set(gatewayHeaders(0));
+  it("GET /ti/dashboard requires permission 2", async () => {
+    const response = await request(createTestApp()).get("/ti/dashboard").set(gatewayHeaders(1));
 
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({

@@ -43,7 +43,7 @@ export function createTiStockRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/items/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -60,7 +60,7 @@ export function createTiStockRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/items/:id",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -77,7 +77,7 @@ export function createTiStockRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/items/:id/movements/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -165,7 +165,7 @@ export function createTiStockRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/categories/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -216,7 +216,7 @@ export function createTiStockRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/locations/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const context = getContext(request);

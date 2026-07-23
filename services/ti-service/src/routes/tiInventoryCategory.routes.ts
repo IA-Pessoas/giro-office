@@ -29,7 +29,7 @@ export function createTiInventoryCategoryRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const organizationId = getOrganizationId(request);

@@ -27,10 +27,23 @@ function gatewayHeaders(permission: number): Record<string, string> {
 }
 
 describe("ti inventory category routes", () => {
-  it("GET /ti/inventory-categories/list lists categories", async () => {
+  it("GET /ti/inventory-categories/list requires admin permission", async () => {
     const response = await request(createTestApp())
       .get("/ti/inventory-categories/list")
       .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para acessar o ti-service.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("GET /ti/inventory-categories/list lists categories with admin permission", async () => {
+    const response = await request(createTestApp())
+      .get("/ti/inventory-categories/list")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ success: true, data: [] });

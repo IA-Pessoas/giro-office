@@ -24,7 +24,7 @@ export function createTiDashboardRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const context = getContext(request);

@@ -38,6 +38,8 @@ export class TiRequestService {
 
   async list(context: TiAuthContext, query: ListTiRequestsQuery): Promise<unknown[]> {
     const { skip, take } = getPaginationParams(query);
+    const requesterId =
+      context.permission < TiPermissionLevel.Technician ? context.userId : query.requester_id;
 
     return this.prisma.tIRequest.findMany({
       where: {
@@ -45,7 +47,7 @@ export class TiRequestService {
         ...(query.status ? { status: query.status } : {}),
         ...(query.urgency ? { urgency: query.urgency } : {}),
         ...(query.category_id ? { category_id: query.category_id } : {}),
-        ...(query.requester_id ? { requester_id: query.requester_id } : {}),
+        ...(requesterId ? { requester_id: requesterId } : {}),
         ...(query.assigned_to_id ? { assigned_to_id: query.assigned_to_id } : {}),
         ...(query.created_from || query.created_to
           ? {
@@ -86,6 +88,13 @@ export class TiRequestService {
     });
 
     if (!request) {
+      throw new ServiceError(404, "Chamado de TI nao encontrado.");
+    }
+
+    if (
+      context.permission < TiPermissionLevel.Technician &&
+      request.requester_id !== context.userId
+    ) {
       throw new ServiceError(404, "Chamado de TI nao encontrado.");
     }
 

@@ -62,10 +62,23 @@ function createPasswordPrismaMock(): Parameters<typeof createTestApp>[0] {
 }
 
 describe("ti password routes", () => {
-  it("GET /ti/passwords/list nao retorna password", async () => {
+  it("GET /ti/passwords/list requires admin permission", async () => {
     const response = await request(createTestApp(createPasswordPrismaMock()))
       .get("/ti/passwords/list")
       .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para acessar o ti-service.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("GET /ti/passwords/list nao retorna password", async () => {
+    const response = await request(createTestApp(createPasswordPrismaMock()))
+      .get("/ti/passwords/list")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -82,22 +95,17 @@ describe("ti password routes", () => {
     expect(response.body.data[0]).not.toHaveProperty("password");
   });
 
-  it("GET /ti/passwords/:id com permissao solicitante nao retorna password", async () => {
+  it("GET /ti/passwords/:id requires admin permission", async () => {
     const response = await request(createTestApp(createPasswordPrismaMock()))
       .get(`/ti/passwords/${passwordId}`)
       .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
-      success: true,
-      data: {
-        id: passwordId,
-        local: "VPN",
-        user_id: userId,
-        organization_id: organizationId,
-      },
+      success: false,
+      error: "Permissao insuficiente para acessar o ti-service.",
+      code: "FORBIDDEN",
     });
-    expect(response.body.data).not.toHaveProperty("password");
   });
 
   it("GET /ti/passwords/:id com permissao administrativa 2 retorna password", async () => {
