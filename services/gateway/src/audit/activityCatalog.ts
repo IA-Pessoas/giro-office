@@ -31,7 +31,8 @@ function normalizePath(rawPath: string): string | null {
   if (!rawPath.startsWith("/")) return null;
 
   try {
-    return new URL(rawPath, "http://localhost").pathname.replace(/\/{2,}/g, "/");
+    const pathname = new URL(rawPath, "http://localhost").pathname.replace(/\/{2,}/g, "/");
+    return pathname.replace(/\/+$/, "") || "/";
   } catch {
     return null;
   }
@@ -43,6 +44,7 @@ const TECHNICAL_RULES = [
   /^\/audit(?:\/|$)/,
   /^\/internal(?:\/|$)/,
   /^\/user\/(?:session|start-config|me)(?:\/|$)/,
+  /^\/project\/metrics$/,
   /^\/ti\/dashboard\/?$/,
   /^\/pessoal\/overview\/?$/,
 ] as const;
@@ -92,6 +94,41 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/task\/project-plan\/hire$/,
     description: { action: "contratou", item: "um plano de projeto" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/project\/progress$/,
+    description: { action: "recalculou", item: "o progresso de um projeto" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/certificate\/pj\/[^/]+\/file$/,
+    description: { action: "enviou", item: "o arquivo de um certificado de pessoa jurídica" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/certificate\/pj\/[^/]+\/file$/,
+    description: { action: "baixou", item: "o arquivo de um certificado de pessoa jurídica" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/certificate\/pj\/[^/]+\/file$/,
+    description: { action: "removeu", item: "o arquivo de um certificado de pessoa jurídica" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/certificate\/pf\/[^/]+\/file$/,
+    description: { action: "enviou", item: "o arquivo de um certificado de pessoa física" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/certificate\/pf\/[^/]+\/file$/,
+    description: { action: "baixou", item: "o arquivo de um certificado de pessoa física" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/certificate\/pf\/[^/]+\/file$/,
+    description: { action: "removeu", item: "o arquivo de um certificado de pessoa física" },
   },
   {
     methods: ["POST"],
@@ -202,6 +239,176 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/pessoal\/obrigations\/competences\/[^/]+\/generate$/,
     description: { action: "gerou", item: "obrigações da competência" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/user\/[^/]+\/photo$/,
+    description: { action: "consultou", item: "a foto de um usuário" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/user\/permission\/[^/]+$/,
+    description: { action: "consultou", item: "as permissões de um usuário" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/client\/integration$/,
+    description: { action: "cadastrou", item: "um novo cliente pela integração" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/[^/]+\/pa$/,
+    description: { action: "consultou", item: "o PA de um cliente" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/[^/]+\/histories\/[^/]+\/file$/,
+    description: { action: "baixou", item: "o arquivo de um histórico de cliente" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/client\/[^/]+\/histories\/pending$/,
+    description: { action: "criou", item: "uma pendência de histórico de cliente" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/histories\/pending$/,
+    description: { action: "consultou", item: "a lista de pendências de histórico" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/client\/histories\/pending\/[^/]+$/,
+    description: { action: "removeu", item: "uma pendência de histórico" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/model\/dependent$/,
+    description: { action: "consultou", item: "os dependentes de um modelo de tarefa" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/model\/dependent$/,
+    description: { action: "adicionou", item: "um dependente a um modelo de tarefa" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/task\/model\/dependent$/,
+    description: { action: "removeu", item: "um dependente de um modelo de tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/integration$/,
+    description: { action: "consultou", item: "os vínculos de integração de tarefa" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/integration$/,
+    description: { action: "criou", item: "um vínculo de integração de tarefa" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/task\/integration$/,
+    description: { action: "removeu", item: "um vínculo de integração de tarefa" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/financeiro$/,
+    description: { action: "atualizou", item: "uma cobrança financeira" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/comercial$/,
+    description: { action: "atualizou", item: "uma cobrança comercial" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/deps\/list$/,
+    description: { action: "consultou", item: "a lista de departamentos com modelos de tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/guidance\/detail$/,
+    description: { action: "consultou", item: "os detalhes de uma orientação de regularização" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/point\/me\/today$/,
+    description: { action: "consultou", item: "o ponto do dia" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/point\/summary$/,
+    description: { action: "consultou", item: "o resumo mensal de ponto" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/point\/adjustment\/approve$/,
+    description: { action: "aprovou", item: "um ajuste de ponto" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/point\/adjustment\/requests$/,
+    description: { action: "consultou", item: "a lista de solicitações de ajuste de ponto" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/rh\/score\/quarters\/nitro$/,
+    description: { action: "atualizou", item: "a pontuação Nitro de um ciclo de avaliação" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/score\/quarters\/me$/,
+    description: { action: "consultou", item: "a lista de ciclos de avaliação" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/score\/evaluations\/pending$/,
+    description: { action: "consultou", item: "a lista de avaliações pendentes" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/time-bank\/summary(?:\/[^/]+)?$/,
+    description: { action: "consultou", item: "o resumo de um banco de horas" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/time-bank\/overview$/,
+    description: { action: "consultou", item: "a visão geral do banco de horas" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/time-bank-releases\/approve$/,
+    description: { action: "aprovou", item: "um lançamento do banco de horas" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/timesheets\/sign$/,
+    description: { action: "assinou", item: "uma folha de ponto" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/contabil\/responsibles\/client\/[^/]+$/,
+    description: { action: "consultou", item: "o responsável contábil de um cliente" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/contabil\/relationships\/client\/[^/]+$/,
+    description: { action: "consultou", item: "o vínculo contábil de um cliente" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/ti\/stock\/items\/[^/]+\/movements\/list$/,
+    description: { action: "consultou", item: "a lista de movimentações de um item de estoque" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/ti\/requests\/[^/]+\/messages$/,
+    description: { action: "consultou", item: "as mensagens de uma solicitação de TI" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/ti\/terms\/[^/]+\/sign$/,
+    description: { action: "assinou", item: "um termo de TI" },
   },
 ];
 
@@ -562,6 +769,20 @@ const RESOURCE_RULES: ResourceRule[] = [
   },
 ];
 
+function getCrudSuffix(resource: ResourceRule, path: string): string | null {
+  const match = resource.pattern.exec(path);
+  if (!match) return null;
+
+  const resourcePath = match[0].replace(/\/$/, "");
+  const suffix = path.slice(resourcePath.length);
+
+  if (suffix === "" || suffix === "/list") return suffix;
+  if (!suffix.startsWith("/")) return null;
+
+  const identifier = suffix.slice(1);
+  return !identifier.includes("/") && IDENTIFIER_SEGMENT.test(identifier) ? suffix : null;
+}
+
 export function classifyActivity(method: string, rawPath: string): ActivityClassification {
   const normalizedMethod = method.trim().toUpperCase();
   const path = normalizePath(rawPath);
@@ -574,11 +795,10 @@ export function classifyActivity(method: string, rawPath: string): ActivityClass
   );
   if (explicit) return { kind: "visible", description: explicit.description };
 
-  const resource = RESOURCE_RULES.find((rule) => rule.pattern.test(path));
+  const resource = RESOURCE_RULES.find((rule) => getCrudSuffix(rule, path) !== null);
   if (!resource) return { kind: "unknown" };
 
-  const hasIdentifier = path.split("/").some((segment) => IDENTIFIER_SEGMENT.test(segment));
-  const isList = path.endsWith("/list") || (normalizedMethod === "GET" && !hasIdentifier);
+  const isList = getCrudSuffix(resource, path) === "" || path.endsWith("/list");
 
   if (normalizedMethod === "GET") {
     return {

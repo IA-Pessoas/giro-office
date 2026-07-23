@@ -156,6 +156,8 @@ interface ActivityRow {
   item: string | null;
   path: string | null;
   created_at: Date | string | null;
+  outcome: string | null;
+  activity_visible: boolean | null;
 }
 
 interface UpdatedAtRow {
@@ -335,6 +337,11 @@ function fillMonthlyClientTrends(rows: MonthlyClientRow[]): DashboardStats["mont
   });
 }
 
+function isEligibleActivity(activity: ActivityRow): boolean {
+  if (activity.activity_visible == null) return true;
+  return activity.activity_visible && activity.outcome === "success";
+}
+
 function normalizeAction(row: ActivityRow): string {
   if (row.action) {
     return row.action;
@@ -477,7 +484,7 @@ export class DashboardStatsService {
           dueDate: formatDueDate(task.prevision_date),
           status: task.is_urgent ? "urgent" : "pending",
         })),
-        activities: activitiesResult.rows.map((activity, index) => {
+        activities: activitiesResult.rows.filter(isEligibleActivity).map((activity, index) => {
           const user = activity.user_name ?? "Usuário";
           return {
             user,
@@ -658,7 +665,9 @@ const ACTIVITIES_SQL = `
     a.method,
     coalesce(nullif(a.referring, ''), nullif(a.referring_id, '')) as item,
     a.path,
-    a.created_at
+    a.created_at,
+    a.outcome,
+    (a.metadata_json ->> 'activityVisible')::boolean as activity_visible
   from public.audit_requests a
   left join public.users u on u.id = a.user_id
   where a.organization_id = $1

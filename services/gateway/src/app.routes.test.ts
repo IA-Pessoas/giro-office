@@ -1900,6 +1900,51 @@ it("records successful proxied requests when audit is enabled", async () => {
   }
 });
 
+it("records semantic task activity when an authenticated upstream request fails", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const auditService = await startAuditIngestServer();
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 500;
+    response.end();
+  });
+  const taskServiceUrl = await startServer(upstream);
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      taskServiceUrl,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/task/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(500);
+
+    await waitForRecords(auditService.records, 1);
+
+    expect(auditService.records[0]).toMatchObject({
+      outcome: "error",
+      action: "consultou",
+      referring: "a lista de tarefas",
+      metadata: { activityVisible: true },
+    });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+    await stopServer(auditService.server);
+  }
+});
+
 it("records organization-service route targets when audit is enabled", async () => {
   const token = createToken({
     user_id: "user-1",

@@ -15,6 +15,44 @@ describe("activityCatalog", () => {
     ["DELETE", "/department/42", "excluiu", "um departamento"],
     ["GET", "/client/list?page=2&search=segredo", "consultou", "a lista de clientes"],
     ["POST", "/rh/point/register", "registrou", "um ponto"],
+    ["POST", "/rh/point/register/", "registrou", "um ponto"],
+    ["POST", "/project/progress", "recalculou", "o progresso de um projeto"],
+    [
+      "POST",
+      "/certificate/pj/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/file",
+      "enviou",
+      "o arquivo de um certificado de pessoa jurídica",
+    ],
+    [
+      "GET",
+      "/certificate/pj/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/file",
+      "baixou",
+      "o arquivo de um certificado de pessoa jurídica",
+    ],
+    [
+      "DELETE",
+      "/certificate/pj/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/file",
+      "removeu",
+      "o arquivo de um certificado de pessoa jurídica",
+    ],
+    [
+      "POST",
+      "/certificate/pf/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/file",
+      "enviou",
+      "o arquivo de um certificado de pessoa física",
+    ],
+    [
+      "GET",
+      "/certificate/pf/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/file",
+      "baixou",
+      "o arquivo de um certificado de pessoa física",
+    ],
+    [
+      "DELETE",
+      "/certificate/pf/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/file",
+      "removeu",
+      "o arquivo de um certificado de pessoa física",
+    ],
     ["POST", "/rh/point/adjustment/approve", "aprovou", "um ajuste de ponto"],
     [
       "PATCH",
@@ -43,6 +81,7 @@ describe("activityCatalog", () => {
     ["GET", "/health"],
     ["GET", "/ready"],
     ["GET", "/openapi.json"],
+    ["GET", "/project/metrics"],
     ["GET", "/dashboard/stats"],
     ["GET", "/audit/requests"],
     ["POST", "/user/session"],
@@ -54,6 +93,7 @@ describe("activityCatalog", () => {
 
   it("não inventa descrição para rota desconhecida", () => {
     expect(classifyActivity("POST", "/unknown/action")).toEqual({ kind: "unknown" });
+    expect(classifyActivity("POST", "/task/nova-acao")).toEqual({ kind: "unknown" });
     expect(describeActivity("POST", "/unknown/action")).toBeNull();
   });
 

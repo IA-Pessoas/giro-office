@@ -80,6 +80,66 @@ describe("DashboardStatsService", () => {
     expect(activitiesSql).toContain("limit 5");
   });
 
+  it("defends the activity feed against unfiltered query rows", async () => {
+    const query = dashboardQueryMock([
+      {
+        user_name: "Legado",
+        action: "consultou",
+        method: "GET",
+        item: "a lista de tarefas",
+        path: "/task/list",
+        created_at: new Date(),
+        outcome: "error",
+        activity_visible: null,
+      },
+      {
+        user_name: "Sucesso",
+        action: "consultou",
+        method: "GET",
+        item: "a lista de tarefas",
+        path: "/task/list",
+        created_at: new Date(),
+        outcome: "success",
+        activity_visible: true,
+      },
+      {
+        user_name: "Erro",
+        action: "consultou",
+        method: "GET",
+        item: "a lista de tarefas",
+        path: "/task/list",
+        created_at: new Date(),
+        outcome: "error",
+        activity_visible: true,
+      },
+      {
+        user_name: "Abortado",
+        action: "consultou",
+        method: "GET",
+        item: "a lista de tarefas",
+        path: "/task/list",
+        created_at: new Date(),
+        outcome: "aborted",
+        activity_visible: true,
+      },
+      {
+        user_name: "Técnico",
+        action: null,
+        method: "GET",
+        item: null,
+        path: "/health",
+        created_at: new Date(),
+        outcome: "success",
+        activity_visible: false,
+      },
+    ]);
+    const service = new DashboardStatsService({ pool: { query } as never });
+
+    const stats = await service.getStats("org-1");
+
+    expect(stats.activities.map((activity) => activity.user)).toEqual(["Legado", "Sucesso"]);
+  });
+
   it("returns updatedAt from the latest real dashboard source timestamp", async () => {
     const query = vi
       .fn()
