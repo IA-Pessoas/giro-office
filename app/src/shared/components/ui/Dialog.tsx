@@ -32,9 +32,9 @@ export function Dialog({
           className={`fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm ${overlayClassName}`}
         />
         <DialogPrimitive.Content
-          className={`fixed left-1/2 top-1/2 z-[1500] w-[min(92vw,680px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark] ${contentClassName}`}
+          className={`fixed left-1/2 top-1/2 z-[1500] flex max-h-[calc(100dvh-2rem)] w-[min(92vw,680px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark] ${contentClassName}`}
         >
-          <header className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+          <header className="flex shrink-0 items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
             <DialogPrimitive.Title className="dialog-neutral-title text-lg font-semibold text-black dark:text-white">
               {title}
             </DialogPrimitive.Title>
@@ -46,9 +46,13 @@ export function Dialog({
               <IoClose className="h-5 w-5" />
             </DialogPrimitive.Close>
           </header>
-          <div className={`px-5 py-4 ${bodyClassName}`}>{children}</div>
+          <div
+            className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 ${bodyClassName}`}
+          >
+            {children}
+          </div>
           {footer ? (
-            <footer className="flex justify-end gap-2 border-t border-gray-200 px-5 py-4 dark:border-gray-700">
+            <footer className="flex shrink-0 justify-end gap-2 border-t border-gray-200 px-5 py-4 dark:border-gray-700">
               {footer}
             </footer>
           ) : null}
