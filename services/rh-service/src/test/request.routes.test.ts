@@ -1,4 +1,5 @@
 import request from "supertest";
+import { FORWARDED_AUTH_PERMISSION_HEADER } from "@workspace/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -58,6 +59,22 @@ describe("request routes", () => {
     expect(requestServiceMock.list).toHaveBeenCalledTimes(1);
   });
 
+  it("GET /rh/requests restringe RH self-service ao proprio usuario", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .get("/rh/requests")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "1")
+      .query({
+        requester_user_id: "00000000-0000-4000-8000-000000000099",
+        assigned_to_user_id: userId,
+      });
+
+    expect(res.status).toBe(200);
+    expect(requestServiceMock.list).toHaveBeenCalledWith(organizationId, {
+      requester_user_id: userId,
+    });
+  });
+
   it("GET /rh/requests/:id detalha solicitacao", async () => {
     const app = createTestApp();
     const res = await request(app).get(`/rh/requests/${itemId}`);
@@ -72,6 +89,17 @@ describe("request routes", () => {
 
     expect(res.status).toBe(200);
     expect(requestServiceMock.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("PUT /rh/requests bloqueia RH self-service", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .put("/rh/requests")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "1")
+      .send({ id: itemId, status: "Resolved" });
+
+    expect(res.status).toBe(403);
+    expect(requestServiceMock.update).not.toHaveBeenCalled();
   });
 
   it("DELETE /rh/requests remove solicitacao", async () => {
