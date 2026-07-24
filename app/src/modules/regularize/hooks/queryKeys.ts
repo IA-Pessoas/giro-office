@@ -12,6 +12,8 @@ import type {
 
 export const regularizeQueryKeys = {
   root: ["regularize"] as const,
+  dashboardRoot: () => [...regularizeQueryKeys.root, "dashboard"] as const,
+  dashboard: (year: number) => [...regularizeQueryKeys.dashboardRoot(), year] as const,
   credentials: () => [...regularizeQueryKeys.root, "credentials"] as const,
   sitePasswords: (filters: RegularizeSitePasswordListFilters) =>
     [...regularizeQueryKeys.credentials(), "sites", filters.status] as const,

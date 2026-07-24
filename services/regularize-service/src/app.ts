@@ -18,12 +18,18 @@ import { createRegularizeRoutes } from "./routes/index.js";
 import { createRegularizeInternalRoutes } from "./routes/regularizeInternal.routes.js";
 import type { RegularizeReconciliationService } from "./services/regularizeReconciliationService.js";
 
-function regularizeServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
+export function regularizeServiceErrorLogContext(request: Request): Record<string, unknown> {
   const userId = request.user_id;
   const organizationId = request.organization_id;
   const permission = request.permission;
-  const out: Record<string, unknown> = {};
+  const out: Record<string, unknown> = {
+    method: request.method,
+    route: request.originalUrl,
+  };
 
+  if (request.requestId) {
+    out.requestId = request.requestId;
+  }
   if (userId) {
     out.userId = userId;
   }
@@ -34,7 +40,7 @@ function regularizeServiceErrorLogContext(request: Request): Record<string, unkn
     out.permission = permission;
   }
 
-  return Object.keys(out).length > 0 ? out : undefined;
+  return out;
 }
 
 export interface CreateAppOptions {

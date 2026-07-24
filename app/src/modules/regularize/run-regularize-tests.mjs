@@ -76,6 +76,132 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   }
 });
 
+await runTest("regularize dashboard has a centralized aggregate data contract", async () => {
+  const contractSource = await readModuleSource("services/regularizeService.contract.ts");
+  const serviceSource = await readModuleSource("services/regularizeService.ts");
+  const hookSource = await readModuleSource("hooks/useRegularizeDashboard.ts");
+  const queryKeysSource = await readModuleSource("hooks/queryKeys.ts");
+
+  assert.match(contractSource, /dashboard: "\/regularize\/dashboard"/);
+  assert.match(contractSource, /buildRegularizeDashboardParams/);
+  assert.match(serviceSource, /async getDashboard\(year: number\)/);
+  assert.match(serviceSource, /REGULARIZE_ENDPOINTS\.dashboard/);
+  assert.match(hookSource, /useRegularizeDashboard/);
+  assert.match(hookSource, /regularizeQueryKeys\.dashboard\(year\)/);
+  assert.match(queryKeysSource, /dashboardRoot/);
+  assert.match(queryKeysSource, /dashboard: \(year: number\)/);
+});
+
+await runTest("regularize mutations invalidate aggregate dashboard data", async () => {
+  for (const hookPath of [
+    "hooks/useRegularizeCredentials.ts",
+    "hooks/useRegularizePeople.ts",
+    "hooks/useRegularizeOperations.ts",
+  ]) {
+    const source = await readModuleSource(hookPath);
+    assert.match(source, /regularizeQueryKeys\.dashboardRoot\(\)/);
+  }
+});
+
+await runTest("regularize dashboard enables only its aggregate query", async () => {
+  const { getRegularizeQueryPolicy } = await import("./utils/regularizeQueryPolicy.ts");
+
+  assert.deepEqual(getRegularizeQueryPolicy("dashboard"), {
+    dashboard: true,
+    clientPfs: false,
+    sitePasswords: false,
+    municipalTaxes: false,
+    processes: false,
+    licenses: false,
+    partners: false,
+    passwords: false,
+    guidance: false,
+  });
+});
+
+await runTest("regularize tab query policy enables only owning contexts", async () => {
+  const { getRegularizeQueryPolicy } = await import("./utils/regularizeQueryPolicy.ts");
+
+  assert.deepEqual(getRegularizeQueryPolicy("passwords"), {
+    dashboard: false,
+    clientPfs: false,
+    sitePasswords: true,
+    municipalTaxes: false,
+    processes: false,
+    licenses: false,
+    partners: false,
+    passwords: true,
+    guidance: false,
+  });
+  assert.equal(getRegularizeQueryPolicy("processes").clientPfs, true);
+  assert.equal(getRegularizeQueryPolicy("processes").guidance, true);
+  assert.equal(getRegularizeQueryPolicy("partners").partners, true);
+  assert.equal(getRegularizeQueryPolicy("taxes").municipalTaxes, true);
+});
+
+await runTest("regularize safely extracts requestId for contextual errors", async () => {
+  const { getRegularizeRequestId } = await import("./utils/regularizeApiError.ts");
+
+  assert.equal(
+    getRegularizeRequestId({ response: { data: { requestId: "request-dashboard-1" } } }),
+    "request-dashboard-1",
+  );
+  assert.equal(getRegularizeRequestId(new Error("network")), undefined);
+  assert.equal(getRegularizeRequestId({ response: { data: { requestId: 10 } } }), undefined);
+});
+
+await runTest("simultaneous server errors produce one active toast", async () => {
+  const { SERVER_ERROR_TOAST_ID, notifyServerError } = await import(
+    "../../shared/services/serverErrorToast.ts"
+  );
+  let active = false;
+  const calls = [];
+  const adapter = {
+    isActive(id) {
+      assert.equal(id, SERVER_ERROR_TOAST_ID);
+      return active;
+    },
+    error(message, options) {
+      calls.push({ message, options });
+      active = true;
+    },
+  };
+
+  notifyServerError(adapter);
+  notifyServerError(adapter);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.toastId, SERVER_ERROR_TOAST_ID);
+
+  active = false;
+  notifyServerError(adapter);
+  assert.equal(calls.length, 2);
+});
+
+await runTest("API client delegates 5xx feedback to the deduplicated notifier", async () => {
+  const apiSource = await readFile(join(appRoot, "src/shared/services/api.ts"), "utf8");
+
+  assert.match(apiSource, /notifyServerError\(toast\)/);
+  assert.doesNotMatch(apiSource, /toast\.error\(SERVER_ERROR_TOAST_MESSAGE\)/);
+});
+
+await runTest("regularize page renders aggregate dashboard and lazy list options", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(
+    pageSource,
+    /useRegularizeDashboard\(currentYear, \{\s*enabled: queryPolicy\.dashboard,\s*\}\)/,
+  );
+  assert.match(pageSource, /getRegularizeQueryPolicy\(activeTab\)/);
+  assert.match(pageSource, /enabled: queryPolicy\.clientPfs/);
+  assert.match(pageSource, /enabled: queryPolicy\.sitePasswords/);
+  assert.match(pageSource, /enabled: queryPolicy\.municipalTaxes/);
+  assert.match(pageSource, /enabled: queryPolicy\.processes/);
+  assert.match(pageSource, /enabled: queryPolicy\.licenses/);
+  assert.match(pageSource, /dashboardQuery\.data\.metrics/);
+  assert.match(pageSource, /getRegularizeRequestId\(dashboardQuery\.error\)/);
+  assert.doesNotMatch(pageSource, /const metricData = useMemo/);
+});
+
 await runTest("regularize list params carry server search and pagination", async () => {
   assert.deepEqual(
     buildRegularizeProcessListParams({

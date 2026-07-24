@@ -16,6 +16,7 @@ import type {
   RegularizeClientPfDetail,
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
+  RegularizeDashboard,
   RegularizeGuidance,
   RegularizeGuidanceListFilters,
   RegularizeId,
@@ -48,6 +49,7 @@ import type {
 import type { PaginatedResult } from "@shared/pagination/pagination";
 import {
   buildRegularizeClientPfListParams,
+  buildRegularizeDashboardParams,
   buildRegularizeGuidanceListParams,
   buildRegularizeIdParams,
   buildRegularizeLicenseListParams,
@@ -75,6 +77,15 @@ function stripSitePasswordSecret(
 }
 
 export const regularizeService = {
+  async getDashboard(year: number): Promise<RegularizeDashboard> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.dashboard, {
+      params: buildRegularizeDashboardParams(year),
+    });
+
+    return unwrapRegularizeEnvelope<RegularizeDashboard>(response.data);
+  },
+
   async listPasswords(
     filters: RegularizePasswordListFilters,
   ): Promise<RegularizePasswordListItem[]> {

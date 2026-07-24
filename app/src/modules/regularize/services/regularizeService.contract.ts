@@ -12,6 +12,7 @@ import type {
 import type { PaginatedResult } from "@shared/pagination/pagination";
 
 export const REGULARIZE_ENDPOINTS = {
+  dashboard: "/regularize/dashboard",
   passwords: "/regularize/passwords",
   password: "/regularize/password",
   sitesPass: "/regularize/sites-pass",
@@ -34,6 +35,10 @@ export const REGULARIZE_ENDPOINTS = {
   licenses: "/regularize/licenses",
   license: "/regularize/license",
 } as const;
+
+export function buildRegularizeDashboardParams(year: number) {
+  return { year };
+}
 
 export function buildRegularizeIdParams(id: RegularizeId | undefined | null) {
   return {
