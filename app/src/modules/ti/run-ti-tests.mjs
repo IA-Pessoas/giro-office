@@ -383,19 +383,25 @@ await runTest("ti passwords tab never renders secrets in list and reveals only b
   assert.doesNotMatch(tabSource, /passwordRows[^]*?\.password/);
 });
 
-await runTest("ti passwords tab keeps create edit flows in a dialog and filters by local", async () => {
+await runTest("ti passwords tab keeps create edit flows in a dialog and searches paginated results", async () => {
   const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
   const dialogSource = await readAppSource("src/shared/components/ui/Dialog.tsx");
 
   assert.match(tabSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog"/);
-  assert.match(tabSource, /const \[filters, setFilters\] = useState<TiListFilters>\(\{\}\)/);
-  assert.match(tabSource, /const \[localSearchDraft, setLocalSearchDraft\] = useState\(""\)/);
+  assert.match(tabSource, /const PASSWORD_PAGE_SIZE = \d+/);
+  assert.match(tabSource, /const \[filters, setFilters\] = useState<TiListFilters>\(\{\s*page: 1,\s*page_size: PASSWORD_PAGE_SIZE,\s*\}\)/);
+  assert.match(tabSource, /const \[searchDraft, setSearchDraft\] = useState\(""\)/);
   assert.match(tabSource, /const \[isPasswordDialogOpen, setIsPasswordDialogOpen\] = useState\(false\)/);
   assert.match(tabSource, /function applyPasswordFilters/);
-  assert.match(tabSource, /local: toOptionalText\(localSearchDraft\)/);
+  assert.match(tabSource, /search: toOptionalText\(searchDraft\)/);
+  assert.match(tabSource, /page: 1/);
+  assert.match(tabSource, /page_size: PASSWORD_PAGE_SIZE/);
   assert.match(tabSource, /aria-label="Filtros de senhas"/);
-  assert.match(tabSource, /label="Buscar local"/);
-  assert.match(tabSource, /placeholder="Local da senha"/);
+  assert.match(tabSource, /label="Buscar por local, usuário ou notas"/);
+  assert.match(tabSource, /placeholder="Local, usuário ou notas"/);
+  assert.match(tabSource, /pageInfoText/);
+  assert.match(tabSource, /onClick=\{\(\) => setPasswordPage\(currentPasswordPage - 1\)\}/);
+  assert.match(tabSource, /onClick=\{\(\) => setPasswordPage\(currentPasswordPage \+ 1\)\}/);
   assert.match(tabSource, /open=\{isPasswordDialogOpen\}/);
   assert.match(tabSource, /title=\{editingPassword \? "Editar senha" : "Nova senha"\}/);
   assert.doesNotMatch(dialogSource, /@shared\/ui\/newLayout\/utils/);
@@ -412,6 +418,15 @@ await runTest("ti passwords tab keeps create edit flows in a dialog and filters 
     tabSource,
     /<form\s+className=\{`\$\{tiCardClassName\} space-y-3`\}\s+onSubmit=\{handleSubmitPassword\}/,
   );
+});
+
+await runTest("ti password reveal copy uses copy icon without toggling visibility", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /Copy,/);
+  assert.match(tabSource, /<Copy className="h-4 w-4" \/>/);
+  assert.match(tabSource, /navigator\.clipboard\.writeText\(secret\)/);
+  assert.doesNotMatch(tabSource, /<EyeOff className="h-4 w-4" \/>[\s\S]*?<span>Copiar senha<\/span>/);
 });
 
 await runTest("ti password reveal clears sensitive detail cache when hidden", async () => {

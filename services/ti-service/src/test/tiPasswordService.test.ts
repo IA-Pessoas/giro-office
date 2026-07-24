@@ -37,16 +37,27 @@ describe("TiPasswordService", () => {
   it("list omite password dos resultados", async () => {
     const prisma = {
       passwordTecnologia: {
+        count: vi.fn(async () => 1),
         findMany: vi.fn(async () => [passwordRecord()]),
       },
     };
     const service = new TiPasswordService(prisma as never, encryption);
 
-    const result = (await service.list(context, {})) as Array<Record<string, unknown>>;
+    const result = (await service.list(context, {})) as {
+      items: Array<Record<string, unknown>>;
+      total: number;
+      page: number;
+      page_size: number;
+      hasMore: boolean;
+    };
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).not.toHaveProperty("password");
-    expect(result[0]).toMatchObject({ id: passwordId, local: "VPN", user_id: userId });
+    expect(result).toMatchObject({ total: 1, page: 1, page_size: 50, hasMore: false });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).not.toHaveProperty("password");
+    expect(result.items[0]).toMatchObject({ id: passwordId, local: "VPN", user_id: userId });
+    expect(prisma.passwordTecnologia.count).toHaveBeenCalledWith({
+      where: { organization_id: organizationId },
+    });
     expect(prisma.passwordTecnologia.findMany).toHaveBeenCalledWith({
       where: { organization_id: organizationId },
       include: {
@@ -64,6 +75,55 @@ describe("TiPasswordService", () => {
       skip: 0,
       take: 50,
     });
+  });
+
+  it("list busca por local, usuario e notas antes da paginacao", async () => {
+    const prisma = {
+      passwordTecnologia: {
+        count: vi.fn(async () => 12),
+        findMany: vi.fn(async () => [passwordRecord()]),
+      },
+    };
+    const service = new TiPasswordService(prisma as never, encryption);
+
+    const result = (await service.list(context, {
+      search: "discord",
+      page: 2,
+      page_size: 10,
+    })) as {
+      items: Array<Record<string, unknown>>;
+      total: number;
+      page: number;
+      page_size: number;
+      hasMore: boolean;
+    };
+
+    expect(result).toMatchObject({ total: 12, page: 2, page_size: 10, hasMore: true });
+    expect(prisma.passwordTecnologia.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        organization_id: organizationId,
+        OR: expect.arrayContaining([
+          { local: { contains: "discord", mode: "insensitive" } },
+          { notes: { contains: "discord", mode: "insensitive" } },
+          {
+            user: {
+              is: {
+                OR: [
+                  { name: { contains: "discord", mode: "insensitive" } },
+                  { full_name: { contains: "discord", mode: "insensitive" } },
+                ],
+              },
+            },
+          },
+        ]),
+      }),
+    });
+    expect(prisma.passwordTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 10,
+        take: 10,
+      }),
+    );
   });
 
   it("getById omite password para permissao menor que admin", async () => {

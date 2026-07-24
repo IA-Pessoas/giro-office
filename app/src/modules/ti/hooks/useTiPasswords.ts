@@ -11,6 +11,7 @@ import { tiPasswordsService } from "../services";
 import type {
   TiId,
   TiListFilters,
+  TiListResponse,
   TiPasswordCreatePayload,
   TiPasswordDetail,
   TiPasswordListItem,
@@ -27,7 +28,7 @@ type TiPasswordMutationVariables = {
 export function useTiPasswords(
   filters?: TiListFilters,
   options?: TiReadQueryOptions,
-): UseQueryResult<TiPasswordListItem[], Error> {
+): UseQueryResult<TiListResponse<TiPasswordListItem>, Error> {
   return useFetch(
     tiQueryKeys.passwords.list(filters),
     () => tiPasswordsService.listPasswords(filters),

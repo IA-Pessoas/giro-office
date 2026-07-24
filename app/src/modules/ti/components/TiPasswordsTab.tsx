@@ -1,8 +1,8 @@
 import { useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
+  Copy,
   Eye,
-  EyeOff,
   KeyRound,
   Loader2,
   Pencil,
@@ -64,6 +64,7 @@ const initialPasswordFormState: PasswordFormState = {
   password: "",
   notes: "",
 };
+const PASSWORD_PAGE_SIZE = 20;
 
 function formatText(value: unknown, fallback = "-"): string {
   if (value === null || value === undefined || value === "") {
@@ -127,8 +128,11 @@ export function TiPasswordsTab() {
   const { access } = useModuleAccess("ti");
   const canManagePasswords = access.canEdit || access.isAdmin;
   const canRevealPasswords = canManagePasswords;
-  const [filters, setFilters] = useState<TiListFilters>({});
-  const [localSearchDraft, setLocalSearchDraft] = useState("");
+  const [filters, setFilters] = useState<TiListFilters>({
+    page: 1,
+    page_size: PASSWORD_PAGE_SIZE,
+  });
+  const [searchDraft, setSearchDraft] = useState("");
   const [revealPasswordId, setRevealPasswordId] = useState<TiId | null>(null);
   const [editingPassword, setEditingPassword] = useState<TiPasswordListItem | null>(null);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
@@ -147,6 +151,18 @@ export function TiPasswordsTab() {
   const isSubmitting = createPasswordMutation.isPending || updatePasswordMutation.isPending;
   const users = assignableUsersQuery.data ?? [];
   const revealedPassword = revealQuery.data;
+  const passwordItems = passwordsQuery.data?.items ?? [];
+  const currentPasswordPage = Number(passwordsQuery.data?.page ?? filters.page ?? 1);
+  const passwordPageSize = Number(passwordsQuery.data?.page_size ?? PASSWORD_PAGE_SIZE);
+  const passwordTotal = Number(passwordsQuery.data?.total ?? passwordItems.length);
+  const passwordFirstItem =
+    passwordTotal === 0 ? 0 : (currentPasswordPage - 1) * passwordPageSize + 1;
+  const passwordLastItem = Math.min(passwordTotal, passwordFirstItem + passwordItems.length - 1);
+  const pageInfoText =
+    passwordTotal === 0
+      ? "Nenhum registro"
+      : `${passwordFirstItem}-${passwordLastItem} de ${passwordTotal}`;
+  const hasPasswordSearch = Boolean(filters.search);
 
   const userOptions = useMemo(
     () => [
@@ -192,8 +208,18 @@ export function TiPasswordsTab() {
   function applyPasswordFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFilters({
-      local: toOptionalText(localSearchDraft),
+      search: toOptionalText(searchDraft),
+      page: 1,
+      page_size: PASSWORD_PAGE_SIZE,
     });
+  }
+
+  function setPasswordPage(nextPage: number) {
+    setFilters((current) => ({
+      ...current,
+      page: Math.max(1, nextPage),
+      page_size: PASSWORD_PAGE_SIZE,
+    }));
   }
 
   function buildCreatePayload(): TiPasswordCreatePayload | null {
@@ -326,10 +352,10 @@ export function TiPasswordsTab() {
         onSubmit={applyPasswordFilters}
       >
         <TiTextField
-          label="Buscar local"
-          onChange={(event) => setLocalSearchDraft(event.target.value)}
-          placeholder="Local da senha"
-          value={localSearchDraft}
+          label="Buscar por local, usuário ou notas"
+          onChange={(event) => setSearchDraft(event.target.value)}
+          placeholder="Local, usuário ou notas"
+          value={searchDraft}
         />
         <div className="flex items-end">
           <button type="submit" className={tiSecondaryButtonClassName}>
@@ -347,47 +373,78 @@ export function TiPasswordsTab() {
           emptyState={
             <TiEmptyState
               icon={KeyRound}
-              title="Nenhuma senha cadastrada"
-              description="Credenciais autorizadas para seu perfil aparecem aqui quando cadastradas."
+              title={hasPasswordSearch ? "Nenhuma senha encontrada" : "Nenhuma senha cadastrada"}
+              description={
+                hasPasswordSearch
+                  ? "Nenhuma senha encontrada para este termo."
+                  : "Credenciais autorizadas para seu perfil aparecem aqui quando cadastradas."
+              }
             />
           }
           query={passwordsQuery}
         >
           {(rows) => (
-            <TiDataTable headers={["Local", "Usuário", "Notas", "Segredo", ""]}>
-              {rows.map((item) => (
-                <tr key={getId(item.id)} className="text-slate-700 dark:text-slate-200">
-                  <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">
-                    {formatText(item.local, "Sem local")}
-                  </td>
-                  <td className="px-4 py-3">{getPasswordUserName(item)}</td>
-                  <td className="px-4 py-3">{formatText(item.notes)}</td>
-                  <td className="px-4 py-3">
-                    <MaskedSecret />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      <TiTableAction
-                        disabled={!canRevealPasswords}
-                        icon={Eye}
-                        label="Revelar"
-                        onClick={() => {
-                          clearPasswordRevealCache(revealPasswordId);
-                          setRevealPasswordId(item.id);
-                        }}
-                      />
-                      {canManagePasswords ? (
+            <>
+              <TiDataTable headers={["Local", "Usuário", "Notas", "Segredo", ""]}>
+                {rows.map((item) => (
+                  <tr key={getId(item.id)} className="text-slate-700 dark:text-slate-200">
+                    <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">
+                      {formatText(item.local, "Sem local")}
+                    </td>
+                    <td className="px-4 py-3">{getPasswordUserName(item)}</td>
+                    <td className="px-4 py-3">
+                      <span className="block max-w-xs truncate" title={formatText(item.notes)}>
+                        {formatText(item.notes)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <MaskedSecret />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-1">
                         <TiTableAction
-                          icon={Pencil}
-                          label="Editar"
-                          onClick={() => openEditForm(item)}
+                          disabled={!canRevealPasswords}
+                          icon={Eye}
+                          label="Revelar"
+                          onClick={() => {
+                            clearPasswordRevealCache(revealPasswordId);
+                            setRevealPasswordId(item.id);
+                          }}
                         />
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </TiDataTable>
+                        {canManagePasswords ? (
+                          <TiTableAction
+                            icon={Pencil}
+                            label="Editar"
+                            onClick={() => openEditForm(item)}
+                          />
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </TiDataTable>
+              <div className="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+                <span>{pageInfoText}</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={tiSecondaryButtonClassName}
+                    disabled={currentPasswordPage <= 1}
+                    onClick={() => setPasswordPage(currentPasswordPage - 1)}
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    className={tiSecondaryButtonClassName}
+                    disabled={!passwordsQuery.data?.hasMore}
+                    onClick={() => setPasswordPage(currentPasswordPage + 1)}
+                  >
+                    Próxima
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </TiQueryStatePanel>
 
@@ -424,10 +481,19 @@ export function TiPasswordsTab() {
               <TiFieldLine
                 label="Senha"
                 value={
-                  revealedPassword.password ? formatText(revealedPassword.password) : <MaskedSecret />
+                  revealedPassword.password ? (
+                    <span className="break-all font-mono">
+                      {formatText(revealedPassword.password)}
+                    </span>
+                  ) : (
+                    <MaskedSecret />
+                  )
                 }
               />
-              <TiFieldLine label="Notas" value={formatText(revealedPassword.notes)} />
+              <TiFieldLine
+                label="Notas"
+                value={<span className="break-words">{formatText(revealedPassword.notes)}</span>}
+              />
               <div className="pt-2">
                 <button
                   type="button"
@@ -437,7 +503,7 @@ export function TiPasswordsTab() {
                     void handleCopyRevealedPassword();
                   }}
                 >
-                  <EyeOff className="h-4 w-4" />
+                  <Copy className="h-4 w-4" />
                   <span>Copiar senha</span>
                 </button>
               </div>

@@ -4,6 +4,7 @@ import type {
   TiEnvelope,
   TiId,
   TiListFilters,
+  TiListResponse,
   TiPasswordCreatePayload,
   TiPasswordDetail,
   TiPasswordListItem,
@@ -14,16 +15,16 @@ import {
   buildTiPath,
   TI_ENDPOINTS,
   unwrapTiEnvelope,
-  unwrapTiList,
+  unwrapTiListResponse,
 } from "./tiService.contract";
 
 export const tiPasswordsService = {
-  async listPasswords(filters?: TiListFilters): Promise<TiPasswordListItem[]> {
+  async listPasswords(filters?: TiListFilters): Promise<TiListResponse<TiPasswordListItem>> {
     const response = await api.get(TI_ENDPOINTS.passwords.list, {
       params: buildTiListParams(filters),
     });
 
-    return unwrapTiList<TiPasswordListItem>(response.data);
+    return unwrapTiListResponse<TiPasswordListItem>(response.data);
   },
 
   async createPassword(payload: TiPasswordCreatePayload): Promise<TiPasswordListItem> {
