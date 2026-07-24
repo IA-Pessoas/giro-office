@@ -61,9 +61,11 @@ export class RegularizeDashboardService {
           cpf_cnpj: true,
           status: true,
           clientPF: {
+            where: { organization_id: organizationId },
             select: { name: true, cpf: true, organization_id: true },
           },
           clientPJ: {
+            where: { organization_id: organizationId },
             select: { name: true, cpf_cnpj: true, organization_id: true },
           },
         },

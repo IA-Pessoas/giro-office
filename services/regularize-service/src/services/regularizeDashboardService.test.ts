@@ -103,9 +103,11 @@ describe("RegularizeDashboardService", () => {
         orderBy: { entry_date: "desc" },
         select: expect.objectContaining({
           clientPF: {
+            where: { organization_id: organizationId },
             select: { name: true, cpf: true, organization_id: true },
           },
           clientPJ: {
+            where: { organization_id: organizationId },
             select: { name: true, cpf_cnpj: true, organization_id: true },
           },
         }),
