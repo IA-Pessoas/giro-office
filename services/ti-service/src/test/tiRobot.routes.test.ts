@@ -27,10 +27,23 @@ function gatewayHeaders(permission: number): Record<string, string> {
 }
 
 describe("ti robot routes", () => {
-  it("GET /ti/robots/list lists robots with permission 1", async () => {
+  it("GET /ti/robots/list requires admin permission", async () => {
     const response = await request(createTestApp())
       .get("/ti/robots/list")
       .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para acessar o ti-service.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("GET /ti/robots/list lists robots with admin permission", async () => {
+    const response = await request(createTestApp())
+      .get("/ti/robots/list")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -98,7 +111,7 @@ describe("ti robot routes", () => {
   it("GET /ti/robots/:id/runs/list lists robot runs", async () => {
     const response = await request(createTestApp())
       .get(`/ti/robots/${robotId}/runs/list`)
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({

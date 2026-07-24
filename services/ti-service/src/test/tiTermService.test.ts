@@ -2,6 +2,7 @@ import "./envBootstrap.js";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import { TiTermService } from "../services/tiTermService.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
@@ -50,6 +51,50 @@ describe("TiTermService", () => {
       },
     });
     expect(result[0]?.user).not.toHaveProperty("password");
+  });
+
+  it("forces user filter for requester permission", async () => {
+    const prisma = {
+      termTecnologia: {
+        findMany: vi.fn(async () => []),
+      },
+    };
+    const service = new TiTermService(prisma as never);
+
+    await service.list(
+      { ...context, permission: TiPermissionLevel.Requester },
+      {
+        user_id: "90000000-0000-4000-8000-000000000001",
+      },
+    );
+
+    expect(prisma.termTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          user_id: userId,
+        }),
+      }),
+    );
+  });
+
+  it("hides another user's term from requester permission", async () => {
+    const prisma = {
+      termTecnologia: {
+        findFirst: vi.fn(async ({ where }) => ({
+          id: where.id,
+          organization_id: where.organization_id,
+          user_id: "90000000-0000-4000-8000-000000000001",
+        })),
+      },
+    };
+    const service = new TiTermService(prisma as never);
+
+    await expect(
+      service.getById({ ...context, permission: TiPermissionLevel.Requester }, termId),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Termo de TI nao encontrado.",
+    });
   });
 
   it("creates term for organization", async () => {
@@ -108,7 +153,7 @@ describe("TiTermService", () => {
     });
   });
 
-  it("rejects permission 1 signing another user's term", async () => {
+  it("hides another user's term when permission 1 signs it", async () => {
     const prisma = {
       termTecnologia: {
         findFirst: vi.fn(async ({ where }) => ({
@@ -123,8 +168,8 @@ describe("TiTermService", () => {
     const service = new TiTermService(prisma as never);
 
     await expect(service.sign({ ...context, permission: 1 }, termId, {})).rejects.toMatchObject({
-      statusCode: 403,
-      message: "Permissao insuficiente para assinar termo de outro usuario.",
+      statusCode: 404,
+      message: "Termo de TI nao encontrado.",
     });
     expect(prisma.termTecnologia.update).not.toHaveBeenCalled();
   });

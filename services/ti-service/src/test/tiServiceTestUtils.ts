@@ -348,6 +348,7 @@ export function createPrismaMock(): PrismaClient {
       findMany: vi.fn(async () => []),
       findFirst: vi.fn(async ({ where }) => ({
         id: where.id,
+        requester_id: userId,
         status: "New",
         organization_id: where.organization_id,
       })),

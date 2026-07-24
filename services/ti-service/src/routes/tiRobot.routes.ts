@@ -37,7 +37,7 @@ export function createTiRobotRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -54,7 +54,7 @@ export function createTiRobotRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/:id",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -124,7 +124,7 @@ export function createTiRobotRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/:id/runs/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const context = getContext(request);

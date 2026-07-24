@@ -241,7 +241,7 @@ function buildPrintableTermHtml(term: TiTerm, departmentName: string): string {
 
 export function TiTermsTab() {
   const { access } = useModuleAccess("ti");
-  const canManage = access.canEdit || access.isAdmin;
+  const canManage = access.isAdmin;
   const canSign = access.canView;
   const [search, setSearch] = useState("");
   const [termStatus, setTermStatus] = useState("");
@@ -252,11 +252,11 @@ export function TiTermsTab() {
   const [dialogError, setDialogError] = useState<string | null>(null);
 
   const termsQuery = useTiTerms();
-  const assetsQuery = useTiInventory();
+  const assetsQuery = useTiInventory(undefined, { enabled: canManage });
   const departmentsQuery = useFetch<DepItem[]>(
     ["ti-terms", "departments"],
     () => departmentService.list(),
-    { retry: false },
+    { retry: false, enabled: canManage },
   );
   const selectedTermQuery = useTiTerm(selectedTermId, { enabled: Boolean(selectedTermId) });
   const createTermMutation = useCreateTiTermMutation();
@@ -290,10 +290,13 @@ export function TiTermsTab() {
     [assetsQuery.data],
   );
 
-  const assetFilterOptions = useMemo(
-    () => [{ value: "", label: "Todos" }, ...assetOptions],
-    [assetOptions],
-  );
+  const assetFilterOptions = useMemo(() => {
+    if (!canManage) {
+      return [{ value: "", label: "Todos" }];
+    }
+
+    return [{ value: "", label: "Todos" }, ...assetOptions];
+  }, [assetOptions, canManage]);
 
   const assetFormOptions = useMemo(
     () => [{ value: "", label: "Selecione" }, ...assetOptions],
