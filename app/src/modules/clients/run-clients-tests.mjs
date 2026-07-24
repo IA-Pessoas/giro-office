@@ -477,3 +477,30 @@ runTest("client create modal binds person type to document validation and payloa
   assert.ok(form.indexOf(">Nome fantasia</span>") < form.indexOf(">Status</span>"));
   assert.doesNotMatch(form, /rounded-2xl border border-slate-200 bg-slate-50/);
 });
+
+runTest("clients list exposes compact page jump input", () => {
+  const clients = readFileSync("src/shared/components/newLayout/Clients.tsx", "utf8");
+
+  assert.match(clients, /useEffect/);
+  assert.match(clients, /const \[pageInputValue, setPageInputValue\] = useState\(String\(page\)\)/);
+  assert.match(clients, /setPageInputValue\(String\(currentPage\)\)/);
+  assert.match(clients, /const pageInputSize = Math\.max\(1, pageInputValue\.length\)/);
+  assert.match(clients, /const pageInputWidthClassName =/);
+  assert.match(clients, /"w-\[3ch\]"/);
+  assert.match(clients, /function goToPage\(value: string\)/);
+  assert.match(clients, /Math\.min\(pageCount, Math\.max\(1, nextPage\)\)/);
+  assert.match(clients, /setPageInputValue\(String\(clampedPage\)\)/);
+  assert.match(clients, /aria-label="Ir para página"/);
+  assert.match(clients, /type="text"/);
+  assert.match(clients, /inputMode="numeric"/);
+  assert.match(clients, /pattern="\[0-9\]\*"/);
+  assert.match(clients, /size=\{pageInputSize\}/);
+  assert.match(clients, /value=\{pageInputValue\}/);
+  assert.match(clients, /setPageInputValue\(event\.target\.value\.replace\(\/\\D\/g, ""\)\)/);
+  assert.match(clients, /pageInputWidthClassName/);
+  assert.doesNotMatch(clients, /style=\{\{ width:/);
+  assert.doesNotMatch(clients, /min-w-\[/);
+  assert.doesNotMatch(clients, /w-16/);
+  assert.match(clients, /onBlur=\{\(event\) => goToPage\(event\.target\.value\)\}/);
+  assert.match(clients, /onKeyDown=\{\(event\) =>/);
+});
