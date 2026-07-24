@@ -50,7 +50,13 @@ describe("ti stock routes", () => {
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       success: true,
-      data: [],
+      data: {
+        data: [],
+        total: 0,
+        page: 1,
+        limit: 50,
+        hasMore: false,
+      },
     });
   });
 

@@ -1,3 +1,7 @@
+import {
+  normalizePaginatedResult,
+  type PaginatedResult,
+} from "@shared/pagination/pagination";
 import { api } from "@shared/services/apiClient";
 
 import type {
@@ -26,12 +30,22 @@ import {
 } from "./tiService.contract";
 
 export const tiStockService = {
-  async listStockItems(filters?: TiListFilters): Promise<TiStockItem[]> {
-    const response = await api.get(TI_ENDPOINTS.stockItems.list, {
-      params: buildTiListParams(filters),
-    });
+  async listStockItems(filters?: TiListFilters): Promise<PaginatedResult<TiStockItem>> {
+    const response = await api.get<TiEnvelope<TiStockItem[] | PaginatedResult<TiStockItem>>>(
+      TI_ENDPOINTS.stockItems.list,
+      {
+        params: buildTiListParams(filters),
+      },
+    );
+    const fallback = {
+      page: Number(filters?.page ?? 1),
+      limit: Number(filters?.page_size ?? 50),
+    };
 
-    return unwrapTiList<TiStockItem>(response.data);
+    return normalizePaginatedResult(
+      unwrapTiEnvelope<TiStockItem[] | PaginatedResult<TiStockItem>>(response.data),
+      fallback,
+    );
   },
 
   async createStockItem(payload: TiStockItemCreatePayload): Promise<TiStockItem> {

@@ -222,6 +222,28 @@ describe("ti-service app", () => {
         },
       },
     });
+
+    expect(
+      response.body.paths["/ti/stock/items/list"].get.responses["200"].content["application/json"]
+        .schema,
+    ).toMatchObject({
+      type: "object",
+      required: ["success", "data"],
+      properties: {
+        success: { type: "boolean", enum: [true] },
+        data: {
+          type: "object",
+          required: ["data", "total", "page", "limit", "hasMore"],
+          properties: {
+            data: { type: "array" },
+            total: { type: "integer", minimum: 0 },
+            page: { type: "integer", minimum: 1 },
+            limit: { type: "integer", minimum: 1 },
+            hasMore: { type: "boolean" },
+          },
+        },
+      },
+    });
   });
 });
 
