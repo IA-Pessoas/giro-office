@@ -17,6 +17,15 @@ export const regularizeQueryKeys = {
   credentials: () => [...regularizeQueryKeys.root, "credentials"] as const,
   sitePasswords: (filters: RegularizeSitePasswordListFilters) =>
     [...regularizeQueryKeys.credentials(), "sites", filters.status] as const,
+  sitePasswordsPage: (filters: RegularizeSitePasswordListFilters) =>
+    [
+      ...regularizeQueryKeys.credentials(),
+      "sites-page",
+      filters.status,
+      filters.search ?? "",
+      filters.page ?? 1,
+      filters.limit ?? 20,
+    ] as const,
   sitePasswordDetail: (id?: RegularizeId | null) =>
     [...regularizeQueryKeys.credentials(), "sites", "detail", id ?? ""] as const,
   passwords: (filters: RegularizePasswordListFilters) =>
@@ -44,6 +53,15 @@ export const regularizeQueryKeys = {
     [...regularizeQueryKeys.operations(), "municipal-taxes", "detail", id ?? ""] as const,
   processes: (filters: RegularizeProcessListFilters) =>
     [...regularizeQueryKeys.operations(), "processes", filters.status] as const,
+  processesPage: (filters: RegularizeProcessListFilters) =>
+    [
+      ...regularizeQueryKeys.operations(),
+      "processes-page",
+      filters.status,
+      filters.search ?? "",
+      filters.page ?? 1,
+      filters.limit ?? 20,
+    ] as const,
   processDetail: (id?: RegularizeId | null) =>
     [...regularizeQueryKeys.operations(), "processes", "detail", id ?? ""] as const,
   guidance: (filters: RegularizeGuidanceListFilters) =>

@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 
 import { useFetch } from "@shared/hooks";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 import { regularizeService } from "../services/regularizeService";
 import type {
@@ -47,6 +48,19 @@ export function useRegularizeSitePasswords(
   return useFetch(
     regularizeQueryKeys.sitePasswords(filters),
     () => regularizeService.listSitePasswords(filters),
+    {
+      enabled: options?.enabled ?? true,
+    },
+  );
+}
+
+export function usePaginatedRegularizeSitePasswords(
+  filters: RegularizeSitePasswordListFilters & { page: number; limit: number },
+  options?: RegularizeReadQueryOptions,
+): UseQueryResult<PaginatedResult<RegularizeSitePasswordListItem>, Error> {
+  return useFetch(
+    regularizeQueryKeys.sitePasswordsPage(filters),
+    () => regularizeService.listSitePasswordsPage(filters),
     {
       enabled: options?.enabled ?? true,
     },

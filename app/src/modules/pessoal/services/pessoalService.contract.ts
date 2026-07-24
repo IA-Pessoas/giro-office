@@ -1,4 +1,5 @@
 import type { PessoalSuccessEnvelope, PessoalTab } from "../types";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 export const PESSOAL_ENDPOINTS = {
   ldd: "/pessoal/ldd",
@@ -33,4 +34,23 @@ export function unwrapPessoalEnvelope<T>(body: unknown): T {
   }
 
   return body as T;
+}
+
+export function unwrapPessoalPage<T>(
+  body: unknown,
+  fallback: { page: number; limit: number },
+): PaginatedResult<T> {
+  const data = unwrapPessoalEnvelope<T[] | PaginatedResult<T>>(body);
+
+  if (Array.isArray(data)) {
+    return {
+      data,
+      total: data.length,
+      page: fallback.page,
+      limit: fallback.limit,
+      hasMore: false,
+    };
+  }
+
+  return data;
 }

@@ -166,7 +166,7 @@ describe("ti-service app", () => {
       .set(INTERNAL_SERVICE_TOKEN_HEADER, "ti-service-internal-token-test")
       .set(FORWARDED_AUTH_USER_ID_HEADER, "00000000-0000-4000-8000-000000000001")
       .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, "10000000-0000-4000-8000-000000000001")
-      .set(FORWARDED_AUTH_PERMISSION_HEADER, "1")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "2")
       .expect(200);
 
     expect(response.body.success).toBe(true);

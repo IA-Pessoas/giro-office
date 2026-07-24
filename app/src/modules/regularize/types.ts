@@ -16,6 +16,9 @@ export type RegularizePasswordListFilters = {
 
 export type RegularizeSitePasswordListFilters = {
   status: boolean;
+  search?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizeClientPfListFilters = {
@@ -33,6 +36,9 @@ export type RegularizeMunicipalTaxesListFilters = {
 
 export type RegularizeProcessListFilters = {
   status: string;
+  search?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizeGuidanceListFilters = {

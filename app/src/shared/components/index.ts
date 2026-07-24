@@ -5,3 +5,4 @@ export { ChatControllerUI } from './ChatControllerUI';
 export { default as LogDrawer } from './LogDrawer';
 export { Dialog } from './ui/Dialog';
 export { TabsRoot, TabsList, TabsTrigger, TabsContent } from './ui/Tabs';
+export { PaginationControls } from './ui/PaginationControls';

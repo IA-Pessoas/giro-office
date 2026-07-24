@@ -50,10 +50,11 @@ export class TiTermService {
 
   async list(context: TiAuthContext, query: ListTiTermsQuery): Promise<unknown[]> {
     const { skip, take } = getPaginationParams(query);
+    const userId = context.permission < TiPermissionLevel.Admin ? context.userId : query.user_id;
     const terms = await this.prisma.termTecnologia.findMany({
       where: {
         organization_id: context.organizationId,
-        ...(query.user_id ? { user_id: query.user_id } : {}),
+        ...(userId ? { user_id: userId } : {}),
       },
       include: SAFE_USER_INCLUDE,
       orderBy: { date: "desc" },
@@ -71,6 +72,10 @@ export class TiTermService {
     });
 
     if (!term) {
+      throw new ServiceError(404, "Termo de TI nao encontrado.");
+    }
+
+    if (context.permission < TiPermissionLevel.Admin && term.user_id !== context.userId) {
       throw new ServiceError(404, "Termo de TI nao encontrado.");
     }
 

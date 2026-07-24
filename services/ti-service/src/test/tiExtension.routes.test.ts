@@ -49,6 +49,31 @@ function createExtensionPrismaMock() {
 }
 
 describe("ti extension routes", () => {
+  it("GET /ti/extensions/list requires admin permission", async () => {
+    const response = await request(createTestApp(createExtensionPrismaMock() as never))
+      .get("/ti/extensions/list")
+      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para acessar o ti-service.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("GET /ti/extensions/list lists extensions with admin permission", async () => {
+    const response = await request(createTestApp(createExtensionPrismaMock() as never))
+      .get("/ti/extensions/list")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: [],
+    });
+  });
+
   it("POST /ti/extensions creates an extension", async () => {
     const response = await request(createTestApp(createExtensionPrismaMock() as never))
       .post("/ti/extensions")

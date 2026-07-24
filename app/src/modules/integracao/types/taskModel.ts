@@ -2,6 +2,10 @@ export interface TaskModelListItem {
   id: string;
   name: string;
   department_id: string;
+  department?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface TaskModelDetail {
@@ -51,6 +55,9 @@ export interface UpdateTaskModelData extends CreateTaskModelData {
 export interface TaskModelListParams {
   type?: string;
   billing?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface TaskDependent {

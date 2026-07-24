@@ -84,7 +84,15 @@ describe("task model routes", () => {
       .query({ type: "fiscal", billing: "Realizar" });
 
     expect(res.status).toBe(200);
-    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith("fiscal", "Realizar", "org-1");
+    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith({
+      type: "fiscal",
+      billing: "Realizar",
+      search: "",
+      organizationId: "org-1",
+      paginationRequested: false,
+      page: 1,
+      limit: 20,
+    });
   });
 
   it("GET /task/model/list lista todos os modelos quando type e billing nao sao enviados", async () => {
@@ -93,7 +101,70 @@ describe("task model routes", () => {
     const res = await request(app).get("/task/model/list");
 
     expect(res.status).toBe(200);
-    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith(undefined, undefined, "org-1");
+    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith({
+      type: undefined,
+      billing: undefined,
+      search: "",
+      organizationId: "org-1",
+      paginationRequested: false,
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it("GET /task/model/list preserva filtros legados enviados no corpo", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/task/model/list")
+      .send({ type: "fiscal", billing: "Realizar" });
+
+    expect(res.status).toBe(200);
+    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith({
+      type: "fiscal",
+      billing: "Realizar",
+      search: "",
+      organizationId: "org-1",
+      paginationRequested: false,
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it("GET /task/model/list pagina busca remota", async () => {
+    taskModelServiceMock.listModel.mockResolvedValueOnce({
+      data: [{ id: "model-21", name: "Fiscal 21", department_id: "dep-1" }],
+      total: 21,
+      page: 2,
+      limit: 20,
+      hasMore: false,
+    });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/task/model/list")
+      .query({ search: "fiscal", page: "2", limit: "20" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.total).toBe(21);
+    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith({
+      type: undefined,
+      billing: undefined,
+      search: "fiscal",
+      organizationId: "org-1",
+      paginationRequested: true,
+      page: 2,
+      limit: 20,
+    });
+  });
+
+  it("GET /task/model/list rejeita limite invalido", async () => {
+    const app = createTestApp();
+
+    const res = await request(app).get("/task/model/list").query({ limit: "101" });
+
+    expect(res.status).toBe(400);
+    expect(taskModelServiceMock.listModel).not.toHaveBeenCalled();
   });
 
   it("DELETE /task/model remove modelo", async () => {

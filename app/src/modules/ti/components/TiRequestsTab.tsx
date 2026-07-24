@@ -12,6 +12,7 @@ import {
 
 import { Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";
+import { useModuleAccess } from "@modules/auth";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { cn } from "@shared/ui/newLayout/utils";
 
@@ -275,6 +276,8 @@ function hasAssignee(request: TiRequest): boolean {
 
 export function TiRequestsTab() {
   const { user: currentUser } = useAuth();
+  const { access } = useModuleAccess("ti");
+  const canManageRequests = access.isAdmin;
   const [filters, setFilters] = useState<TiListFilters>({ status: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRequestId, setSelectedRequestId] = useState<TiId | undefined>();
@@ -544,18 +547,24 @@ export function TiRequestsTab() {
     <TiPanel className="space-y-5">
       <TiSectionHeader
         title="Chamados"
-        description="Gerencie solicitações, responsáveis, status e conversas do atendimento."
+        description={
+          canManageRequests
+            ? "Gerencie solicitações, responsáveis, status e conversas do atendimento."
+            : "Abra chamados e acompanhe as conversas do atendimento."
+        }
         action={
           <div className="flex flex-col gap-2 sm:flex-row">
-            <TiIconAction
-              icon={Tags}
-              label="Categorias"
-              disabled={isCategorySaving}
-              onClick={() => {
-                setCategoryFormError(null);
-                setIsCategoryDialogOpen(true);
-              }}
-            />
+            {canManageRequests ? (
+              <TiIconAction
+                icon={Tags}
+                label="Categorias"
+                disabled={isCategorySaving}
+                onClick={() => {
+                  setCategoryFormError(null);
+                  setIsCategoryDialogOpen(true);
+                }}
+              />
+            ) : null}
             <TiIconAction
               icon={Plus}
               label={createRequestMutation.isPending ? "Criando..." : "Novo chamado"}
@@ -977,7 +986,7 @@ export function TiRequestsTab() {
                       <dt className={tiLabelClassName}>Responsável</dt>
                       <dd className="mt-1 flex flex-col items-start gap-2 text-slate-700 dark:text-slate-200">
                         <span>{getAssigneeLabel(activeRequest)}</span>
-                        {!hasAssignee(activeRequest) ? (
+                        {canManageRequests && !hasAssignee(activeRequest) ? (
                           <button
                             type="button"
                             className={cn(
@@ -1009,6 +1018,7 @@ export function TiRequestsTab() {
                     </div>
                   </dl>
 
+                  {canManageRequests ? (
                   <form
                     key={`edit-${activeRequest.id}`}
                     className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800"
@@ -1068,6 +1078,7 @@ export function TiRequestsTab() {
                       </button>
                     </div>
                   </form>
+                  ) : null}
                 </div>
               ) : null}
             </div>

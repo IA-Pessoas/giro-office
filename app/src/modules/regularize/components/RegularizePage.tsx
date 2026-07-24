@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { UseQueryResult } from "@tanstack/react-query";
 import {
   Activity,
   ArrowRight,
@@ -15,6 +14,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Search,
   ShieldCheck,
   Trash2,
   UserRound,
@@ -27,6 +27,9 @@ import { toast } from "react-toastify";
 import { useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, ClientSelectionField, type ClientPickerOption } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
+import { PaginationControls } from "@shared/components";
+import { useDebouncedValue } from "@shared/hooks";
+import { getLastPage } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
 import { formatCPF_CNPJ } from "@shared/utils/formatters";
 
@@ -49,6 +52,7 @@ import {
   useRegularizePasswords,
   useRegularizeSitePasswordDetail,
   useRegularizeSitePasswords,
+  usePaginatedRegularizeSitePasswords,
   useUpdateRegularizePasswordMutation,
   useUpdateRegularizeSitePasswordMutation,
 } from "../hooks/useRegularizeCredentials";
@@ -75,6 +79,7 @@ import {
   useRegularizeMunicipalTaxes,
   useRegularizeProcessDetail,
   useRegularizeProcesses,
+  usePaginatedRegularizeProcesses,
   useRemoveRegularizeGuidanceActivityMutation,
   useRemoveRegularizeGuidancePartnerMutation,
   useUpdateRegularizeGuidanceMutation,
@@ -125,6 +130,8 @@ import {
   regularizePrimaryButtonClassName,
 } from "./regularizeFormControls";
 
+const REGULARIZE_PAGE_SIZE = 20;
+
 type RegularizeTab = {
   id: RegularizeTabId;
   label: string;
@@ -151,10 +158,14 @@ type RegularizeFormState =
   | { type: "license"; mode: "create" }
   | { type: "license"; mode: "edit"; id: RegularizeId };
 
-type ListQuery<T> = Pick<
-  UseQueryResult<T[], Error>,
-  "data" | "error" | "isError" | "isFetching" | "isLoading" | "refetch"
->;
+type ListQuery<T> = {
+  data?: T[];
+  error: Error | null;
+  isError: boolean;
+  isFetching: boolean;
+  isLoading: boolean;
+  refetch: () => Promise<unknown>;
+};
 
 const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "dashboard", label: "Dashboard", icon: BarChart3 },
@@ -659,6 +670,16 @@ export function RegularizePage() {
   const [activePasswordId, setActivePasswordId] = useState<RegularizeId>();
   const [activeSitePasswordId, setActiveSitePasswordId] = useState<RegularizeId>();
   const [activeForm, setActiveForm] = useState<RegularizeFormState | null>(null);
+  const [processSearch, setProcessSearch] = useState("");
+  const [processStatus, setProcessStatus] = useState("Todos");
+  const [processPage, setProcessPage] = useState(1);
+  const [siteSearch, setSiteSearch] = useState("");
+  const [siteStatus, setSiteStatus] = useState(true);
+  const [sitePage, setSitePage] = useState(1);
+  const debouncedProcessSearch = useDebouncedValue(processSearch.trim(), 300);
+  const debouncedSiteSearch = useDebouncedValue(siteSearch.trim(), 300);
+  const isProcessSearchPending = processSearch.trim() !== debouncedProcessSearch;
+  const isSiteSearchPending = siteSearch.trim() !== debouncedSiteSearch;
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const { access: regularizeAccess } = useModuleAccess("regularize");
@@ -688,6 +709,24 @@ export function RegularizePage() {
   const licenseQuery = useRegularizeLicenses(
     { status: "Ativo" },
     { enabled: queryPolicy.licenses },
+  );
+  const processPageQuery = usePaginatedRegularizeProcesses(
+    {
+      status: processStatus,
+      search: debouncedProcessSearch,
+      page: processPage,
+      limit: REGULARIZE_PAGE_SIZE,
+    },
+    { enabled: activeTab === "processes" },
+  );
+  const sitePageQuery = usePaginatedRegularizeSitePasswords(
+    {
+      status: siteStatus,
+      search: debouncedSiteSearch,
+      page: sitePage,
+      limit: REGULARIZE_PAGE_SIZE,
+    },
+    { enabled: activeTab === "sites" },
   );
 
   const createSitePasswordMutation = useCreateRegularizeSitePasswordMutation();
@@ -767,6 +806,31 @@ export function RegularizePage() {
       setSelectedProcessId(firstProcessId);
     }
   }, [firstProcessId, selectedProcessId]);
+
+  useEffect(() => {
+    const result = processPageQuery.data;
+    if (result && result.data.length === 0 && result.total > 0 && processPage > 1) {
+      setProcessPage(getLastPage(result.total, REGULARIZE_PAGE_SIZE));
+    }
+  }, [processPage, processPageQuery.data]);
+
+  useEffect(() => {
+    const result = sitePageQuery.data;
+    if (result && result.data.length === 0 && result.total > 0 && sitePage > 1) {
+      setSitePage(getLastPage(result.total, REGULARIZE_PAGE_SIZE));
+    }
+  }, [sitePage, sitePageQuery.data]);
+
+  const processTableQuery: ListQuery<RegularizeProcessListItem> = {
+    ...processPageQuery,
+    data: isProcessSearchPending ? undefined : processPageQuery.data?.data,
+    isLoading: isProcessSearchPending || processPageQuery.isLoading,
+  };
+  const siteTableQuery: ListQuery<RegularizeSitePasswordListItem> = {
+    ...sitePageQuery,
+    data: isSiteSearchPending ? undefined : sitePageQuery.data?.data,
+    isLoading: isSiteSearchPending || sitePageQuery.isLoading,
+  };
 
   const dashboardRequestId = getRegularizeRequestId(dashboardQuery.error);
   const hasProcessRows = (processQuery.data?.length ?? 0) > 0;
@@ -1328,15 +1392,54 @@ export function RegularizePage() {
             }
           />
 
+          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_220px] dark:border-gray-700 dark:bg-gray-800">
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Buscar processo
+              </span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={processSearch}
+                  onChange={(event) => {
+                    setProcessSearch(event.target.value);
+                    setProcessPage(1);
+                  }}
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  placeholder="Processo, cliente ou documento"
+                />
+              </div>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Status</span>
+              <RegularizeNativeSelect
+                value={processStatus}
+                onChange={(event) => {
+                  setProcessStatus(event.target.value);
+                  setProcessPage(1);
+                }}
+              >
+                {["Todos", "Aberto", "Em andamento", "Pendente", "Concluído", "Cancelado"].map(
+                  (status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ),
+                )}
+              </RegularizeNativeSelect>
+            </label>
+          </div>
+
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">
             <QueryStatePanel
-              query={processQuery}
+              query={processTableQuery}
               emptyTitle="Nenhum processo encontrado."
               emptyClassName="xl:col-span-2 min-h-[220px] items-center justify-center"
             >
               {(processRows) => (
-                <DataTable headers={["Processo", "Cliente", "Documento", "Status", ""]}>
-                  {processRows.map((item) => (
+                <div>
+                  <DataTable headers={["Processo", "Cliente", "Documento", "Status", ""]}>
+                    {processRows.map((item) => (
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
                       <td className="px-4 py-3">{getProcessClientName(item)}</td>
@@ -1364,8 +1467,19 @@ export function RegularizePage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </DataTable>
+                    ))}
+                  </DataTable>
+                  <PaginationControls
+                    page={processPage}
+                    limit={REGULARIZE_PAGE_SIZE}
+                    total={processPageQuery.data?.total ?? 0}
+                    count={processRows.length}
+                    hasMore={processPageQuery.data?.hasMore ?? false}
+                    isFetching={processPageQuery.isFetching || isProcessSearchPending}
+                    onPrevious={() => setProcessPage((current) => Math.max(1, current - 1))}
+                    onNext={() => setProcessPage((current) => current + 1)}
+                  />
+                </div>
               )}
             </QueryStatePanel>
 
@@ -1830,15 +1944,49 @@ export function RegularizePage() {
             }
           />
 
+          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_220px] dark:border-gray-700 dark:bg-gray-800">
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Buscar site
+              </span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={siteSearch}
+                  onChange={(event) => {
+                    setSiteSearch(event.target.value);
+                    setSitePage(1);
+                  }}
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  placeholder="Site, esfera, link ou usuário"
+                />
+              </div>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Status</span>
+              <RegularizeNativeSelect
+                value={String(siteStatus)}
+                onChange={(event) => {
+                  setSiteStatus(event.target.value === "true");
+                  setSitePage(1);
+                }}
+              >
+                <option value="true">Ativo</option>
+                <option value="false">Inativo</option>
+              </RegularizeNativeSelect>
+            </label>
+          </div>
+
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)] xl:items-stretch">
             <QueryStatePanel
-              query={siteQuery}
+              query={siteTableQuery}
               emptyTitle="Nenhum site encontrado."
               emptyClassName="xl:col-span-2"
             >
               {(siteRows) => (
-                <DataTable headers={["Site", "Escopo", "Usuário", "Status", ""]}>
-                  {siteRows.map((item: RegularizeSitePasswordListItem) => (
+                <div>
+                  <DataTable headers={["Site", "Escopo", "Usuário", "Status", ""]}>
+                    {siteRows.map((item: RegularizeSitePasswordListItem) => (
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
                       <td className="px-4 py-3">{formatText(item.sphere)}</td>
@@ -1872,8 +2020,19 @@ export function RegularizePage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </DataTable>
+                    ))}
+                  </DataTable>
+                  <PaginationControls
+                    page={sitePage}
+                    limit={REGULARIZE_PAGE_SIZE}
+                    total={sitePageQuery.data?.total ?? 0}
+                    count={siteRows.length}
+                    hasMore={sitePageQuery.data?.hasMore ?? false}
+                    isFetching={sitePageQuery.isFetching || isSiteSearchPending}
+                    onPrevious={() => setSitePage((current) => Math.max(1, current - 1))}
+                    onNext={() => setSitePage((current) => current + 1)}
+                  />
+                </div>
               )}
             </QueryStatePanel>
 

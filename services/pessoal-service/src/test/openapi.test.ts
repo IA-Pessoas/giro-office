@@ -79,4 +79,26 @@ describe("pessoal-service OpenAPI", () => {
       });
     }
   });
+
+  it("documenta busca e resposta dual de sindicatos", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const operation = (spec.paths as Record<string, { get?: Record<string, unknown> }>)[
+      "/pessoal/unions"
+    ]?.get as {
+      parameters?: Array<{ name?: string }>;
+      responses?: Record<
+        string,
+        { content?: Record<string, { schema?: { oneOf?: unknown[] } }> }
+      >;
+    };
+
+    expect(operation.parameters?.map((parameter) => parameter.name)).toEqual([
+      "search",
+      "page",
+      "limit",
+    ]);
+    expect(
+      operation.responses?.["200"]?.content?.["application/json"]?.schema?.oneOf,
+    ).toHaveLength(2);
+  });
 });
