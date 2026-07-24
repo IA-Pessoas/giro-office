@@ -11,6 +11,11 @@ const DEPARTMENT_FIELD_NAMES = new Set([
   "castelo_med",
 ]);
 
+const NOT_CONTRACTED_AND_PAUSED_STATUSES = new Set([
+  "Não Contradados e Paralisados",
+  "Não Contradado e Paralisado",
+]);
+
 /**
  * Constrói o filtro `where` alinhado ao legado `ClientService.list` (com `organization_id` aplicado depois).
  */
@@ -25,8 +30,7 @@ export function buildLegacyListStatusWhere(
   if (ref === "integracao") {
     if (status === "Ativo" || status === "Inativo") {
       return {
-        status,
-        dominio_code: { not: null },
+        AND: [{ status }, { dominio_code: { not: null } }, { dominio_code: { not: "" } }],
       };
     }
     if (status === "Ativo e Prospecção") {
@@ -47,7 +51,7 @@ export function buildLegacyListStatusWhere(
         return { status: statusPart, type: typePart };
       }
     }
-    if (status === "Não Contradados e Paralisados") {
+    if (NOT_CONTRACTED_AND_PAUSED_STATUSES.has(status)) {
       return {
         prospecting_status: { in: ["Paralisado", "Recusado pelo Cliente"] },
       };

@@ -119,6 +119,13 @@ runTest("buildClientListParams uses legacy integration filter for active and ina
   });
 });
 
+runTest("client integration filters use backend-supported not-contracted token", () => {
+  const filters = readFileSync("src/modules/clients/components/ClientFilters.tsx", "utf8");
+
+  assert.match(filters, /status: 'Não Contradados e Paralisados'/);
+  assert.doesNotMatch(filters, /status: 'Não Contradado e Paralisado'/);
+});
+
 runTest("unwrapClientEnvelope normalizes response.data.data", () => {
   const payload = { items: [], total: 0, page: 1, pageSize: 20, hasMore: false };
 
