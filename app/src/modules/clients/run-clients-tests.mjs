@@ -14,6 +14,7 @@ import {
   hasCommercialChanges,
 } from "./utils/commercialForm.ts";
 import {
+  formatCpfCnpjInput,
   validateCpfCnpjDocument,
   validateOptionalCpfDocument,
 } from "./utils/documentValidation.ts";
@@ -248,6 +249,13 @@ runTest("document validation enforces integration person type length", () => {
   assert.equal(validateCpfCnpjDocument("123.456.789-10", "PJ"), "CNPJ deve ter 14 dígitos.");
 });
 
+runTest("document input formatter masks and limits by person type", () => {
+  assert.equal(formatCpfCnpjInput("123456789101112", "PF"), "123.456.789-10");
+  assert.equal(formatCpfCnpjInput("123456789101112", "PJ"), "12.345.678/9101-11");
+  assert.equal(formatCpfCnpjInput("abc1234", "PF"), "123.4");
+  assert.equal(formatCpfCnpjInput("1234567", "PJ"), "12.345.67");
+});
+
 runTest("optional cpf validation accepts empty values and rejects invalid lengths", () => {
   assert.equal(validateOptionalCpfDocument("CPF do responsável", ""), null);
   assert.equal(validateOptionalCpfDocument("CPF do responsável", "123.456.789-10"), null);
@@ -447,4 +455,25 @@ runTest("client picker keeps paginated remote search and accessible feedback", (
   assert.match(picker, /htmlFor=\{searchInputId\}/);
   assert.match(picker, /role="listbox"/);
   assert.match(picker, /handleSelect\(null\)/);
+});
+
+runTest("client create modal binds person type to document validation and payload", () => {
+  const modal = readFileSync("src/modules/clients/components/ClientCreateModal.tsx", "utf8");
+  const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+
+  assert.match(modal, /type: "PJ"/);
+  assert.match(modal, /setShowDocumentError\(true\)/);
+  assert.match(modal, /setShowDocumentError\(false\)/);
+  assert.match(modal, /formatCpfCnpjInput/);
+  assert.match(modal, /validateCpfCnpjDocument\(formValues\.cpf_cnpj,\s*formValues\.type\)/);
+  assert.match(modal, /type: formValues\.type/);
+  assert.match(modal, /showPersonType/);
+  assert.match(modal, /showDocumentError/);
+  assert.match(form, /name="type"/);
+  assert.match(form, /showDocumentError && showPersonType && values\.cpf_cnpj/);
+  assert.ok(form.indexOf(">Nome</span>") < form.indexOf(">Razão social</span>"));
+  assert.ok(form.indexOf(">Razão social</span>") < form.indexOf(">Tipo de pessoa</span>"));
+  assert.ok(form.indexOf(">Tipo de pessoa</span>") < form.indexOf("{documentLabel}"));
+  assert.ok(form.indexOf(">Nome fantasia</span>") < form.indexOf(">Status</span>"));
+  assert.doesNotMatch(form, /rounded-2xl border border-slate-200 bg-slate-50/);
 });
