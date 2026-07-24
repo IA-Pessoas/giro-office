@@ -40,10 +40,17 @@ type RegularizeReadQueryOptions = {
   enabled?: boolean;
 };
 
-function invalidateRegularizeOperations(queryClient: ReturnType<typeof useQueryClient>) {
-  return queryClient.invalidateQueries({
-    queryKey: regularizeQueryKeys.operations(),
-  });
+async function invalidateRegularizeOperations(
+  queryClient: ReturnType<typeof useQueryClient>,
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: regularizeQueryKeys.operations(),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: regularizeQueryKeys.dashboardRoot(),
+    }),
+  ]);
 }
 
 export function useRegularizeMunicipalTaxes(

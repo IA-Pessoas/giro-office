@@ -71,6 +71,33 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   }
 });
 
+await runTest("regularize dashboard has a centralized aggregate data contract", async () => {
+  const contractSource = await readModuleSource("services/regularizeService.contract.ts");
+  const serviceSource = await readModuleSource("services/regularizeService.ts");
+  const hookSource = await readModuleSource("hooks/useRegularizeDashboard.ts");
+  const queryKeysSource = await readModuleSource("hooks/queryKeys.ts");
+
+  assert.match(contractSource, /dashboard: "\/regularize\/dashboard"/);
+  assert.match(contractSource, /buildRegularizeDashboardParams/);
+  assert.match(serviceSource, /async getDashboard\(year: number\)/);
+  assert.match(serviceSource, /REGULARIZE_ENDPOINTS\.dashboard/);
+  assert.match(hookSource, /useRegularizeDashboard/);
+  assert.match(hookSource, /regularizeQueryKeys\.dashboard\(year\)/);
+  assert.match(queryKeysSource, /dashboardRoot/);
+  assert.match(queryKeysSource, /dashboard: \(year: number\)/);
+});
+
+await runTest("regularize mutations invalidate aggregate dashboard data", async () => {
+  for (const hookPath of [
+    "hooks/useRegularizeCredentials.ts",
+    "hooks/useRegularizePeople.ts",
+    "hooks/useRegularizeOperations.ts",
+  ]) {
+    const source = await readModuleSource(hookPath);
+    assert.match(source, /regularizeQueryKeys\.dashboardRoot\(\)/);
+  }
+});
+
 await runTest("regularize service is the only module file importing the API client", async () => {
   const files = await collectSourceFiles(moduleRoot);
   const offenders = [];

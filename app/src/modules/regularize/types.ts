@@ -453,3 +453,20 @@ export type CreateRegularizeLicensePayload = {
 export type UpdateRegularizeLicensePayload = CreateRegularizeLicensePayload & {
   id: RegularizeId;
 };
+
+export interface RegularizeDashboard {
+  year: number;
+  metrics: {
+    openProcesses: number;
+    activeLicenses: number;
+    activeClientPfs: number;
+    activeSites: number;
+    municipalTaxesCompleted: number;
+    municipalTaxesPending: number;
+    municipalTaxesTotal: number;
+  };
+  recentProcesses: RegularizeProcessListItem[];
+  trackedLicenses: Array<
+    Pick<RegularizeLicenseListItem, "id" | "type_license" | "protocol" | "due_date">
+  >;
+}
