@@ -849,6 +849,29 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
             enumQueryParameter("status", "Filtro de item ativo", ["true", "false"]),
             ...paginationParameters(),
           ],
+          successSchema: {
+            type: "object",
+            required: ["success", "data"],
+            properties: {
+              success: { type: "boolean", enum: [true] },
+              data: {
+                type: "object",
+                required: ["data", "total", "page", "limit", "hasMore"],
+                properties: {
+                  data: {
+                    type: "array",
+                    items: { type: "object", additionalProperties: true },
+                  },
+                  total: { type: "integer", minimum: 0 },
+                  page: { type: "integer", minimum: 1 },
+                  limit: { type: "integer", minimum: 1 },
+                  hasMore: { type: "boolean" },
+                },
+                additionalProperties: false,
+              },
+            },
+            additionalProperties: true,
+          },
           successDescription: "Itens de estoque listados",
           errors: [400, 401, 403, 404],
         }),

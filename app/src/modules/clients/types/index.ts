@@ -108,6 +108,7 @@ export interface ClientListFilters {
 }
 
 export interface ClientFormValues {
+  type?: "PJ" | "PF";
   name: string;
   company_name: string;
   fantasy_name: string;
@@ -259,6 +260,7 @@ export interface CreateClientData {
 
 export interface CreateClientPayload {
   organization_id?: string;
+  type: "PJ" | "PF";
   name: string;
   status?: string;
   cpf_cnpj: string;

@@ -57,4 +57,60 @@ describe("regularize password routes", () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.id).toBe("pass-1");
   });
+
+  it("GET /regularize/password reveals an encrypted password detail", async () => {
+    const encryption = new EncryptionService(regularizeTestEnv.encryptionKey);
+    const prisma = {
+      passwordRegularize: {
+        findFirst: vi.fn(async () => ({
+          id: "f0000000-0000-4000-8000-000000000001",
+          client_id: "d0000000-0000-4000-8000-000000000001",
+          site_id: "e0000000-0000-4000-8000-000000000001",
+          login: encryption.encrypt("login"),
+          password: encryption.encrypt("password"),
+          notes: "nota",
+        })),
+      },
+    } as unknown as PrismaClient;
+    const app = createTestApp(prisma);
+
+    const response = await request(app)
+      .get("/regularize/password")
+      .set(gatewayHeaders())
+      .query({ id: "f0000000-0000-4000-8000-000000000001" });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.login).toBe("login");
+    expect(response.body.data.password).toBe("password");
+  });
+
+  it("GET /regularize/password returns 422 for legacy invalid encrypted payload", async () => {
+    const prisma = {
+      passwordRegularize: {
+        findFirst: vi.fn(async () => ({
+          id: "f0000000-0000-4000-8000-000000000001",
+          client_id: "d0000000-0000-4000-8000-000000000001",
+          site_id: "e0000000-0000-4000-8000-000000000001",
+          login: "legacy-login",
+          password: "legacy-password",
+          notes: "Migrado da coluna legada",
+        })),
+      },
+    } as unknown as PrismaClient;
+    const app = createTestApp(prisma);
+
+    const response = await request(app)
+      .get("/regularize/password")
+      .set(gatewayHeaders())
+      .query({ id: "f0000000-0000-4000-8000-000000000001" });
+
+    expect(response.status).toBe(422);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error).toBe(
+      "Credencial indisponivel para revelacao. Atualize o cadastro da senha.",
+    );
+    expect(JSON.stringify(response.body)).not.toContain("legacy-login");
+    expect(JSON.stringify(response.body)).not.toContain("legacy-password");
+  });
 });

@@ -166,6 +166,31 @@ describe("client-service", () => {
     expect(res.body.paths?.["/internal/competence-output-update"]).toBeDefined();
   });
 
+  it("GET /openapi.json documents client detail Regularize fields", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+    const res = await request(app).get("/openapi.json");
+
+    const detailResponse =
+      res.body.paths?.["/client/{id}"]?.get?.responses?.["200"]?.content?.["application/json"]
+        ?.schema;
+    const detailSchema = res.body.components?.schemas?.ClientDetail;
+
+    expect(res.status).toBe(200);
+    expect(detailResponse?.properties?.data).toEqual({
+      $ref: "#/components/schemas/ClientDetail",
+    });
+    expect(detailSchema?.properties).toEqual(
+      expect.objectContaining({
+        responsible: { type: ["string", "null"] },
+        cpf_responsible: { type: ["string", "null"] },
+        address: { type: ["string", "null"] },
+        customer_since: { type: ["string", "null"], format: "date-time" },
+        contabil: { type: ["boolean", "null"] },
+      }),
+    );
+  });
+
   it("GET /openapi.json marks client create organization_id as token-derived", async () => {
     const mock: IClientService = { ...mockServiceBase() };
     const app = buildTestApp(mock);

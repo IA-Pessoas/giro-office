@@ -40,6 +40,14 @@ export type TiStockMovement = {
   balance_after: number | null;
 };
 
+export type TiStockListResult = {
+  data: unknown[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+};
+
 export class TiStockService {
   private readonly departmentResolver: TiDepartmentResolverService;
 
@@ -47,28 +55,43 @@ export class TiStockService {
     this.departmentResolver = new TiDepartmentResolverService(prisma);
   }
 
-  async listItems(context: TiAuthContext, query: ListTiStockItemsQuery): Promise<unknown[]> {
+  async listItems(
+    context: TiAuthContext,
+    query: ListTiStockItemsQuery,
+  ): Promise<TiStockListResult> {
     const departmentId = await this.resolveDepartment(context.organizationId);
+    const page = query.page ?? 1;
     const { skip, take } = getPaginationParams(query);
+    const where = {
+      organization_id: context.organizationId,
+      department_id: departmentId,
+      ...(query.category_id ? { category_id: query.category_id } : {}),
+      ...(query.location_id ? { location_id: query.location_id } : {}),
+      ...(query.name ? { name: { contains: query.name, mode: "insensitive" as const } } : {}),
+      ...(query.status === undefined ? {} : { status: query.status }),
+    };
+    const [total, data] = await Promise.all([
+      this.prisma.stock.count({ where }),
+      this.prisma.stock.findMany({
+        where,
+        include: {
+          category: true,
+          location: true,
+          department: true,
+        },
+        orderBy: { name: "asc" },
+        skip,
+        take,
+      }),
+    ]);
 
-    return this.prisma.stock.findMany({
-      where: {
-        organization_id: context.organizationId,
-        department_id: departmentId,
-        ...(query.category_id ? { category_id: query.category_id } : {}),
-        ...(query.location_id ? { location_id: query.location_id } : {}),
-        ...(query.name ? { name: { contains: query.name, mode: "insensitive" } } : {}),
-        ...(query.status === undefined ? {} : { status: query.status }),
-      },
-      include: {
-        category: true,
-        location: true,
-        department: true,
-      },
-      orderBy: { name: "asc" },
-      skip,
-      take,
-    });
+    return {
+      data,
+      total,
+      page,
+      limit: take,
+      hasMore: page * take < total,
+    };
   }
 
   async getItemById(context: TiAuthContext, id: string): Promise<unknown> {

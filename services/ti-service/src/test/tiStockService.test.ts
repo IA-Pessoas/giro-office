@@ -30,6 +30,61 @@ describe("TiDepartmentResolverService", () => {
 });
 
 describe("TiStockService", () => {
+  it("filters the full stock result before pagination and returns page metadata", async () => {
+    const item = {
+      id: stockId,
+      name: "Mouse sem fio",
+      category_id: categoryId,
+      location_id: locationId,
+      status: true,
+      location: { id: locationId, name: "Almoxarifado TI" },
+    };
+    const count = vi.fn(async () => 3);
+    const findMany = vi.fn(async () => [item]);
+    const prisma = {
+      department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
+      stock: { count, findMany },
+    };
+    const service = new TiStockService(prisma as never);
+
+    const result = await service.listItems(context, {
+      name: "Mouse",
+      category_id: categoryId,
+      location_id: locationId,
+      status: true,
+      page: 2,
+      page_size: 1,
+    });
+    const where = {
+      organization_id: context.organizationId,
+      department_id: departmentId,
+      category_id: categoryId,
+      location_id: locationId,
+      name: { contains: "Mouse", mode: "insensitive" },
+      status: true,
+    };
+
+    expect(count).toHaveBeenCalledWith({ where });
+    expect(findMany).toHaveBeenCalledWith({
+      where,
+      include: {
+        category: true,
+        location: true,
+        department: true,
+      },
+      orderBy: { name: "asc" },
+      skip: 1,
+      take: 1,
+    });
+    expect(result).toEqual({
+      data: [item],
+      total: 3,
+      page: 2,
+      limit: 1,
+      hasMore: true,
+    });
+  });
+
   it("creates a stock item in the Tecnologia department", async () => {
     const prisma = {
       department: { findFirst: vi.fn(async () => ({ id: departmentId })) },

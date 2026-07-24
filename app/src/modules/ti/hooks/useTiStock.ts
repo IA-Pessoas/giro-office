@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 
 import { useFetch } from "@shared/hooks";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 import { tiStockService } from "../services";
 import type {
@@ -64,7 +65,7 @@ function useInvalidateTiStockCaches() {
 export function useTiStockItems(
   filters?: TiListFilters,
   options?: TiReadQueryOptions,
-): UseQueryResult<TiStockItem[], Error> {
+): UseQueryResult<PaginatedResult<TiStockItem>, Error> {
   return useFetch(
     tiQueryKeys.stock.items(filters),
     () => tiStockService.listStockItems(filters),

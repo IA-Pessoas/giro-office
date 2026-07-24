@@ -120,7 +120,10 @@ import type {
   UpdateRegularizeSitePasswordPayload,
 } from "../types";
 import { getRegularizeRequestId } from "../utils/regularizeApiError";
-import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
+import {
+  getRegularizeErrorMessage,
+  getRegularizeMutationErrorMessage,
+} from "../utils/regularizeForm";
 import {
   getRegularizeQueryPolicy,
   type RegularizeTabId,
@@ -1912,7 +1915,13 @@ export function RegularizePage() {
               {passwordDetailQuery.isLoading ? (
                 <FieldLine label="Status" value="Carregando..." />
               ) : passwordDetailQuery.isError ? (
-                <FieldLine label="Status" value="Acesso negado ou indisponível." />
+                <FieldLine
+                  label="Status"
+                  value={getRegularizeErrorMessage(
+                    passwordDetailQuery.error,
+                    "Acesso negado ou indisponível.",
+                  )}
+                />
               ) : passwordDetailQuery.data ? (
                 <>
                   <FieldLine label="Login" value={formatText(passwordDetailQuery.data.login)} />

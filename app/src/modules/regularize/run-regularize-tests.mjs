@@ -623,6 +623,24 @@ await runTest("regularize credential detail panels stretch with their grids", as
   assert.ok((credentialGridMatches?.length ?? 0) >= 2);
 });
 
+await runTest("regularize password reveal panel shows API error message", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const utilsSource = await readModuleSource("utils/regularizeForm.ts");
+  const passwordsStart = pageSource.indexOf('<DetailPanel title="Senha selecionada">');
+  const sitesStart = pageSource.indexOf('{activeTab === "sites"', passwordsStart);
+  const passwordsSource = pageSource.slice(passwordsStart, sitesStart);
+
+  assert.match(utilsSource, /export function getRegularizeErrorMessage/);
+  assert.match(utilsSource, /response\?\.data\?\.error/);
+  assert.notEqual(passwordsStart, -1);
+  assert.notEqual(sitesStart, -1);
+  assert.match(
+    passwordsSource,
+    /getRegularizeErrorMessage\(\s*passwordDetailQuery\.error,\s*"Acesso negado ou indisponível\.",?\s*\)/,
+  );
+  assert.doesNotMatch(passwordsSource, /value="Acesso negado ou indisponível\."/);
+});
+
 await runTest("regularize credential empty detail states are centered", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
   const emptyStateMatches = pageSource.match(/<DetailEmptyState message="Sem revelação ativa\." \/>/g);
