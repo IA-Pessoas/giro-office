@@ -118,13 +118,13 @@ import type {
   UpdateRegularizeProcessPayload,
   UpdateRegularizeSitePasswordPayload,
 } from "../types";
-
-const REGULARIZE_PAGE_SIZE = 20;
 import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
 import {
   type RegularizeFormOption,
   regularizePrimaryButtonClassName,
 } from "./regularizeFormControls";
+
+const REGULARIZE_PAGE_SIZE = 20;
 
 type RegularizeTabId =
   | "dashboard"

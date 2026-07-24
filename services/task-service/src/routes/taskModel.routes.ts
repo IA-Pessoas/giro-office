@@ -134,7 +134,11 @@ router.get(
     try {
       const { organization_id } = requireAuthenticatedRequestContext(req);
       const paginationRequested = req.query.page !== undefined || req.query.limit !== undefined;
-      const query = parseWithZod(taskModelListQuerySchema, req.query);
+      const query = parseWithZod(taskModelListQuerySchema, {
+        ...req.query,
+        type: req.query.type ?? req.body?.type,
+        billing: req.query.billing ?? req.body?.billing,
+      });
       const result = await taskModelService.listModel({
         organizationId: organization_id,
         paginationRequested,

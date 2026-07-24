@@ -116,16 +116,26 @@ describe("TaskCrudService", () => {
       }),
     });
     expect(prismaMock.task.count).toHaveBeenNthCalledWith(2, {
-      where: expect.objectContaining({
-        organization_id: "org-1",
-        status: { contains: "andamento", mode: "insensitive" },
-      }),
+      where: {
+        AND: [
+          expect.objectContaining({
+            organization_id: "org-1",
+            OR: [{ name: { contains: "registro", mode: "insensitive" } }],
+          }),
+          { status: { contains: "andamento", mode: "insensitive" } },
+        ],
+      },
     });
     expect(prismaMock.task.count).toHaveBeenNthCalledWith(3, {
-      where: expect.objectContaining({
-        organization_id: "org-1",
-        NOT: { billing: { contains: "não", mode: "insensitive" } },
-      }),
+      where: {
+        AND: [
+          expect.objectContaining({
+            organization_id: "org-1",
+            OR: [{ name: { contains: "registro", mode: "insensitive" } }],
+          }),
+          { NOT: { billing: { contains: "não", mode: "insensitive" } } },
+        ],
+      },
     });
   });
 

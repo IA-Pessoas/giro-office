@@ -112,6 +112,25 @@ describe("task model routes", () => {
     });
   });
 
+  it("GET /task/model/list preserva filtros legados enviados no corpo", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/task/model/list")
+      .send({ type: "fiscal", billing: "Realizar" });
+
+    expect(res.status).toBe(200);
+    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith({
+      type: "fiscal",
+      billing: "Realizar",
+      search: "",
+      organizationId: "org-1",
+      paginationRequested: false,
+      page: 1,
+      limit: 20,
+    });
+  });
+
   it("GET /task/model/list pagina busca remota", async () => {
     taskModelServiceMock.listModel.mockResolvedValueOnce({
       data: [{ id: "model-21", name: "Fiscal 21", department_id: "dep-1" }],

@@ -375,14 +375,12 @@ export class TaskCrudService {
         prismaClient.task.count({ where }),
         prismaClient.task.count({
           where: {
-            ...where,
-            status: { contains: "andamento", mode: "insensitive" },
+            AND: [where, { status: { contains: "andamento", mode: "insensitive" } }],
           },
         }),
         prismaClient.task.count({
           where: {
-            ...where,
-            NOT: { billing: { contains: "não", mode: "insensitive" } },
+            AND: [where, { NOT: { billing: { contains: "não", mode: "insensitive" } } }],
           },
         }),
       ]);
