@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Eye, FileCheck2, Pencil, Plus, Printer, Save, Signature, X } from "lucide-react";
+import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
@@ -372,6 +373,9 @@ export function TiTermsTab() {
     const printWindow = window.open("", "_blank", "width=900,height=1100");
 
     if (!printWindow) {
+      toast.error(
+        "Não foi possível abrir a janela de impressão. Verifique o bloqueador de pop-ups do navegador.",
+      );
       return;
     }
 
