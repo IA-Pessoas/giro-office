@@ -21,7 +21,8 @@ type UnionFindFirstResult = {
 function createPrismaMock() {
   return {
     unionPessoal: {
-      findMany: vi.fn(async () => []),
+      findMany: vi.fn(async (): Promise<UnionFindFirstResult[]> => []),
+      count: vi.fn(async () => 0),
       findFirst: vi.fn(
         async ({ where }): Promise<UnionFindFirstResult | null> =>
           typeof where.id === "string"
@@ -45,11 +46,47 @@ describe("UnionService", () => {
     const prisma = createPrismaMock();
     const service = new UnionService(prisma as never, createAuditMock());
 
-    await service.list({ organizationId });
+    await service.list(
+      { organizationId },
+      { search: "", page: 1, limit: 20, paginationRequested: false },
+    );
 
     expect(prisma.unionPessoal.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { organization_id: organizationId } }),
     );
+  });
+
+  it("busca por nome ou CNPJ antes de paginar", async () => {
+    const prisma = createPrismaMock();
+    prisma.unionPessoal.findMany.mockResolvedValueOnce([
+      {
+        id: "union-21",
+        name: "Metalúrgicos",
+        cnpj: "123",
+        base_date: null,
+        organization_id: organizationId,
+      },
+    ]);
+    prisma.unionPessoal.count.mockResolvedValueOnce(21);
+    const service = new UnionService(prisma as never, createAuditMock());
+
+    const result = await service.list(
+      { organizationId },
+      { search: "metal", page: 2, limit: 20, paginationRequested: true },
+    );
+
+    const where = {
+      organization_id: organizationId,
+      OR: [
+        { name: { contains: "metal", mode: "insensitive" } },
+        { cnpj: { contains: "metal", mode: "insensitive" } },
+      ],
+    };
+    expect(prisma.unionPessoal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where, skip: 20, take: 20 }),
+    );
+    expect(prisma.unionPessoal.count).toHaveBeenCalledWith({ where });
+    expect(result).toMatchObject({ total: 21, page: 2, limit: 20, hasMore: false });
   });
 
   it("rejeita sindicato duplicado na mesma organizacao", async () => {

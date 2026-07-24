@@ -5,6 +5,7 @@ import {
   PESSOAL_ENDPOINTS,
   PESSOAL_TABS,
   unwrapPessoalEnvelope,
+  unwrapPessoalPage,
 } from "./services/pessoalService.contract.ts";
 import {
   buildPessoalLddListParams,
@@ -12,6 +13,7 @@ import {
   buildPessoalPayrollPayload,
   buildPessoalPayrollUpdatePayload,
   buildPessoalUnionPayload,
+  buildPessoalUnionListParams,
   hasPessoalPasswordSecretFields,
 } from "./services/pessoalService.ts";
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
@@ -116,6 +118,38 @@ runTest("union payload builder keeps backend field names", () => {
       base_date: null,
     },
   );
+});
+
+runTest("union management sends remote search and pagination", () => {
+  assert.deepEqual(
+    buildPessoalUnionListParams({ search: " Metal ", page: 2, limit: 20 }),
+    { search: "Metal", page: 2, limit: 20 },
+  );
+  const page = {
+    data: [{ id: "union-21", name: "Metal", cnpj: "123", base_date: null }],
+    total: 21,
+    page: 2,
+    limit: 20,
+    hasMore: false,
+  };
+  assert.deepEqual(unwrapPessoalPage({ data: page }, { page: 2, limit: 20 }), page);
+});
+
+runTest("union management is paginated while payroll keeps the full catalog", () => {
+  const section = readFileSync(
+    "src/modules/pessoal/components/PessoalUnionsSection.tsx",
+    "utf8",
+  );
+  const payroll = readFileSync(
+    "src/modules/pessoal/components/PessoalPayrollSection.tsx",
+    "utf8",
+  );
+
+  assert.match(section, /usePaginatedPessoalUnions/);
+  assert.match(section, /useDebouncedValue\(searchTerm\.trim\(\), 300\)/);
+  assert.match(section, /<PaginationControls/);
+  assert.match(payroll, /usePessoalUnions\(\)/);
+  assert.doesNotMatch(payroll, /usePaginatedPessoalUnions/);
 });
 
 runTest("payroll payload builder keeps backend payroll fields", () => {

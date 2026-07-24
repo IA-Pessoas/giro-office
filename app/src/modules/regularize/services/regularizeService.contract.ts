@@ -9,6 +9,7 @@ import type {
   RegularizeProcessListFilters,
   RegularizeSitePasswordListFilters,
 } from "../types";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 export const REGULARIZE_ENDPOINTS = {
   passwords: "/regularize/passwords",
@@ -53,6 +54,9 @@ export function buildRegularizeSitePasswordListParams(
 ) {
   return {
     status: filters.status,
+    ...(filters.search ? { search: filters.search.trim() } : {}),
+    ...(filters.page !== undefined ? { page: filters.page } : {}),
+    ...(filters.limit !== undefined ? { limit: filters.limit } : {}),
   };
 }
 
@@ -82,6 +86,9 @@ export function buildRegularizeMunicipalTaxesListParams(
 export function buildRegularizeProcessListParams(filters: RegularizeProcessListFilters) {
   return {
     status: filters.status,
+    ...(filters.search ? { search: filters.search.trim() } : {}),
+    ...(filters.page !== undefined ? { page: filters.page } : {}),
+    ...(filters.limit !== undefined ? { limit: filters.limit } : {}),
   };
 }
 
@@ -113,4 +120,23 @@ export function unwrapRegularizeEntity<T>(body: unknown, key = "detail"): T {
   }
 
   return data as T;
+}
+
+export function unwrapRegularizePage<T>(
+  body: unknown,
+  fallback: { page: number; limit: number },
+): PaginatedResult<T> {
+  const data = unwrapRegularizeEnvelope<T[] | PaginatedResult<T>>(body);
+
+  if (Array.isArray(data)) {
+    return {
+      data,
+      total: data.length,
+      page: fallback.page,
+      limit: fallback.limit,
+      hasMore: false,
+    };
+  }
+
+  return data;
 }

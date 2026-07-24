@@ -1,5 +1,6 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 import type { TaskModelGetPayload } from "../generated/prisma/models/TaskModel.js";
+import type { Prisma } from "../generated/prisma/client.js";
 
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
@@ -56,10 +57,34 @@ const TASK_MODEL_LIST_SELECT = {
   id: true,
   name: true,
   department_id: true,
+  department: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
 } as const;
 
 export type TaskModelRow = TaskModelGetPayload<{ select: typeof TASK_MODEL_SELECT }>;
 export type TaskModelListItem = TaskModelGetPayload<{ select: typeof TASK_MODEL_LIST_SELECT }>;
+
+export interface ListTaskModelsParams {
+  organizationId: string;
+  type?: string;
+  billing?: string;
+  search: string;
+  page: number;
+  limit: number;
+  paginationRequested: boolean;
+}
+
+export interface PaginatedTaskModels {
+  data: TaskModelListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
 
 export class TaskModelService {
   async #requireManagerPermission(userId: string): Promise<void> {
@@ -192,22 +217,51 @@ export class TaskModelService {
   }
 
   async listModel(
-    type: string | undefined,
-    billing: string | undefined,
-    organizationId: string,
-  ): Promise<TaskModelListItem[]> {
+    params: ListTaskModelsParams,
+  ): Promise<TaskModelListItem[] | PaginatedTaskModels> {
     try {
-      const list = await prismaClient.taskModel.findMany({
-        where: {
-          organization_id: organizationId,
-          ...(type ? { type } : {}),
-          ...(billing ? { billing } : {}),
-        },
+      const where: Prisma.TaskModelWhereInput = {
+        organization_id: params.organizationId,
+        ...(params.type ? { type: params.type } : {}),
+        ...(params.billing ? { billing: params.billing } : {}),
+        ...(params.search
+          ? {
+              OR: [
+                { name: { contains: params.search, mode: "insensitive" } },
+                {
+                  department: {
+                    name: { contains: params.search, mode: "insensitive" },
+                  },
+                },
+              ],
+            }
+          : {}),
+      };
+      const findManyArgs = {
+        where,
         select: TASK_MODEL_LIST_SELECT,
-        orderBy: { name: "asc" },
-      });
+        orderBy: { name: "asc" as const },
+        ...(params.paginationRequested
+          ? { skip: (params.page - 1) * params.limit, take: params.limit }
+          : {}),
+      };
 
-      return list;
+      if (!params.paginationRequested) {
+        return prismaClient.taskModel.findMany(findManyArgs);
+      }
+
+      const [list, total] = await Promise.all([
+        prismaClient.taskModel.findMany(findManyArgs),
+        prismaClient.taskModel.count({ where }),
+      ]);
+
+      return {
+        data: list,
+        total,
+        page: params.page,
+        limit: params.limit,
+        hasMore: params.page * params.limit < total,
+      };
     } catch (err: unknown) {
       logError("Erro ao listar modelos de tarefa", { err });
       if (err instanceof ServiceError) throw err;

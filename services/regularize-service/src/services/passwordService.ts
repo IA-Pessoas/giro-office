@@ -1,6 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type {
   CreatePasswordBody,
   CreateSitePasswordBody,
@@ -234,19 +234,57 @@ export class PasswordService {
     return updated as unknown as Record<string, unknown>;
   }
 
-  async listSites(organizationId: string, status: boolean): Promise<Record<string, unknown>[]> {
-    const list = await this.prisma.sitePasswordsRegularize.findMany({
-      where: {
-        organization_id: organizationId,
-        status,
-      },
+  async listSites(params: {
+    organizationId: string;
+    status: boolean;
+    search: string;
+    page: number;
+    limit: number;
+    paginationRequested: boolean;
+  }): Promise<Record<string, unknown>[] | Record<string, unknown>> {
+    const where: Prisma.SitePasswordsRegularizeWhereInput = {
+      organization_id: params.organizationId,
+      status: params.status,
+      ...(params.search
+        ? {
+            OR: [
+              { name: { contains: params.search, mode: "insensitive" } },
+              { sphere: { contains: params.search, mode: "insensitive" } },
+              { link: { contains: params.search, mode: "insensitive" } },
+              { user: { contains: params.search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+    const findManyArgs = {
+      where,
       select: sitePasswordSelect,
       orderBy: {
         name: "asc",
       },
-    });
+      ...(params.paginationRequested
+        ? { skip: (params.page - 1) * params.limit, take: params.limit }
+        : {}),
+    } as const;
 
-    return list as unknown as Record<string, unknown>[];
+    if (!params.paginationRequested) {
+      return this.prisma.sitePasswordsRegularize.findMany(
+        findManyArgs,
+      ) as unknown as Record<string, unknown>[];
+    }
+
+    const [list, total] = await Promise.all([
+      this.prisma.sitePasswordsRegularize.findMany(findManyArgs),
+      this.prisma.sitePasswordsRegularize.count({ where }),
+    ]);
+
+    return {
+      data: list,
+      total,
+      page: params.page,
+      limit: params.limit,
+      hasMore: params.page * params.limit < total,
+    };
   }
 
   async detailSite(organizationId: string, id: string): Promise<Record<string, unknown>> {

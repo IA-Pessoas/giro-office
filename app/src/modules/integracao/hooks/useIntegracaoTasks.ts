@@ -29,7 +29,6 @@ export function useIntegracaoTasksList(
     () => integracaoTasksService.list(params),
     {
       enabled: true,
-      placeholderData: (previousData) => previousData,
     },
   );
 }

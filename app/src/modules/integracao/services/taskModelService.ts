@@ -1,4 +1,5 @@
 import { setupAPIClient } from "@shared/services/api";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 import type {
   CreateTaskDependentData,
@@ -22,6 +23,7 @@ import {
   unwrapTaskDependentList,
   unwrapTaskModelDetail,
   unwrapTaskModelList,
+  unwrapTaskModelPage,
   unwrapUpdatedTaskModel,
 } from "./taskModelService.contract";
 
@@ -33,6 +35,17 @@ export const taskModelService = {
     });
 
     return unwrapTaskModelList(response.data);
+  },
+
+  async listPage(
+    params: TaskModelListParams & { page: number; limit: number },
+  ): Promise<PaginatedResult<TaskModelListItem>> {
+    const api = setupAPIClient();
+    const response = await api.get(TASK_MODEL_ENDPOINTS.list, {
+      params: buildTaskModelListParams(params),
+    });
+
+    return unwrapTaskModelPage(response.data, params);
   },
 
   async detail(taskId: string): Promise<TaskModelDetail> {

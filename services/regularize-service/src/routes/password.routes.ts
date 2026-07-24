@@ -131,7 +131,12 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(listSitePasswordsQuerySchema, request.query);
-        const list = await passwordService.listSites(request.organization_id, query.status);
+        const list = await passwordService.listSites({
+          organizationId: request.organization_id,
+          paginationRequested:
+            request.query.page !== undefined || request.query.limit !== undefined,
+          ...query,
+        });
         response.json(createSuccessResponse(list));
       } catch (err) {
         logError("Erro ao listar sites de senha do regularize", { err });
