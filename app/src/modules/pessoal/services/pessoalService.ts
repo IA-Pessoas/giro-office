@@ -22,7 +22,12 @@ import type {
   PessoalSituationPayload,
   PessoalSituationUpdatePayload,
 } from "../types/tracking";
-import type { PessoalUnion, PessoalUnionPayload } from "../types/unions";
+import type {
+  PessoalUnion,
+  PessoalUnionListParams,
+  PessoalUnionPayload,
+} from "../types/unions";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 async function getPessoalHttp() {
   const [{ setupAPIClient }, contract] = await Promise.all([
@@ -41,6 +46,14 @@ export function buildPessoalUnionPayload(payload: PessoalUnionPayload): PessoalU
     name: payload.name,
     cnpj: payload.cnpj,
     base_date: typeof payload.base_date === "undefined" ? null : payload.base_date,
+  };
+}
+
+export function buildPessoalUnionListParams(params: PessoalUnionListParams) {
+  return {
+    ...(params.search?.trim() ? { search: params.search.trim() } : {}),
+    page: params.page,
+    limit: params.limit,
   };
 }
 
@@ -132,6 +145,17 @@ export const pessoalService = {
     const response = await api.get(PESSOAL_ENDPOINTS.unions);
 
     return unwrapPessoalEnvelope<PessoalUnion[]>(response.data);
+  },
+
+  async listUnionsPage(
+    params: PessoalUnionListParams,
+  ): Promise<PaginatedResult<PessoalUnion>> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalPage } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.unions, {
+      params: buildPessoalUnionListParams(params),
+    });
+
+    return unwrapPessoalPage<PessoalUnion>(response.data, params);
   },
 
   async detailUnion(id: string): Promise<PessoalUnion> {
