@@ -39,7 +39,7 @@ export function createTiPasswordRoutes(
 
   router.get(
     "/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -56,7 +56,7 @@ export function createTiPasswordRoutes(
 
   router.get(
     "/:id",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Technician),
     async (request, response, next) => {
       try {
         const context = getContext(request);

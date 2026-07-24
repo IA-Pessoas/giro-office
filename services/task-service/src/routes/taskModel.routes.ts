@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  parseWithZod,
   requireAuthenticatedRequestContext,
   ServiceError,
 } from "@workspace/shared";
@@ -8,6 +9,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { taskModelListQuerySchema } from "../schemas/taskModelList.schemas.js";
 import { TaskModelService } from "../services/taskModelService.js";
 
 const router: ReturnType<typeof Router> = Router();
@@ -130,16 +132,18 @@ router.get(
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const type = req.body.type ?? req.query.type;
-      const billing = req.body.billing ?? req.query.billing;
-
       const { organization_id } = requireAuthenticatedRequestContext(req);
-
-      const result = await taskModelService.listModel(
-        type === undefined ? undefined : String(type),
-        billing === undefined ? undefined : String(billing),
-        organization_id,
-      );
+      const paginationRequested = req.query.page !== undefined || req.query.limit !== undefined;
+      const query = parseWithZod(taskModelListQuerySchema, {
+        ...req.query,
+        type: req.query.type ?? req.body?.type,
+        billing: req.query.billing ?? req.body?.billing,
+      });
+      const result = await taskModelService.listModel({
+        organizationId: organization_id,
+        paginationRequested,
+        ...query,
+      });
 
       res.json(createSuccessResponse(result));
     } catch (err) {

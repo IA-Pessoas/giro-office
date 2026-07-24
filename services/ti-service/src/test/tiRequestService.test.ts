@@ -73,6 +73,30 @@ describe("TiRequestService", () => {
     );
   });
 
+  it("forces requester filter for requester permission", async () => {
+    const prisma = {
+      tIRequest: {
+        findMany: vi.fn(async () => []),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    await service.list(
+      { ...context, permission: TiPermissionLevel.Requester },
+      {
+        requester_id: otherUserId,
+      },
+    );
+
+    expect(prisma.tIRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          requester_id: userId,
+        }),
+      }),
+    );
+  });
+
   it("creates request for authenticated user when requester_id is omitted", async () => {
     const prisma = {
       tICategoryRequest: { findFirst: vi.fn(async () => ({ id: categoryId, active: true })) },
@@ -180,10 +204,33 @@ describe("TiRequestService", () => {
     );
   });
 
+  it("hides another user's request from requester permission", async () => {
+    const prisma = {
+      tIRequest: {
+        findFirst: vi.fn(async () => ({
+          id: "req-1",
+          status: "New",
+          requester_id: otherUserId,
+        })),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.getById(
+        { ...context, permission: TiPermissionLevel.Requester },
+        "30000000-0000-4000-8000-000000000001",
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Chamado de TI nao encontrado.",
+    });
+  });
+
   it("rejects transition from Closed without admin permission", async () => {
     const prisma = {
       tIRequest: {
-        findFirst: vi.fn(async () => ({ id: "req-1", status: "Closed" })),
+        findFirst: vi.fn(async () => ({ id: "req-1", status: "Closed", requester_id: userId })),
       },
     };
     const service = new TiRequestService(prisma as never);
@@ -201,7 +248,7 @@ describe("TiRequestService", () => {
   it("rejects reopening resolved request without admin permission", async () => {
     const prisma = {
       tIRequest: {
-        findFirst: vi.fn(async () => ({ id: "req-1", status: "Resolved" })),
+        findFirst: vi.fn(async () => ({ id: "req-1", status: "Resolved", requester_id: userId })),
       },
     };
     const service = new TiRequestService(prisma as never);

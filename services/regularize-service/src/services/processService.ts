@@ -1,6 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type { CreateProcessBody, UpdateProcessBody } from "../schemas/process.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 
@@ -126,12 +126,32 @@ export class ProcessService {
     return { detail };
   }
 
-  async list(organizationId: string, status: string): Promise<Record<string, unknown>[]> {
-    const list = await this.prisma.process.findMany({
-      where: {
-        organization_id: organizationId,
-        ...(status === "Todos" ? {} : { status }),
-      },
+  async list(params: {
+    organizationId: string;
+    status: string;
+    search: string;
+    page: number;
+    limit: number;
+    paginationRequested: boolean;
+  }): Promise<Record<string, unknown>[] | Record<string, unknown>> {
+    const where: Prisma.ProcessWhereInput = {
+      organization_id: params.organizationId,
+      ...(params.status === "Todos" ? {} : { status: params.status }),
+      ...(params.search
+        ? {
+            OR: [
+              { process_type: { contains: params.search, mode: "insensitive" } },
+              { cpf_cnpj: { contains: params.search, mode: "insensitive" } },
+              { clientPF: { name: { contains: params.search, mode: "insensitive" } } },
+              { clientPF: { cpf: { contains: params.search, mode: "insensitive" } } },
+              { clientPJ: { name: { contains: params.search, mode: "insensitive" } } },
+              { clientPJ: { cpf_cnpj: { contains: params.search, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    };
+    const findManyArgs = {
+      where,
       select: {
         id: true,
         client_pj_id: true,
@@ -155,9 +175,27 @@ export class ProcessService {
       orderBy: {
         id: "asc",
       },
-    });
+      ...(params.paginationRequested
+        ? { skip: (params.page - 1) * params.limit, take: params.limit }
+        : {}),
+    } as const;
 
-    return list as unknown as Record<string, unknown>[];
+    if (!params.paginationRequested) {
+      return this.prisma.process.findMany(findManyArgs) as unknown as Record<string, unknown>[];
+    }
+
+    const [list, total] = await Promise.all([
+      this.prisma.process.findMany(findManyArgs),
+      this.prisma.process.count({ where }),
+    ]);
+
+    return {
+      data: list,
+      total,
+      page: params.page,
+      limit: params.limit,
+      hasMore: params.page * params.limit < total,
+    };
   }
 
   private async ensureRelations(

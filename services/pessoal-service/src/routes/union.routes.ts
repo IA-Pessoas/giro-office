@@ -3,6 +3,7 @@ import { Router } from "express";
 
 import {
   createUnionBodySchema,
+  listUnionsQuerySchema,
   unionIdParamsSchema,
   updateUnionBodySchema,
 } from "../schemas/union.schemas.js";
@@ -14,7 +15,12 @@ export function createUnionRoutes(service: UnionService): Router {
 
   router.get("/", async (request, response, next) => {
     try {
-      const result = await service.list(getPessoalOrganizationContext(request));
+      const query = parseWithZod(listUnionsQuerySchema, request.query);
+      const result = await service.list(getPessoalOrganizationContext(request), {
+        ...query,
+        paginationRequested:
+          request.query.page !== undefined || request.query.limit !== undefined,
+      });
 
       response.status(200).json(createSuccessResponse(result));
     } catch (err: unknown) {

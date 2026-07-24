@@ -41,7 +41,12 @@ export interface IntegracaoTaskListItem {
 
 export interface IntegracaoTaskListResult {
   data: IntegracaoTaskListItem[];
+  total: number;
   hasMore: boolean;
+  summary: {
+    inProgress: number;
+    billable: number;
+  };
 }
 
 export interface IntegracaoTaskDetail {

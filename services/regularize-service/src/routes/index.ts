@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { createClientPfRoutes } from "./clientPf.routes.js";
+import { createDashboardRoutes } from "./dashboard.routes.js";
 import { createGuidanceRoutes } from "./guidance.routes.js";
 import { createLicenseRoutes } from "./license.routes.js";
 import { createMunicipalTaxesRoutes } from "./municipalTaxes.routes.js";
@@ -12,6 +13,7 @@ import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 export function createRegularizeRoutes(deps: RegularizeRouteDeps): Router {
   const router = Router();
 
+  router.use(createDashboardRoutes(deps));
   router.use(createPasswordRoutes(deps));
   router.use(createClientPfRoutes(deps));
   router.use(createPartnersRoutes(deps));

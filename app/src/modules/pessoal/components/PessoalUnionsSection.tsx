@@ -1,12 +1,15 @@
-import { useState, type FormEvent } from "react";
-import { AlertCircle, Landmark, Loader2, Pencil, Plus, RefreshCw, X } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { AlertCircle, Landmark, Loader2, Pencil, Plus, RefreshCw, Search, X } from "lucide-react";
 
+import { PaginationControls } from "@shared/components";
+import { useDebouncedValue } from "@shared/hooks";
+import { getLastPage } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
 import { formatCPF_CNPJ } from "@shared/utils/formatters";
 
 import {
   useCreatePessoalUnionMutation,
-  usePessoalUnions,
+  usePaginatedPessoalUnions,
   useUpdatePessoalUnionMutation,
 } from "../hooks/usePessoalUnions";
 import type { PessoalUnion, PessoalUnionPayload } from "../types/unions";
@@ -16,6 +19,8 @@ import {
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
+
+const UNIONS_PAGE_SIZE = 20;
 
 interface PessoalUnionsSectionProps {
   canEdit: boolean;
@@ -74,15 +79,30 @@ function formatUnionDate(value: string | null): string {
 }
 
 export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
-  const unionsQuery = usePessoalUnions();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
+  const isSearchPending = searchTerm.trim() !== debouncedSearch;
+  const unionsQuery = usePaginatedPessoalUnions({
+    search: debouncedSearch,
+    page,
+    limit: UNIONS_PAGE_SIZE,
+  });
   const createMutation = useCreatePessoalUnionMutation();
   const [selectedUnion, setSelectedUnion] = useState<PessoalUnion | null>(null);
   const updateMutation = useUpdatePessoalUnionMutation(selectedUnion?.id ?? "");
   const [formValues, setFormValues] = useState<UnionFormValues>(emptyUnionFormValues);
   const [formError, setFormError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const unions = unionsQuery.data ?? [];
+  const unions = isSearchPending ? [] : unionsQuery.data?.data ?? [];
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  useEffect(() => {
+    const result = unionsQuery.data;
+    if (result && result.data.length === 0 && result.total > 0 && page > 1) {
+      setPage(getLastPage(result.total, UNIONS_PAGE_SIZE));
+    }
+  }, [page, unionsQuery.data]);
 
   function handleStartCreate() {
     setSelectedUnion(null);
@@ -183,7 +203,21 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
         </div>
 
         <div className="mt-5 space-y-3">
-          {unionsQuery.isLoading ? (
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              value={searchTerm}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setPage(1);
+              }}
+              className={`${pessoalTextFieldClassName} pl-10`}
+              placeholder="Buscar por nome ou CNPJ"
+              aria-label="Buscar sindicatos"
+            />
+          </label>
+
+          {unionsQuery.isLoading || isSearchPending ? (
             <StateMessage icon={Loader2} title="Carregando sindicatos" tone="loading">
               Buscando os cadastros disponíveis para esta organização.
             </StateMessage>
@@ -195,7 +229,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
             </StateMessage>
           ) : null}
 
-          {!unionsQuery.isLoading && !unionsQuery.isError && unions.length === 0 ? (
+          {!unionsQuery.isLoading && !isSearchPending && !unionsQuery.isError && unions.length === 0 ? (
             <StateMessage icon={Landmark} title="Nenhum sindicato cadastrado">
               {canEdit
                 ? "Use o botão Criar sindicato para criar o primeiro cadastro."
@@ -203,8 +237,9 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
             </StateMessage>
           ) : null}
 
-          {!unionsQuery.isLoading && !unionsQuery.isError && unions.length > 0 ? (
-            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+          {!unionsQuery.isLoading && !isSearchPending && !unionsQuery.isError && unions.length > 0 ? (
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700">
+              <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] border-separate border-spacing-y-2 px-2 text-sm">
                 <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-700 dark:bg-gray-700/50 dark:text-gray-300">
                   <tr>
@@ -248,6 +283,17 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
                   ))}
                 </tbody>
               </table>
+              </div>
+              <PaginationControls
+                page={page}
+                limit={UNIONS_PAGE_SIZE}
+                total={unionsQuery.data?.total ?? 0}
+                count={unions.length}
+                hasMore={unionsQuery.data?.hasMore ?? false}
+                isFetching={unionsQuery.isFetching || isSearchPending}
+                onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+                onNext={() => setPage((current) => current + 1)}
+              />
             </div>
           ) : null}
         </div>

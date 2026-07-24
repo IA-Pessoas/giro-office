@@ -29,10 +29,23 @@ function gatewayHeaders(permission: number): Record<string, string> {
 }
 
 describe("ti stock routes", () => {
-  it("GET /ti/stock/items/list lists stock items", async () => {
+  it("GET /ti/stock/items/list requires admin permission", async () => {
     const response = await request(createTestApp())
       .get("/ti/stock/items/list")
       .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para acessar o ti-service.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("GET /ti/stock/items/list lists stock items with admin permission", async () => {
+    const response = await request(createTestApp())
+      .get("/ti/stock/items/list")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -153,7 +166,7 @@ describe("ti stock routes", () => {
   it("GET /ti/stock/items/:id/movements/list lists consolidated movements", async () => {
     const response = await request(createTestApp())
       .get(`/ti/stock/items/${stockId}/movements/list`)
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -202,7 +215,7 @@ describe("ti stock routes", () => {
   it("GET /ti/stock/items/:id/movements/list rejects invalid item id", async () => {
     const response = await request(createTestApp())
       .get("/ti/stock/items/not-a-uuid/movements/list")
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
 
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({

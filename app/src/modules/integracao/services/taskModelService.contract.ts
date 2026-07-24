@@ -8,6 +8,7 @@ import type {
   UpdateTaskModelData,
 } from "../types/taskModel";
 import { unwrapServiceEnvelope } from "./envelope.contract.js";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 export const TASK_MODEL_ENDPOINTS = {
   crud: "/task/model",
@@ -23,6 +24,9 @@ export function buildTaskModelListParams(params: TaskModelListParams = {}) {
   return {
     ...(params.type ? { type: params.type } : {}),
     ...(params.billing ? { billing: params.billing } : {}),
+    ...(params.search ? { search: params.search.trim() } : {}),
+    ...(params.page !== undefined ? { page: params.page } : {}),
+    ...(params.limit !== undefined ? { limit: params.limit } : {}),
   };
 }
 
@@ -69,6 +73,27 @@ export function buildDeleteDependentPayload(id: string) {
 
 export function unwrapTaskModelList(body: unknown): TaskModelListItem[] {
   return unwrapServiceEnvelope(body) as TaskModelListItem[];
+}
+
+export function unwrapTaskModelPage(
+  body: unknown,
+  fallback: { page: number; limit: number },
+): PaginatedResult<TaskModelListItem> {
+  const data = unwrapServiceEnvelope(body) as
+    | TaskModelListItem[]
+    | PaginatedResult<TaskModelListItem>;
+
+  if (Array.isArray(data)) {
+    return {
+      data,
+      total: data.length,
+      page: fallback.page,
+      limit: fallback.limit,
+      hasMore: false,
+    };
+  }
+
+  return data;
 }
 
 export function unwrapTaskModelDetail(body: unknown): TaskModelDetail {

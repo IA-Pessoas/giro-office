@@ -15,7 +15,7 @@ import { toast } from "react-toastify";
 
 import { isAdminPermission } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
-import { useMe } from "@shared/hooks";
+import { useDebouncedValue, useMe } from "@shared/hooks";
 
 import { INTEGRACAO_TASK_STATUS_VALUES, type IntegracaoTaskListItem } from "../types";
 import {
@@ -100,16 +100,18 @@ export function TasksWorkspace() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
+  const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
+  const isSearchPending = searchTerm.trim() !== debouncedSearch;
 
   const listParams = useMemo(
     () => ({
       status: statusFilter,
       ref: refFilter,
-      search: searchTerm.trim(),
+      search: debouncedSearch,
       page,
       limit: TASKS_PAGE_SIZE,
     }),
-    [page, refFilter, searchTerm, statusFilter],
+    [debouncedSearch, page, refFilter, statusFilter],
   );
 
   const tasksQuery = useIntegracaoTasksList(listParams);
@@ -123,34 +125,34 @@ export function TasksWorkspace() {
   }, [refFilter, searchTerm, statusFilter]);
 
   useEffect(() => {
-    if (!tasksQuery.data) {
+    if (!tasksQuery.data || isSearchPending) {
       return;
     }
 
     setVisibleTasks((currentTasks) =>
       page === 1 ? tasksQuery.data.data : mergeTaskPages(currentTasks, tasksQuery.data.data),
     );
-  }, [page, tasksQuery.data]);
+  }, [isSearchPending, page, tasksQuery.data]);
 
   const stats = useMemo(
     () => [
       {
         label: "Tarefas",
-        value: visibleTasks.length,
-        description: "Registros carregados com os filtros atuais.",
+        value: tasksQuery.data?.total ?? 0,
+        description: "Todos os registros com os filtros atuais.",
       },
       {
         label: "Em andamento",
-        value: visibleTasks.filter((task) => task.status.toLowerCase().includes("andamento")).length,
-        description: "Tarefas ativas na página carregada.",
+        value: tasksQuery.data?.summary.inProgress ?? 0,
+        description: "Tarefas ativas em todo o resultado filtrado.",
       },
       {
         label: "Com cobrança",
-        value: visibleTasks.filter((task) => !task.billing.toLowerCase().includes("não")).length,
-        description: "Itens marcados para realizar cobrança.",
+        value: tasksQuery.data?.summary.billable ?? 0,
+        description: "Itens com cobrança em todo o resultado filtrado.",
       },
     ],
-    [visibleTasks],
+    [tasksQuery.data],
   );
 
   async function handleDelete(task: IntegracaoTaskListItem) {

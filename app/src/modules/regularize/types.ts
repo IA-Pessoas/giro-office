@@ -16,6 +16,9 @@ export type RegularizePasswordListFilters = {
 
 export type RegularizeSitePasswordListFilters = {
   status: boolean;
+  search?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizeClientPfListFilters = {
@@ -33,6 +36,9 @@ export type RegularizeMunicipalTaxesListFilters = {
 
 export type RegularizeProcessListFilters = {
   status: string;
+  search?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizeGuidanceListFilters = {
@@ -453,3 +459,20 @@ export type CreateRegularizeLicensePayload = {
 export type UpdateRegularizeLicensePayload = CreateRegularizeLicensePayload & {
   id: RegularizeId;
 };
+
+export interface RegularizeDashboard {
+  year: number;
+  metrics: {
+    openProcesses: number;
+    activeLicenses: number;
+    activeClientPfs: number;
+    activeSites: number;
+    municipalTaxesCompleted: number;
+    municipalTaxesPending: number;
+    municipalTaxesTotal: number;
+  };
+  recentProcesses: RegularizeProcessListItem[];
+  trackedLicenses: Array<
+    Pick<RegularizeLicenseListItem, "id" | "type_license" | "protocol" | "due_date">
+  >;
+}

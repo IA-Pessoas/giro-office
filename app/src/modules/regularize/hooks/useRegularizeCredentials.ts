@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 
 import { useFetch } from "@shared/hooks";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 import { regularizeService } from "../services/regularizeService";
 import type {
@@ -27,6 +28,19 @@ type RegularizeReadQueryOptions = {
   enabled?: boolean;
 };
 
+async function invalidateRegularizeCredentials(
+  queryClient: ReturnType<typeof useQueryClient>,
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: regularizeQueryKeys.credentials(),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: regularizeQueryKeys.dashboardRoot(),
+    }),
+  ]);
+}
+
 export function useRegularizeSitePasswords(
   filters: RegularizeSitePasswordListFilters,
   options?: RegularizeReadQueryOptions,
@@ -34,6 +48,19 @@ export function useRegularizeSitePasswords(
   return useFetch(
     regularizeQueryKeys.sitePasswords(filters),
     () => regularizeService.listSitePasswords(filters),
+    {
+      enabled: options?.enabled ?? true,
+    },
+  );
+}
+
+export function usePaginatedRegularizeSitePasswords(
+  filters: RegularizeSitePasswordListFilters & { page: number; limit: number },
+  options?: RegularizeReadQueryOptions,
+): UseQueryResult<PaginatedResult<RegularizeSitePasswordListItem>, Error> {
+  return useFetch(
+    regularizeQueryKeys.sitePasswordsPage(filters),
+    () => regularizeService.listSitePasswordsPage(filters),
     {
       enabled: options?.enabled ?? true,
     },
@@ -62,11 +89,7 @@ export function useCreateRegularizeSitePasswordMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createSitePassword(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.credentials(),
-      });
-    },
+    onSuccess: () => invalidateRegularizeCredentials(queryClient),
   });
 }
 
@@ -79,11 +102,7 @@ export function useUpdateRegularizeSitePasswordMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updateSitePassword(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.credentials(),
-      });
-    },
+    onSuccess: () => invalidateRegularizeCredentials(queryClient),
   });
 }
 
@@ -111,11 +130,7 @@ export function useCreateRegularizePasswordMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createPassword(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.credentials(),
-      });
-    },
+    onSuccess: () => invalidateRegularizeCredentials(queryClient),
   });
 }
 
@@ -128,11 +143,7 @@ export function useUpdateRegularizePasswordMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updatePassword(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.credentials(),
-      });
-    },
+    onSuccess: () => invalidateRegularizeCredentials(queryClient),
   });
 }
 

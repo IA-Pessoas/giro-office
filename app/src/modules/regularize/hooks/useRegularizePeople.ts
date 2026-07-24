@@ -26,6 +26,19 @@ type RegularizeReadQueryOptions = {
   enabled?: boolean;
 };
 
+async function invalidateRegularizePeople(
+  queryClient: ReturnType<typeof useQueryClient>,
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: regularizeQueryKeys.people(),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: regularizeQueryKeys.dashboardRoot(),
+    }),
+  ]);
+}
+
 export function useRegularizeClientPfs(
   filters: RegularizeClientPfListFilters,
   options?: RegularizeReadQueryOptions,
@@ -61,11 +74,7 @@ export function useCreateRegularizeClientPfMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createClientPf(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.people(),
-      });
-    },
+    onSuccess: () => invalidateRegularizePeople(queryClient),
   });
 }
 
@@ -78,11 +87,7 @@ export function useUpdateRegularizeClientPfMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updateClientPf(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.people(),
-      });
-    },
+    onSuccess: () => invalidateRegularizePeople(queryClient),
   });
 }
 
@@ -110,11 +115,7 @@ export function useCreateRegularizePartnerMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createPartner(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.people(),
-      });
-    },
+    onSuccess: () => invalidateRegularizePeople(queryClient),
   });
 }
 
@@ -127,11 +128,7 @@ export function useUpdateRegularizePartnerMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updatePartner(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.people(),
-      });
-    },
+    onSuccess: () => invalidateRegularizePeople(queryClient),
   });
 }
 

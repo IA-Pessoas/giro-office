@@ -86,6 +86,7 @@ runTest("department admin is not created as organization owner", () => {
     modules: {
       rh: 2,
       comercial: 1,
+      ti: 1,
     },
     invited_by: "owner-1",
   });
@@ -138,6 +139,7 @@ runTest("non-owner creator cannot build organization owner payload", () => {
     modules: {
       rh: 2,
       comercial: 1,
+      ti: 1,
     },
   });
 });
@@ -155,15 +157,17 @@ runTest("department module permission is always explicit for non-owner users", (
     {
       rh: 2,
       fiscal: 0,
+      ti: 1,
     },
   );
 });
 
-runTest("eligible non-RH user receives RH self-service by default", () => {
+runTest("eligible non-RH user receives RH and TI self-service by default", () => {
   assert.deepEqual(
     buildCreateUserModulesPayload(
       {
         rh: { enabled: false, level: 0 },
+        ti: { enabled: false, level: 0 },
         fiscal: { enabled: false, level: 0 },
       },
       "fiscal",
@@ -172,15 +176,17 @@ runTest("eligible non-RH user receives RH self-service by default", () => {
     {
       fiscal: 1,
       rh: 1,
+      ti: 1,
     },
   );
 });
 
-runTest("explicit RH management is preserved on user creation", () => {
+runTest("explicit RH and TI management are preserved on user creation", () => {
   assert.deepEqual(
     buildCreateUserModulesPayload(
       {
         rh: { enabled: true, level: 2 },
+        ti: { enabled: true, level: 2 },
         fiscal: { enabled: false, level: 0 },
       },
       "fiscal",
@@ -189,15 +195,17 @@ runTest("explicit RH management is preserved on user creation", () => {
     {
       fiscal: 1,
       rh: 2,
+      ti: 2,
     },
   );
 });
 
-runTest("viewer does not receive RH self-service by default", () => {
+runTest("viewer does not receive RH or TI self-service by default", () => {
   assert.deepEqual(
     buildCreateUserModulesPayload(
       {
         rh: { enabled: false, level: 0 },
+        ti: { enabled: false, level: 0 },
         fiscal: { enabled: false, level: 0 },
       },
       "fiscal",

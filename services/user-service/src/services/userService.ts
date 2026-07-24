@@ -30,7 +30,7 @@ const USER_CREATE_SELECT = {
 
 const DEFAULT_NON_OWNER_PERMISSION = 1;
 const OWNER_MAX_MODULE_VALUE = 2;
-const RH_SELF_SERVICE_PERMISSION = 1;
+const SELF_SERVICE_PERMISSION = 1;
 const MODULE_FIELDS = [
   "atendimento",
   "certificado",
@@ -217,18 +217,21 @@ function withDepartmentAdminModule(
   };
 }
 
-function withDefaultRhSelfService(modules: ModulePatch, permission: number): ModulePatch {
-  if (permission < RH_SELF_SERVICE_PERMISSION) {
-    return modules;
-  }
-
-  if (typeof modules.rh === "number" && modules.rh >= RH_SELF_SERVICE_PERMISSION) {
+function withDefaultSelfServiceModules(modules: ModulePatch, permission: number): ModulePatch {
+  if (permission < DEFAULT_NON_OWNER_PERMISSION) {
     return modules;
   }
 
   return {
     ...modules,
-    rh: RH_SELF_SERVICE_PERMISSION,
+    rh:
+      typeof modules.rh === "number" && modules.rh >= SELF_SERVICE_PERMISSION
+        ? modules.rh
+        : SELF_SERVICE_PERMISSION,
+    ti:
+      typeof modules.ti === "number" && modules.ti >= SELF_SERVICE_PERMISSION
+        ? modules.ti
+        : SELF_SERVICE_PERMISSION,
   };
 }
 
@@ -276,7 +279,7 @@ class UserService {
     const modulesToApply =
       normalizedType === "owner"
         ? MAX_MODULES
-        : withDefaultRhSelfService(
+        : withDefaultSelfServiceModules(
             withDepartmentAdminModule(
               pickKnownModules(data.modules),
               normalizedType,
@@ -433,14 +436,24 @@ class UserService {
       modulesToApply = EMPTY_MODULES;
     }
 
+    const effectivePermission =
+      typeof updateData.permission === "number"
+        ? updateData.permission
+        : typeof existingUser.permission === "number"
+          ? normalizePermissionForType(requestedType, existingUser.permission)
+          : 0;
+    const shouldProvisionSelfService =
+      modulesToApply === null &&
+      data.modules === undefined &&
+      (data.permission !== undefined || data.type !== undefined) &&
+      requestedType !== "owner" &&
+      effectivePermission >= DEFAULT_NON_OWNER_PERMISSION;
+    if (shouldProvisionSelfService) {
+      modulesToApply = {};
+    }
+
     if (modulesToApply) {
-      const effectivePermission =
-        typeof updateData.permission === "number"
-          ? updateData.permission
-          : typeof existingUser.permission === "number"
-            ? normalizePermissionForType(requestedType, existingUser.permission)
-            : 0;
-      modulesToApply = withDefaultRhSelfService(modulesToApply, effectivePermission);
+      modulesToApply = withDefaultSelfServiceModules(modulesToApply, effectivePermission);
     }
 
     try {
