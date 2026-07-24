@@ -310,6 +310,18 @@ export class PasswordService {
     }
   }
 
+  private decryptSecret(value: string): string {
+    try {
+      return this.#encryption.decrypt(value);
+    } catch (err: unknown) {
+      throw new ServiceError(
+        422,
+        "Credencial indisponivel para revelacao. Atualize o cadastro da senha.",
+        err,
+      );
+    }
+  }
+
   private hydratePassword(password: {
     id: string;
     client_id: string;
@@ -320,8 +332,8 @@ export class PasswordService {
   }): Record<string, unknown> {
     return {
       ...password,
-      login: this.#encryption.decrypt(password.login),
-      password: this.#encryption.decrypt(password.password),
+      login: this.decryptSecret(password.login),
+      password: this.decryptSecret(password.password),
     };
   }
 }
