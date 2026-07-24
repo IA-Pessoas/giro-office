@@ -145,6 +145,40 @@ await runTest("regularize safely extracts requestId for contextual errors", asyn
   assert.equal(getRegularizeRequestId({ response: { data: { requestId: 10 } } }), undefined);
 });
 
+await runTest("simultaneous server errors produce one active toast", async () => {
+  const { SERVER_ERROR_TOAST_ID, notifyServerError } = await import(
+    "../../shared/services/serverErrorToast.ts"
+  );
+  let active = false;
+  const calls = [];
+  const adapter = {
+    isActive(id) {
+      assert.equal(id, SERVER_ERROR_TOAST_ID);
+      return active;
+    },
+    error(message, options) {
+      calls.push({ message, options });
+      active = true;
+    },
+  };
+
+  notifyServerError(adapter);
+  notifyServerError(adapter);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.toastId, SERVER_ERROR_TOAST_ID);
+
+  active = false;
+  notifyServerError(adapter);
+  assert.equal(calls.length, 2);
+});
+
+await runTest("API client delegates 5xx feedback to the deduplicated notifier", async () => {
+  const apiSource = await readFile(join(appRoot, "src/shared/services/api.ts"), "utf8");
+
+  assert.match(apiSource, /notifyServerError\(toast\)/);
+  assert.doesNotMatch(apiSource, /toast\.error\(SERVER_ERROR_TOAST_MESSAGE\)/);
+});
+
 await runTest("regularize page renders aggregate dashboard and lazy list options", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
 
