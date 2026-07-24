@@ -98,6 +98,71 @@ await runTest("regularize mutations invalidate aggregate dashboard data", async 
   }
 });
 
+await runTest("regularize dashboard enables only its aggregate query", async () => {
+  const { getRegularizeQueryPolicy } = await import("./utils/regularizeQueryPolicy.ts");
+
+  assert.deepEqual(getRegularizeQueryPolicy("dashboard"), {
+    dashboard: true,
+    clientPfs: false,
+    sitePasswords: false,
+    municipalTaxes: false,
+    processes: false,
+    licenses: false,
+    partners: false,
+    passwords: false,
+    guidance: false,
+  });
+});
+
+await runTest("regularize tab query policy enables only owning contexts", async () => {
+  const { getRegularizeQueryPolicy } = await import("./utils/regularizeQueryPolicy.ts");
+
+  assert.deepEqual(getRegularizeQueryPolicy("passwords"), {
+    dashboard: false,
+    clientPfs: false,
+    sitePasswords: true,
+    municipalTaxes: false,
+    processes: false,
+    licenses: false,
+    partners: false,
+    passwords: true,
+    guidance: false,
+  });
+  assert.equal(getRegularizeQueryPolicy("processes").clientPfs, true);
+  assert.equal(getRegularizeQueryPolicy("processes").guidance, true);
+  assert.equal(getRegularizeQueryPolicy("partners").partners, true);
+  assert.equal(getRegularizeQueryPolicy("taxes").municipalTaxes, true);
+});
+
+await runTest("regularize safely extracts requestId for contextual errors", async () => {
+  const { getRegularizeRequestId } = await import("./utils/regularizeApiError.ts");
+
+  assert.equal(
+    getRegularizeRequestId({ response: { data: { requestId: "request-dashboard-1" } } }),
+    "request-dashboard-1",
+  );
+  assert.equal(getRegularizeRequestId(new Error("network")), undefined);
+  assert.equal(getRegularizeRequestId({ response: { data: { requestId: 10 } } }), undefined);
+});
+
+await runTest("regularize page renders aggregate dashboard and lazy list options", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(
+    pageSource,
+    /useRegularizeDashboard\(currentYear, \{\s*enabled: queryPolicy\.dashboard,\s*\}\)/,
+  );
+  assert.match(pageSource, /getRegularizeQueryPolicy\(activeTab\)/);
+  assert.match(pageSource, /enabled: queryPolicy\.clientPfs/);
+  assert.match(pageSource, /enabled: queryPolicy\.sitePasswords/);
+  assert.match(pageSource, /enabled: queryPolicy\.municipalTaxes/);
+  assert.match(pageSource, /enabled: queryPolicy\.processes/);
+  assert.match(pageSource, /enabled: queryPolicy\.licenses/);
+  assert.match(pageSource, /dashboardQuery\.data\.metrics/);
+  assert.match(pageSource, /getRegularizeRequestId\(dashboardQuery\.error\)/);
+  assert.doesNotMatch(pageSource, /const metricData = useMemo/);
+});
+
 await runTest("regularize service is the only module file importing the API client", async () => {
   const files = await collectSourceFiles(moduleRoot);
   const offenders = [];

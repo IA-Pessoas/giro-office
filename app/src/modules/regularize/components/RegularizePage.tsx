@@ -41,6 +41,7 @@ import { RegularizePartnerForm } from "./RegularizePartnerForm";
 import { RegularizePasswordForm } from "./RegularizePasswordForm";
 import { RegularizeProcessForm } from "./RegularizeProcessForm";
 import { RegularizeSitePasswordForm } from "./RegularizeSitePasswordForm";
+import { useRegularizeDashboard } from "../hooks/useRegularizeDashboard";
 import {
   useCreateRegularizePasswordMutation,
   useCreateRegularizeSitePasswordMutation,
@@ -113,21 +114,16 @@ import type {
   UpdateRegularizeProcessPayload,
   UpdateRegularizeSitePasswordPayload,
 } from "../types";
+import { getRegularizeRequestId } from "../utils/regularizeApiError";
 import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
+import {
+  getRegularizeQueryPolicy,
+  type RegularizeTabId,
+} from "../utils/regularizeQueryPolicy";
 import {
   type RegularizeFormOption,
   regularizePrimaryButtonClassName,
 } from "./regularizeFormControls";
-
-type RegularizeTabId =
-  | "dashboard"
-  | "processes"
-  | "licenses"
-  | "pf"
-  | "partners"
-  | "passwords"
-  | "sites"
-  | "taxes";
 
 type RegularizeTab = {
   id: RegularizeTabId;
@@ -669,11 +665,30 @@ export function RegularizePage() {
   const canRevealCredentials = regularizeAccess.canEdit;
   const canManageRegularizeCore = regularizeAccess.canEdit;
 
-  const pfQuery = useRegularizeClientPfs({ status: "Ativo" });
-  const siteQuery = useRegularizeSitePasswords({ status: true });
-  const taxQuery = useRegularizeMunicipalTaxes({ year: currentYear });
-  const processQuery = useRegularizeProcesses({ status: "Todos" });
-  const licenseQuery = useRegularizeLicenses({ status: "Ativo" });
+  const queryPolicy = getRegularizeQueryPolicy(activeTab);
+  const dashboardQuery = useRegularizeDashboard(currentYear, {
+    enabled: queryPolicy.dashboard,
+  });
+  const pfQuery = useRegularizeClientPfs(
+    { status: "Ativo" },
+    { enabled: queryPolicy.clientPfs },
+  );
+  const siteQuery = useRegularizeSitePasswords(
+    { status: true },
+    { enabled: queryPolicy.sitePasswords },
+  );
+  const taxQuery = useRegularizeMunicipalTaxes(
+    { year: currentYear },
+    { enabled: queryPolicy.municipalTaxes },
+  );
+  const processQuery = useRegularizeProcesses(
+    { status: "Todos" },
+    { enabled: queryPolicy.processes },
+  );
+  const licenseQuery = useRegularizeLicenses(
+    { status: "Ativo" },
+    { enabled: queryPolicy.licenses },
+  );
 
   const createSitePasswordMutation = useCreateRegularizeSitePasswordMutation();
   const updateSitePasswordMutation = useUpdateRegularizeSitePasswordMutation();
@@ -704,12 +719,15 @@ export function RegularizePage() {
 
   const partnerQuery = useRegularizePartners(
     currentClientPfId ? { type: "pf", client_id: currentClientPfId } : undefined,
+    { enabled: queryPolicy.partners },
   );
   const credentialQuery = useRegularizePasswords(
     currentCredentialClientId ? { client_id: currentCredentialClientId } : undefined,
+    { enabled: queryPolicy.passwords },
   );
   const guidanceQuery = useRegularizeGuidance(
     currentProcessId ? { process_id: currentProcessId } : undefined,
+    { enabled: queryPolicy.guidance },
   );
   const clientPfDetailQuery = useRegularizeClientPfDetail(currentClientPfId, {
     enabled: activeTab === "pf",
@@ -750,27 +768,7 @@ export function RegularizePage() {
     }
   }, [firstProcessId, selectedProcessId]);
 
-  const metricData = useMemo(() => {
-    const taxRows = taxQuery.data ?? [];
-    const processRows = processQuery.data ?? [];
-    const completedTaxRows = taxRows.filter((item) => (item.municipalTaxes?.length ?? 0) > 0);
-    const openProcessRows = processRows.filter((item) => {
-      const normalized = normalizeStatus(item.status);
-
-      return !["cancelado", "concluido", "encerrado"].includes(normalized);
-    });
-
-    return {
-      activePfs: pfQuery.data?.length ?? 0,
-      activeLicenses: licenseQuery.data?.length ?? 0,
-      openProcesses: openProcessRows.length,
-      processTotal: processRows.length,
-      siteTotal: siteQuery.data?.length ?? 0,
-      taxesDone: completedTaxRows.length,
-      taxesPending: Math.max(taxRows.length - completedTaxRows.length, 0),
-      taxesTotal: taxRows.length,
-    };
-  }, [licenseQuery.data, pfQuery.data, processQuery.data, siteQuery.data, taxQuery.data]);
+  const dashboardRequestId = getRegularizeRequestId(dashboardQuery.error);
   const hasProcessRows = (processQuery.data?.length ?? 0) > 0;
   const hasSiteRows = (siteQuery.data?.length ?? 0) > 0;
 
@@ -840,16 +838,19 @@ export function RegularizePage() {
     activeForm?.type === "partner" && activeForm.mode === "edit" ? activeForm.partner : null;
 
   function handleRefreshRegularize() {
-    void Promise.all([
-      pfQuery.refetch(),
-      siteQuery.refetch(),
-      taxQuery.refetch(),
-      processQuery.refetch(),
-      licenseQuery.refetch(),
-      partnerQuery.refetch(),
-      credentialQuery.refetch(),
-      guidanceQuery.refetch(),
-    ]);
+    const refreshes: Promise<unknown>[] = [];
+
+    if (queryPolicy.dashboard) refreshes.push(dashboardQuery.refetch());
+    if (queryPolicy.clientPfs) refreshes.push(pfQuery.refetch());
+    if (queryPolicy.sitePasswords) refreshes.push(siteQuery.refetch());
+    if (queryPolicy.municipalTaxes) refreshes.push(taxQuery.refetch());
+    if (queryPolicy.processes) refreshes.push(processQuery.refetch());
+    if (queryPolicy.licenses) refreshes.push(licenseQuery.refetch());
+    if (queryPolicy.partners) refreshes.push(partnerQuery.refetch());
+    if (queryPolicy.passwords) refreshes.push(credentialQuery.refetch());
+    if (queryPolicy.guidance) refreshes.push(guidanceQuery.refetch());
+
+    void Promise.all(refreshes);
   }
 
   function closeCoreForm() {
@@ -1176,19 +1177,57 @@ export function RegularizePage() {
         </div>
       </nav>
 
-      {activeTab === "dashboard" ? (
+      {activeTab === "dashboard" && dashboardQuery.isLoading ? (
+        <div className="flex min-h-64 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-10 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Carregando visão geral...
+        </div>
+      ) : null}
+
+      {activeTab === "dashboard" && dashboardQuery.isError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5 shadow-sm dark:border-red-900/40 dark:bg-red-950/20">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-base font-semibold text-red-700 dark:text-red-300">
+                Não foi possível carregar o dashboard.
+              </p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-300/80">
+                Tente novamente. Se o problema continuar, informe o código da solicitação ao
+                suporte.
+              </p>
+              {dashboardRequestId ? (
+                <p className="mt-2 font-mono text-xs text-red-600 dark:text-red-300/80">
+                  Solicitação: {dashboardRequestId}
+                </p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void dashboardQuery.refetch();
+              }}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200 dark:hover:bg-red-950/50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "dashboard" && dashboardQuery.data ? (
         <section className="space-y-5">
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] xl:items-stretch">
             <DashboardHeroCard
               icon={ClipboardList}
               label={
-                metricData.openProcesses > 0
+                dashboardQuery.data.metrics.openProcesses > 0
                   ? "Processos em acompanhamento"
                   : "Fluxo operacional em dia"
               }
-              value={processQuery.isLoading ? "--" : metricData.openProcesses}
+              value={dashboardQuery.data.metrics.openProcesses}
               description={
-                metricData.openProcesses > 0
+                dashboardQuery.data.metrics.openProcesses > 0
                   ? "Processos que ainda exigem acompanhamento, retorno ou conclusão dentro do Regularize."
                   : "Nenhum processo aberto no momento. Novas demandas passam a aparecer aqui quando entrarem no fluxo."
               }
@@ -1198,23 +1237,23 @@ export function RegularizePage() {
               <MetricTile
                 icon={BadgeCheck}
                 label="Licenças ativas"
-                value={licenseQuery.isLoading ? "--" : metricData.activeLicenses}
+                value={dashboardQuery.data.metrics.activeLicenses}
               />
               <MetricTile
                 icon={UserRound}
                 label="PF ativos"
-                value={pfQuery.isLoading ? "--" : metricData.activePfs}
+                value={dashboardQuery.data.metrics.activeClientPfs}
               />
               <MetricTile
                 icon={Landmark}
                 label="Tributos pendentes"
-                value={taxQuery.isLoading ? "--" : metricData.taxesPending}
-                supporting={`${metricData.taxesDone}/${metricData.taxesTotal} criados em ${currentYear}`}
+                value={dashboardQuery.data.metrics.municipalTaxesPending}
+                supporting={`${dashboardQuery.data.metrics.municipalTaxesCompleted}/${dashboardQuery.data.metrics.municipalTaxesTotal} criados em ${dashboardQuery.data.year}`}
               />
               <MetricTile
                 icon={ShieldCheck}
                 label="Sites ativos"
-                value={siteQuery.isLoading ? "--" : metricData.siteTotal}
+                value={dashboardQuery.data.metrics.activeSites}
               />
             </div>
           </div>
@@ -1226,22 +1265,24 @@ export function RegularizePage() {
               actionLabel="Ver processos"
               onAction={() => setActiveTab("processes")}
             >
-              <QueryStatePanel query={processQuery} emptyTitle="Nenhum processo encontrado.">
-                {(processRows) => (
-                  <DataTable headers={["Processo", "Cliente", "Documento", "Status"]}>
-                    {processRows.slice(0, 6).map((item) => (
-                      <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                        <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
-                        <td className="px-4 py-3">{getProcessClientName(item)}</td>
-                        <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
-                        <td className="px-4 py-3">
-                          <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
-                        </td>
-                      </tr>
-                    ))}
-                  </DataTable>
-                )}
-              </QueryStatePanel>
+              {dashboardQuery.data.recentProcesses.length === 0 ? (
+                <div className="flex min-h-32 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                  Nenhum processo encontrado.
+                </div>
+              ) : (
+                <DataTable headers={["Processo", "Cliente", "Documento", "Status"]}>
+                  {dashboardQuery.data.recentProcesses.map((item) => (
+                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                      <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
+                      <td className="px-4 py-3">{getProcessClientName(item)}</td>
+                      <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
+                      </td>
+                    </tr>
+                  ))}
+                </DataTable>
+              )}
             </DashboardSectionCard>
 
             <DashboardSectionCard
@@ -1250,19 +1291,21 @@ export function RegularizePage() {
               actionLabel="Ver licenças"
               onAction={() => setActiveTab("licenses")}
             >
-              <QueryStatePanel query={licenseQuery} emptyTitle="Nenhuma licença encontrada.">
-                {(licenseRows) => (
-                  <DataTable headers={["Licença", "Protocolo", "Vencimento"]}>
-                    {licenseRows.slice(0, 6).map((item) => (
-                      <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                        <td className="px-4 py-3 font-medium">{formatText(item.type_license)}</td>
-                        <td className="px-4 py-3">{formatText(item.protocol)}</td>
-                        <td className="px-4 py-3">{formatDate(item.due_date)}</td>
-                      </tr>
-                    ))}
-                  </DataTable>
-                )}
-              </QueryStatePanel>
+              {dashboardQuery.data.trackedLicenses.length === 0 ? (
+                <div className="flex min-h-32 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                  Nenhuma licença encontrada.
+                </div>
+              ) : (
+                <DataTable headers={["Licença", "Protocolo", "Vencimento"]}>
+                  {dashboardQuery.data.trackedLicenses.map((item) => (
+                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                      <td className="px-4 py-3 font-medium">{formatText(item.type_license)}</td>
+                      <td className="px-4 py-3">{formatText(item.protocol)}</td>
+                      <td className="px-4 py-3">{formatDate(item.due_date)}</td>
+                    </tr>
+                  ))}
+                </DataTable>
+              )}
             </DashboardSectionCard>
           </div>
         </section>
