@@ -1,6 +1,6 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type { CreateUnionBody, UpdateUnionBody } from "../schemas/union.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
 import { omitUndefined, type PessoalAuthContext, requireUserId } from "./pessoalServiceTypes.js";
@@ -21,18 +21,67 @@ export type UnionRecord = {
   organization_id: string;
 };
 
+export interface UnionListQuery {
+  search: string;
+  page: number;
+  limit: number;
+  paginationRequested: boolean;
+}
+
+export interface PaginatedUnions {
+  data: UnionRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
 export class UnionService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly auditService: PessoalAuditService,
   ) {}
 
-  async list(context: Pick<PessoalAuthContext, "organizationId">): Promise<UnionRecord[]> {
-    return this.prisma.unionPessoal.findMany({
-      where: { organization_id: context.organizationId },
+  async list(
+    context: Pick<PessoalAuthContext, "organizationId">,
+    query: UnionListQuery,
+  ): Promise<UnionRecord[] | PaginatedUnions> {
+    const where: Prisma.UnionPessoalWhereInput = {
+      organization_id: context.organizationId,
+      ...(query.search
+        ? {
+            OR: [
+              { name: { contains: query.search, mode: "insensitive" } },
+              { cnpj: { contains: query.search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+    const findManyArgs = {
+      where,
       select: unionSelect,
       orderBy: { name: "asc" },
-    });
+      ...(query.paginationRequested
+        ? { skip: (query.page - 1) * query.limit, take: query.limit }
+        : {}),
+    } as const;
+
+    if (!query.paginationRequested) {
+      return this.prisma.unionPessoal.findMany(findManyArgs);
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.unionPessoal.findMany(findManyArgs),
+      this.prisma.unionPessoal.count({ where }),
+    ]);
+
+    return {
+      data,
+      total,
+      page: query.page,
+      limit: query.limit,
+      hasMore: query.page * query.limit < total,
+    };
   }
 
   async detail(

@@ -54,6 +54,45 @@ const readResponses = {
   "404": { description: "Not found", ...errorJson },
 } as const;
 
+const unionListResponses = {
+  ...readResponses,
+  "200": {
+    description: "Array completo ou pagina de sindicatos",
+    content: {
+      "application/json": {
+        schema: {
+          oneOf: [
+            {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                data: { type: "array", items: { type: "object" } },
+              },
+            },
+            {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                data: {
+                  type: "object",
+                  required: ["data", "total", "page", "limit", "hasMore"],
+                  properties: {
+                    data: { type: "array", items: { type: "object" } },
+                    total: { type: "integer", minimum: 0 },
+                    page: { type: "integer", minimum: 1 },
+                    limit: { type: "integer", minimum: 1, maximum: 100 },
+                    hasMore: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+  },
+} as const;
+
 const jsonRequestBody = (schema: Record<string, unknown>) =>
   ({
     required: true,
@@ -522,7 +561,22 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           security: bearerSecurity,
           summary: "Listar sindicatos",
           operationId: "listPessoalUnions",
-          responses: readResponses,
+          parameters: [
+            queryParam("search", undefined, false),
+            {
+              name: "page",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1 },
+            },
+            {
+              name: "limit",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+          ],
+          responses: unionListResponses,
         },
         post: {
           tags: ["Pessoal Unions"],
