@@ -170,7 +170,7 @@ await runTest("ti password copy uses the safe helper and generic feedback", asyn
   assert.match(tabSource, /toast\.success\("Senha copiada\."\)/);
   assert.match(
     tabSource,
-    /toast\.error\("Não foi possível copiar a senha\. Verifique a permissão da área de transferência\."\)/,
+    /toast\.error\(\s*"Não foi possível copiar a senha\. Verifique a permissão da área de transferência\.",?\s*\)/,
   );
   assert.doesNotMatch(tabSource, /navigator\.clipboard\.writeText\(secret\)/);
   assert.doesNotMatch(tabSource, /document\.execCommand/);

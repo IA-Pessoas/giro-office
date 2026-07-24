@@ -399,6 +399,24 @@ await runTest("ti sensitive clipboard helper handles an unavailable writer", asy
   assert.equal(await copySensitiveText("segredo de teste", undefined), false);
 });
 
+await runTest("ti password copy uses the safe helper and generic feedback", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /import \{ copySensitiveText \} from "\.\.\/utils\/copySensitiveText"/);
+  assert.match(
+    tabSource,
+    /const clipboard = typeof navigator === "undefined" \? undefined : navigator\.clipboard/,
+  );
+  assert.match(tabSource, /const copied = await copySensitiveText\(secret, clipboard\)/);
+  assert.match(tabSource, /toast\.success\("Senha copiada\."\)/);
+  assert.match(
+    tabSource,
+    /toast\.error\(\s*"Não foi possível copiar a senha\. Verifique a permissão da área de transferência\.",?\s*\)/,
+  );
+  assert.doesNotMatch(tabSource, /navigator\.clipboard\.writeText\(secret\)/);
+  assert.doesNotMatch(tabSource, /document\.execCommand/);
+});
+
 await runTest("ti passwords tab never renders secrets in list and reveals only by explicit action", async () => {
   const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
 
