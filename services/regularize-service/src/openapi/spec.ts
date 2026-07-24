@@ -33,6 +33,7 @@ export function buildRegularizeServiceOpenApiSpec(
     servers: [{ url: baseUrl }],
     tags: [
       { name: "Health", description: "Saude do servico" },
+      { name: "Dashboard", description: "Resumo do modulo Regularize" },
       { name: "Passwords", description: "Senhas por cliente" },
       { name: "Sites", description: "Sites e credenciais base" },
       { name: "PF", description: "Clientes PF do regularize" },
@@ -74,6 +75,24 @@ export function buildRegularizeServiceOpenApiSpec(
               description: "Servico disponivel",
               ...successEnvelopeContent(),
             },
+          },
+        },
+      },
+      "/regularize/dashboard": {
+        get: {
+          tags: ["Dashboard"],
+          summary: "Obter resumo do dashboard do Regularize",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "year",
+              in: "query",
+              required: true,
+              schema: { type: "integer" },
+            },
+          ],
+          responses: {
+            "200": { description: "Resumo do dashboard", ...successEnvelopeContent() },
           },
         },
       },
