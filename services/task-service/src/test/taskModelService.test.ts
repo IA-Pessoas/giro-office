@@ -7,6 +7,7 @@ const { prismaMock, auditMock } = vi.hoisted(() => ({
       create: vi.fn(),
       update: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn(),
       delete: vi.fn(),
     },
     user: {
@@ -59,7 +60,13 @@ describe("TaskModelService", () => {
     prismaMock.taskModel.findMany.mockResolvedValue([{ id: "model-1", name: "Modelo" }]);
     const service = new TaskModelService();
 
-    const result = await service.listModel(undefined, undefined, "org-1");
+    const result = await service.listModel({
+      organizationId: "org-1",
+      paginationRequested: false,
+      search: "",
+      page: 1,
+      limit: 20,
+    });
 
     expect(result).toEqual([{ id: "model-1", name: "Modelo" }]);
     expect(prismaMock.taskModel.findMany).toHaveBeenCalledWith({
@@ -70,8 +77,43 @@ describe("TaskModelService", () => {
         id: true,
         name: true,
         department_id: true,
+        department: { select: { id: true, name: true } },
       },
       orderBy: { name: "asc" },
+    });
+  });
+
+  it("listModel busca por modelo ou departamento antes de paginar", async () => {
+    const row = { id: "model-21", name: "Fiscal 21", department_id: "dep-1" };
+    prismaMock.taskModel.findMany.mockResolvedValue([row]);
+    prismaMock.taskModel.count.mockResolvedValue(21);
+    const service = new TaskModelService();
+
+    const result = await service.listModel({
+      organizationId: "org-1",
+      paginationRequested: true,
+      search: "fiscal",
+      page: 2,
+      limit: 20,
+    });
+
+    const where = {
+      organization_id: "org-1",
+      OR: [
+        { name: { contains: "fiscal", mode: "insensitive" } },
+        { department: { name: { contains: "fiscal", mode: "insensitive" } } },
+      ],
+    };
+    expect(prismaMock.taskModel.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where, skip: 20, take: 20 }),
+    );
+    expect(prismaMock.taskModel.count).toHaveBeenCalledWith({ where });
+    expect(result).toEqual({
+      data: [row],
+      total: 21,
+      page: 2,
+      limit: 20,
+      hasMore: false,
     });
   });
 

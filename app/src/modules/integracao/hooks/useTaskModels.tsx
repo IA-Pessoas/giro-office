@@ -2,45 +2,40 @@ import { useEffect } from "react";
 import { useQueryClient, type QueryObserverResult } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
-import { departmentService } from "@modules/departments";
 import { useFetch } from "@shared/hooks";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 import type {
   CreateTaskModelData,
   TaskModel,
+  TaskModelListItem,
+  TaskModelListParams,
   UpdateTaskModelData,
 } from "../types";
 import { taskModelsListQueryKey } from "./queryKeys";
 import { taskModelService } from "../services/taskModelService";
-import { fetchTaskModelsWithOptionalDepartments } from "./useTaskModels.helpers";
 
 interface UseTaskModelsResult {
   models: TaskModel[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
   isLoading: boolean;
   createModel: (data: CreateTaskModelData) => Promise<boolean>;
   updateModel: (data: UpdateTaskModelData) => Promise<boolean>;
   deleteModel: (id: string) => Promise<boolean>;
-  refresh: () => Promise<QueryObserverResult<TaskModel[], Error>>;
+  refresh: () => Promise<QueryObserverResult<PaginatedResult<TaskModelListItem>, Error>>;
   isError: boolean;
 }
 
-async function fetchTaskModels(): Promise<TaskModel[]> {
-  return fetchTaskModelsWithOptionalDepartments({
-    listModels: () => taskModelService.list(),
-    listDepartments: () => departmentService.list({ status: "Ativo" }),
-    onDepartmentError: () => {
-      toast.warn("Modelos carregados sem os nomes dos departamentos.", {
-        toastId: "task-models-departments-warning",
-      });
-    },
-  });
-}
-
-export const useTaskModels = (): UseTaskModelsResult => {
+export const useTaskModels = (
+  params: TaskModelListParams & { page: number; limit: number },
+): UseTaskModelsResult => {
   const queryClient = useQueryClient();
-  const taskModelsList = taskModelsListQueryKey();
+  const taskModelsList = taskModelsListQueryKey(params);
 
-  const taskModelsQuery = useFetch(taskModelsList, fetchTaskModels, {
+  const taskModelsQuery = useFetch(taskModelsList, () => taskModelService.listPage(params), {
     enabled: true,
   });
 
@@ -57,7 +52,7 @@ export const useTaskModels = (): UseTaskModelsResult => {
       await taskModelService.create(data);
       toast.success("Modelo criado com sucesso!");
       await queryClient.invalidateQueries({
-        queryKey: taskModelsList,
+        queryKey: ["task-models"],
       });
       return true;
     } catch (error) {
@@ -71,7 +66,7 @@ export const useTaskModels = (): UseTaskModelsResult => {
       await taskModelService.update(data);
       toast.success("Modelo atualizado!");
       await queryClient.invalidateQueries({
-        queryKey: taskModelsList,
+        queryKey: ["task-models"],
       });
       return true;
     } catch (error) {
@@ -85,7 +80,7 @@ export const useTaskModels = (): UseTaskModelsResult => {
       await taskModelService.delete(id);
       toast.success("Removido!");
       await queryClient.invalidateQueries({
-        queryKey: taskModelsList,
+        queryKey: ["task-models"],
       });
       return true;
     } catch (error) {
@@ -95,8 +90,12 @@ export const useTaskModels = (): UseTaskModelsResult => {
   };
 
   return {
-    models: taskModelsQuery.data ?? [],
-    isLoading: taskModelsQuery.isLoading || taskModelsQuery.isRefetching,
+    models: taskModelsQuery.data?.data ?? [],
+    total: taskModelsQuery.data?.total ?? 0,
+    page: taskModelsQuery.data?.page ?? params.page,
+    limit: taskModelsQuery.data?.limit ?? params.limit,
+    hasMore: taskModelsQuery.data?.hasMore ?? false,
+    isLoading: taskModelsQuery.isLoading,
     createModel,
     updateModel,
     deleteModel,

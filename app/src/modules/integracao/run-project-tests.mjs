@@ -15,11 +15,13 @@ import {
 import {
   buildCreateTaskModelPayload,
   buildDeleteTaskModelPayload,
+  buildTaskModelListParams,
   buildUpdateTaskModelPayload,
   TASK_MODEL_ENDPOINTS,
   unwrapCreatedTaskModel,
   unwrapTaskModelDetail,
   unwrapTaskModelList,
+  unwrapTaskModelPage,
 } from "./services/taskModelService.contract.ts";
 import {
   buildCreateProjectPayload,
@@ -305,6 +307,13 @@ runTest("task model endpoints match task-service contract", () => {
   assert.equal(TASK_MODEL_ENDPOINTS.dependent, "/task/model/dependent");
 });
 
+runTest("task model list params include remote search and pagination", () => {
+  assert.deepEqual(
+    buildTaskModelListParams({ search: " Fiscal ", page: 2, limit: 20 }),
+    { search: "Fiscal", page: 2, limit: 20 },
+  );
+});
+
 runTest("buildUpdateTaskModelPayload maps id to task_id", () => {
   assert.deepEqual(
     buildUpdateTaskModelPayload({
@@ -368,6 +377,17 @@ runTest("buildDeleteTaskModelPayload maps task_id body", () => {
 runTest("unwrapTaskModelList returns array from envelope", () => {
   const payload = [{ id: "model-1", name: "Modelo", department_id: "dep-1" }];
   assert.deepEqual(unwrapTaskModelList({ success: true, data: payload }), payload);
+});
+
+runTest("unwrapTaskModelPage preserves later-page metadata", () => {
+  const payload = {
+    data: [{ id: "model-21", name: "Fiscal 21", department_id: "dep-1" }],
+    total: 21,
+    page: 2,
+    limit: 20,
+    hasMore: false,
+  };
+  assert.deepEqual(unwrapTaskModelPage({ success: true, data: payload }, { page: 2, limit: 20 }), payload);
 });
 
 runTest("unwrapTaskModelDetail extracts nested detail", () => {
@@ -541,6 +561,14 @@ runTest("task model config table locks visible column alignment", () => {
   assert.equal(TASK_MODEL_TABLE_MODEL_COLUMN_CLASSNAME, "w-[52%]");
   assert.equal(TASK_MODEL_TABLE_DEPARTMENT_COLUMN_CLASSNAME, "w-[32%]");
   assert.equal(TASK_MODEL_TABLE_ACTION_COLUMN_CLASSNAME, "w-24");
+});
+
+runTest("task model config delegates search and pagination to the server", () => {
+  const source = readFileSync("src/pages/configs/integracao/tasks/index.tsx", "utf8");
+
+  assert.match(source, /useDebouncedValue\(searchTerm\.trim\(\), 300\)/);
+  assert.match(source, /<PaginationControls/);
+  assert.doesNotMatch(source, /filteredModels/);
 });
 
 await runAsyncTest("active users for task selects are loaded without unsupported user query params", async () => {

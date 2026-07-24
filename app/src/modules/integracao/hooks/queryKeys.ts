@@ -22,6 +22,9 @@ export function taskModelsListQueryKey(params: TaskModelListParams = {}) {
     "list",
     params.type ?? "",
     params.billing ?? "",
+    params.search ?? "",
+    params.page ?? 1,
+    params.limit ?? 20,
   ] as const;
 }
 

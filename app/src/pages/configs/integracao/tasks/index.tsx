@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import {
@@ -47,65 +47,65 @@ import {
   TASK_TABLE_HEAD_CELL_CLASSNAME,
 } from "@modules/integracao/components/taskWorkspaceUi";
 import { Dialog } from "@shared/components/ui/Dialog";
-import { useMe } from "@shared/hooks";
+import { PaginationControls } from "@shared/components";
+import { useDebouncedValue, useMe } from "@shared/hooks";
+import { getLastPage } from "@shared/pagination/pagination";
+
+const TASK_MODEL_PAGE_SIZE = 20;
 
 export default function TaskModelsConfig() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
+  const isSearchPending = searchTerm.trim() !== debouncedSearch;
   const {
     models,
+    total,
+    hasMore,
     isLoading,
     isError,
     createModel,
     updateModel,
     deleteModel,
     refresh,
-  } = useTaskModels();
+  } = useTaskModels({
+    search: debouncedSearch,
+    page,
+    limit: TASK_MODEL_PAGE_SIZE,
+  });
   const meQuery = useMe();
   const canManageTaskModels = canManageTaskModelConfig(meQuery.data?.permission);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<TaskModel | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [modelToDelete, setModelToDelete] = useState<TaskModel | null>(null);
 
-  const filteredModels = useMemo(() => {
-    const lowerSearch = searchTerm.trim().toLowerCase();
-
-    if (!lowerSearch) {
-      return models;
+  useEffect(() => {
+    if (!isLoading && models.length === 0 && total > 0 && page > 1) {
+      setPage(getLastPage(total, TASK_MODEL_PAGE_SIZE));
     }
-
-    return models.filter((model) => {
-      const departmentLabel = getTaskModelDepartmentLabel(model).toLowerCase();
-
-      return (
-        model.name.toLowerCase().includes(lowerSearch) ||
-        departmentLabel.includes(lowerSearch) ||
-        model.department_id.toLowerCase().includes(lowerSearch)
-      );
-    });
-  }, [models, searchTerm]);
+  }, [isLoading, models.length, page, total]);
 
   const stats = useMemo(() => {
     const departmentsCount = new Set(models.map((model) => model.department_id)).size;
-    const unresolvedDepartments = models.filter((model) => !model.department?.name).length;
 
     return [
       {
         label: "Modelos",
-        value: models.length,
-        description: "Templates disponíveis para criação de tarefas de integração.",
+        value: total,
+        description: "Templates em todo o resultado filtrado.",
       },
       {
-        label: "Departamentos",
+        label: "Departamentos na página",
         value: departmentsCount,
-        description: "Áreas vinculadas aos modelos carregados.",
+        description: "Áreas representadas nos registros exibidos.",
       },
       {
-        label: "Sem nome de departamento",
-        value: unresolvedDepartments,
-        description: "Modelos carregados sem enriquecimento da lista de departamentos.",
+        label: "Exibidos",
+        value: models.length,
+        description: "Registros presentes nesta página.",
       },
     ];
-  }, [models]);
+  }, [models, total]);
 
   function handleOpenCreate() {
     if (!canManageTaskModels) {
@@ -149,7 +149,8 @@ export default function TaskModelsConfig() {
   }
 
   const hasSearch = Boolean(searchTerm.trim());
-  const showEmptyState = !isLoading && filteredModels.length === 0;
+  const showLoading = isLoading || isSearchPending;
+  const showEmptyState = !showLoading && models.length === 0;
 
   return (
     <>
@@ -225,7 +226,10 @@ export default function TaskModelsConfig() {
                 <input
                   type="text"
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value);
+                    setPage(1);
+                  }}
                   className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
                   placeholder="Buscar por nome ou departamento"
                 />
@@ -264,7 +268,7 @@ export default function TaskModelsConfig() {
                 </tr>
               </thead>
               <tbody>
-                {isLoading ? (
+                {showLoading ? (
                   <tr>
                     <td colSpan={3} className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400">
                       <LoaderCircle className="mr-2 inline h-4 w-4 animate-spin" />
@@ -278,7 +282,7 @@ export default function TaskModelsConfig() {
                     </td>
                   </tr>
                 ) : (
-                  filteredModels.map((model) => (
+                  models.map((model) => (
                     <tr
                       key={model.id}
                       className="border-b border-slate-200/80 last:border-b-0 dark:border-slate-800"
@@ -325,6 +329,16 @@ export default function TaskModelsConfig() {
               </tbody>
             </table>
           </div>
+          <PaginationControls
+            page={page}
+            limit={TASK_MODEL_PAGE_SIZE}
+            total={total}
+            count={models.length}
+            hasMore={hasMore}
+            isFetching={isLoading || isSearchPending}
+            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+            onNext={() => setPage((current) => current + 1)}
+          />
         </section>
       </div>
 
