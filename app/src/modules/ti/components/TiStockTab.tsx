@@ -831,83 +831,83 @@ export function TiStockTab() {
             query={{ ...stockItemsQuery, data: stockItems }}
           >
             {(items) => (
-              <TiDataTable
-                className={tiFiveRowTableClassName}
-                footer={
-                  <PaginationControls
-                    page={stockPage}
-                    limit={STOCK_PAGE_SIZE}
-                    total={stockItemsQuery.data?.total ?? 0}
-                    count={stockItems.length}
-                    hasMore={stockItemsQuery.data?.hasMore ?? false}
-                    isFetching={stockItemsQuery.isFetching}
-                    onPrevious={() => setStockPage((current) => Math.max(1, current - 1))}
-                    onNext={() => setStockPage((current) => current + 1)}
-                  />
-                }
-                headers={["Item", "Categoria", "Local", "Saldo", "Status", ""]}
-              >
-                {items.map((item) => {
-                  const isSelected = getId(item.id) === getId(selectedItemId);
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                <TiDataTable
+                  className={cn(tiFiveRowTableClassName, "rounded-none border-0")}
+                  headers={["Item", "Categoria", "Local", "Saldo", "Status", ""]}
+                >
+                  {items.map((item) => {
+                    const isSelected = getId(item.id) === getId(selectedItemId);
 
-                  return (
-                    <tr
-                      key={getId(item.id)}
-                      className={cn(
-                        "text-slate-700 dark:text-slate-200",
-                        isSelected ? "bg-blue-50/60 dark:bg-blue-950/20" : null,
-                      )}
-                    >
-                      <td className="min-w-56 max-w-sm px-4 py-2 align-top">
-                        <button
-                          type="button"
-                          className="max-w-full break-words text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
-                          onClick={() => openStockDetail(item)}
-                        >
-                          {formatText(item.name, "Item sem nome")}
-                        </button>
-                        {item.description ? (
-                          <p className="mt-1 line-clamp-2 max-w-sm break-words text-xs text-slate-500 dark:text-slate-400">
-                            {formatText(item.description)}
-                          </p>
-                        ) : null}
-                      </td>
-                      <td className="max-w-44 px-4 py-2 align-top">
-                        <span className="block break-words">
-                          {getRelatedName(item.category, item.category_id)}
-                        </span>
-                      </td>
-                      <td className="max-w-44 px-4 py-2 align-top">
-                        <span className="block break-words">
-                          {resolveTiStockLocationName(item, stockLocations)}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-2 text-right align-top font-semibold">
-                        {formatQuantity(item.quantity)}
-                      </td>
-                      <td className="px-4 py-2 align-top">
-                        <StatusBadge config={formatStatus(item.status)} size="sm" />
-                      </td>
-                      <td className="px-4 py-2 align-top">
-                        <div className="flex justify-end gap-1">
-                          <TiTableAction
-                            icon={PackageCheck}
-                            label="Abrir"
+                    return (
+                      <tr
+                        key={getId(item.id)}
+                        className={cn(
+                          "text-slate-700 dark:text-slate-200",
+                          isSelected ? "bg-blue-50/60 dark:bg-blue-950/20" : null,
+                        )}
+                      >
+                        <td className="min-w-56 max-w-sm px-4 py-2 align-top">
+                          <button
+                            type="button"
+                            className="max-w-full break-words text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
                             onClick={() => openStockDetail(item)}
-                          />
-                          {canEditStock ? (
-                            <TiTableAction
-                              icon={Pencil}
-                              label="Editar"
-                              onClick={() => handleEditItem(item)}
-                            />
+                          >
+                            {formatText(item.name, "Item sem nome")}
+                          </button>
+                          {item.description ? (
+                            <p className="mt-1 line-clamp-2 max-w-sm break-words text-xs text-slate-500 dark:text-slate-400">
+                              {formatText(item.description)}
+                            </p>
                           ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </TiDataTable>
+                        </td>
+                        <td className="max-w-44 px-4 py-2 align-top">
+                          <span className="block break-words">
+                            {getRelatedName(item.category, item.category_id)}
+                          </span>
+                        </td>
+                        <td className="max-w-44 px-4 py-2 align-top">
+                          <span className="block break-words">
+                            {resolveTiStockLocationName(item, stockLocations)}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-right align-top font-semibold">
+                          {formatQuantity(item.quantity)}
+                        </td>
+                        <td className="px-4 py-2 align-top">
+                          <StatusBadge config={formatStatus(item.status)} size="sm" />
+                        </td>
+                        <td className="px-4 py-2 align-top">
+                          <div className="flex justify-end gap-1">
+                            <TiTableAction
+                              icon={PackageCheck}
+                              label="Abrir"
+                              onClick={() => openStockDetail(item)}
+                            />
+                            {canEditStock ? (
+                              <TiTableAction
+                                icon={Pencil}
+                                label="Editar"
+                                onClick={() => handleEditItem(item)}
+                              />
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </TiDataTable>
+                <PaginationControls
+                  page={stockPage}
+                  limit={STOCK_PAGE_SIZE}
+                  total={stockItemsQuery.data?.total ?? 0}
+                  count={stockItems.length}
+                  hasMore={stockItemsQuery.data?.hasMore ?? false}
+                  isFetching={stockItemsQuery.isFetching}
+                  onPrevious={() => setStockPage((current) => Math.max(1, current - 1))}
+                  onNext={() => setStockPage((current) => current + 1)}
+                />
+              </div>
             )}
           </TiQueryStatePanel>
         </div>

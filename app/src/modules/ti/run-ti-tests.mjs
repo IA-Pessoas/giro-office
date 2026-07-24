@@ -255,6 +255,17 @@ await runTest("ti stock filters reset and render server pagination", async () =>
   );
 });
 
+await runTest("ti stock pagination stays outside the scrollable table", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+  const tableIndex = tabSource.indexOf("<TiDataTable");
+  const tableCloseIndex = tabSource.indexOf("</TiDataTable>", tableIndex);
+  const paginationIndex = tabSource.indexOf("<PaginationControls", tableIndex);
+
+  assert.ok(tableIndex > 0);
+  assert.ok(tableCloseIndex > tableIndex);
+  assert.ok(paginationIndex > tableCloseIndex);
+});
+
 await runTest("ti stock tab renders operational item, movement, category and location workflows", async () => {
   const tabSource = await readModuleSource("components/TiStockTab.tsx");
 
@@ -321,7 +332,7 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.match(tabSource, /const selectedListItem = stockItems\.find/);
   assert.match(tabSource, /const selectedItem = selectedItemQuery\.data \?\? selectedListItem/);
   assert.match(tabSource, /headers=\{\["Item", "Categoria", "Local", "Saldo", "Status", ""\]\}/);
-  assert.match(tabSource, /className=\{tiFiveRowTableClassName\}/);
+  assert.match(tabSource, /className=\{cn\(tiFiveRowTableClassName/);
   assert.match(tabSource, /xl:min-h-\[280px\]/);
   assert.match(tabSource, /Saldo atual/);
   assert.match(tabSource, /Movimentacoes/);

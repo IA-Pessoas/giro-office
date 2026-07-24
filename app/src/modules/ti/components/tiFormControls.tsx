@@ -236,12 +236,10 @@ export function TiQueryStatePanel<T>({
 export function TiDataTable({
   children,
   className,
-  footer,
   headers,
 }: {
   children: ReactNode;
   className?: string;
-  footer?: ReactNode;
   headers: string[];
 }) {
   return (
@@ -270,7 +268,6 @@ export function TiDataTable({
         </thead>
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">{children}</tbody>
       </table>
-      {footer}
     </div>
   );
 }
