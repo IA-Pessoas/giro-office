@@ -4,7 +4,7 @@
 
 **Issue:** #448
 
-**Status:** aguardando revisão do documento
+**Status:** aprovado para implementação
 
 ## Contexto e diagnóstico
 
