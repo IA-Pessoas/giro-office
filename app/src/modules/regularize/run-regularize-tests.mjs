@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  buildRegularizeProcessListParams,
+  buildRegularizeSitePasswordListParams,
+  unwrapRegularizePage,
+} from "./services/regularizeService.contract.ts";
 
 const moduleRoot = fileURLToPath(new URL("./", import.meta.url));
 const appRoot = join(moduleRoot, "../../..");
@@ -69,6 +74,40 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   ]) {
     assert.match(contractSource, new RegExp(endpoint.replaceAll("/", "\\/")));
   }
+});
+
+await runTest("regularize list params carry server search and pagination", async () => {
+  assert.deepEqual(
+    buildRegularizeProcessListParams({
+      status: "Aberto",
+      search: " Acme ",
+      page: 2,
+      limit: 20,
+    }),
+    { status: "Aberto", search: "Acme", page: 2, limit: 20 },
+  );
+  assert.deepEqual(
+    buildRegularizeSitePasswordListParams({
+      status: true,
+      search: " Gov ",
+      page: 2,
+      limit: 20,
+    }),
+    { status: true, search: "Gov", page: 2, limit: 20 },
+  );
+  const page = { data: [{ id: "row-21" }], total: 21, page: 2, limit: 20, hasMore: false };
+  assert.deepEqual(unwrapRegularizePage({ data: page }, { page: 2, limit: 20 }), page);
+});
+
+await runTest("regularize management tables use debounced paginated hooks", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /usePaginatedRegularizeProcesses/);
+  assert.match(pageSource, /usePaginatedRegularizeSitePasswords/);
+  assert.match(pageSource, /useDebouncedValue\(processSearch\.trim\(\), 300\)/);
+  assert.match(pageSource, /useDebouncedValue\(siteSearch\.trim\(\), 300\)/);
+  assert.match(pageSource, /<PaginationControls/);
+  assert.doesNotMatch(pageSource, /selectedCredentialClientId[\s\S]{0,120}sitePageQuery/);
 });
 
 await runTest("regularize service is the only module file importing the API client", async () => {
@@ -488,7 +527,7 @@ await runTest("regularize credential empty layouts keep intentional detail behav
   assert.doesNotMatch(passwordsSource, /hasCredentialRows \? \(/);
   assert.doesNotMatch(passwordsSource, /emptyClassName="[^"]*xl:col-span-2[^"]*"/);
   assert.match(pageSource, /hasSiteRows \? \(\s*<DetailPanel title="Site selecionado">/);
-  assert.match(pageSource, /<QueryStatePanel\s+query=\{siteQuery\}\s+emptyTitle="Nenhum site encontrado\."\s+emptyClassName="[^"]*xl:col-span-2[^"]*"/);
+  assert.match(pageSource, /<QueryStatePanel\s+query=\{siteTableQuery\}\s+emptyTitle="Nenhum site encontrado\."\s+emptyClassName="[^"]*xl:col-span-2[^"]*"/);
 });
 
 await runTest("regularize page uses the new module instead of the legacy mock screen", async () => {

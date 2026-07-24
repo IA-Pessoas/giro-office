@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 
 import { useFetch } from "@shared/hooks";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 import { regularizeService } from "../services/regularizeService";
 import type {
@@ -105,6 +106,19 @@ export function useRegularizeProcesses(
   return useFetch(
     regularizeQueryKeys.processes(filters),
     () => regularizeService.listProcesses(filters),
+    {
+      enabled: Boolean(filters.status) && (options?.enabled ?? true),
+    },
+  );
+}
+
+export function usePaginatedRegularizeProcesses(
+  filters: RegularizeProcessListFilters & { page: number; limit: number },
+  options?: RegularizeReadQueryOptions,
+): UseQueryResult<PaginatedResult<RegularizeProcessListItem>, Error> {
+  return useFetch(
+    regularizeQueryKeys.processesPage(filters),
+    () => regularizeService.listProcessesPage(filters),
     {
       enabled: Boolean(filters.status) && (options?.enabled ?? true),
     },
