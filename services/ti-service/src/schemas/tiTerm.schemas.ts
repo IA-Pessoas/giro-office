@@ -1,4 +1,4 @@
-import { zIsoDate, zNonEmptyText } from "@workspace/shared";
+import { zIsoDate } from "@workspace/shared";
 import { z } from "zod";
 
 import { paginationQuerySchema } from "./pagination.schemas.js";
@@ -20,9 +20,7 @@ export const listTiTermsQuerySchema = paginationQuerySchema
 export const createTiTermBodySchema = z
   .object({
     date: zIsoDate("date"),
-    user_name: zNonEmptyText("user_name"),
-    user_cpf: zNonEmptyText("user_cpf"),
-    user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
+    user_id: z.string().uuid({ message: "Usuario invalido." }),
     department_id: z.string().uuid({ message: "Departamento invalido." }).optional(),
     address: z.string().optional(),
     reason: z.string().optional(),
@@ -33,11 +31,25 @@ export const createTiTermBodySchema = z
   })
   .strict();
 
-export const updateTiTermBodySchema = createTiTermBodySchema
-  .partial()
-  .refine((value) => Object.keys(value).length > 0, {
+const tiTermEditableFieldsSchema = z
+  .object({
+    date: zIsoDate("date").optional(),
+    department_id: z.string().uuid({ message: "Departamento invalido." }).optional(),
+    address: z.string().optional(),
+    reason: z.string().optional(),
+    equipament_list: z.string().optional(),
+    brand: z.string().optional(),
+    asset_code: z.string().optional(),
+    imei: z.string().optional(),
+  })
+  .strict();
+
+export const updateTiTermBodySchema = tiTermEditableFieldsSchema.refine(
+  (value) => Object.keys(value).length > 0,
+  {
     message: "Informe ao menos um campo para atualizar.",
-  });
+  },
+);
 
 export const signTiTermBodySchema = z
   .object({
