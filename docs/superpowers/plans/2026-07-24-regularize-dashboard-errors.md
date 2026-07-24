@@ -66,7 +66,7 @@
 - Produces: `RegularizeDashboardService.getDashboard(organizationId: string, year: number): Promise<RegularizeDashboardResult>`.
 - Produces: `RegularizeDashboardResult`, used by the HTTP route and serialized by Express.
 
-- [ ] **Step 1: Write the failing service tests**
+- [x] **Step 1: Write the failing service tests**
 
 Create `regularizeDashboardService.test.ts` with a Prisma double whose methods return distinct
 values in transaction order:
@@ -233,7 +233,7 @@ describe("RegularizeDashboardService", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify the red state**
+- [x] **Step 2: Run the test and verify the red state**
 
 Run:
 
@@ -243,7 +243,7 @@ pnpm --filter @workspace/regularize-service test -- src/services/regularizeDashb
 
 Expected: FAIL because `regularizeDashboardService.js` does not exist.
 
-- [ ] **Step 3: Implement the aggregate service**
+- [x] **Step 3: Implement the aggregate service**
 
 Create `regularizeDashboardService.ts` with these exported interfaces and transaction:
 
@@ -393,7 +393,7 @@ export class RegularizeDashboardService {
 }
 ```
 
-- [ ] **Step 4: Run service tests and typecheck**
+- [x] **Step 4: Run service tests and typecheck**
 
 Run:
 
@@ -404,7 +404,7 @@ pnpm --filter @workspace/regularize-service typecheck
 
 Expected: the new test file passes and TypeScript reports no errors.
 
-- [ ] **Step 5: Commit the service**
+- [x] **Step 5: Commit the service**
 
 ```bash
 git add services/regularize-service/src/services/regularizeDashboardService.ts services/regularize-service/src/services/regularizeDashboardService.test.ts
@@ -431,7 +431,7 @@ git commit -m "feat(regularize): aggregate dashboard data"
 - Produces: authenticated `GET /regularize/dashboard?year=<integer>`.
 - Produces: `regularizeServiceErrorLogContext(request)` with `requestId`, method, route, user, organization, and permission.
 
-- [ ] **Step 1: Write failing route and context tests**
+- [x] **Step 1: Write failing route and context tests**
 
 Create `dashboard.routes.test.ts`:
 
@@ -551,7 +551,7 @@ it("builds correlated regularize error context", () => {
 });
 ```
 
-- [ ] **Step 2: Run route tests and verify the red state**
+- [x] **Step 2: Run route tests and verify the red state**
 
 Run:
 
@@ -561,7 +561,7 @@ pnpm --filter @workspace/regularize-service test -- src/test/dashboard.routes.te
 
 Expected: FAIL because the route and exported context do not exist.
 
-- [ ] **Step 3: Add schema, route, mount, logging context, and OpenAPI**
+- [x] **Step 3: Add schema, route, mount, logging context, and OpenAPI**
 
 Create `dashboard.schemas.ts`:
 
@@ -664,7 +664,7 @@ Add this path to `buildRegularizeServiceOpenApiSpec`:
 
 Also add `{ name: "Dashboard", description: "Resumo do modulo Regularize" }` to the tag list.
 
-- [ ] **Step 4: Run service, gateway contract, typecheck, and formatting checks**
+- [x] **Step 4: Run service, gateway contract, typecheck, and formatting checks**
 
 Run:
 
@@ -678,7 +678,7 @@ pnpm --filter @workspace/gateway test -- src/app.routes.test.ts
 Expected: all Regularize tests pass; gateway OpenAPI aggregation still passes; typecheck and Biome
 report no errors.
 
-- [ ] **Step 5: Commit the route and observability**
+- [x] **Step 5: Commit the route and observability**
 
 ```bash
 git add services/regularize-service/src/schemas/dashboard.schemas.ts services/regularize-service/src/routes/dashboard.routes.ts services/regularize-service/src/routes/index.ts services/regularize-service/src/app.ts services/regularize-service/src/test/dashboard.routes.test.ts services/regularize-service/src/test/app.test.ts services/regularize-service/src/openapi/spec.ts
@@ -708,7 +708,7 @@ git commit -m "feat(regularize): expose dashboard summary"
 - Produces: `useRegularizeDashboard(year, options): UseQueryResult<RegularizeDashboard, Error>`.
 - Produces: `regularizeQueryKeys.dashboardRoot()` and `regularizeQueryKeys.dashboard(year)`.
 
-- [ ] **Step 1: Add failing frontend contract assertions**
+- [x] **Step 1: Add failing frontend contract assertions**
 
 Add tests to `run-regularize-tests.mjs`:
 
@@ -741,7 +741,7 @@ await runTest("regularize mutations invalidate aggregate dashboard data", async 
 });
 ```
 
-- [ ] **Step 2: Run the contract test and verify the red state**
+- [x] **Step 2: Run the contract test and verify the red state**
 
 Run:
 
@@ -751,7 +751,7 @@ pnpm --filter @workspace/app test:regularize
 
 Expected: FAIL reading `useRegularizeDashboard.ts` or matching the missing endpoint.
 
-- [ ] **Step 3: Add types, endpoint, service method, query key, and hook**
+- [x] **Step 3: Add types, endpoint, service method, query key, and hook**
 
 Add to `types.ts`:
 
@@ -829,7 +829,7 @@ export function useRegularizeDashboard(
 }
 ```
 
-- [ ] **Step 4: Invalidate the dashboard after Regularize mutations**
+- [x] **Step 4: Invalidate the dashboard after Regularize mutations**
 
 Keep the existing operations helper and make it await both roots:
 
@@ -870,7 +870,7 @@ Replace every inline credentials/people `onSuccess` invalidation with
 `onSuccess: () => invalidateRegularizeCredentials(queryClient)` or
 `onSuccess: () => invalidateRegularizePeople(queryClient)`, respectively.
 
-- [ ] **Step 5: Run frontend tests and typecheck**
+- [x] **Step 5: Run frontend tests and typecheck**
 
 Run:
 
@@ -881,7 +881,7 @@ pnpm --filter @workspace/app typecheck
 
 Expected: all Regularize contract tests pass and TypeScript reports no errors.
 
-- [ ] **Step 6: Commit the frontend data layer**
+- [x] **Step 6: Commit the frontend data layer**
 
 ```bash
 git add app/src/modules/regularize/types.ts app/src/modules/regularize/services/regularizeService.contract.ts app/src/modules/regularize/services/regularizeService.ts app/src/modules/regularize/hooks/useRegularizeDashboard.ts app/src/modules/regularize/hooks/queryKeys.ts app/src/modules/regularize/hooks/useRegularizeCredentials.ts app/src/modules/regularize/hooks/useRegularizePeople.ts app/src/modules/regularize/hooks/useRegularizeOperations.ts app/src/modules/regularize/run-regularize-tests.mjs
@@ -905,7 +905,7 @@ git commit -m "feat(regularize): consume dashboard summary"
 - Produces: `getRegularizeRequestId(error): string | undefined`.
 - Consumes: `useRegularizeDashboard(year)` and the dashboard response contract from Task 3.
 
-- [ ] **Step 1: Write failing policy and page regressions**
+- [x] **Step 1: Write failing policy and page regressions**
 
 Add to `run-regularize-tests.mjs`:
 
@@ -980,7 +980,7 @@ await runTest("regularize page renders aggregate dashboard and lazy list options
 });
 ```
 
-- [ ] **Step 2: Run the frontend contract test and verify the red state**
+- [x] **Step 2: Run the frontend contract test and verify the red state**
 
 Run:
 
@@ -990,7 +990,7 @@ pnpm --filter @workspace/app test:regularize
 
 Expected: FAIL because the policy and error utility modules do not exist.
 
-- [ ] **Step 3: Implement the pure query policy**
+- [x] **Step 3: Implement the pure query policy**
 
 Create `regularizeQueryPolicy.ts`:
 
@@ -1040,7 +1040,7 @@ export function getRegularizeQueryPolicy(
 Move the `RegularizeTabId` ownership from `RegularizePage.tsx` to this utility and import it back
 into the page.
 
-- [ ] **Step 4: Implement safe request ID extraction**
+- [x] **Step 4: Implement safe request ID extraction**
 
 Create `regularizeApiError.ts`:
 
@@ -1062,7 +1062,7 @@ export function getRegularizeRequestId(error: unknown): string | undefined {
 }
 ```
 
-- [ ] **Step 5: Wire the policy and dashboard hook into `RegularizePage`**
+- [x] **Step 5: Wire the policy and dashboard hook into `RegularizePage`**
 
 Import the new hook and utilities:
 
@@ -1161,7 +1161,7 @@ Before the dashboard success layout, render these exclusive states:
 
 Render the success dashboard only when `dashboardQuery.data` exists.
 
-- [ ] **Step 6: Restrict refresh to enabled queries**
+- [x] **Step 6: Restrict refresh to enabled queries**
 
 Replace the unconditional refresh array with:
 
@@ -1187,7 +1187,7 @@ function handleRefreshRegularize() {
 }
 ```
 
-- [ ] **Step 7: Run frontend regressions and typecheck**
+- [x] **Step 7: Run frontend regressions and typecheck**
 
 Run:
 
@@ -1198,7 +1198,7 @@ pnpm --filter @workspace/app typecheck
 
 Expected: policy, request ID, source-contract, existing Regularize tests, and TypeScript all pass.
 
-- [ ] **Step 8: Commit the lazy dashboard UI**
+- [x] **Step 8: Commit the lazy dashboard UI**
 
 ```bash
 git add app/src/modules/regularize/utils/regularizeQueryPolicy.ts app/src/modules/regularize/utils/regularizeApiError.ts app/src/modules/regularize/components/RegularizePage.tsx app/src/modules/regularize/run-regularize-tests.mjs
@@ -1221,7 +1221,7 @@ git commit -m "fix(regularize): lazy-load dashboard dependencies"
 - Consumes: React Toastify's `toast.isActive` and `toast.error`.
 - Keeps the existing user-facing server error message unchanged.
 
-- [ ] **Step 1: Write the failing behavioral test**
+- [x] **Step 1: Write the failing behavioral test**
 
 Add to `run-regularize-tests.mjs`:
 
@@ -1262,7 +1262,7 @@ await runTest("API client delegates 5xx feedback to the deduplicated notifier", 
 });
 ```
 
-- [ ] **Step 2: Run the contract test and verify the red state**
+- [x] **Step 2: Run the contract test and verify the red state**
 
 Run:
 
@@ -1272,7 +1272,7 @@ pnpm --filter @workspace/app test:regularize
 
 Expected: FAIL because `serverErrorToast.ts` does not exist.
 
-- [ ] **Step 3: Implement the pure notifier and use it from the API client**
+- [x] **Step 3: Implement the pure notifier and use it from the API client**
 
 Create `serverErrorToast.ts`:
 
@@ -1308,7 +1308,7 @@ onServerError: () => {
 },
 ```
 
-- [ ] **Step 4: Run frontend regressions and typecheck**
+- [x] **Step 4: Run frontend regressions and typecheck**
 
 Run:
 
@@ -1319,7 +1319,7 @@ pnpm --filter @workspace/app typecheck
 
 Expected: the toast behavior test, all existing Regularize tests, and TypeScript pass.
 
-- [ ] **Step 5: Commit toast deduplication**
+- [x] **Step 5: Commit toast deduplication**
 
 ```bash
 git add app/src/shared/services/serverErrorToast.ts app/src/shared/services/api.ts app/src/modules/regularize/run-regularize-tests.mjs
@@ -1340,7 +1340,7 @@ git commit -m "fix(app): deduplicate server error toasts"
 - Consumes: all deliverables from Tasks 1–5.
 - Produces: a verified branch ready for code review and later publication.
 
-- [ ] **Step 1: Run all scoped automated checks from a clean command invocation**
+- [x] **Step 1: Run all scoped automated checks from a clean command invocation**
 
 ```bash
 pnpm --filter @workspace/regularize-service test
@@ -1355,7 +1355,7 @@ pnpm smoke:coverage
 Expected: every command exits `0`; Regularize service retains at least the 53 baseline tests plus
 the new dashboard tests; the frontend runner reports every contract as `PASS`.
 
-- [ ] **Step 2: Inspect fan-out and secret boundaries**
+- [x] **Step 2: Inspect fan-out and secret boundaries**
 
 Run:
 
@@ -1373,7 +1373,7 @@ Expected:
 - no unrelated files changed;
 - the diff matches the approved specification.
 
-- [ ] **Step 3: Attempt scoped Graphify refresh and record the known fallback**
+- [x] **Step 3: Attempt scoped Graphify refresh and record the known fallback**
 
 ```bash
 pnpm graphify:update:ui
@@ -1383,12 +1383,12 @@ pnpm graphify:update:services
 Expected in this worktree: both commands may report that no local graph exists. This is an accepted
 fallback; do not create or commit `graphify-out/`.
 
-- [ ] **Step 4: Request code review**
+- [x] **Step 4: Request code review**
 
 Invoke `superpowers:requesting-code-review` against `origin/develop...HEAD`. Resolve any proven
 correctness, security, contract, or test gap before declaring the branch complete.
 
-- [ ] **Step 5: Verify the worktree is intentional**
+- [x] **Step 5: Verify the worktree is intentional**
 
 ```bash
 git status --short --branch
@@ -1398,7 +1398,7 @@ git log --oneline origin/develop..HEAD
 Expected: only deliberate plan checkbox/document updates may remain uncommitted; implementation
 commits are present in task order.
 
-- [ ] **Step 6: Commit completed plan tracking if it changed**
+- [x] **Step 6: Commit completed plan tracking if it changed**
 
 ```bash
 git add -f docs/superpowers/plans/2026-07-24-regularize-dashboard-errors.md
