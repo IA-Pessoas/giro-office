@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Building2, ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 
 import { ClientCreateModal } from "@modules/clients/components/ClientCreateModal";
@@ -52,6 +52,7 @@ export function Clients() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [pageInputValue, setPageInputValue] = useState(String(page));
   const deferredSearch = useDeferredValue(search);
   const limit = 10;
 
@@ -72,6 +73,32 @@ export function Clients() {
   const currentPage = clientsPage?.page ?? page;
   const pageSize = clientsPage?.pageSize ?? limit;
   const pageCount = total > 0 ? Math.ceil(total / pageSize) : 1;
+  const pageInputSize = Math.max(1, pageInputValue.length);
+  const pageInputWidthClassName =
+    pageInputSize <= 1 ? "w-[3ch]" : pageInputSize === 2 ? "w-[4ch]" : "w-[5ch]";
+
+  useEffect(() => {
+    setPageInputValue(String(currentPage));
+  }, [currentPage]);
+
+  function goToPage(value: string) {
+    if (!value.trim()) {
+      setPageInputValue(String(currentPage));
+      return;
+    }
+
+    const nextPage = Math.trunc(Number(value));
+
+    if (!Number.isFinite(nextPage)) {
+      setPageInputValue(String(currentPage));
+      return;
+    }
+
+    const clampedPage = Math.min(pageCount, Math.max(1, nextPage));
+
+    setPage(clampedPage);
+    setPageInputValue(String(clampedPage));
+  }
 
   return (
     <div className="space-y-6">
@@ -241,9 +268,27 @@ export function Clients() {
         </div>
 
         <div className="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            Página {currentPage} de {pageCount}
-          </p>
+          <label className="flex items-center gap-2">
+            <span>Página</span>
+            <input
+              aria-label="Ir para página"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              size={pageInputSize}
+              value={pageInputValue}
+              onChange={(event) => setPageInputValue(event.target.value.replace(/\D/g, ""))}
+              onBlur={(event) => goToPage(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  goToPage(event.currentTarget.value);
+                  event.currentTarget.blur();
+                }
+              }}
+              className={`${pageInputWidthClassName} h-7 rounded-md border border-slate-200 bg-white px-0.5 text-center text-sm font-medium text-slate-700 outline-none transition-colors focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200`}
+            />
+            <span>de {pageCount}</span>
+          </label>
 
           <div className="flex items-center gap-2">
             <button
