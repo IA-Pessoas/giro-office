@@ -501,6 +501,25 @@ await runTest("ti user selects reuse the paginated assignable users source", asy
   }
 });
 
+await runTest("ti extension numbers use an exact four-digit contract", async () => {
+  const {
+    TI_EXTENSION_NUMBER_LENGTH,
+    isValidTiExtensionNumber,
+    sanitizeTiExtensionNumber,
+  } = await import("./utils/extensionNumber.ts");
+
+  assert.equal(TI_EXTENSION_NUMBER_LENGTH, 4);
+  assert.equal(isValidTiExtensionNumber("1001"), true);
+  assert.equal(isValidTiExtensionNumber("0007"), true);
+
+  for (const invalid of ["", "123", "12345", "12A4", "12-4", " 1234 "]) {
+    assert.equal(isValidTiExtensionNumber(invalid), false);
+  }
+
+  assert.equal(sanitizeTiExtensionNumber("12A4"), "124");
+  assert.equal(sanitizeTiExtensionNumber("12-34-56"), "1234");
+});
+
 await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   const hookSource = await readModuleSource("hooks/useTiExtensions.ts");
   const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
