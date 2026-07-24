@@ -2,11 +2,23 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { ClientServiceEnv } from "../config/env.js";
 
-function successEnvelopeContent() {
+type OpenApiSchema = Record<string, unknown>;
+
+function successEnvelopeContent(dataSchema?: OpenApiSchema) {
   return {
     content: {
       "application/json": {
-        schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+        schema: dataSchema
+          ? {
+              type: "object",
+              properties: {
+                success: { type: "boolean", enum: [true] },
+                data: dataSchema,
+              },
+              required: ["success", "data"],
+              additionalProperties: true,
+            }
+          : { $ref: "#/components/schemas/SuccessEnvelope" },
       },
     },
   };
@@ -51,6 +63,85 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           type: "object",
           description: "Resposta de sucesso padrao do workspace",
           additionalProperties: true,
+        },
+        ClientOrganization: {
+          type: "object",
+          additionalProperties: false,
+          required: ["id", "name", "slug", "status", "subscription_plan"],
+          properties: {
+            id: { type: "string", format: "uuid" },
+            name: { type: "string" },
+            slug: { type: "string" },
+            logo_url: { type: ["string", "null"] },
+            status: { type: "string" },
+            subscription_plan: { type: "string" },
+          },
+        },
+        ClientDetail: {
+          type: "object",
+          additionalProperties: true,
+          required: [
+            "id",
+            "name",
+            "organization_id",
+            "status",
+            "cpf_cnpj",
+            "service_unique",
+            "deletion_date",
+            "organization",
+          ],
+          properties: {
+            id: { type: "string", format: "uuid" },
+            name: { type: "string" },
+            organization_id: { type: "string", format: "uuid" },
+            status: { type: "string" },
+            cpf_cnpj: { type: "string" },
+            company_name: { type: ["string", "null"] },
+            fantasy_name: { type: ["string", "null"] },
+            service_unique: { type: "boolean" },
+            deletion_date: { type: ["string", "null"], format: "date-time" },
+            organization: { $ref: "#/components/schemas/ClientOrganization" },
+            dominio_code: { type: ["string", "null"] },
+            address: { type: ["string", "null"] },
+            cep: { type: ["string", "null"] },
+            neighborhood: { type: ["string", "null"] },
+            state: { type: ["string", "null"] },
+            city: { type: ["string", "null"] },
+            customer_since: { type: ["string", "null"], format: "date-time" },
+            municipal_registration: { type: ["string", "null"] },
+            state_registration: { type: ["string", "null"] },
+            commercial_board_registration: { type: ["string", "null"] },
+            competence_entry: { type: ["string", "null"], format: "date-time" },
+            competence_output: { type: ["string", "null"], format: "date-time" },
+            opening_date: { type: ["string", "null"], format: "date-time" },
+            instagram: { type: ["string", "null"] },
+            indication: { type: ["string", "null"] },
+            regime: { type: ["string", "null"] },
+            size: { type: ["string", "null"] },
+            segment: { type: ["string", "null"] },
+            start_strike: { type: ["string", "null"], format: "date-time" },
+            end_strike: { type: ["string", "null"], format: "date-time" },
+            cnae: { type: ["string", "null"] },
+            cnae_secondary: { type: ["string", "null"] },
+            responsible: { type: ["string", "null"] },
+            cpf_responsible: { type: ["string", "null"] },
+            agent: { type: ["string", "null"] },
+            cpf_agent: { type: ["string", "null"] },
+            number: { type: ["string", "null"] },
+            email: { type: ["string", "null"] },
+            contabil: { type: ["boolean", "null"] },
+            fiscal: { type: ["boolean", "null"] },
+            pessoal: { type: ["boolean", "null"] },
+            infoproduto: { type: ["boolean", "null"] },
+            consultoria: { type: ["boolean", "null"] },
+            castelo_med: { type: ["boolean", "null"] },
+            contract: { type: ["boolean", "null"] },
+            date_status: { type: ["string", "null"], format: "date-time" },
+            description_prospecting: { type: ["string", "null"] },
+            participants_meet: { type: ["string", "null"] },
+            meet_type: { type: ["string", "null"] },
+            register_date_prospecting: { type: ["string", "null"], format: "date-time" },
+          },
         },
       },
     },
@@ -177,7 +268,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           responses: {
             "200": {
               description: "Cliente encontrado",
-              ...successEnvelopeContent(),
+              ...successEnvelopeContent({ $ref: "#/components/schemas/ClientDetail" }),
             },
           },
         },
