@@ -147,4 +147,3 @@ Validation will include:
 - **No secret exposure outside the existing reveal:** enforced by the helper boundary and generic
   UI messages.
 - **Clipboard failure is covered:** verified for both rejected and unavailable writers.
-
