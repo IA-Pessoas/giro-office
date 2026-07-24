@@ -186,6 +186,21 @@ describe("ti-service app", () => {
       expect(response.body.paths).toHaveProperty(path);
     }
 
+    const extensionNumberSchema = {
+      type: "string",
+      minLength: 4,
+      maxLength: 4,
+      pattern: "^[0-9]{4}$",
+      example: "1001",
+    };
+
+    expect(response.body.components.schemas.TiExtensionInput.properties.number).toEqual(
+      extensionNumberSchema,
+    );
+    expect(response.body.components.schemas.TiExtensionUpdateInput.properties.number).toEqual(
+      extensionNumberSchema,
+    );
+
     const operationIds = new Set<string>();
     for (const [path, expectedMethods] of Object.entries(tiPublicOpenApiOperations)) {
       const pathItem = response.body.paths[path];
