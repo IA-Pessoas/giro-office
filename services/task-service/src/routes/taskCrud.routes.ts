@@ -11,6 +11,7 @@ import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { integracaoTaskCreateBodySchema } from "../schemas/integracaoTaskCreate.schema.js";
 import { integracaoTaskUpdateBodySchema } from "../schemas/integracaoTaskUpdate.schema.js";
+import { taskListQuerySchema } from "../schemas/taskList.schemas.js";
 import { TaskCrudService } from "../services/taskCrudService.js";
 
 const router: ReturnType<typeof Router> = Router();
@@ -42,24 +43,11 @@ router.post("/", isAuthenticated, async (req: Request, res: Response, next: Next
 router.get("/list", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { organization_id } = requireAuthenticatedRequestContext(req);
-    const status = String(req.query.status ?? "Todos");
-    const ref = String(req.query.ref ?? "");
-    const ref_id = String(req.query.ref_id ?? "");
-    const search = String(req.query.search ?? "");
-    const page = Math.max(1, Number.parseInt(String(req.query.page ?? "1"), 10) || 1);
-    const limit = Math.max(
-      1,
-      Math.min(100, Number.parseInt(String(req.query.limit ?? "20"), 10) || 20),
-    );
+    const query = parseWithZod(taskListQuerySchema, req.query);
 
     const result = await taskCrudService.listTasks({
       organization_id,
-      status,
-      ref,
-      ref_id,
-      search,
-      page,
-      limit,
+      ...query,
     });
 
     res.json(createSuccessResponse(result));

@@ -261,12 +261,12 @@ runTest("buildDeleteIntegracaoTaskPayload maps task_id body", () => {
   assert.deepEqual(buildDeleteIntegracaoTaskPayload("task-1"), { task_id: "task-1" });
 });
 
-runTest("unwrapIntegracaoTaskList extracts data and hasMore", () => {
+runTest("unwrapIntegracaoTaskList preserves global totals and a later-page record", () => {
   const payload = {
     data: [
       {
-        id: "t1",
-        name: "Tarefa",
+        id: "task-21",
+        name: "Registro 21",
         status: "A Realizar",
         billing: "Não Realizar",
         charge_comercial: false,
@@ -276,7 +276,9 @@ runTest("unwrapIntegracaoTaskList extracts data and hasMore", () => {
         charge_financeiro: false,
       },
     ],
+    total: 41,
     hasMore: true,
+    summary: { inProgress: 9, billable: 14 },
   };
   assert.deepEqual(unwrapIntegracaoTaskList({ success: true, data: payload }), payload);
 });

@@ -420,7 +420,39 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
             { name: "page", in: "query", schema: { type: "integer" } },
             { name: "limit", in: "query", schema: { type: "integer" } },
           ],
-          responses: { "200": { description: "Lista", ...successJson } },
+          responses: {
+            "200": {
+              description: "Lista paginada com totais sobre o resultado filtrado completo",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["success", "data"],
+                    properties: {
+                      success: { type: "boolean", enum: [true] },
+                      data: {
+                        type: "object",
+                        required: ["data", "total", "hasMore", "summary"],
+                        properties: {
+                          data: { type: "array", items: { type: "object" } },
+                          total: { type: "integer", minimum: 0 },
+                          hasMore: { type: "boolean" },
+                          summary: {
+                            type: "object",
+                            required: ["inProgress", "billable"],
+                            properties: {
+                              inProgress: { type: "integer", minimum: 0 },
+                              billable: { type: "integer", minimum: 0 },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
       "/task/model": {

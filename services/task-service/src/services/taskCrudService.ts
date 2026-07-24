@@ -2,6 +2,7 @@ import { error as logError, ServiceError } from "@workspace/shared";
 import type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracaoTask.js";
 import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
+import type { Prisma } from "../generated/prisma/client.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { TaskWorkflowService } from "./taskWorkflowService.js";
@@ -336,17 +337,16 @@ export class TaskCrudService {
 
   async listTasks(params: ListTaskCrudParams): Promise<{
     data: TaskListRow[];
+    total: number;
     hasMore: boolean;
+    summary: {
+      inProgress: number;
+      billable: number;
+    };
   }> {
     try {
       const skip = (params.page - 1) * params.limit;
-      const where: {
-        organization_id: string;
-        status?: string;
-        charge_comercial?: boolean;
-        charge_financeiro?: boolean;
-        OR?: { name: { contains: string; mode: "insensitive" } }[];
-      } = {
+      const where: Prisma.TaskWhereInput = {
         organization_id: params.organization_id,
       };
 
@@ -364,7 +364,7 @@ export class TaskCrudService {
         where.OR = [{ name: { contains: params.search, mode: "insensitive" } }];
       }
 
-      const [list, total] = await Promise.all([
+      const [list, total, inProgress, billable] = await Promise.all([
         prismaClient.task.findMany({
           where,
           select: TASK_LIST_SELECT,
@@ -373,11 +373,28 @@ export class TaskCrudService {
           orderBy: { name: "asc" },
         }),
         prismaClient.task.count({ where }),
+        prismaClient.task.count({
+          where: {
+            ...where,
+            status: { contains: "andamento", mode: "insensitive" },
+          },
+        }),
+        prismaClient.task.count({
+          where: {
+            ...where,
+            NOT: { billing: { contains: "não", mode: "insensitive" } },
+          },
+        }),
       ]);
 
       const hasMore = params.page * params.limit < total;
 
-      return { data: list, hasMore };
+      return {
+        data: list,
+        total,
+        hasMore,
+        summary: { inProgress, billable },
+      };
     } catch (err: unknown) {
       logError("Erro ao listar tarefas", { err });
       if (err instanceof ServiceError) throw err;
