@@ -424,6 +424,58 @@ await runTest("ti password contracts separate list data from explicit reveal det
   assert.match(hookSource, /enabled:\s*Boolean\(id\)\s*&&\s*Boolean\(canReveal\)/);
 });
 
+await runTest("ti sensitive clipboard helper copies the exact value", async () => {
+  const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
+  const writes = [];
+  const revealedPassword = "S3nh@ com espaços ";
+
+  const copied = await copySensitiveText(revealedPassword, {
+    writeText: async (value) => {
+      writes.push(value);
+    },
+  });
+
+  assert.equal(copied, true);
+  assert.deepEqual(writes, [revealedPassword]);
+});
+
+await runTest("ti sensitive clipboard helper handles a rejected write", async () => {
+  const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
+
+  assert.equal(
+    await copySensitiveText("segredo de teste", {
+      writeText: async () => {
+        throw new Error("NotAllowedError");
+      },
+    }),
+    false,
+  );
+});
+
+await runTest("ti sensitive clipboard helper handles an unavailable writer", async () => {
+  const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
+
+  assert.equal(await copySensitiveText("segredo de teste", undefined), false);
+});
+
+await runTest("ti password copy uses the safe helper and generic feedback", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /import \{ copySensitiveText \} from "\.\.\/utils\/copySensitiveText"/);
+  assert.match(
+    tabSource,
+    /const clipboard = typeof navigator === "undefined" \? undefined : navigator\.clipboard/,
+  );
+  assert.match(tabSource, /const copied = await copySensitiveText\(secret, clipboard\)/);
+  assert.match(tabSource, /toast\.success\("Senha copiada\."\)/);
+  assert.match(
+    tabSource,
+    /toast\.error\(\s*"Não foi possível copiar a senha\. Verifique a permissão da área de transferência\.",?\s*\)/,
+  );
+  assert.doesNotMatch(tabSource, /navigator\.clipboard\.writeText\(secret\)/);
+  assert.doesNotMatch(tabSource, /document\.execCommand/);
+});
+
 await runTest("ti passwords tab never renders secrets in list and reveals only by explicit action", async () => {
   const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
 

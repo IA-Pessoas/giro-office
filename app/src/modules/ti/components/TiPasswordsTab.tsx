@@ -32,6 +32,7 @@ import type {
   TiPasswordListItem,
   TiPasswordUpdatePayload,
 } from "../types";
+import { copySensitiveText } from "../utils/copySensitiveText";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -286,12 +287,21 @@ export function TiPasswordsTab() {
     const secret = revealedPassword?.password;
 
     if (!secret) {
-      toast.error("Senha indisponivel para copia.");
+      toast.error("Senha indisponível para cópia.");
       return;
     }
 
-    await navigator.clipboard.writeText(secret);
-    toast.success("Senha copiada.");
+    const clipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard;
+    const copied = await copySensitiveText(secret, clipboard);
+
+    if (copied) {
+      toast.success("Senha copiada.");
+      return;
+    }
+
+    toast.error(
+      "Não foi possível copiar a senha. Verifique a permissão da área de transferência.",
+    );
   }
 
   return (
