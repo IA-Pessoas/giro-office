@@ -30,6 +30,7 @@ const myOrganizationSectionSource = readFileSync(
   new URL("../../modules/organizations/ui/MyOrganizationSection.tsx", import.meta.url),
   "utf8",
 );
+const dialogSource = readFileSync(new URL("./ui/Dialog.tsx", import.meta.url), "utf8");
 const legacyAiChatBackdrop = [
   'className="fixed inset-0 z-[60] bg-black/40"',
   " onClick",
@@ -112,6 +113,19 @@ runTest("Integracao task modals remain on shared Dialog", () => {
   assert.match(taskFormModalSource, /<Dialog/);
   assert.match(taskModelModalSource, /<Dialog/);
   assert.match(taskModelsConfigSource, /<Dialog/);
+});
+
+runTest("shared Dialog constrains content and scrolls only its body", () => {
+  assert.match(
+    dialogSource,
+    /<DialogPrimitive\.Content[\s\S]*className=\{`[^`]*max-h-\[calc\(100dvh-2rem\)\][^`]*flex-col[^`]*overflow-hidden[^`]*`\}/,
+  );
+  assert.match(dialogSource, /<header className="[^"]*shrink-0[^"]*"/);
+  assert.match(
+    dialogSource,
+    /<div\s+className=\{`[^`]*min-h-0[^`]*flex-1[^`]*overflow-y-auto[^`]*overscroll-contain[^`]*\$\{bodyClassName\}[^`]*`\}/,
+  );
+  assert.match(dialogSource, /<footer className="[^"]*shrink-0[^"]*"/);
 });
 
 runTest("MyOrganizationSection opens organization editing in a shared Dialog", () => {
