@@ -45,7 +45,7 @@ Insert this test after the password contract test block in
 `app/src/modules/ti/run-ti-tests.mjs`:
 
 ```js
-await runTest("ti sensitive clipboard helper copies exactly and handles failures", async () => {
+await runTest("ti sensitive clipboard helper copies the exact value", async () => {
   const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
   const writes = [];
   const revealedPassword = "S3nh@ com espaços ";
@@ -58,15 +58,25 @@ await runTest("ti sensitive clipboard helper copies exactly and handles failures
 
   assert.equal(copied, true);
   assert.deepEqual(writes, [revealedPassword]);
+});
+
+await runTest("ti sensitive clipboard helper handles a rejected write", async () => {
+  const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
+
   assert.equal(
-    await copySensitiveText(revealedPassword, {
+    await copySensitiveText("segredo de teste", {
       writeText: async () => {
         throw new Error("NotAllowedError");
       },
     }),
     false,
   );
-  assert.equal(await copySensitiveText(revealedPassword, undefined), false);
+});
+
+await runTest("ti sensitive clipboard helper handles an unavailable writer", async () => {
+  const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
+
+  assert.equal(await copySensitiveText("segredo de teste", undefined), false);
 });
 ```
 
@@ -352,4 +362,3 @@ After verification, use `superpowers:verification-before-completion`,
 - use an English PR title and an English Markdown description;
 - include root cause, user impact, validation evidence, and `Closes #505`; and
 - preserve the isolated worktree for review changes.
-
