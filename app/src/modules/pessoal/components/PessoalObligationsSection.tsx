@@ -10,6 +10,7 @@ import {
   useUpdatePessoalObligationMutation,
 } from "../hooks/usePessoalObligations";
 import type { PessoalObligationUpdatePayload } from "../types/obligations";
+import { formatPessoalObligationGenerationSummary } from "../utils/obligationGenerationSummary";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
   pessoalCheckboxCardClassName,
@@ -94,20 +95,8 @@ export function PessoalObligationsSection({
     return () => clearSuccessTimeout();
   }, []);
 
-  if (!hasClient) {
-    return (
-      <PessoalPlaceholderSection
-        icon={CheckSquare}
-        title="Obrigações"
-        description="Selecione um cliente para continuar."
-        requiresClient
-        hasClient={false}
-      />
-    );
-  }
-
   async function handleCreate() {
-    if (!canEdit) {
+    if (!canEdit || !hasClient) {
       return;
     }
 
@@ -139,13 +128,7 @@ export function PessoalObligationsSection({
     try {
       const result = await generateMutation.mutateAsync();
 
-      showTemporarySuccess(
-        [
-          `Geração concluída: ${result.created} criadas`,
-          `${result.skippedExisting} existentes`,
-          `${result.skippedNoPayroll} sem folha.`,
-        ].join(", "),
-      );
+      showTemporarySuccess(formatPessoalObligationGenerationSummary(result));
     } catch (error) {
       setFormError(getPessoalErrorMessage(error, "Não foi possível gerar as obrigações."));
     }
@@ -194,7 +177,7 @@ export function PessoalObligationsSection({
               </h2>
             </div>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Controle mensal gerado a partir da configuração de folha do cliente.
+              A geração em massa avalia todos os clientes ativos de Departamento Pessoal.
             </p>
           </div>
 
@@ -208,19 +191,21 @@ export function PessoalObligationsSection({
                 className={pessoalTextFieldClassName}
               />
             </label>
-            <button
-              type="button"
-              onClick={() => obligationQuery.refetch()}
-              disabled={obligationQuery.isFetching}
-              className={pessoalSecondaryButtonClassName}
-            >
-              {obligationQuery.isFetching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Atualizar
-            </button>
+            {hasClient ? (
+              <button
+                type="button"
+                onClick={() => obligationQuery.refetch()}
+                disabled={obligationQuery.isFetching}
+                className={pessoalSecondaryButtonClassName}
+              >
+                {obligationQuery.isFetching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Atualizar
+              </button>
+            ) : null}
             {canEdit ? (
               <>
                 <button
@@ -234,39 +219,51 @@ export function PessoalObligationsSection({
                   ) : (
                     <RefreshCw className="h-4 w-4" />
                   )}
-                  Gerar
+                  Gerar todos
                 </button>
-                <button
-                  type="button"
-                  onClick={handleCreate}
-                  disabled={!competence || Boolean(obligation) || isMutating}
-                  className={pessoalPrimaryButtonClassName}
-                >
-                  {createMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <PlusCircle className="h-4 w-4" />
-                  )}
-                  Criar
-                </button>
+                {hasClient ? (
+                  <button
+                    type="button"
+                    onClick={handleCreate}
+                    disabled={!competence || Boolean(obligation) || isMutating}
+                    className={pessoalPrimaryButtonClassName}
+                  >
+                    {createMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <PlusCircle className="h-4 w-4" />
+                    )}
+                    Criar
+                  </button>
+                ) : null}
               </>
             ) : null}
           </div>
         </div>
 
-        {obligationQuery.isLoading ? (
+        {!hasClient ? (
+          <PessoalPlaceholderSection
+            icon={CheckSquare}
+            title="Obrigação individual"
+            description="Selecione um cliente para consultar ou editar a obrigação individual."
+            requiresClient
+            hasClient={false}
+          />
+        ) : null}
+
+        {hasClient && obligationQuery.isLoading ? (
           <StateMessage icon={Loader2} title="Carregando obrigação" tone="loading">
             Buscando a competência selecionada.
           </StateMessage>
         ) : null}
 
-        {obligationQuery.isError ? (
+        {hasClient && obligationQuery.isError ? (
           <StateMessage icon={AlertCircle} title="Não foi possível carregar" tone="danger">
             {getPessoalErrorMessage(obligationQuery.error, "Falha ao carregar obrigação.")}
           </StateMessage>
         ) : null}
 
-        {!obligationQuery.isLoading && !obligationQuery.isError && !obligation ? (
+        {hasClient && !obligationQuery.isLoading && !obligationQuery.isError && !obligation ? (
           <StateMessage icon={CheckSquare} title="Obrigação não cadastrada">
             Nenhuma obrigação cadastrada para este cliente nesta competência.
           </StateMessage>
