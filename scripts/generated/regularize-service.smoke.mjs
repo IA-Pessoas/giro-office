@@ -17,6 +17,15 @@ const regularizeOpenApiOperations = [
   {
     service,
     method: "GET",
+    path: "/regularize/dashboard",
+    action: "regularizeDashboard",
+    target: "gateway",
+    auth: "bearer",
+    expectedStatus: [200],
+  },
+  {
+    service,
+    method: "GET",
     path: "/regularize/passwords",
     action: "regularizePasswordsList",
     target: "gateway",
