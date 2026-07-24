@@ -520,6 +520,31 @@ await runTest("ti extension numbers use an exact four-digit contract", async () 
   assert.equal(sanitizeTiExtensionNumber("12-34-56"), "1234");
 });
 
+await runTest("ti extension form validates digits and hides the internal id", async () => {
+  const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
+
+  assert.match(
+    tabSource,
+    /import \{[\s\S]*TI_EXTENSION_NUMBER_LENGTH,[\s\S]*isValidTiExtensionNumber,[\s\S]*sanitizeTiExtensionNumber,[\s\S]*\} from "\.\.\/utils\/extensionNumber"/,
+  );
+  assert.equal([...tabSource.matchAll(/isValidTiExtensionNumber\(number\)/g)].length, 2);
+  assert.equal(
+    [
+      ...tabSource.matchAll(
+        /toast\.error\("Informe um ramal com exatamente 4 dígitos\."\)/g,
+      ),
+    ].length,
+    2,
+  );
+  assert.match(tabSource, /inputMode="numeric"/);
+  assert.match(tabSource, /maxLength=\{TI_EXTENSION_NUMBER_LENGTH\}/);
+  assert.match(
+    tabSource,
+    /updateExtensionField\(\s*"number",\s*sanitizeTiExtensionNumber\(event\.target\.value\),?\s*\)/,
+  );
+  assert.doesNotMatch(tabSource, /<TiFieldLine label="ID"/);
+});
+
 await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   const hookSource = await readModuleSource("hooks/useTiExtensions.ts");
   const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
