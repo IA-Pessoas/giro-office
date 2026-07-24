@@ -18,6 +18,41 @@ function successEnvelopeContent() {
   };
 }
 
+function dualListSuccessEnvelopeContent() {
+  const itemArray = { type: "array", items: { type: "object" } };
+  return {
+    content: {
+      "application/json": {
+        schema: {
+          oneOf: [
+            {
+              type: "object",
+              properties: { success: { type: "boolean" }, data: itemArray },
+            },
+            {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                data: {
+                  type: "object",
+                  required: ["data", "total", "page", "limit", "hasMore"],
+                  properties: {
+                    data: itemArray,
+                    total: { type: "integer", minimum: 0 },
+                    page: { type: "integer", minimum: 1 },
+                    limit: { type: "integer", minimum: 1, maximum: 100 },
+                    hasMore: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+  };
+}
+
 export function buildRegularizeServiceOpenApiSpec(
   env: RegularizeServiceOpenApiEnv,
 ): OpenApiDocument {
@@ -123,8 +158,20 @@ export function buildRegularizeServiceOpenApiSpec(
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "status", in: "query", required: true, schema: { type: "boolean" } },
+            { name: "search", in: "query", schema: { type: "string" } },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
           ],
-          responses: { "200": { description: "Lista de sites", ...successEnvelopeContent() } },
+          responses: {
+            "200": {
+              description: "Lista completa ou pagina de sites",
+              ...dualListSuccessEnvelopeContent(),
+            },
+          },
         },
         post: {
           tags: ["Sites"],
@@ -301,8 +348,22 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Processes"],
           summary: "Listar processos",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "status", in: "query", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Lista de processos", ...successEnvelopeContent() } },
+          parameters: [
+            { name: "status", in: "query", required: true, schema: { type: "string" } },
+            { name: "search", in: "query", schema: { type: "string" } },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Lista completa ou pagina de processos",
+              ...dualListSuccessEnvelopeContent(),
+            },
+          },
         },
       },
       "/regularize/guidance": {

@@ -74,7 +74,12 @@ export function createProcessRoutes(deps: RegularizeRouteDeps): Router {
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(listProcessesQuerySchema, request.query);
-        const list = await processService.list(request.organization_id, query.status);
+        const list = await processService.list({
+          organizationId: request.organization_id,
+          paginationRequested:
+            request.query.page !== undefined || request.query.limit !== undefined,
+          ...query,
+        });
         response.json(createSuccessResponse(list));
       } catch (err) {
         logError("Erro ao listar processos do regularize", { err });
