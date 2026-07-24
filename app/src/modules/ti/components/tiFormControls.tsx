@@ -1,5 +1,4 @@
 import type { HTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
-import type { UseQueryResult } from "@tanstack/react-query";
 import { Loader2, RefreshCw, type LucideIcon } from "lucide-react";
 
 import { cn } from "@shared/ui/newLayout/utils";
@@ -42,10 +41,14 @@ type TiTableActionProps = {
   onClick?: () => void;
 };
 
-type TiListQuery<T> = Pick<
-  UseQueryResult<T[], Error>,
-  "data" | "error" | "isError" | "isFetching" | "isLoading" | "refetch"
->;
+type TiListQuery<T> = {
+  data?: T[];
+  error: Error | null;
+  isError: boolean;
+  isFetching: boolean;
+  isLoading: boolean;
+  refetch: () => Promise<unknown>;
+};
 
 type TiTextFieldProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
@@ -233,10 +236,12 @@ export function TiQueryStatePanel<T>({
 export function TiDataTable({
   children,
   className,
+  footer,
   headers,
 }: {
   children: ReactNode;
   className?: string;
+  footer?: ReactNode;
   headers: string[];
 }) {
   return (
@@ -265,6 +270,7 @@ export function TiDataTable({
         </thead>
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">{children}</tbody>
       </table>
+      {footer}
     </div>
   );
 }

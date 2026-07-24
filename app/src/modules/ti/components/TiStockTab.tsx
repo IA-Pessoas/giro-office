@@ -21,6 +21,7 @@ import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
 import { useAssignableUsers } from "@modules/rh";
+import { PaginationControls } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { cn } from "@shared/ui/newLayout/utils";
@@ -48,6 +49,7 @@ import type {
   TiStockLocation,
   TiStockMovement,
 } from "../types";
+import { resolveTiStockLocationName } from "../utils/stockDisplay";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -126,6 +128,8 @@ const STOCK_STATUS_FILTER_OPTIONS = [
   { value: "true", label: "Ativos" },
   { value: "false", label: "Inativos" },
 ] as const;
+
+const STOCK_PAGE_SIZE = 50;
 
 function formatText(value: unknown, fallback = "-"): string {
   if (value === null || value === undefined || value === "") {
@@ -275,6 +279,7 @@ export function TiStockTab() {
   const { access } = useModuleAccess("ti");
   const canEditStock = access.canEdit || access.isAdmin;
   const [filters, setFilters] = useState<TiListFilters>({});
+  const [stockPage, setStockPage] = useState(1);
   const [stockFilterDraft, setStockFilterDraft] =
     useState<StockFilterDraft>(initialStockFilterDraft);
   const [selectedItemId, setSelectedItemId] = useState<TiId | undefined>();
@@ -289,7 +294,15 @@ export function TiStockTab() {
   const [locationName, setLocationName] = useState("");
   const [locationFloor, setLocationFloor] = useState("");
 
-  const stockItemsQuery = useTiStockItems(filters);
+  const stockListFilters = useMemo(
+    () => ({
+      ...filters,
+      page: stockPage,
+      page_size: STOCK_PAGE_SIZE,
+    }),
+    [filters, stockPage],
+  );
+  const stockItemsQuery = useTiStockItems(stockListFilters);
   const selectedItemQuery = useTiStockItem(selectedItemId, { enabled: Boolean(selectedItemId) });
   const stockMovementsQuery = useTiStockItemMovements(selectedItemId, {
     enabled: Boolean(selectedItemId && isStockDetailDialogOpen),
@@ -307,7 +320,7 @@ export function TiStockTab() {
 
   const stockCategories = stockCategoriesQuery.data ?? [];
   const stockLocations = stockLocationsQuery.data ?? [];
-  const stockItems = stockItemsQuery.data ?? [];
+  const stockItems = stockItemsQuery.data?.data ?? [];
   const users = assignableUsersQuery.data ?? [];
   const selectedListItem = stockItems.find((item) => getId(item.id) === getId(selectedItemId));
   const selectedItem = selectedItemQuery.data ?? selectedListItem;
@@ -717,6 +730,7 @@ export function TiStockTab() {
 
   function applyStockFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setStockPage(1);
     setFilters({
       name: toOptionalText(stockFilterDraft.name),
       category_id: toOptionalId(stockFilterDraft.category_id),
@@ -814,11 +828,23 @@ export function TiStockTab() {
                 description="Itens de Tecnologia aparecem aqui quando forem cadastrados."
               />
             }
-            query={stockItemsQuery}
+            query={{ ...stockItemsQuery, data: stockItems }}
           >
             {(items) => (
               <TiDataTable
                 className={tiFiveRowTableClassName}
+                footer={
+                  <PaginationControls
+                    page={stockPage}
+                    limit={STOCK_PAGE_SIZE}
+                    total={stockItemsQuery.data?.total ?? 0}
+                    count={stockItems.length}
+                    hasMore={stockItemsQuery.data?.hasMore ?? false}
+                    isFetching={stockItemsQuery.isFetching}
+                    onPrevious={() => setStockPage((current) => Math.max(1, current - 1))}
+                    onNext={() => setStockPage((current) => current + 1)}
+                  />
+                }
                 headers={["Item", "Categoria", "Local", "Saldo", "Status", ""]}
               >
                 {items.map((item) => {
@@ -853,7 +879,7 @@ export function TiStockTab() {
                       </td>
                       <td className="max-w-44 px-4 py-2 align-top">
                         <span className="block break-words">
-                          {getRelatedName(item.location, item.location_id)}
+                          {resolveTiStockLocationName(item, stockLocations)}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-right align-top font-semibold">
@@ -973,7 +999,7 @@ export function TiStockTab() {
                 label="Local"
                 value={
                   <span className="break-words">
-                    {getRelatedName(selectedItem.location, selectedItem.location_id)}
+                    {resolveTiStockLocationName(selectedItem, stockLocations)}
                   </span>
                 }
               />
