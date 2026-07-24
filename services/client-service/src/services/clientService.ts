@@ -21,6 +21,8 @@ export type OrganizationPublic = {
   subscription_plan: string;
 };
 
+type ClientPublicExtraValue = string | number | boolean | null;
+
 export type ClientPublic = {
   id: string;
   name: string;
@@ -32,7 +34,7 @@ export type ClientPublic = {
   service_unique: boolean;
   deletion_date: string | null;
   organization: OrganizationPublic;
-};
+} & Partial<Record<(typeof EXTENDED_CLIENT_KEYS)[number], ClientPublicExtraValue>>;
 
 export type ClientListPage = {
   items: ClientPublic[];
@@ -69,6 +71,54 @@ const clientSelect = {
 
 type ClientRow = Prisma.ClientGetPayload<{
   select: typeof clientSelect;
+}>;
+
+const clientDetailSelect = {
+  ...clientSelect,
+  dominio_code: true,
+  address: true,
+  cep: true,
+  neighborhood: true,
+  state: true,
+  city: true,
+  customer_since: true,
+  municipal_registration: true,
+  state_registration: true,
+  commercial_board_registration: true,
+  competence_entry: true,
+  competence_output: true,
+  opening_date: true,
+  instagram: true,
+  indication: true,
+  regime: true,
+  size: true,
+  segment: true,
+  start_strike: true,
+  end_strike: true,
+  cnae: true,
+  cnae_secondary: true,
+  responsible: true,
+  cpf_responsible: true,
+  agent: true,
+  cpf_agent: true,
+  number: true,
+  email: true,
+  contabil: true,
+  fiscal: true,
+  pessoal: true,
+  infoproduto: true,
+  consultoria: true,
+  castelo_med: true,
+  contract: true,
+  date_status: true,
+  description_prospecting: true,
+  participants_meet: true,
+  meet_type: true,
+  register_date_prospecting: true,
+} satisfies Prisma.ClientSelect;
+
+type ClientDetailRow = Prisma.ClientGetPayload<{
+  select: typeof clientDetailSelect;
 }>;
 
 const EXTENDED_CLIENT_KEYS = [
@@ -136,8 +186,40 @@ function toOrganizationPublic(row: OrganizationRow): OrganizationPublic {
   };
 }
 
-function toPublic(row: ClientRow, organization: OrganizationPublic): ClientPublic {
-  return {
+function serializePublicExtra(value: unknown): ClientPublicExtraValue {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value === null
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
+function appendPublicExtras(row: ClientRow | ClientDetailRow, out: ClientPublic): ClientPublic {
+  const source = row as Record<string, unknown>;
+
+  for (const key of EXTENDED_CLIENT_KEYS) {
+    if (key in source) {
+      out[key] = serializePublicExtra(source[key]);
+    }
+  }
+
+  return out;
+}
+
+function toPublic(
+  row: ClientRow | ClientDetailRow,
+  organization: OrganizationPublic,
+): ClientPublic {
+  return appendPublicExtras(row, {
     id: row.id,
     name: row.name,
     organization_id: row.organization_id,
@@ -148,7 +230,7 @@ function toPublic(row: ClientRow, organization: OrganizationPublic): ClientPubli
     service_unique: row.service_unique ?? false,
     deletion_date: row.deletion_date ? row.deletion_date.toISOString() : null,
     organization,
-  };
+  });
 }
 
 function buildListStatusWhere(filters: ListClientsFilters): Prisma.ClientWhereInput | undefined {
@@ -226,7 +308,7 @@ export class ClientService implements IClientService {
   async getById(id: string, organizationId: string): Promise<ClientPublic | null> {
     const row = await this.prisma.client.findFirst({
       where: { id, organization_id: organizationId },
-      select: clientSelect,
+      select: clientDetailSelect,
     });
 
     if (!row) {
