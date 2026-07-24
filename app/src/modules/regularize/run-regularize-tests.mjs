@@ -647,8 +647,25 @@ await runTest("regularize credential empty detail states are centered", async ()
 
   assert.match(pageSource, /function DetailEmptyState/);
   assert.match(pageSource, /items-center justify-center text-center/);
-  assert.ok((emptyStateMatches?.length ?? 0) >= 2);
+  assert.ok((emptyStateMatches?.length ?? 0) >= 1);
   assert.doesNotMatch(pageSource, /<FieldLine label="Status" value="Sem revelação ativa\." \/>/);
+});
+
+await runTest("regularize site credential detail states are explicit", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const sitesStart = pageSource.indexOf('{activeTab === "sites"');
+  const taxesStart = pageSource.indexOf('{activeTab === "taxes"', sitesStart);
+  const sitesSource = pageSource.slice(sitesStart, taxesStart);
+
+  assert.notEqual(sitesStart, -1);
+  assert.notEqual(taxesStart, -1);
+  assert.match(sitesSource, /Selecione um site para revelar credenciais/);
+  assert.match(sitesSource, /Acesso negado para revelar credenciais/);
+  assert.match(pageSource, /Credencial indispon[iÃ­]vel para revela[cÃ§][aÃ£]o/);
+  assert.match(sitesSource, /getSiteCredentialDetailStatus\(sitePasswordDetailQuery\.error\)/);
+  assert.match(pageSource, /getRegularizeErrorMessage\(error, "Credencial indisponivel para revelacao\."\)/);
+  assert.match(pageSource, /403\|forbidden\|permission\|permiss\|acesso negado/);
+  assert.doesNotMatch(sitesSource, /Acesso negado ou indispon[iÃ­]vel/);
 });
 
 await runTest("regularize credential empty layouts keep intentional detail behavior", async () => {
