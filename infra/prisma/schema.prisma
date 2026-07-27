@@ -1444,7 +1444,7 @@ model Payroll {
   organization_id String
   organization    Organization  @relation(fields: [organization_id], references: [id])
   responsible     User?         @relation(fields: [responsible_id], references: [id])
-  union           UnionPessoal? @relation(fields: [union_id], references: [id])
+  union           UnionPessoal? @relation(fields: [union_id], references: [id], onDelete: Restrict)
 
   @@map("pessoal.payroll")
 }

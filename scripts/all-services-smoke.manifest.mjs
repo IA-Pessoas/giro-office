@@ -2384,6 +2384,14 @@ const baseManifest = [
   }),
   op({
     service: "pessoal-service",
+    method: "DELETE",
+    path: "/pessoal/unions/{id}",
+    action: "pessoalUnionDelete",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "pessoal-service",
     method: "POST",
     path: "/pessoal/payroll",
     action: "pessoalPayrollCreate",

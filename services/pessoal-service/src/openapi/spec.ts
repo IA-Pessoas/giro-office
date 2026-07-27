@@ -633,6 +633,14 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           requestBody: jsonRequestBody(updateUnionRequestSchema),
           responses: mutationResponses,
         },
+        delete: {
+          tags: ["Pessoal Unions"],
+          security: bearerSecurity,
+          summary: "Excluir sindicato",
+          operationId: "deletePessoalUnion",
+          parameters: [idParam("id")],
+          responses: mutationResponses,
+        },
       },
       "/pessoal/payroll": {
         post: {
