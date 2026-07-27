@@ -102,6 +102,19 @@ await runTest("regularize PF list contract preserves explicit search status and 
   assert.match(queryKeysSource, /clientPfsPage/);
 });
 
+await runTest("regularize PF forms use an independent option source and preserve linked clients", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /const pfFormOptionsQuery = usePaginatedRegularizeClientPfs/);
+  assert.match(pageSource, /status: "Todos"/);
+  assert.match(pageSource, /limit: 100/);
+  assert.match(pageSource, /const selectedPfForFormQuery = useRegularizeClientPfDetail/);
+  assert.match(pageSource, /const pfFormOptions = useMemo<RegularizeFormOption\[\]>/);
+  assert.match(pageSource, /selectedPfForFormQuery\.data/);
+  assert.match(pageSource, /pfOptions=\{pfFormOptions\}/);
+  assert.doesNotMatch(pageSource, /pfOptions=\{visiblePfRows\}/);
+});
+
 await runTest("regularize dashboard has a centralized aggregate data contract", async () => {
   const contractSource = await readModuleSource("services/regularizeService.contract.ts");
   const serviceSource = await readModuleSource("services/regularizeService.ts");

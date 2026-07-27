@@ -53,6 +53,45 @@ function dualListSuccessEnvelopeContent() {
   };
 }
 
+function paginatedClientPfSuccessEnvelopeContent() {
+  return {
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              required: ["data", "total", "page", "limit", "hasMore"],
+              properties: {
+                data: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["id", "name"],
+                    properties: {
+                      id: { type: "string", format: "uuid" },
+                      code: { type: "string", nullable: true },
+                      name: { type: "string" },
+                      cpf: { type: "string", nullable: true },
+                    },
+                  },
+                },
+                total: { type: "integer", minimum: 0 },
+                page: { type: "integer", minimum: 1 },
+                limit: { type: "integer", minimum: 1, maximum: 100 },
+                hasMore: { type: "boolean" },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
 export function buildRegularizeServiceOpenApiSpec(
   env: RegularizeServiceOpenApiEnv,
 ): OpenApiDocument {
@@ -264,7 +303,10 @@ export function buildRegularizeServiceOpenApiSpec(
             },
           ],
           responses: {
-            "200": { description: "Página de clientes PF", ...successEnvelopeContent() },
+            "200": {
+              description: "Página de clientes PF",
+              ...paginatedClientPfSuccessEnvelopeContent(),
+            },
           },
         },
       },

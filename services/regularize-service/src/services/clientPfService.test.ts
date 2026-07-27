@@ -37,4 +37,31 @@ describe("ClientPfService", () => {
     );
     expect(prisma.clientPF.count).toHaveBeenCalledWith({ where });
   });
+
+  it("lists every status with default pagination without adding a status filter", async () => {
+    const prisma = {
+      clientPF: {
+        findMany: vi.fn(async () => []),
+        count: vi.fn(async () => 0),
+      },
+    } as unknown as PrismaClient;
+    const service = new ClientPfService(prisma, {} as never);
+
+    const result = await service.list({
+      organizationId: "org-1",
+      status: "Todos",
+      search: "",
+      page: 1,
+      limit: 20,
+    });
+
+    expect(result).toMatchObject({ data: [], total: 0, page: 1, limit: 20, hasMore: false });
+    expect(prisma.clientPF.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: "org-1" },
+        skip: 0,
+        take: 20,
+      }),
+    );
+  });
 });
