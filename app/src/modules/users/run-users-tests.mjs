@@ -38,6 +38,10 @@ const createUserModalSource = readFileSync(
   new URL("./components/CreateUserModal.tsx", import.meta.url),
   "utf8",
 );
+const adminUserDetailsPanelSource = readFileSync(
+  new URL("./components/AdminUserDetailsPanel.tsx", import.meta.url),
+  "utf8",
+);
 const createUserConfigSource = readFileSync(
   new URL("./constants/createUserConfig.ts", import.meta.url),
   "utf8",
@@ -259,6 +263,36 @@ runTest("organization owner scope field uses a checkbox toggle", () => {
   assert.match(createUserModalSource, /className="flex h-\[42px\] items-center justify-center gap-3"/);
   assert.match(createUserModalSource, /className=\{`\$\{FIELD_LABEL_CLASSNAME\} mb-0`\}/);
   assert.equal(createUserModalSource.includes('name="isOrganizationOwner"'), false);
+});
+
+runTest("admin user password update asks for explicit confirmation", () => {
+  const dialogStart = adminUserDetailsPanelSource.indexOf("<Dialog");
+  const dialogEnd = adminUserDetailsPanelSource.indexOf("</Dialog>", dialogStart);
+  const dialogSource = adminUserDetailsPanelSource.slice(dialogStart, dialogEnd);
+  const confirmHandlerBody = adminUserDetailsPanelSource.match(
+    /const handleConfirmPasswordUpdate = async \(\) => \{[\s\S]*?\n  \};/,
+  )?.[0] ?? "";
+
+  assert.match(adminUserDetailsPanelSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog";/);
+  assert.match(adminUserDetailsPanelSource, /isPasswordConfirmationOpen/);
+  assert.match(adminUserDetailsPanelSource, /Confirmar alteracao de senha/);
+  assert.match(adminUserDetailsPanelSource, /A senha do usuario selecionado sera alterada/);
+  assert.match(dialogSource, /onClick=\{\(\) => setIsPasswordConfirmationOpen\(false\)\}/);
+  assert.match(dialogSource, /onClick=\{\(\) => void handleConfirmPasswordUpdate\(\)\}/);
+  assert.doesNotMatch(dialogSource, /formData\.password/);
+  assert.match(confirmHandlerBody, /await persistUserUpdate\(\)/);
+  assert.match(
+    adminUserDetailsPanelSource,
+    /formData\.password\.trim\(\)[\s\S]*setIsPasswordConfirmationOpen\(true\)[\s\S]*return;/,
+  );
+});
+
+runTest("admin user details keeps non-password updates direct", () => {
+  const handleSaveBody = adminUserDetailsPanelSource.match(
+    /const handleSave = async \(\) => \{[\s\S]*?\n  \};/,
+  )?.[0] ?? "";
+
+  assert.match(handleSaveBody, /await persistUserUpdate\(\)/);
 });
 
 runTest("department permission sync payload mirrors the department module level", () => {

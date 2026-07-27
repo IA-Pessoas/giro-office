@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 
 import { canAccessAdministration } from "@modules/auth";
 import { useAuth } from "@/context/AuthContext";
+import { Dialog } from "@shared/components/ui/Dialog";
 import { CREATE_USER_PERMISSION_OPTIONS } from "../constants/createUserConfig";
 import { ADMIN_USER_STATUS_LABELS, type AdminUserStatus, normalizeAdminUserStatus } from "../services/adminUsersService";
 import { userService } from "../services/userService";
@@ -31,6 +32,9 @@ const SELECT_ARROW_STYLE = {
 
 const PRIMARY_ACTION_CLASSNAME =
   "rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] disabled:cursor-not-allowed disabled:opacity-70";
+
+const SECONDARY_ACTION_CLASSNAME =
+  "rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800";
 
 const PANEL_CLASSNAME =
   "rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-950/40";
@@ -78,6 +82,7 @@ export function AdminUserDetailsPanel({
   const [formData, setFormData] = useState<FormState | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPasswordConfirmationOpen, setIsPasswordConfirmationOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -157,7 +162,7 @@ export function AdminUserDetailsPanel({
     });
   };
 
-  const handleSave = async () => {
+  const persistUserUpdate = async () => {
     if (!userId || !formData) {
       return;
     }
@@ -192,6 +197,24 @@ export function AdminUserDetailsPanel({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (!formData) {
+      return;
+    }
+
+    if (formData.password.trim()) {
+      setIsPasswordConfirmationOpen(true);
+      return;
+    }
+
+    await persistUserUpdate();
+  };
+
+  const handleConfirmPasswordUpdate = async () => {
+    setIsPasswordConfirmationOpen(false);
+    await persistUserUpdate();
   };
 
   if (!userId) {
@@ -367,6 +390,41 @@ export function AdminUserDetailsPanel({
           </button>
         </div>
       </div>
+
+      <Dialog
+        open={isPasswordConfirmationOpen}
+        onOpenChange={(open) => {
+          if (!isSaving) {
+            setIsPasswordConfirmationOpen(open);
+          }
+        }}
+        title="Confirmar alteracao de senha"
+        description="Confirme antes de atualizar as credenciais do usuario."
+        footer={(
+          <>
+            <button
+              type="button"
+              className={SECONDARY_ACTION_CLASSNAME}
+              disabled={isSaving}
+              onClick={() => setIsPasswordConfirmationOpen(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className={PRIMARY_ACTION_CLASSNAME}
+              disabled={isSaving}
+              onClick={() => void handleConfirmPasswordUpdate()}
+            >
+              {isSaving ? "Salvando..." : "Confirmar alteracao"}
+            </button>
+          </>
+        )}
+      >
+        <p className={TEXT_CLASSNAME}>
+          A senha do usuario selecionado sera alterada. O valor digitado nao sera exibido nesta confirmacao.
+        </p>
+      </Dialog>
     </div>
   );
 }
