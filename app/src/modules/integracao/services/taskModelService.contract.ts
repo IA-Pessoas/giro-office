@@ -30,13 +30,26 @@ export function buildTaskModelListParams(params: TaskModelListParams = {}) {
   };
 }
 
+export function normalizeTaskModelResponsibleSequence(payload: Pick<
+  CreateTaskModelData,
+  "responsible_id" | "responsible2_id" | "responsible3_id"
+>) {
+  const responsible_id = payload.responsible_id;
+  const responsible2_id = responsible_id ? payload.responsible2_id : "";
+  const responsible3_id = responsible2_id ? payload.responsible3_id : "";
+
+  return { responsible_id, responsible2_id, responsible3_id };
+}
+
 export function buildCreateTaskModelPayload(payload: CreateTaskModelData) {
+  const responsibleSequence = normalizeTaskModelResponsibleSequence(payload);
+
   return {
     name: payload.name,
     department_id: payload.department_id,
-    responsible_id: payload.responsible_id,
-    responsible2_id: payload.responsible2_id || null,
-    responsible3_id: payload.responsible3_id || null,
+    responsible_id: responsibleSequence.responsible_id,
+    responsible2_id: responsibleSequence.responsible2_id || null,
+    responsible3_id: responsibleSequence.responsible3_id || null,
     observations: payload.observations || null,
     billing: payload.billing,
     prevision: payload.prevision,
@@ -45,13 +58,15 @@ export function buildCreateTaskModelPayload(payload: CreateTaskModelData) {
 }
 
 export function buildUpdateTaskModelPayload(payload: UpdateTaskModelData) {
+  const responsibleSequence = normalizeTaskModelResponsibleSequence(payload);
+
   return {
     task_id: payload.id,
     name: payload.name,
     department_id: payload.department_id,
-    responsible_id: payload.responsible_id,
-    responsible2_id: payload.responsible2_id || null,
-    responsible3_id: payload.responsible3_id || null,
+    responsible_id: responsibleSequence.responsible_id,
+    responsible2_id: responsibleSequence.responsible2_id || null,
+    responsible3_id: responsibleSequence.responsible3_id || null,
     observations: payload.observations || null,
     billing: payload.billing,
     prevision: payload.prevision,

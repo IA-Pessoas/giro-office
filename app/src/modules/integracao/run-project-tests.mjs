@@ -17,6 +17,7 @@ import {
   buildDeleteTaskModelPayload,
   buildTaskModelListParams,
   buildUpdateTaskModelPayload,
+  normalizeTaskModelResponsibleSequence,
   TASK_MODEL_ENDPOINTS,
   unwrapCreatedTaskModel,
   unwrapTaskModelDetail,
@@ -368,6 +369,75 @@ runTest("buildCreateTaskModelPayload maps nullable fields", () => {
       type: "Projeto",
     },
   );
+});
+
+runTest("task model responsible sequence clears descendants without their predecessor", () => {
+  assert.deepEqual(
+    normalizeTaskModelResponsibleSequence({
+      responsible_id: "",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+    }),
+    {
+      responsible_id: "",
+      responsible2_id: "",
+      responsible3_id: "",
+    },
+  );
+  assert.deepEqual(
+    normalizeTaskModelResponsibleSequence({
+      responsible_id: "user-1",
+      responsible2_id: "",
+      responsible3_id: "user-3",
+    }),
+    {
+      responsible_id: "user-1",
+      responsible2_id: "",
+      responsible3_id: "",
+    },
+  );
+});
+
+runTest("task model payloads omit responsible descendants without their predecessor", () => {
+  assert.deepEqual(
+    buildCreateTaskModelPayload({
+      name: "Modelo",
+      department_id: "dep-1",
+      responsible_id: "",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+      observations: "",
+      billing: "Realizar",
+      prevision: 5,
+      type: "Projeto",
+    }),
+    {
+      name: "Modelo",
+      department_id: "dep-1",
+      responsible_id: "",
+      responsible2_id: null,
+      responsible3_id: null,
+      observations: null,
+      billing: "Realizar",
+      prevision: 5,
+      type: "Projeto",
+    },
+  );
+});
+
+runTest("task model modal gates dependent responsible controls", () => {
+  const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
+
+  assert.match(
+    source,
+    /disabled=\{!formData\.responsible_id \|\| \(loadingOptions && users\.length === 0\)\}/,
+  );
+  assert.match(
+    source,
+    /disabled=\{!formData\.responsible2_id \|\| \(loadingOptions && users\.length === 0\)\}/,
+  );
+  assert.match(source, /Selecione o responsável antes de definir o responsável 2\./);
+  assert.match(source, /Selecione o responsável 2 antes de definir o responsável 3\./);
 });
 
 runTest("buildDeleteTaskModelPayload maps task_id body", () => {
