@@ -9,7 +9,7 @@ import {
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { createTestApp } from "./tiServiceTestUtils.js";
+import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
@@ -95,16 +95,61 @@ describe("ti robot routes", () => {
     });
   });
 
-  it("POST /ti/robots validates body", async () => {
-    const response = await request(createTestApp())
+  it.each([
+    {
+      label: "a missing name",
+      body: { type: "Backup" },
+      error: "Informe o nome do robô.",
+    },
+    {
+      label: "a blank name",
+      body: { name: "   ", type: "Backup" },
+      error: "Informe o nome do robô.",
+    },
+    {
+      label: "a missing type",
+      body: { name: "Backup diario" },
+      error: "Selecione o tipo do robô.",
+    },
+    {
+      label: "an invalid type",
+      body: { name: "Backup diario", type: "Outro" },
+      error: "Tipo de robô inválido.",
+    },
+  ])("POST /ti/robots rejects $label before persistence", async ({ body, error }) => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
       .post("/ti/robots")
       .set(gatewayHeaders(TI_ADMIN_PERMISSION))
-      .send({ name: "", type: "Backup" });
+      .send(body);
 
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
+      error,
       code: "BAD_REQUEST",
+    });
+    expect(prisma.tIRobot.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /ti/robots accepts the minimal required create body", async () => {
+    const response = await request(createTestApp())
+      .post("/ti/robots")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({
+        name: "Backup diario",
+        type: "Backup",
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        name: "Backup diario",
+        type: "Backup",
+        status: "active",
+        active: true,
+      },
     });
   });
 
