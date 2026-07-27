@@ -12,6 +12,8 @@ import type { NextFunction, Request, Response } from "express";
 
 import { getFiscalServiceEnv } from "../config/env.js";
 
+const FISCAL_WRITE_PERMISSION = 1;
+
 function parseForwardedPermission(headerValue: string | undefined): number | undefined {
   if (headerValue === undefined || headerValue === "") {
     return undefined;
@@ -59,4 +61,17 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
     logError("Erro ao validar autenticação", { err });
     next(new ServiceError(401, "Não autenticado."));
   }
+}
+
+export function requireFiscalWritePermission(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  if (Number(request.permission ?? 0) < FISCAL_WRITE_PERMISSION) {
+    next(new ServiceError(403, "Permissao insuficiente para alterar dados fiscais."));
+    return;
+  }
+
+  next();
 }
