@@ -78,8 +78,10 @@ describe("regularize list pagination", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data).toMatchObject({ total: 21, page: 2, limit: 20 });
+    expect(JSON.stringify(response.body)).not.toContain("password");
     expect(prisma.sitePasswordsRegularize.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        select: expect.not.objectContaining({ password: true }),
         where: expect.objectContaining({
           organization_id: "a0000000-0000-4000-8000-000000000001",
           status: true,

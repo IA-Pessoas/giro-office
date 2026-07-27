@@ -13,12 +13,13 @@ import type { NextFunction, Request, Response } from "express";
 import { getRegularizeServiceEnv } from "../config/env.js";
 
 function parseForwardedPermission(headerValue: string | undefined): number | undefined {
-  if (headerValue === undefined || headerValue === "") {
+  const normalized = headerValue?.trim();
+  if (normalized === undefined || normalized === "") {
     return undefined;
   }
 
-  const parsed = Number.parseInt(headerValue, 10);
-  return Number.isNaN(parsed) ? undefined : parsed;
+  const parsed = Number(normalized);
+  return Number.isInteger(parsed) ? parsed : undefined;
 }
 
 export function isAuthenticated(request: Request, _response: Response, next: NextFunction): void {

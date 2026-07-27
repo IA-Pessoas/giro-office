@@ -663,6 +663,16 @@ function MaskedValue() {
   return <span className="font-mono text-gray-500 dark:text-slate-400">********</span>;
 }
 
+function getSiteCredentialDetailStatus(error: unknown): string {
+  const message = getRegularizeErrorMessage(error, "Credencial indisponivel para revelacao.");
+
+  if (/403|forbidden|permission|permiss|acesso negado/i.test(message)) {
+    return "Acesso negado para revelar credenciais.";
+  }
+
+  return "Credencial indisponivel para revelacao.";
+}
+
 export function RegularizePage() {
   const [activeTab, setActiveTab] = useState<RegularizeTabId>("dashboard");
   const [selectedClientPfId, setSelectedClientPfId] = useState<RegularizeId>();
@@ -2008,7 +2018,11 @@ export function RegularizePage() {
                           <TableActionButton
                             disabled={!canRevealCredentials}
                             icon={Eye}
-                            title="Revelar credencial"
+                            title={
+                              canRevealCredentials
+                                ? "Revelar credencial"
+                                : "Acesso negado para revelar credenciais"
+                            }
                             onClick={() => setActiveSitePasswordId(item.id)}
                           />
                           {canManageRegularizeCore ? (
@@ -2049,8 +2063,13 @@ export function RegularizePage() {
               <DetailPanel title="Site selecionado">
                 {sitePasswordDetailQuery.isLoading ? (
                   <FieldLine label="Status" value="Carregando..." />
+                ) : !canRevealCredentials ? (
+                  <DetailEmptyState message="Acesso negado para revelar credenciais." />
                 ) : sitePasswordDetailQuery.isError ? (
-                  <FieldLine label="Status" value="Acesso negado ou indisponível." />
+                  <FieldLine
+                    label="Status"
+                    value={getSiteCredentialDetailStatus(sitePasswordDetailQuery.error)}
+                  />
                 ) : sitePasswordDetailQuery.data ? (
                   <>
                     <FieldLine
@@ -2064,7 +2083,7 @@ export function RegularizePage() {
                     <FieldLine label="Link" value={formatText(sitePasswordDetailQuery.data.link)} />
                   </>
                 ) : (
-                  <DetailEmptyState message="Sem revelação ativa." />
+                  <DetailEmptyState message="Selecione um site para revelar credenciais." />
                 )}
               </DetailPanel>
             ) : null}
