@@ -275,8 +275,12 @@ runTest("admin user password update asks for explicit confirmation", () => {
 
   assert.match(adminUserDetailsPanelSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog";/);
   assert.match(adminUserDetailsPanelSource, /isPasswordConfirmationOpen/);
-  assert.match(adminUserDetailsPanelSource, /Confirmar alteracao de senha/);
-  assert.match(adminUserDetailsPanelSource, /A senha do usuario selecionado sera alterada/);
+  assert.match(adminUserDetailsPanelSource, /Confirmar alteração de senha/);
+  assert.match(adminUserDetailsPanelSource, /A senha do usuário selecionado será alterada/);
+  assert.doesNotMatch(adminUserDetailsPanelSource, /O valor digitado não será exibido nesta confirmação/);
+  assert.match(adminUserDetailsPanelSource, /!w-\[min\(92vw,520px\)\]/);
+  assert.match(adminUserDetailsPanelSource, /!rounded-lg/);
+  assert.match(adminUserDetailsPanelSource, /bodyClassName="!px-4 !py-3"/);
   assert.match(dialogSource, /onClick=\{\(\) => setIsPasswordConfirmationOpen\(false\)\}/);
   assert.match(dialogSource, /onClick=\{\(\) => void handleConfirmPasswordUpdate\(\)\}/);
   assert.doesNotMatch(dialogSource, /formData\.password/);
