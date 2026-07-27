@@ -1,14 +1,17 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  ImagePlus,
   MessageSquare,
   Plus,
   Send,
   Tags,
   Ticket,
   UserCheck,
+  X,
 } from "lucide-react";
+import { toast } from "react-toastify";
 
 import { Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";
@@ -30,6 +33,10 @@ import {
   useUpdateTiRequestStatus,
 } from "../hooks";
 import type { TiId, TiListFilters, TiRequest, TiRequestCategory } from "../types";
+import {
+  getTiRequestMessageActionError,
+  validateTiRequestMessageImage,
+} from "../utils/requestMessageAttachment";
 import { TiNativeSelect } from "./TiNativeSelect";
 import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
 import {
@@ -289,6 +296,10 @@ export function TiRequestsTab() {
   const [createFormError, setCreateFormError] = useState<string | null>(null);
   const [categoryFormError, setCategoryFormError] = useState<string | null>(null);
   const [messageDraft, setMessageDraft] = useState("");
+  const [messageAttachment, setMessageAttachment] = useState<File | null>(null);
+  const [messageAttachmentPreviewUrl, setMessageAttachmentPreviewUrl] = useState<string | null>(
+    null,
+  );
   const [actionError, setActionError] = useState<string | null>(null);
 
   const requestsQuery = useTiRequests(filters);
@@ -368,6 +379,25 @@ export function TiRequestsTab() {
     createMessageMutation.isPending;
   const isCategorySaving = createCategoryMutation.isPending || updateCategoryMutation.isPending;
 
+  useEffect(() => {
+    if (!messageAttachment) {
+      setMessageAttachmentPreviewUrl(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(messageAttachment);
+    setMessageAttachmentPreviewUrl(previewUrl);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [messageAttachment]);
+
+  function resetMessageComposer() {
+    setMessageDraft("");
+    setMessageAttachment(null);
+    setMessageAttachmentPreviewUrl(null);
+    setActionError(null);
+  }
+
   function handleCloseCreateDialog() {
     setIsCreateDialogOpen(false);
     setCreateFormError(null);
@@ -442,6 +472,7 @@ export function TiRequestsTab() {
         urgency: requestDraft.urgency,
       });
 
+      resetMessageComposer();
       setSelectedRequestId(createdRequest.id);
       setIsDetailDialogOpen(true);
       handleCloseCreateDialog();
@@ -535,12 +566,42 @@ export function TiRequestsTab() {
     try {
       await createMessageMutation.mutateAsync({
         id: activeRequestId,
-        payload: { message: messageDraft.trim() },
+        payload: {
+          message: messageDraft.trim(),
+          ...(messageAttachment ? { attachment: messageAttachment } : {}),
+        },
       });
-      setMessageDraft("");
+      resetMessageComposer();
     } catch (error) {
-      setActionError(getErrorMessage(error));
+      const feedback = getTiRequestMessageActionError(error);
+      setActionError(feedback);
+      toast.error(feedback);
     }
+  }
+
+  function handleMessageAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
+    setActionError(null);
+
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const validationError = validateTiRequestMessageImage(file);
+
+    if (validationError) {
+      setActionError(validationError);
+      toast.error(validationError);
+      return;
+    }
+
+    setMessageAttachment(file);
+  }
+
+  function handleRemoveMessageAttachment() {
+    setMessageAttachment(null);
   }
 
   return (
@@ -890,8 +951,8 @@ export function TiRequestsTab() {
                             isSelected ? "bg-blue-50 dark:bg-blue-950/30" : null,
                           )}
                           onClick={() => {
+                            resetMessageComposer();
                             setSelectedRequestId(request.id);
-                            setActionError(null);
                             setIsDetailDialogOpen(true);
                           }}
                         >
@@ -930,7 +991,7 @@ export function TiRequestsTab() {
           onOpenChange={(nextOpen) => {
             setIsDetailDialogOpen(nextOpen);
             if (!nextOpen) {
-              setActionError(null);
+              resetMessageComposer();
             }
           }}
           title={activeRequest ? getRequestTitle(activeRequest) : "Detalhe do chamado"}
@@ -1108,20 +1169,42 @@ export function TiRequestsTab() {
               ) : null}
 
               <div className="space-y-3">
-                {(messagesQuery.data ?? []).map((message) => (
-                  <div
-                    key={message.id}
-                    className={tiDialogSubsectionClassName}
-                  >
-                    <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
-                      <span>{message.author_name ?? getStringField(message, ["author"], "Autor")}</span>
-                      <span>{formatDate(message.created_at)}</span>
+                {(messagesQuery.data ?? []).map((message) => {
+                  const attachmentUrl =
+                    typeof message.attachment === "string" && message.attachment
+                      ? message.attachment
+                      : undefined;
+
+                  return (
+                    <div key={message.id} className={tiDialogSubsectionClassName}>
+                      <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span>{message.author_name ?? getStringField(message, ["author"], "Autor")}</span>
+                        <span>{formatDate(message.created_at)}</span>
+                      </div>
+                      <p className="text-sm leading-6 text-slate-700 dark:text-slate-200 whitespace-pre-wrap break-words">
+                        {message.message ?? getStringField(message, ["content", "body"], "")}
+                      </p>
+                      {attachmentUrl ? (
+                        <a
+                          href={attachmentUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 block w-fit rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        >
+                          <img
+                            src={attachmentUrl}
+                            alt="Imagem anexada à mensagem"
+                            loading="lazy"
+                            className="max-h-64 max-w-full rounded-md border border-slate-200 object-contain dark:border-slate-700"
+                          />
+                          <span className="mt-1 block text-xs font-medium text-blue-700 dark:text-blue-300">
+                            Abrir imagem em outra guia
+                          </span>
+                        </a>
+                      ) : null}
                     </div>
-                    <p className="text-sm leading-6 text-slate-700 dark:text-slate-200 whitespace-pre-wrap break-words">
-                      {message.message ?? getStringField(message, ["content", "body"], "")}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <form className="mt-4 space-y-3" onSubmit={handleCreateMessage}>
@@ -1134,6 +1217,50 @@ export function TiRequestsTab() {
                     onChange={(event) => setMessageDraft(event.target.value)}
                   />
                 </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label
+                    className={cn(
+                      tiSecondaryButtonClassName,
+                      "cursor-pointer focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 dark:focus-within:ring-blue-400",
+                    )}
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                    <span>Anexar imagem</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="sr-only"
+                      onChange={handleMessageAttachmentChange}
+                      disabled={createMessageMutation.isPending}
+                    />
+                  </label>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    PNG, JPEG ou WebP de até 5 MB.
+                  </span>
+                </div>
+                {messageAttachment ? (
+                  <div className="flex items-center gap-3 rounded-md border border-slate-200 p-2 dark:border-slate-700">
+                    {messageAttachmentPreviewUrl ? (
+                      <img
+                        src={messageAttachmentPreviewUrl}
+                        alt={`Prévia de ${messageAttachment.name}`}
+                        className="h-16 w-16 rounded object-cover"
+                      />
+                    ) : null}
+                    <span className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-200">
+                      {messageAttachment.name}
+                    </span>
+                    <button
+                      type="button"
+                      className={tiSecondaryButtonClassName}
+                      onClick={handleRemoveMessageAttachment}
+                      disabled={createMessageMutation.isPending}
+                    >
+                      <X className="h-4 w-4" />
+                      <span>Remover</span>
+                    </button>
+                  </div>
+                ) : null}
                 <button
                   type="submit"
                   className={tiPrimaryButtonClassName}

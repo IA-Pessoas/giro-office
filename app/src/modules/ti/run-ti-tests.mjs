@@ -22,6 +22,99 @@ async function runTest(name, fn) {
   }
 }
 
+await runTest("ti request message attachments accept supported images without trusting arbitrary URL hosts", async () => {
+  const {
+    MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES,
+    validateTiRequestMessageImage,
+  } = await import("./utils/requestMessageAttachment.ts");
+
+  assert.equal(MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES, 5 * 1024 * 1024);
+  assert.equal(
+    validateTiRequestMessageImage({
+      type: "image/png",
+      size: MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES,
+    }),
+    null,
+  );
+  assert.equal(
+    validateTiRequestMessageImage({ type: "image/gif", size: 10 }),
+    "Selecione uma imagem PNG, JPEG ou WebP.",
+  );
+  assert.equal(
+    validateTiRequestMessageImage({
+      type: "image/webp",
+      size: MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES + 1,
+    }),
+    "A imagem deve ter no máximo 5 MB.",
+  );
+});
+
+await runTest("ti request messages use multipart only when an image is attached", async () => {
+  const { buildTiRequestMessageSubmission } = await import(
+    "./utils/requestMessageAttachment.ts"
+  );
+  const attachment = new File(["test image"], "evidence.png", { type: "image/png" });
+
+  const multipartSubmission = buildTiRequestMessageSubmission({
+    message: "Segue a evidência.",
+    attachment,
+  });
+
+  assert.equal(multipartSubmission instanceof FormData, true);
+  assert.equal(multipartSubmission.get("message"), "Segue a evidência.");
+  assert.equal(multipartSubmission.get("file"), attachment);
+
+  assert.deepEqual(buildTiRequestMessageSubmission({ message: "Mensagem sem anexo." }), {
+    message: "Mensagem sem anexo.",
+  });
+});
+
+await runTest("ti request message uploads prefer domain errors and hide technical Axios messages", async () => {
+  const { getTiRequestMessageActionError } = await import(
+    "./utils/requestMessageAttachment.ts"
+  );
+
+  assert.equal(
+    getTiRequestMessageActionError({
+      message: "Request failed with status code 413",
+      response: { data: { error: "A imagem excede o limite permitido." } },
+    }),
+    "A imagem excede o limite permitido.",
+  );
+  assert.equal(
+    getTiRequestMessageActionError(new Error("Request failed with status code 500")),
+    "Não foi possível enviar a mensagem. Tente novamente.",
+  );
+});
+
+await runTest("ti request attachment UI retains the accessible upload flow and clears context-bound drafts", async () => {
+  const requestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(requestsTabSource, /type="file"/);
+  assert.match(requestsTabSource, /accept="image\/png,image\/jpeg,image\/webp"/);
+  assert.match(requestsTabSource, /focus-within:ring-2/);
+  assert.match(requestsTabSource, /onChange=\{handleMessageAttachmentChange\}/);
+  assert.match(requestsTabSource, /URL\.createObjectURL\(messageAttachment\)/);
+  assert.match(requestsTabSource, /URL\.revokeObjectURL\(previewUrl\)/);
+  assert.match(requestsTabSource, /alt=\{`Prévia de \$\{messageAttachment\.name\}`\}/);
+  assert.match(requestsTabSource, /onClick=\{handleRemoveMessageAttachment\}/);
+  assert.match(requestsTabSource, /disabled=\{createMessageMutation\.isPending\}/);
+  assert.doesNotMatch(requestsTabSource, /getTiRequestMessageAttachmentUrl\(/);
+  assert.match(requestsTabSource, /target="_blank"/);
+  assert.match(requestsTabSource, /rel="noreferrer"/);
+  assert.match(requestsTabSource, /toast\.error\(validationError\)/);
+  assert.match(requestsTabSource, /toast\.error\(feedback\)/);
+  assert.match(
+    requestsTabSource,
+    /function resetMessageComposer\(\) \{[\s\S]*setMessageDraft\(""\);[\s\S]*setMessageAttachment\(null\);[\s\S]*setActionError\(null\);[\s\S]*\}/,
+  );
+  assert.match(requestsTabSource, /if \(!nextOpen\) \{[\s\S]*resetMessageComposer\(\);/);
+  assert.match(
+    requestsTabSource,
+    /onClick=\{\(\) => \{[\s\S]*resetMessageComposer\(\);[\s\S]*setSelectedRequestId\(request\.id\);/,
+  );
+});
+
 async function readModuleSource(relativePath) {
   return readFile(join(moduleRoot, relativePath), "utf8");
 }

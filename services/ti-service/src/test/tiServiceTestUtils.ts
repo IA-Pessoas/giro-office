@@ -5,6 +5,7 @@ import { vi } from "vitest";
 import { createTiApplication } from "../app.js";
 import type { TiServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import type { TiRequestImageStorage } from "../services/tiRequestImageStorage.js";
 
 export function createPrismaMock(): PrismaClient {
   const organizationId = "10000000-0000-4000-8000-000000000001";
@@ -415,7 +416,10 @@ export function createPrismaMock(): PrismaClient {
   } as unknown as PrismaClient;
 }
 
-export function createTestApp(prisma = createPrismaMock()) {
+export function createTestApp(
+  prisma = createPrismaMock(),
+  options?: { requestImageStorage?: TiRequestImageStorage },
+) {
   const env = {
     nodeEnv: "test",
     port: 3040,
@@ -424,6 +428,9 @@ export function createTestApp(prisma = createPrismaMock()) {
     auditServiceToken: "audit-service-token-test",
     internalServiceToken: "ti-service-internal-token-test",
     passwordEncryptionKey: "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=",
+    supabaseUrl: "https://example.supabase.co",
+    supabaseServiceRoleKey: "test-supabase-service-role-key",
+    tiRequestImageBucket: "ti-request-attachments-private",
     allowedOrigins: ["*"],
     enableApiDocs: false,
     logLevel: "info",
@@ -440,5 +447,6 @@ export function createTestApp(prisma = createPrismaMock()) {
     env,
     logger,
     prisma,
+    ...(options?.requestImageStorage ? { requestImageStorage: options.requestImageStorage } : {}),
   });
 }
