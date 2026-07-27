@@ -99,6 +99,20 @@ runTest("pessoal error message prefers api fields before local fallback", () => 
   );
 });
 
+runTest("password form errors are rendered inside the open modal", () => {
+  const source = readFileSync(
+    "src/modules/pessoal/components/PessoalPasswordsSection.tsx",
+    "utf8",
+  );
+  const dialogStart = source.indexOf('<form onSubmit={handleSubmit} className="space-y-3">');
+  const alertIndex = source.indexOf('role="alert"', dialogStart);
+  const serviceFieldIndex = source.indexOf("Serviço", dialogStart);
+
+  assert.ok(dialogStart >= 0);
+  assert.ok(alertIndex > dialogStart && alertIndex < serviceFieldIndex);
+  assert.match(source, /formError && !isFormOpen/);
+});
+
 runTest("departamento pessoal page uses the pessoal module instead of the old mock", () => {
   const page = readFileSync("src/pages/departamento-pessoal/index.tsx", "utf8");
 
