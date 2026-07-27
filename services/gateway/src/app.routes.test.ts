@@ -2033,7 +2033,7 @@ it("records ti-service route targets when audit is enabled", async () => {
   }
 });
 
-it("records TI password deactivation as complementary metadata-only audit", async () => {
+it("records TI password deactivation without body or query secrets", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -2060,7 +2060,7 @@ it("records TI password deactivation as complementary metadata-only audit", asyn
 
   try {
     const response = await fetch(
-      `${gatewayUrl}/ti/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/deactivate`,
+      `${gatewayUrl}/ti/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/deactivate?reason=query-secret&password=query-password&ticket=TI-507`,
       {
         method: "POST",
         headers: {
@@ -2086,11 +2086,15 @@ it("records TI password deactivation as complementary metadata-only audit", asyn
         activityVisible: true,
       },
     });
+    expect(auditService.records[0]?.query).toEqual({ ticket: "TI-507" });
     expect(auditService.records[0]?.createdAt).toEqual(expect.any(String));
     expect(auditService.records[0]?.finishedAt).toEqual(expect.any(String));
-    expect(JSON.stringify(auditService.records[0])).not.toContain(
-      "Contains private administrative context",
-    );
+    const serializedAuditRecord = JSON.stringify(auditService.records[0]);
+    expect(serializedAuditRecord).not.toContain("Contains private administrative context");
+    expect(serializedAuditRecord).not.toContain("query-secret");
+    expect(serializedAuditRecord).not.toContain("query-password");
+    expect(serializedAuditRecord).not.toContain('"reason"');
+    expect(serializedAuditRecord).not.toContain('"password"');
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
