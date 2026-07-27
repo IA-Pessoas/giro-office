@@ -475,6 +475,31 @@ await runTest("ti stock exit feedback uses the scoped mutation error normalizer"
   );
 });
 
+await runTest("ti stock locations filter progressively and identify normalized active duplicates", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+  const {
+    filterTiStockLocations,
+    hasActiveTiStockLocation,
+    normalizeTiStockLocationName,
+  } = await import("./utils/stockDisplay.ts");
+  const locations = [
+    { id: 1, name: "Almoxarifado São", status: true },
+    { id: 2, name: "Sala de reuniões", status: true },
+    { id: 3, name: "Almoxarifado antigo", status: false },
+  ];
+
+  assert.equal(typeof normalizeTiStockLocationName, "function");
+  assert.equal(normalizeTiStockLocationName("  Almoxarifado   São  "), "almoxarifado sao");
+  assert.deepEqual(
+    filterTiStockLocations(locations, "almox"),
+    [locations[0], locations[2]],
+  );
+  assert.equal(hasActiveTiStockLocation(locations, "ALMOXARIFADO SAO"), true);
+  assert.equal(hasActiveTiStockLocation(locations, "Sala"), false);
+  assert.match(tabSource, /hasActiveTiStockLocation\(stockLocations, name\)/);
+  assert.match(tabSource, /rows=\{filteredStockLocations\}/);
+});
+
 await runTest("ti stock filters reset and render server pagination", async () => {
   const tabSource = await readModuleSource("components/TiStockTab.tsx");
 
