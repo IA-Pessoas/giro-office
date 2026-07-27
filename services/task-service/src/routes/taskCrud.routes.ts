@@ -29,8 +29,16 @@ router.post("/", isAuthenticated, async (req: Request, res: Response, next: Next
       project_id: body.project_id,
       client_id: body.client_id,
       prospecting_status: body.prospecting_status,
+      name: body.name,
+      status: body.status,
+      department_id: body.department_id,
       observations: body.observations,
+      billing: body.billing,
       urgency: body.urgency,
+      responsible_id: body.responsible_id,
+      responsible2_id: body.responsible2_id,
+      responsible3_id: body.responsible3_id,
+      prevision_date: body.prevision_date,
     });
 
     res.status(201).json(createSuccessResponse(result));

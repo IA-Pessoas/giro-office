@@ -8,7 +8,7 @@ describe("task crud routes", () => {
     resetTaskRouteMocks();
   });
 
-  it("POST /task cria tarefa", async () => {
+  it("POST /task encaminha os detalhes operacionais opcionais da criação", async () => {
     const app = createTestApp();
 
     const res = await request(app).post("/task").send({
@@ -16,12 +16,37 @@ describe("task crud routes", () => {
       project_id: "project-1",
       client_id: "client-1",
       prospecting_status: "Fechado",
+      name: "Revisar documentação assinada",
+      status: "Em Espera",
+      department_id: "department-1",
       observations: "obs",
+      billing: "Não Realizar",
       urgency: "Alta",
+      responsible_id: "user-1",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+      prevision_date: "2026-08-15",
     });
 
     expect(res.status).toBe(201);
-    expect(taskCrudServiceMock.createTask).toHaveBeenCalledTimes(1);
+    expect(taskCrudServiceMock.createTask).toHaveBeenCalledWith({
+      user_id: "user-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      name: "Revisar documentação assinada",
+      status: "Em Espera",
+      department_id: "department-1",
+      observations: "obs",
+      billing: "Não Realizar",
+      urgency: "Alta",
+      responsible_id: "user-1",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+      prevision_date: "2026-08-15",
+    });
   });
 
   it("GET /task/list lista tarefas", async () => {
