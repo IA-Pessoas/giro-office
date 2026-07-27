@@ -386,7 +386,13 @@ const schemas: Record<string, OpenApiSchema> = {
     required: ["user_id", "number"],
     properties: {
       user_id: { type: "string", format: "uuid" },
-      number: { type: "string", minLength: 1 },
+      number: {
+        type: "string",
+        minLength: 4,
+        maxLength: 4,
+        pattern: "^[0-9]{4}$",
+        example: "1001",
+      },
     },
     additionalProperties: false,
   },
@@ -395,7 +401,13 @@ const schemas: Record<string, OpenApiSchema> = {
     minProperties: 1,
     properties: {
       user_id: { type: "string", format: "uuid" },
-      number: { type: "string", minLength: 1 },
+      number: {
+        type: "string",
+        minLength: 4,
+        maxLength: 4,
+        pattern: "^[0-9]{4}$",
+        example: "1001",
+      },
     },
     additionalProperties: false,
   },
