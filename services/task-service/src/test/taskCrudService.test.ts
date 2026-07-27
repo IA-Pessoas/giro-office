@@ -114,6 +114,7 @@ describe("TaskCrudService", () => {
       statusCode: 404,
       message: "Projeto nao encontrado.",
     });
+    expect(prismaMock.task.create).not.toHaveBeenCalled();
   });
 
   it("createTask cria a tarefa quando o projeto pertence ao cliente", async () => {

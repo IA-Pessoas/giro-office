@@ -1,8 +1,8 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 import type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracaoTask.js";
 import type { ProspectingStatus } from "../constants/prospectingStatus.js";
-import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { TaskWorkflowService } from "./taskWorkflowService.js";
