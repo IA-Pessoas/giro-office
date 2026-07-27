@@ -45,14 +45,7 @@ const createTaskRequestBody = createObjectRequestBody({
     observations: "Priorizar validacao documental.",
     urgency: "ALTA",
   },
-  required: [
-    "model_id",
-    "project_id",
-    "client_id",
-    "prospecting_status",
-    "observations",
-    "urgency",
-  ],
+  required: ["model_id", "project_id", "client_id", "prospecting_status", "urgency"],
   properties: {
     model_id: { type: "string" },
     project_id: { type: "string" },
