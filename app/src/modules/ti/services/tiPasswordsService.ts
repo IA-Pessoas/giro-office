@@ -63,7 +63,7 @@ export const tiPasswordsService = {
   ): Promise<TiPasswordListItem> {
     const response = await api.post<TiEnvelope<TiPasswordListItem>>(
       buildTiPath(TI_ENDPOINTS.passwords.deactivate, id),
-      payload,
+      { reason: payload.reason },
     );
 
     return unwrapTiEnvelope<TiPasswordListItem>(response.data);
