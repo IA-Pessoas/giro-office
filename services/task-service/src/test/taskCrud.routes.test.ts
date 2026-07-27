@@ -49,6 +49,58 @@ describe("task crud routes", () => {
     });
   });
 
+  it("POST /task normaliza detalhes opcionais vazios para preservar os defaults do modelo", async () => {
+    const app = createTestApp();
+
+    const res = await request(app).post("/task").send({
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      name: "",
+      status: "",
+      department_id: "",
+      billing: "",
+      observations: "obs",
+      urgency: "Alta",
+      responsible_id: "",
+      responsible2_id: "",
+      responsible3_id: "",
+      prevision_date: "",
+    });
+
+    expect(res.status).toBe(201);
+    expect(taskCrudServiceMock.createTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: undefined,
+        status: undefined,
+        department_id: undefined,
+        billing: undefined,
+        responsible_id: undefined,
+        responsible2_id: undefined,
+        responsible3_id: undefined,
+        prevision_date: undefined,
+      }),
+    );
+  });
+
+  it("POST /task rejects an invalid prevision date", async () => {
+    const app = createTestApp();
+
+    const res = await request(app).post("/task").send({
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      observations: "obs",
+      urgency: "Alta",
+      prevision_date: "2026-02-31",
+    });
+
+    expect(res.status).toBe(400);
+    expect(taskCrudServiceMock.createTask).not.toHaveBeenCalled();
+  });
+
   it("GET /task/list lista tarefas", async () => {
     const app = createTestApp();
 

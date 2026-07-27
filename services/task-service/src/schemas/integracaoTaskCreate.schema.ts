@@ -20,21 +20,48 @@ const integracaoTaskStatusZod = z.enum(
 
 const taskBillingZod = z.enum(["Realizar", "Não Realizar"]);
 
+function normalizeOptionalText(value: unknown): unknown {
+  return typeof value === "string" && !value.trim() ? undefined : value;
+}
+
+function isIsoCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+const optionalTextZod = z.preprocess(normalizeOptionalText, z.string().optional());
+const optionalStatusZod = z.preprocess(normalizeOptionalText, integracaoTaskStatusZod.optional());
+const optionalBillingZod = z.preprocess(normalizeOptionalText, taskBillingZod.optional());
+const optionalResponsibleIdZod = z.preprocess(
+  normalizeOptionalText,
+  z.union([z.string(), z.null()]).optional(),
+);
+const optionalIsoDateZod = z.preprocess(
+  normalizeOptionalText,
+  z.string().refine(isIsoCalendarDate, "prevision_date deve ser uma data YYYY-MM-DD válida.").optional(),
+);
+
 export const integracaoTaskCreateBodySchema = z
   .object({
     model_id: zNonEmptyText("model_id"),
     project_id: zNonEmptyText("project_id"),
     client_id: zNonEmptyText("client_id"),
     prospecting_status: prospectingStatusZod,
-    name: z.string().optional(),
-    status: integracaoTaskStatusZod.optional(),
-    department_id: z.string().optional(),
+    name: optionalTextZod,
+    status: optionalStatusZod,
+    department_id: optionalTextZod,
     observations: z.string().optional().default(""),
-    billing: taskBillingZod.optional(),
+    billing: optionalBillingZod,
     urgency: zNonEmptyText("urgency"),
-    responsible_id: z.string().optional(),
-    responsible2_id: z.union([z.string(), z.null()]).optional(),
-    responsible3_id: z.union([z.string(), z.null()]).optional(),
-    prevision_date: z.union([z.string(), z.null(), z.date()]).optional(),
+    responsible_id: optionalTextZod,
+    responsible2_id: optionalResponsibleIdZod,
+    responsible3_id: optionalResponsibleIdZod,
+    prevision_date: optionalIsoDateZod,
   })
   .strict();

@@ -242,22 +242,22 @@ export class TaskCrudService {
         throw new ServiceError(404, "Tarefa modelo não existe.");
       }
 
+      const billing = data.billing ?? model.billing;
       let defaultStatus = "A Realizar";
       if (data.prospecting_status === "Fechado") {
         defaultStatus = "Em Andamento";
       }
-      if (model.billing === "Realizar") {
+      if (billing === "Realizar") {
         defaultStatus = "A Realizar";
       }
 
       const status = data.status ?? defaultStatus;
-      const billing = data.billing ?? model.billing;
-      const charge_comercial = billing !== "Não Realizar";
+      const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
       const previsionDate =
         data.prevision_date === undefined || data.prevision_date === null
           ? null
           : typeof data.prevision_date === "string"
-            ? new Date(data.prevision_date)
+            ? new Date(`${data.prevision_date}T00:00:00.000Z`)
             : data.prevision_date;
 
       const create = await prismaClient.task.create({

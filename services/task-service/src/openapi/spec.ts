@@ -51,7 +51,7 @@ const createTaskRequestBody = createObjectRequestBody({
     responsible_id: "user-uuid",
     responsible2_id: "backup-user-uuid",
     responsible3_id: null,
-    prevision_date: "2026-04-10T09:00:00.000Z",
+    prevision_date: "2026-04-10",
   },
   required: [
     "model_id",
@@ -75,7 +75,7 @@ const createTaskRequestBody = createObjectRequestBody({
     responsible_id: { type: "string" },
     responsible2_id: { type: ["string", "null"] },
     responsible3_id: { type: ["string", "null"] },
-    prevision_date: { type: ["string", "null"], format: "date-time" },
+    prevision_date: { type: "string", format: "date" },
   },
 });
 
