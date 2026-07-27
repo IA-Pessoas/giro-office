@@ -858,7 +858,7 @@ await runTest("ti password reveal copy uses copy icon without toggling visibilit
 
   assert.match(tabSource, /Copy,/);
   assert.match(tabSource, /<Copy className="h-4 w-4" \/>/);
-  assert.match(tabSource, /navigator\.clipboard\.writeText\(secret\)/);
+  assert.match(tabSource, /copySensitiveText\(secret, clipboard\)/);
   assert.doesNotMatch(tabSource, /<EyeOff className="h-4 w-4" \/>[\s\S]*?<span>Copiar senha<\/span>/);
 });
 
@@ -876,12 +876,13 @@ await runTest("ti password reveal clears sensitive detail cache when hidden", as
   assert.match(tabSource, /setRevealPasswordId\(null\)/);
 });
 
-await runTest("ti user selects reuse the paginated assignable users source", async () => {
+await runTest("ti user selects reuse the active RH operational users source", async () => {
   const hookSource = await readAppSource("src/modules/rh/hooks/useAssignableUsers.ts");
   const rhTypesSource = await readAppSource("src/modules/rh/types.ts");
   const userTypesSource = await readAppSource("src/modules/users/types/index.ts");
 
-  assert.match(hookSource, /listAdminUsers\("active"\)/);
+  assert.match(hookSource, /RH_ENDPOINTS\.operationalUsers/);
+  assert.match(hookSource, /unwrapRhEnvelope<RhOperationalUser\[\]>/);
   assert.doesNotMatch(hookSource, /cpf: user\.cpf \?\? null/);
   assert.doesNotMatch(rhTypesSource, /cpf\?: string \| null/);
   assert.doesNotMatch(userTypesSource, /cpf\?: string \| null/);
@@ -1478,6 +1479,26 @@ await runTest("ti terms filters stay local because the backend list only support
   assert.doesNotMatch(source, /inventory_id: assetId/);
   assert.doesNotMatch(source, /asset_id: assetId/);
   assert.doesNotMatch(source, /status,\s*inventory_id/);
+});
+
+await runTest("ti terms list paginates locally and keeps actions compact", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+  const controlsSource = await readModuleSource("components/tiFormControls.tsx");
+
+  assert.match(source, /import \{ PaginationControls \} from "@shared\/components";/);
+  assert.match(source, /const TERMS_PAGE_SIZE = 10;/);
+  assert.match(source, /const \[termsPage, setTermsPage\] = useState\(1\);/);
+  assert.match(source, /useEffect\(\(\) => \{\s*setTermsPage\(1\);/);
+  assert.match(source, /const paginatedTerms = useMemo\(/);
+  assert.match(source, /filteredTerms\.slice\(/);
+  assert.match(source, /paginatedTerms\.map\(\(term\)/);
+  assert.doesNotMatch(source, /filteredTerms\.map\(\(term\)/);
+  assert.match(source, /<PaginationControls/);
+  assert.match(source, /total=\{filteredTerms\.length\}/);
+  assert.match(source, /totalPages=\{termsPageCount\}/);
+  assert.match(source, /onPageChange=\{\(page\) => setTermsPage\(page\)\}/);
+  assert.match(source, /iconOnly/);
+  assert.match(controlsSource, /iconOnly \? "w-8 px-0" : "px-2\.5"/);
 });
 
 await runTest("ti terms create uses assignable user selection and edit keeps identity read-only", async () => {
