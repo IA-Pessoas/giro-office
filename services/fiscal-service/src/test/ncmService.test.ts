@@ -23,6 +23,7 @@ function createMockPrisma(): NcmServicePrisma {
   return {
     ncm: {
       findFirst: vi.fn(async () => null),
+      count: vi.fn(async () => 0),
       findMany: vi.fn(async () => []),
       create: vi.fn(async () => ({})),
       update: vi.fn(async () => ({})),
@@ -123,31 +124,55 @@ describe("NcmService", () => {
     expect(audit.logUpdateIfChanged).toHaveBeenCalledTimes(1);
   });
 
-  it("list retorna array vazio quando não há códigos", async () => {
+  it("list retorna pagina quando nao ha codigos", async () => {
     const prisma = createMockPrisma();
+    const row = { id: NCM_ID, ncm_code: "84719012" };
+    prisma.ncm.count = vi.fn(async () => 3) as unknown as NcmServicePrisma["ncm"]["count"];
+    prisma.ncm.findMany = vi.fn(async () => [
+      row,
+    ]) as unknown as NcmServicePrisma["ncm"]["findMany"];
     const service = new NcmService(prisma, createMockAudit());
 
-    const result = await service.list([], ORG_ID);
-    expect(result).toEqual([]);
+    const result = await service.list({ page: 2, page_size: 1 }, ORG_ID);
+    const where = { organization_id: ORG_ID };
+
+    expect(prisma.ncm.count).toHaveBeenCalledWith({ where });
+    expect(prisma.ncm.findMany).toHaveBeenCalledWith({
+      where,
+      select: expect.any(Object),
+      orderBy: { ncm_code: "asc" },
+      skip: 1,
+      take: 1,
+    });
+    expect(result).toEqual({
+      data: [row],
+      total: 3,
+      page: 2,
+      limit: 1,
+      hasMore: true,
+    });
   });
 
-  it("list usa filtro in com ncmCodes e organizationId", async () => {
+  it("list usa busca parcial com ncmCodes e organizationId", async () => {
     const findMany = vi.fn(async () => []);
     const prisma = createMockPrisma();
     prisma.ncm.findMany = findMany as unknown as NcmServicePrisma["ncm"]["findMany"];
     const service = new NcmService(prisma, createMockAudit());
 
-    await service.list(["84719012", "84713012"], ORG_ID);
+    await service.list({ ncmCodes: ["8471", "84713"] }, ORG_ID);
 
     expect(findMany).toHaveBeenCalledTimes(1);
     const firstCall = (findMany as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
     if (!firstCall) throw new Error("Expected findMany to be called.");
     const arg = firstCall[0] as {
-      where: { organization_id: string; ncm_code: { in: string[] } };
+      where: { organization_id: string; OR: unknown[] };
     };
     expect(arg.where).toEqual({
       organization_id: ORG_ID,
-      ncm_code: { in: ["84719012", "84713012"] },
+      OR: [
+        { ncm_code: { contains: "8471", mode: "insensitive" } },
+        { ncm_code: { contains: "84713", mode: "insensitive" } },
+      ],
     });
   });
 });

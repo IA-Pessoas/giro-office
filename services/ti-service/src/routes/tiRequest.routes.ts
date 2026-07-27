@@ -80,7 +80,7 @@ export function createTiRequestRoutes(
 
   router.get(
     "/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -97,7 +97,7 @@ export function createTiRequestRoutes(
 
   router.get(
     "/:id",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -114,7 +114,7 @@ export function createTiRequestRoutes(
 
   router.post(
     "/",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -185,7 +185,7 @@ export function createTiRequestRoutes(
 
   router.get(
     "/:id/messages",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -208,7 +208,7 @@ export function createTiRequestRoutes(
 
   router.post(
     "/:id/messages",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     upload.single("file"),
     async (request, response, next) => {
       try {

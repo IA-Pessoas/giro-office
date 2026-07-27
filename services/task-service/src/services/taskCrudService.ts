@@ -1,8 +1,8 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 import type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracaoTask.js";
 import type { ProspectingStatus } from "../constants/prospectingStatus.js";
-import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { TaskWorkflowService } from "./taskWorkflowService.js";
@@ -221,6 +221,19 @@ export class TaskCrudService {
 
   async createTask(data: CreateTaskCrudRequest): Promise<{ create: TaskCreateRow }> {
     try {
+      const project = await prismaClient.project.findFirst({
+        where: { id: data.project_id, organization_id: data.organization_id },
+        select: { client_id: true },
+      });
+
+      if (!project) {
+        throw new ServiceError(404, "Projeto nao encontrado.");
+      }
+
+      if (project.client_id !== data.client_id) {
+        throw new ServiceError(400, "Projeto nao pertence ao cliente informado.");
+      }
+
       const dup = await prismaClient.task.findFirst({
         where: {
           organization_id: data.organization_id,

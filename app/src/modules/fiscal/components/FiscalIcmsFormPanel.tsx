@@ -15,7 +15,6 @@ type FiscalIcmsFormPanelMode = "create" | "edit";
 interface FiscalIcmsFormPanelProps {
   mode: FiscalIcmsFormPanelMode;
   icmsId?: string;
-  searchDescriptions: string[];
   onClose: () => void;
   showHeader?: boolean;
   bare?: boolean;
@@ -68,7 +67,6 @@ function normalizeOptionalText(value: string) {
 export function FiscalIcmsFormPanel({
   mode,
   icmsId,
-  searchDescriptions,
   onClose,
   showHeader = true,
   bare = false,
@@ -162,13 +160,8 @@ export function FiscalIcmsFormPanel({
         });
         toast.success("ICMS atualizado com sucesso.");
       } else {
-        const createdIcms = await createMutation.mutateAsync(basePayload);
-
-        if (!searchDescriptions.includes(createdIcms.description)) {
-          toast.success("Cadastro criado. Inclua a descrição na busca para visualizar.");
-        } else {
-          toast.success("ICMS cadastrado com sucesso.");
-        }
+        await createMutation.mutateAsync(basePayload);
+        toast.success("ICMS cadastrado com sucesso.");
       }
 
       setFormState(DEFAULT_FORM_STATE);

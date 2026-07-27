@@ -108,7 +108,16 @@ export function createPrismaMock(): PrismaClient {
           throw new Error("Stock location list missing Tecnologia department scope.");
         }
 
-        return [];
+        return [
+          {
+            id: "70000000-0000-4000-8000-000000000099",
+            name: "Almoxarifado São",
+            floor: 1,
+            department_id: departmentId,
+            status: true,
+            organization_id: organizationId,
+          },
+        ];
       }),
       findFirst: vi.fn(async ({ where }) => {
         if (

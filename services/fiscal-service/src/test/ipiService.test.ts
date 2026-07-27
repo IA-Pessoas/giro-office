@@ -45,6 +45,7 @@ function createMockPrisma(): IpiServicePrisma {
   return {
     ipi: {
       findFirst: vi.fn(async () => null),
+      count: vi.fn(async () => 0),
       findMany: vi.fn(async () => []),
       create: vi.fn(async () => ({})),
       update: vi.fn(async () => ({})),
@@ -186,31 +187,55 @@ describe("IpiService", () => {
     );
   });
 
-  it("list retorna array vazio quando não há códigos", async () => {
+  it("list retorna pagina quando nao ha codigos", async () => {
     const prisma = createMockPrisma();
+    const row = { id: IPI_ID, ncm: "84719012" };
+    prisma.ipi.count = vi.fn(async () => 3) as unknown as IpiServicePrisma["ipi"]["count"];
+    prisma.ipi.findMany = vi.fn(async () => [
+      row,
+    ]) as unknown as IpiServicePrisma["ipi"]["findMany"];
     const service = new IpiService(prisma, createMockAudit());
 
-    const result = await service.list([], ORG_ID);
-    expect(result).toEqual([]);
+    const result = await service.list({ page: 2, page_size: 1 }, ORG_ID);
+    const where = { organization_id: ORG_ID };
+
+    expect(prisma.ipi.count).toHaveBeenCalledWith({ where });
+    expect(prisma.ipi.findMany).toHaveBeenCalledWith({
+      where,
+      select: expect.any(Object),
+      orderBy: { ncm: "asc" },
+      skip: 1,
+      take: 1,
+    });
+    expect(result).toEqual({
+      data: [row],
+      total: 3,
+      page: 2,
+      limit: 1,
+      hasMore: true,
+    });
   });
 
-  it("list usa filtro ncm in com ipiCodes e organizationId", async () => {
+  it("list usa busca parcial ncm com ipiCodes e organizationId", async () => {
     const findMany = vi.fn(async () => []);
     const prisma = createMockPrisma();
     prisma.ipi.findMany = findMany as unknown as IpiServicePrisma["ipi"]["findMany"];
     const service = new IpiService(prisma, createMockAudit());
 
-    await service.list(["84719012", "84719013"], ORG_ID);
+    await service.list({ ipiCodes: ["8471", "84719"] }, ORG_ID);
 
     expect(findMany).toHaveBeenCalledTimes(1);
     const firstCall = (findMany as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
     if (!firstCall) throw new Error("Expected findMany to be called.");
     const arg = firstCall[0] as {
-      where: { organization_id: string; ncm: { in: string[] } };
+      where: { organization_id: string; OR: unknown[] };
     };
     expect(arg.where).toEqual({
       organization_id: ORG_ID,
-      ncm: { in: ["84719012", "84719013"] },
+      OR: [
+        { ncm: { contains: "8471", mode: "insensitive" } },
+        { ncm: { contains: "84719", mode: "insensitive" } },
+      ],
     });
   });
 });

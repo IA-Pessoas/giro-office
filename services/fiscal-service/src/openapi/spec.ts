@@ -60,6 +60,46 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
     validity_start_date: "2026-01-01T00:00:00.000Z",
   };
 
+  const paginationParameters = [
+    {
+      name: "page",
+      in: "query",
+      required: false,
+      schema: { type: "integer", minimum: 1 },
+      description: "Página da listagem. Padrão: 1.",
+    },
+    {
+      name: "page_size",
+      in: "query",
+      required: false,
+      schema: { type: "integer", minimum: 1, maximum: 100 },
+      description: "Quantidade de registros por página. Padrão: 50.",
+    },
+  ];
+
+  const paginatedListEnvelopeSchema = {
+    type: "object",
+    required: ["success", "data"],
+    additionalProperties: true,
+    properties: {
+      success: { type: "boolean", example: true },
+      data: {
+        type: "object",
+        required: ["data", "total", "page", "limit", "hasMore"],
+        properties: {
+          data: {
+            type: "array",
+            items: { type: "object", additionalProperties: true },
+          },
+          total: { type: "integer", minimum: 0 },
+          page: { type: "integer", minimum: 1 },
+          limit: { type: "integer", minimum: 1 },
+          hasMore: { type: "boolean" },
+        },
+      },
+    },
+  };
+
   return {
     openapi: "3.0.3",
     info: {
@@ -235,23 +275,24 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       "/fiscal/ncm/list": {
         get: {
           tags: ["NCM"],
-          summary: "Listar NCMs por códigos",
+          summary: "Listar NCMs paginados",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
               name: "ncmCodes",
               in: "query",
-              required: true,
+              required: false,
               schema: { type: "string" },
-              description: "Códigos NCM separados por vírgula",
+              description: "Termos ou códigos NCM parciais separados por vírgula",
             },
+            ...paginationParameters,
           ],
           responses: {
             "200": {
-              description: "Lista",
+              description: "Lista paginada",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  schema: paginatedListEnvelopeSchema,
                 },
               },
             },
@@ -363,23 +404,24 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       "/fiscal/icms/list": {
         get: {
           tags: ["ICMS"],
-          summary: "Listar ICMS por códigos",
+          summary: "Listar ICMS paginados",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
               name: "icmsCodes",
               in: "query",
-              required: true,
+              required: false,
               schema: { type: "string" },
-              description: "Códigos ICMS separados por vírgula",
+              description: "Termos de descrição parciais separados por vírgula",
             },
+            ...paginationParameters,
           ],
           responses: {
             "200": {
-              description: "Lista",
+              description: "Lista paginada",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  schema: paginatedListEnvelopeSchema,
                 },
               },
             },
@@ -483,23 +525,24 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       "/fiscal/ipi/list": {
         get: {
           tags: ["IPI"],
-          summary: "Listar IPI por códigos NCM",
+          summary: "Listar IPI paginados",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
               name: "ipiCodes",
               in: "query",
-              required: true,
+              required: false,
               schema: { type: "string" },
-              description: "Códigos NCM separados por vírgula",
+              description: "Termos ou códigos NCM parciais separados por vírgula",
             },
+            ...paginationParameters,
           ],
           responses: {
             "200": {
-              description: "Lista",
+              description: "Lista paginada",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  schema: paginatedListEnvelopeSchema,
                 },
               },
             },

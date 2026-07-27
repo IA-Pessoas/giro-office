@@ -4,6 +4,7 @@ import type {
   CreateFiscalIpiPayload,
   FiscalIpi,
   FiscalIpiListFilters,
+  FiscalIpiListResult,
   UpdateFiscalIpiPayload,
 } from "../types";
 import {
@@ -12,18 +13,21 @@ import {
   FISCAL_ENDPOINTS,
   unwrapFiscalCreate,
   unwrapFiscalDetail,
-  unwrapFiscalEnvelope,
+  unwrapFiscalPaginatedEnvelope,
   unwrapFiscalMutation,
 } from "./fiscalService.contract";
 
 export const fiscalIpiService = {
-  async list(filters: FiscalIpiListFilters = {}): Promise<FiscalIpi[]> {
+  async list(filters: FiscalIpiListFilters = {}): Promise<FiscalIpiListResult> {
     const api = setupAPIClient();
     const response = await api.get(FISCAL_ENDPOINTS.ipiList, {
       params: buildFiscalIpiListParams(filters),
     });
 
-    return unwrapFiscalEnvelope<FiscalIpi[]>(response.data);
+    return unwrapFiscalPaginatedEnvelope<FiscalIpi>(response.data, {
+      page: filters.page ?? 1,
+      limit: filters.page_size ?? 50,
+    });
   },
 
   async detail(ipiId: string): Promise<FiscalIpi> {

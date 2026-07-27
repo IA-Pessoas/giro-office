@@ -1,3 +1,5 @@
+import { normalizePaginatedResult, type PaginatedResult } from "@shared/pagination/pagination";
+
 import type {
   FiscalIcmsListFilters,
   FiscalIpiListFilters,
@@ -18,18 +20,24 @@ export const FISCAL_ENDPOINTS = {
 export function buildFiscalNcmListParams(filters: FiscalNcmListFilters = {}) {
   return {
     ncmCodes: filters.ncmCodes?.length ? filters.ncmCodes.join(",") : undefined,
+    page: filters.page,
+    page_size: filters.page_size,
   };
 }
 
 export function buildFiscalIcmsListParams(filters: FiscalIcmsListFilters = {}) {
   return {
     icmsCodes: filters.icmsCodes?.length ? filters.icmsCodes.join(",") : undefined,
+    page: filters.page,
+    page_size: filters.page_size,
   };
 }
 
 export function buildFiscalIpiListParams(filters: FiscalIpiListFilters = {}) {
   return {
     ipiCodes: filters.ipiCodes?.length ? filters.ipiCodes.join(",") : undefined,
+    page: filters.page,
+    page_size: filters.page_size,
   };
 }
 
@@ -63,6 +71,13 @@ export function unwrapFiscalEnvelope<T>(body: unknown): T {
   }
 
   return body as T;
+}
+
+export function unwrapFiscalPaginatedEnvelope<T>(
+  body: unknown,
+  fallback: { page: number; limit: number },
+): PaginatedResult<T> {
+  return normalizePaginatedResult(unwrapFiscalEnvelope<T[] | PaginatedResult<T>>(body), fallback);
 }
 
 // `unwrapFiscalDetail` and `unwrapFiscalCreate` handle backend responses nested in `detail` and `create`.

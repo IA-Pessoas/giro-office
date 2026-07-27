@@ -36,7 +36,7 @@ export function createTiTermRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -53,7 +53,7 @@ export function createTiTermRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/:id",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -105,7 +105,7 @@ export function createTiTermRoutes(prisma: PrismaClient): Router {
 
   router.patch(
     "/:id/sign",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
