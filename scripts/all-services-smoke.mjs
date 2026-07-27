@@ -1563,6 +1563,31 @@ const handlers = {
     });
   },
 
+  async tiPasswordDeactivate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/passwords/${requireState("tiPasswordId")}/deactivate`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        reason: "Smoke credential retired.",
+      },
+    });
+  },
+
+  async tiPasswordDeactivateConflict(op) {
+    await httpRequest(op, {
+      expectedStatus: [409],
+      expectEnvelope: false,
+      path: `/ti/passwords/${requireState("tiPasswordId")}/deactivate`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        reason: "Smoke repeated deactivation.",
+      },
+    });
+  },
+
   async tiExtensionList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },

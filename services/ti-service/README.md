@@ -30,6 +30,18 @@ As variaveis sao lidas em `src/config/env.ts`.
 - Exemplo: `GET /ti/inventory/list`
 - Exemplo: `POST /ti/inventory`
 
+## Senhas de TI
+
+As rotas de senhas exigem permissão administrativa do módulo TI.
+
+- `GET /ti/passwords/list` lista credenciais ativas por padrão e aceita
+  `status=active|inactive|all`.
+- `POST /ti/passwords/:id/deactivate` inativa uma credencial com um motivo obrigatório de até
+  500 caracteres.
+
+A inativação é apenas no Giro Office: ela não revoga, altera ou rotaciona a senha no sistema
+externo. Não há rota de exclusão permanente ou reativação.
+
 ## Desenvolvimento
 
 ```bash
