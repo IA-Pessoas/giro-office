@@ -279,6 +279,19 @@ runTest("commercial options separate backend value from UI label", () => {
   });
 });
 
+runTest("commercial warning explains the client-status impact without technical wording", () => {
+  const commercialForm = readFileSync(
+    "src/modules/clients/components/ClientCommercialForm.tsx",
+    "utf8",
+  );
+
+  assert.match(
+    commercialForm,
+    /Alterar o status de prospecção pode impactar o status geral do cliente\./,
+  );
+  assert.doesNotMatch(commercialForm, /backend/i);
+});
+
 runTest("commercial initial values normalize dates to input format", () => {
   const client = {
     prospecting_status: "Análise/Agendamento",
