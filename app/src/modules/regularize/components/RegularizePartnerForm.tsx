@@ -17,10 +17,10 @@ import {
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
-  type RegularizeFormOption,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
+import { RegularizeClientPfSelect } from "./RegularizeClientPfSelect";
 
 type RegularizePartnerFormState = {
   pj_id: string;
@@ -68,7 +68,6 @@ export function RegularizePartnerForm({
   onSubmit,
   open,
   partner,
-  pfOptions,
 }: {
   defaultPfId: string;
   defaultPjId: string;
@@ -79,7 +78,6 @@ export function RegularizePartnerForm({
   ) => Promise<void>;
   open: boolean;
   partner: RegularizePartner | null;
-  pfOptions: RegularizeFormOption[];
 }) {
   const [formState, setFormState] = useState<RegularizePartnerFormState>(
     buildPartnerFormState(partner, defaultPfId, defaultPjId),
@@ -166,18 +164,10 @@ export function RegularizePartnerForm({
           </RegularizeFormField>
 
           <RegularizeFormField label="Cliente PF" required>
-            <RegularizeNativeSelect
+            <RegularizeClientPfSelect
               value={formState.pf_id}
-              onChange={(event) => handleChange("pf_id", event.target.value)}
-            >
-              <option value="">Selecione</option>
-              {pfOptions.map((clientPf) => (
-                <option key={clientPf.id} value={clientPf.id}>
-                  {clientPf.label}
-                  {clientPf.description ? `, ${clientPf.description}` : ""}
-                </option>
-              ))}
-            </RegularizeNativeSelect>
+              onChange={(id) => handleChange("pf_id", id)}
+            />
           </RegularizeFormField>
 
           <RegularizeFormField label="Participação" required>

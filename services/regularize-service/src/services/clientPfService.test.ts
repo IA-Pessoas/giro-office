@@ -64,4 +64,29 @@ describe("ClientPfService", () => {
       }),
     );
   });
+
+  it("allows locating a PF beyond the first hundred rows through a later page", async () => {
+    const prisma = {
+      clientPF: {
+        findMany: vi.fn(async () => [
+          { id: "pf-101", code: "101", name: "Cliente 101", cpf: "12345678901" },
+        ]),
+        count: vi.fn(async () => 101),
+      },
+    } as unknown as PrismaClient;
+    const service = new ClientPfService(prisma, {} as never);
+
+    const result = await service.list({
+      organizationId: "org-1",
+      status: "Todos",
+      search: "cliente 101",
+      page: 6,
+      limit: 20,
+    });
+
+    expect(result.data).toHaveLength(1);
+    expect(prisma.clientPF.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 100, take: 20 }),
+    );
+  });
 });

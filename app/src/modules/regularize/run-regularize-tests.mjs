@@ -102,17 +102,27 @@ await runTest("regularize PF list contract preserves explicit search status and 
   assert.match(queryKeysSource, /clientPfsPage/);
 });
 
-await runTest("regularize PF forms use an independent option source and preserve linked clients", async () => {
+await runTest("regularize PF forms search every paginated PF option and preserve linked clients", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
 
-  assert.match(pageSource, /const pfFormOptionsQuery = usePaginatedRegularizeClientPfs/);
-  assert.match(pageSource, /status: "Todos"/);
-  assert.match(pageSource, /limit: 100/);
-  assert.match(pageSource, /const selectedPfForFormQuery = useRegularizeClientPfDetail/);
-  assert.match(pageSource, /const pfFormOptions = useMemo<RegularizeFormOption\[\]>/);
-  assert.match(pageSource, /selectedPfForFormQuery\.data/);
-  assert.match(pageSource, /pfOptions=\{pfFormOptions\}/);
-  assert.doesNotMatch(pageSource, /pfOptions=\{visiblePfRows\}/);
+  assert.doesNotMatch(pageSource, /limit: 100/);
+
+  const [partnerFormSource, processFormSource] = await Promise.all([
+    readModuleSource("components/RegularizePartnerForm.tsx"),
+    readModuleSource("components/RegularizeProcessForm.tsx"),
+  ]);
+  assert.match(partnerFormSource, /RegularizeClientPfSelect/);
+  assert.match(processFormSource, /RegularizeClientPfSelect/);
+  assert.match(partnerFormSource, /onChange=\{\(id\) => handleChange\("pf_id", id\)\}/);
+  assert.match(processFormSource, /handleClientPfChange\(id, option\?\.cpf\)/);
+
+  const selectSource = await readModuleSource("components/RegularizeClientPfSelect.tsx");
+  assert.match(selectSource, /usePaginatedRegularizeClientPfs/);
+  assert.match(selectSource, /useRegularizeClientPfDetail/);
+  assert.match(selectSource, /placeholder="Buscar PF por nome, código ou CPF"/);
+  assert.match(selectSource, /page: pfPage/);
+  assert.match(selectSource, /onNext/);
+  assert.match(selectSource, /selectedPfQuery\.data/);
 });
 
 await runTest("regularize dashboard has a centralized aggregate data contract", async () => {
@@ -535,6 +545,7 @@ await runTest("regularize process empty state is centered across the process vie
 
 await runTest("regularize client documents are consistently formatted", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const pfSelectSource = await readModuleSource("components/RegularizeClientPfSelect.tsx");
   const rawDocumentMatches = pageSource.match(/formatText\(item\.cpf_cnpj\)/g) ?? [];
   const formattedDocumentMatches = pageSource.match(/formatDocument\(item\.cpf_cnpj\)/g) ?? [];
 
@@ -543,8 +554,9 @@ await runTest("regularize client documents are consistently formatted", async ()
   assert.deepEqual(rawDocumentMatches, []);
   assert.ok(formattedDocumentMatches.length >= 3);
   assert.doesNotMatch(pageSource, /description: client\.cpf_cnpj/);
-  assert.doesNotMatch(pageSource, /description: clientPf\.cpf/);
-  assert.match(pageSource, /description: formatDocumentDescription\(clientPf\.cpf\)/);
+  assert.match(pfSelectSource, /import \{ formatCPF_CNPJ \} from "@shared\/utils\/formatters";/);
+  assert.match(pfSelectSource, /cpf: clientPf\.cpf/);
+  assert.match(pfSelectSource, /formatCPF_CNPJ\(option\.cpf\)/);
   assert.match(
     pageSource,
     /return item\.clientPJ\?\.name \?\? item\.clientPF\?\.name \?\? formatDocument\(item\.cpf_cnpj\);/,

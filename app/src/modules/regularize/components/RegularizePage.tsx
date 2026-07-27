@@ -243,14 +243,6 @@ function formatDocumentDescription(value: string | null | undefined): string | u
   return formatted === "-" ? undefined : formatted;
 }
 
-function toClientPfFormOption(clientPf: RegularizeClientPfListItem): RegularizeFormOption {
-  return {
-    id: clientPf.id,
-    label: clientPf.name || clientPf.id,
-    description: formatDocumentDescription(clientPf.cpf),
-  };
-}
-
 function formatDate(value: string | null | undefined): string {
   if (!value) {
     return "-";
@@ -743,17 +735,6 @@ export function RegularizePage() {
     },
     { enabled: queryPolicy.clientPfs },
   );
-  const pfFormOptionsQuery = usePaginatedRegularizeClientPfs(
-    {
-      status: "Todos",
-      search: "",
-      page: 1,
-      limit: 100,
-    },
-    {
-      enabled: activeForm?.type === "partner" || activeForm?.type === "process",
-    },
-  );
   const siteQuery = useRegularizeSitePasswords(
     { status: true },
     { enabled: queryPolicy.sitePasswords },
@@ -836,17 +817,6 @@ export function RegularizePage() {
   const processDetailQuery = useRegularizeProcessDetail(currentProcessId, {
     enabled: activeTab === "processes",
   });
-  const selectedPfForFormId =
-    activeForm?.type === "partner"
-      ? activeForm.mode === "edit"
-        ? activeForm.partner.pf_id
-        : currentClientPfId
-      : activeForm?.type === "process" && activeForm.mode === "edit"
-        ? processDetailQuery.data?.client_pf_id
-        : undefined;
-  const selectedPfForFormQuery = useRegularizeClientPfDetail(selectedPfForFormId, {
-    enabled: Boolean(selectedPfForFormId),
-  });
   const isPasswordRevealContextActive =
     activeTab === "passwords" || activeForm?.type === "password";
   const isSitePasswordRevealContextActive =
@@ -917,20 +887,6 @@ export function RegularizePage() {
   const dashboardRequestId = getRegularizeRequestId(dashboardQuery.error);
   const hasProcessRows = visibleProcessRows.length > 0;
   const hasSiteRows = (siteQuery.data?.length ?? 0) > 0;
-
-  const pfFormOptions = useMemo<RegularizeFormOption[]>(
-    () => {
-      const options = (pfFormOptionsQuery.data?.data ?? []).map(toClientPfFormOption);
-      const selected = selectedPfForFormQuery.data;
-
-      if (!selected || options.some((option) => option.id === selected.id)) {
-        return options;
-      }
-
-      return [toClientPfFormOption(selected), ...options];
-    },
-    [pfFormOptionsQuery.data, selectedPfForFormQuery.data],
-  );
 
   const siteOptions = useMemo<RegularizeFormOption[]>(
     () =>
@@ -2377,7 +2333,6 @@ export function RegularizePage() {
         partner={activePartnerForForm}
         defaultPfId={currentClientPfId ?? ""}
         defaultPjId={currentCredentialClientId ?? ""}
-        pfOptions={pfFormOptions}
         isSubmitting={createPartnerMutation.isPending || updatePartnerMutation.isPending}
         onClose={closeCoreForm}
         onSubmit={handleSubmitPartner}
@@ -2434,7 +2389,6 @@ export function RegularizePage() {
         mode={activeForm?.type === "process" ? activeForm.mode : "create"}
         process={activeProcessForForm}
         defaultClientId={currentCredentialClientId ?? ""}
-        pfOptions={pfFormOptions}
         isLoadingInitialValue={
           activeForm?.type === "process" &&
           activeForm.mode === "edit" &&

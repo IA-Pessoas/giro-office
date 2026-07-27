@@ -20,7 +20,6 @@ import {
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
-  type RegularizeFormOption,
   getRegularizePresetOptions,
   regularizeProcessStatusOptions,
   regularizeTextareaClassName,
@@ -28,6 +27,7 @@ import {
   regularizeUrgencyOptions,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
+import { RegularizeClientPfSelect } from "./RegularizeClientPfSelect";
 
 type RegularizeProcessClientKind = "pj" | "pf";
 
@@ -114,7 +114,6 @@ export function RegularizeProcessForm({
   onClose,
   onSubmit,
   open,
-  pfOptions,
   process,
 }: {
   defaultClientId: string;
@@ -126,7 +125,6 @@ export function RegularizeProcessForm({
     payload: CreateRegularizeProcessPayload | UpdateRegularizeProcessPayload,
   ) => Promise<void>;
   open: boolean;
-  pfOptions: RegularizeFormOption[];
   process: RegularizeProcessDetail | null;
 }) {
   const [formState, setFormState] = useState<RegularizeProcessFormState>(
@@ -134,7 +132,6 @@ export function RegularizeProcessForm({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const isEditing = mode === "edit";
-  const currentClientOptions = pfOptions;
 
   useEffect(() => {
     if (open) {
@@ -154,23 +151,18 @@ export function RegularizeProcessForm({
   }
 
   function handleClientKindChange(value: RegularizeProcessClientKind) {
-    const options = value === "pf" ? pfOptions : [];
-
     setFormState((current) => ({
       ...current,
       clientKind: value,
-      client_id: options[0]?.id ?? "",
-      cpf_cnpj: options[0]?.description ?? current.cpf_cnpj,
+      client_id: "",
     }));
   }
 
-  function handleClientChange(clientId: string) {
-    const selected = currentClientOptions.find((option) => option.id === clientId);
-
+  function handleClientPfChange(clientId: string, cpf?: string | null) {
     setFormState((current) => ({
       ...current,
       client_id: clientId,
-      cpf_cnpj: selected?.description ?? current.cpf_cnpj,
+      cpf_cnpj: cpf ?? current.cpf_cnpj,
     }));
   }
 
@@ -252,18 +244,10 @@ export function RegularizeProcessForm({
               {formState.clientKind === "pj" ? (
                 <ClientSelectionField clientId={formState.client_id} />
               ) : (
-                <RegularizeNativeSelect
+                <RegularizeClientPfSelect
                   value={formState.client_id}
-                  onChange={(event) => handleClientChange(event.target.value)}
-                >
-                  <option value="">Selecione</option>
-                  {currentClientOptions.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.label}
-                      {client.description ? `, ${client.description}` : ""}
-                    </option>
-                  ))}
-                </RegularizeNativeSelect>
+                  onChange={(id, option) => handleClientPfChange(id, option?.cpf)}
+                />
               )}
             </RegularizeFormField>
 
