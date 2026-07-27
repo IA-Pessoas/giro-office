@@ -1391,6 +1391,16 @@ await runTest("ti requests tab exposes request category management actions", asy
   assert.doesNotMatch(tabSource, /editingCategoryId/);
 });
 
+await runTest("ti request categories are managed by users and hidden from viewers", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(tabSource, /const canManageCategories = access\.canEdit/);
+  assert.match(tabSource, /\{canManageCategories \? \(/);
+  assert.match(tabSource, /label="Categorias"/);
+  assert.match(tabSource, /open=\{isCategoryDialogOpen\}/);
+  assert.match(tabSource, /categoriesQuery\.data \?\? \[\]/);
+});
+
 await runTest("ti native select uses a centered chevron instead of the browser default arrow", async () => {
   const selectSource = await readModuleSource("components/TiNativeSelect.tsx");
 
