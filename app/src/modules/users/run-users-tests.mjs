@@ -3,14 +3,6 @@ import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 
 import {
-  buildAdminCreateUserPayload,
-  buildCreateUserModulesPayload,
-  buildDepartmentPermissionSyncPayload,
-  needsDepartmentPermissionSync,
-  resolveCreateUserTopLevelPermission,
-  resolveCreateUserType,
-} from "./utils/createUserPayload.ts";
-import {
   getMinimumPermissionLevel,
   getPermissionSelectOptions,
   normalizePermissionForModule,
@@ -20,7 +12,8 @@ registerHooks({
   resolve(specifier, context, nextResolve) {
     if (
       specifier === "../constants/permissionConfig" &&
-      context.parentURL?.endsWith("/modules/users/utils/permissionUtils.ts")
+      (context.parentURL?.endsWith("/modules/users/utils/permissionUtils.ts") ||
+        context.parentURL?.endsWith("/modules/users/utils/createUserPayload.ts"))
     ) {
       return nextResolve(`${specifier}.ts`, context);
     }
@@ -28,6 +21,15 @@ registerHooks({
     return nextResolve(specifier, context);
   },
 });
+
+const {
+  buildAdminCreateUserPayload,
+  buildCreateUserModulesPayload,
+  buildDepartmentPermissionSyncPayload,
+  needsDepartmentPermissionSync,
+  resolveCreateUserTopLevelPermission,
+  resolveCreateUserType,
+} = await import("./utils/createUserPayload.ts");
 
 const {
   arePermissionDraftsEqual,
@@ -298,7 +300,7 @@ runTest("explicit RH and TI management are preserved on user creation", () => {
   );
 });
 
-runTest("viewer does not receive RH or TI self-service by default", () => {
+runTest("Viewer creation payload includes RH and Technology at Viewer minimum", () => {
   assert.deepEqual(
     buildCreateUserModulesPayload(
       {
@@ -311,7 +313,29 @@ runTest("viewer does not receive RH or TI self-service by default", () => {
     ),
     {
       fiscal: 0,
+      rh: 0,
+      ti: 0,
     },
+  );
+});
+
+runTest("create user UI consumes minimum-aware defaults and options", () => {
+  assert.match(
+    createUserModalSource,
+    /getMinimumPermissionLevel\(moduleOption\.key\)/,
+  );
+  assert.match(
+    createUserModalSource,
+    /getPermissionSelectOptions\(moduleOption\.key\)\.map/,
+  );
+  assert.match(
+    createUserModalSource,
+    /normalizePermissionForModule\(moduleKey,/,
+  );
+  assert.match(createUserModalSource, /CREATE_MODULE_OPTION_LABELS/);
+  assert.equal(
+    createUserModalSource.includes('<option value="none">Sem acesso</option>'),
+    false,
   );
 });
 

@@ -1,5 +1,6 @@
 import type { ModuleKey } from "@modules/auth";
 
+import { MINIMUM_PERMISSION_LEVEL_BY_MODULE } from "../constants/permissionConfig";
 import type { AdminCreateUserData, UpdateUserData, UserPermission, UserType } from "../types";
 
 export interface CreateUserFormState {
@@ -67,6 +68,16 @@ export function buildCreateUserModulesPayload(
 
     if (selection.enabled) {
       modules[moduleKey] = selection.level;
+    }
+  }
+
+  for (const [moduleKey, minimumLevel] of Object.entries(
+    MINIMUM_PERMISSION_LEVEL_BY_MODULE,
+  )) {
+    const currentLevel = modules[moduleKey];
+
+    if (typeof currentLevel !== "number" || currentLevel < minimumLevel) {
+      modules[moduleKey] = minimumLevel;
     }
   }
 
