@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Loader2, Plus, Search, ScrollText } from "lucide-react";
+import { AlertCircle, ArrowLeft, Loader2, Pencil, Plus, Search, ScrollText } from "lucide-react";
 
 import { useFiscalNcmList } from "../hooks";
 import { FISCAL_LIST_PAGE_SIZE } from "../hooks/queryKeys";
@@ -19,7 +19,19 @@ type FiscalNcmPanelIntent =
   | null;
 
 const ACTION_BUTTON_CLASSNAME =
-  "inline-flex h-8 min-w-[88px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+
+const TABLE_HEADER_CLASSNAME =
+  "px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-700 dark:text-slate-300";
+
+const TABLE_TEXT_CELL_CLASSNAME =
+  "px-3 py-2.5 text-sm leading-5 break-words text-gray-700 dark:text-slate-300";
+
+const TABLE_CENTER_CELL_CLASSNAME =
+  "px-3 py-2.5 text-center text-sm leading-5 text-gray-700 dark:text-slate-300";
+
+const TABLE_CODE_CELL_CLASSNAME =
+  "px-4 py-2.5 text-center text-sm font-medium leading-5 text-gray-900 dark:text-white";
 
 export function FiscalNcmSection() {
   const [filterValue, setFilterValue] = useState("");
@@ -261,58 +273,60 @@ function FiscalNcmTable({
       <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-slate-700">
         <thead className="bg-gray-50 dark:bg-slate-800/60">
           <tr>
-            <th className="w-[12%] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[12%] px-4`}>
               NCM
             </th>
-            <th className="w-[28%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[26%]`}>
               Descrição
             </th>
-            <th className="w-[16%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[18%]`}>
               Regime
             </th>
-            <th className="w-[16%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Tributação federal
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[16%]`}>
+              Tributação
             </th>
-            <th className="w-[9%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Vigência inicial
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[11%]`}>
+              Início
             </th>
-            <th className="w-[9%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Vigência final
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[10%]`}>
+              Fim
             </th>
-            <th className="w-[10%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Ações
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[7%] px-3`}>
+              Ação
             </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
           {items.map((item) => (
-            <tr key={item.id} className="align-top hover:bg-gray-50 dark:hover:bg-slate-800/30">
-              <td className="px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">
+            <tr key={item.id} className="align-middle hover:bg-gray-50 dark:hover:bg-slate-800/30">
+              <td className={TABLE_CODE_CELL_CLASSNAME}>
                 {item.ncm_code}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+              <td className={TABLE_TEXT_CELL_CLASSNAME}>
                 {item.description}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+              <td className={TABLE_TEXT_CELL_CLASSNAME}>
                 {item.tax_regime}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+              <td className={TABLE_TEXT_CELL_CLASSNAME}>
                 {item.federal_taxation_type}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+              <td className={TABLE_CENTER_CELL_CLASSNAME}>
                 {formatFiscalDateLabel(item.validity_start_date)}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
-                {formatFiscalDateLabel(item.validity_end_date)}
+              <td className={TABLE_CENTER_CELL_CLASSNAME}>
+                {item.validity_end_date ? formatFiscalDateLabel(item.validity_end_date) : "Sem fim"}
               </td>
-              <td className="px-5 py-3">
-                <div className="flex justify-end">
+              <td className="px-3 py-2.5 text-center">
+                <div className="flex justify-center">
                   <button
                     type="button"
                     onClick={() => onEdit(item)}
+                    aria-label={`Editar NCM ${item.ncm_code}`}
+                    title="Editar"
                     className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
                   >
-                    Editar
+                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </div>
               </td>

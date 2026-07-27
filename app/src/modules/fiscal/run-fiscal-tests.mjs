@@ -75,6 +75,30 @@ runTest("fiscal sections list on open, debounce search, clear search and paginat
   assert.doesNotMatch(fiscalSources.ipiSection, /NCM_CODE_LENGTH|\\d\{8\}/);
 });
 
+runTest("fiscal tables use centered headers, balanced cells and icon-only edit actions", () => {
+  for (const source of [fiscalSources.ncmSection, fiscalSources.icmsSection, fiscalSources.ipiSection]) {
+    assert.match(source, /Pencil/);
+    assert.match(source, /py-2\.5 text-center text-\[11px\] font-semibold uppercase/);
+    assert.match(source, /text-sm leading-5/);
+    assert.match(source, /align-middle hover:bg-gray-50/);
+    assert.match(source, /ACTION_BUTTON_CLASSNAME =\s*\n\s*"inline-flex h-8 w-8/);
+    assert.match(source, /aria-label=\{`Editar/);
+    assert.match(source, /<Pencil className="h-3\.5 w-3\.5"/);
+    assert.doesNotMatch(source, />\s*Editar\s*<\/button>/);
+  }
+  assert.match(fiscalSources.ncmSection, />\s*Tributação\s*</);
+  assert.match(fiscalSources.ncmSection, />\s*Início\s*</);
+  assert.match(fiscalSources.ncmSection, />\s*Fim\s*</);
+  assert.match(fiscalSources.ncmSection, />\s*Ação\s*</);
+  assert.match(fiscalSources.ncmSection, /w-\[12%\][\s\S]*w-\[26%\][\s\S]*w-\[18%\][\s\S]*w-\[16%\][\s\S]*w-\[11%\][\s\S]*w-\[10%\][\s\S]*w-\[7%\]/);
+  assert.match(fiscalSources.ncmSection, /:\s*"Sem fim"/);
+  assert.match(fiscalSources.icmsSection, />\s*Conv\.\s*</);
+  assert.match(fiscalSources.icmsSection, />\s*MVA apl\.\s*</);
+  assert.match(fiscalSources.icmsSection, /w-\[8%\][\s\S]*w-\[24%\][\s\S]*w-\[10%\][\s\S]*w-\[10%\][\s\S]*w-\[16%\][\s\S]*w-\[9%\][\s\S]*w-\[9%\][\s\S]*w-\[8%\][\s\S]*w-\[6%\]/);
+  assert.match(fiscalSources.ipiSection, />\s*Alíq\.\s*</);
+  assert.match(fiscalSources.ipiSection, /w-\[24%\][\s\S]*w-\[12%\][\s\S]*w-\[38%\][\s\S]*w-\[16%\][\s\S]*w-\[10%\]/);
+});
+
 runTest("fiscal-service list schemas accept optional terms and pagination", () => {
   for (const source of [fiscalSources.ncmSchema, fiscalSources.icmsSchema, fiscalSources.ipiSchema]) {
     assert.match(source, /paginationQuerySchema/);
