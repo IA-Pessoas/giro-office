@@ -453,3 +453,18 @@ runTest("department module remains editable in permissions tab", () => {
     /isDepartmentModule \? \(\s*<div/s,
   );
 });
+
+runTest("admin permission editor uses module-specific options and normalization", () => {
+  assert.match(
+    administracaoSource,
+    /getPermissionSelectOptions\(moduleKey\)\.map/,
+  );
+  assert.match(
+    administracaoSource,
+    /normalizePermissionForModule\(\s*moduleKey,/s,
+  );
+  assert.doesNotMatch(
+    administracaoSource,
+    /\{PERMISSION_SELECT_OPTIONS\.map\(\(option\) => \(/,
+  );
+});

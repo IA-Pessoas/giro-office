@@ -17,6 +17,8 @@ import {
   PERMISSION_MODULE_GROUPS,
   PERMISSION_SELECT_OPTIONS,
   getPermissionModuleLabel,
+  getPermissionSelectOptions,
+  normalizePermissionForModule,
 } from "@modules/users/constants/permissionConfig";
 import { permissionService } from "@modules/users/services/permissionService";
 import {
@@ -529,11 +531,16 @@ export function Administracao() {
     setSelectedPermissionUserId(nextUserId);
   };
   const handlePermissionChange = (moduleKey: string, nextValue: PermissionSelectValue) => {
+    const normalizedValue = normalizePermissionForModule(
+      moduleKey,
+      nextValue === "null" ? null : Number(nextValue),
+    );
+
     setPermissionDraft((currentDraft) =>
       normalizePermissionDraft(
         {
           ...currentDraft,
-          [moduleKey]: nextValue === "null" ? null : Number(nextValue),
+          [moduleKey]: normalizedValue,
         },
         permissionExtraKeys,
       ),
@@ -1152,7 +1159,7 @@ export function Administracao() {
                                   style={ADMIN_SELECT_ARROW_STYLE}
                                   disabled={isSelectedPermissionOwner || isSavingPermissions}
                                 >
-                                  {PERMISSION_SELECT_OPTIONS.map((option) => (
+                                  {getPermissionSelectOptions(moduleKey).map((option) => (
                                     <option key={option.value} value={option.value}>
                                       {option.label}
                                     </option>
