@@ -17,6 +17,7 @@ import {
   isOrganizationOwner,
 } from "./utils/permissions.ts";
 import {
+  APP_ROUTE_MODULE_MAP,
   resolveAccessLevelFromAdditionalPermission,
   resolveDepartmentModuleKey,
   resolveModuleAccess,
@@ -386,6 +387,11 @@ await (async () => {
     assert.equal(resolveAccessLevelFromAdditionalPermission(1), "edit");
     assert.equal(resolveAccessLevelFromAdditionalPermission(0), "view");
     assert.equal(resolveAccessLevelFromAdditionalPermission(null), "none");
+  });
+
+  await runTest("integration routes require integration module access", () => {
+    assert.equal(APP_ROUTE_MODULE_MAP["/clients"], "integracao");
+    assert.equal(APP_ROUTE_MODULE_MAP["/projects"], "integracao");
   });
 
   await runTest("app shell uses module hook for menu visibility instead of raw access store", () => {
