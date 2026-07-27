@@ -57,6 +57,49 @@ export const PERMISSION_SELECT_OPTIONS = [
   { value: "2", label: "Administrador" },
 ] as const;
 
+export type PermissionLevel = 0 | 1 | 2;
+export type PermissionSelectOption = (typeof PERMISSION_SELECT_OPTIONS)[number];
+
+export const MINIMUM_PERMISSION_LEVEL_BY_MODULE: Partial<
+  Record<KnownPermissionModuleKey, PermissionLevel>
+> = {
+  rh: 0,
+  ti: 0,
+};
+
+export function getMinimumPermissionLevel(moduleKey: string): PermissionLevel | null {
+  return MINIMUM_PERMISSION_LEVEL_BY_MODULE[moduleKey as KnownPermissionModuleKey] ?? null;
+}
+
+export function normalizePermissionForModule(
+  moduleKey: string,
+  value: number | null | undefined,
+): PermissionLevel | null {
+  const normalizedValue: PermissionLevel | null =
+    value === 0 || value === 1 || value === 2 ? value : null;
+  const minimumLevel = getMinimumPermissionLevel(moduleKey);
+
+  if (minimumLevel !== null && (normalizedValue === null || normalizedValue < minimumLevel)) {
+    return minimumLevel;
+  }
+
+  return normalizedValue;
+}
+
+export function getPermissionSelectOptions(
+  moduleKey: string,
+): readonly PermissionSelectOption[] {
+  const minimumLevel = getMinimumPermissionLevel(moduleKey);
+
+  if (minimumLevel === null) {
+    return PERMISSION_SELECT_OPTIONS;
+  }
+
+  return PERMISSION_SELECT_OPTIONS.filter(
+    (option) => option.value !== "null" && Number(option.value) >= minimumLevel,
+  );
+}
+
 export function getPermissionModuleLabel(moduleKey: KnownPermissionModuleKey): string {
   return PERMISSION_MODULE_LABELS[moduleKey];
 }

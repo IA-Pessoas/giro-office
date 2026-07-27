@@ -1,5 +1,9 @@
 import type { ModuleKey } from "@modules/auth";
 
+import {
+  MINIMUM_PERMISSION_LEVEL_BY_MODULE,
+  getMinimumPermissionLevel,
+} from "../constants/permissionConfig";
 import type { AdminCreateUserData, UpdateUserData, UserPermission, UserType } from "../types";
 
 export interface CreateUserFormState {
@@ -67,6 +71,16 @@ export function buildCreateUserModulesPayload(
 
     if (selection.enabled) {
       modules[moduleKey] = selection.level;
+    }
+  }
+
+  for (const [moduleKey, minimumLevel] of Object.entries(
+    MINIMUM_PERMISSION_LEVEL_BY_MODULE,
+  )) {
+    const currentLevel = modules[moduleKey];
+
+    if (typeof currentLevel !== "number" || currentLevel < minimumLevel) {
+      modules[moduleKey] = minimumLevel;
     }
   }
 
@@ -152,12 +166,40 @@ export function needsDepartmentPermissionSync(
   departmentModuleKey: string | null | undefined,
   modules: Record<string, number | null>,
   user: Pick<UpdateUserData, "permission" | "type"> | null | undefined,
+  baselineModules?: Readonly<Record<string, unknown>>,
 ): boolean {
   if (!departmentModuleKey || !user) {
     return false;
   }
 
   const syncPayload = buildDepartmentPermissionSyncPayload(departmentModuleKey, modules);
+  const needsSync =
+    user.permission !== syncPayload.permission || user.type !== syncPayload.type;
 
-  return user.permission !== syncPayload.permission || user.type !== syncPayload.type;
+  if (!needsSync || !baselineModules) {
+    return needsSync;
+  }
+
+  const minimumLevel = getMinimumPermissionLevel(departmentModuleKey);
+  const baselineWasNoAccess =
+    !Object.prototype.hasOwnProperty.call(baselineModules, departmentModuleKey) ||
+    baselineModules[departmentModuleKey] === null;
+
+  if (
+    minimumLevel === null ||
+    !baselineWasNoAccess ||
+    modules[departmentModuleKey] !== minimumLevel
+  ) {
+    return true;
+  }
+
+  const baselineSyncPayload = buildDepartmentPermissionSyncPayload(departmentModuleKey, {
+    ...modules,
+    [departmentModuleKey]: null,
+  });
+
+  return (
+    user.permission !== baselineSyncPayload.permission ||
+    user.type !== baselineSyncPayload.type
+  );
 }
