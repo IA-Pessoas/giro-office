@@ -214,6 +214,17 @@ export function TiPasswordsTab() {
     return () => window.clearTimeout(timeoutId);
   }, [searchDraft]);
 
+  useEffect(() => {
+    if (!canRevealPasswords && revealPasswordId) {
+      clearPasswordRevealCache(revealPasswordId);
+      setRevealPasswordId(null);
+    }
+
+    return () => {
+      clearPasswordRevealCache(revealPasswordId);
+    };
+  }, [canRevealPasswords, clearPasswordRevealCache, revealPasswordId]);
+
   if (!canManagePasswords) {
     return (
       <TiPanel>

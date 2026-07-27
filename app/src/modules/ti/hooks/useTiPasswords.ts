@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import {
   useMutation,
   useQueryClient,
@@ -67,13 +68,20 @@ export function useTiPasswordReveal(
 export function useClearTiPasswordRevealCache(): (id?: TiId | null) => void {
   const queryClient = useQueryClient();
 
-  return (id) => {
-    if (!id) {
-      return;
-    }
+  return useCallback(
+    (id) => {
+      if (!id) {
+        return;
+      }
 
-    queryClient.removeQueries({ queryKey: tiQueryKeys.passwords.detail(id), exact: true });
-  };
+      void queryClient.cancelQueries({
+        queryKey: tiQueryKeys.passwords.detail(id),
+        exact: true,
+      });
+      queryClient.removeQueries({ queryKey: tiQueryKeys.passwords.detail(id), exact: true });
+    },
+    [queryClient],
+  );
 }
 
 export function useCreateTiPasswordMutation(): UseMutationResult<

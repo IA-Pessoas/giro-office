@@ -572,6 +572,21 @@ await runTest("ti password deactivation dialog requires reason and warns about e
   assert.match(tabSource, /toast\.success\("Credencial inativada\."\)/);
 });
 
+await runTest("ti password reveal cleanup cancels cache on permission loss and unmount", async () => {
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(hookSource, /import \{ useCallback \} from "react"/);
+  assert.match(
+    hookSource,
+    /return useCallback\(\s*\(id\) => \{[\s\S]*?queryClient\.cancelQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.detail\(id\),\s*exact: true,?\s*\}\);[\s\S]*?queryClient\.removeQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.detail\(id\),\s*exact: true,?\s*\}\);[\s\S]*?\},\s*\[queryClient\],?\s*\)/,
+  );
+  assert.match(
+    tabSource,
+    /useEffect\(\(\) => \{\s*if \(!canRevealPasswords && revealPasswordId\) \{\s*clearPasswordRevealCache\(revealPasswordId\);\s*setRevealPasswordId\(null\);\s*\}\s*return \(\) => \{\s*clearPasswordRevealCache\(revealPasswordId\);\s*\};\s*\}, \[canRevealPasswords, clearPasswordRevealCache, revealPasswordId\]\)/,
+  );
+});
+
 await runTest("ti sensitive clipboard helper copies the exact value", async () => {
   const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
   const writes = [];
