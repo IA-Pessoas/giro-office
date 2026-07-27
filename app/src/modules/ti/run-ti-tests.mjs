@@ -6,8 +6,13 @@ import { fileURLToPath } from "node:url";
 const moduleRoot = fileURLToPath(new URL("./", import.meta.url));
 const appRoot = join(moduleRoot, "../../..");
 const moduleRootRelative = "src/modules/ti";
+const testPattern = process.env.TI_TEST_PATTERN;
 
 async function runTest(name, fn) {
+  if (testPattern && !name.includes(testPattern)) {
+    return;
+  }
+
   try {
     await fn();
     console.log(`PASS ${name}`);
@@ -44,6 +49,149 @@ async function collectSourceFiles(directory) {
 
   return files;
 }
+
+await runTest("issue 509 ti robot form utilities preserve validation and payload semantics", async () => {
+  const {
+    buildCreateRobotPayload,
+    buildUpdateRobotPayload,
+    getFirstInvalidRobotField,
+    getRobotMutationErrorMessage,
+    validateRobotDraft,
+  } = await import("./utils/robotForm.ts");
+
+  const emptyDraft = {
+    name: "   ",
+    description: "   ",
+    type: "",
+    status: "active",
+    active: true,
+    schedule: "   ",
+  };
+
+  assert.deepEqual(validateRobotDraft(emptyDraft), {
+    name: "Informe o nome do robô.",
+    type: "Selecione o tipo do robô.",
+  });
+  assert.deepEqual(
+    validateRobotDraft({ ...emptyDraft, name: "Backup diário" }),
+    { type: "Selecione o tipo do robô." },
+  );
+  assert.equal(
+    getFirstInvalidRobotField(validateRobotDraft(emptyDraft)),
+    "name",
+  );
+  assert.equal(
+    getFirstInvalidRobotField(
+      validateRobotDraft({ ...emptyDraft, name: "Backup diário" }),
+    ),
+    "type",
+  );
+
+  const validDraft = {
+    ...emptyDraft,
+    name: "  Backup diário  ",
+    type: "Backup",
+  };
+  assert.deepEqual(validateRobotDraft(validDraft), {});
+  assert.deepEqual(buildCreateRobotPayload(validDraft), {
+    name: "Backup diário",
+    type: "Backup",
+    status: "active",
+    active: true,
+  });
+  assert.deepEqual(buildUpdateRobotPayload(validDraft), {
+    name: "Backup diário",
+    description: null,
+    type: "Backup",
+    status: "active",
+    active: true,
+    schedule: null,
+  });
+
+  const filledDraft = {
+    ...validDraft,
+    description: "  Arquivos internos  ",
+    schedule: "  diariamente às 02:00  ",
+  };
+  assert.deepEqual(buildCreateRobotPayload(filledDraft), {
+    name: "Backup diário",
+    description: "Arquivos internos",
+    type: "Backup",
+    status: "active",
+    active: true,
+    schedule: "diariamente às 02:00",
+  });
+
+  const responseError = Object.assign(new Error("Request failed with status code 400"), {
+    response: {
+      data: {
+        error: "Selecione o tipo do robô.",
+        message: "Mensagem secundária.",
+      },
+    },
+  });
+  assert.equal(
+    getRobotMutationErrorMessage(responseError),
+    "Selecione o tipo do robô.",
+  );
+  assert.equal(
+    getRobotMutationErrorMessage({ response: { data: { message: "Falha legível da API." } } }),
+    "Falha legível da API.",
+  );
+  assert.equal(
+    getRobotMutationErrorMessage(new Error("Falha legível do cliente.")),
+    "Falha legível do cliente.",
+  );
+  assert.equal(
+    getRobotMutationErrorMessage({}),
+    "Não foi possível concluir a ação.",
+  );
+
+  const typeSource = await readModuleSource("types/robots.ts");
+  const payloadTypeSource =
+    typeSource.match(/export interface TiRobotPayload \{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(payloadTypeSource, /name: string/);
+  assert.match(payloadTypeSource, /type: TiRobotType \| string/);
+  assert.doesNotMatch(payloadTypeSource, /name\?: string/);
+  assert.doesNotMatch(payloadTypeSource, /type\?: TiRobotType \| string/);
+});
+
+await runTest("issue 509 ti robot dialog exposes accessible required field errors", async () => {
+  const tabSource = await readModuleSource("components/TiRobotsTab.tsx");
+
+  assert.match(tabSource, /useEffect/);
+  assert.match(tabSource, /useRef/);
+  assert.match(tabSource, /type: ""/);
+  assert.match(
+    tabSource,
+    /\{\s*value: "",\s*label: "Selecione o tipo",\s*disabled: true\s*\}/,
+  );
+  assert.match(tabSource, /validateRobotDraft\(robotDraft\)/);
+  assert.match(tabSource, /getFirstInvalidRobotField\(nextFieldErrors\)/);
+  assert.match(tabSource, /buildCreateRobotPayload\(robotDraft\)/);
+  assert.match(tabSource, /buildUpdateRobotPayload\(robotDraft\)/);
+  assert.match(tabSource, /getRobotMutationErrorMessage\(error\)/);
+  assert.match(tabSource, /robotFormRef\.current\?\.elements\.namedItem\(focusField\)/);
+  assert.match(tabSource, /control\.focus\(\)/);
+  assert.match(tabSource, /setFocusField\(null\)/);
+  assert.match(tabSource, /ref=\{robotFormRef\}/);
+  assert.match(tabSource, /noValidate/);
+  assert.match(tabSource, /id="ti-robot-name"/);
+  assert.match(tabSource, /name="name"/);
+  assert.match(tabSource, /id="ti-robot-type"/);
+  assert.match(tabSource, /name="type"/);
+  assert.match(tabSource, /htmlFor="ti-robot-type"/);
+  assert.match(tabSource, /required/);
+  assert.match(tabSource, /aria-invalid=\{Boolean\(fieldErrors\.name\)\}/);
+  assert.match(tabSource, /aria-invalid=\{Boolean\(fieldErrors\.type\)\}/);
+  assert.match(tabSource, /aria-describedby=\{fieldErrors\.name/);
+  assert.match(tabSource, /aria-describedby=\{fieldErrors\.type/);
+  assert.match(tabSource, /id="ti-robot-name-error"/);
+  assert.match(tabSource, /id="ti-robot-type-error"/);
+  assert.match(tabSource, /role="alert"/);
+  assert.match(tabSource, /clearRobotFieldError\("name"\)/);
+  assert.match(tabSource, /clearRobotFieldError\("type"\)/);
+});
 
 await runTest("ti endpoints stay centralized in the frontend contract", async () => {
   const contractSource = await readModuleSource("services/tiService.contract.ts");
@@ -1499,9 +1647,15 @@ await runTest("ti robots hooks expose write flows and invalidate robots plus das
     assert.match(serviceSource, new RegExp(`${serviceMethod}\\s*\\(`));
   }
 
+  const payloadTypeSource =
+    typeSource.match(/export interface TiRobotPayload \{[\s\S]*?\n\}/)?.[0] ?? "";
+
   assert.match(typeSource, /interface TiRobotPayload/);
   assert.match(typeSource, /interface TiRobotRunPayload/);
-  assert.match(typeSource, /type\?: TiRobotType \| string/);
+  assert.match(payloadTypeSource, /name: string/);
+  assert.match(payloadTypeSource, /type: TiRobotType \| string/);
+  assert.doesNotMatch(payloadTypeSource, /name\?: string/);
+  assert.doesNotMatch(payloadTypeSource, /type\?: TiRobotType \| string/);
   assert.match(typeSource, /active\?: boolean/);
   assert.match(typeSource, /message\?: string/);
   assert.match(typeSource, /metadata_json\?: Record<string, unknown>/);
@@ -1537,8 +1691,9 @@ await runTest("ti robots tab exposes operational list detail forms and run actio
   assert.match(tabSource, /TiNativeSelect/);
   assert.match(tabSource, /ROBOT_TYPE_OPTIONS/);
   assert.match(tabSource, /ROBOT_ACTIVE_FILTER_OPTIONS/);
-  assert.match(tabSource, /type: draft\.type/);
-  assert.match(tabSource, /active: draft\.active/);
+  assert.match(tabSource, /buildCreateRobotPayload\(robotDraft\)/);
+  assert.match(tabSource, /buildUpdateRobotPayload\(robotDraft\)/);
+  assert.doesNotMatch(tabSource, /function buildRobotPayload/);
   assert.match(tabSource, /message: draft\.message\.trim\(\)/);
   assert.match(tabSource, /Tempo gasto/);
   assert.match(tabSource, /placeholder="12 min ou 00:12:00"/);
