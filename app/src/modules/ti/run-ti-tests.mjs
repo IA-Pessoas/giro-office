@@ -25,6 +25,10 @@ async function readAppSource(relativePath) {
   return readFile(join(appRoot, relativePath), "utf8");
 }
 
+async function readWorkspaceSource(relativePath) {
+  return readFile(join(appRoot, "..", relativePath), "utf8");
+}
+
 async function collectSourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
@@ -973,9 +977,21 @@ await runTest("ti terms tab exposes term create, edit, detail and signing action
   assert.match(source, /useTiTerm\(/);
   assert.match(source, /useTiInventory\(/);
   assert.match(source, /const canManage = access\.isAdmin/);
-  assert.match(source, /useTiInventory\(undefined, \{ enabled: canManage \}\)/);
+  assert.match(source, /useTiInventory\([\s\S]*status: "available"[\s\S]*page_size: 100[\s\S]*enabled: canManage/);
+  assert.doesNotMatch(source, /useTiInventory\(undefined, \{ enabled: canManage \}\)/);
   assert.match(source, /departmentService\.list\(\),\s*\{ retry: false, enabled: canManage \}/);
   assert.match(source, /confirm\(/);
+});
+
+await runTest("ti inventory list exposes availability status for term asset selectors", async () => {
+  const schemaSource = await readWorkspaceSource("services/ti-service/src/schemas/tiInventory.schemas.ts");
+  const serviceSource = await readWorkspaceSource("services/ti-service/src/services/tiInventoryService.ts");
+  const openApiSource = await readWorkspaceSource("services/ti-service/src/openapi/spec.ts");
+
+  assert.match(schemaSource, /status: z\.enum\(\["available", "assigned"\]\)\.optional\(\)/);
+  assert.match(serviceSource, /query\.status === "available"[\s\S]*\{ user_id: null \}/);
+  assert.match(serviceSource, /query\.status === "assigned"[\s\S]*\{ user_id: \{ not: null \} \}/);
+  assert.match(openApiSource, /enumQueryParameter\("status", "Disponibilidade do ativo", \["available", "assigned"\]\)/);
 });
 
 await runTest("ti terms keeps primary action clear and opens term detail in a dialog", async () => {

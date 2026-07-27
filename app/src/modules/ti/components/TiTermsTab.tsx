@@ -253,7 +253,10 @@ export function TiTermsTab() {
   const [dialogError, setDialogError] = useState<string | null>(null);
 
   const termsQuery = useTiTerms();
-  const assetsQuery = useTiInventory(undefined, { enabled: canManage });
+  const assetsQuery = useTiInventory(
+    { status: "available", page_size: 100 },
+    { enabled: canManage },
+  );
   const departmentsQuery = useFetch<DepItem[]>(
     ["ti-terms", "departments"],
     () => departmentService.list(),
