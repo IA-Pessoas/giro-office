@@ -482,11 +482,32 @@ await runTest("ti password deactivation uses the centralized endpoint and safe p
 
 await runTest("ti password deactivation mutation evicts detail and invalidates lists", async () => {
   const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+  const deactivateVariablesStart = hookSource.indexOf("export type TiPasswordDeactivateVariables");
+  const deactivateVariablesEnd = hookSource.indexOf(
+    "\n\nexport function useTiPasswords",
+    deactivateVariablesStart,
+  );
+  const deactivateVariablesSource = hookSource.slice(
+    deactivateVariablesStart,
+    deactivateVariablesEnd,
+  );
+  const deactivateHookStart = hookSource.indexOf("export function useDeactivateTiPasswordMutation");
+  const deactivateHookEnd = hookSource.indexOf("\n}", deactivateHookStart) + 2;
   const deactivateHookSource = hookSource.slice(
-    hookSource.indexOf("export function useDeactivateTiPasswordMutation"),
+    deactivateHookStart,
+    deactivateHookEnd,
   );
 
-  assert.match(hookSource, /export type TiPasswordDeactivateVariables = \{\s*id: TiId;\s*payload: TiPasswordDeactivatePayload;\s*\}/);
+  assert.notEqual(deactivateVariablesStart, -1);
+  assert.notEqual(deactivateVariablesEnd, -1);
+  assert.notEqual(deactivateHookStart, -1);
+  assert.notEqual(deactivateHookEnd, 1);
+  assert.match(
+    deactivateVariablesSource,
+    /export type TiPasswordDeactivateVariables = \{\s*id: TiId;\s*payload: TiPasswordDeactivatePayload;\s*\}/,
+  );
+  assert.doesNotMatch(deactivateVariablesSource, /export function/);
+  assert.equal([...deactivateHookSource.matchAll(/export function/g)].length, 1);
   assert.match(
     deactivateHookSource,
     /UseMutationResult<\s*TiPasswordListItem,\s*Error,\s*TiPasswordDeactivateVariables\s*>/,
