@@ -422,6 +422,17 @@ runTest("task model config links back to the tasks workspace", () => {
   assert.equal(source.includes("Voltar para tarefas"), true);
 });
 
+runTest("issue 495 project task observations preserve line breaks and wrap long tokens", () => {
+  const source = readFileSync(new URL("./components/ProjectDetailView.tsx", import.meta.url), "utf8");
+  const observationsDisplay =
+    source.match(
+      /<p className="[^"]*">\s*\{task\.observations \|\| task\.observation \|\| "Sem observações específicas\."\}\s*<\/p>/,
+    )?.[0] ?? "";
+
+  assert.match(observationsDisplay, /whitespace-pre-wrap/);
+  assert.match(observationsDisplay, /break-words/);
+});
+
 runTest("tasks footer summary uses natural Portuguese copy", () => {
   assert.equal(formatTasksFooterSummary({ page: 1, count: 0 }), "Nenhuma tarefa carregada.");
   assert.equal(formatTasksFooterSummary({ page: 1, count: 1 }), "1 tarefa carregada.");

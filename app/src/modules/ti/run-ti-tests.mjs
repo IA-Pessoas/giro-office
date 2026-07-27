@@ -1071,6 +1071,17 @@ await runTest("ti request detail opens in a dialog instead of a stretched side p
   assert.doesNotMatch(tabSource, /title="Selecione um chamado"/);
 });
 
+await runTest("issue 495 ti request messages preserve line breaks and wrap long text", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+  const messageDisplay =
+    tabSource.match(
+      /<p className="[^"]*">\s*\{message\.message \?\? getStringField\(message, \["content", "body"\], ""\)\}\s*<\/p>/,
+    )?.[0] ?? "";
+
+  assert.match(messageDisplay, /whitespace-pre-wrap/);
+  assert.match(messageDisplay, /break-words/);
+});
+
 await runTest("ti request detail keeps secondary actions compact", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 

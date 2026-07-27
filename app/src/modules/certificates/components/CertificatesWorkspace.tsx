@@ -1656,7 +1656,7 @@ export function CertificatesWorkspace() {
 
               <div className="grid gap-3">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Observações</p>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+                <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap break-words">
                   {pjDetail?.notes ?? "Sem observações."}
                 </p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -1748,7 +1748,7 @@ export function CertificatesWorkspace() {
 
               <div className="grid gap-3">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Observações</p>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+                <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap break-words">
                   {pfDetail?.notes ?? "Sem observações."}
                 </p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
