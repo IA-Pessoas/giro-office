@@ -77,6 +77,14 @@ const permissionConfigSource = readFileSync(
 );
 const userTypesSource = readFileSync(new URL("./types/index.ts", import.meta.url), "utf8");
 
+runTest("create user password visibility control remains explicit and accessible", () => {
+  assert.match(createUserModalSource, /const \[isPasswordVisible, setIsPasswordVisible\] = useState\(false\);/);
+  assert.match(createUserModalSource, /aria-label=\{isPasswordVisible \? 'Ocultar senha' : 'Mostrar senha'\}/);
+  assert.match(createUserModalSource, /aria-pressed=\{isPasswordVisible\}/);
+  assert.match(createUserModalSource, /type=\{isPasswordVisible \? 'text' : 'password'\}/);
+  assert.match(createUserModalSource, /autoComplete="new-password"/);
+});
+
 runTest("RH and Technology define Viewer as their frontend minimum", () => {
   assert.equal(getMinimumPermissionLevel("rh"), 0);
   assert.equal(getMinimumPermissionLevel("ti"), 0);

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 import { resolveDepartmentModuleKey } from '@modules/auth';
@@ -124,6 +125,7 @@ export function CreateUserModal({
   const [moduleSelections, setModuleSelections] = useState<ModuleSelectionState>(createInitialModuleSelections);
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const isCreateBlocked = departmentsLoading || departmentsError || departments.length === 0 || organizationIdLoading || !organizationId;
   const selectedDepartmentName = useMemo(() => {
     if (!formData.department_id) {
@@ -179,6 +181,12 @@ export function CreateUserModal({
     }));
   };
 
+  const handleClose = () => {
+    setIsPasswordVisible(false);
+    setSubmitError(null);
+    onClose();
+  };
+
   const handleCadastrar = async () => {
     setSubmitError(null);
 
@@ -213,7 +221,7 @@ export function CreateUserModal({
       const newUser = await userService.create(payload);
       toast.success('Usuario cadastrado com sucesso!');
       onUserCreated(newUser);
-      onClose();
+      handleClose();
       setFormData(INITIAL_FORM_DATA);
       setModuleSelections(createInitialModuleSelections());
     } catch (err) {
@@ -230,8 +238,7 @@ export function CreateUserModal({
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
-          setSubmitError(null);
-          onClose();
+          handleClose();
         }
       }}
       title="Cadastrar Novo Usuario"
@@ -243,7 +250,7 @@ export function CreateUserModal({
           <button
             type="button"
             className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            onClick={onClose}
+            onClick={handleClose}
           >
             Cancelar
           </button>
@@ -315,7 +322,27 @@ export function CreateUserModal({
             </div>
             <div className="md:col-span-1">
               <label htmlFor="user-password" className={FIELD_LABEL_CLASSNAME}>Senha</label>
-              <input id="user-password" type="password" name="password" value={formData.password} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+              <div className="relative">
+                <input
+                  id="user-password"
+                  type={isPasswordVisible ? 'text' : 'password'}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  className={`${FIELD_CLASSNAME} pr-11`}
+                  autoComplete="new-password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/30 dark:text-slate-400 dark:hover:text-slate-200"
+                  onClick={() => setIsPasswordVisible((visible) => !visible)}
+                  aria-label={isPasswordVisible ? 'Ocultar senha' : 'Mostrar senha'}
+                  aria-pressed={isPasswordVisible}
+                >
+                  {isPasswordVisible ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                </button>
+              </div>
             </div>
           </div>
 
