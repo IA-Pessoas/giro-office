@@ -60,7 +60,7 @@ import {
   useCreateRegularizeClientPfMutation,
   useCreateRegularizePartnerMutation,
   useRegularizeClientPfDetail,
-  useRegularizeClientPfs,
+  usePaginatedRegularizeClientPfs,
   useRegularizePartners,
   useUpdateRegularizeClientPfMutation,
   useUpdateRegularizePartnerMutation,
@@ -707,10 +707,15 @@ export function RegularizePage() {
   const [siteSearch, setSiteSearch] = useState("");
   const [siteStatus, setSiteStatus] = useState(true);
   const [sitePage, setSitePage] = useState(1);
+  const [pfSearch, setPfSearch] = useState("");
+  const [pfStatus, setPfStatus] = useState("Todos");
+  const [pfPage, setPfPage] = useState(1);
   const debouncedProcessSearch = useDebouncedValue(processSearch.trim(), 300);
   const debouncedSiteSearch = useDebouncedValue(siteSearch.trim(), 300);
+  const debouncedPfSearch = useDebouncedValue(pfSearch.trim(), 300);
   const isProcessSearchPending = processSearch.trim() !== debouncedProcessSearch;
   const isSiteSearchPending = siteSearch.trim() !== debouncedSiteSearch;
+  const isPfSearchPending = pfSearch.trim() !== debouncedPfSearch;
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const { access: regularizeAccess } = useModuleAccess("regularize");
@@ -721,8 +726,13 @@ export function RegularizePage() {
   const dashboardQuery = useRegularizeDashboard(currentYear, {
     enabled: queryPolicy.dashboard,
   });
-  const pfQuery = useRegularizeClientPfs(
-    { status: "Ativo" },
+  const pfPageQuery = usePaginatedRegularizeClientPfs(
+    {
+      status: pfStatus,
+      search: debouncedPfSearch,
+      page: pfPage,
+      limit: REGULARIZE_PAGE_SIZE,
+    },
     { enabled: queryPolicy.clientPfs },
   );
   const siteQuery = useRegularizeSitePasswords(
@@ -781,7 +791,8 @@ export function RegularizePage() {
   const createLicenseMutation = useCreateRegularizeLicenseMutation();
   const updateLicenseMutation = useUpdateRegularizeLicenseMutation();
 
-  const firstClientPfId = pfQuery.data?.[0]?.id;
+  const visiblePfRows = isPfSearchPending ? [] : pfPageQuery.data?.data ?? [];
+  const firstClientPfId = visiblePfRows[0]?.id;
   const visibleProcessRows = isProcessSearchPending ? [] : processPageQuery.data?.data ?? [];
   const automaticProcessId = visibleProcessRows[0]?.id;
   const currentCredentialClientId = selectedCredentialClientId;
@@ -849,6 +860,14 @@ export function RegularizePage() {
     }
   }, [sitePage, sitePageQuery.data]);
 
+  useEffect(() => {
+    const result = pfPageQuery.data;
+    if (result && result.data.length === 0 && result.total > 0 && pfPage > 1) {
+      setSelectedClientPfId(undefined);
+      setPfPage(getLastPage(result.total, REGULARIZE_PAGE_SIZE));
+    }
+  }, [pfPage, pfPageQuery.data]);
+
   const processTableQuery: ListQuery<RegularizeProcessListItem> = {
     ...processPageQuery,
     data: isProcessSearchPending ? undefined : visibleProcessRows,
@@ -859,6 +878,11 @@ export function RegularizePage() {
     data: isSiteSearchPending ? undefined : sitePageQuery.data?.data,
     isLoading: isSiteSearchPending || sitePageQuery.isLoading,
   };
+  const pfTableQuery: ListQuery<RegularizeClientPfListItem> = {
+    ...pfPageQuery,
+    data: isPfSearchPending ? undefined : visiblePfRows,
+    isLoading: isPfSearchPending || pfPageQuery.isLoading,
+  };
 
   const dashboardRequestId = getRegularizeRequestId(dashboardQuery.error);
   const hasProcessRows = visibleProcessRows.length > 0;
@@ -866,12 +890,12 @@ export function RegularizePage() {
 
   const pfOptions = useMemo<RegularizeFormOption[]>(
     () =>
-      (pfQuery.data ?? []).map((clientPf) => ({
+      visiblePfRows.map((clientPf) => ({
         id: clientPf.id,
         label: clientPf.name || clientPf.id,
         description: formatDocumentDescription(clientPf.cpf),
       })),
-    [pfQuery.data],
+    [visiblePfRows],
   );
 
   const siteOptions = useMemo<RegularizeFormOption[]>(
@@ -952,7 +976,7 @@ export function RegularizePage() {
     const refreshes: Promise<unknown>[] = [];
 
     if (queryPolicy.dashboard) refreshes.push(dashboardQuery.refetch());
-    if (queryPolicy.clientPfs) refreshes.push(pfQuery.refetch());
+    if (queryPolicy.clientPfs) refreshes.push(pfPageQuery.refetch());
     if (queryPolicy.sitePasswords) refreshes.push(siteQuery.refetch());
     if (queryPolicy.municipalTaxes) refreshes.push(taxQuery.refetch());
     if (queryPolicy.processes) refreshes.push(processQuery.refetch());
@@ -1807,11 +1831,55 @@ export function RegularizePage() {
             }
           />
 
+          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_180px] dark:border-gray-700 dark:bg-gray-900">
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Buscar</span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={pfSearch}
+                  onChange={(event) => {
+                    setSelectedClientPfId(undefined);
+                    setPfSearch(event.target.value);
+                    setPfPage(1);
+                  }}
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  placeholder="Buscar por nome, código ou CPF"
+                />
+              </div>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Status</span>
+              <RegularizeNativeSelect
+                value={pfStatus}
+                onChange={(event) => {
+                  setSelectedClientPfId(undefined);
+                  setPfStatus(event.target.value);
+                  setPfPage(1);
+                }}
+              >
+                {["Todos", "Ativo", "Inativo"].map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </label>
+          </div>
+
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
-            <QueryStatePanel query={pfQuery} emptyTitle="Nenhum cliente PF encontrado.">
+            <QueryStatePanel
+              query={pfTableQuery}
+              emptyTitle={
+                pfSearch || pfStatus !== "Todos"
+                  ? "Nenhum cliente PF corresponde aos filtros."
+                  : "Nenhum cliente PF cadastrado."
+              }
+            >
               {(pfRows) => (
-                <DataTable headers={["Código", "Nome", "CPF", ""]}>
-                  {pfRows.map((item: RegularizeClientPfListItem) => (
+                <div>
+                  <DataTable headers={["Código", "Nome", "CPF", ""]}>
+                    {pfRows.map((item: RegularizeClientPfListItem) => (
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3">{formatText(item.code)}</td>
                       <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
@@ -1836,8 +1904,25 @@ export function RegularizePage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </DataTable>
+                    ))}
+                  </DataTable>
+                  <PaginationControls
+                    page={pfPage}
+                    limit={REGULARIZE_PAGE_SIZE}
+                    total={pfPageQuery.data?.total ?? 0}
+                    count={pfRows.length}
+                    hasMore={pfPageQuery.data?.hasMore ?? false}
+                    isFetching={pfPageQuery.isFetching || isPfSearchPending}
+                    onPrevious={() => {
+                      setSelectedClientPfId(undefined);
+                      setPfPage((current) => Math.max(1, current - 1));
+                    }}
+                    onNext={() => {
+                      setSelectedClientPfId(undefined);
+                      setPfPage((current) => current + 1);
+                    }}
+                  />
+                </div>
               )}
             </QueryStatePanel>
 

@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  buildRegularizeClientPfListParams,
   buildRegularizeProcessListParams,
   buildRegularizeSitePasswordListParams,
   unwrapRegularizePage,
@@ -74,6 +75,31 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   ]) {
     assert.match(contractSource, new RegExp(endpoint.replaceAll("/", "\\/")));
   }
+});
+
+await runTest("regularize PF list contract preserves explicit search status and pagination", async () => {
+  assert.deepEqual(
+    buildRegularizeClientPfListParams({
+      status: "Ativo",
+      search: "ana",
+      page: 2,
+      limit: 20,
+    }),
+    { status: "Ativo", search: "ana", page: 2, limit: 20 },
+  );
+
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const peopleSource = await readModuleSource("hooks/useRegularizePeople.ts");
+  const queryKeysSource = await readModuleSource("hooks/queryKeys.ts");
+
+  assert.match(pageSource, /const \[pfSearch, setPfSearch\] = useState\(""\)/);
+  assert.match(pageSource, /const \[pfStatus, setPfStatus\] = useState\("Todos"\)/);
+  assert.match(pageSource, /usePaginatedRegularizeClientPfs/);
+  assert.match(pageSource, /placeholder="Buscar por nome, código ou CPF"/);
+  assert.match(pageSource, /label="Status"/);
+  assert.match(pageSource, /<PaginationControls/);
+  assert.match(peopleSource, /usePaginatedRegularizeClientPfs/);
+  assert.match(queryKeysSource, /clientPfsPage/);
 });
 
 await runTest("regularize dashboard has a centralized aggregate data contract", async () => {

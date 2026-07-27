@@ -251,11 +251,20 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/pfs": {
         get: {
           tags: ["PF"],
-          summary: "Listar clientes PF",
+          summary: "Listar clientes PF com busca e paginação",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "status", in: "query", required: true, schema: { type: "string" } }],
+          parameters: [
+            { name: "status", in: "query", required: true, schema: { type: "string" } },
+            { name: "search", in: "query", schema: { type: "string" } },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
           responses: {
-            "200": { description: "Lista de clientes PF", ...successEnvelopeContent() },
+            "200": { description: "Página de clientes PF", ...successEnvelopeContent() },
           },
         },
       },

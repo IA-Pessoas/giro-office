@@ -81,6 +81,46 @@ describe("regularize client PF and partners routes", () => {
     );
   });
 
+  it("GET /regularize/pfs searches, filters and paginates PF clients within the organization", async () => {
+    const prisma = {
+      clientPF: {
+        findMany: vi.fn(async () => [
+          { id: "pf-21", code: "021", name: "Ana Silva", cpf: "12345678901" },
+        ]),
+        count: vi.fn(async () => 21),
+      },
+    } as unknown as PrismaClient;
+    const app = createTestApp(prisma);
+
+    const response = await request(app)
+      .get("/regularize/pfs")
+      .query({ status: "Ativo", search: "ana", page: "2", limit: "20" })
+      .set(gatewayHeaders());
+
+    const where = {
+      organization_id: "a0000000-0000-4000-8000-000000000001",
+      status: "Ativo",
+      OR: [
+        { name: { contains: "ana", mode: "insensitive" } },
+        { code: { contains: "ana", mode: "insensitive" } },
+        { cpf: { contains: "ana", mode: "insensitive" } },
+      ],
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      total: 21,
+      page: 2,
+      limit: 20,
+      hasMore: false,
+      data: [{ id: "pf-21", name: "Ana Silva" }],
+    });
+    expect(prisma.clientPF.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where, skip: 20, take: 20 }),
+    );
+    expect(prisma.clientPF.count).toHaveBeenCalledWith({ where });
+  });
+
   it("POST /regularize/partners creates a record", async () => {
     vi.spyOn(RegularizeReconciliationService.prototype, "handlePartnersChanged").mockResolvedValue(
       undefined,

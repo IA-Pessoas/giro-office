@@ -179,15 +179,15 @@ export const regularizeService = {
     return unwrapRegularizeEnvelope<RegularizeSitePasswordDetail>(response.data);
   },
 
-  async listClientPfs(
-    filters: RegularizeClientPfListFilters,
-  ): Promise<RegularizeClientPfListItem[]> {
+  async listClientPfsPage(
+    filters: RegularizeClientPfListFilters & { page: number; limit: number },
+  ): Promise<PaginatedResult<RegularizeClientPfListItem>> {
     const api = setupAPIClient();
     const response = await api.get(REGULARIZE_ENDPOINTS.pfs, {
       params: buildRegularizeClientPfListParams(filters),
     });
 
-    return unwrapRegularizeEnvelope<RegularizeClientPfListItem[]>(response.data) ?? [];
+    return unwrapRegularizePage<RegularizeClientPfListItem>(response.data, filters);
   },
 
   async getClientPf(id: RegularizeId): Promise<RegularizeClientPfDetail> {
