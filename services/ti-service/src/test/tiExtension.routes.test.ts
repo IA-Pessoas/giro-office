@@ -13,6 +13,7 @@ import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
+const extensionId = "20000000-0000-4000-8000-000000000001";
 const TI_REQUESTER_PERMISSION = 1;
 const TI_ADMIN_PERMISSION = 2;
 
@@ -92,6 +93,45 @@ describe("ti extension routes", () => {
         organization_id: organizationId,
       },
     });
+  });
+
+  it("POST /ti/extensions rejects an alphabetic number before persistence", async () => {
+    const prisma = createExtensionPrismaMock();
+
+    const response = await request(createTestApp(prisma as never))
+      .post("/ti/extensions")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({
+        user_id: userId,
+        number: "12A4",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "number deve conter exatamente 4 dígitos.",
+      code: "BAD_REQUEST",
+    });
+    expect(prisma.extensionsTecnologia.create).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /ti/extensions/:id rejects a non-four-digit number before persistence", async () => {
+    const prisma = createExtensionPrismaMock();
+
+    const response = await request(createTestApp(prisma as never))
+      .patch(`/ti/extensions/${extensionId}`)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({
+        number: "123",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "number deve conter exatamente 4 dígitos.",
+      code: "BAD_REQUEST",
+    });
+    expect(prisma.extensionsTecnologia.update).not.toHaveBeenCalled();
   });
 
   it("POST /ti/extensions requires admin permission", async () => {

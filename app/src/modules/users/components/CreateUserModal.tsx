@@ -8,6 +8,11 @@ import {
   CREATE_USER_MODULE_OPTIONS,
   CREATE_USER_PERMISSION_OPTIONS,
 } from '../constants/createUserConfig';
+import {
+  getMinimumPermissionLevel,
+  getPermissionSelectOptions,
+  normalizePermissionForModule,
+} from '../constants/permissionConfig';
 import type { UserItem, UserPermission } from '../types';
 import {
   buildAdminCreateUserPayload,
@@ -42,6 +47,13 @@ type ModuleKey = (typeof CREATE_USER_MODULE_OPTIONS)[number]['key'];
 type ModuleSelectionState = Record<ModuleKey, { enabled: boolean; level: 0 | 1 | 2 }>;
 type ModuleSelectValue = 'none' | '0' | '1' | '2';
 
+const CREATE_MODULE_OPTION_LABELS: Record<ModuleSelectValue, string> = {
+  none: 'Sem acesso',
+  '0': 'Visualizador',
+  '1': 'Usuário',
+  '2': 'Administrador',
+};
+
 const FIELD_CLASSNAME =
   'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition-all outline-none placeholder:text-slate-400 focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-80';
 
@@ -70,7 +82,12 @@ const SECTION_DESCRIPTION_CLASSNAME =
 
 function createInitialModuleSelections(): ModuleSelectionState {
   return CREATE_USER_MODULE_OPTIONS.reduce((acc, moduleOption) => {
-    acc[moduleOption.key] = { enabled: false, level: 0 };
+    const minimumLevel = getMinimumPermissionLevel(moduleOption.key);
+
+    acc[moduleOption.key] = {
+      enabled: minimumLevel !== null,
+      level: minimumLevel ?? 0,
+    };
     return acc;
   }, {} as ModuleSelectionState);
 }
@@ -150,12 +167,14 @@ export function CreateUserModal({
   };
 
   const handleModuleLevelChange = (moduleKey: ModuleKey, value: ModuleSelectValue) => {
+    const normalizedLevel = normalizePermissionForModule(moduleKey, value === 'none' ? null : Number(value));
+
     setSubmitError(null);
     setModuleSelections((prev) => ({
       ...prev,
       [moduleKey]: {
-        enabled: value !== 'none',
-        level: value === 'none' ? 0 : Number(value) as 0 | 1 | 2,
+        enabled: normalizedLevel !== null,
+        level: normalizedLevel ?? 0,
       },
     }));
   };
@@ -385,10 +404,16 @@ export function CreateUserModal({
                         className={`${SELECT_FIELD_CLASSNAME} h-10 px-3 text-sm`}
                         style={SELECT_ARROW_STYLE}
                       >
-                        <option value="none">Sem acesso</option>
-                        <option value="0">Visualizador</option>
-                        <option value="1">Usuário</option>
-                        <option value="2">Administrador</option>
+                        {getPermissionSelectOptions(moduleOption.key).map((option) => {
+                          const createValue: ModuleSelectValue =
+                            option.value === 'null' ? 'none' : option.value;
+
+                          return (
+                            <option key={option.value} value={createValue}>
+                              {CREATE_MODULE_OPTION_LABELS[createValue]}
+                            </option>
+                          );
+                        })}
                       </select>
                     )}
                   </div>

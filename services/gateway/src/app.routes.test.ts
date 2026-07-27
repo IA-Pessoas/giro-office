@@ -2033,6 +2033,156 @@ it("records ti-service route targets when audit is enabled", async () => {
   }
 });
 
+it("records TI password deactivation without body or query secrets", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const auditService = await startAuditIngestServer();
+  const upstream = createServer(async (request, response) => {
+    await readJsonBody(request);
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { active: false } }));
+  });
+  const tiServiceUrl = await startServer(upstream);
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      tiServiceUrl,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(
+      `${gatewayUrl}/ti/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/deactivate?reason=query-secret&password=query-password&ticket=TI-507`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ reason: "Contains private administrative context" }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await waitForRecords(auditService.records, 1);
+
+    expect(auditService.records[0]).toMatchObject({
+      organizationId: "org-1",
+      userId: "user-1",
+      method: "POST",
+      path: "/ti/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/deactivate",
+      outcome: "success",
+      action: "inativou",
+      referring: "uma credencial de TI",
+      metadata: {
+        routeTarget: "ti-service",
+        activityVisible: true,
+      },
+    });
+    expect(auditService.records[0]?.query).toEqual({ ticket: "TI-507" });
+    expect(auditService.records[0]?.createdAt).toEqual(expect.any(String));
+    expect(auditService.records[0]?.finishedAt).toEqual(expect.any(String));
+    const serializedAuditRecord = JSON.stringify(auditService.records[0]);
+    expect(serializedAuditRecord).not.toContain("Contains private administrative context");
+    expect(serializedAuditRecord).not.toContain("query-secret");
+    expect(serializedAuditRecord).not.toContain("query-password");
+    expect(serializedAuditRecord).not.toContain('"reason"');
+    expect(serializedAuditRecord).not.toContain('"password"');
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+    await stopServer(auditService.server);
+  }
+});
+
+it.each([
+  {
+    variant: "trailing slash",
+    requestPath: "/ti/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/deactivate/",
+    expectedPath: "/ti/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/deactivate/",
+  },
+  {
+    variant: "different casing",
+    requestPath: "/TI/PASSWORDS/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/DEACTIVATE",
+    expectedPath: "/TI/PASSWORDS/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/DEACTIVATE",
+  },
+])("sanitizes TI password deactivation audit with $variant", async ({
+  requestPath,
+  expectedPath,
+}) => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const auditService = await startAuditIngestServer();
+  const upstream = createServer(async (request, response) => {
+    await readJsonBody(request);
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { active: false } }));
+  });
+  const tiServiceUrl = await startServer(upstream);
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      tiServiceUrl,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(
+      `${gatewayUrl}${requestPath}?reason=secret&password=query-password&ticket=TI-507`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ reason: "Valid administrative reason" }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await waitForRecords(auditService.records, 1);
+
+    expect(auditService.records[0]).toMatchObject({
+      organizationId: "org-1",
+      userId: "user-1",
+      method: "POST",
+      path: expectedPath,
+      statusCode: 200,
+      outcome: "success",
+    });
+    expect(auditService.records[0]?.query).toEqual({ ticket: "TI-507" });
+    expect(auditService.records[0]?.createdAt).toEqual(expect.any(String));
+    expect(auditService.records[0]?.finishedAt).toEqual(expect.any(String));
+
+    const serializedAuditRecord = JSON.stringify(auditService.records[0]);
+    expect(serializedAuditRecord).not.toContain("Valid administrative reason");
+    expect(serializedAuditRecord).not.toContain("secret");
+    expect(serializedAuditRecord).not.toContain("query-password");
+    expect(serializedAuditRecord).not.toContain('"reason"');
+    expect(serializedAuditRecord).not.toContain('"password"');
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+    await stopServer(auditService.server);
+  }
+});
+
 it("records certificate-service route targets when audit is enabled", async () => {
   const token = createToken({
     user_id: "user-1",
@@ -2945,6 +3095,42 @@ it("proxies /regularize to the regularize microservice", async () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(seenUrl).toBe("/regularize/smoke");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("forwards the Fiscal module permission and internal token", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { fiscal: 0 },
+  });
+  let seenPermission: string | undefined;
+  let seenInternalToken: string | undefined;
+  const upstream = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    seenInternalToken = request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const fiscalServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ fiscalServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/fiscal/ncm/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("0");
+    expect(seenInternalToken).toBe("audit-service-token");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

@@ -1,14 +1,43 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { registerHooks } from "node:module";
 
 import {
+  getMinimumPermissionLevel,
+  getPermissionSelectOptions,
+  normalizePermissionForModule,
+} from "./constants/permissionConfig.ts";
+
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (
+      specifier === "../constants/permissionConfig" &&
+      (context.parentURL?.endsWith("/modules/users/utils/permissionUtils.ts") ||
+        context.parentURL?.endsWith("/modules/users/utils/createUserPayload.ts"))
+    ) {
+      return nextResolve(`${specifier}.ts`, context);
+    }
+
+    return nextResolve(specifier, context);
+  },
+});
+
+const {
   buildAdminCreateUserPayload,
   buildCreateUserModulesPayload,
   buildDepartmentPermissionSyncPayload,
   needsDepartmentPermissionSync,
   resolveCreateUserTopLevelPermission,
   resolveCreateUserType,
-} from "./utils/createUserPayload.ts";
+} = await import("./utils/createUserPayload.ts");
+
+const {
+  arePermissionDraftsEqual,
+  buildPermissionUpdatePayload,
+  freezePermissionSnapshot,
+  normalizePermissionDraft,
+  normalizePermissionResponse,
+} = await import("./utils/permissionUtils.ts");
 
 const administracaoSource = readFileSync(
   new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
@@ -51,6 +80,127 @@ const permissionConfigSource = readFileSync(
   "utf8",
 );
 const userTypesSource = readFileSync(new URL("./types/index.ts", import.meta.url), "utf8");
+
+runTest("RH and Technology define Viewer as their frontend minimum", () => {
+  assert.equal(getMinimumPermissionLevel("rh"), 0);
+  assert.equal(getMinimumPermissionLevel("ti"), 0);
+  assert.equal(getMinimumPermissionLevel("fiscal"), null);
+});
+
+runTest("minimum module options omit no access and preserve higher levels", () => {
+  assert.deepEqual(
+    getPermissionSelectOptions("rh").map((option) => option.value),
+    ["0", "1", "2"],
+  );
+  assert.deepEqual(
+    getPermissionSelectOptions("ti").map((option) => option.value),
+    ["0", "1", "2"],
+  );
+  assert.deepEqual(
+    getPermissionSelectOptions("fiscal").map((option) => option.value),
+    ["null", "0", "1", "2"],
+  );
+});
+
+runTest("module permission normalization changes only values below a configured minimum", () => {
+  assert.equal(normalizePermissionForModule("rh", null), 0);
+  assert.equal(normalizePermissionForModule("ti", undefined), 0);
+  assert.equal(normalizePermissionForModule("rh", 1), 1);
+  assert.equal(normalizePermissionForModule("ti", 2), 2);
+  assert.equal(normalizePermissionForModule("fiscal", null), null);
+  assert.equal(normalizePermissionForModule("fiscal", 1), 1);
+});
+
+runTest("legacy RH and Technology no-access values normalize to Viewer", () => {
+  const response = normalizePermissionResponse({
+    rh: null,
+    ti: null,
+    fiscal: null,
+  });
+
+  assert.equal(response.known.rh, 0);
+  assert.equal(response.known.ti, 0);
+  assert.equal(response.known.fiscal, null);
+
+  const missingDraft = normalizePermissionDraft({});
+  assert.equal(missingDraft.rh, 0);
+  assert.equal(missingDraft.ti, 0);
+});
+
+runTest("normalized legacy permissions do not become dirty solely on load", () => {
+  const draft = normalizePermissionDraft({
+    rh: null,
+    ti: null,
+    fiscal: null,
+  });
+  const snapshot = freezePermissionSnapshot(draft);
+
+  assert.equal(arePermissionDraftsEqual(draft, snapshot), true);
+});
+
+runTest("legacy minimum normalization does not request RH or Technology department sync", () => {
+  for (const moduleKey of ["rh", "ti"]) {
+    const rawPermissions = {
+      [moduleKey]: null,
+    };
+    const response = normalizePermissionResponse(rawPermissions);
+    const draft = normalizePermissionDraft({
+      ...response.known,
+      ...response.extras,
+    });
+    const snapshot = freezePermissionSnapshot(draft);
+
+    const isDirty =
+      !arePermissionDraftsEqual(draft, snapshot) ||
+      needsDepartmentPermissionSync(
+        moduleKey,
+        draft,
+        { permission: -1, type: "user" },
+        rawPermissions,
+      );
+
+    assert.equal(isDirty, false);
+  }
+});
+
+runTest("persisted Viewer still detects stale RH or Technology department sync", () => {
+  for (const moduleKey of ["rh", "ti"]) {
+    const rawPermissions = {
+      [moduleKey]: 0,
+    };
+    const response = normalizePermissionResponse(rawPermissions);
+    const draft = normalizePermissionDraft({
+      ...response.known,
+      ...response.extras,
+    });
+    const snapshot = freezePermissionSnapshot(draft);
+
+    const isDirty =
+      !arePermissionDraftsEqual(draft, snapshot) ||
+      needsDepartmentPermissionSync(
+        moduleKey,
+        draft,
+        { permission: -1, type: "user" },
+        rawPermissions,
+      );
+
+    assert.equal(isDirty, true);
+  }
+});
+
+runTest("permission update payload enforces only RH and Technology minimums", () => {
+  const payload = buildPermissionUpdatePayload({
+    rh: null,
+    ti: null,
+    fiscal: null,
+    contabil: 2,
+  });
+
+  assert.equal(payload.rh, 0);
+  assert.equal(payload.ti, 0);
+  assert.equal(payload.fiscal, null);
+  assert.equal(payload.contabil, 2);
+});
 
 runTest("create user additional modules hide unavailable services", () => {
   assert.equal(createUserConfigSource.includes('key: "comercial"'), false);
@@ -204,7 +354,7 @@ runTest("explicit RH and TI management are preserved on user creation", () => {
   );
 });
 
-runTest("viewer does not receive RH or TI self-service by default", () => {
+runTest("Viewer creation payload includes RH and Technology at Viewer minimum", () => {
   assert.deepEqual(
     buildCreateUserModulesPayload(
       {
@@ -217,7 +367,29 @@ runTest("viewer does not receive RH or TI self-service by default", () => {
     ),
     {
       fiscal: 0,
+      rh: 0,
+      ti: 0,
     },
+  );
+});
+
+runTest("create user UI consumes minimum-aware defaults and options", () => {
+  assert.match(
+    createUserModalSource,
+    /getMinimumPermissionLevel\(moduleOption\.key\)/,
+  );
+  assert.match(
+    createUserModalSource,
+    /getPermissionSelectOptions\(moduleOption\.key\)\.map/,
+  );
+  assert.match(
+    createUserModalSource,
+    /normalizePermissionForModule\(moduleKey,/,
+  );
+  assert.match(createUserModalSource, /CREATE_MODULE_OPTION_LABELS/);
+  assert.equal(
+    createUserModalSource.includes('<option value="none">Sem acesso</option>'),
+    false,
   );
 });
 
@@ -363,9 +535,28 @@ runTest("department module remains editable in permissions tab", () => {
   );
   assert.match(administracaoSource, /buildDepartmentPermissionSyncPayload/);
   assert.match(administracaoSource, /needsDepartmentPermissionSync/);
+  assert.match(
+    administracaoSource,
+    /needsDepartmentPermissionSync\(\s*selectedPermissionDepartmentModule,\s*normalizedPermissionDraft,\s*selectedPermissionUser,\s*permissionBaseline \?\? undefined,/s,
+  );
   assert.match(administracaoSource, /userService\.update\(\s*selectedPermissionUserId/s);
   assert.doesNotMatch(
     administracaoSource,
     /isDepartmentModule \? \(\s*<div/s,
+  );
+});
+
+runTest("admin permission editor uses module-specific options and normalization", () => {
+  assert.match(
+    administracaoSource,
+    /getPermissionSelectOptions\(moduleKey\)\.map/,
+  );
+  assert.match(
+    administracaoSource,
+    /normalizePermissionForModule\(\s*moduleKey,/s,
+  );
+  assert.doesNotMatch(
+    administracaoSource,
+    /\{PERMISSION_SELECT_OPTIONS\.map\(\(option\) => \(/,
   );
 });

@@ -17,6 +17,7 @@ import {
   hasPessoalPasswordSecretFields,
 } from "./services/pessoalService.ts";
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
+import { formatPessoalObligationGenerationSummary } from "./utils/obligationGenerationSummary.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
 
 function runTest(name, fn) {
@@ -188,6 +189,31 @@ runTest("obligation params map client and competence", () => {
   });
 });
 
+runTest("obligation generation copy explains global scope and no-payroll count", () => {
+  const section = readFileSync(
+    "src/modules/pessoal/components/PessoalObligationsSection.tsx",
+    "utf8",
+  );
+  const message = formatPessoalObligationGenerationSummary({
+    clients: 10,
+    payrollRows: 8,
+    existing: 3,
+    created: 5,
+    skippedExisting: 3,
+    skippedNoPayroll: 2,
+  });
+
+  assert.match(section, /Gerar todos/);
+  assert.match(section, /A gera[cç][aã]o em massa avalia todos os clientes ativos de Departamento Pessoal/);
+  assert.match(section, /<PessoalPlaceholderSection/);
+  assert.doesNotMatch(section, /if \(!hasClient\) \{\s*return/);
+  assert.equal(
+    message,
+    "Geração global concluída: 10 clientes avaliados, 8 clientes com folha configurada, 5 criadas, 3 existentes, 2 clientes sem configuração de folha.",
+  );
+  assert.doesNotMatch(section, /\$\{result\.skippedNoPayroll\} sem folha/);
+});
+
 runTest("ldd list params include optional client id only when present", () => {
   assert.deepEqual(buildPessoalLddListParams("client-1"), { client_id: "client-1" });
   assert.deepEqual(buildPessoalLddListParams(""), {});
@@ -234,7 +260,6 @@ runTest("pessoal shell wires access, client selector, and functional tabs", () =
 runTest("client-scoped sections block requests without selected client", () => {
   for (const file of [
     "PessoalPayrollSection.tsx",
-    "PessoalObligationsSection.tsx",
     "PessoalTrackingSection.tsx",
     "PessoalPasswordsSection.tsx",
   ]) {
@@ -243,6 +268,16 @@ runTest("client-scoped sections block requests without selected client", () => {
     assert.match(source, /if \(!hasClient\)/);
     assert.match(source, /PessoalPlaceholderSection/);
   }
+
+  const obligations = readFileSync(
+    "src/modules/pessoal/components/PessoalObligationsSection.tsx",
+    "utf8",
+  );
+
+  assert.match(obligations, /Gerar todos/);
+  assert.match(obligations, /hasClient && obligationQuery\.isLoading/);
+  assert.match(obligations, /title="Obrigação individual"/);
+  assert.doesNotMatch(obligations, /if \(!hasClient\) \{\s*return/);
 });
 
 runTest("pessoal overview reads available dashboard data", () => {

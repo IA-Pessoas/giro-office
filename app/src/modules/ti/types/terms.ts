@@ -30,8 +30,6 @@ export interface TiTerm {
 
 export interface TiTermPayload {
   date?: string;
-  user_name?: string;
-  user_cpf?: string;
   user_id?: TiId | "";
   department_id?: TiId | "";
   address?: string;
@@ -41,6 +39,8 @@ export interface TiTermPayload {
   asset_code?: string;
   imei?: string;
 }
+
+export type TiTermUpdatePayload = Omit<TiTermPayload, "user_id">;
 
 export interface TiTermSignPayload {
   reason?: string;

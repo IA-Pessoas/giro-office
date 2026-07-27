@@ -1887,17 +1887,22 @@ model RhMessage {
 }
 
 model PasswordTecnologia {
-  id              String       @id @default(uuid())
-  local           String
-  user_id         String
-  password        String
-  notes           String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  organization_id String
-  organization    Organization @relation(fields: [organization_id], references: [id])
-  user            User         @relation(fields: [user_id], references: [id])
+  id                      String       @id @default(uuid())
+  local                   String
+  user_id                 String
+  password                String
+  notes                   String?
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+  organization_id         String
+  active                  Boolean      @default(true)
+  deactivated_at          DateTime?
+  deactivated_by_user_id  String?
+  deactivation_reason     String?
+  organization            Organization @relation(fields: [organization_id], references: [id])
+  user                    User         @relation(fields: [user_id], references: [id])
 
+  @@index([organization_id, active, local], map: "idx_tecnologia_passwords_org_active_local")
   @@map("tecnologia.passwords_users")
 }
 
