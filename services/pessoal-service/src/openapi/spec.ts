@@ -47,6 +47,14 @@ const mutationResponses = {
   "409": { description: "Conflict", ...errorJson },
 } as const;
 
+const deleteResponses = {
+  "200": { description: "OK", ...successJson },
+  "400": { description: "Bad request", ...errorJson },
+  "401": { description: "Unauthorized", ...errorJson },
+  "403": { description: "Forbidden", ...errorJson },
+  "404": { description: "Not found", ...errorJson },
+} as const;
+
 const readResponses = {
   "200": { description: "OK", ...successJson },
   "400": { description: "Bad request", ...errorJson },
@@ -581,6 +589,14 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           parameters: [idParam("id")],
           requestBody: jsonRequestBody(updateSituationRequestSchema),
           responses: mutationResponses,
+        },
+        delete: {
+          tags: ["Pessoal Situations"],
+          security: bearerSecurity,
+          summary: "Remover situacao",
+          operationId: "deletePessoalSituation",
+          parameters: [idParam("id")],
+          responses: deleteResponses,
         },
       },
       "/pessoal/unions": {

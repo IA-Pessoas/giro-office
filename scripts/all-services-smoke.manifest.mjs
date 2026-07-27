@@ -2352,6 +2352,14 @@ const baseManifest = [
   }),
   op({
     service: "pessoal-service",
+    method: "DELETE",
+    path: "/pessoal/situations/{id}",
+    action: "pessoalSituationDelete",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "pessoal-service",
     method: "GET",
     path: "/pessoal/unions",
     action: "pessoalUnionList",

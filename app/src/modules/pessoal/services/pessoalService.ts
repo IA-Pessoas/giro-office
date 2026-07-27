@@ -344,6 +344,13 @@ export const pessoalService = {
     return unwrapPessoalEnvelope<PessoalSituation>(response.data);
   },
 
+  async deleteSituation(id: string): Promise<PessoalSituation> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.delete(PESSOAL_ENDPOINTS.situationDetail(id));
+
+    return unwrapPessoalEnvelope<PessoalSituation>(response.data);
+  },
+
   async listPasswords(clientId: string): Promise<PessoalPasswordListItem[]> {
     const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
     const response = await api.get(PESSOAL_ENDPOINTS.passwords, {
