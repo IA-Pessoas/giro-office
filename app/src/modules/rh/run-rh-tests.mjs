@@ -20,3 +20,11 @@ runTest("assignable RH users are loaded from rh-service, not user-service", () =
   assert.doesNotMatch(hookSource, /@modules\/users/);
   assert.doesNotMatch(hookSource, /listAdminUsers/);
 });
+
+runTest("RH request form preserves validation errors returned by the API", () => {
+  const source = readFileSync("src/modules/rh/components/RhRequestFormModal.tsx", "utf8");
+
+  assert.match(source, /import \{ isAxiosError \} from "axios"/);
+  assert.match(source, /isAxiosError\(error\) \? error\.response\?\.data\?\.error : undefined/);
+  assert.match(source, /typeof responseMessage === "string"[\s\S]*?\? responseMessage/);
+});
