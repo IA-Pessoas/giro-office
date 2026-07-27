@@ -2011,3 +2011,12 @@ await runTest("ti automation metrics stay inside the robots tab for this PR", as
   assert.doesNotMatch(dashboardTypeSource, /robot_runs_failed\?: number/);
   assert.doesNotMatch(dashboardSource, /api\.(get|post|patch|put|delete)\(/);
 });
+
+await runTest("new TI request discloses required fields before submission", async () => {
+  const source = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(source, /RequiredFieldLabel/);
+  assert.match(source, /id="ti-request-title"[\s\S]*aria-required/);
+  assert.match(source, /value=\{requestDraft\.category_id\}[\s\S]*aria-required/);
+  assert.match(source, /<textarea[\s\S]*aria-required/);
+});

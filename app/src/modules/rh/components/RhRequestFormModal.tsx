@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { Dialog } from "@shared/components";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
 import { useCreateRhRequestMutation, useUpdateRhRequestMutation } from "../hooks/useRhRequests";
 import type {
@@ -193,22 +194,24 @@ export function RhRequestFormModal({
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300 md:col-span-2">
-          <span>Título</span>
+          <RequiredFieldLabel required>Título</RequiredFieldLabel>
           <input
             value={formState.title}
             onChange={(event) => handleChange("title", event.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             placeholder="Ex.: Solicitação de férias"
+            aria-required="true"
           />
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Categoria</span>
+          <RequiredFieldLabel required>Categoria</RequiredFieldLabel>
           <div className="relative">
             <select
               value={formState.category_id}
               onChange={(event) => handleChange("category_id", event.target.value)}
               className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              aria-required="true"
             >
               <option value="">Selecione</option>
               {categories.map((category) => (
@@ -223,12 +226,13 @@ export function RhRequestFormModal({
 
         {canManageRequests ? (
           <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <span>Responsável</span>
+            <RequiredFieldLabel required>Responsável</RequiredFieldLabel>
             <div className="relative">
               <select
                 value={formState.assigned_to_user_id}
                 onChange={(event) => handleChange("assigned_to_user_id", event.target.value)}
                 className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                aria-required="true"
               >
                 <option value="">Selecione</option>
                 {assignableUsers.map((user) => (
@@ -261,13 +265,14 @@ export function RhRequestFormModal({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300 md:col-span-2">
-          <span>Descrição</span>
+          <RequiredFieldLabel required>Descrição</RequiredFieldLabel>
           <textarea
             value={formState.description}
             onChange={(event) => handleChange("description", event.target.value)}
             rows={5}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             placeholder="Descreva o contexto da solicitação"
+            aria-required="true"
           />
         </label>
 

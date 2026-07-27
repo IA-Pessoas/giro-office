@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
 import { Dialog } from "@shared/components";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { useRequestRhPointAdjustmentMutation } from "../hooks/useRhPoint";
 import type { RhPointListItem } from "../types";
 
@@ -164,54 +165,59 @@ export function RhPointAdjustmentRequestModal({
     >
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Entrada</span>
+          <RequiredFieldLabel required>Entrada</RequiredFieldLabel>
           <input
             type="datetime-local"
             value={formState.clockIn}
             onChange={(event) => handleChange("clockIn", event.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            aria-required="true"
           />
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Saída almoço</span>
+          <RequiredFieldLabel required>Saída almoço</RequiredFieldLabel>
           <input
             type="datetime-local"
             value={formState.lunchOut}
             onChange={(event) => handleChange("lunchOut", event.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            aria-required="true"
           />
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Volta almoço</span>
+          <RequiredFieldLabel required>Volta almoço</RequiredFieldLabel>
           <input
             type="datetime-local"
             value={formState.lunchIn}
             onChange={(event) => handleChange("lunchIn", event.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            aria-required="true"
           />
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Saída</span>
+          <RequiredFieldLabel required>Saída</RequiredFieldLabel>
           <input
             type="datetime-local"
             value={formState.clockOut}
             onChange={(event) => handleChange("clockOut", event.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            aria-required="true"
           />
         </label>
       </div>
 
       <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-        <span>Justificativa</span>
+        <RequiredFieldLabel required>Justificativa</RequiredFieldLabel>
         <textarea
           value={formState.justification}
           onChange={(event) => handleChange("justification", event.target.value)}
           rows={4}
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           placeholder="Descreva o motivo do ajuste"
+          aria-required="true"
         />
       </label>
     </Dialog>
