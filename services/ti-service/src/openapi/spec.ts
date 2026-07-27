@@ -421,11 +421,9 @@ const schemas: Record<string, OpenApiSchema> = {
   },
   TiTermInput: {
     type: "object",
-    required: ["date", "user_name", "user_cpf"],
+    required: ["date", "user_id"],
     properties: {
       date: { type: "string", format: "date-time" },
-      user_name: { type: "string", minLength: 1 },
-      user_cpf: { type: "string", minLength: 1 },
       user_id: { type: "string", format: "uuid" },
       department_id: { type: "string", format: "uuid" },
       address: { type: "string" },
@@ -442,9 +440,6 @@ const schemas: Record<string, OpenApiSchema> = {
     minProperties: 1,
     properties: {
       date: { type: "string", format: "date-time" },
-      user_name: { type: "string", minLength: 1 },
-      user_cpf: { type: "string", minLength: 1 },
-      user_id: { type: "string", format: "uuid" },
       department_id: { type: "string", format: "uuid" },
       address: { type: "string" },
       reason: { type: "string" },

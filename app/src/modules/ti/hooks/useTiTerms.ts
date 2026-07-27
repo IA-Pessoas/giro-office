@@ -15,12 +15,13 @@ import type {
   TiTerm,
   TiTermPayload,
   TiTermSignPayload,
+  TiTermUpdatePayload,
 } from "../types";
 import { tiQueryKeys } from "./queryKeys";
 
 type TiTermUpdateVariables = {
   id: TiId;
-  payload: TiTermPayload;
+  payload: TiTermUpdatePayload;
 };
 
 type TiTermSignVariables = {

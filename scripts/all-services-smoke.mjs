@@ -1638,8 +1638,6 @@ const handlers = {
       headers: getTiAdminHeaders(),
       json: {
         date: new Date().toISOString(),
-        user_name: uniqueText("Smoke TI User"),
-        user_cpf: uniqueDigits(11),
         user_id: await ensureRhTargetUser(),
         reason: "Smoke TI term.",
       },
