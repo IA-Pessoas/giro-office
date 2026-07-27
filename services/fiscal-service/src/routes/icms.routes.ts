@@ -83,11 +83,22 @@ export function createIcmsRoutes(service: IcmsRouteDeps): ReturnType<typeof Rout
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const rawObj = { icmsCodes: req.query.icmsCodes };
+        const rawObj = {
+          icmsCodes: req.query.icmsCodes,
+          page: req.query.page,
+          page_size: req.query.page_size,
+        };
         const query = parseWithZod(listIcmsQuerySchema, rawObj);
         const auth = requireAuthenticatedRequestContext(req);
 
-        const result = await service.list(query.icmsCodes, auth.organization_id);
+        const result = await service.list(
+          {
+            icmsCodes: query.icmsCodes,
+            page: query.page,
+            page_size: query.page_size,
+          },
+          auth.organization_id,
+        );
 
         res.json(createSuccessResponse(result));
       } catch (err) {

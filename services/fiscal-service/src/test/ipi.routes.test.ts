@@ -33,12 +33,14 @@ function gatewayHeaders(): Record<string, string> {
   };
 }
 
+const emptyListResult = { data: [], total: 0, page: 1, limit: 50, hasMore: false };
+
 function createMockDeps(): IpiRouteDeps {
   return {
     create: vi.fn(async () => ({ create: {} })),
     update: vi.fn(async () => ({})),
     detail: vi.fn(async () => ({ detail: {} })),
-    list: vi.fn(async () => []),
+    list: vi.fn(async () => emptyListResult),
   };
 }
 
@@ -124,15 +126,52 @@ describe("ipi routes", () => {
 
   it("GET /fiscal/ipi/list com ipiCodes retorna 200", async () => {
     const deps = createMockDeps();
-    deps.list = vi.fn(async () => [{ id: IPI_ID }]);
+    deps.list = vi.fn(async () => ({
+      data: [{ id: IPI_ID }],
+      total: 1,
+      page: 2,
+      limit: 1,
+      hasMore: false,
+    }));
     const app = createFiscalApp({ env, logger, ipiRouteDeps: deps });
 
     const res = await request(app)
       .get("/fiscal/ipi/list")
-      .query({ ipiCodes: "84719012,84719013" })
+      .query({ ipiCodes: "8471,84719", page: "2", page_size: "1" })
       .set(gatewayHeaders());
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+    expect(deps.list).toHaveBeenCalledWith(
+      { ipiCodes: ["8471", "84719"], page: 2, page_size: 1 },
+      ORG_ID,
+    );
+  });
+
+  it("GET /fiscal/ipi/list sem termo retorna listagem paginada", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, ipiRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/fiscal/ipi/list")
+      .query({ page: "2", page_size: "25" })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(deps.list).toHaveBeenCalledWith({ ipiCodes: [], page: 2, page_size: 25 }, ORG_ID);
+  });
+
+  it("GET /fiscal/ipi/list com page_size acima do limite retorna 400", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, ipiRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/fiscal/ipi/list")
+      .query({ page_size: "101" })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(400);
+    expect(deps.list).not.toHaveBeenCalled();
   });
 });

@@ -7,6 +7,7 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
+import { getPaginationParams, type PaginationQuery } from "../schemas/pagination.schemas.js";
 
 export type NcmServicePrisma = typeof prismaClient;
 
@@ -50,6 +51,18 @@ export interface UpdateNcmRequest extends NcmAuthContext {
   information_source?: string;
   reference_legislation?: string;
   validity_end_date?: Date;
+}
+
+export interface ListNcmRequest extends PaginationQuery {
+  ncmCodes?: string[];
+}
+
+export interface NcmListResult {
+  data: unknown[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
 }
 
 const NCM_SELECT = {
@@ -190,18 +203,37 @@ export class NcmService {
     return { detail };
   }
 
-  async list(ncmCodes: string[], organizationId: string): Promise<unknown[]> {
-    if (!ncmCodes || ncmCodes.length === 0) {
-      return [];
-    }
+  async list(query: ListNcmRequest, organizationId: string): Promise<NcmListResult> {
+    const page = query.page ?? 1;
+    const { skip, take } = getPaginationParams(query);
+    const terms = query.ncmCodes?.map((code) => code.trim()).filter(Boolean) ?? [];
+    const where = {
+      organization_id: organizationId,
+      ...(terms.length > 0
+        ? {
+            OR: terms.map((code) => ({
+              ncm_code: { contains: code, mode: "insensitive" as const },
+            })),
+          }
+        : {}),
+    };
+    const [total, data] = await Promise.all([
+      this.prisma.ncm.count({ where }),
+      this.prisma.ncm.findMany({
+        where,
+        select: NCM_SELECT,
+        orderBy: { ncm_code: "asc" },
+        skip,
+        take,
+      }),
+    ]);
 
-    return this.prisma.ncm.findMany({
-      where: {
-        organization_id: organizationId,
-        ncm_code: { in: ncmCodes },
-      },
-      select: NCM_SELECT,
-      orderBy: { ncm_code: "asc" },
-    });
+    return {
+      data,
+      total,
+      page,
+      limit: take,
+      hasMore: page * take < total,
+    };
   }
 }

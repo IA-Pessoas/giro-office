@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, ArrowLeft, Landmark, Loader2, Plus, Search } from "lucide-react";
 
 import { useFiscalIcmsList } from "../hooks";
+import { FISCAL_LIST_PAGE_SIZE } from "../hooks/queryKeys";
 import type { FiscalIcms } from "../types";
 import {
   getFiscalErrorMessage,
@@ -9,6 +10,7 @@ import {
 } from "../utils";
 import { FiscalIcmsFormPanel } from "./FiscalIcmsFormPanel";
 import { FiscalStateBox } from "./FiscalStateBox";
+import { PaginationControls } from "@shared/components/ui/PaginationControls";
 
 type FiscalIcmsPanelIntent =
   | { mode: "create" }
@@ -20,27 +22,31 @@ const ACTION_BUTTON_CLASSNAME =
 
 export function FiscalIcmsSection() {
   const [filterValue, setFilterValue] = useState("");
-  const [submittedTerms, setSubmittedTerms] = useState<string[]>([]);
-  const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
-  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [searchTerms, setSearchTerms] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
   const [panelIntent, setPanelIntent] = useState<FiscalIcmsPanelIntent>(null);
 
-  const listQuery = useFiscalIcmsList(submittedTerms, hasSubmittedSearch);
+  const listQuery = useFiscalIcmsList({
+    icmsCodes: searchTerms,
+    page,
+    page_size: FISCAL_LIST_PAGE_SIZE,
+  });
   const errorMessage = listQuery.error ? getFiscalErrorMessage(listQuery.error) : null;
-  const submittedLabel = useMemo(() => submittedTerms.join(", "), [submittedTerms]);
+  const searchLabel = useMemo(() => searchTerms.join(", "), [searchTerms]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setSearchTerms(parseCommaSeparatedValues(filterValue));
+      setPage(1);
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [filterValue]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    const normalizedTerms = parseCommaSeparatedValues(filterValue);
-    if (normalizedTerms.length === 0) {
-      setValidationMessage("Informe ao menos uma descrição para buscar.");
-      return;
-    }
-
-    setValidationMessage(null);
-    setSubmittedTerms(normalizedTerms);
-    setHasSubmittedSearch(true);
+    setSearchTerms(parseCommaSeparatedValues(filterValue));
+    setPage(1);
   }
 
   if (panelIntent) {
@@ -74,11 +80,11 @@ export function FiscalIcmsSection() {
                 </p>
               </div>
 
-              {submittedTerms.length > 0 ? (
+              {searchTerms.length > 0 ? (
                 <div className="text-sm text-gray-500 dark:text-slate-400">
                   Busca atual:{" "}
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {submittedLabel}
+                    {searchLabel}
                   </span>
                 </div>
               ) : null}
@@ -89,7 +95,6 @@ export function FiscalIcmsSection() {
             <FiscalIcmsFormPanel
               mode={panelIntent.mode}
               icmsId={panelIntent.mode === "edit" ? panelIntent.icmsId : undefined}
-              searchDescriptions={submittedTerms}
               onClose={() => setPanelIntent(null)}
               showHeader={false}
               bare
@@ -139,46 +144,44 @@ export function FiscalIcmsSection() {
                 <input
                   type="text"
                   value={filterValue}
-                  onChange={(event) => {
-                    setFilterValue(event.target.value);
-                    if (validationMessage) {
-                      setValidationMessage(null);
-                    }
-                  }}
+                  onChange={(event) => setFilterValue(event.target.value)}
                   placeholder="Ex.: substituição tributária, bebidas frias"
                   className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-[13px] text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
                 />
               </div>
 
-              <button
-                type="submit"
-                className="inline-flex h-9 min-w-[88px] items-center justify-center rounded-lg bg-blue-600 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-              >
-                Buscar
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  className="inline-flex h-9 min-w-[88px] items-center justify-center rounded-lg bg-blue-600 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                >
+                  Buscar
+                </button>
+                {filterValue ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterValue("");
+                      setSearchTerms([]);
+                      setPage(1);
+                    }}
+                    className="inline-flex h-9 min-w-[72px] items-center justify-center rounded-lg border border-gray-300 px-3.5 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                  >
+                    Limpar
+                  </button>
+                ) : null}
+              </div>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              Use vírgulas para consultar mais de uma descrição cadastrada.
+              Digite parte da descricao ou use virgulas para consultar mais de um termo.
             </p>
           </div>
-
-          {validationMessage ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-              {validationMessage}
-            </div>
-          ) : null}
         </form>
       </div>
 
-      {!hasSubmittedSearch ? (
-        <FiscalStateBox icon={Search} title="Informe as descrições e clique em buscar" compact>
-          Use a consulta manual para listar apenas os registros de ICMS que fazem sentido neste momento.
-        </FiscalStateBox>
-      ) : null}
-
-      {hasSubmittedSearch && listQuery.isLoading && !listQuery.data ? (
+      {listQuery.isLoading && !listQuery.data ? (
         <FiscalStateBox icon={Loader2} tone="loading" title="Buscando ICMS" compact>
-          Estamos consultando os registros para as descrições informadas.
+          Estamos consultando os registros fiscais.
         </FiscalStateBox>
       ) : null}
 
@@ -193,12 +196,12 @@ export function FiscalIcmsSection() {
           <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                {listQuery.data.length === 1
+                {listQuery.data.data.length === 1
                   ? "1 registro encontrado"
-                  : `${listQuery.data.length} registros encontrados`}
+                  : `${listQuery.data.total} registros encontrados`}
               </p>
               <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
-                Busca atual: {submittedLabel}
+                Busca atual: {searchTerms.length > 0 ? searchLabel : "Listagem geral"}
               </p>
             </div>
 
@@ -216,9 +219,9 @@ export function FiscalIcmsSection() {
             </FiscalStateBox>
           ) : null}
 
-          {listQuery.data.length > 0 ? (
+          {listQuery.data.data.length > 0 ? (
             <FiscalIcmsTable
-              items={listQuery.data}
+              items={listQuery.data.data}
               onEdit={(item) => setPanelIntent({ mode: "edit", icmsId: item.id })}
             />
           ) : (
@@ -226,6 +229,17 @@ export function FiscalIcmsSection() {
               Não localizamos registros para as descrições informadas. Revise os termos da busca e tente novamente.
             </FiscalStateBox>
           )}
+
+          <PaginationControls
+            page={listQuery.data.page}
+            limit={listQuery.data.limit}
+            total={listQuery.data.total}
+            count={listQuery.data.data.length}
+            hasMore={listQuery.data.hasMore}
+            isFetching={listQuery.isFetching}
+            onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+            onNext={() => setPage((currentPage) => currentPage + 1)}
+          />
         </div>
       ) : null}
     </section>

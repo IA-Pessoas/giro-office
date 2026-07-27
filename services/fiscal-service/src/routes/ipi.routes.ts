@@ -83,11 +83,22 @@ export function createIpiRoutes(service: IpiRouteDeps): ReturnType<typeof Router
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const rawObj = { ipiCodes: req.query.ipiCodes };
+        const rawObj = {
+          ipiCodes: req.query.ipiCodes,
+          page: req.query.page,
+          page_size: req.query.page_size,
+        };
         const query = parseWithZod(listIpiQuerySchema, rawObj);
         const auth = requireAuthenticatedRequestContext(req);
 
-        const result = await service.list(query.ipiCodes, auth.organization_id);
+        const result = await service.list(
+          {
+            ipiCodes: query.ipiCodes,
+            page: query.page,
+            page_size: query.page_size,
+          },
+          auth.organization_id,
+        );
 
         res.json(createSuccessResponse(result));
       } catch (err) {
