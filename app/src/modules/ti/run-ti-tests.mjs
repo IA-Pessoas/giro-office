@@ -156,6 +156,43 @@ await runTest("issue 509 ti robot form utilities preserve validation and payload
   assert.doesNotMatch(payloadTypeSource, /type\?: TiRobotType \| string/);
 });
 
+await runTest("issue 509 ti robot dialog exposes accessible required field errors", async () => {
+  const tabSource = await readModuleSource("components/TiRobotsTab.tsx");
+
+  assert.match(tabSource, /useEffect/);
+  assert.match(tabSource, /useRef/);
+  assert.match(tabSource, /type: ""/);
+  assert.match(
+    tabSource,
+    /\{\s*value: "",\s*label: "Selecione o tipo",\s*disabled: true\s*\}/,
+  );
+  assert.match(tabSource, /validateRobotDraft\(robotDraft\)/);
+  assert.match(tabSource, /getFirstInvalidRobotField\(nextFieldErrors\)/);
+  assert.match(tabSource, /buildCreateRobotPayload\(robotDraft\)/);
+  assert.match(tabSource, /buildUpdateRobotPayload\(robotDraft\)/);
+  assert.match(tabSource, /getRobotMutationErrorMessage\(error\)/);
+  assert.match(tabSource, /robotFormRef\.current\?\.elements\.namedItem\(focusField\)/);
+  assert.match(tabSource, /control\.focus\(\)/);
+  assert.match(tabSource, /setFocusField\(null\)/);
+  assert.match(tabSource, /ref=\{robotFormRef\}/);
+  assert.match(tabSource, /noValidate/);
+  assert.match(tabSource, /id="ti-robot-name"/);
+  assert.match(tabSource, /name="name"/);
+  assert.match(tabSource, /id="ti-robot-type"/);
+  assert.match(tabSource, /name="type"/);
+  assert.match(tabSource, /htmlFor="ti-robot-type"/);
+  assert.match(tabSource, /required/);
+  assert.match(tabSource, /aria-invalid=\{Boolean\(fieldErrors\.name\)\}/);
+  assert.match(tabSource, /aria-invalid=\{Boolean\(fieldErrors\.type\)\}/);
+  assert.match(tabSource, /aria-describedby=\{fieldErrors\.name/);
+  assert.match(tabSource, /aria-describedby=\{fieldErrors\.type/);
+  assert.match(tabSource, /id="ti-robot-name-error"/);
+  assert.match(tabSource, /id="ti-robot-type-error"/);
+  assert.match(tabSource, /role="alert"/);
+  assert.match(tabSource, /clearRobotFieldError\("name"\)/);
+  assert.match(tabSource, /clearRobotFieldError\("type"\)/);
+});
+
 await runTest("ti endpoints stay centralized in the frontend contract", async () => {
   const contractSource = await readModuleSource("services/tiService.contract.ts");
 
@@ -1457,8 +1494,9 @@ await runTest("ti robots tab exposes operational list detail forms and run actio
   assert.match(tabSource, /TiNativeSelect/);
   assert.match(tabSource, /ROBOT_TYPE_OPTIONS/);
   assert.match(tabSource, /ROBOT_ACTIVE_FILTER_OPTIONS/);
-  assert.match(tabSource, /type: draft\.type/);
-  assert.match(tabSource, /active: draft\.active/);
+  assert.match(tabSource, /buildCreateRobotPayload\(robotDraft\)/);
+  assert.match(tabSource, /buildUpdateRobotPayload\(robotDraft\)/);
+  assert.doesNotMatch(tabSource, /function buildRobotPayload/);
   assert.match(tabSource, /message: draft\.message\.trim\(\)/);
   assert.match(tabSource, /Tempo gasto/);
   assert.match(tabSource, /placeholder="12 min ou 00:12:00"/);
