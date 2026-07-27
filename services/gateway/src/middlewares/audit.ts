@@ -18,7 +18,7 @@ interface BuildAuditLifecycleMiddlewareOptions {
   recordAuditRequest: AuditRecorder;
 }
 
-const TI_PASSWORD_DEACTIVATION_PATH = /^\/ti\/passwords\/[^/]+\/deactivate$/;
+const TI_PASSWORD_DEACTIVATION_PATH = /^\/ti\/passwords\/[^/]+\/deactivate\/?$/i;
 const TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS = new Set(["password", "reason"]);
 
 function getResponseSizeBytes(response: Response): number | undefined {
