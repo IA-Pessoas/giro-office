@@ -426,6 +426,47 @@ await runTest("ti password contracts separate list data from explicit reveal det
   assert.match(hookSource, /enabled:\s*Boolean\(id\)\s*&&\s*Boolean\(canReveal\)/);
 });
 
+await runTest("ti password deactivation exposes typed lifecycle contract", async () => {
+  const typesSource = await readModuleSource("types/passwords.ts");
+
+  assert.match(typesSource, /export type TiPasswordStatusFilter = "active" \| "inactive" \| "all"/);
+  assert.match(typesSource, /export type TiPasswordListFilters = TiListFilters &/);
+  assert.match(typesSource, /active: boolean/);
+  assert.match(typesSource, /deactivated_at\?: string \| null/);
+  assert.match(typesSource, /deactivated_by_user_id\?: TiId \| null/);
+  assert.match(typesSource, /deactivation_reason\?: string \| null/);
+  assert.match(typesSource, /export interface TiPasswordDeactivatePayload/);
+  assert.match(typesSource, /reason: string/);
+});
+
+await runTest("ti password deactivation uses the centralized endpoint and safe payload", async () => {
+  const contractSource = await readModuleSource("services/tiService.contract.ts");
+  const serviceSource = await readModuleSource("services/tiPasswordsService.ts");
+
+  assert.match(contractSource, /deactivate: "\/ti\/passwords\/\{id\}\/deactivate"/);
+  assert.match(serviceSource, /async deactivatePassword\(/);
+  assert.match(
+    serviceSource,
+    /api\.post<TiEnvelope<TiPasswordListItem>>\(\s*buildTiPath\(TI_ENDPOINTS\.passwords\.deactivate, id\),\s*payload/,
+  );
+  assert.doesNotMatch(serviceSource, /deactivatePassword[\s\S]*setQueryData/);
+});
+
+await runTest("ti password deactivation mutation evicts detail and invalidates lists", async () => {
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+
+  assert.match(hookSource, /export function useDeactivateTiPasswordMutation/);
+  assert.match(
+    hookSource,
+    /queryClient\.removeQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.detail\(variables\.id\),\s*exact: true,?\s*\}\)/,
+  );
+  assert.match(
+    hookSource,
+    /queryClient\.invalidateQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.all\(\),?\s*\}\)/,
+  );
+  assert.doesNotMatch(hookSource, /setQueryData\(\s*tiQueryKeys\.passwords\.detail/);
+});
+
 await runTest("ti sensitive clipboard helper copies the exact value", async () => {
   const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
   const writes = [];

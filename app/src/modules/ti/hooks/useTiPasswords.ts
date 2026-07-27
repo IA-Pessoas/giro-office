@@ -10,10 +10,11 @@ import { useFetch } from "@shared/hooks";
 import { tiPasswordsService } from "../services";
 import type {
   TiId,
-  TiListFilters,
   TiListResponse,
   TiPasswordCreatePayload,
+  TiPasswordDeactivatePayload,
   TiPasswordDetail,
+  TiPasswordListFilters,
   TiPasswordListItem,
   TiPasswordUpdatePayload,
   TiReadQueryOptions,
@@ -25,8 +26,13 @@ type TiPasswordMutationVariables = {
   payload: TiPasswordUpdatePayload;
 };
 
+export type TiPasswordDeactivateVariables = {
+  id: TiId;
+  payload: TiPasswordDeactivatePayload;
+};
+
 export function useTiPasswords(
-  filters?: TiListFilters,
+  filters?: TiPasswordListFilters,
   options?: TiReadQueryOptions,
 ): UseQueryResult<TiListResponse<TiPasswordListItem>, Error> {
   return useFetch(
@@ -99,6 +105,25 @@ export function useUpdateTiPasswordMutation(): UseMutationResult<
         queryClient.invalidateQueries({ queryKey: tiQueryKeys.passwords.all() }),
         queryClient.invalidateQueries({ queryKey: tiQueryKeys.passwords.detail(variables.id) }),
       ]);
+    },
+  });
+}
+
+export function useDeactivateTiPasswordMutation(): UseMutationResult<
+  TiPasswordListItem,
+  Error,
+  TiPasswordDeactivateVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => tiPasswordsService.deactivatePassword(id, payload),
+    onSuccess: async (_password, variables) => {
+      queryClient.removeQueries({
+        queryKey: tiQueryKeys.passwords.detail(variables.id),
+        exact: true,
+      });
+      await queryClient.invalidateQueries({ queryKey: tiQueryKeys.passwords.all() });
     },
   });
 }
