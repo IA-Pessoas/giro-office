@@ -18,7 +18,7 @@ type FiscalIcmsPanelIntent =
 const ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 min-w-[88px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
 
-export function FiscalIcmsSection() {
+export function FiscalIcmsSection({ canEdit }: { canEdit: boolean }) {
   const [filterValue, setFilterValue] = useState("");
   const [submittedTerms, setSubmittedTerms] = useState<string[]>([]);
   const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
@@ -43,7 +43,7 @@ export function FiscalIcmsSection() {
     setHasSubmittedSearch(true);
   }
 
-  if (panelIntent) {
+  if (panelIntent && canEdit) {
     return (
       <section className="space-y-4">
         <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
@@ -118,14 +118,16 @@ export function FiscalIcmsSection() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setPanelIntent({ mode: "create" })}
-            className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-          >
-            <Plus className="h-4 w-4" />
-            Novo ICMS
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => setPanelIntent({ mode: "create" })}
+              className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            >
+              <Plus className="h-4 w-4" />
+              Novo ICMS
+            </button>
+          ) : null}
         </div>
 
         <form className="mt-3 space-y-2.5" onSubmit={handleSubmit}>
@@ -219,7 +221,7 @@ export function FiscalIcmsSection() {
           {listQuery.data.length > 0 ? (
             <FiscalIcmsTable
               items={listQuery.data}
-              onEdit={(item) => setPanelIntent({ mode: "edit", icmsId: item.id })}
+              onEdit={canEdit ? (item) => setPanelIntent({ mode: "edit", icmsId: item.id }) : undefined}
             />
           ) : (
             <FiscalStateBox icon={Landmark} title="Nenhum ICMS encontrado" compact>
@@ -237,7 +239,7 @@ function FiscalIcmsTable({
   onEdit,
 }: {
   items: FiscalIcms[];
-  onEdit: (item: FiscalIcms) => void;
+  onEdit?: (item: FiscalIcms) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
@@ -268,9 +270,11 @@ function FiscalIcmsTable({
               <th className="w-[8%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
                 MVA original
               </th>
-              <th className="w-[8%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-                Ações
-              </th>
+              {onEdit ? (
+                <th className="w-[8%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+                  Ações
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
@@ -300,17 +304,19 @@ function FiscalIcmsTable({
                 <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
                   {item.original_mva ?? "—"}
                 </td>
-                <td className="px-5 py-3">
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => onEdit(item)}
-                      className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
-                    >
-                      Editar
-                    </button>
-                  </div>
-                </td>
+                {onEdit ? (
+                  <td className="px-5 py-3">
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => onEdit(item)}
+                        className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
+                      >
+                        Editar
+                      </button>
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
