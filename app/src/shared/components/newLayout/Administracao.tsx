@@ -135,6 +135,9 @@ export function Administracao() {
   const [permissionSnapshot, setPermissionSnapshot] = useState<Readonly<PermissionDraft> | null>(
     null,
   );
+  const [permissionBaseline, setPermissionBaseline] = useState<
+    Readonly<Record<string, unknown>> | null
+  >(null);
   const [permissionExtraKeys, setPermissionExtraKeys] = useState<string[]>([]);
   const [loadedPermissionUserId, setLoadedPermissionUserId] = useState<string | null>(null);
   const [permissionSaveError, setPermissionSaveError] = useState<string | null>(null);
@@ -274,10 +277,12 @@ export function Administracao() {
         selectedPermissionDepartmentModule,
         normalizedPermissionDraft,
         selectedPermissionUser,
+        permissionBaseline ?? undefined,
       )
     );
   }, [
     normalizedPermissionDraft,
+    permissionBaseline,
     permissionSnapshot,
     selectedPermissionDepartmentModule,
     selectedPermissionUser,
@@ -421,6 +426,7 @@ export function Administracao() {
     if (!selectedPermissionUserId) {
       setPermissionDraft(normalizePermissionDraft({}));
       setPermissionSnapshot(null);
+      setPermissionBaseline(null);
       setPermissionExtraKeys([]);
       setLoadedPermissionUserId(null);
       setPermissionSaveError(null);
@@ -430,6 +436,7 @@ export function Administracao() {
     if (selectedPermissionUserId !== loadedPermissionUserId) {
       setPermissionDraft(normalizePermissionDraft({}));
       setPermissionSnapshot(null);
+      setPermissionBaseline(null);
       setPermissionExtraKeys([]);
       setPermissionSaveError(null);
     }
@@ -477,6 +484,7 @@ export function Administracao() {
 
     setPermissionDraft(nextDraft);
     setPermissionSnapshot(freezePermissionSnapshot(nextDraft));
+    setPermissionBaseline(permissionQuery.data.raw);
     setPermissionExtraKeys(nextExtraKeys);
     setLoadedPermissionUserId(permissionQuery.data.userId);
     setPermissionSaveError(null);
@@ -597,6 +605,7 @@ export function Administracao() {
 
       setPermissionDraft(nextDraft);
       setPermissionSnapshot(freezePermissionSnapshot(nextDraft));
+      setPermissionBaseline(raw);
       setPermissionExtraKeys(nextExtraKeys);
       setLoadedPermissionUserId(selectedPermissionUserId);
       setPermissionSaveError(null);

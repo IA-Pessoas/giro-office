@@ -134,6 +134,56 @@ runTest("normalized legacy permissions do not become dirty solely on load", () =
   assert.equal(arePermissionDraftsEqual(draft, snapshot), true);
 });
 
+runTest("legacy minimum normalization does not request RH or Technology department sync", () => {
+  for (const moduleKey of ["rh", "ti"]) {
+    const rawPermissions = {
+      [moduleKey]: null,
+    };
+    const response = normalizePermissionResponse(rawPermissions);
+    const draft = normalizePermissionDraft({
+      ...response.known,
+      ...response.extras,
+    });
+    const snapshot = freezePermissionSnapshot(draft);
+
+    const isDirty =
+      !arePermissionDraftsEqual(draft, snapshot) ||
+      needsDepartmentPermissionSync(
+        moduleKey,
+        draft,
+        { permission: -1, type: "user" },
+        rawPermissions,
+      );
+
+    assert.equal(isDirty, false);
+  }
+});
+
+runTest("persisted Viewer still detects stale RH or Technology department sync", () => {
+  for (const moduleKey of ["rh", "ti"]) {
+    const rawPermissions = {
+      [moduleKey]: 0,
+    };
+    const response = normalizePermissionResponse(rawPermissions);
+    const draft = normalizePermissionDraft({
+      ...response.known,
+      ...response.extras,
+    });
+    const snapshot = freezePermissionSnapshot(draft);
+
+    const isDirty =
+      !arePermissionDraftsEqual(draft, snapshot) ||
+      needsDepartmentPermissionSync(
+        moduleKey,
+        draft,
+        { permission: -1, type: "user" },
+        rawPermissions,
+      );
+
+    assert.equal(isDirty, true);
+  }
+});
+
 runTest("permission update payload enforces only RH and Technology minimums", () => {
   const payload = buildPermissionUpdatePayload({
     rh: null,
@@ -447,6 +497,10 @@ runTest("department module remains editable in permissions tab", () => {
   );
   assert.match(administracaoSource, /buildDepartmentPermissionSyncPayload/);
   assert.match(administracaoSource, /needsDepartmentPermissionSync/);
+  assert.match(
+    administracaoSource,
+    /needsDepartmentPermissionSync\(\s*selectedPermissionDepartmentModule,\s*normalizedPermissionDraft,\s*selectedPermissionUser,\s*permissionBaseline \?\? undefined,/s,
+  );
   assert.match(administracaoSource, /userService\.update\(\s*selectedPermissionUserId/s);
   assert.doesNotMatch(
     administracaoSource,
