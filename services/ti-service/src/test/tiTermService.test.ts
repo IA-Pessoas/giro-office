@@ -100,7 +100,13 @@ describe("TiTermService", () => {
   it("creates term for organization", async () => {
     const prisma = {
       user: {
-        findFirst: vi.fn(async () => ({ id: userId, organization_id: organizationId })),
+        findFirst: vi.fn(async () => ({
+          id: userId,
+          name: "Maria Silva",
+          full_name: "Maria Silva",
+          cpf: "12345678900",
+          organization_id: organizationId,
+        })),
       },
       department: {
         findFirst: vi.fn(async () => ({ id: departmentId, organization_id: organizationId })),
@@ -114,8 +120,6 @@ describe("TiTermService", () => {
     const result = await service.create(context, {
       date: "2026-05-19",
       user_id: userId,
-      user_name: "Maria Silva",
-      user_cpf: "12345678900",
       department_id: departmentId,
       asset_code: "NB-001",
     });
@@ -129,6 +133,74 @@ describe("TiTermService", () => {
       asset_code: "NB-001",
       organization_id: organizationId,
     });
+  });
+
+  it("normalizes term user identity from linked user on create", async () => {
+    const prisma = {
+      user: {
+        findFirst: vi.fn(async () => ({
+          id: userId,
+          name: "Maria Login",
+          full_name: "Maria Silva",
+          cpf: "12345678900",
+          organization_id: organizationId,
+        })),
+      },
+      termTecnologia: {
+        create: vi.fn(async ({ data }) => ({ id: termId, ...data })),
+      },
+    };
+    const service = new TiTermService(prisma as never);
+
+    const created = (await service.create(context, {
+      date: "2026-05-19",
+      user_id: userId,
+    })) as Record<string, unknown>;
+
+    expect(prisma.termTecnologia.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          user_id: userId,
+          user_name: "Maria Silva",
+          user_cpf: "12345678900",
+        }),
+      }),
+    );
+    expect(created.user_name).toBe("Maria Silva");
+  });
+
+  it("normalizes legacy linked users without CPF to an empty stored CPF", async () => {
+    const prisma = {
+      user: {
+        findFirst: vi.fn(async () => ({
+          id: userId,
+          name: "Maria Silva",
+          full_name: "Maria Silva",
+          cpf: null,
+          organization_id: organizationId,
+        })),
+      },
+      termTecnologia: {
+        create: vi.fn(async ({ data }) => ({ id: termId, ...data })),
+      },
+    };
+    const service = new TiTermService(prisma as never);
+
+    const created = (await service.create(context, {
+      date: "2026-05-19",
+      user_id: userId,
+    })) as Record<string, unknown>;
+
+    expect(created.user_cpf).toBe("");
+    expect(prisma.termTecnologia.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          user_id: userId,
+          user_name: "Maria Silva",
+          user_cpf: "",
+        }),
+      }),
+    );
   });
 
   it("signs term with default reason", async () => {
