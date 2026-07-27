@@ -2033,6 +2033,71 @@ it("records ti-service route targets when audit is enabled", async () => {
   }
 });
 
+it("records TI password deactivation as complementary metadata-only audit", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const auditService = await startAuditIngestServer();
+  const upstream = createServer(async (request, response) => {
+    await readJsonBody(request);
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { active: false } }));
+  });
+  const tiServiceUrl = await startServer(upstream);
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      tiServiceUrl,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(
+      `${gatewayUrl}/ti/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/deactivate`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ reason: "Contains private administrative context" }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await waitForRecords(auditService.records, 1);
+
+    expect(auditService.records[0]).toMatchObject({
+      organizationId: "org-1",
+      userId: "user-1",
+      method: "POST",
+      outcome: "success",
+      action: "inativou",
+      referring: "uma credencial de TI",
+      metadata: {
+        routeTarget: "ti-service",
+        activityVisible: true,
+      },
+    });
+    expect(auditService.records[0]?.createdAt).toEqual(expect.any(String));
+    expect(auditService.records[0]?.finishedAt).toEqual(expect.any(String));
+    expect(JSON.stringify(auditService.records[0])).not.toContain(
+      "Contains private administrative context",
+    );
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+    await stopServer(auditService.server);
+  }
+});
+
 it("records certificate-service route targets when audit is enabled", async () => {
   const token = createToken({
     user_id: "user-1",

@@ -176,6 +176,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "assinou", item: "uma folha de ponto" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/ti\/passwords\/[^/]+\/deactivate$/,
+    description: { action: "inativou", item: "uma credencial de TI" },
+  },
+  {
     methods: ["POST", "PATCH"],
     pattern: /^\/ti\/inventory\/[^/]+\/assign-user$/,
     description: { action: "atribuiu", item: "um item de inventário" },
