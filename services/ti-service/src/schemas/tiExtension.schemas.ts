@@ -1,7 +1,10 @@
-import { zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
 import { paginationQuerySchema } from "./pagination.schemas.js";
+
+const tiExtensionNumberSchema = z.string().regex(/^[0-9]{4}$/, {
+  message: "number deve conter exatamente 4 dígitos.",
+});
 
 export const tiExtensionIdParamsSchema = z
   .object({
@@ -20,7 +23,7 @@ export const listTiExtensionsQuerySchema = paginationQuerySchema
 export const createTiExtensionBodySchema = z
   .object({
     user_id: z.string().uuid({ message: "Usuario invalido." }),
-    number: zNonEmptyText("number"),
+    number: tiExtensionNumberSchema,
   })
   .strict();
 

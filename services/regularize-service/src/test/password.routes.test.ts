@@ -1,5 +1,6 @@
 import "./envBootstrap.js";
 
+import { FORWARDED_AUTH_PERMISSION_HEADER } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
@@ -112,5 +113,76 @@ describe("regularize password routes", () => {
     );
     expect(JSON.stringify(response.body)).not.toContain("legacy-login");
     expect(JSON.stringify(response.body)).not.toContain("legacy-password");
+  });
+
+  it("GET /regularize/sites-pass-detail rejects users without reveal permission", async () => {
+    const prisma = {
+      sitePasswordsRegularize: {
+        findFirst: vi.fn(),
+      },
+    } as unknown as PrismaClient;
+    const app = createTestApp(prisma);
+
+    const response = await request(app)
+      .get("/regularize/sites-pass-detail")
+      .set(gatewayHeaders({ permission: 1 }))
+      .query({ id: "e0000000-0000-4000-8000-000000000001" });
+
+    expect(response.status).toBe(403);
+    expect(prisma.sitePasswordsRegularize.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("GET /regularize/sites-pass-detail rejects malformed forwarded permission", async () => {
+    const prisma = {
+      sitePasswordsRegularize: {
+        findFirst: vi.fn(),
+      },
+    } as unknown as PrismaClient;
+    const app = createTestApp(prisma);
+
+    const response = await request(app)
+      .get("/regularize/sites-pass-detail")
+      .set(gatewayHeaders())
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "2abc")
+      .query({ id: "e0000000-0000-4000-8000-000000000001" });
+
+    expect(response.status).toBe(403);
+    expect(prisma.sitePasswordsRegularize.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("GET /regularize/sites-pass-detail reveals a site password for authorized users", async () => {
+    const prisma = {
+      sitePasswordsRegularize: {
+        findFirst: vi.fn(async ({ where }) => ({
+          id: where.id,
+          organization_id: where.organization_id,
+          name: "Gov",
+          sphere: "Federal",
+          link: "https://gov.example",
+          user: "login",
+          password: "secret",
+          status: true,
+        })),
+      },
+    } as unknown as PrismaClient;
+    const app = createTestApp(prisma);
+
+    const response = await request(app)
+      .get("/regularize/sites-pass-detail")
+      .set(gatewayHeaders({ permission: 2 }))
+      .query({ id: "e0000000-0000-4000-8000-000000000001" });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.user).toBe("login");
+    expect(response.body.data.password).toBe("secret");
+    expect(prisma.sitePasswordsRegularize.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "e0000000-0000-4000-8000-000000000001",
+          organization_id: "a0000000-0000-4000-8000-000000000001",
+        },
+      }),
+    );
   });
 });

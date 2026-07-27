@@ -1,4 +1,10 @@
-import type { TiId, TiStatus } from "./common";
+import type { TiId, TiListFilters, TiStatus } from "./common";
+
+export type TiPasswordStatusFilter = "active" | "inactive" | "all";
+
+export type TiPasswordListFilters = TiListFilters & {
+  status?: TiPasswordStatusFilter;
+};
 
 export interface TiPasswordUser {
   id?: TiId;
@@ -15,6 +21,10 @@ export interface TiPasswordListItem {
   user_id?: TiId | null;
   notes?: string | null;
   status?: TiStatus | boolean;
+  active: boolean;
+  deactivated_at?: string | null;
+  deactivated_by_user_id?: TiId | null;
+  deactivation_reason?: string | null;
   user?: TiPasswordUser | null;
   created_at?: string;
   updated_at?: string;
@@ -39,4 +49,8 @@ export interface TiPasswordUpdatePayload {
   user_id?: TiId;
   password?: string;
   notes?: string;
+}
+
+export interface TiPasswordDeactivatePayload {
+  reason: string;
 }

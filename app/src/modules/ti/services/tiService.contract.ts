@@ -36,6 +36,7 @@ export const TI_ENDPOINTS = {
     list: "/ti/passwords/list",
     base: "/ti/passwords",
     detail: "/ti/passwords/{id}",
+    deactivate: "/ti/passwords/{id}/deactivate",
   },
   extensions: {
     list: "/ti/extensions/list",
@@ -110,15 +111,25 @@ export function unwrapTiEnvelope<TPayload>(body: TiEnvelope<TPayload>): TPayload
 export function unwrapTiList<TItem>(
   body: TiEnvelope<TItem[] | TiListResponse<TItem>>,
 ): TItem[] {
+  return unwrapTiListResponse<TItem>(body).items;
+}
+
+export function unwrapTiListResponse<TItem>(
+  body: TiEnvelope<TItem[] | TiListResponse<TItem>>,
+): TiListResponse<TItem> {
   const payload = unwrapTiEnvelope<TItem[] | TiListResponse<TItem>>(body);
 
   if (Array.isArray(payload)) {
-    return payload;
+    return { items: payload, total: payload.length };
   }
 
   if (isRecord(payload) && Array.isArray(payload.items)) {
-    return payload.items as TItem[];
+    return {
+      ...payload,
+      items: payload.items as TItem[],
+      total: typeof payload.total === "number" ? payload.total : payload.items.length,
+    };
   }
 
-  return [];
+  return { items: [], total: 0 };
 }

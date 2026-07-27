@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
+import { useAssignableUsers } from "@modules/rh";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
@@ -17,7 +18,7 @@ import {
   useTiTerms,
   useUpdateTiTermMutation,
 } from "../hooks";
-import type { TiId, TiInventoryAsset, TiTerm } from "../types";
+import type { TiId, TiInventoryAsset, TiTerm, TiTermUpdatePayload } from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -257,6 +258,7 @@ export function TiTermsTab() {
     { status: "available", page_size: 100 },
     { enabled: canManage },
   );
+  const assignableUsersQuery = useAssignableUsers({ enabled: canManage });
   const departmentsQuery = useFetch<DepItem[]>(
     ["ti-terms", "departments"],
     () => departmentService.list(),
@@ -266,6 +268,7 @@ export function TiTermsTab() {
   const createTermMutation = useCreateTiTermMutation();
   const updateTermMutation = useUpdateTiTermMutation();
   const signTermMutation = useSignTiTermMutation();
+  const assignableUsers = assignableUsersQuery.data ?? [];
 
   const assetsById = useMemo(
     () => new Map((assetsQuery.data ?? []).map((asset) => [String(asset.id), asset])),
@@ -318,6 +321,17 @@ export function TiTermsTab() {
     [departmentsQuery.data],
   );
 
+  const assignableUserOptions = useMemo(
+    () => [
+      { value: "", label: "Selecione" },
+      ...assignableUsers.map((user) => ({
+        value: user.id,
+        label: user.departmentName ? `${user.name} - ${user.departmentName}` : user.name,
+      })),
+    ],
+    [assignableUsers],
+  );
+
   const filteredTerms = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     const selectedAsset = assetsById.get(String(assetId));
@@ -348,6 +362,7 @@ export function TiTermsTab() {
     (term) => String(term.id) === String(selectedTermId),
   );
   const selectedTerm = selectedTermQuery.data ?? selectedListTerm;
+  const isEditingTerm = dialogState?.type === "term" && dialogState.mode === "edit";
 
   function getDepartmentName(id: unknown): string {
     return getText(departmentsById.get(String(id))?.name);
@@ -402,11 +417,9 @@ export function TiTermsTab() {
     const selectedAssetId = getFormText(formData, "selected_asset_id");
     const selectedAsset = assetsById.get(String(selectedAssetId));
     const selectedAssetCode = getAssetCode(selectedAsset);
-    const payload = compactPayload({
+    const selectedUserId = getFormText(formData, "user_id");
+    const payload: TiTermUpdatePayload = compactPayload({
       date: getFormText(formData, "date"),
-      user_name: getFormText(formData, "user_name"),
-      user_cpf: getFormText(formData, "user_cpf"),
-      user_id: getFormText(formData, "user_id"),
       department_id: getFormText(formData, "department_id"),
       address: getFormText(formData, "address"),
       reason: getFormText(formData, "reason"),
@@ -431,10 +444,13 @@ export function TiTermsTab() {
     try {
       setDialogError(null);
 
-      if (dialogState.mode === "edit") {
+      if (isEditingTerm) {
         await updateTermMutation.mutateAsync({ id: dialogState.term.id, payload });
       } else {
-        const createdTerm = await createTermMutation.mutateAsync(payload);
+        const createdTerm = await createTermMutation.mutateAsync({
+          ...payload,
+          user_id: selectedUserId,
+        });
         setSelectedTermId(createdTerm.id);
         setIsDetailDialogOpen(true);
       }
@@ -676,23 +692,33 @@ export function TiTermsTab() {
         <form className="space-y-3" onSubmit={handleSubmitTerm}>
           {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
           <div className="grid gap-3 md:grid-cols-2">
-            <TiTextField
-              label="Nome do usuário"
-              name="user_name"
-              required
-              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.user_name, "") : ""}
-            />
-            <TiTextField
-              label="CPF do usuário"
-              name="user_cpf"
-              required
-              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.user_cpf, "") : ""}
-            />
-            <TiTextField
-              label="ID do usuário"
-              name="user_id"
-              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.user_id, "") : ""}
-            />
+            {isEditingTerm ? (
+              <>
+                <TiTextField
+                  label="Nome do usuário"
+                  value={getText(dialogState.term.user_name, "")}
+                  readOnly
+                />
+                <TiTextField
+                  label="CPF do usuário"
+                  value={getText(dialogState.term.user_cpf, "")}
+                  readOnly
+                />
+                <TiTextField
+                  label="ID do usuário"
+                  value={getText(dialogState.term.user_id, "")}
+                  readOnly
+                />
+              </>
+            ) : (
+              <TiNativeSelect
+                label="Usuário"
+                name="user_id"
+                required
+                disabled={assignableUsersQuery.isLoading}
+                options={assignableUserOptions}
+              />
+            )}
             <TiNativeSelect
               label="Departamento"
               name="department_id"

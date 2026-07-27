@@ -60,6 +60,12 @@ describe("activityCatalog", () => {
       "alterou",
       "o status de uma solicitação de TI",
     ],
+    [
+      "POST",
+      "/ti/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/deactivate",
+      "inativou",
+      "uma credencial de TI",
+    ],
     ["POST", "/ti/terms/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/sign", "assinou", "um termo de TI"],
     [
       "POST",
@@ -105,6 +111,20 @@ describe("activityCatalog", () => {
     expect(serialized).not.toContain("9a68a809");
     expect(serialized).not.toContain("token");
     expect(serialized).not.toContain("nao-exibir");
+  });
+
+  it("classifica inativação de credencial de TI sem expor identificadores ou motivo", () => {
+    const serialized = JSON.stringify(
+      describeActivity(
+        "POST",
+        "/ti/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/deactivate?reason=secret",
+      ),
+    );
+
+    expect(serialized).toContain("inativou");
+    expect(serialized).not.toContain("9a68a809");
+    expect(serialized).not.toContain("reason");
+    expect(serialized).not.toContain("secret");
   });
 
   it.each([

@@ -12,8 +12,13 @@ describe("buildLegacyListStatusWhere", () => {
 
   it("integracao + Ativo exige dominio_code", () => {
     expect(buildLegacyListStatusWhere("integracao", "Ativo")).toEqual({
-      status: "Ativo",
-      dominio_code: { not: null },
+      AND: [{ status: "Ativo" }, { dominio_code: { not: null } }, { dominio_code: { not: "" } }],
+    });
+  });
+
+  it("integracao aceita typo legado de nao contratados e paralisados", () => {
+    expect(buildLegacyListStatusWhere("integracao", "Não Contradado e Paralisado")).toEqual({
+      prospecting_status: { in: ["Paralisado", "Recusado pelo Cliente"] },
     });
   });
 

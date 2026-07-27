@@ -1,4 +1,12 @@
-import { useMemo, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 import {
   Bot,
   CheckCircle2,
@@ -29,11 +37,19 @@ import type {
   TiId,
   TiListFilters,
   TiRobot,
-  TiRobotPayload,
   TiRobotRun,
   TiRobotRunPayload,
-  TiRobotType,
 } from "../types";
+import {
+  buildCreateRobotPayload,
+  buildUpdateRobotPayload,
+  getFirstInvalidRobotField,
+  getRobotMutationErrorMessage,
+  validateRobotDraft,
+  type RobotDraft,
+  type RobotField,
+  type RobotFieldErrors,
+} from "../utils/robotForm";
 import { TiNativeSelect } from "./TiNativeSelect";
 import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
 import {
@@ -63,7 +79,10 @@ const ROBOT_TYPE_OPTIONS = [
   { value: "Monitoramento", label: "Monitoramento" },
 ] as const;
 
-const ROBOT_FORM_TYPE_OPTIONS = ROBOT_TYPE_OPTIONS.filter((option) => option.value);
+const ROBOT_FORM_TYPE_OPTIONS = [
+  { value: "", label: "Selecione o tipo", disabled: true },
+  ...ROBOT_TYPE_OPTIONS.filter((option) => option.value),
+] as const;
 
 const ROBOT_ACTIVE_FILTER_OPTIONS = [
   { value: "", label: "Todos" },
@@ -83,15 +102,6 @@ const ROBOT_RUN_STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelada" },
 ] as const;
 
-type RobotDraft = {
-  name: string;
-  description: string;
-  type: TiRobotType | string;
-  status: string;
-  active: boolean;
-  schedule: string;
-};
-
 type RunDraft = {
   status: string;
   message: string;
@@ -108,7 +118,7 @@ type AutomationMetric = {
 const INITIAL_ROBOT_DRAFT: RobotDraft = {
   name: "",
   description: "",
-  type: "Monitoramento",
+  type: "",
   status: "active",
   active: true,
   schedule: "",
@@ -281,33 +291,6 @@ function formatDate(value: string | null | undefined) {
   }).format(date);
 }
 
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (error && typeof error === "object" && "response" in error) {
-    const response = (error as { response?: { data?: { message?: string } } }).response;
-
-    if (response?.data?.message) {
-      return response.data.message;
-    }
-  }
-
-  return "Não foi possível concluir a ação.";
-}
-
-function buildRobotPayload(draft: RobotDraft): TiRobotPayload {
-  return {
-    name: draft.name.trim(),
-    description: draft.description.trim() || null,
-    type: draft.type,
-    status: draft.status,
-    active: draft.active,
-    schedule: draft.schedule.trim() || null,
-  };
-}
-
 function parseDurationMs(value: string) {
   const durationText = value.trim().toLowerCase();
 
@@ -394,6 +377,9 @@ export function TiRobotsTab() {
   const [isRunDialogOpen, setIsRunDialogOpen] = useState(false);
   const [editingRobot, setEditingRobot] = useState<TiRobot | undefined>();
   const [robotDraft, setRobotDraft] = useState<RobotDraft>(INITIAL_ROBOT_DRAFT);
+  const [fieldErrors, setFieldErrors] = useState<RobotFieldErrors>({});
+  const [focusField, setFocusField] = useState<RobotField | null>(null);
+  const robotFormRef = useRef<HTMLFormElement>(null);
   const [runDraft, setRunDraft] = useState<RunDraft>(INITIAL_RUN_DRAFT);
   const [lastRunOverrides, setLastRunOverrides] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -411,6 +397,20 @@ export function TiRobotsTab() {
   const createRobotMutation = useCreateTiRobot();
   const updateRobotMutation = useUpdateTiRobot();
   const createRunMutation = useCreateTiRobotRun();
+
+  useEffect(() => {
+    if (!focusField) {
+      return;
+    }
+
+    const control = robotFormRef.current?.elements.namedItem(focusField);
+
+    if (control instanceof HTMLElement) {
+      control.focus();
+    }
+
+    setFocusField(null);
+  }, [focusField]);
 
   const isRobotSaving = createRobotMutation.isPending || updateRobotMutation.isPending;
   const isRunSaving = createRunMutation.isPending;
@@ -536,10 +536,24 @@ export function TiRobotsTab() {
     }
   }
 
+  function clearRobotFieldError(field: RobotField) {
+    setFieldErrors((current) => {
+      if (!current[field]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
   function openCreateDialog() {
     clearRobotSelection();
     setEditingRobot(undefined);
     setRobotDraft(INITIAL_ROBOT_DRAFT);
+    setFieldErrors({});
+    setFocusField(null);
     setFormError(null);
     setIsRobotDialogOpen(true);
   }
@@ -547,6 +561,8 @@ export function TiRobotsTab() {
   function openEditDialog(robot: TiRobot) {
     setEditingRobot(robot);
     setRobotDraft(createRobotDraft(robot));
+    setFieldErrors({});
+    setFocusField(null);
     setFormError(null);
     setIsRobotDialogOpen(true);
   }
@@ -562,27 +578,29 @@ export function TiRobotsTab() {
     event.preventDefault();
     setFormError(null);
 
-    if (!robotDraft.name.trim()) {
-      setFormError("Informe o nome do robô.");
-      return;
-    }
+    const nextFieldErrors = validateRobotDraft(robotDraft);
+    setFieldErrors(nextFieldErrors);
 
-    if (!robotDraft.type) {
-      setFormError("Informe o tipo do robô.");
+    const firstInvalidField = getFirstInvalidRobotField(nextFieldErrors);
+
+    if (firstInvalidField) {
+      setFocusField(firstInvalidField);
       return;
     }
 
     try {
-      const payload = buildRobotPayload(robotDraft);
       if (editingRobot) {
-        await updateRobotMutation.mutateAsync({ id: editingRobot.id, payload });
+        await updateRobotMutation.mutateAsync({
+          id: editingRobot.id,
+          payload: buildUpdateRobotPayload(robotDraft),
+        });
       } else {
-        await createRobotMutation.mutateAsync(payload);
+        await createRobotMutation.mutateAsync(buildCreateRobotPayload(robotDraft));
       }
 
       setIsRobotDialogOpen(false);
     } catch (error) {
-      setFormError(getErrorMessage(error));
+      setFormError(getRobotMutationErrorMessage(error));
     }
   }
 
@@ -610,8 +628,9 @@ export function TiRobotsTab() {
       }));
       setIsRunDialogOpen(false);
     } catch (error) {
-      setFormError(getErrorMessage(error));
-      setActionError(getErrorMessage(error));
+      const message = getRobotMutationErrorMessage(error);
+      setFormError(message);
+      setActionError(message);
     }
   }
 
@@ -934,20 +953,42 @@ export function TiRobotsTab() {
         contentClassName="w-[min(92vw,720px)]"
         bodyClassName="space-y-4"
       >
-        <form className="space-y-4" onSubmit={handleSaveRobot}>
+        <form ref={robotFormRef} className="space-y-4" noValidate onSubmit={handleSaveRobot}>
           {formError ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
+            <div
+              className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300"
+              role="alert"
+            >
               {formError}
             </div>
           ) : null}
 
-          <label className="flex min-w-0 flex-col gap-2">
-            <span className={tiLabelClassName}>Nome</span>
+          <label className="flex min-w-0 flex-col gap-2" htmlFor="ti-robot-name">
+            <span className={tiLabelClassName}>
+              Nome <span aria-hidden="true">*</span>
+            </span>
             <input
-              className={tiInputClassName}
+              id="ti-robot-name"
+              name="name"
+              required
+              aria-describedby={fieldErrors.name ? "ti-robot-name-error" : undefined}
+              aria-invalid={Boolean(fieldErrors.name)}
+              className={cn(
+                tiInputClassName,
+                fieldErrors.name &&
+                  "border-red-500 focus:border-red-500 focus:ring-red-500/20 dark:border-red-500",
+              )}
               value={robotDraft.name}
-              onChange={(event) => setRobotDraft((draft) => ({ ...draft, name: event.target.value }))}
+              onChange={(event) => {
+                setRobotDraft((draft) => ({ ...draft, name: event.target.value }));
+                clearRobotFieldError("name");
+              }}
             />
+            {fieldErrors.name ? (
+              <span id="ti-robot-name-error" className="text-xs text-red-600 dark:text-red-300">
+                {fieldErrors.name}
+              </span>
+            ) : null}
           </label>
 
           <label className="flex min-w-0 flex-col gap-2">
@@ -962,14 +1003,36 @@ export function TiRobotsTab() {
           </label>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <TiNativeSelect
-              label="Tipo"
-              value={robotDraft.type}
-              options={ROBOT_FORM_TYPE_OPTIONS}
-              onChange={(event) =>
-                setRobotDraft((draft) => ({ ...draft, type: event.target.value }))
-              }
-            />
+            <div className="flex min-w-0 flex-col gap-2">
+              <label className={tiLabelClassName} htmlFor="ti-robot-type">
+                Tipo <span aria-hidden="true">*</span>
+              </label>
+              <TiNativeSelect
+                id="ti-robot-type"
+                name="type"
+                required
+                aria-describedby={fieldErrors.type ? "ti-robot-type-error" : undefined}
+                aria-invalid={Boolean(fieldErrors.type)}
+                className={cn(
+                  fieldErrors.type &&
+                    "border-red-500 focus:border-red-500 focus:ring-red-500/20 dark:border-red-500",
+                )}
+                value={robotDraft.type}
+                options={ROBOT_FORM_TYPE_OPTIONS}
+                onChange={(event) => {
+                  setRobotDraft((draft) => ({
+                    ...draft,
+                    type: event.target.value,
+                  }));
+                  clearRobotFieldError("type");
+                }}
+              />
+              {fieldErrors.type ? (
+                <span id="ti-robot-type-error" className="text-xs text-red-600 dark:text-red-300">
+                  {fieldErrors.type}
+                </span>
+              ) : null}
+            </div>
             <TiNativeSelect
               label="Status"
               value={robotDraft.status}

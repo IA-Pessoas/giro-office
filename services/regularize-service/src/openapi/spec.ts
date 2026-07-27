@@ -174,6 +174,7 @@ export function buildRegularizeServiceOpenApiSpec(
         get: {
           tags: ["Sites"],
           summary: "Listar sites base",
+          description: "Retorna somente campos seguros da lista; o campo password nao e retornado.",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "status", in: "query", required: true, schema: { type: "boolean" } },
@@ -208,12 +209,16 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/sites-pass-detail": {
         get: {
           tags: ["Sites"],
-          summary: "Detalhar site base",
+          summary: "Detalhar site base com credencial",
+          description: "Revela usuario e senha somente para usuarios com permissao de revelacao.",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
-          responses: { "200": { description: "Detalhe do site", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Detalhe do site com credencial", ...successEnvelopeContent() },
+            "403": { description: "Permissao insuficiente para revelar credencial" },
+          },
         },
       },
       "/regularize/pf": {
