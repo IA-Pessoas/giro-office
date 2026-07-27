@@ -161,7 +161,13 @@ export function createPrismaMock(): PrismaClient {
         };
       }),
       create: vi.fn(async ({ data }) => ({ id: "stock-cat-1", ...data })),
-      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+      update: vi.fn(async ({ where, data }) => {
+        if (data.name === "Categoria em conflito") {
+          throw { code: "P2002" };
+        }
+
+        return { id: where.id, ...data };
+      }),
     },
     stock: {
       count: vi.fn(async ({ where }) => {

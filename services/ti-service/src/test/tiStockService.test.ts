@@ -77,6 +77,26 @@ describe("TiStockService", () => {
     });
   });
 
+  it("maps a unique category update collision to a domain conflict", async () => {
+    const prisma = {
+      department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
+      categoryStock: {
+        findFirst: vi.fn(async () => ({ id: categoryId })),
+        update: vi.fn(async () => {
+          throw { code: "P2002" };
+        }),
+      },
+    };
+    const service = new TiStockService(prisma as never);
+
+    await expect(
+      service.updateCategory(context, categoryId, { name: "Perifericos" }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+    });
+  });
+
   it("filters the full stock result before pagination and returns page metadata", async () => {
     const item = {
       id: stockId,

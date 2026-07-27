@@ -486,6 +486,12 @@ export class TiStockService {
     } catch (err: unknown) {
       logError("Erro ao atualizar categoria de estoque de TI", { err });
       if (err instanceof ServiceError) throw err;
+      if (isPrismaUniqueConstraintError(err)) {
+        throw new ServiceError(
+          409,
+          "Ja existe uma categoria de estoque de TI ativa com este nome.",
+        );
+      }
       throw new ServiceError(500, "Erro ao atualizar categoria de estoque de TI.", err);
     }
   }
