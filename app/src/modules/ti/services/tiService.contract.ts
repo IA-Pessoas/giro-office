@@ -36,6 +36,7 @@ export const TI_ENDPOINTS = {
     list: "/ti/passwords/list",
     base: "/ti/passwords",
     detail: "/ti/passwords/{id}",
+    deactivate: "/ti/passwords/{id}/deactivate",
   },
   extensions: {
     list: "/ti/extensions/list",

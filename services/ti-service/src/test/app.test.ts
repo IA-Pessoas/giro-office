@@ -57,6 +57,7 @@ const tiPublicOpenApiOperations = {
   "/ti/passwords/list": ["get"],
   "/ti/passwords": ["post"],
   "/ti/passwords/{id}": ["get", "patch"],
+  "/ti/passwords/{id}/deactivate": ["post"],
   "/ti/extensions/list": ["get"],
   "/ti/extensions": ["post"],
   "/ti/extensions/{id}": ["get", "patch"],
@@ -200,6 +201,42 @@ describe("ti-service app", () => {
     expect(response.body.components.schemas.TiExtensionUpdateInput.properties.number).toEqual(
       extensionNumberSchema,
     );
+
+    const passwordStatusParameter = response.body.paths["/ti/passwords/list"].get.parameters.find(
+      (parameter: { name?: string }) => parameter.name === "status",
+    );
+    expect(passwordStatusParameter).toMatchObject({
+      in: "query",
+      required: false,
+      schema: {
+        type: "string",
+        enum: ["active", "inactive", "all"],
+        default: "active",
+      },
+    });
+
+    expect(response.body.components.schemas.TiPasswordDeactivateInput).toEqual({
+      type: "object",
+      required: ["reason"],
+      properties: {
+        reason: { type: "string", minLength: 1, maxLength: 500 },
+      },
+      additionalProperties: false,
+    });
+
+    expect(response.body.paths["/ti/passwords/{id}/deactivate"].post.responses).toEqual(
+      expect.objectContaining({
+        "200": expect.any(Object),
+        "400": expect.any(Object),
+        "401": expect.any(Object),
+        "403": expect.any(Object),
+        "404": expect.any(Object),
+        "409": expect.any(Object),
+      }),
+    );
+    expect(response.body.paths["/ti/passwords/{id}"].get.responses).toHaveProperty("409");
+    expect(response.body.paths["/ti/passwords/{id}"].patch.responses).toHaveProperty("409");
+    expect(response.body.paths["/ti/passwords/{id}"]).not.toHaveProperty("delete");
 
     const operationIds = new Set<string>();
     for (const [path, expectedMethods] of Object.entries(tiPublicOpenApiOperations)) {

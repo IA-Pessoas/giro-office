@@ -426,6 +426,167 @@ await runTest("ti password contracts separate list data from explicit reveal det
   assert.match(hookSource, /enabled:\s*Boolean\(id\)\s*&&\s*Boolean\(canReveal\)/);
 });
 
+await runTest("ti password deactivation exposes typed lifecycle contract", async () => {
+  const typesSource = await readModuleSource("types/passwords.ts");
+  const serviceSource = await readModuleSource("services/tiPasswordsService.ts");
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+  const listInterfaceSource = typesSource.slice(
+    typesSource.indexOf("export interface TiPasswordListItem"),
+    typesSource.indexOf("export interface TiPasswordDetail"),
+  );
+  const listFiltersSource = typesSource.slice(
+    typesSource.indexOf("export type TiPasswordListFilters"),
+    typesSource.indexOf("export interface TiPasswordUser"),
+  );
+  const listServiceSource = serviceSource.slice(
+    serviceSource.indexOf("async listPasswords"),
+    serviceSource.indexOf("async createPassword"),
+  );
+  const listHookSource = hookSource.slice(
+    hookSource.indexOf("export function useTiPasswords"),
+    hookSource.indexOf("export function useTiPassword("),
+  );
+
+  assert.match(typesSource, /export type TiPasswordStatusFilter = "active" \| "inactive" \| "all"/);
+  assert.match(listFiltersSource, /status\?: TiPasswordStatusFilter/);
+  assert.match(listInterfaceSource, /active: boolean/);
+  assert.match(listInterfaceSource, /deactivated_at\?: string \| null/);
+  assert.match(listInterfaceSource, /deactivated_by_user_id\?: TiId \| null/);
+  assert.match(listInterfaceSource, /deactivation_reason\?: string \| null/);
+  assert.match(typesSource, /export interface TiPasswordDeactivatePayload/);
+  assert.match(typesSource, /reason: string/);
+  assert.match(listHookSource, /filters\?: TiPasswordListFilters/);
+  assert.match(listHookSource, /tiPasswordsService\.listPasswords\(filters\)/);
+  assert.match(listServiceSource, /filters\?: TiPasswordListFilters/);
+  assert.match(listServiceSource, /params: buildTiListParams\(filters\)/);
+});
+
+await runTest("ti password deactivation uses the centralized endpoint and safe payload", async () => {
+  const contractSource = await readModuleSource("services/tiService.contract.ts");
+  const serviceSource = await readModuleSource("services/tiPasswordsService.ts");
+  const deactivateServiceSource = serviceSource.slice(
+    serviceSource.indexOf("async deactivatePassword"),
+  );
+
+  assert.match(contractSource, /deactivate: "\/ti\/passwords\/\{id\}\/deactivate"/);
+  assert.match(deactivateServiceSource, /async deactivatePassword\(/);
+  assert.match(
+    deactivateServiceSource,
+    /api\.post<TiEnvelope<TiPasswordListItem>>\(\s*buildTiPath\(TI_ENDPOINTS\.passwords\.deactivate, id\),\s*\{ reason: payload\.reason \},/,
+  );
+  assert.doesNotMatch(
+    deactivateServiceSource,
+    /buildTiPath\(TI_ENDPOINTS\.passwords\.deactivate, id\),\s*payload/,
+  );
+});
+
+await runTest("ti password deactivation mutation evicts detail and invalidates lists", async () => {
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+  const deactivateVariablesStart = hookSource.indexOf("export type TiPasswordDeactivateVariables");
+  const deactivateVariablesEnd = hookSource.indexOf(
+    "\n\nexport function useTiPasswords",
+    deactivateVariablesStart,
+  );
+  const deactivateVariablesSource = hookSource.slice(
+    deactivateVariablesStart,
+    deactivateVariablesEnd,
+  );
+  const deactivateHookStart = hookSource.indexOf("export function useDeactivateTiPasswordMutation");
+  const deactivateHookEnd = hookSource.indexOf("\n}", deactivateHookStart) + 2;
+  const deactivateHookSource = hookSource.slice(
+    deactivateHookStart,
+    deactivateHookEnd,
+  );
+
+  assert.notEqual(deactivateVariablesStart, -1);
+  assert.notEqual(deactivateVariablesEnd, -1);
+  assert.notEqual(deactivateHookStart, -1);
+  assert.notEqual(deactivateHookEnd, 1);
+  assert.match(
+    deactivateVariablesSource,
+    /export type TiPasswordDeactivateVariables = \{\s*id: TiId;\s*payload: TiPasswordDeactivatePayload;\s*\}/,
+  );
+  assert.doesNotMatch(deactivateVariablesSource, /export function/);
+  assert.equal([...deactivateHookSource.matchAll(/export function/g)].length, 1);
+  assert.match(
+    deactivateHookSource,
+    /UseMutationResult<\s*TiPasswordListItem,\s*Error,\s*TiPasswordDeactivateVariables\s*>/,
+  );
+  assert.match(deactivateHookSource, /return useMutation\(/);
+  assert.match(
+    deactivateHookSource,
+    /mutationFn: \(\{ id, payload \}\) => tiPasswordsService\.deactivatePassword\(id, payload\)/,
+  );
+  assert.match(
+    deactivateHookSource,
+    /queryClient\.removeQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.detail\(variables\.id\),\s*exact: true,?\s*\}\)/,
+  );
+  assert.match(
+    deactivateHookSource,
+    /queryClient\.invalidateQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.all\(\),?\s*\}\)/,
+  );
+  assert.doesNotMatch(deactivateHookSource, /setQueryData\(\s*tiQueryKeys\.passwords\.detail/);
+});
+
+await runTest("ti password administration is admin-only and defaults to active", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /const canManagePasswords = access\.isAdmin/);
+  assert.match(
+    tabSource,
+    /useState<TiPasswordListFilters>\(\{\s*status: "active",\s*page: 1,\s*page_size: PASSWORD_PAGE_SIZE/,
+  );
+  assert.match(tabSource, /useTiPasswords\(filters, \{ enabled: canManagePasswords \}\)/);
+  assert.match(tabSource, /value: "active", label: "Ativas"/);
+  assert.match(tabSource, /value: "inactive", label: "Inativas"/);
+  assert.match(tabSource, /value: "all", label: "Todas"/);
+  assert.match(tabSource, /page: 1/);
+});
+
+await runTest("ti password inactive rows expose metadata without secret actions", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /const isActive = item\.active !== false/);
+  assert.match(tabSource, /<StatusBadge/);
+  assert.match(tabSource, /label: isActive \? "Ativa" : "Inativa"/);
+  assert.match(tabSource, /deactivation_reason/);
+  assert.match(tabSource, /isActive \? \(/);
+  assert.match(tabSource, /label="Inativar"/);
+  assert.doesNotMatch(tabSource, /setRevealPasswordId\(item\.id\)[\s\S]*item\.active === false/);
+});
+
+await runTest("ti password deactivation dialog requires reason and warns about external access", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /const \[deactivatingPassword, setDeactivatingPassword\]/);
+  assert.match(tabSource, /const \[deactivationReason, setDeactivationReason\]/);
+  assert.match(tabSource, /deactivationReason\.trim\(\)/);
+  assert.match(tabSource, /maxLength=\{500\}/);
+  assert.match(tabSource, /Inativar credencial/);
+  assert.match(
+    tabSource,
+    /inativar este registro no Giro Office[\s\S]*não revoga nem altera a senha no sistema externo/i,
+  );
+  assert.match(tabSource, /clearPasswordRevealCache\(deactivatingPassword\.id\)/);
+  assert.match(tabSource, /setRevealPasswordId\(null\)/);
+  assert.match(tabSource, /toast\.success\("Credencial inativada\."\)/);
+});
+
+await runTest("ti password reveal cleanup cancels cache on permission loss and unmount", async () => {
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(hookSource, /import \{ useCallback \} from "react"/);
+  assert.match(
+    hookSource,
+    /return useCallback\(\s*\(id\) => \{[\s\S]*?queryClient\.cancelQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.detail\(id\),\s*exact: true,?\s*\}\);[\s\S]*?queryClient\.removeQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.detail\(id\),\s*exact: true,?\s*\}\);[\s\S]*?\},\s*\[queryClient\],?\s*\)/,
+  );
+  assert.match(
+    tabSource,
+    /useEffect\(\(\) => \{\s*if \(!canRevealPasswords && revealPasswordId\) \{\s*clearPasswordRevealCache\(revealPasswordId\);\s*setRevealPasswordId\(null\);\s*\}\s*return \(\) => \{\s*clearPasswordRevealCache\(revealPasswordId\);\s*\};\s*\}, \[canRevealPasswords, clearPasswordRevealCache, revealPasswordId\]\)/,
+  );
+});
+
 await runTest("ti sensitive clipboard helper copies the exact value", async () => {
   const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
   const writes = [];
@@ -505,7 +666,7 @@ await runTest("ti passwords tab keeps create edit flows in a dialog and searches
   assert.match(tabSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog"/);
   assert.match(tabSource, /const PASSWORD_PAGE_SIZE = \d+/);
   assert.match(tabSource, /const PASSWORD_SEARCH_DEBOUNCE_MS = \d+/);
-  assert.match(tabSource, /const \[filters, setFilters\] = useState<TiListFilters>\(\{\s*page: 1,\s*page_size: PASSWORD_PAGE_SIZE,\s*\}\)/);
+  assert.match(tabSource, /const \[filters, setFilters\] = useState<TiPasswordListFilters>\(\{\s*status: "active",\s*page: 1,\s*page_size: PASSWORD_PAGE_SIZE,\s*\}\)/);
   assert.match(tabSource, /const \[searchDraft, setSearchDraft\] = useState\(""\)/);
   assert.match(tabSource, /const \[isPasswordDialogOpen, setIsPasswordDialogOpen\] = useState\(false\)/);
   assert.match(tabSource, /useEffect\(\(\) => \{/);
