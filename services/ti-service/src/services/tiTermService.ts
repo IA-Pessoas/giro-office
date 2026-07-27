@@ -84,9 +84,8 @@ export class TiTermService {
 
   async create(context: TiAuthContext, body: CreateTiTermBody): Promise<unknown> {
     try {
-      if (body.user_id) {
-        await this.ensureUser(context.organizationId, body.user_id);
-      }
+      const user = await this.ensureUser(context.organizationId, body.user_id);
+
       if (body.department_id) {
         await this.ensureDepartment(context.organizationId, body.department_id);
       }
@@ -95,6 +94,9 @@ export class TiTermService {
         data: {
           ...body,
           organization_id: context.organizationId,
+          user_id: user.id,
+          user_name: user.full_name?.trim() || user.name,
+          user_cpf: user.cpf?.trim() ?? "",
         },
       });
     } catch (err: unknown) {
@@ -108,9 +110,6 @@ export class TiTermService {
     try {
       await this.getById(context, id);
 
-      if (body.user_id) {
-        await this.ensureUser(context.organizationId, body.user_id);
-      }
       if (body.department_id) {
         await this.ensureDepartment(context.organizationId, body.department_id);
       }
@@ -147,14 +146,17 @@ export class TiTermService {
     }
   }
 
-  private async ensureUser(organizationId: string, userId: string): Promise<void> {
+  private async ensureUser(organizationId: string, userId: string) {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, organization_id: organizationId },
+      select: { id: true, name: true, full_name: true, cpf: true, organization_id: true },
     });
 
     if (!user) {
       throw new ServiceError(404, "Usuario nao encontrado.");
     }
+
+    return user;
   }
 
   private async ensureDepartment(organizationId: string, departmentId: string): Promise<void> {

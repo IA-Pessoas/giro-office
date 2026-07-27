@@ -14,6 +14,7 @@ export const RH_ENDPOINTS = {
   requests: "/rh/requests",
   requestDetail: (id: string) => `/rh/requests/${id}`,
   messages: "/rh/messages",
+  operationalUsers: "/rh/operational-users",
   pointConfig: "/rh/point-config",
   pointConfigByUser: (userId: string) => `/rh/point-config/${userId}`,
   points: "/rh/point",

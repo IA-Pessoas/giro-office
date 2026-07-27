@@ -329,6 +329,14 @@ const passwordMutationResponses = {
   },
 } as const;
 
+const obligationGenerationResponses = {
+  ...mutationResponses,
+  "200": {
+    description: "Resumo da geracao global de obrigacoes",
+    ...successJsonWithData({ $ref: "#/components/schemas/PessoalObligationGenerationResult" }),
+  },
+} as const;
+
 const optionalDetailResponses = {
   "200": {
     description: "OK; data e null quando o registro ainda nao existe",
@@ -449,6 +457,26 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
             },
           ],
         },
+        PessoalObligationGenerationResult: {
+          type: "object",
+          description: "Contadores retornados pela geracao global de obrigacoes.",
+          required: [
+            "clients",
+            "payrollRows",
+            "existing",
+            "created",
+            "skippedExisting",
+            "skippedNoPayroll",
+          ],
+          properties: {
+            clients: { type: "integer", minimum: 0 },
+            payrollRows: { type: "integer", minimum: 0 },
+            existing: { type: "integer", minimum: 0 },
+            created: { type: "integer", minimum: 0 },
+            skippedExisting: { type: "integer", minimum: 0 },
+            skippedNoPayroll: { type: "integer", minimum: 0 },
+          },
+        },
       },
     },
     paths: {
@@ -487,7 +515,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Criar LDD",
           operationId: "createPessoalLdd",
           requestBody: jsonRequestBody(createLddRequestSchema),
-          responses: mutationResponses,
+          responses: obligationGenerationResponses,
         },
       },
       "/pessoal/ldd/{id}": {

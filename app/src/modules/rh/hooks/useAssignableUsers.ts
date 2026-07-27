@@ -1,13 +1,21 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 
+import { setupAPIClient } from "@shared/services/api";
 import { useFetch } from "@shared/hooks";
-import { listAdminUsers, normalizeAdminUserStatus } from "@modules/users";
 
 import { RH_QUERY_KEY } from "./useRhRequests";
+import { RH_ENDPOINTS, unwrapRhEnvelope } from "../services/rhService.contract";
 import type { AssignableUser } from "../types";
 
 interface UseAssignableUsersOptions {
   enabled?: boolean;
+}
+
+interface RhOperationalUser {
+  id: string;
+  name: string;
+  status: string | null;
+  department: string | null;
 }
 
 export function assignableUsersQueryKey() {
@@ -20,14 +28,16 @@ export function useAssignableUsers(
   return useFetch(
     assignableUsersQueryKey(),
     async () => {
-      const users = await listAdminUsers("active");
+      const api = setupAPIClient();
+      const response = await api.get(RH_ENDPOINTS.operationalUsers);
+      const users = unwrapRhEnvelope<RhOperationalUser[]>(response.data);
 
       return users.map<AssignableUser>((user) => ({
         id: user.id,
         name: user.name,
-        status: normalizeAdminUserStatus(user.status),
-        departmentName: user.department?.name ?? null,
-        photoUrl: user.photo_url ?? user.photo ?? null,
+        status: user.status,
+        departmentName: user.department,
+        photoUrl: null,
       }));
     },
     {

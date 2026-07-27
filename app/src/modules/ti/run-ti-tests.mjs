@@ -713,8 +713,13 @@ await runTest("ti password reveal clears sensitive detail cache when hidden", as
 
 await runTest("ti user selects reuse the paginated assignable users source", async () => {
   const hookSource = await readAppSource("src/modules/rh/hooks/useAssignableUsers.ts");
+  const rhTypesSource = await readAppSource("src/modules/rh/types.ts");
+  const userTypesSource = await readAppSource("src/modules/users/types/index.ts");
 
   assert.match(hookSource, /listAdminUsers\("active"\)/);
+  assert.doesNotMatch(hookSource, /cpf: user\.cpf \?\? null/);
+  assert.doesNotMatch(rhTypesSource, /cpf\?: string \| null/);
+  assert.doesNotMatch(userTypesSource, /cpf\?: string \| null/);
   assert.doesNotMatch(hookSource, /const page = await userService\.listPage\(\{\s*skip:\s*0,/);
 
   for (const componentPath of [
@@ -1298,8 +1303,28 @@ await runTest("ti terms filters stay local because the backend list only support
   assert.doesNotMatch(source, /status,\s*inventory_id/);
 });
 
+await runTest("ti terms create uses assignable user selection and edit keeps identity read-only", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /name="user_id"/);
+  assert.match(source, /label="Usuario"|label="Usu\u00e1rio"/);
+  assert.match(source, /isEditingTerm/);
+  assert.match(source, /readOnly/);
+  assert.doesNotMatch(
+    source,
+    /name="user_name"[\s\S]*label="Nome do usuario"|name="user_name"[\s\S]*label="Nome do usu\u00e1rio"/,
+  );
+  assert.doesNotMatch(
+    source,
+    /name="user_cpf"[\s\S]*label="CPF do usuario"|name="user_cpf"[\s\S]*label="CPF do usu\u00e1rio"/,
+  );
+});
+
 await runTest("ti terms form sends the backend term contract", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
+  const hookSource = await readModuleSource("hooks/useTiTerms.ts");
+  const serviceSource = await readModuleSource("services/tiTermsService.ts");
   const typesSource = await readModuleSource("types/terms.ts");
   const termPayloadSource = typesSource.slice(
     typesSource.indexOf("export interface TiTermPayload"),
@@ -1309,9 +1334,6 @@ await runTest("ti terms form sends the backend term contract", async () => {
 
   for (const expected of [
     "date",
-    "user_name",
-    "user_cpf",
-    "user_id",
     "department_id",
     "address",
     "reason",
@@ -1323,11 +1345,25 @@ await runTest("ti terms form sends the backend term contract", async () => {
     assert.match(source, new RegExp(`${expected}: getFormText\\(formData, "${expected}"\\)`));
   }
 
+  assert.match(source, /const payload: TiTermUpdatePayload = compactPayload/);
+  assert.match(source, /createTermMutation\.mutateAsync\(\{\s*\.\.\.payload,\s*user_id: selectedUserId,?\s*\}\)/);
+  assert.match(
+    typesSource,
+    /export type TiTermUpdatePayload = Omit<TiTermPayload, "user_id">/,
+  );
+  assert.match(serviceSource, /updateTerm\(id: TiId, payload: TiTermUpdatePayload\)/);
+  assert.match(hookSource, /payload: TiTermUpdatePayload/);
   assert.match(source, /name="selected_asset_id"/);
+  assert.match(source, /name="user_id"/);
   assert.match(source, /name="department_id"/);
   assert.match(source, /departmentService\.list\(\)/);
   assert.match(source, /reason: getFormText\(formData, "reason"\)/);
   assert.match(signPayloadSource, /reason\?: string/);
+  assert.doesNotMatch(source, /payload\.user_name/);
+  assert.doesNotMatch(source, /payload\.user_cpf/);
+  assert.doesNotMatch(source, /user_name: getFormText\(formData, "user_name"\)/);
+  assert.doesNotMatch(source, /user_cpf: getFormText\(formData, "user_cpf"\)/);
+  assert.doesNotMatch(source, /user_id: getFormText\(formData, "user_id"\)/);
   assert.doesNotMatch(source, /title: getFormText\(formData, "title"\)/);
   assert.doesNotMatch(source, /description: getFormText\(formData, "description"\)/);
   assert.doesNotMatch(source, /inventory_id: selectedAssetId/);

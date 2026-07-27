@@ -34,6 +34,9 @@ function createPrismaMock(): PrismaClient {
     user: {
       findFirst: vi.fn(async ({ where }) => ({
         id: where.id,
+        name: "Maria Silva",
+        full_name: "Maria Silva",
+        cpf: "12345678900",
         organization_id: where.organization_id,
       })),
     },
@@ -65,8 +68,6 @@ describe("ti term routes", () => {
       .send({
         date: "2026-05-19",
         user_id: userId,
-        user_name: "Maria Silva",
-        user_cpf: "12345678900",
         department_id: departmentId,
         asset_code: "NB-001",
       });
@@ -84,6 +85,22 @@ describe("ti term routes", () => {
         organization_id: organizationId,
       },
     });
+  });
+
+  it("PATCH /ti/terms/:id rejects manual user identity changes", async () => {
+    const prisma = createPrismaMock();
+
+    const response = await request(createTestApp(prisma))
+      .patch(`/ti/terms/${termId}`)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({
+        user_id: otherUserId,
+        user_name: "Outro Usuario",
+        user_cpf: "00000000000",
+      });
+
+    expect(response.status).toBe(400);
+    expect(prisma.termTecnologia.update).not.toHaveBeenCalled();
   });
 
   it("PATCH /ti/terms/:id/sign signs a term", async () => {
