@@ -1,7 +1,7 @@
 import {
   KNOWN_PERMISSION_MODULE_KEYS,
   normalizePermissionForModule,
-} from "../constants/permissionConfig.ts";
+} from "../constants/permissionConfig";
 import type {
   KnownPermissionModuleKey,
   KnownPermissionRecord,

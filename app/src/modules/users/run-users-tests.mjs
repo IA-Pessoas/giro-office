@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { registerHooks } from "node:module";
 
 import {
   buildAdminCreateUserPayload,
@@ -14,13 +15,27 @@ import {
   getPermissionSelectOptions,
   normalizePermissionForModule,
 } from "./constants/permissionConfig.ts";
-import {
+
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (
+      specifier === "../constants/permissionConfig" &&
+      context.parentURL?.endsWith("/modules/users/utils/permissionUtils.ts")
+    ) {
+      return nextResolve(`${specifier}.ts`, context);
+    }
+
+    return nextResolve(specifier, context);
+  },
+});
+
+const {
   arePermissionDraftsEqual,
   buildPermissionUpdatePayload,
   freezePermissionSnapshot,
   normalizePermissionDraft,
   normalizePermissionResponse,
-} from "./utils/permissionUtils.ts";
+} = await import("./utils/permissionUtils.ts");
 
 const administracaoSource = readFileSync(
   new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
