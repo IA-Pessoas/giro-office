@@ -47,6 +47,7 @@ function passwordRecord() {
 function createPasswordPrismaMock(): Parameters<typeof createTestApp>[0] {
   return {
     passwordTecnologia: {
+      count: vi.fn(async () => 1),
       findMany: vi.fn(async () => [passwordRecord()]),
       findFirst: vi.fn(async () => passwordRecord()),
       create: vi.fn(async ({ data }) => ({ id: passwordId, ...data })),
@@ -83,16 +84,44 @@ describe("ti password routes", () => {
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       success: true,
-      data: [
-        {
-          id: passwordId,
-          local: "VPN",
-          user_id: userId,
-          organization_id: organizationId,
-        },
-      ],
+      data: {
+        items: [
+          {
+            id: passwordId,
+            local: "VPN",
+            user_id: userId,
+            organization_id: organizationId,
+          },
+        ],
+        total: 1,
+        page: 1,
+        page_size: 50,
+        hasMore: false,
+      },
     });
-    expect(response.body.data[0]).not.toHaveProperty("password");
+    expect(response.body.data.items[0]).not.toHaveProperty("password");
+  });
+
+  it("GET /ti/passwords/list aceita busca textual sem retornar 400", async () => {
+    const prisma = createPasswordPrismaMock();
+    const response = await request(createTestApp(prisma))
+      .get("/ti/passwords/list")
+      .query({ search: "discord", page: 2, page_size: 10 })
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        total: 1,
+        page: 2,
+        page_size: 10,
+        hasMore: false,
+      },
+    });
+    expect(prisma.passwordTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 10, take: 10 }),
+    );
   });
 
   it("GET /ti/passwords/:id requires admin permission", async () => {

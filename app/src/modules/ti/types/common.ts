@@ -23,6 +23,7 @@ export interface TiListResponse<TItem> {
   total?: number;
   page?: number;
   page_size?: number;
+  hasMore?: boolean;
   limit?: number;
   [key: string]: unknown;
 }

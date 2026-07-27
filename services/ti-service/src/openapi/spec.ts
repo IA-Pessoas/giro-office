@@ -1250,6 +1250,8 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           summary: "Lista senhas de TI",
           parameters: [
             uuidQueryParameter("user_id", "Usuario vinculado a senha"),
+            stringQueryParameter("search", "Busca por local, usuario ou notas"),
+            stringQueryParameter("local", "Filtro legado por local da senha"),
             ...paginationParameters(),
           ],
           successDescription: "Senhas listadas",

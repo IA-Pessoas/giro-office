@@ -1,6 +1,6 @@
 import { type EncryptionService, error as logError, ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
@@ -11,6 +11,14 @@ import type {
 import type { TiAuthContext } from "./tiRequestService.js";
 
 type PasswordRecord = Record<string, unknown>;
+
+interface TiPasswordListResult {
+  items: unknown[];
+  total: number;
+  page: number;
+  page_size: number;
+  hasMore: boolean;
+}
 
 const SAFE_USER_INCLUDE = {
   user: {
@@ -49,26 +57,70 @@ function withoutPassword(record: unknown): unknown {
   return withoutNestedUserPassword(safeRecord);
 }
 
+function getSearchTerm(query: ListTiPasswordsQuery): string | undefined {
+  const term = (query.search ?? query.local)?.trim();
+
+  return term || undefined;
+}
+
+function buildPasswordWhere(
+  context: TiAuthContext,
+  query: ListTiPasswordsQuery,
+): Prisma.PasswordTecnologiaWhereInput {
+  const search = getSearchTerm(query);
+
+  return {
+    organization_id: context.organizationId,
+    ...(query.user_id ? { user_id: query.user_id } : {}),
+    ...(search
+      ? {
+          OR: [
+            { local: { contains: search, mode: "insensitive" } },
+            { notes: { contains: search, mode: "insensitive" } },
+            {
+              user: {
+                is: {
+                  OR: [
+                    { name: { contains: search, mode: "insensitive" } },
+                    { full_name: { contains: search, mode: "insensitive" } },
+                  ],
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  };
+}
+
 export class TiPasswordService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly encryption: EncryptionService,
   ) {}
 
-  async list(context: TiAuthContext, query: ListTiPasswordsQuery): Promise<unknown[]> {
+  async list(context: TiAuthContext, query: ListTiPasswordsQuery): Promise<TiPasswordListResult> {
     const { skip, take } = getPaginationParams(query);
-    const passwords = await this.prisma.passwordTecnologia.findMany({
-      where: {
-        organization_id: context.organizationId,
-        ...(query.user_id ? { user_id: query.user_id } : {}),
-      },
-      include: SAFE_USER_INCLUDE,
-      orderBy: { local: "asc" },
-      skip,
-      take,
-    });
+    const page = query.page ?? 1;
+    const where = buildPasswordWhere(context, query);
+    const [total, passwords] = await Promise.all([
+      this.prisma.passwordTecnologia.count({ where }),
+      this.prisma.passwordTecnologia.findMany({
+        where,
+        include: SAFE_USER_INCLUDE,
+        orderBy: { local: "asc" },
+        skip,
+        take,
+      }),
+    ]);
 
-    return passwords.map((password) => withoutPassword(password));
+    return {
+      items: passwords.map((password) => withoutPassword(password)),
+      total,
+      page,
+      page_size: take,
+      hasMore: skip + passwords.length < total,
+    };
   }
 
   async getById(context: TiAuthContext, id: string): Promise<unknown> {

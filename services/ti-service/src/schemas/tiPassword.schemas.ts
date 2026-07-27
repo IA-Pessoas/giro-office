@@ -13,6 +13,8 @@ export const listTiPasswordsQuerySchema = paginationQuerySchema
   .merge(
     z.object({
       user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
+      local: z.string().trim().optional(),
+      search: z.string().trim().optional(),
     }),
   )
   .strict();
