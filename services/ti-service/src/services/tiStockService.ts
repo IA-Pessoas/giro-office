@@ -52,6 +52,15 @@ function normalizeStockCategoryName(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function isPrismaUniqueConstraintError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "P2002"
+  );
+}
+
 export class TiStockService {
   private readonly departmentResolver: TiDepartmentResolverService;
 
@@ -445,6 +454,12 @@ export class TiStockService {
     } catch (err: unknown) {
       logError("Erro ao criar categoria de estoque de TI", { err });
       if (err instanceof ServiceError) throw err;
+      if (isPrismaUniqueConstraintError(err)) {
+        throw new ServiceError(
+          409,
+          "Ja existe uma categoria de estoque de TI ativa com este nome.",
+        );
+      }
       throw new ServiceError(500, "Erro ao criar categoria de estoque de TI.", err);
     }
   }
