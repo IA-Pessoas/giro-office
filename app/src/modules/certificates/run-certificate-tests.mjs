@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   buildCertificateFileFormData,
@@ -107,6 +108,22 @@ runTest("unwrapCertificateEnvelope extracts data from success envelope", () => {
   const payload = { id: "1", name: "A" };
   assert.deepEqual(unwrapCertificateEnvelope({ success: true, data: payload }), payload);
   assert.deepEqual(unwrapCertificateEnvelope(payload), payload);
+});
+
+runTest("issue 495 certificate notes preserve line breaks and wrap long tokens", () => {
+  const source = readFileSync(new URL("./components/CertificatesWorkspace.tsx", import.meta.url), "utf8");
+
+  for (const detailName of ["pjDetail", "pfDetail"]) {
+    const notesDisplay =
+      source.match(
+        new RegExp(
+          `<p className="[^"]*">\\s*\\{${detailName}\\?\\.notes \\?\\? "Sem observações\\."\\}\\s*<\\/p>`,
+        ),
+      )?.[0] ?? "";
+
+    assert.match(notesDisplay, /whitespace-pre-wrap/);
+    assert.match(notesDisplay, /break-words/);
+  }
 });
 
 console.log("certificates contract tests passed");

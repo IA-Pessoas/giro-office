@@ -1117,7 +1117,7 @@ export function TiRequestsTab() {
                       <span>{message.author_name ?? getStringField(message, ["author"], "Autor")}</span>
                       <span>{formatDate(message.created_at)}</span>
                     </div>
-                    <p className="text-sm leading-6 text-slate-700 dark:text-slate-200">
+                    <p className="text-sm leading-6 text-slate-700 dark:text-slate-200 whitespace-pre-wrap break-words">
                       {message.message ?? getStringField(message, ["content", "body"], "")}
                     </p>
                   </div>
