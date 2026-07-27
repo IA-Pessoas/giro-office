@@ -29,6 +29,15 @@ const sitePasswordSelect = {
   status: true,
 } as const;
 
+const sitePasswordListSelect = {
+  id: true,
+  name: true,
+  sphere: true,
+  link: true,
+  user: true,
+  status: true,
+} as const;
+
 export class PasswordService {
   readonly #encryption: EncryptionService;
   readonly #logs: RegularizeLogService;
@@ -258,7 +267,7 @@ export class PasswordService {
     };
     const findManyArgs = {
       where,
-      select: sitePasswordSelect,
+      select: sitePasswordListSelect,
       orderBy: {
         name: "asc",
       },
@@ -268,9 +277,10 @@ export class PasswordService {
     } as const;
 
     if (!params.paginationRequested) {
-      return this.prisma.sitePasswordsRegularize.findMany(
-        findManyArgs,
-      ) as unknown as Record<string, unknown>[];
+      return this.prisma.sitePasswordsRegularize.findMany(findManyArgs) as unknown as Record<
+        string,
+        unknown
+      >[];
     }
 
     const [list, total] = await Promise.all([

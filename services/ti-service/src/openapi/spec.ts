@@ -381,12 +381,26 @@ const schemas: Record<string, OpenApiSchema> = {
     },
     additionalProperties: false,
   },
+  TiPasswordDeactivateInput: {
+    type: "object",
+    required: ["reason"],
+    properties: {
+      reason: { type: "string", minLength: 1, maxLength: 500 },
+    },
+    additionalProperties: false,
+  },
   TiExtensionInput: {
     type: "object",
     required: ["user_id", "number"],
     properties: {
       user_id: { type: "string", format: "uuid" },
-      number: { type: "string", minLength: 1 },
+      number: {
+        type: "string",
+        minLength: 4,
+        maxLength: 4,
+        pattern: "^[0-9]{4}$",
+        example: "1001",
+      },
     },
     additionalProperties: false,
   },
@@ -395,17 +409,21 @@ const schemas: Record<string, OpenApiSchema> = {
     minProperties: 1,
     properties: {
       user_id: { type: "string", format: "uuid" },
-      number: { type: "string", minLength: 1 },
+      number: {
+        type: "string",
+        minLength: 4,
+        maxLength: 4,
+        pattern: "^[0-9]{4}$",
+        example: "1001",
+      },
     },
     additionalProperties: false,
   },
   TiTermInput: {
     type: "object",
-    required: ["date", "user_name", "user_cpf"],
+    required: ["date", "user_id"],
     properties: {
       date: { type: "string", format: "date-time" },
-      user_name: { type: "string", minLength: 1 },
-      user_cpf: { type: "string", minLength: 1 },
       user_id: { type: "string", format: "uuid" },
       department_id: { type: "string", format: "uuid" },
       address: { type: "string" },
@@ -422,9 +440,6 @@ const schemas: Record<string, OpenApiSchema> = {
     minProperties: 1,
     properties: {
       date: { type: "string", format: "date-time" },
-      user_name: { type: "string", minLength: 1 },
-      user_cpf: { type: "string", minLength: 1 },
-      user_id: { type: "string", format: "uuid" },
       department_id: { type: "string", format: "uuid" },
       address: { type: "string" },
       reason: { type: "string" },
@@ -1238,6 +1253,20 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           summary: "Lista senhas de TI",
           parameters: [
             uuidQueryParameter("user_id", "Usuario vinculado a senha"),
+            stringQueryParameter("search", "Busca por local, usuario ou notas"),
+            stringQueryParameter("local", "Filtro legado por local da senha"),
+            {
+              ...enumQueryParameter("status", "Filtro de status da credencial", [
+                "active",
+                "inactive",
+                "all",
+              ]),
+              schema: {
+                type: "string",
+                enum: ["active", "inactive", "all"],
+                default: "active",
+              },
+            },
             ...paginationParameters(),
           ],
           successDescription: "Senhas listadas",
@@ -1262,7 +1291,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           summary: "Busca senha de TI",
           parameters: [pathIdParameter("Senha de TI")],
           successDescription: "Senha encontrada",
-          errors: [400, 401, 403, 404],
+          errors: [400, 401, 403, 404, 409],
         }),
         patch: publicTiOperation({
           operationId: "updateTiPassword",
@@ -1271,7 +1300,18 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Senha de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiPasswordUpdateInput"),
           successDescription: "Senha atualizada",
-          errors: [400, 401, 403, 404],
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/passwords/{id}/deactivate": {
+        post: publicTiOperation({
+          operationId: "deactivateTiPassword",
+          tags: ["TI Passwords"],
+          summary: "Inativa uma senha de TI",
+          parameters: [pathIdParameter("Senha de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiPasswordDeactivateInput"),
+          successDescription: "Senha de TI inativada",
+          errors: [400, 401, 403, 404, 409],
         }),
       },
       "/ti/extensions/list": {

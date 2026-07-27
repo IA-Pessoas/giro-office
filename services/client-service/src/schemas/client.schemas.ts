@@ -41,6 +41,7 @@ const INTEGRATION_EXTRA_STATUSES = [
   "Prospecção PF",
   "Inativo PF",
   "Não Contradados e Paralisados",
+  "Não Contradado e Paralisado",
 ] as const;
 
 const DEPARTMENT_LIST_STATUSES = [

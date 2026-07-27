@@ -18,6 +18,9 @@ interface BuildAuditLifecycleMiddlewareOptions {
   recordAuditRequest: AuditRecorder;
 }
 
+const TI_PASSWORD_DEACTIVATION_PATH = /^\/ti\/passwords\/[^/]+\/deactivate\/?$/i;
+const TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS = new Set(["password", "reason"]);
+
 function getResponseSizeBytes(response: Response): number | undefined {
   const header = response.getHeader("content-length");
 
@@ -46,11 +49,19 @@ function normalizeOptionalString(value: string | undefined): string | undefined 
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function buildQueryFromUrl(url: string): AuditQuery {
+function buildQueryFromUrl(url: string, method: string, path: string): AuditQuery {
   const query: AuditQuery = {};
   const parsedUrl = new URL(url, "http://localhost");
+  const isTiPasswordDeactivation = method === "POST" && TI_PASSWORD_DEACTIVATION_PATH.test(path);
 
   parsedUrl.searchParams.forEach((value, key) => {
+    if (
+      isTiPasswordDeactivation &&
+      TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS.has(key.toLowerCase())
+    ) {
+      return;
+    }
+
     const current = query[key];
 
     if (!current) {
@@ -125,7 +136,7 @@ export function buildAuditLifecycleMiddleware({
             : undefined,
         method: request.method,
         path: publicPath,
-        query: buildQueryFromUrl(request.originalUrl),
+        query: buildQueryFromUrl(request.originalUrl, request.method, publicPath),
         statusCode,
         outcome,
         durationMs: getDurationMs(startedAt),

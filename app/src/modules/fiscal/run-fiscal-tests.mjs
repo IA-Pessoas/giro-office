@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 
-function readSource(path) {
-  return readFileSync(new URL(path, import.meta.url), "utf8");
+async function readSource(relativePath) {
+  return readFile(new URL(relativePath, import.meta.url), "utf8");
 }
 
-function runTest(name, fn) {
+async function runTest(name, fn) {
   try {
-    fn();
+    await fn();
     console.log(`PASS ${name}`);
   } catch (error) {
     console.error(`FAIL ${name}`);
@@ -16,27 +16,48 @@ function runTest(name, fn) {
 }
 
 const fiscalSources = {
-  ncmSection: readSource("./components/FiscalNcmSection.tsx"),
-  icmsSection: readSource("./components/FiscalIcmsSection.tsx"),
-  ipiSection: readSource("./components/FiscalIpiSection.tsx"),
-  queryKeys: readSource("./hooks/queryKeys.ts"),
-  ncmHook: readSource("./hooks/useFiscalNcmList.ts"),
-  icmsHook: readSource("./hooks/useFiscalIcmsList.ts"),
-  ipiHook: readSource("./hooks/useFiscalIpiList.ts"),
-  contract: readSource("./services/fiscalService.contract.ts"),
-  types: readSource("./types/index.ts"),
-  ncmSchema: readSource("../../../../services/fiscal-service/src/schemas/ncm.schemas.ts"),
-  icmsSchema: readSource("../../../../services/fiscal-service/src/schemas/icms.schemas.ts"),
-  ipiSchema: readSource("../../../../services/fiscal-service/src/schemas/ipi.schemas.ts"),
-  ncmRoute: readSource("../../../../services/fiscal-service/src/routes/ncm.routes.ts"),
-  icmsRoute: readSource("../../../../services/fiscal-service/src/routes/icms.routes.ts"),
-  ipiRoute: readSource("../../../../services/fiscal-service/src/routes/ipi.routes.ts"),
-  ncmService: readSource("../../../../services/fiscal-service/src/services/ncmService.ts"),
-  icmsService: readSource("../../../../services/fiscal-service/src/services/icmsService.ts"),
-  ipiService: readSource("../../../../services/fiscal-service/src/services/ipiService.ts"),
+  shell: await readSource("./components/FiscalShell.tsx"),
+  ncmSection: await readSource("./components/FiscalNcmSection.tsx"),
+  icmsSection: await readSource("./components/FiscalIcmsSection.tsx"),
+  ipiSection: await readSource("./components/FiscalIpiSection.tsx"),
+  queryKeys: await readSource("./hooks/queryKeys.ts"),
+  ncmHook: await readSource("./hooks/useFiscalNcmList.ts"),
+  icmsHook: await readSource("./hooks/useFiscalIcmsList.ts"),
+  ipiHook: await readSource("./hooks/useFiscalIpiList.ts"),
+  contract: await readSource("./services/fiscalService.contract.ts"),
+  types: await readSource("./types/index.ts"),
+  ncmSchema: await readSource("../../../../services/fiscal-service/src/schemas/ncm.schemas.ts"),
+  icmsSchema: await readSource("../../../../services/fiscal-service/src/schemas/icms.schemas.ts"),
+  ipiSchema: await readSource("../../../../services/fiscal-service/src/schemas/ipi.schemas.ts"),
+  ncmRoute: await readSource("../../../../services/fiscal-service/src/routes/ncm.routes.ts"),
+  icmsRoute: await readSource("../../../../services/fiscal-service/src/routes/icms.routes.ts"),
+  ipiRoute: await readSource("../../../../services/fiscal-service/src/routes/ipi.routes.ts"),
+  ncmService: await readSource("../../../../services/fiscal-service/src/services/ncmService.ts"),
+  icmsService: await readSource("../../../../services/fiscal-service/src/services/icmsService.ts"),
+  ipiService: await readSource("../../../../services/fiscal-service/src/services/ipiService.ts"),
 };
 
-runTest("fiscal list hooks stay enabled for initial paginated listing", () => {
+await runTest("fiscal derives write access from the fiscal module", () => {
+  assert.match(fiscalSources.shell, /import \{ useModuleAccess \} from "@modules\/auth";/);
+  assert.match(fiscalSources.shell, /const \{ access: fiscalAccess \} = useModuleAccess\("fiscal"\);/);
+  assert.match(fiscalSources.shell, /<FiscalNcmTab canEdit=\{canEdit\} \/>/);
+  assert.match(fiscalSources.shell, /<FiscalIcmsTab canEdit=\{canEdit\} \/>/);
+  assert.match(fiscalSources.shell, /<FiscalIpiTab canEdit=\{canEdit\} \/>/);
+  assert.match(fiscalSources.shell, /<FiscalNcmSection canEdit=\{canEdit\} \/>/);
+  assert.match(fiscalSources.shell, /<FiscalIcmsSection canEdit=\{canEdit\} \/>/);
+  assert.match(fiscalSources.shell, /<FiscalIpiSection canEdit=\{canEdit\} \/>/);
+});
+
+await runTest("fiscal viewer keeps NCM, ICMS and IPI sections read-only", () => {
+  for (const source of [fiscalSources.ncmSection, fiscalSources.icmsSection, fiscalSources.ipiSection]) {
+    assert.match(source, /export function Fiscal\w+Section\(\{ canEdit \}/);
+    assert.match(source, /if \(panelIntent && canEdit\)/);
+    assert.match(source, /onEdit=\{canEdit \? \(item\) => setPanelIntent/);
+    assert.match(source, /\{onEdit \? \(/);
+  }
+});
+
+await runTest("fiscal list hooks stay enabled for initial paginated listing", () => {
   for (const source of [fiscalSources.ncmHook, fiscalSources.icmsHook, fiscalSources.ipiHook]) {
     assert.doesNotMatch(source, /enabled:\s*enabled\s*&&[\s\S]*length\s*>\s*0/);
     assert.match(source, /page_size/);
@@ -44,12 +65,13 @@ runTest("fiscal list hooks stay enabled for initial paginated listing", () => {
   }
 });
 
-runTest("fiscal list params include pagination and preserve current query", () => {
+await runTest("fiscal list params include pagination and preserve current query", () => {
   assert.match(fiscalSources.types, /PaginatedResult/);
   assert.doesNotMatch(fiscalSources.queryKeys, /\.join\("\|"\)/);
   assert.match(fiscalSources.queryKeys, /\[\.\.\.\(filters\.ncmCodes \?\? \[\]\)\]/);
   assert.match(fiscalSources.queryKeys, /\[\.\.\.\(filters\.icmsCodes \?\? \[\]\)\]/);
   assert.match(fiscalSources.queryKeys, /\[\.\.\.\(filters\.ipiCodes \?\? \[\]\)\]/);
+
   for (const builder of [
     "buildFiscalNcmListParams",
     "buildFiscalIcmsListParams",
@@ -60,10 +82,11 @@ runTest("fiscal list params include pagination and preserve current query", () =
     assert.match(body, /page:\s*filters\.page/);
     assert.match(body, /page_size:\s*filters\.page_size/);
   }
+
   assert.match(fiscalSources.contract, /normalizePaginatedResult/);
 });
 
-runTest("fiscal sections list on open, debounce search, clear search and paginate", () => {
+await runTest("fiscal sections list on open, debounce search, clear search and paginate", () => {
   for (const source of [fiscalSources.ncmSection, fiscalSources.icmsSection, fiscalSources.ipiSection]) {
     assert.doesNotMatch(source, /hasSubmittedSearch/);
     assert.match(source, /useEffect/);
@@ -72,10 +95,11 @@ runTest("fiscal sections list on open, debounce search, clear search and paginat
     assert.match(source, /setPage\(\(currentPage\) => currentPage \+ 1\)/);
     assert.match(source, /setFilterValue\(""\)/);
   }
+
   assert.doesNotMatch(fiscalSources.ipiSection, /NCM_CODE_LENGTH|\\d\{8\}/);
 });
 
-runTest("fiscal tables use centered headers, balanced cells and icon-only edit actions", () => {
+await runTest("fiscal tables use centered headers, balanced cells and icon-only edit actions", () => {
   for (const source of [fiscalSources.ncmSection, fiscalSources.icmsSection, fiscalSources.ipiSection]) {
     assert.match(source, /Pencil/);
     assert.match(source, /py-2\.5 text-center text-\[11px\] font-semibold uppercase/);
@@ -86,6 +110,7 @@ runTest("fiscal tables use centered headers, balanced cells and icon-only edit a
     assert.match(source, /<Pencil className="h-3\.5 w-3\.5"/);
     assert.doesNotMatch(source, />\s*Editar\s*<\/button>/);
   }
+
   assert.match(fiscalSources.ncmSection, />\s*Tributação\s*</);
   assert.match(fiscalSources.ncmSection, />\s*Início\s*</);
   assert.match(fiscalSources.ncmSection, />\s*Fim\s*</);
@@ -99,7 +124,7 @@ runTest("fiscal tables use centered headers, balanced cells and icon-only edit a
   assert.match(fiscalSources.ipiSection, /w-\[24%\][\s\S]*w-\[12%\][\s\S]*w-\[38%\][\s\S]*w-\[16%\][\s\S]*w-\[10%\]/);
 });
 
-runTest("fiscal-service list schemas accept optional terms and pagination", () => {
+await runTest("fiscal-service list schemas accept optional terms and pagination", () => {
   for (const source of [fiscalSources.ncmSchema, fiscalSources.icmsSchema, fiscalSources.ipiSchema]) {
     assert.match(source, /paginationQuerySchema/);
     assert.match(source, /commaSeparatedListSchema/);
@@ -107,7 +132,7 @@ runTest("fiscal-service list schemas accept optional terms and pagination", () =
   }
 });
 
-runTest("fiscal-service list routes pass pagination and optional search terms", () => {
+await runTest("fiscal-service list routes pass pagination and optional search terms", () => {
   for (const source of [fiscalSources.ncmRoute, fiscalSources.icmsRoute, fiscalSources.ipiRoute]) {
     assert.match(source, /page:\s*req\.query\.page/);
     assert.match(source, /page_size:\s*req\.query\.page_size/);
@@ -115,7 +140,7 @@ runTest("fiscal-service list routes pass pagination and optional search terms", 
   }
 });
 
-runTest("fiscal-service lists use partial search and paginated result metadata", () => {
+await runTest("fiscal-service lists use partial search and paginated result metadata", () => {
   for (const source of [fiscalSources.ncmService, fiscalSources.icmsService, fiscalSources.ipiService]) {
     assert.match(source, /count\(\{ where \}\)/);
     assert.match(source, /contains/);

@@ -3,6 +3,7 @@ import "./envBootstrap.js";
 import {
   createLogger,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
@@ -25,11 +26,12 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-function gatewayHeaders(): Record<string, string> {
+function gatewayHeaders(permission = 1): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORG_ID,
+    [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
   };
 }
 
@@ -96,6 +98,34 @@ describe("icms routes", () => {
     expect(deps.create).not.toHaveBeenCalled();
   });
 
+  it("POST /fiscal/icms com Visualizador retorna 403 antes do servico", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, icmsRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/fiscal/icms")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(0))
+      .send({});
+
+    expect(res.status).toBe(403);
+    expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("PUT /fiscal/icms com Visualizador retorna 403 antes do servico", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, icmsRouteDeps: deps });
+
+    const res = await request(app)
+      .put("/fiscal/icms")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(0))
+      .send({});
+
+    expect(res.status).toBe(403);
+    expect(deps.update).not.toHaveBeenCalled();
+  });
+
   it("GET /fiscal/icms sem icms_id válido retorna 400", async () => {
     const deps = createMockDeps();
     const app = createFiscalApp({ env, logger, icmsRouteDeps: deps });
@@ -117,7 +147,7 @@ describe("icms routes", () => {
     const res = await request(app)
       .get("/fiscal/icms")
       .query({ icms_id: ICMS_ID })
-      .set(gatewayHeaders());
+      .set(gatewayHeaders(0));
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -138,7 +168,7 @@ describe("icms routes", () => {
     const res = await request(app)
       .get("/fiscal/icms/list")
       .query({ icmsCodes: "bebida,fria", page: "2", page_size: "1" })
-      .set(gatewayHeaders());
+      .set(gatewayHeaders(0));
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);

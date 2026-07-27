@@ -7,7 +7,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { isAuthenticated, requireFiscalWritePermission } from "../middlewares/isAuthenticated.js";
 import {
   createIcmsBodySchema,
   detailIcmsQuerySchema,
@@ -25,43 +25,53 @@ function firstQueryValue(value: unknown): unknown {
 export function createIcmsRoutes(service: IcmsRouteDeps): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
 
-  router.post("/icms", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const body = parseWithZod(createIcmsBodySchema, req.body);
-      const auth = requireAuthenticatedRequestContext(req);
+  router.post(
+    "/icms",
+    isAuthenticated,
+    requireFiscalWritePermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(createIcmsBodySchema, req.body);
+        const auth = requireAuthenticatedRequestContext(req);
 
-      const result = await service.create({
-        userId: auth.user_id,
-        organizationId: auth.organization_id,
-        permission: auth.permission,
-        ...body,
-      });
+        const result = await service.create({
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+          ...body,
+        });
 
-      res.status(201).json(createSuccessResponse(result));
-    } catch (err) {
-      logError("Erro ao criar ICMS", { err });
-      next(err);
-    }
-  });
+        res.status(201).json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao criar ICMS", { err });
+        next(err);
+      }
+    },
+  );
 
-  router.put("/icms", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const body = parseWithZod(updateIcmsBodySchema, req.body);
-      const auth = requireAuthenticatedRequestContext(req);
+  router.put(
+    "/icms",
+    isAuthenticated,
+    requireFiscalWritePermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(updateIcmsBodySchema, req.body);
+        const auth = requireAuthenticatedRequestContext(req);
 
-      const result = await service.update({
-        userId: auth.user_id,
-        organizationId: auth.organization_id,
-        permission: auth.permission,
-        ...body,
-      });
+        const result = await service.update({
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+          ...body,
+        });
 
-      res.json(createSuccessResponse(result));
-    } catch (err) {
-      logError("Erro ao atualizar ICMS", { err });
-      next(err);
-    }
-  });
+        res.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao atualizar ICMS", { err });
+        next(err);
+      }
+    },
+  );
 
   router.get("/icms", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
     try {

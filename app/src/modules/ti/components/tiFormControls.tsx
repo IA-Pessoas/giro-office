@@ -41,8 +41,10 @@ type TiTableActionProps = {
   onClick?: () => void;
 };
 
+type TiListQueryData<T> = T[] | { items?: T[] };
+
 type TiListQuery<T> = {
-  data?: T[];
+  data?: TiListQueryData<T>;
   error: Error | null;
   isError: boolean;
   isFetching: boolean;
@@ -214,7 +216,7 @@ export function TiQueryStatePanel<T>({
     );
   }
 
-  const rows = query.data ?? [];
+  const rows = Array.isArray(query.data) ? query.data : query.data?.items ?? [];
 
   if (rows.length === 0) {
     return <>{emptyState}</>;

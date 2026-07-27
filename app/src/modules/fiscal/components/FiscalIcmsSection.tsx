@@ -32,7 +32,7 @@ const TABLE_CENTER_CELL_CLASSNAME =
 const TABLE_CODE_CELL_CLASSNAME =
   "px-4 py-2.5 text-center text-sm font-medium leading-5 text-gray-900 dark:text-white";
 
-export function FiscalIcmsSection() {
+export function FiscalIcmsSection({ canEdit }: { canEdit: boolean }) {
   const [filterValue, setFilterValue] = useState("");
   const [searchTerms, setSearchTerms] = useState<string[]>([]);
   const [page, setPage] = useState(1);
@@ -61,7 +61,7 @@ export function FiscalIcmsSection() {
     setPage(1);
   }
 
-  if (panelIntent) {
+  if (panelIntent && canEdit) {
     return (
       <section className="space-y-4">
         <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
@@ -135,14 +135,16 @@ export function FiscalIcmsSection() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setPanelIntent({ mode: "create" })}
-            className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-          >
-            <Plus className="h-4 w-4" />
-            Novo ICMS
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => setPanelIntent({ mode: "create" })}
+              className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            >
+              <Plus className="h-4 w-4" />
+              Novo ICMS
+            </button>
+          ) : null}
         </div>
 
         <form className="mt-3 space-y-2.5" onSubmit={handleSubmit}>
@@ -234,7 +236,7 @@ export function FiscalIcmsSection() {
           {listQuery.data.data.length > 0 ? (
             <FiscalIcmsTable
               items={listQuery.data.data}
-              onEdit={(item) => setPanelIntent({ mode: "edit", icmsId: item.id })}
+              onEdit={canEdit ? (item) => setPanelIntent({ mode: "edit", icmsId: item.id }) : undefined}
             />
           ) : (
             <FiscalStateBox icon={Landmark} title="Nenhum ICMS encontrado" compact>
@@ -263,7 +265,7 @@ function FiscalIcmsTable({
   onEdit,
 }: {
   items: FiscalIcms[];
-  onEdit: (item: FiscalIcms) => void;
+  onEdit?: (item: FiscalIcms) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
@@ -294,9 +296,11 @@ function FiscalIcmsTable({
               <th className={`${TABLE_HEADER_CLASSNAME} w-[8%]`}>
                 MVA orig.
               </th>
-              <th className={`${TABLE_HEADER_CLASSNAME} w-[6%] px-3`}>
-                Ação
-              </th>
+              {onEdit ? (
+                <th className={`${TABLE_HEADER_CLASSNAME} w-[6%] px-3`}>
+                  Ação
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
@@ -326,19 +330,21 @@ function FiscalIcmsTable({
                 <td className={TABLE_CENTER_CELL_CLASSNAME}>
                   {item.original_mva ?? "—"}
                 </td>
-                <td className="px-3 py-2.5 text-center">
-                  <div className="flex justify-center">
-                    <button
-                      type="button"
-                      onClick={() => onEdit(item)}
-                      aria-label={`Editar ICMS ${item.description}`}
-                      title="Editar"
-                      className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
-                    >
-                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
-                  </div>
-                </td>
+                {onEdit ? (
+                  <td className="px-3 py-2.5 text-center">
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => onEdit(item)}
+                        aria-label={`Editar ICMS ${item.description}`}
+                        title="Editar"
+                        className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
