@@ -276,6 +276,20 @@ describe("ti stock routes", () => {
     });
   });
 
+  it("PATCH /ti/stock/categories/:id returns 409 when reactivating a conflicting category", async () => {
+    const response = await request(createTestApp())
+      .patch(`/ti/stock/categories/${categoryId}`)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({ status: true });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "CONFLICT",
+      error: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+    });
+  });
+
   it("POST /ti/stock/locations creates a stock location", async () => {
     const response = await request(createTestApp())
       .post("/ti/stock/locations")
