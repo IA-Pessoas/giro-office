@@ -87,6 +87,24 @@ describe("permission routes", () => {
     );
   });
 
+  it("rejeita módulos de permissão aposentados no query e no payload", async () => {
+    const app = createTestApp();
+
+    const getRes = await request(app)
+      .get("/user/permission/user-3")
+      .set(gatewayAuthHeaders())
+      .query({ modulo: "pec" });
+    const putRes = await request(app)
+      .put("/user/permission/user-3")
+      .set(gatewayAuthHeaders())
+      .send({ atendimento: 2, wiki: 1 });
+
+    expect(getRes.status).toBe(400);
+    expect(putRes.status).toBe(400);
+    expect(permissionServiceMock.getByUserId).not.toHaveBeenCalled();
+    expect(permissionServiceMock.update).not.toHaveBeenCalled();
+  });
+
   it("GET /user/permission/:userId permite admin RH consultar permissoes modulares", async () => {
     permissionServiceMock.getByUserId.mockResolvedValue({ comercial: 2 });
     const app = createTestApp();

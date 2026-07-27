@@ -382,6 +382,9 @@ await (async () => {
   await runTest("module access helpers normalize aliases and additional permission levels", () => {
     assert.equal(resolveDepartmentModuleKey("Departamento Pessoal"), "pessoal");
     assert.equal(resolveDepartmentModuleKey("Tecnologia"), "ti");
+    assert.equal(resolveDepartmentModuleKey("Atendimento"), null);
+    assert.equal(resolveDepartmentModuleKey("PEC"), null);
+    assert.equal(resolveDepartmentModuleKey("Wiki"), null);
     assert.equal(resolveAccessLevelFromAdditionalPermission(2), "admin");
     assert.equal(resolveAccessLevelFromAdditionalPermission(1), "edit");
     assert.equal(resolveAccessLevelFromAdditionalPermission(0), "view");

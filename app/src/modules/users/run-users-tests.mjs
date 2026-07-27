@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 
 import {
+  KNOWN_PERMISSION_MODULE_KEYS,
+  PERMISSION_MODULE_GROUPS,
+  PERMISSION_MODULE_LABELS,
   getMinimumPermissionLevel,
   getPermissionSelectOptions,
   normalizePermissionForModule,
@@ -83,6 +86,14 @@ runTest("create user password visibility control remains explicit and accessible
   assert.match(createUserModalSource, /aria-pressed=\{isPasswordVisible\}/);
   assert.match(createUserModalSource, /type=\{isPasswordVisible \? 'text' : 'password'\}/);
   assert.match(createUserModalSource, /autoComplete="new-password"/);
+});
+
+runTest("retired department modules are never sent by create-user payloads", () => {
+  const modules = buildCreateUserModulesPayload({}, null, 1);
+
+  for (const retiredKey of ["atendimento", "pec", "wiki"]) {
+    assert.equal(Object.hasOwn(modules, retiredKey), false);
+  }
 });
 
 runTest("RH and Technology define Viewer as their frontend minimum", () => {
@@ -204,6 +215,37 @@ runTest("permission update payload enforces only RH and Technology minimums", ()
   assert.equal(payload.ti, 0);
   assert.equal(payload.fiscal, null);
   assert.equal(payload.contabil, 2);
+});
+
+runTest("retired PEC, Atendimento and Wiki modules are absent from every user permission UI config", () => {
+  const retiredKeys = ["pec", "atendimento", "wiki"];
+
+  for (const retiredKey of retiredKeys) {
+    assert.equal(KNOWN_PERMISSION_MODULE_KEYS.includes(retiredKey), false);
+    assert.equal(Object.hasOwn(PERMISSION_MODULE_LABELS, retiredKey), false);
+    assert.equal(PERMISSION_MODULE_GROUPS.flatMap((group) => group.keys).includes(retiredKey), false);
+    assert.equal(createUserConfigSource.includes(`key: "${retiredKey}"`), false);
+    assert.equal(userTypesSource.includes(`| "${retiredKey}"`), false);
+  }
+});
+
+runTest("retired permission modules from a legacy response are never re-sent as extras", () => {
+  const normalization = normalizePermissionResponse({
+    atendimento: 1,
+    pec: 2,
+    wiki: 0,
+    custom_module: 1,
+  });
+  const payload = buildPermissionUpdatePayload(
+    { ...normalization.known, ...normalization.extras },
+    Object.keys(normalization.extras),
+  );
+
+  assert.deepEqual(normalization.extras, { custom_module: 1 });
+  assert.equal(Object.hasOwn(payload, "atendimento"), false);
+  assert.equal(Object.hasOwn(payload, "pec"), false);
+  assert.equal(Object.hasOwn(payload, "wiki"), false);
+  assert.equal(payload.custom_module, 1);
 });
 
 runTest("create user additional modules hide unavailable services", () => {
