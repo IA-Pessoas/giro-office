@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   buildCertificateFileFormData,
@@ -30,6 +31,20 @@ runTest("certificate endpoints match gateway public contract", () => {
   assert.equal(CERTIFICATE_ENDPOINTS.pfDetail("id-1"), "/certificate/pf/id-1");
   assert.equal(CERTIFICATE_ENDPOINTS.pfFile("id-1"), "/certificate/pf/id-1/file");
   assert.equal(CERTIFICATE_ENDPOINTS.notifications, "/certificate/notifications");
+});
+
+runTest("certificate record deletion uses the detail endpoints and an internal dialog", () => {
+  const clientSource = readFileSync(new URL("./services/certificateService.ts", import.meta.url), "utf8");
+  const actionsSource = readFileSync(
+    new URL("./components/CertificateFileActions.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(clientSource, /async deletePj\(id: string\): Promise<void>/);
+  assert.match(clientSource, /async deletePf\(id: string\): Promise<void>/);
+  assert.match(actionsSource, /Excluir certificado/);
+  assert.match(actionsSource, /<Dialog/);
+  assert.doesNotMatch(actionsSource, /window\.confirm/);
 });
 
 runTest("buildCertificateListParams removes empty values", () => {

@@ -431,6 +431,22 @@ export class CertificatePfService {
     return { ok: true };
   }
 
+  async deleteCertificatePf(
+    input: CertificatePfFileInput,
+  ): Promise<CertificatePfFileDeleteResult> {
+    const record = await this.findCertificatePfForFile(input);
+
+    if (record.file_path) {
+      await this.requireFileDeps().fileStorage.deleteObject(record.file_path);
+    }
+
+    await this.prisma.certificatePF.delete({
+      where: { id: input.id, organization_id: input.organizationId },
+    });
+
+    return { ok: true };
+  }
+
   private requireFileDeps(): CertificatePfFileDeps {
     if (!this.fileDeps) {
       throw new ServiceError(500, "Storage de arquivo de certificado nao configurado.");

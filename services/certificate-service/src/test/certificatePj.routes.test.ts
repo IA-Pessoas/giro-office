@@ -477,4 +477,18 @@ describe("certificate PJ routes", () => {
     });
     expect(fileStorage.deleteObject).toHaveBeenCalledWith(objectPath);
   });
+
+  it("DELETE /certificate/pj/:id returns 404 for a certificate outside the organization", async () => {
+    const prisma = createCertificatePrismaMock();
+    vi.mocked(prisma.certificatePJ.findFirst).mockResolvedValueOnce(null);
+    const app = createCertificateTestApp(prisma);
+
+    const response = await request(app)
+      .delete(`/certificate/pj/${certificateId}`)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(404);
+    expect(response.body).toMatchObject({ success: false, code: "NOT_FOUND" });
+    expect(prisma.certificatePJ.delete).not.toHaveBeenCalled();
+  });
 });

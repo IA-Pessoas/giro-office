@@ -586,4 +586,30 @@ describe("CertificatePjService", () => {
     expect(storage.deleteObject).toHaveBeenCalledWith(objectPath);
     expect(prisma.certificatePJ.update).not.toHaveBeenCalled();
   });
+
+  it("deleteCertificatePj returns 404 without touching storage outside the organization", async () => {
+    const { storage, crypto } = createCertificateFileDeps();
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => null),
+        delete: vi.fn(),
+      },
+    };
+    const service = new CertificatePjService(prisma as never, {
+      fileStorage: storage,
+      fileCrypto: crypto,
+      storageProvider: "local",
+      storageBucket: "Certificados",
+    });
+
+    await expect(
+      service.deleteCertificatePj({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 } satisfies Partial<ServiceError>);
+
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    expect(prisma.certificatePJ.delete).not.toHaveBeenCalled();
+  });
 });
