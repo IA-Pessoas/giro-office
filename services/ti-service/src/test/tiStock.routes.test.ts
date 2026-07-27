@@ -265,4 +265,18 @@ describe("ti stock routes", () => {
       },
     });
   });
+
+  it("POST /ti/stock/locations rejects a normalized duplicate", async () => {
+    const response = await request(createTestApp())
+      .post("/ti/stock/locations")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({ name: "  ALMOXARIFADO   SAO  " });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Ja existe um local de estoque de TI ativo com este nome.",
+      code: "CONFLICT",
+    });
+  });
 });

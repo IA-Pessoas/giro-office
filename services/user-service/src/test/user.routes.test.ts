@@ -334,6 +334,25 @@ describe("user routes", () => {
     expect(userServiceMock.create).not.toHaveBeenCalled();
   });
 
+  it("POST /user rejeita módulos de permissão aposentados", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user")
+      .set(gatewayAuthHeaders())
+      .send({
+        name: "Novo Usuario",
+        login: "novo.usuario.legado",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 1,
+        modules: { pec: 2 },
+      });
+
+    expect(res.status).toBe(400);
+    expect(userServiceMock.create).not.toHaveBeenCalled();
+  });
+
   it("PATCH /user/:id atualiza usuario", async () => {
     userServiceMock.update.mockResolvedValue({ id: "user-3" });
     const app = createTestApp();

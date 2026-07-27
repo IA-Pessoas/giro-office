@@ -194,7 +194,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                       Departamento: {task.department?.name || task.model?.department?.name}
                     </p>
                   ) : null}
-                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                  <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap break-words">
                     {task.observations || task.observation || "Sem observações específicas."}
                   </p>
                 </article>

@@ -37,6 +37,26 @@ describe("task model routes", () => {
     });
   });
 
+  it("POST /task/model rejeita responsável 3 sem responsável 2", async () => {
+    const app = createTestApp();
+
+    const res = await request(app).post("/task/model").send({
+      name: "Modelo",
+      department_id: "dep-1",
+      responsible_id: "user-1",
+      responsible3_id: "user-3",
+      billing: "Realizar",
+      prevision: 2,
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({
+      success: false,
+      error: "Responsável 2 é obrigatório antes do responsável 3.",
+    });
+    expect(taskModelServiceMock.createModel).not.toHaveBeenCalled();
+  });
+
   it("GET /task/model busca modelo", async () => {
     const app = createTestApp();
 

@@ -147,7 +147,7 @@ describe("UserService", () => {
       permission: 1,
       organization_id: "org-1",
       type: "admin",
-      modules: { fiscal: 1 },
+      modules: { atendimento: 2, fiscal: 1, pec: 2, wiki: 1 },
     });
 
     expect(prismaMock.department.findFirst).toHaveBeenCalledWith({

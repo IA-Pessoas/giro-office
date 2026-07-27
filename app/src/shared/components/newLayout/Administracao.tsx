@@ -582,7 +582,7 @@ export function Administracao() {
       const raw = shouldSyncDepartmentPermission
         ? await (async () => {
             if (!selectedPermissionDepartmentModule) {
-              throw new Error("Modulo do departamento nao encontrado.");
+              throw new Error("Módulo do departamento não encontrado.");
             }
 
             await userService.update(
@@ -660,9 +660,9 @@ export function Administracao() {
 
   const adminTabs = [
     { key: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { key: "users", label: "Usuarios", icon: Users },
+    { key: "users", label: "Usuários", icon: Users },
     ...(canManagePermissions
-      ? [{ key: "permissions", label: "Permissoes", icon: Lock }]
+      ? [{ key: "permissions", label: "Permissões", icon: Lock }]
       : []),
   ] as const;
 
@@ -1079,7 +1079,7 @@ export function Administracao() {
                       Níveis da permissão por módulo
                     </p>
                     <p className={ADMIN_MUTED_CLASSNAME}>
-                      Ajuste apenas acessos complementares ao modulo principal do usuario selecionado.
+                      Ajuste apenas acessos complementares ao módulo principal do usuário selecionado.
                     </p>
                   </div>
                   <button

@@ -1,9 +1,15 @@
 import "./envBootstrap.js";
 
+import { ServiceError } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import { createUnionRoutes } from "../routes/union.routes.js";
-import { createRouteTestApp, gatewayHeaders, organizationId } from "./pessoalCoreTestUtils.js";
+import {
+  createRouteTestApp,
+  gatewayHeaders,
+  organizationId,
+  unionId,
+} from "./pessoalCoreTestUtils.js";
 
 describe("union routes", () => {
   it("lista sindicatos em envelope", async () => {
@@ -56,5 +62,44 @@ describe("union routes", () => {
 
     expect(response.status).toBe(400);
     expect(service.list).not.toHaveBeenCalled();
+  });
+
+  it("remove sindicato em envelope", async () => {
+    const deletedUnion = { id: unionId, name: "Metalurgicos" };
+    const service = { delete: vi.fn(async () => deletedUnion) };
+    const app = createRouteTestApp("/pessoal/unions", createUnionRoutes(service as never));
+
+    const response = await request(app).delete(`/pessoal/unions/${unionId}`).set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: deletedUnion });
+    expect(service.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId }),
+      unionId,
+    );
+  });
+
+  it("rejeita id de sindicato invalido antes de chamar a exclusao", async () => {
+    const service = { delete: vi.fn() };
+    const app = createRouteTestApp("/pessoal/unions", createUnionRoutes(service as never));
+
+    const response = await request(app).delete("/pessoal/unions/id-invalido").set(gatewayHeaders());
+
+    expect(response.status).toBe(400);
+    expect(service.delete).not.toHaveBeenCalled();
+  });
+
+  it("encaminha conflito da exclusao para o envelope de erro", async () => {
+    const service = {
+      delete: vi.fn(async () => {
+        throw new ServiceError(409, "Sindicato vinculado a folha.");
+      }),
+    };
+    const app = createRouteTestApp("/pessoal/unions", createUnionRoutes(service as never));
+
+    const response = await request(app).delete(`/pessoal/unions/${unionId}`).set(gatewayHeaders());
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({ success: false, error: "Sindicato vinculado a folha." });
   });
 });

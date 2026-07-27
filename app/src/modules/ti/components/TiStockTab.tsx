@@ -49,7 +49,12 @@ import type {
   TiStockLocation,
   TiStockMovement,
 } from "../types";
-import { resolveTiStockLocationName } from "../utils/stockDisplay";
+import {
+  filterTiStockLocations,
+  hasActiveTiStockLocation,
+  resolveTiStockLocationName,
+} from "../utils/stockDisplay";
+import { getTiStockMutationErrorMessage } from "../utils/stockMutationError";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -320,6 +325,10 @@ export function TiStockTab() {
 
   const stockCategories = stockCategoriesQuery.data ?? [];
   const stockLocations = stockLocationsQuery.data ?? [];
+  const filteredStockLocations = useMemo(
+    () => filterTiStockLocations(stockLocations, locationName),
+    [locationName, stockLocations],
+  );
   const stockItems = stockItemsQuery.data?.data ?? [];
   const users = assignableUsersQuery.data ?? [];
   const selectedListItem = stockItems.find((item) => getId(item.id) === getId(selectedItemId));
@@ -670,7 +679,7 @@ export function TiStockTab() {
       closeExitDialog();
       toast.success("Saída registrada com sucesso.");
     } catch (error) {
-      toast.error(getMutationErrorMessage(error, "Não foi possível registrar a saída."));
+      toast.error(getTiStockMutationErrorMessage(error, "Não foi possível registrar a saída."));
     }
   }
 
@@ -709,6 +718,11 @@ export function TiStockTab() {
 
     if (!name) {
       toast.error("Informe o nome do local.");
+      return;
+    }
+
+    if (hasActiveTiStockLocation(stockLocations, name)) {
+      toast.error("Já existe um local de estoque de TI ativo com este nome.");
       return;
     }
 
@@ -1384,7 +1398,11 @@ export function TiStockTab() {
                   type="submit"
                   label={createLocationMutation.isPending ? "Criando..." : "Criar"}
                   variant="primary"
-                  disabled={!canEditStock || createLocationMutation.isPending}
+                  disabled={
+                    !canEditStock ||
+                    createLocationMutation.isPending ||
+                    hasActiveTiStockLocation(stockLocations, locationName)
+                  }
                 />
               </div>
             </form>
@@ -1395,9 +1413,9 @@ export function TiStockTab() {
               Locais cadastrados
             </h3>
             <MiniResourceList
-              emptyLabel="Nenhum local cadastrado."
+              emptyLabel={locationName.trim() ? "Nenhum local encontrado." : "Nenhum local cadastrado."}
               icon={MapPin}
-              rows={stockLocations}
+              rows={filteredStockLocations}
             />
           </section>
         </div>

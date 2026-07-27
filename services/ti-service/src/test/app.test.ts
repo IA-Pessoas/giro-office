@@ -27,6 +27,9 @@ const tiTestEnv = {
   auditServiceToken: "audit-service-token-test",
   internalServiceToken: "ti-service-internal-token-test",
   passwordEncryptionKey: "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=",
+  supabaseUrl: "https://example.supabase.co",
+  supabaseServiceRoleKey: "test-supabase-service-role-key",
+  tiRequestImageBucket: "ti-request-attachments-private",
   allowedOrigins: ["*"],
   enableApiDocs: false,
   logLevel: "info",
@@ -296,6 +299,30 @@ describe("ti-service app", () => {
         },
       },
     });
+
+    const createMessageOperation = response.body.paths["/ti/requests/{id}/messages"].post;
+
+    expect(createMessageOperation.requestBody.content["application/json"].schema).toEqual({
+      $ref: "#/components/schemas/TiMessageInput",
+    });
+    expect(createMessageOperation.requestBody.content["multipart/form-data"]).toMatchObject({
+      schema: {
+        type: "object",
+        required: ["message"],
+        properties: {
+          message: { type: "string", minLength: 1 },
+          file: { type: "string", format: "binary" },
+        },
+      },
+      encoding: {
+        file: {
+          contentType: "image/jpeg, image/png, image/webp",
+        },
+      },
+    });
+    expect(createMessageOperation.responses).toHaveProperty("400");
+    expect(createMessageOperation.responses).toHaveProperty("413");
+    expect(createMessageOperation.responses).toHaveProperty("500");
   });
 });
 

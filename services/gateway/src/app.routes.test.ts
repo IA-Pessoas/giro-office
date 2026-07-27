@@ -2795,6 +2795,36 @@ it("blocks limited users without client-related module permission before proxyin
   }
 });
 
+it("does not authorize client routes with a retired atendimento permission", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { atendimento: 2 },
+  });
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.end(JSON.stringify({ success: true }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(response.status).toBe(403);
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("allows limited users with client-related module permission to proxy /client", async () => {
   const token = createToken({
     user_id: "user-1",

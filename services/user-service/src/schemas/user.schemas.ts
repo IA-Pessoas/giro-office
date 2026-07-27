@@ -1,10 +1,8 @@
 import { z } from "zod";
 
-import { permissionModuleValueSchema } from "./permission.schemas.js";
+import { modulesSchema } from "./permission.schemas.js";
 
 const userTypeSchema = z.enum(["admin", "owner", "user"]);
-
-const modulesSchema = z.record(permissionModuleValueSchema);
 
 export const listUsersQuerySchema = z
   .object({

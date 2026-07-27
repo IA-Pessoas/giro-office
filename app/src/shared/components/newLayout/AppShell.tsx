@@ -255,7 +255,13 @@ type AppShellNotification = {
   unread: boolean;
 };
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  isIframeView = false,
+}: {
+  children: React.ReactNode;
+  isIframeView?: boolean;
+}) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
   const meQuery = useMe();
@@ -473,6 +479,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
     chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
   }, [chatMessages, showAiChat]);
+
+  if (isIframeView) {
+    return <div className="min-h-screen bg-gray-50 dark:bg-slate-950">{mainContent}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">

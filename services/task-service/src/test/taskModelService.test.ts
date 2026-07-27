@@ -47,6 +47,52 @@ describe("TaskModelService", () => {
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 
+  it("createModel rejeita responsável 3 sem responsável 2 antes de consultar o banco", async () => {
+    const service = new TaskModelService();
+
+    await expect(
+      service.createModel({
+        user_id: "user-1",
+        organization_id: "org-1",
+        name: "Modelo",
+        department_id: "dep-1",
+        responsible_id: "user-1",
+        responsible2_id: null,
+        responsible3_id: "user-3",
+        billing: "Realizar",
+        prevision: 2,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Responsável 2 é obrigatório antes do responsável 3.",
+    });
+
+    expect(prismaMock.taskModel.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("updateModel rejeita responsável 2 quando o responsável principal está ausente", async () => {
+    const service = new TaskModelService();
+
+    await expect(
+      service.updateModel({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "model-1",
+        name: "Modelo",
+        department_id: "dep-1",
+        responsible_id: "",
+        responsible2_id: "user-2",
+        billing: "Realizar",
+        prevision: 2,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Responsável é obrigatório.",
+    });
+
+    expect(prismaMock.taskModel.findFirst).not.toHaveBeenCalled();
+  });
+
   it("detailModel lança 404 quando modelo não existe", async () => {
     prismaMock.taskModel.findFirst.mockResolvedValue(null);
     const service = new TaskModelService();

@@ -19,6 +19,13 @@ import {
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
 import { formatPessoalObligationGenerationSummary } from "./utils/obligationGenerationSummary.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
+import {
+  cancelUnionDeletion,
+  completeUnionDeletion,
+  failUnionDeletion,
+  getUnionDeletionTargetId,
+  openUnionDeletion,
+} from "./utils/unionDeletionFlow.ts";
 
 function runTest(name, fn) {
   try {
@@ -54,6 +61,38 @@ runTest("pessoal endpoints match the gateway public contract", () => {
   );
   assert.equal(PESSOAL_ENDPOINTS.passwords, "/pessoal/passwords");
   assert.equal(PESSOAL_ENDPOINTS.passwordDetail("password-1"), "/pessoal/passwords/password-1");
+});
+
+runTest("pessoal situation deletion client uses the detail endpoint and refreshes cached state", () => {
+  const service = readFileSync("src/modules/pessoal/services/pessoalService.ts", "utf8");
+  const trackingHook = readFileSync("src/modules/pessoal/hooks/usePessoalTracking.ts", "utf8");
+
+  assert.match(
+    service,
+    /async deleteSituation\(id: string\): Promise<PessoalSituation> \{[\s\S]*?api\.delete\(PESSOAL_ENDPOINTS\.situationDetail\(id\)\)/,
+  );
+  assert.match(
+    trackingHook,
+    /export function useDeletePessoalSituationMutation\(\s*clientId: string,?\s*\)[\s\S]*?mutationFn: \(id\) => pessoalService\.deleteSituation\(id\)[\s\S]*?situationsKey\(clientId\)[\s\S]*?situationDetailKey\(id\)/,
+  );
+});
+
+runTest("pessoal situations expose a permissioned delete confirmation with feedback", () => {
+  const section = readFileSync(
+    "src/modules/pessoal/components/PessoalTrackingSection.tsx",
+    "utf8",
+  );
+
+  assert.match(section, /useDeletePessoalSituationMutation\(selectedClientId\)/);
+  assert.match(section, /const \[situationToDelete, setSituationToDelete\] = useState<PessoalSituation \| null>\(null\)/);
+  assert.match(section, /function openDeleteSituationDialog\(situation: PessoalSituation\) \{[\s\S]*?if \(!canEdit\) \{[\s\S]*?return;/);
+  assert.match(section, /async function handleConfirmDeleteSituation\(\) \{[\s\S]*?await deleteSituationMutation\.mutateAsync\(situation\.id\)/);
+  assert.match(section, /setSuccessMessage\("Situação removida\."\)/);
+  assert.match(section, /title="Remover situação"/);
+  assert.match(section, /Não será possível recuperar a situação, mesmo quando ela já estiver finalizada\./);
+  assert.match(section, /disabled=\{deleteSituationMutation\.isPending\}/);
+  assert.match(section, /onClick=\{\(\) => setSituationToDelete\(null\)\}/);
+  assert.match(section, /\{canEdit \? \([\s\S]*?onClick=\{\(\) => openDeleteSituationDialog\(situation\)\}/);
 });
 
 runTest("pessoal tabs stay stable for branch integration", () => {
@@ -151,6 +190,65 @@ runTest("union management is paginated while payroll keeps the full catalog", ()
   assert.match(section, /<PaginationControls/);
   assert.match(payroll, /usePessoalUnions\(\)/);
   assert.doesNotMatch(payroll, /usePaginatedPessoalUnions/);
+});
+
+runTest("union deletion uses the scoped client, cache mutation, and guarded dialog", () => {
+  const service = readFileSync("src/modules/pessoal/services/pessoalService.ts", "utf8");
+  const hook = readFileSync("src/modules/pessoal/hooks/usePessoalUnions.ts", "utf8");
+  const section = readFileSync(
+    "src/modules/pessoal/components/PessoalUnionsSection.tsx",
+    "utf8",
+  );
+
+  assert.match(service, /async deleteUnion\(id: string\): Promise<PessoalUnion>/);
+  assert.match(service, /api\.delete\(PESSOAL_ENDPOINTS\.unionDetail\(id\)\)/);
+  assert.match(hook, /export function useDeletePessoalUnionMutation/);
+  assert.match(hook, /mutationFn: \(id\) => pessoalService\.deleteUnion\(id\)/);
+  assert.match(hook, /onSuccess: async \(\) => \{\s*await queryClient\.invalidateQueries\(\{ queryKey: unionsKey \}\)/);
+  assert.match(section, /useDeletePessoalUnionMutation/);
+  assert.match(section, /canEdit \? \(\s*<td/);
+  assert.match(section, /<Dialog[\s\S]*title="Remover sindicato"/);
+  assert.match(section, /openUnionDeletion/);
+  assert.match(section, /getUnionDeletionTargetId\(unionDeletion\)/);
+  assert.match(section, /await deleteMutation\.mutateAsync\(unionId\)/);
+  assert.match(section, /completeUnionDeletion\(current, unionId\)/);
+  assert.match(section, /failUnionDeletion\(current, unionId, message\)/);
+  assert.match(section, /unionDeletion\.union\.name/);
+  assert.match(section, /role="alert"/);
+  assert.match(section, /unionDeletion\.union\.cnpj/);
+  assert.match(section, /toast\.success\("Sindicato removido\."\)/);
+  assert.match(
+    section,
+    /const message = getPessoalErrorMessage\(error, "Não foi possível remover o sindicato\."\)/,
+  );
+  assert.match(section, /toast\.error\(message\)/);
+  assert.doesNotMatch(section, /window\.confirm|confirm\(/);
+});
+
+runTest("union deletion state preserves the chosen target and cancels without a request target", () => {
+  const union = { id: "union-42", name: "Metal", cnpj: "123", base_date: null };
+  const opened = openUnionDeletion(null, union, { canEdit: true, isPending: false });
+
+  assert.equal(getUnionDeletionTargetId(opened), "union-42");
+  assert.equal(opened?.union.name, "Metal");
+  assert.equal(getUnionDeletionTargetId(cancelUnionDeletion(opened, false)), null);
+});
+
+runTest("union deletion result closes only after success and keeps the target with the API conflict", () => {
+  const union = { id: "union-42", name: "Metal", cnpj: "123", base_date: null };
+  const opened = openUnionDeletion(null, union, { canEdit: true, isPending: false });
+  const conflict = failUnionDeletion(
+    opened,
+    "union-42",
+    "Não é possível remover o sindicato porque ele está vinculado a uma configuração de folha.",
+  );
+
+  assert.equal(getUnionDeletionTargetId(conflict), "union-42");
+  assert.equal(
+    conflict?.error,
+    "Não é possível remover o sindicato porque ele está vinculado a uma configuração de folha.",
+  );
+  assert.equal(getUnionDeletionTargetId(completeUnionDeletion(conflict, "union-42")), null);
 });
 
 runTest("payroll payload builder keeps backend payroll fields", () => {
@@ -278,6 +376,30 @@ runTest("client-scoped sections block requests without selected client", () => {
   assert.match(obligations, /hasClient && obligationQuery\.isLoading/);
   assert.match(obligations, /title="Obrigação individual"/);
   assert.doesNotMatch(obligations, /if \(!hasClient\) \{\s*return/);
+});
+
+runTest("situation detail exposes explicit completion and reopening actions", () => {
+  const tracking = readFileSync(
+    "src/modules/pessoal/components/PessoalTrackingSection.tsx",
+    "utf8",
+  );
+
+  assert.match(tracking, /Concluir situação/);
+  assert.match(tracking, /Reabrir situação/);
+  assert.match(tracking, /handleSituationStatusChange\("Finalizado"\)/);
+  assert.match(tracking, /handleSituationStatusChange\("Em andamento"\)/);
+  assert.match(
+    tracking,
+    /if \(selectedSituationId\) \{[\s\S]*?payload: \{\s*title: payload\.title,\s*description: payload\.description,\s*\},/,
+  );
+  assert.doesNotMatch(tracking, /situationFormValues\.status/);
+  assert.match(
+    tracking,
+    /handleSituationStatusChange\(nextStatus: PessoalSituationStatus\)[\s\S]*?payload: \{\s*status: nextStatus,\s*\},[\s\S]*?setSuccessMessage\(\n?\s*nextStatus === "Finalizado"\n?\s*\? "Situação concluída\."\n?\s*:\s*"Situação reaberta\."/,
+  );
+  assert.match(tracking, /Finalizar registra a data de conclusão\./);
+  assert.match(tracking, /Reabrir limpa a data de conclusão\./);
+  assert.match(tracking, /Concluída em \{formatDate\(situation\.completion_date\)\}/);
 });
 
 runTest("pessoal overview reads available dashboard data", () => {

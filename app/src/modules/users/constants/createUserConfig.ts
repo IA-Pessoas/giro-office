@@ -19,15 +19,12 @@ export const CREATE_USER_PERMISSION_OPTIONS: Array<{ value: UserPermission; labe
 ];
 
 export const CREATE_USER_MODULE_OPTIONS = [
-  { key: "atendimento", label: "Atendimento" },
   { key: "certificado", label: "Certificado" },
   { key: "contabil", label: "Contábil" },
   { key: "fiscal", label: "Fiscal" },
   { key: "integracao", label: "Integracao" },
-  { key: "pec", label: "PEC" },
   { key: "pessoal", label: "Pessoal" },
   { key: "regularize", label: "Regularize" },
   { key: "rh", label: "RH" },
   { key: "ti", label: "Tecnologia" },
-  { key: "wiki", label: "Wiki" },
 ] as const;

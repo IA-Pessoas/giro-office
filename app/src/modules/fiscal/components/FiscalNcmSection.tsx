@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Loader2, Plus, Search, ScrollText } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, ArrowLeft, Loader2, Pencil, Plus, Search, ScrollText } from "lucide-react";
 
 import { useFiscalNcmList } from "../hooks";
+import { FISCAL_LIST_PAGE_SIZE } from "../hooks/queryKeys";
 import type { FiscalNcm } from "../types";
 import {
   formatFiscalDateLabel,
@@ -10,6 +11,7 @@ import {
 } from "../utils";
 import { FiscalNcmFormPanel } from "./FiscalNcmFormPanel";
 import { FiscalStateBox } from "./FiscalStateBox";
+import { PaginationControls } from "@shared/components/ui/PaginationControls";
 
 type FiscalNcmPanelIntent =
   | { mode: "create" }
@@ -17,34 +19,50 @@ type FiscalNcmPanelIntent =
   | null;
 
 const ACTION_BUTTON_CLASSNAME =
-  "inline-flex h-8 min-w-[88px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+
+const TABLE_HEADER_CLASSNAME =
+  "px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-700 dark:text-slate-300";
+
+const TABLE_TEXT_CELL_CLASSNAME =
+  "px-3 py-2.5 text-sm leading-5 break-words text-gray-700 dark:text-slate-300";
+
+const TABLE_CENTER_CELL_CLASSNAME =
+  "px-3 py-2.5 text-center text-sm leading-5 text-gray-700 dark:text-slate-300";
+
+const TABLE_CODE_CELL_CLASSNAME =
+  "px-4 py-2.5 text-center text-sm font-medium leading-5 text-gray-900 dark:text-white";
 
 export function FiscalNcmSection({ canEdit }: { canEdit: boolean }) {
   const [filterValue, setFilterValue] = useState("");
-  const [submittedCodes, setSubmittedCodes] = useState<string[]>([]);
-  const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
-  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [searchCodes, setSearchCodes] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
   const [panelIntent, setPanelIntent] = useState<FiscalNcmPanelIntent>(null);
 
-  const searchQuery = useFiscalNcmList(submittedCodes, hasSubmittedSearch);
+  const searchQuery = useFiscalNcmList({
+    ncmCodes: searchCodes,
+    page,
+    page_size: FISCAL_LIST_PAGE_SIZE,
+  });
   const errorMessage = searchQuery.error
     ? getFiscalErrorMessage(searchQuery.error)
     : null;
 
-  const submittedLabel = useMemo(() => submittedCodes.join(", "), [submittedCodes]);
+  const searchLabel = useMemo(() => searchCodes.join(", "), [searchCodes]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setSearchCodes(parseCommaSeparatedCodes(filterValue));
+      setPage(1);
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [filterValue]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    const normalizedCodes = parseCommaSeparatedCodes(filterValue);
-    if (normalizedCodes.length === 0) {
-      setValidationMessage("Informe ao menos um código NCM para buscar.");
-      return;
-    }
-
-    setValidationMessage(null);
-    setSubmittedCodes(normalizedCodes);
-    setHasSubmittedSearch(true);
+    setSearchCodes(parseCommaSeparatedCodes(filterValue));
+    setPage(1);
   }
 
   if (panelIntent && canEdit) {
@@ -78,11 +96,11 @@ export function FiscalNcmSection({ canEdit }: { canEdit: boolean }) {
                 </p>
               </div>
 
-              {submittedCodes.length > 0 ? (
+              {searchCodes.length > 0 ? (
                 <div className="text-sm text-gray-500 dark:text-slate-400">
                   Busca atual:{" "}
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {submittedLabel}
+                    {searchLabel}
                   </span>
                 </div>
               ) : null}
@@ -92,7 +110,6 @@ export function FiscalNcmSection({ canEdit }: { canEdit: boolean }) {
             <FiscalNcmFormPanel
               mode={panelIntent.mode}
               ncmId={panelIntent.mode === "edit" ? panelIntent.ncmId : undefined}
-              searchCodes={submittedCodes}
               onClose={() => setPanelIntent(null)}
               showHeader={false}
               bare
@@ -144,46 +161,44 @@ export function FiscalNcmSection({ canEdit }: { canEdit: boolean }) {
                 <input
                   type="text"
                   value={filterValue}
-                  onChange={(event) => {
-                    setFilterValue(event.target.value);
-                    if (validationMessage) {
-                      setValidationMessage(null);
-                    }
-                  }}
+                  onChange={(event) => setFilterValue(event.target.value)}
                   placeholder="Ex.: 84719012, 84715010"
                   className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-[13px] text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
                 />
               </div>
 
-              <button
-                type="submit"
-                className="inline-flex h-9 min-w-[88px] items-center justify-center rounded-lg bg-blue-600 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-              >
-                Buscar
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  className="inline-flex h-9 min-w-[88px] items-center justify-center rounded-lg bg-blue-600 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                >
+                  Buscar
+                </button>
+                {filterValue ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterValue("");
+                      setSearchCodes([]);
+                      setPage(1);
+                    }}
+                    className="inline-flex h-9 min-w-[72px] items-center justify-center rounded-lg border border-gray-300 px-3.5 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                  >
+                    Limpar
+                  </button>
+                ) : null}
+              </div>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              Use vírgulas para consultar mais de um código NCM.
+              Digite parte do codigo ou use virgulas para consultar mais de um NCM.
             </p>
           </div>
-
-          {validationMessage ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-              {validationMessage}
-            </div>
-          ) : null}
         </form>
       </div>
 
-      {!hasSubmittedSearch ? (
-        <FiscalStateBox icon={Search} title="Informe os códigos NCM e clique em buscar" compact>
-          Use a consulta sob demanda para listar apenas os NCMs que fazem sentido neste momento.
-        </FiscalStateBox>
-      ) : null}
-
-      {hasSubmittedSearch && searchQuery.isLoading && !searchQuery.data ? (
+      {searchQuery.isLoading && !searchQuery.data ? (
         <FiscalStateBox icon={Loader2} tone="loading" title="Buscando NCMs" compact>
-          Estamos consultando os registros para os códigos informados.
+          Estamos consultando os registros fiscais.
         </FiscalStateBox>
       ) : null}
 
@@ -198,12 +213,12 @@ export function FiscalNcmSection({ canEdit }: { canEdit: boolean }) {
           <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                {searchQuery.data.length === 1
+                {searchQuery.data.data.length === 1
                   ? "1 registro encontrado"
-                  : `${searchQuery.data.length} registros encontrados`}
+                  : `${searchQuery.data.total} registros encontrados`}
               </p>
               <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
-                Busca atual: {submittedLabel}
+                Busca atual: {searchCodes.length > 0 ? searchLabel : "Listagem geral"}
               </p>
             </div>
 
@@ -221,9 +236,9 @@ export function FiscalNcmSection({ canEdit }: { canEdit: boolean }) {
             </FiscalStateBox>
           ) : null}
 
-          {searchQuery.data.length > 0 ? (
+          {searchQuery.data.data.length > 0 ? (
             <FiscalNcmTable
-              items={searchQuery.data}
+              items={searchQuery.data.data}
               onEdit={canEdit ? (item) => setPanelIntent({ mode: "edit", ncmId: item.id }) : undefined}
             />
           ) : (
@@ -231,6 +246,17 @@ export function FiscalNcmSection({ canEdit }: { canEdit: boolean }) {
               Não localizamos registros para os códigos informados. Revise a busca e tente novamente.
             </FiscalStateBox>
           )}
+
+          <PaginationControls
+            page={searchQuery.data.page}
+            limit={searchQuery.data.limit}
+            total={searchQuery.data.total}
+            count={searchQuery.data.data.length}
+            hasMore={searchQuery.data.hasMore}
+            isFetching={searchQuery.isFetching}
+            onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+            onNext={() => setPage((currentPage) => currentPage + 1)}
+          />
         </div>
       ) : null}
     </section>
@@ -249,61 +275,63 @@ function FiscalNcmTable({
       <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-slate-700">
         <thead className="bg-gray-50 dark:bg-slate-800/60">
           <tr>
-            <th className="w-[12%] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[12%] px-4`}>
               NCM
             </th>
-            <th className="w-[28%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[26%]`}>
               Descrição
             </th>
-            <th className="w-[16%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[18%]`}>
               Regime
             </th>
-            <th className="w-[16%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Tributação federal
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[16%]`}>
+              Tributação
             </th>
-            <th className="w-[9%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Vigência inicial
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[11%]`}>
+              Início
             </th>
-            <th className="w-[9%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-              Vigência final
+            <th className={`${TABLE_HEADER_CLASSNAME} w-[10%]`}>
+              Fim
             </th>
             {onEdit ? (
-              <th className="w-[10%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-                Ações
+              <th className={`${TABLE_HEADER_CLASSNAME} w-[7%] px-3`}>
+                Ação
               </th>
             ) : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
           {items.map((item) => (
-            <tr key={item.id} className="align-top hover:bg-gray-50 dark:hover:bg-slate-800/30">
-              <td className="px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">
+            <tr key={item.id} className="align-middle hover:bg-gray-50 dark:hover:bg-slate-800/30">
+              <td className={TABLE_CODE_CELL_CLASSNAME}>
                 {item.ncm_code}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+              <td className={TABLE_TEXT_CELL_CLASSNAME}>
                 {item.description}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+              <td className={TABLE_TEXT_CELL_CLASSNAME}>
                 {item.tax_regime}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+              <td className={TABLE_TEXT_CELL_CLASSNAME}>
                 {item.federal_taxation_type}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+              <td className={TABLE_CENTER_CELL_CLASSNAME}>
                 {formatFiscalDateLabel(item.validity_start_date)}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
-                {formatFiscalDateLabel(item.validity_end_date)}
+              <td className={TABLE_CENTER_CELL_CLASSNAME}>
+                {item.validity_end_date ? formatFiscalDateLabel(item.validity_end_date) : "Sem fim"}
               </td>
               {onEdit ? (
-                <td className="px-5 py-3">
-                  <div className="flex justify-end">
+                <td className="px-3 py-2.5 text-center">
+                  <div className="flex justify-center">
                     <button
                       type="button"
                       onClick={() => onEdit(item)}
+                      aria-label={`Editar NCM ${item.ncm_code}`}
+                      title="Editar"
                       className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
                     >
-                      Editar
+                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                   </div>
                 </td>

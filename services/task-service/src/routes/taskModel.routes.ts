@@ -10,6 +10,9 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { taskModelListQuerySchema } from "../schemas/taskModelList.schemas.js";
+import {
+  parseTaskModelResponsibleSequence,
+} from "../schemas/taskModelResponsibleSequence.schemas.js";
 import { TaskModelService } from "../services/taskModelService.js";
 
 const router: ReturnType<typeof Router> = Router();
@@ -29,6 +32,11 @@ router.post("/model", isAuthenticated, async (req: Request, res: Response, next:
       type,
     } = req.body;
     const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
+    const responsibleSequence = parseTaskModelResponsibleSequence({
+      responsible_id,
+      responsible2_id: responsible2_id ?? null,
+      responsible3_id: responsible3_id ?? null,
+    });
 
     if (!name || !department_id || !responsible_id || !billing || prevision === undefined) {
       throw new ServiceError(
@@ -42,9 +50,9 @@ router.post("/model", isAuthenticated, async (req: Request, res: Response, next:
       organization_id,
       name,
       department_id,
-      responsible_id,
-      responsible2_id: responsible2_id ?? null,
-      responsible3_id: responsible3_id ?? null,
+      responsible_id: responsibleSequence.responsible_id,
+      responsible2_id: responsibleSequence.responsible2_id,
+      responsible3_id: responsibleSequence.responsible3_id,
       observations: observations ?? null,
       billing,
       prevision: Number(prevision),
@@ -90,6 +98,11 @@ router.put("/model", isAuthenticated, async (req: Request, res: Response, next: 
       type,
     } = req.body;
     const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
+    const responsibleSequence = parseTaskModelResponsibleSequence({
+      responsible_id,
+      responsible2_id: responsible2_id ?? null,
+      responsible3_id: responsible3_id ?? null,
+    });
 
     if (
       !task_id ||
@@ -111,9 +124,9 @@ router.put("/model", isAuthenticated, async (req: Request, res: Response, next: 
       task_id,
       name,
       department_id,
-      responsible_id,
-      responsible2_id: responsible2_id ?? null,
-      responsible3_id: responsible3_id ?? null,
+      responsible_id: responsibleSequence.responsible_id,
+      responsible2_id: responsibleSequence.responsible2_id,
+      responsible3_id: responsibleSequence.responsible3_id,
       observations: observations ?? null,
       billing,
       prevision: Number(prevision),

@@ -37,6 +37,10 @@ function createPrismaMock() {
       ),
       create: vi.fn(async ({ data }) => ({ id: recordId, ...data })),
       update: vi.fn(async ({ data }) => ({ id: recordId, ...data })),
+      delete: vi.fn(async () => undefined),
+    },
+    payroll: {
+      count: vi.fn(async () => 0),
     },
   };
 }
@@ -137,5 +141,116 @@ describe("UnionService", () => {
       select: { id: true },
     });
     expect(prisma.unionPessoal.update).not.toHaveBeenCalled();
+  });
+
+  it("remove sindicato escopado por organizacao e audita o snapshot", async () => {
+    const prisma = createPrismaMock();
+    const audit = createAuditMock();
+    const service = new UnionService(prisma as never, audit);
+
+    const result = await service.delete(
+      { organizationId, userId, permission: 1, requestId: "request-union-delete" },
+      recordId,
+    );
+
+    expect(prisma.unionPessoal.findFirst).toHaveBeenCalledWith({
+      where: { id: recordId, organization_id: organizationId },
+      select: {
+        id: true,
+        name: true,
+        cnpj: true,
+        base_date: true,
+        organization_id: true,
+      },
+    });
+    expect(prisma.payroll.count).toHaveBeenCalledWith({
+      where: { organization_id: organizationId, union_id: recordId },
+    });
+    expect(prisma.unionPessoal.delete).toHaveBeenCalledWith({ where: { id: recordId } });
+    expect(audit.recordChange).toHaveBeenCalledWith({
+      requestId: "request-union-delete",
+      organizationId,
+      userId,
+      permission: 1,
+      action: "Exclusao",
+      referring: "pessoal.union",
+      referringId: recordId,
+      changes: {
+        id: recordId,
+        name: "Sindicato A",
+        cnpj: "123",
+        base_date: null,
+        organization_id: organizationId,
+      },
+      path: `/pessoal/unions/${recordId}`,
+    });
+    expect(result).toEqual({
+      id: recordId,
+      name: "Sindicato A",
+      cnpj: "123",
+      base_date: null,
+      organization_id: organizationId,
+    });
+  });
+
+  it("nao remove sindicato de outra organizacao", async () => {
+    const prisma = createPrismaMock();
+    prisma.unionPessoal.findFirst.mockResolvedValueOnce(null);
+    const audit = createAuditMock();
+    const service = new UnionService(prisma as never, audit);
+
+    await expect(service.delete({ organizationId, userId }, recordId)).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Sindicato nao encontrado.",
+    });
+
+    expect(prisma.payroll.count).not.toHaveBeenCalled();
+    expect(prisma.unionPessoal.delete).not.toHaveBeenCalled();
+    expect(audit.recordChange).not.toHaveBeenCalled();
+  });
+
+  it("rejeita exclusao de sindicato vinculado a folha", async () => {
+    const prisma = createPrismaMock();
+    prisma.payroll.count.mockResolvedValueOnce(1);
+    const audit = createAuditMock();
+    const service = new UnionService(prisma as never, audit);
+
+    await expect(service.delete({ organizationId, userId }, recordId)).rejects.toMatchObject({
+      statusCode: 409,
+      message:
+        "Não é possível remover o sindicato porque ele está vinculado a uma ou mais configurações de folha. Altere esses vínculos antes de tentar novamente.",
+    });
+
+    expect(prisma.unionPessoal.delete).not.toHaveBeenCalled();
+    expect(audit.recordChange).not.toHaveBeenCalled();
+  });
+
+  it("traduz conflito Prisma P2003 concorrente para o conflito de folha", async () => {
+    const prisma = createPrismaMock();
+    prisma.unionPessoal.delete.mockRejectedValueOnce({ code: "P2003" });
+    const audit = createAuditMock();
+    const service = new UnionService(prisma as never, audit);
+
+    await expect(service.delete({ organizationId, userId }, recordId)).rejects.toMatchObject({
+      statusCode: 409,
+      message:
+        "Não é possível remover o sindicato porque ele está vinculado a uma ou mais configurações de folha. Altere esses vínculos antes de tentar novamente.",
+    });
+
+    expect(audit.recordChange).not.toHaveBeenCalled();
+  });
+
+  it("traduz exclusao concorrente ja consumida pelo Prisma para sindicato nao encontrado", async () => {
+    const prisma = createPrismaMock();
+    prisma.unionPessoal.delete.mockRejectedValueOnce({ code: "P2025" });
+    const audit = createAuditMock();
+    const service = new UnionService(prisma as never, audit);
+
+    await expect(service.delete({ organizationId, userId }, recordId)).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Sindicato nao encontrado.",
+    });
+
+    expect(audit.recordChange).not.toHaveBeenCalled();
   });
 });
