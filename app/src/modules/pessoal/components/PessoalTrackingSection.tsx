@@ -62,7 +62,6 @@ type LddFormValues = {
 type SituationFormValues = {
   title: string;
   description: string;
-  status: PessoalSituationStatus;
 };
 
 const emptyLddFormValues: LddFormValues = {
@@ -77,7 +76,6 @@ const emptyLddFormValues: LddFormValues = {
 const emptySituationFormValues: SituationFormValues = {
   title: "",
   description: "",
-  status: "Em andamento",
 };
 
 const lddTypeOptions = ["INSS", "FGTS", "IRRF", "ISS"] as const;
@@ -126,7 +124,6 @@ function buildSituationFormValues(situation: PessoalSituation | null): Situation
   return {
     title: situation.title,
     description: situation.description,
-    status: situation.status,
   };
 }
 
@@ -326,7 +323,6 @@ export function PessoalTrackingSection({
       client_id: selectedClientId,
       title: situationFormValues.title.trim(),
       description: situationFormValues.description.trim(),
-      status: situationFormValues.status,
     };
 
     if (!payload.title || !payload.description) {
@@ -343,7 +339,6 @@ export function PessoalTrackingSection({
           payload: {
             title: payload.title,
             description: payload.description,
-            status: payload.status,
           },
         });
         setIsSituationFormOpen(false);
@@ -357,6 +352,31 @@ export function PessoalTrackingSection({
       }
     } catch (error) {
       setFormError(getPessoalErrorMessage(error, "Não foi possível salvar a situação."));
+    }
+  }
+
+  async function handleSituationStatusChange(nextStatus: PessoalSituationStatus) {
+    if (!canEdit || !selectedSituationId) {
+      return;
+    }
+
+    clearFeedback();
+
+    try {
+      await updateSituationMutation.mutateAsync({
+        id: selectedSituationId,
+        payload: {
+          status: nextStatus,
+        },
+      });
+      setIsSituationFormOpen(false);
+      setSuccessMessage(
+        nextStatus === "Finalizado" ? "Situação concluída." : "Situação reaberta.",
+      );
+    } catch (error) {
+      setFormError(
+        getPessoalErrorMessage(error, "Não foi possível alterar o status da situação."),
+      );
     }
   }
 
@@ -514,6 +534,11 @@ export function PessoalTrackingSection({
                       <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         {situation.status} desde {formatDate(situation.registration_date)}
                       </p>
+                      {situation.completion_date ? (
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                          Concluída em {formatDate(situation.completion_date)}
+                        </p>
+                      ) : null}
                     </div>
                     <button
                       type="button"
@@ -771,31 +796,56 @@ export function PessoalTrackingSection({
                   className={`${pessoalTextFieldClassName} min-h-28 resize-y`}
                 />
               </label>
-              <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-                Status
-                <div className="relative">
-                  <select
-                    value={situationFormValues.status}
-                    onChange={(event) =>
-                      setSituationFormValues((current) => ({
-                        ...current,
-                        status: event.target.value as PessoalSituationStatus,
-                      }))
-                    }
-                    disabled={!canEdit || isSituationSubmitting}
-                    className={`${pessoalTextFieldClassName} appearance-none pr-12`}
-                  >
-                    <option value="Em andamento">Em andamento</option>
-                    <option value="Finalizado">Finalizado</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-                </div>
-              </label>
-
               {selectedSituation ? (
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-300">
                   <p>Registrada em {formatDate(selectedSituation.registration_date)}</p>
                   <p>Concluída em {formatDate(selectedSituation.completion_date)}</p>
+                </div>
+              ) : null}
+
+              {selectedSituationId && selectedSituation ? (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-100">
+                  {selectedSituation.status === "Em andamento" ? (
+                    <>
+                      <p className="font-medium">Esta situação está em andamento.</p>
+                      <p className="mt-1">Finalizar registra a data de conclusão.</p>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSituationStatusChange("Finalizado")}
+                          disabled={isSituationSubmitting}
+                          className={`${pessoalPrimaryButtonClassName} mt-3`}
+                        >
+                          {isSituationSubmitting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
+                          {isSituationSubmitting ? "Concluindo situação..." : "Concluir situação"}
+                        </button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium">Esta situação está finalizada.</p>
+                      <p className="mt-1">Reabrir limpa a data de conclusão.</p>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSituationStatusChange("Em andamento")}
+                          disabled={isSituationSubmitting}
+                          className={`${pessoalSecondaryButtonClassName} mt-3`}
+                        >
+                          {isSituationSubmitting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                          {isSituationSubmitting ? "Reabrindo situação..." : "Reabrir situação"}
+                        </button>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               ) : null}
 
