@@ -15,6 +15,7 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const categoryId = "20000000-0000-4000-8000-000000000001";
 const requestId = "30000000-0000-4000-8000-000000000001";
+const TI_VIEWER_PERMISSION = 0;
 const TI_REQUESTER_PERMISSION = 1;
 const TI_ADMIN_PERMISSION = 2;
 const otherUserId = "00000000-0000-4000-8000-000000000002";
@@ -30,6 +31,37 @@ function gatewayHeaders(permission: number): Record<string, string> {
 }
 
 describe("ti request routes", () => {
+  it("GET /ti/requests/list allows Viewer to list only own requests", async () => {
+    const response = await request(createTestApp())
+      .get("/ti/requests/list")
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, data: [] });
+  });
+
+  it("POST /ti/requests allows Viewer to create an own request", async () => {
+    const response = await request(createTestApp())
+      .post("/ti/requests")
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
+      .send({
+        title: "Notebook nao liga",
+        description: "Equipamento nao inicia.",
+        category_id: categoryId,
+        urgency: "High",
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        requester_id: userId,
+        status: "New",
+        organization_id: organizationId,
+      },
+    });
+  });
+
   it("POST /ti/requests creates a request", async () => {
     const response = await request(createTestApp())
       .post("/ti/requests")
@@ -338,5 +370,31 @@ describe("ti request routes", () => {
     });
     expect(upload).not.toHaveBeenCalled();
     expect(createSignedAccessUrl).not.toHaveBeenCalled();
+  });
+
+  it("POST /ti/requests/:id/messages allows Viewer to send a secure image attachment", async () => {
+    const objectPath = `ti/organizations/${organizationId}/requests/${requestId}/viewer-message.png`;
+    const upload = vi.fn(async () => objectPath);
+    const createSignedAccessUrl = vi.fn(async () => "https://storage.example/signed/viewer-message.png");
+
+    const response = await request(
+      createTestApp(createPrismaMock(), { requestImageStorage: { upload, createSignedAccessUrl } }),
+    )
+      .post(`/ti/requests/${requestId}/messages`)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
+      .field("message", "Segue a captura de tela.")
+      .attach("file", validPng, { filename: "viewer-message.png", contentType: "image/png" });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        request_id: requestId,
+        message: "Segue a captura de tela.",
+        attachment: "https://storage.example/signed/viewer-message.png",
+      },
+    });
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(createSignedAccessUrl).toHaveBeenCalledWith(objectPath);
   });
 });

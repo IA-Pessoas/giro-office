@@ -15,7 +15,6 @@ type FiscalIpiFormPanelMode = "create" | "edit";
 interface FiscalIpiFormPanelProps {
   mode: FiscalIpiFormPanelMode;
   ipiId?: string;
-  searchCodes: string[];
   onClose: () => void;
   showHeader?: boolean;
   bare?: boolean;
@@ -57,7 +56,6 @@ function normalizeOptionalText(value: string) {
 export function FiscalIpiFormPanel({
   mode,
   ipiId,
-  searchCodes,
   onClose,
   showHeader = true,
   bare = false,
@@ -152,13 +150,8 @@ export function FiscalIpiFormPanel({
         });
         toast.success("IPI atualizado com sucesso.");
       } else {
-        const createdIpi = await createMutation.mutateAsync(basePayload);
-
-        if (!searchCodes.includes(createdIpi.ncm)) {
-          toast.success("Cadastro criado. Inclua o código NCM na busca para visualizar.");
-        } else {
-          toast.success("IPI cadastrado com sucesso.");
-        }
+        await createMutation.mutateAsync(basePayload);
+        toast.success("IPI cadastrado com sucesso.");
       }
 
       setFormState(DEFAULT_FORM_STATE);

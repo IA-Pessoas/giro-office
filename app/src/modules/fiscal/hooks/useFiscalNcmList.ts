@@ -3,18 +3,24 @@ import { keepPreviousData, type UseQueryResult } from "@tanstack/react-query";
 import { useFetch } from "@shared/hooks";
 
 import { fiscalNcmService } from "../services";
-import type { FiscalNcm } from "../types";
-import { fiscalNcmListQueryKey } from "./queryKeys";
+import type { FiscalNcmListFilters, FiscalNcmListResult } from "../types";
+import { FISCAL_LIST_PAGE_SIZE, fiscalNcmListQueryKey } from "./queryKeys";
 
 export function useFiscalNcmList(
-  ncmCodes: string[],
+  filters: FiscalNcmListFilters = {},
   enabled = true,
-): UseQueryResult<FiscalNcm[], Error> {
+): UseQueryResult<FiscalNcmListResult, Error> {
+  const listFilters = {
+    ...filters,
+    page: filters.page ?? 1,
+    page_size: filters.page_size ?? FISCAL_LIST_PAGE_SIZE,
+  };
+
   return useFetch(
-    fiscalNcmListQueryKey(ncmCodes),
-    () => fiscalNcmService.list({ ncmCodes }),
+    fiscalNcmListQueryKey(listFilters),
+    () => fiscalNcmService.list(listFilters),
     {
-      enabled: enabled && ncmCodes.length > 0,
+      enabled,
       placeholderData: keepPreviousData,
     },
   );

@@ -1,6 +1,8 @@
 import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+import { commaSeparatedListSchema, paginationQuerySchema } from "./pagination.schemas.js";
+
 const ncmIdSchema = z.string().uuid({ message: "ncm_id inválido." });
 
 export const createNcmBodySchema = z
@@ -46,13 +48,7 @@ export const detailNcmQuerySchema = z
 
 export const listNcmQuerySchema = z
   .object({
-    ncmCodes: z.preprocess(
-      (v) => {
-        if (Array.isArray(v)) return v;
-        if (typeof v === "string") return v.split(",").filter(Boolean);
-        return [];
-      },
-      z.array(z.string().min(1)).min(1, "ncmCodes é obrigatório."),
-    ),
+    ...paginationQuerySchema.shape,
+    ncmCodes: commaSeparatedListSchema,
   })
   .strict();

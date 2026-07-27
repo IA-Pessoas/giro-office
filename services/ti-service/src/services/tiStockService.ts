@@ -61,6 +61,15 @@ function isPrismaUniqueConstraintError(err: unknown): boolean {
   );
 }
 
+function normalizeStockLocationName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase();
+}
+
 export class TiStockService {
   private readonly departmentResolver: TiDepartmentResolverService;
 
@@ -511,14 +520,18 @@ export class TiStockService {
   ): Promise<unknown> {
     try {
       const departmentId = await this.resolveDepartment(context.organizationId);
-      const existing = await this.prisma.locationStock.findFirst({
+      const activeLocations = await this.prisma.locationStock.findMany({
         where: {
           organization_id: context.organizationId,
           department_id: departmentId,
-          name: body.name,
           status: true,
         },
+        select: { name: true },
       });
+      const normalizedName = normalizeStockLocationName(body.name);
+      const existing = activeLocations.some(
+        (location) => normalizeStockLocationName(location.name) === normalizedName,
+      );
 
       if (existing) {
         throw new ServiceError(409, "Ja existe um local de estoque de TI ativo com este nome.");

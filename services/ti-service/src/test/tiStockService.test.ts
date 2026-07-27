@@ -198,6 +198,27 @@ describe("TiStockService", () => {
     });
   });
 
+  it("rejects an active stock location with the same normalized name", async () => {
+    const locationStock = {
+      findFirst: vi.fn(async () => null),
+      findMany: vi.fn(async () => [{ id: locationId, name: "Almoxarifado São", status: true }]),
+      create: vi.fn(async ({ data }) => ({ id: "location-2", ...data })),
+    };
+    const prisma = {
+      department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
+      locationStock,
+    };
+    const service = new TiStockService(prisma as never);
+
+    await expect(
+      service.createLocation(context, { name: "  ALMOXARIFADO   SAO  " }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Ja existe um local de estoque de TI ativo com este nome.",
+    });
+    expect(locationStock.create).not.toHaveBeenCalled();
+  });
+
   it("creates an entry and increments stock quantity", async () => {
     const tx = {
       stock: {
