@@ -40,7 +40,7 @@ export function createTiRequestRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -57,7 +57,7 @@ export function createTiRequestRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/:id",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -74,7 +74,7 @@ export function createTiRequestRoutes(prisma: PrismaClient): Router {
 
   router.post(
     "/",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -145,7 +145,7 @@ export function createTiRequestRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/:id/messages",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -163,7 +163,7 @@ export function createTiRequestRoutes(prisma: PrismaClient): Router {
 
   router.post(
     "/:id/messages",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
