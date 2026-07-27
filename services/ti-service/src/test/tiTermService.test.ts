@@ -53,7 +53,7 @@ describe("TiTermService", () => {
     expect(result[0]?.user).not.toHaveProperty("password");
   });
 
-  it("forces user filter for requester permission", async () => {
+  it("forces user filter for viewer permission", async () => {
     const prisma = {
       termTecnologia: {
         findMany: vi.fn(async () => []),
@@ -62,7 +62,7 @@ describe("TiTermService", () => {
     const service = new TiTermService(prisma as never);
 
     await service.list(
-      { ...context, permission: TiPermissionLevel.Requester },
+      { ...context, permission: TiPermissionLevel.Viewer },
       {
         user_id: "90000000-0000-4000-8000-000000000001",
       },
@@ -77,7 +77,7 @@ describe("TiTermService", () => {
     );
   });
 
-  it("hides another user's term from requester permission", async () => {
+  it("hides another user's term from viewer permission", async () => {
     const prisma = {
       termTecnologia: {
         findFirst: vi.fn(async ({ where }) => ({
@@ -90,7 +90,7 @@ describe("TiTermService", () => {
     const service = new TiTermService(prisma as never);
 
     await expect(
-      service.getById({ ...context, permission: TiPermissionLevel.Requester }, termId),
+      service.getById({ ...context, permission: TiPermissionLevel.Viewer }, termId),
     ).rejects.toMatchObject({
       statusCode: 404,
       message: "Termo de TI nao encontrado.",

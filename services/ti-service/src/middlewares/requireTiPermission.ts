@@ -2,6 +2,7 @@ import { requireAuthenticatedRequestContext, ServiceError } from "@workspace/sha
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 export enum TiPermissionLevel {
+  Viewer = 0,
   Requester = 1,
   Technician = 2,
   Admin = 2,
