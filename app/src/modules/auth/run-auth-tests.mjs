@@ -17,6 +17,7 @@ import {
   isOrganizationOwner,
 } from "./utils/permissions.ts";
 import {
+  APP_ROUTE_MODULE_MAP,
   resolveAccessLevelFromAdditionalPermission,
   resolveDepartmentModuleKey,
   resolveModuleAccess,
@@ -99,6 +100,7 @@ const appShellSource = await readFile(
   new URL("../../shared/components/newLayout/AppShell.tsx", import.meta.url),
   "utf8",
 );
+const appSource = await readFile(new URL("../../pages/_app.tsx", import.meta.url), "utf8");
 const administracaoSource = await readFile(
   new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
   "utf8",
@@ -389,6 +391,16 @@ await (async () => {
     assert.equal(resolveAccessLevelFromAdditionalPermission(1), "edit");
     assert.equal(resolveAccessLevelFromAdditionalPermission(0), "view");
     assert.equal(resolveAccessLevelFromAdditionalPermission(null), "none");
+  });
+
+  await runTest("integration routes require integration module access", () => {
+    assert.equal(APP_ROUTE_MODULE_MAP["/clients"], "integracao");
+    assert.equal(APP_ROUTE_MODULE_MAP["/projects"], "integracao");
+  });
+
+  await runTest("iframe views retain module access protection", () => {
+    assert.match(appSource, /<AppLayout isIframeView=\{isIframeView\}>/);
+    assert.match(appShellSource, /if \(isIframeView\) \{\s*return <div[^>]*>\{mainContent\}<\/div>;/);
   });
 
   await runTest("app shell uses module hook for menu visibility instead of raw access store", () => {
