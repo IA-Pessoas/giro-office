@@ -9,6 +9,11 @@ import {
   resolveCreateUserTopLevelPermission,
   resolveCreateUserType,
 } from "./utils/createUserPayload.ts";
+import {
+  getMinimumPermissionLevel,
+  getPermissionSelectOptions,
+  normalizePermissionForModule,
+} from "./constants/permissionConfig.ts";
 
 const administracaoSource = readFileSync(
   new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
@@ -47,6 +52,36 @@ const permissionConfigSource = readFileSync(
   "utf8",
 );
 const userTypesSource = readFileSync(new URL("./types/index.ts", import.meta.url), "utf8");
+
+runTest("RH and Technology define Viewer as their frontend minimum", () => {
+  assert.equal(getMinimumPermissionLevel("rh"), 0);
+  assert.equal(getMinimumPermissionLevel("ti"), 0);
+  assert.equal(getMinimumPermissionLevel("fiscal"), null);
+});
+
+runTest("minimum module options omit no access and preserve higher levels", () => {
+  assert.deepEqual(
+    getPermissionSelectOptions("rh").map((option) => option.value),
+    ["0", "1", "2"],
+  );
+  assert.deepEqual(
+    getPermissionSelectOptions("ti").map((option) => option.value),
+    ["0", "1", "2"],
+  );
+  assert.deepEqual(
+    getPermissionSelectOptions("fiscal").map((option) => option.value),
+    ["null", "0", "1", "2"],
+  );
+});
+
+runTest("module permission normalization changes only values below a configured minimum", () => {
+  assert.equal(normalizePermissionForModule("rh", null), 0);
+  assert.equal(normalizePermissionForModule("ti", undefined), 0);
+  assert.equal(normalizePermissionForModule("rh", 1), 1);
+  assert.equal(normalizePermissionForModule("ti", 2), 2);
+  assert.equal(normalizePermissionForModule("fiscal", null), null);
+  assert.equal(normalizePermissionForModule("fiscal", 1), 1);
+});
 
 runTest("create user additional modules hide unavailable services", () => {
   assert.equal(createUserConfigSource.includes('key: "comercial"'), false);
