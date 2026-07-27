@@ -4,7 +4,6 @@ export const MODULE_EDIT_PERMISSION = 1;
 export const MODULE_ADMIN_PERMISSION = 2;
 
 export const MODULE_KEYS = [
-  "atendimento",
   "certificado",
   "comercial",
   "contabil",
@@ -13,13 +12,11 @@ export const MODULE_KEYS = [
   "integracao",
   "marketing",
   "parcelamento",
-  "pec",
   "pessoal",
   "regularize",
   "rh",
   "ti",
   "triagem",
-  "wiki",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -62,7 +59,6 @@ export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
 };
 
 const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
-  atendimento: "atendimento",
   certificado: "certificado",
   comercial: "comercial",
   contabil: "contabil",
@@ -78,7 +74,6 @@ const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
   "integração": "integracao",
   marketing: "marketing",
   parcelamento: "parcelamento",
-  pec: "pec",
   pessoal: "pessoal",
   "departamento pessoal": "pessoal",
   regularize: "regularize",
@@ -87,7 +82,6 @@ const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
   tecnologia: "ti",
   ti: "ti",
   triagem: "triagem",
-  wiki: "wiki",
 };
 
 function createModuleAccess(level: AccessLevel, source: AccessSource): ModuleAccess {

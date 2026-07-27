@@ -2795,6 +2795,36 @@ it("blocks limited users without client-related module permission before proxyin
   }
 });
 
+it("does not authorize client routes with a retired atendimento permission", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { atendimento: 2 },
+  });
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.end(JSON.stringify({ success: true }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(response.status).toBe(403);
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("allows limited users with client-related module permission to proxy /client", async () => {
   const token = createToken({
     user_id: "user-1",
@@ -3095,6 +3125,42 @@ it("proxies /regularize to the regularize microservice", async () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(seenUrl).toBe("/regularize/smoke");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("forwards the Fiscal module permission and internal token", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { fiscal: 0 },
+  });
+  let seenPermission: string | undefined;
+  let seenInternalToken: string | undefined;
+  const upstream = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    seenInternalToken = request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const fiscalServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ fiscalServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/fiscal/ncm/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("0");
+    expect(seenInternalToken).toBe("audit-service-token");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

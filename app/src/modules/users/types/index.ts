@@ -20,17 +20,14 @@ export type UserType = "user" | "admin" | "owner";
 export type UserPermission = -1 | 0 | 1 | 2;
 
 export type KnownPermissionModuleKey =
-  | "atendimento"
   | "certificado"
   | "contabil"
   | "fiscal"
   | "integracao"
-  | "pec"
   | "pessoal"
   | "regularize"
   | "rh"
   | "ti"
-  | "wiki";
 
 export type KnownPermissionRecord = Record<KnownPermissionModuleKey, number | null>;
 export type PermissionDraft = Record<string, number | null>;

@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import {
   createExpressErrorHandler,
   createSecurityHeadersMiddleware,
@@ -29,6 +30,10 @@ import { createTiRequestCategoryRoutes } from "./routes/tiRequestCategory.routes
 import { createTiRobotRoutes } from "./routes/tiRobot.routes.js";
 import { createTiStockRoutes } from "./routes/tiStock.routes.js";
 import { createTiTermRoutes } from "./routes/tiTerm.routes.js";
+import {
+  SupabaseTiRequestImageStorage,
+  type TiRequestImageStorage,
+} from "./services/tiRequestImageStorage.js";
 
 function tiServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const out: Record<string, unknown> = {};
@@ -50,15 +55,23 @@ export interface CreateTiApplicationOptions {
   env: TiServiceEnv;
   logger: Logger;
   prisma: PrismaClient;
+  requestImageStorage?: TiRequestImageStorage;
 }
 
 export function createTiApplication({
   env,
   logger,
   prisma,
+  requestImageStorage,
 }: CreateTiApplicationOptions): express.Express {
   const app = express();
   const encryptionService = new EncryptionService(env.passwordEncryptionKey);
+  const tiRequestImageStorage =
+    requestImageStorage ??
+    new SupabaseTiRequestImageStorage(
+      createClient(env.supabaseUrl, env.supabaseServiceRoleKey),
+      env.tiRequestImageBucket,
+    );
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -96,7 +109,7 @@ export function createTiApplication({
   app.use("/ti/stock", createTiStockRoutes(prisma));
   app.use("/ti/robots", createTiRobotRoutes(prisma));
   app.use("/ti/dashboard", createTiDashboardRoutes(prisma));
-  app.use("/ti/requests", createTiRequestRoutes(prisma));
+  app.use("/ti/requests", createTiRequestRoutes(prisma, tiRequestImageStorage));
   app.use("/ti/request-categories", createTiRequestCategoryRoutes(prisma));
 
   if (env.enableApiDocs) {

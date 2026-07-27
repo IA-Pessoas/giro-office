@@ -11,7 +11,6 @@ interface LoginRequest {
 }
 
 type ModulePermissionKey =
-  | "atendimento"
   | "certificado"
   | "comercial"
   | "contabil"
@@ -20,18 +19,15 @@ type ModulePermissionKey =
   | "integracao"
   | "marketing"
   | "parcelamento"
-  | "pec"
   | "pessoal"
   | "regularize"
   | "rh"
   | "ti"
-  | "triagem"
-  | "wiki";
+  | "triagem";
 
 type ModulePermissions = Record<ModulePermissionKey, number | null>;
 
 const MODULE_PERMISSION_KEYS: ModulePermissionKey[] = [
-  "atendimento",
   "certificado",
   "comercial",
   "contabil",
@@ -40,13 +36,11 @@ const MODULE_PERMISSION_KEYS: ModulePermissionKey[] = [
   "integracao",
   "marketing",
   "parcelamento",
-  "pec",
   "pessoal",
   "regularize",
   "rh",
   "ti",
   "triagem",
-  "wiki",
 ];
 
 function normalizeAuthUserType(value: unknown): AuthUserType | undefined {

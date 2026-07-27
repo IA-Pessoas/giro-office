@@ -47,8 +47,27 @@ describe("PermissionService", () => {
     expect(prismaMock.permission.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { user_id: "user-1", organization_id: "org-1" },
+        select: expect.not.objectContaining({
+          atendimento: true,
+          pec: true,
+          wiki: true,
+        }),
       }),
     );
+  });
+
+  it("getByUserId rejeita um módulo de permissão aposentado", async () => {
+    prismaMock.permission.findFirst.mockResolvedValue({
+      id: "permission-1",
+      user_id: "user-1",
+      organization_id: "org-1",
+      pec: 2,
+    });
+    const service = new PermissionService();
+
+    await expect(service.getByUserId("user-1", "pec", "org-1")).rejects.toMatchObject({
+      statusCode: 400,
+    });
   });
 
   it("getByUserId lança 403 quando módulo não está liberado", async () => {

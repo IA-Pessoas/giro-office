@@ -71,7 +71,6 @@ describe("AuthService", () => {
       permissions: [
         {
           organization_id: "org-1",
-          atendimento: null,
           certificado: null,
           comercial: null,
           contabil: null,
@@ -80,13 +79,11 @@ describe("AuthService", () => {
           integracao: null,
           marketing: null,
           parcelamento: null,
-          pec: null,
           pessoal: null,
           regularize: null,
           rh: null,
           ti: 2,
           triagem: null,
-          wiki: null,
         },
       ],
     });
@@ -103,7 +100,6 @@ describe("AuthService", () => {
       permission: 2,
       type: "admin",
       modules: {
-        atendimento: null,
         certificado: null,
         comercial: null,
         contabil: null,
@@ -112,13 +108,11 @@ describe("AuthService", () => {
         integracao: null,
         marketing: null,
         parcelamento: null,
-        pec: null,
         pessoal: null,
         regularize: null,
         rh: null,
         ti: 2,
         triagem: null,
-        wiki: null,
       },
       department_id: "dep-1",
       organization_id: "org-1",

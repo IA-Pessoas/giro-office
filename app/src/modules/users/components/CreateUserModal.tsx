@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 import { resolveDepartmentModuleKey } from '@modules/auth';
@@ -50,7 +51,7 @@ type ModuleSelectValue = 'none' | '0' | '1' | '2';
 const CREATE_MODULE_OPTION_LABELS: Record<ModuleSelectValue, string> = {
   none: 'Sem acesso',
   '0': 'Visualizador',
-  '1': 'Usuario',
+  '1': 'Usuário',
   '2': 'Administrador',
 };
 
@@ -124,6 +125,7 @@ export function CreateUserModal({
   const [moduleSelections, setModuleSelections] = useState<ModuleSelectionState>(createInitialModuleSelections);
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const isCreateBlocked = departmentsLoading || departmentsError || departments.length === 0 || organizationIdLoading || !organizationId;
   const selectedDepartmentName = useMemo(() => {
     if (!formData.department_id) {
@@ -179,21 +181,27 @@ export function CreateUserModal({
     }));
   };
 
+  const handleClose = () => {
+    setIsPasswordVisible(false);
+    setSubmitError(null);
+    onClose();
+  };
+
   const handleCadastrar = async () => {
     setSubmitError(null);
 
     if (!formData.name || !formData.login || !formData.password || !formData.department_id) {
-      toast.warn('Preencha todos os campos obrigatorios!');
+      toast.warn('Preencha todos os campos obrigatórios!');
       return;
     }
 
     if (organizationIdLoading) {
-      toast.info('Carregando o contexto da organizacao. Tente novamente em instantes.');
+      toast.info('Carregando o contexto da organização. Tente novamente em instantes.');
       return;
     }
 
     if (!organizationId) {
-      toast.error('Nao foi possivel identificar a organizacao do usuario logado. Recarregue a pagina e tente novamente.');
+      toast.error('Não foi possível identificar a organização do usuário logado. Recarregue a página e tente novamente.');
       return;
     }
 
@@ -211,14 +219,14 @@ export function CreateUserModal({
       });
 
       const newUser = await userService.create(payload);
-      toast.success('Usuario cadastrado com sucesso!');
+      toast.success('Usuário cadastrado com sucesso!');
       onUserCreated(newUser);
-      onClose();
+      handleClose();
       setFormData(INITIAL_FORM_DATA);
       setModuleSelections(createInitialModuleSelections());
     } catch (err) {
-      setSubmitError('Nao foi possivel concluir o cadastro com os dados informados.');
-      toast.error('Erro ao cadastrar usuario.');
+      setSubmitError('Não foi possível concluir o cadastro com os dados informados.');
+      toast.error('Erro ao cadastrar usuário.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -230,12 +238,11 @@ export function CreateUserModal({
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
-          setSubmitError(null);
-          onClose();
+          handleClose();
         }
       }}
-      title="Cadastrar Novo Usuario"
-      description="Formulario para cadastro de novo usuario"
+      title="Cadastrar Novo Usuário"
+      description="Formulário para cadastro de novo usuário"
       contentClassName="admin-users-modal flex max-h-[90vh] flex-col overflow-hidden border border-slate-200 bg-white shadow-2xl sm:max-h-[88vh] dark:border-slate-700 dark:bg-slate-900"
       bodyClassName="overflow-y-auto"
       footer={(
@@ -243,7 +250,7 @@ export function CreateUserModal({
           <button
             type="button"
             className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            onClick={onClose}
+            onClick={handleClose}
           >
             Cancelar
           </button>
@@ -253,7 +260,7 @@ export function CreateUserModal({
             disabled={isLoading || isCreateBlocked}
             onClick={handleCadastrar}
           >
-            {isLoading ? 'Salvando...' : 'Criar Usuario'}
+            {isLoading ? 'Salvando...' : 'Criar Usuário'}
           </button>
         </>
       )}
@@ -268,7 +275,7 @@ export function CreateUserModal({
         {departmentsError ? (
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
             <p className="dialog-neutral-text text-sm font-medium text-slate-700 dark:text-white">
-              Nao foi possivel carregar os departamentos. O cadastro foi bloqueado ate a integracao voltar.
+              Não foi possível carregar os departamentos. O cadastro foi bloqueado até a integração voltar.
             </p>
             {onRetryDepartments ? (
               <button
@@ -289,7 +296,7 @@ export function CreateUserModal({
         ) : !organizationIdLoading && departments.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
             <p className="dialog-neutral-text text-sm font-medium text-slate-700 dark:text-white">
-              Nenhum departamento disponivel. O cadastro depende dos dados retornados pelo backend.
+              Nenhum departamento disponível. O cadastro depende dos dados retornados pelo backend.
             </p>
             {onRetryDepartments ? (
               <button
@@ -315,7 +322,27 @@ export function CreateUserModal({
             </div>
             <div className="md:col-span-1">
               <label htmlFor="user-password" className={FIELD_LABEL_CLASSNAME}>Senha</label>
-              <input id="user-password" type="password" name="password" value={formData.password} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+              <div className="relative">
+                <input
+                  id="user-password"
+                  type={isPasswordVisible ? 'text' : 'password'}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  className={`${FIELD_CLASSNAME} pr-11`}
+                  autoComplete="new-password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/30 dark:text-slate-400 dark:hover:text-slate-200"
+                  onClick={() => setIsPasswordVisible((visible) => !visible)}
+                  aria-label={isPasswordVisible ? 'Ocultar senha' : 'Mostrar senha'}
+                  aria-pressed={isPasswordVisible}
+                >
+                  {isPasswordVisible ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -339,7 +366,7 @@ export function CreateUserModal({
               </select>
             </div>
             <div>
-              <label htmlFor="user-permission" className={FIELD_LABEL_CLASSNAME}>Permissao</label>
+              <label htmlFor="user-permission" className={FIELD_LABEL_CLASSNAME}>Permissão</label>
               <select
                 id="user-permission"
                 name="departmentPermission"
@@ -373,12 +400,12 @@ export function CreateUserModal({
 
         <section className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40">
           <div className="mb-4 space-y-1">
-            <label className={SECTION_TITLE_CLASSNAME}>Modulos adicionais</label>
+            <label className={SECTION_TITLE_CLASSNAME}>Módulos adicionais</label>
             <p className={SECTION_DESCRIPTION_CLASSNAME}>
               Defina apenas acessos complementares fora do departamento principal.
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              O modulo da area principal recebe a permissao definida no departamento.
+              O módulo da área principal recebe a permissão definida no departamento.
             </p>
           </div>
           <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1">

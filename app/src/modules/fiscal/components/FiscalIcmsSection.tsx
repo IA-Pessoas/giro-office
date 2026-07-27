@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Landmark, Loader2, Plus, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, ArrowLeft, Landmark, Loader2, Pencil, Plus, Search } from "lucide-react";
 
 import { useFiscalIcmsList } from "../hooks";
+import { FISCAL_LIST_PAGE_SIZE } from "../hooks/queryKeys";
 import type { FiscalIcms } from "../types";
 import {
   getFiscalErrorMessage,
@@ -9,6 +10,7 @@ import {
 } from "../utils";
 import { FiscalIcmsFormPanel } from "./FiscalIcmsFormPanel";
 import { FiscalStateBox } from "./FiscalStateBox";
+import { PaginationControls } from "@shared/components/ui/PaginationControls";
 
 type FiscalIcmsPanelIntent =
   | { mode: "create" }
@@ -16,34 +18,50 @@ type FiscalIcmsPanelIntent =
   | null;
 
 const ACTION_BUTTON_CLASSNAME =
-  "inline-flex h-8 min-w-[88px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
 
-export function FiscalIcmsSection() {
+const TABLE_HEADER_CLASSNAME =
+  "px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-700 dark:text-slate-300";
+
+const TABLE_TEXT_CELL_CLASSNAME =
+  "px-3 py-2.5 text-sm leading-5 break-words text-gray-700 dark:text-slate-300";
+
+const TABLE_CENTER_CELL_CLASSNAME =
+  "px-3 py-2.5 text-center text-sm leading-5 text-gray-700 dark:text-slate-300";
+
+const TABLE_CODE_CELL_CLASSNAME =
+  "px-4 py-2.5 text-center text-sm font-medium leading-5 text-gray-900 dark:text-white";
+
+export function FiscalIcmsSection({ canEdit }: { canEdit: boolean }) {
   const [filterValue, setFilterValue] = useState("");
-  const [submittedTerms, setSubmittedTerms] = useState<string[]>([]);
-  const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
-  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [searchTerms, setSearchTerms] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
   const [panelIntent, setPanelIntent] = useState<FiscalIcmsPanelIntent>(null);
 
-  const listQuery = useFiscalIcmsList(submittedTerms, hasSubmittedSearch);
+  const listQuery = useFiscalIcmsList({
+    icmsCodes: searchTerms,
+    page,
+    page_size: FISCAL_LIST_PAGE_SIZE,
+  });
   const errorMessage = listQuery.error ? getFiscalErrorMessage(listQuery.error) : null;
-  const submittedLabel = useMemo(() => submittedTerms.join(", "), [submittedTerms]);
+  const searchLabel = useMemo(() => searchTerms.join(", "), [searchTerms]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setSearchTerms(parseCommaSeparatedValues(filterValue));
+      setPage(1);
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [filterValue]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    const normalizedTerms = parseCommaSeparatedValues(filterValue);
-    if (normalizedTerms.length === 0) {
-      setValidationMessage("Informe ao menos uma descrição para buscar.");
-      return;
-    }
-
-    setValidationMessage(null);
-    setSubmittedTerms(normalizedTerms);
-    setHasSubmittedSearch(true);
+    setSearchTerms(parseCommaSeparatedValues(filterValue));
+    setPage(1);
   }
 
-  if (panelIntent) {
+  if (panelIntent && canEdit) {
     return (
       <section className="space-y-4">
         <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
@@ -74,11 +92,11 @@ export function FiscalIcmsSection() {
                 </p>
               </div>
 
-              {submittedTerms.length > 0 ? (
+              {searchTerms.length > 0 ? (
                 <div className="text-sm text-gray-500 dark:text-slate-400">
                   Busca atual:{" "}
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {submittedLabel}
+                    {searchLabel}
                   </span>
                 </div>
               ) : null}
@@ -89,7 +107,6 @@ export function FiscalIcmsSection() {
             <FiscalIcmsFormPanel
               mode={panelIntent.mode}
               icmsId={panelIntent.mode === "edit" ? panelIntent.icmsId : undefined}
-              searchDescriptions={submittedTerms}
               onClose={() => setPanelIntent(null)}
               showHeader={false}
               bare
@@ -118,14 +135,16 @@ export function FiscalIcmsSection() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setPanelIntent({ mode: "create" })}
-            className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-          >
-            <Plus className="h-4 w-4" />
-            Novo ICMS
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => setPanelIntent({ mode: "create" })}
+              className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            >
+              <Plus className="h-4 w-4" />
+              Novo ICMS
+            </button>
+          ) : null}
         </div>
 
         <form className="mt-3 space-y-2.5" onSubmit={handleSubmit}>
@@ -139,46 +158,44 @@ export function FiscalIcmsSection() {
                 <input
                   type="text"
                   value={filterValue}
-                  onChange={(event) => {
-                    setFilterValue(event.target.value);
-                    if (validationMessage) {
-                      setValidationMessage(null);
-                    }
-                  }}
+                  onChange={(event) => setFilterValue(event.target.value)}
                   placeholder="Ex.: substituição tributária, bebidas frias"
                   className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-[13px] text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
                 />
               </div>
 
-              <button
-                type="submit"
-                className="inline-flex h-9 min-w-[88px] items-center justify-center rounded-lg bg-blue-600 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-              >
-                Buscar
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  className="inline-flex h-9 min-w-[88px] items-center justify-center rounded-lg bg-blue-600 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                >
+                  Buscar
+                </button>
+                {filterValue ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterValue("");
+                      setSearchTerms([]);
+                      setPage(1);
+                    }}
+                    className="inline-flex h-9 min-w-[72px] items-center justify-center rounded-lg border border-gray-300 px-3.5 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                  >
+                    Limpar
+                  </button>
+                ) : null}
+              </div>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              Use vírgulas para consultar mais de uma descrição cadastrada.
+              Digite parte da descricao ou use virgulas para consultar mais de um termo.
             </p>
           </div>
-
-          {validationMessage ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-              {validationMessage}
-            </div>
-          ) : null}
         </form>
       </div>
 
-      {!hasSubmittedSearch ? (
-        <FiscalStateBox icon={Search} title="Informe as descrições e clique em buscar" compact>
-          Use a consulta manual para listar apenas os registros de ICMS que fazem sentido neste momento.
-        </FiscalStateBox>
-      ) : null}
-
-      {hasSubmittedSearch && listQuery.isLoading && !listQuery.data ? (
+      {listQuery.isLoading && !listQuery.data ? (
         <FiscalStateBox icon={Loader2} tone="loading" title="Buscando ICMS" compact>
-          Estamos consultando os registros para as descrições informadas.
+          Estamos consultando os registros fiscais.
         </FiscalStateBox>
       ) : null}
 
@@ -193,12 +210,12 @@ export function FiscalIcmsSection() {
           <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                {listQuery.data.length === 1
+                {listQuery.data.data.length === 1
                   ? "1 registro encontrado"
-                  : `${listQuery.data.length} registros encontrados`}
+                  : `${listQuery.data.total} registros encontrados`}
               </p>
               <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
-                Busca atual: {submittedLabel}
+                Busca atual: {searchTerms.length > 0 ? searchLabel : "Listagem geral"}
               </p>
             </div>
 
@@ -216,16 +233,27 @@ export function FiscalIcmsSection() {
             </FiscalStateBox>
           ) : null}
 
-          {listQuery.data.length > 0 ? (
+          {listQuery.data.data.length > 0 ? (
             <FiscalIcmsTable
-              items={listQuery.data}
-              onEdit={(item) => setPanelIntent({ mode: "edit", icmsId: item.id })}
+              items={listQuery.data.data}
+              onEdit={canEdit ? (item) => setPanelIntent({ mode: "edit", icmsId: item.id }) : undefined}
             />
           ) : (
             <FiscalStateBox icon={Landmark} title="Nenhum ICMS encontrado" compact>
               Não localizamos registros para as descrições informadas. Revise os termos da busca e tente novamente.
             </FiscalStateBox>
           )}
+
+          <PaginationControls
+            page={listQuery.data.page}
+            limit={listQuery.data.limit}
+            total={listQuery.data.total}
+            count={listQuery.data.data.length}
+            hasMore={listQuery.data.hasMore}
+            isFetching={listQuery.isFetching}
+            onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+            onNext={() => setPage((currentPage) => currentPage + 1)}
+          />
         </div>
       ) : null}
     </section>
@@ -237,80 +265,86 @@ function FiscalIcmsTable({
   onEdit,
 }: {
   items: FiscalIcms[];
-  onEdit: (item: FiscalIcms) => void;
+  onEdit?: (item: FiscalIcms) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
       <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-slate-700">
           <thead className="bg-gray-50 dark:bg-slate-800/60">
             <tr>
-              <th className="w-[8%] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className={`${TABLE_HEADER_CLASSNAME} w-[8%] px-4`}>
                 UF
               </th>
-              <th className="w-[26%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className={`${TABLE_HEADER_CLASSNAME} w-[24%]`}>
                 Descrição
               </th>
-              <th className="w-[10%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className={`${TABLE_HEADER_CLASSNAME} w-[10%]`}>
                 Item
               </th>
-              <th className="w-[10%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
+              <th className={`${TABLE_HEADER_CLASSNAME} w-[10%]`}>
                 CEST
               </th>
-              <th className="w-[14%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-                Convênio
+              <th className={`${TABLE_HEADER_CLASSNAME} w-[16%]`}>
+                Conv.
               </th>
-              <th className="w-[8%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-                MVA aplicada
+              <th className={`${TABLE_HEADER_CLASSNAME} w-[9%]`}>
+                MVA apl.
               </th>
-              <th className="w-[8%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-                MVA ajustada
+              <th className={`${TABLE_HEADER_CLASSNAME} w-[9%]`}>
+                MVA ajust.
               </th>
-              <th className="w-[8%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-                MVA original
+              <th className={`${TABLE_HEADER_CLASSNAME} w-[8%]`}>
+                MVA orig.
               </th>
-              <th className="w-[8%] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700 dark:text-slate-300">
-                Ações
-              </th>
+              {onEdit ? (
+                <th className={`${TABLE_HEADER_CLASSNAME} w-[6%] px-3`}>
+                  Ação
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
             {items.map((item) => (
-              <tr key={item.id} className="align-top hover:bg-gray-50 dark:hover:bg-slate-800/30">
-                <td className="whitespace-nowrap px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">
+              <tr key={item.id} className="align-middle hover:bg-gray-50 dark:hover:bg-slate-800/30">
+                <td className={TABLE_CODE_CELL_CLASSNAME}>
                   {item.state}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                <td className={TABLE_TEXT_CELL_CLASSNAME}>
                   {item.description}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                <td className={TABLE_CENTER_CELL_CLASSNAME}>
                   {item.item_number ?? "—"}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                <td className={TABLE_CENTER_CELL_CLASSNAME}>
                   {item.cest_code ?? "—"}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                <td className={TABLE_TEXT_CELL_CLASSNAME}>
                   {item.interstate_agreement ?? "—"}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                <td className={TABLE_CENTER_CELL_CLASSNAME}>
                   {item.applied_original_mva ?? "—"}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                <td className={TABLE_CENTER_CELL_CLASSNAME}>
                   {item.adjusted_mva ?? "—"}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                <td className={TABLE_CENTER_CELL_CLASSNAME}>
                   {item.original_mva ?? "—"}
                 </td>
-                <td className="px-5 py-3">
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => onEdit(item)}
-                      className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
-                    >
-                      Editar
-                    </button>
-                  </div>
-                </td>
+                {onEdit ? (
+                  <td className="px-3 py-2.5 text-center">
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => onEdit(item)}
+                        aria-label={`Editar ICMS ${item.description}`}
+                        title="Editar"
+                        className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>

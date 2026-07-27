@@ -58,7 +58,6 @@ export const updateTiRequestStatusBodySchema = z
 export const createTiMessageBodySchema = z
   .object({
     message: zNonEmptyText("message"),
-    attachment: z.string().url({ message: "Anexo deve ser uma URL valida." }).optional(),
     type: z.enum(["Message", "Solution", "Rejection", "Acceptance"]).default("Message"),
   })
   .strict();

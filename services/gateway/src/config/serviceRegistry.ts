@@ -103,6 +103,8 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.fiscalServiceUrl,
       auditTarget: "fiscal-service",
       routePrefixes: [...FISCAL_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
+      permissionModule: "fiscal",
     },
     {
       key: "contabil-service",

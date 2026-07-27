@@ -7,7 +7,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { isAuthenticated, requireFiscalWritePermission } from "../middlewares/isAuthenticated.js";
 import {
   createNcmBodySchema,
   detailNcmQuerySchema,
@@ -25,43 +25,53 @@ function firstQueryValue(value: unknown): unknown {
 export function createNcmRoutes(service: NcmRouteDeps): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
 
-  router.post("/ncm", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const body = parseWithZod(createNcmBodySchema, req.body);
-      const auth = requireAuthenticatedRequestContext(req);
+  router.post(
+    "/ncm",
+    isAuthenticated,
+    requireFiscalWritePermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(createNcmBodySchema, req.body);
+        const auth = requireAuthenticatedRequestContext(req);
 
-      const result = await service.create({
-        userId: auth.user_id,
-        organizationId: auth.organization_id,
-        permission: auth.permission,
-        ...body,
-      });
+        const result = await service.create({
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+          ...body,
+        });
 
-      res.status(201).json(createSuccessResponse(result));
-    } catch (err) {
-      logError("Erro ao criar NCM", { err });
-      next(err);
-    }
-  });
+        res.status(201).json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao criar NCM", { err });
+        next(err);
+      }
+    },
+  );
 
-  router.put("/ncm", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const body = parseWithZod(updateNcmBodySchema, req.body);
-      const auth = requireAuthenticatedRequestContext(req);
+  router.put(
+    "/ncm",
+    isAuthenticated,
+    requireFiscalWritePermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(updateNcmBodySchema, req.body);
+        const auth = requireAuthenticatedRequestContext(req);
 
-      const result = await service.update({
-        userId: auth.user_id,
-        organizationId: auth.organization_id,
-        permission: auth.permission,
-        ...body,
-      });
+        const result = await service.update({
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+          ...body,
+        });
 
-      res.json(createSuccessResponse(result));
-    } catch (err) {
-      logError("Erro ao atualizar NCM", { err });
-      next(err);
-    }
-  });
+        res.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao atualizar NCM", { err });
+        next(err);
+      }
+    },
+  );
 
   router.get("/ncm", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -83,11 +93,22 @@ export function createNcmRoutes(service: NcmRouteDeps): ReturnType<typeof Router
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const rawObj = { ncmCodes: req.query.ncmCodes };
+        const rawObj = {
+          ncmCodes: req.query.ncmCodes,
+          page: req.query.page,
+          page_size: req.query.page_size,
+        };
         const query = parseWithZod(listNcmQuerySchema, rawObj);
         const auth = requireAuthenticatedRequestContext(req);
 
-        const result = await service.list(query.ncmCodes, auth.organization_id);
+        const result = await service.list(
+          {
+            ncmCodes: query.ncmCodes,
+            page: query.page,
+            page_size: query.page_size,
+          },
+          auth.organization_id,
+        );
 
         res.json(createSuccessResponse(result));
       } catch (err) {

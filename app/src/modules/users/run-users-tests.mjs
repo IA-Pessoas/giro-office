@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 
 import {
+  KNOWN_PERMISSION_MODULE_KEYS,
+  PERMISSION_MODULE_GROUPS,
+  PERMISSION_MODULE_LABELS,
   getMinimumPermissionLevel,
   getPermissionSelectOptions,
   normalizePermissionForModule,
@@ -67,6 +70,10 @@ const createUserModalSource = readFileSync(
   new URL("./components/CreateUserModal.tsx", import.meta.url),
   "utf8",
 );
+const adminUserDetailsPanelSource = readFileSync(
+  new URL("./components/AdminUserDetailsPanel.tsx", import.meta.url),
+  "utf8",
+);
 const createUserConfigSource = readFileSync(
   new URL("./constants/createUserConfig.ts", import.meta.url),
   "utf8",
@@ -76,6 +83,22 @@ const permissionConfigSource = readFileSync(
   "utf8",
 );
 const userTypesSource = readFileSync(new URL("./types/index.ts", import.meta.url), "utf8");
+
+runTest("create user password visibility control remains explicit and accessible", () => {
+  assert.match(createUserModalSource, /const \[isPasswordVisible, setIsPasswordVisible\] = useState\(false\);/);
+  assert.match(createUserModalSource, /aria-label=\{isPasswordVisible \? 'Ocultar senha' : 'Mostrar senha'\}/);
+  assert.match(createUserModalSource, /aria-pressed=\{isPasswordVisible\}/);
+  assert.match(createUserModalSource, /type=\{isPasswordVisible \? 'text' : 'password'\}/);
+  assert.match(createUserModalSource, /autoComplete="new-password"/);
+});
+
+runTest("retired department modules are never sent by create-user payloads", () => {
+  const modules = buildCreateUserModulesPayload({}, null, 1);
+
+  for (const retiredKey of ["atendimento", "pec", "wiki"]) {
+    assert.equal(Object.hasOwn(modules, retiredKey), false);
+  }
+});
 
 runTest("RH and Technology define Viewer as their frontend minimum", () => {
   assert.equal(getMinimumPermissionLevel("rh"), 0);
@@ -196,6 +219,37 @@ runTest("permission update payload enforces only RH and Technology minimums", ()
   assert.equal(payload.ti, 0);
   assert.equal(payload.fiscal, null);
   assert.equal(payload.contabil, 2);
+});
+
+runTest("retired PEC, Atendimento and Wiki modules are absent from every user permission UI config", () => {
+  const retiredKeys = ["pec", "atendimento", "wiki"];
+
+  for (const retiredKey of retiredKeys) {
+    assert.equal(KNOWN_PERMISSION_MODULE_KEYS.includes(retiredKey), false);
+    assert.equal(Object.hasOwn(PERMISSION_MODULE_LABELS, retiredKey), false);
+    assert.equal(PERMISSION_MODULE_GROUPS.flatMap((group) => group.keys).includes(retiredKey), false);
+    assert.equal(createUserConfigSource.includes(`key: "${retiredKey}"`), false);
+    assert.equal(userTypesSource.includes(`| "${retiredKey}"`), false);
+  }
+});
+
+runTest("retired permission modules from a legacy response are never re-sent as extras", () => {
+  const normalization = normalizePermissionResponse({
+    atendimento: 1,
+    pec: 2,
+    wiki: 0,
+    custom_module: 1,
+  });
+  const payload = buildPermissionUpdatePayload(
+    { ...normalization.known, ...normalization.extras },
+    Object.keys(normalization.extras),
+  );
+
+  assert.deepEqual(normalization.extras, { custom_module: 1 });
+  assert.equal(Object.hasOwn(payload, "atendimento"), false);
+  assert.equal(Object.hasOwn(payload, "pec"), false);
+  assert.equal(Object.hasOwn(payload, "wiki"), false);
+  assert.equal(payload.custom_module, 1);
 });
 
 runTest("create user additional modules hide unavailable services", () => {
@@ -431,6 +485,40 @@ runTest("organization owner scope field uses a checkbox toggle", () => {
   assert.match(createUserModalSource, /className="flex h-\[42px\] items-center justify-center gap-3"/);
   assert.match(createUserModalSource, /className=\{`\$\{FIELD_LABEL_CLASSNAME\} mb-0`\}/);
   assert.equal(createUserModalSource.includes('name="isOrganizationOwner"'), false);
+});
+
+runTest("admin user password update asks for explicit confirmation", () => {
+  const dialogStart = adminUserDetailsPanelSource.indexOf("<Dialog");
+  const dialogEnd = adminUserDetailsPanelSource.indexOf("</Dialog>", dialogStart);
+  const dialogSource = adminUserDetailsPanelSource.slice(dialogStart, dialogEnd);
+  const confirmHandlerBody = adminUserDetailsPanelSource.match(
+    /const handleConfirmPasswordUpdate = async \(\) => \{[\s\S]*?\n  \};/,
+  )?.[0] ?? "";
+
+  assert.match(adminUserDetailsPanelSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog";/);
+  assert.match(adminUserDetailsPanelSource, /isPasswordConfirmationOpen/);
+  assert.match(adminUserDetailsPanelSource, /Confirmar alteração de senha/);
+  assert.match(adminUserDetailsPanelSource, /A senha do usuário selecionado será alterada/);
+  assert.doesNotMatch(adminUserDetailsPanelSource, /O valor digitado não será exibido nesta confirmação/);
+  assert.match(adminUserDetailsPanelSource, /!w-\[min\(92vw,520px\)\]/);
+  assert.match(adminUserDetailsPanelSource, /!rounded-lg/);
+  assert.match(adminUserDetailsPanelSource, /bodyClassName="!px-4 !py-3"/);
+  assert.match(dialogSource, /onClick=\{\(\) => setIsPasswordConfirmationOpen\(false\)\}/);
+  assert.match(dialogSource, /onClick=\{\(\) => void handleConfirmPasswordUpdate\(\)\}/);
+  assert.doesNotMatch(dialogSource, /formData\.password/);
+  assert.match(confirmHandlerBody, /await persistUserUpdate\(\)/);
+  assert.match(
+    adminUserDetailsPanelSource,
+    /formData\.password\.trim\(\)[\s\S]*setIsPasswordConfirmationOpen\(true\)[\s\S]*return;/,
+  );
+});
+
+runTest("admin user details keeps non-password updates direct", () => {
+  const handleSaveBody = adminUserDetailsPanelSource.match(
+    /const handleSave = async \(\) => \{[\s\S]*?\n  \};/,
+  )?.[0] ?? "";
+
+  assert.match(handleSaveBody, /await persistUserUpdate\(\)/);
 });
 
 runTest("department permission sync payload mirrors the department module level", () => {

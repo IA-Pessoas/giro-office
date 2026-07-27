@@ -3,6 +3,7 @@ import "./envBootstrap.js";
 import {
   createLogger,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
@@ -25,20 +26,23 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-function gatewayHeaders(): Record<string, string> {
+function gatewayHeaders(permission = 1): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORG_ID,
+    [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
   };
 }
+
+const emptyListResult = { data: [], total: 0, page: 1, limit: 50, hasMore: false };
 
 function createMockDeps(): IcmsRouteDeps {
   return {
     create: vi.fn(async () => ({ create: {} })),
     update: vi.fn(async () => ({})),
     detail: vi.fn(async () => ({ detail: {} })),
-    list: vi.fn(async () => []),
+    list: vi.fn(async () => emptyListResult),
   };
 }
 
@@ -94,6 +98,34 @@ describe("icms routes", () => {
     expect(deps.create).not.toHaveBeenCalled();
   });
 
+  it("POST /fiscal/icms com Visualizador retorna 403 antes do servico", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, icmsRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/fiscal/icms")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(0))
+      .send({});
+
+    expect(res.status).toBe(403);
+    expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("PUT /fiscal/icms com Visualizador retorna 403 antes do servico", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, icmsRouteDeps: deps });
+
+    const res = await request(app)
+      .put("/fiscal/icms")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(0))
+      .send({});
+
+    expect(res.status).toBe(403);
+    expect(deps.update).not.toHaveBeenCalled();
+  });
+
   it("GET /fiscal/icms sem icms_id válido retorna 400", async () => {
     const deps = createMockDeps();
     const app = createFiscalApp({ env, logger, icmsRouteDeps: deps });
@@ -115,7 +147,7 @@ describe("icms routes", () => {
     const res = await request(app)
       .get("/fiscal/icms")
       .query({ icms_id: ICMS_ID })
-      .set(gatewayHeaders());
+      .set(gatewayHeaders(0));
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -124,15 +156,52 @@ describe("icms routes", () => {
 
   it("GET /fiscal/icms/list com icmsCodes retorna 200", async () => {
     const deps = createMockDeps();
-    deps.list = vi.fn(async () => [{ id: ICMS_ID }]);
+    deps.list = vi.fn(async () => ({
+      data: [{ id: ICMS_ID }],
+      total: 1,
+      page: 2,
+      limit: 1,
+      hasMore: false,
+    }));
     const app = createFiscalApp({ env, logger, icmsRouteDeps: deps });
 
     const res = await request(app)
       .get("/fiscal/icms/list")
-      .query({ icmsCodes: "ICMS-A,ICMS-B" })
+      .query({ icmsCodes: "bebida,fria", page: "2", page_size: "1" })
+      .set(gatewayHeaders(0));
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(deps.list).toHaveBeenCalledWith(
+      { icmsCodes: ["bebida", "fria"], page: 2, page_size: 1 },
+      ORG_ID,
+    );
+  });
+
+  it("GET /fiscal/icms/list sem termo retorna listagem paginada", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, icmsRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/fiscal/icms/list")
+      .query({ page: "2", page_size: "25" })
       .set(gatewayHeaders());
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+    expect(deps.list).toHaveBeenCalledWith({ icmsCodes: [], page: 2, page_size: 25 }, ORG_ID);
+  });
+
+  it("GET /fiscal/icms/list com page_size acima do limite retorna 400", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, icmsRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/fiscal/icms/list")
+      .query({ page_size: "101" })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(400);
+    expect(deps.list).not.toHaveBeenCalled();
   });
 });

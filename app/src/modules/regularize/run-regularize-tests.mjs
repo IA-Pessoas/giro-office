@@ -236,6 +236,40 @@ await runTest("regularize management tables use debounced paginated hooks", asyn
   assert.doesNotMatch(pageSource, /selectedCredentialClientId[\s\S]{0,120}sitePageQuery/);
 });
 
+await runTest("regularize process selection follows the visible page and gives explicit feedback", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(
+    pageSource,
+    /const visibleProcessRows = isProcessSearchPending \? \[\] : processPageQuery\.data\?\.data \?\? \[\];/,
+  );
+  assert.match(pageSource, /const automaticProcessId = visibleProcessRows\[0\]\?\.id;/);
+  assert.match(pageSource, /const currentProcessId = selectedProcessId \?\? automaticProcessId;/);
+  assert.match(pageSource, /type ProcessSelectionOrigin = "automatic" \| "manual";/);
+  assert.match(
+    pageSource,
+    /const \[processSelectionOrigin, setProcessSelectionOrigin\] = useState<ProcessSelectionOrigin>\(\s*"automatic",?\s*\);/,
+  );
+  assert.match(pageSource, /function resetProcessSelection\(\)/);
+  assert.match(pageSource, /function selectProcessManually\(processId: RegularizeId\)/);
+  assert.match(pageSource, /aria-selected=\{currentProcessId === item\.id\}/);
+  assert.match(pageSource, /bg-blue-50 dark:bg-blue-950\/30/);
+  assert.match(pageSource, /role="status"\s+aria-live="polite"/);
+  assert.match(pageSource, /processSelectionOrigin === "manual"/);
+});
+
+await runTest("regularize manually selected process detail is safely focused on narrow viewports", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /const selectedProcessDetailRef = useRef<HTMLElement \| null>\(null\);/);
+  assert.match(pageSource, /typeof window === "undefined"/);
+  assert.match(pageSource, /window\.matchMedia\("\(min-width: 1280px\)"\)\.matches/);
+  assert.match(pageSource, /window\.requestAnimationFrame\(\(\) => \{/);
+  assert.match(pageSource, /selectedProcessDetailRef\.current\?\.focus\(\{ preventScroll: true \}\);/);
+  assert.match(pageSource, /selectedProcessDetailRef\.current\?\.scrollIntoView\(\{ behavior: "smooth", block: "start" \}\);/);
+  assert.match(pageSource, /panelRef=\{selectedProcessDetailRef\}/);
+});
+
 await runTest("regularize service is the only module file importing the API client", async () => {
   const files = await collectSourceFiles(moduleRoot);
   const offenders = [];

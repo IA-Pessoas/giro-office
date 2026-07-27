@@ -18,7 +18,6 @@ const pessoalModulePolicy: AuthPolicy = {
 };
 
 const clientRelatedModules = [
-  "atendimento",
   "comercial",
   "contabil",
   "financeiro",
