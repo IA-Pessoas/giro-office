@@ -86,10 +86,7 @@ describe("pessoal-service OpenAPI", () => {
       "/pessoal/unions"
     ]?.get as {
       parameters?: Array<{ name?: string }>;
-      responses?: Record<
-        string,
-        { content?: Record<string, { schema?: { oneOf?: unknown[] } }> }
-      >;
+      responses?: Record<string, { content?: Record<string, { schema?: { oneOf?: unknown[] } }> }>;
     };
 
     expect(operation.parameters?.map((parameter) => parameter.name)).toEqual([
@@ -97,8 +94,31 @@ describe("pessoal-service OpenAPI", () => {
       "page",
       "limit",
     ]);
-    expect(
-      operation.responses?.["200"]?.content?.["application/json"]?.schema?.oneOf,
-    ).toHaveLength(2);
+    expect(operation.responses?.["200"]?.content?.["application/json"]?.schema?.oneOf).toHaveLength(
+      2,
+    );
+  });
+
+  it("documenta exclusao de sindicato e seus erros de contrato", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const operation = (
+      spec.paths as Record<
+        string,
+        {
+          delete?: {
+            operationId?: string;
+            parameters?: unknown[];
+            responses?: Record<string, unknown>;
+          };
+        }
+      >
+    )["/pessoal/unions/{id}"]?.delete;
+
+    expect(operation?.operationId).toBe("deletePessoalUnion");
+    expect(operation?.parameters).toHaveLength(1);
+    expect(operation?.responses?.["200"]).toBeDefined();
+    expect(operation?.responses?.["400"]).toBeDefined();
+    expect(operation?.responses?.["404"]).toBeDefined();
+    expect(operation?.responses?.["409"]).toBeDefined();
   });
 });

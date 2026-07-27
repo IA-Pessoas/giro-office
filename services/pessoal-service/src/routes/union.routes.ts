@@ -18,8 +18,7 @@ export function createUnionRoutes(service: UnionService): Router {
       const query = parseWithZod(listUnionsQuerySchema, request.query);
       const result = await service.list(getPessoalOrganizationContext(request), {
         ...query,
-        paginationRequested:
-          request.query.page !== undefined || request.query.limit !== undefined,
+        paginationRequested: request.query.page !== undefined || request.query.limit !== undefined,
       });
 
       response.status(200).json(createSuccessResponse(result));
@@ -65,6 +64,19 @@ export function createUnionRoutes(service: UnionService): Router {
       response.status(200).json(createSuccessResponse(result));
     } catch (err: unknown) {
       logError("Erro ao atualizar sindicato de pessoal", { err });
+      next(err);
+    }
+  });
+
+  router.delete("/:id", async (request, response, next) => {
+    try {
+      const context = getPessoalRouteContext(request);
+      const params = parseWithZod(unionIdParamsSchema, request.params);
+      const result = await service.delete(context, params.id);
+
+      response.status(200).json(createSuccessResponse(result));
+    } catch (err: unknown) {
+      logError("Erro ao remover sindicato de pessoal", { err });
       next(err);
     }
   });

@@ -182,6 +182,13 @@ export const pessoalService = {
     return unwrapPessoalEnvelope<PessoalUnion>(response.data);
   },
 
+  async deleteUnion(id: string): Promise<PessoalUnion> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.delete(PESSOAL_ENDPOINTS.unionDetail(id));
+
+    return unwrapPessoalEnvelope<PessoalUnion>(response.data);
+  },
+
   async detailPayroll(clientId: string): Promise<PessoalPayroll | null> {
     const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
 

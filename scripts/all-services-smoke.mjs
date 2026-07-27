@@ -2774,6 +2774,33 @@ const handlers = {
     });
   },
 
+  async pessoalUnionDelete(op) {
+    if (isBadExpectation(op)) {
+      await httpRequest(op, {
+        expectedStatus: [401],
+        path: "/pessoal/unions/40000000-0000-4000-8000-000000000002",
+      });
+      return;
+    }
+
+    const created = await httpRequest(op, {
+      method: "POST",
+      path: "/pessoal/unions",
+      expectedStatus: [201],
+      json: {
+        name: uniqueText("Smoke Union To Delete"),
+        cnpj: uniqueDigits(14),
+        base_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    });
+    const temporaryUnionId = pickFirst(created.body, "data.id") ?? findFirstId(created.body?.data);
+
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/unions/${temporaryUnionId}`,
+    });
+  },
+
   async pessoalPayrollCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],
