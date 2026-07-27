@@ -50,6 +50,7 @@ import type {
   TiStockMovement,
 } from "../types";
 import { resolveTiStockLocationName } from "../utils/stockDisplay";
+import { getTiStockMutationErrorMessage } from "../utils/stockMutationError";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -670,7 +671,7 @@ export function TiStockTab() {
       closeExitDialog();
       toast.success("Saída registrada com sucesso.");
     } catch (error) {
-      toast.error(getMutationErrorMessage(error, "Não foi possível registrar a saída."));
+      toast.error(getTiStockMutationErrorMessage(error, "Não foi possível registrar a saída."));
     }
   }
 

@@ -387,6 +387,94 @@ await runTest("ti stock location display never falls back to a raw id", async ()
   );
 });
 
+await runTest("ti stock mutation error preserves the domain message returned by the API", async () => {
+  const { getTiStockMutationErrorMessage } = await import("./utils/stockMutationError.ts");
+  const axiosStyleError = {
+    isAxiosError: true,
+    message: "Request failed with status code 409",
+    response: {
+      status: 409,
+      data: {
+        success: false,
+        error: "Saldo insuficiente no estoque de TI.",
+        code: "CONFLICT",
+      },
+    },
+  };
+
+  const message = getTiStockMutationErrorMessage(
+    axiosStyleError,
+    "Não foi possível registrar a saída.",
+  );
+
+  assert.equal(message, "Saldo insuficiente no estoque de TI.");
+  assert.notEqual(message, "Request failed with status code 409");
+});
+
+await runTest("ti stock mutation error rejects a technical API error message for a 409", async () => {
+  const { getTiStockMutationErrorMessage } = await import("./utils/stockMutationError.ts");
+  const axiosStyleError = {
+    isAxiosError: true,
+    message: "Request failed with status code 409",
+    response: {
+      status: 409,
+      data: {
+        success: false,
+        error: "Request failed with status code 409",
+        code: "CONFLICT",
+      },
+    },
+  };
+
+  const message = getTiStockMutationErrorMessage(
+    axiosStyleError,
+    "Não foi possível registrar a saída.",
+  );
+
+  assert.equal(message, "Não foi possível registrar a saída: o saldo disponível é insuficiente.");
+  assert.notEqual(message, "Request failed with status code 409");
+});
+
+await runTest("ti stock mutation error uses an actionable fallback for a 409 without domain message", async () => {
+  const { getTiStockMutationErrorMessage } = await import("./utils/stockMutationError.ts");
+  const axiosStyleError = {
+    isAxiosError: true,
+    message: "Request failed with status code 409",
+    response: {
+      status: 409,
+      data: {
+        success: false,
+        error: "   ",
+        code: "CONFLICT",
+      },
+    },
+  };
+
+  const message = getTiStockMutationErrorMessage(
+    axiosStyleError,
+    "Não foi possível registrar a saída.",
+  );
+
+  assert.equal(message, "Não foi possível registrar a saída: o saldo disponível é insuficiente.");
+  assert.notEqual(message, "Request failed with status code 409");
+});
+
+await runTest("ti stock exit feedback uses the scoped mutation error normalizer", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+  const exitHandlerStart = tabSource.indexOf("async function handleSubmitExit");
+  const exitHandlerEnd = tabSource.indexOf("async function handleSubmitCategory", exitHandlerStart);
+  const exitHandlerSource = tabSource.slice(exitHandlerStart, exitHandlerEnd);
+
+  assert.match(
+    tabSource,
+    /import \{ getTiStockMutationErrorMessage \} from "\.\.\/utils\/stockMutationError"/,
+  );
+  assert.match(
+    exitHandlerSource,
+    /getTiStockMutationErrorMessage\(error, "Não foi possível registrar a saída\."\)/,
+  );
+});
+
 await runTest("ti stock filters reset and render server pagination", async () => {
   const tabSource = await readModuleSource("components/TiStockTab.tsx");
 
@@ -854,7 +942,8 @@ await runTest("ti password reveal copy uses copy icon without toggling visibilit
 
   assert.match(tabSource, /Copy,/);
   assert.match(tabSource, /<Copy className="h-4 w-4" \/>/);
-  assert.match(tabSource, /navigator\.clipboard\.writeText\(secret\)/);
+  assert.match(tabSource, /const copied = await copySensitiveText\(secret, clipboard\)/);
+  assert.doesNotMatch(tabSource, /navigator\.clipboard\.writeText\(secret\)/);
   assert.doesNotMatch(tabSource, /<EyeOff className="h-4 w-4" \/>[\s\S]*?<span>Copiar senha<\/span>/);
 });
 
@@ -872,12 +961,12 @@ await runTest("ti password reveal clears sensitive detail cache when hidden", as
   assert.match(tabSource, /setRevealPasswordId\(null\)/);
 });
 
-await runTest("ti user selects reuse the paginated assignable users source", async () => {
+await runTest("ti user selects reuse the operational users source", async () => {
   const hookSource = await readAppSource("src/modules/rh/hooks/useAssignableUsers.ts");
   const rhTypesSource = await readAppSource("src/modules/rh/types.ts");
   const userTypesSource = await readAppSource("src/modules/users/types/index.ts");
 
-  assert.match(hookSource, /listAdminUsers\("active"\)/);
+  assert.match(hookSource, /api\.get\(RH_ENDPOINTS\.operationalUsers\)/);
   assert.doesNotMatch(hookSource, /cpf: user\.cpf \?\? null/);
   assert.doesNotMatch(rhTypesSource, /cpf\?: string \| null/);
   assert.doesNotMatch(userTypesSource, /cpf\?: string \| null/);
