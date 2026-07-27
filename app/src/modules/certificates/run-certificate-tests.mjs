@@ -126,4 +126,25 @@ runTest("issue 495 certificate notes preserve line breaks and wrap long tokens",
   }
 });
 
+runTest("certificate refresh keeps rows while a new first page is requested", () => {
+  const workspaceSource = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workspaceSource, /pjListQuery\.isPlaceholderData/);
+  assert.match(workspaceSource, /pjListQuery\.data\.page !== pjPage/);
+  assert.match(workspaceSource, /pfListQuery\.isPlaceholderData/);
+  assert.match(workspaceSource, /pfListQuery\.data\.page !== pfPage/);
+  assert.match(workspaceSource, /notificationsQuery\.isPlaceholderData/);
+  assert.match(workspaceSource, /notificationsQuery\.data\.page !== notificationPage/);
+  assert.match(workspaceSource, /const activeListIsLoading = activeTab === "pf"\n    \? pfListQuery\.isFetching/);
+  assert.doesNotMatch(workspaceSource, /setVisiblePjItems\(\[\]\);\n      void pjListQuery\.refetch\(\);/);
+  assert.doesNotMatch(workspaceSource, /setVisiblePfItems\(\[\]\);\n      void pfListQuery\.refetch\(\);/);
+  assert.match(
+    workspaceSource,
+    /if \(activeTab === "notifications"[\s\S]*setNotificationPage\(FIRST_PAGE\)/,
+  );
+});
+
 console.log("certificates contract tests passed");

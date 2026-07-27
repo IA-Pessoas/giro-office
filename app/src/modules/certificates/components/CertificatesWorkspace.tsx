@@ -250,6 +250,7 @@ export function CertificatesWorkspace() {
   const [notificationPage, setNotificationPage] = useState(FIRST_PAGE);
   const [visiblePjItems, setVisiblePjItems] = useState<CertificatePj[]>([]);
   const [visiblePfItems, setVisiblePfItems] = useState<CertificatePf[]>([]);
+  const [visibleNotificationItems, setVisibleNotificationItems] = useState<CertificateNotification[]>([]);
 
   const [pjFilters, setPjFilters] = useState<PjFilters>({
     name: "",
@@ -348,7 +349,11 @@ export function CertificatesWorkspace() {
   const updatePfMutation = useUpdateCertificatePfMutation(selected?.type === "pf" ? selected.id : "");
 
   useEffect(() => {
-    if (!pjListQuery.data) {
+    if (
+      !pjListQuery.data ||
+      pjListQuery.isPlaceholderData ||
+      pjListQuery.data.page !== pjPage
+    ) {
       return;
     }
 
@@ -357,10 +362,14 @@ export function CertificatesWorkspace() {
     setVisiblePjItems((current) =>
       pjPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
     );
-  }, [pjListQuery.data, pjPage]);
+  }, [pjListQuery.data, pjListQuery.isPlaceholderData, pjPage]);
 
   useEffect(() => {
-    if (!pfListQuery.data) {
+    if (
+      !pfListQuery.data ||
+      pfListQuery.isPlaceholderData ||
+      pfListQuery.data.page !== pfPage
+    ) {
       return;
     }
 
@@ -369,7 +378,23 @@ export function CertificatesWorkspace() {
     setVisiblePfItems((current) =>
       pfPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
     );
-  }, [pfListQuery.data, pfPage]);
+  }, [pfListQuery.data, pfListQuery.isPlaceholderData, pfPage]);
+
+  useEffect(() => {
+    if (
+      !notificationsQuery.data ||
+      notificationsQuery.isPlaceholderData ||
+      notificationsQuery.data.page !== notificationPage
+    ) {
+      return;
+    }
+
+    const nextItems = notificationsQuery.data.data;
+
+    setVisibleNotificationItems((current) =>
+      notificationPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
+    );
+  }, [notificationPage, notificationsQuery.data, notificationsQuery.isPlaceholderData]);
 
   useEffect(() => {
     setPjPage(FIRST_PAGE);
@@ -433,8 +458,8 @@ export function CertificatesWorkspace() {
   }, [visiblePfItems]);
 
   const notificationsStats = useMemo(() => {
-    const total = notificationsQuery.data?.data.length ?? ZERO;
-    const pjCount = notificationsQuery.data?.data.filter((item) => item.type === "PJ").length ?? ZERO;
+    const total = visibleNotificationItems.length;
+    const pjCount = visibleNotificationItems.filter((item) => item.type === "PJ").length;
     const pfCount = total - pjCount;
 
     return [
@@ -451,19 +476,22 @@ export function CertificatesWorkspace() {
         value: pfCount,
       },
     ];
-  }, [notificationsQuery.data?.data]);
+  }, [visibleNotificationItems]);
 
   const activeStats = activeTab === "pf" ? pfStats : activeTab === "pj" ? pjStats : notificationsStats;
   const activeListHasMore = activeTab === "pf"
-    ? pfListQuery.data?.hasMore
+    ? !pfListQuery.isPlaceholderData && pfListQuery.data?.page === pfPage && pfListQuery.data.hasMore
     : activeTab === "pj"
-      ? pjListQuery.data?.hasMore
-      : notificationsQuery.data?.hasMore;
+      ? !pjListQuery.isPlaceholderData && pjListQuery.data?.page === pjPage && pjListQuery.data.hasMore
+      :
+          !notificationsQuery.isPlaceholderData &&
+          notificationsQuery.data?.page === notificationPage &&
+          notificationsQuery.data.hasMore;
   const activeListIsLoading = activeTab === "pf"
-    ? pfListQuery.isLoading
+    ? pfListQuery.isFetching
     : activeTab === "pj"
-      ? pjListQuery.isLoading
-      : notificationsQuery.isLoading;
+      ? pjListQuery.isFetching
+      : notificationsQuery.isFetching;
   const activeListError = activeTab === "pf" ? pfListQuery.isError : activeTab === "pj" ? pjListQuery.isError : notificationsQuery.isError;
   const activeListErrorMessage = activeTab === "pf"
     ? getCertificateErrorMessage(pfListQuery.error, "Não foi possível carregar os certificados PF agora. Tente atualizar em alguns instantes.")
@@ -478,7 +506,7 @@ export function CertificatesWorkspace() {
 
   const hasPjRows = visiblePjItems.length > ZERO;
   const hasPfRows = visiblePfItems.length > ZERO;
-  const hasNotificationRows = (notificationsQuery.data?.data.length ?? ZERO) > ZERO;
+  const hasNotificationRows = visibleNotificationItems.length > ZERO;
   const hasActiveRows = activeTab === "pf"
     ? hasPfRows
     : activeTab === "pj"
@@ -576,27 +604,36 @@ export function CertificatesWorkspace() {
 
   function handleRefresh() {
     if (activeTab === "pj") {
-      setVisiblePjItems([]);
-      void pjListQuery.refetch();
-      setPjPage(FIRST_PAGE);
+      if (pjPage === FIRST_PAGE) {
+        void pjListQuery.refetch();
+      } else {
+        setPjPage(FIRST_PAGE);
+      }
       setWorkspaceMode("view");
       setShowDetailPassword(false);
       return;
     }
 
     if (activeTab === "pf") {
-      setVisiblePfItems([]);
-      void pfListQuery.refetch();
-      setPfPage(FIRST_PAGE);
+      if (pfPage === FIRST_PAGE) {
+        void pfListQuery.refetch();
+      } else {
+        setPfPage(FIRST_PAGE);
+      }
       setWorkspaceMode("view");
       setShowDetailPassword(false);
       return;
     }
 
-    void notificationsQuery.refetch();
-    setNotificationPage(FIRST_PAGE);
-    setWorkspaceMode("view");
-    setShowDetailPassword(false);
+    if (activeTab === "notifications") {
+      if (notificationPage === FIRST_PAGE) {
+        void notificationsQuery.refetch();
+      } else {
+        setNotificationPage(FIRST_PAGE);
+      }
+      setWorkspaceMode("view");
+      setShowDetailPassword(false);
+    }
   }
 
   function handlePjFileActionSuccess(certificateId: string) {
@@ -1419,7 +1456,7 @@ export function CertificatesWorkspace() {
                     </td>
                   </tr>
                 ) : (
-                  notificationsQuery.data?.data.map((notification) => (
+                  visibleNotificationItems.map((notification) => (
                     <tr
                       key={notification.id}
                       className="border-b border-slate-200/80 align-top last:border-b-0 dark:border-slate-800"
