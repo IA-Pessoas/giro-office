@@ -48,6 +48,10 @@ export type TiStockListResult = {
   hasMore: boolean;
 };
 
+function normalizeStockCategoryName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 export class TiStockService {
   private readonly departmentResolver: TiDepartmentResolverService;
 
@@ -409,14 +413,19 @@ export class TiStockService {
   ): Promise<unknown> {
     try {
       const departmentId = await this.resolveDepartment(context.organizationId);
-      const existing = await this.prisma.categoryStock.findFirst({
+      const name = body.name.trim().replace(/\s+/g, " ");
+      const normalizedName = normalizeStockCategoryName(name);
+      const activeCategories = await this.prisma.categoryStock.findMany({
         where: {
           organization_id: context.organizationId,
           department_id: departmentId,
-          name: body.name,
           status: true,
         },
+        select: { name: true },
       });
+      const existing = activeCategories.some(
+        (category) => normalizeStockCategoryName(category.name) === normalizedName,
+      );
 
       if (existing) {
         throw new ServiceError(
@@ -427,7 +436,7 @@ export class TiStockService {
 
       return this.prisma.categoryStock.create({
         data: {
-          name: body.name,
+          name,
           department_id: departmentId,
           status: true,
           organization_id: context.organizationId,

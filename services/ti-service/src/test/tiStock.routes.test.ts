@@ -231,20 +231,34 @@ describe("ti stock routes", () => {
     });
   });
 
-  it("POST /ti/stock/categories creates a stock category", async () => {
+  it("POST /ti/stock/categories creates a stock category without an existing normalized name", async () => {
     const response = await request(createTestApp())
       .post("/ti/stock/categories")
       .set(gatewayHeaders(TI_ADMIN_PERMISSION))
-      .send({ name: "Perifericos" });
+      .send({ name: "Redes" });
 
     expect(response.status).toBe(201);
     expect(response.body).toMatchObject({
       success: true,
       data: {
-        name: "Perifericos",
+        name: "Redes",
         status: true,
         organization_id: organizationId,
       },
+    });
+  });
+
+  it("POST /ti/stock/categories returns 409 for a normalized duplicate", async () => {
+    const response = await request(createTestApp())
+      .post("/ti/stock/categories")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({ name: "  perifericos  " });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "CONFLICT",
+      error: "Ja existe uma categoria de estoque de TI ativa com este nome.",
     });
   });
 

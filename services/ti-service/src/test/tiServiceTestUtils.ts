@@ -137,6 +137,10 @@ export function createPrismaMock(): PrismaClient {
           throw new Error("Stock category list missing Tecnologia department scope.");
         }
 
+        if (where.status === true) {
+          return [{ name: "Perifericos" }];
+        }
+
         return [];
       }),
       findFirst: vi.fn(async ({ where }) => {

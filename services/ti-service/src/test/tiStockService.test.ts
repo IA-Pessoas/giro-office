@@ -30,6 +30,35 @@ describe("TiDepartmentResolverService", () => {
 });
 
 describe("TiStockService", () => {
+  it("rejects an active stock category whose name only differs by case and spaces", async () => {
+    const findMany = vi.fn(async () => [{ name: "  Rede   Interna  " }]);
+    const create = vi.fn(async ({ data }) => ({ id: "stock-cat-1", ...data }));
+    const prisma = {
+      department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
+      categoryStock: {
+        findFirst: vi.fn(async () => null),
+        findMany,
+        create,
+      },
+    };
+    const service = new TiStockService(prisma as never);
+
+    await expect(service.createCategory(context, { name: "rede interna" })).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+    });
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: context.organizationId,
+        department_id: departmentId,
+        status: true,
+      },
+      select: { name: true },
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("filters the full stock result before pagination and returns page metadata", async () => {
     const item = {
       id: stockId,

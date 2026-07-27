@@ -220,6 +220,10 @@ function toOptionalText(value: string): string | undefined {
   return trimmed || undefined;
 }
 
+function normalizeStockCategoryName(value: unknown): string {
+  return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function toOptionalId(value: string): TiId | undefined {
   const trimmed = value.trim();
 
@@ -334,6 +338,20 @@ export function TiStockTab() {
     stockCategoriesQuery.isFetching ||
     stockLocationsQuery.isFetching ||
     assignableUsersQuery.isFetching;
+
+  const normalizedCategorySearch = normalizeStockCategoryName(categoryName);
+  const filteredStockCategories = useMemo(() => {
+    if (!normalizedCategorySearch) {
+      return stockCategories;
+    }
+
+    return stockCategories.filter((category) =>
+      normalizeStockCategoryName(category.name).includes(normalizedCategorySearch),
+    );
+  }, [normalizedCategorySearch, stockCategories]);
+  const hasExactCategoryName = stockCategories.some(
+    (category) => normalizeStockCategoryName(category.name) === normalizedCategorySearch,
+  );
 
   const categoryOptions = useMemo(
     () => [
@@ -1324,10 +1342,21 @@ export function TiStockTab() {
                   type="submit"
                   label={createCategoryMutation.isPending ? "Criando..." : "Criar"}
                   variant="primary"
-                  disabled={!canEditStock || createCategoryMutation.isPending}
+                  disabled={!canEditStock || createCategoryMutation.isPending || hasExactCategoryName}
                 />
               </div>
             </form>
+            {normalizedCategorySearch ? (
+              hasExactCategoryName ? (
+                <TiInlineNotice tone="warning">
+                  Já existe uma categoria cadastrada com este nome.
+                </TiInlineNotice>
+              ) : filteredStockCategories.length === 0 ? (
+                <TiInlineNotice>
+                  Nenhuma categoria correspondente. Você pode criar uma nova categoria.
+                </TiInlineNotice>
+              ) : null
+            ) : null}
           </section>
 
           <section className="space-y-3">
@@ -1337,7 +1366,7 @@ export function TiStockTab() {
             <MiniResourceList
               emptyLabel="Nenhuma categoria cadastrada."
               icon={Layers3}
-              rows={stockCategories}
+              rows={filteredStockCategories}
             />
           </section>
         </div>
