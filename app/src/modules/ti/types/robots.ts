@@ -33,9 +33,9 @@ export interface TiRobotRun {
 }
 
 export interface TiRobotPayload {
-  name?: string;
+  name: string;
   description?: string | null;
-  type?: TiRobotType | string;
+  type: TiRobotType | string;
   status?: string;
   active?: boolean;
   schedule?: string | null;
