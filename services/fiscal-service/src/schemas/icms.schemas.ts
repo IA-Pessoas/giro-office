@@ -1,6 +1,8 @@
 import { zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+import { commaSeparatedListSchema, paginationQuerySchema } from "./pagination.schemas.js";
+
 const icmsIdSchema = z.string().uuid({ message: "icms_id inválido." });
 
 export const createIcmsBodySchema = z
@@ -38,13 +40,7 @@ export const detailIcmsQuerySchema = z
 
 export const listIcmsQuerySchema = z
   .object({
-    icmsCodes: z.preprocess(
-      (value) => {
-        if (Array.isArray(value)) return value;
-        if (typeof value === "string") return value.split(",").filter(Boolean);
-        return [];
-      },
-      z.array(z.string().min(1)).min(1, "icmsCodes é obrigatório."),
-    ),
+    ...paginationQuerySchema.shape,
+    icmsCodes: commaSeparatedListSchema,
   })
   .strict();

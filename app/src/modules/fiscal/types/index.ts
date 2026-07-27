@@ -1,3 +1,5 @@
+import type { PaginatedResult } from "@shared/pagination/pagination";
+
 export type FiscalTabId = "search" | "ncm" | "icms" | "ipi";
 
 export interface FiscalNcm {
@@ -44,15 +46,25 @@ export interface FiscalNcmSearchResult {
 
 export interface FiscalNcmListFilters {
   ncmCodes?: string[];
+  page?: number;
+  page_size?: number;
 }
 
 export interface FiscalIcmsListFilters {
   icmsCodes?: string[];
+  page?: number;
+  page_size?: number;
 }
 
 export interface FiscalIpiListFilters {
   ipiCodes?: string[];
+  page?: number;
+  page_size?: number;
 }
+
+export type FiscalNcmListResult = PaginatedResult<FiscalNcm>;
+export type FiscalIcmsListResult = PaginatedResult<FiscalIcms>;
+export type FiscalIpiListResult = PaginatedResult<FiscalIpi>;
 
 export interface FiscalNcmSearchFilters {
   ncmCode?: string;
