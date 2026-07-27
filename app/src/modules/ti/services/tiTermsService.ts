@@ -7,6 +7,7 @@ import type {
   TiTerm,
   TiTermPayload,
   TiTermSignPayload,
+  TiTermUpdatePayload,
 } from "../types";
 import {
   buildTiListParams,
@@ -37,7 +38,7 @@ export const tiTermsService = {
     return unwrapTiEnvelope<TiTerm>(response.data);
   },
 
-  async updateTerm(id: TiId, payload: TiTermPayload): Promise<TiTerm> {
+  async updateTerm(id: TiId, payload: TiTermUpdatePayload): Promise<TiTerm> {
     const response = await api.patch<TiEnvelope<TiTerm>>(
       buildTiPath(TI_ENDPOINTS.terms.detail, id),
       payload,
