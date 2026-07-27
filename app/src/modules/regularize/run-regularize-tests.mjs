@@ -113,6 +113,10 @@ await runTest("regularize PF forms search every paginated PF option and preserve
   ]);
   assert.match(partnerFormSource, /RegularizeClientPfSelect/);
   assert.match(processFormSource, /RegularizeClientPfSelect/);
+  assert.match(partnerFormSource, /<fieldset/);
+  assert.match(partnerFormSource, /<legend[^>]*>[\s\S]*<span>Cliente PF<\/span>/);
+  assert.match(processFormSource, /<fieldset/);
+  assert.doesNotMatch(partnerFormSource, /<RegularizeFormField label="Cliente PF"/);
   assert.match(partnerFormSource, /onChange=\{\(id\) => handleChange\("pf_id", id\)\}/);
   assert.match(processFormSource, /handleClientPfChange\(id, option\?\.cpf\)/);
 
@@ -123,6 +127,13 @@ await runTest("regularize PF forms search every paginated PF option and preserve
   assert.match(selectSource, /page: pfPage/);
   assert.match(selectSource, /onNext/);
   assert.match(selectSource, /selectedPfQuery\.data/);
+  assert.match(selectSource, /aria-label="Buscar cliente PF"/);
+  assert.match(selectSource, /aria-label="Selecionar cliente PF"/);
+  assert.match(selectSource, /role="status"/);
+  assert.match(selectSource, /role="alert"/);
+  assert.match(selectSource, /Tentar novamente/);
+  assert.match(selectSource, /const error = listQuery\.error \?\? selectedPfQuery\.error/);
+  assert.match(selectSource, /listQuery\.refetch/);
 });
 
 await runTest("regularize dashboard has a centralized aggregate data contract", async () => {

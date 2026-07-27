@@ -163,12 +163,16 @@ export function RegularizePartnerForm({
             <ClientSelectionField clientId={formState.pj_id} />
           </RegularizeFormField>
 
-          <RegularizeFormField label="Cliente PF" required>
+          <fieldset className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <legend className="inline-flex items-center gap-1">
+              <span>Cliente PF</span>
+              <span className="text-red-500">*</span>
+            </legend>
             <RegularizeClientPfSelect
               value={formState.pf_id}
               onChange={(id) => handleChange("pf_id", id)}
             />
-          </RegularizeFormField>
+          </fieldset>
 
           <RegularizeFormField label="Participação" required>
             <input

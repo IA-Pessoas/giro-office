@@ -240,7 +240,11 @@ export function RegularizeProcessForm({
               </RegularizeNativeSelect>
             </RegularizeFormField>
 
-            <RegularizeFormField label="Cliente" required className="md:col-span-2">
+            <fieldset className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300 md:col-span-2">
+              <legend className="inline-flex items-center gap-1">
+                <span>Cliente</span>
+                <span className="text-red-500">*</span>
+              </legend>
               {formState.clientKind === "pj" ? (
                 <ClientSelectionField clientId={formState.client_id} />
               ) : (
@@ -249,7 +253,7 @@ export function RegularizeProcessForm({
                   onChange={(id, option) => handleClientPfChange(id, option?.cpf)}
                 />
               )}
-            </RegularizeFormField>
+            </fieldset>
 
             <RegularizeFormField label="CPF/CNPJ" required>
               <input

@@ -40,6 +40,9 @@ export function RegularizeClientPfSelect({
     limit: PF_SELECT_PAGE_SIZE,
   });
   const selectedPfQuery = useRegularizeClientPfDetail(value, { enabled: Boolean(value) });
+  const error = listQuery.error ?? selectedPfQuery.error;
+  const hasError = Boolean(error) || listQuery.isError || selectedPfQuery.isError;
+  const isLoading = listQuery.isLoading || selectedPfQuery.isLoading;
 
   const options = useMemo<RegularizeClientPfSelectOption[]>(() => {
     const pageOptions = (listQuery.data?.data ?? []).map((clientPf) =>
@@ -71,13 +74,40 @@ export function RegularizeClientPfSelect({
         }}
         className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
         placeholder="Buscar PF por nome, código ou CPF"
+        aria-label="Buscar cliente PF"
       />
+      {isLoading ? (
+        <p role="status" aria-live="polite" className="text-sm text-gray-500 dark:text-gray-400">
+          Carregando clientes PF...
+        </p>
+      ) : null}
+      {hasError ? (
+        <div role="alert" className="flex items-center justify-between gap-2 text-sm text-red-700 dark:text-red-300">
+          <span>Não foi possível carregar clientes PF.</span>
+          <button
+            type="button"
+            onClick={() => {
+              if (listQuery.isError) {
+                void listQuery.refetch();
+              }
+
+              if (selectedPfQuery.isError) {
+                void selectedPfQuery.refetch();
+              }
+            }}
+            className="font-medium underline underline-offset-2"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      ) : null}
       <RegularizeNativeSelect
         value={value}
         onChange={(event) => {
           const option = options.find((candidate) => candidate.id === event.target.value);
           onChange(event.target.value, option);
         }}
+        aria-label="Selecionar cliente PF"
       >
         <option value="">Selecione</option>
         {options.map((option) => (
