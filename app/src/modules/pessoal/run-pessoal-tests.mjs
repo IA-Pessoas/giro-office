@@ -346,6 +346,30 @@ runTest("client-scoped sections block requests without selected client", () => {
   assert.doesNotMatch(obligations, /if \(!hasClient\) \{\s*return/);
 });
 
+runTest("situation detail exposes explicit completion and reopening actions", () => {
+  const tracking = readFileSync(
+    "src/modules/pessoal/components/PessoalTrackingSection.tsx",
+    "utf8",
+  );
+
+  assert.match(tracking, /Concluir situação/);
+  assert.match(tracking, /Reabrir situação/);
+  assert.match(tracking, /handleSituationStatusChange\("Finalizado"\)/);
+  assert.match(tracking, /handleSituationStatusChange\("Em andamento"\)/);
+  assert.match(
+    tracking,
+    /if \(selectedSituationId\) \{[\s\S]*?payload: \{\s*title: payload\.title,\s*description: payload\.description,\s*\},/,
+  );
+  assert.doesNotMatch(tracking, /situationFormValues\.status/);
+  assert.match(
+    tracking,
+    /handleSituationStatusChange\(nextStatus: PessoalSituationStatus\)[\s\S]*?payload: \{\s*status: nextStatus,\s*\},[\s\S]*?setSuccessMessage\(\n?\s*nextStatus === "Finalizado"\n?\s*\? "Situação concluída\."\n?\s*:\s*"Situação reaberta\."/,
+  );
+  assert.match(tracking, /Finalizar registra a data de conclusão\./);
+  assert.match(tracking, /Reabrir limpa a data de conclusão\./);
+  assert.match(tracking, /Concluída em \{formatDate\(situation\.completion_date\)\}/);
+});
+
 runTest("pessoal overview reads available dashboard data", () => {
   const overview = readFileSync("src/modules/pessoal/components/PessoalOverviewSection.tsx", "utf8");
   const trackingHook = readFileSync("src/modules/pessoal/hooks/usePessoalTracking.ts", "utf8");
