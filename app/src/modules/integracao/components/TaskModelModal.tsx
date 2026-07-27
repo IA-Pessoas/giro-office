@@ -7,6 +7,7 @@ import { listAdminUsers, type UserItem } from "@modules/users";
 import { Dialog } from "@shared/components/ui/Dialog";
 
 import { taskModelService } from "../services/taskModelService";
+import { normalizeTaskModelResponsibleSequence } from "../services/taskModelService.contract";
 import type {
   CreateTaskModelData,
   TaskDependent,
@@ -199,12 +200,16 @@ export function TaskModelModal({
           return;
         }
 
-        setFormData({
-          name: detail.name ?? "",
-          department_id: detail.department_id ?? "",
+        const responsibleSequence = normalizeTaskModelResponsibleSequence({
           responsible_id: detail.responsible_id ?? "",
           responsible2_id: detail.responsible2_id ?? "",
           responsible3_id: detail.responsible3_id ?? "",
+        });
+
+        setFormData({
+          name: detail.name ?? "",
+          department_id: detail.department_id ?? "",
+          ...responsibleSequence,
           observations: detail.observations ?? "",
           billing: detail.billing || EMPTY_FORM_DATA.billing,
           prevision: Number.isFinite(detail.prevision) ? detail.prevision : 0,
@@ -247,10 +252,25 @@ export function TaskModelModal({
     field: Key,
     value: CreateTaskModelData[Key],
   ) {
-    setFormData((currentData) => ({
-      ...currentData,
-      [field]: value,
-    }));
+    setFormData((currentData) => {
+      const updatedData: CreateTaskModelData = {
+        ...currentData,
+        [field]: value,
+      };
+
+      if (
+        field === "responsible_id" ||
+        field === "responsible2_id" ||
+        field === "responsible3_id"
+      ) {
+        return {
+          ...updatedData,
+          ...normalizeTaskModelResponsibleSequence(updatedData),
+        };
+      }
+
+      return updatedData;
+    });
   }
 
   function shouldRenderCurrentDepartmentOption() {
@@ -517,7 +537,10 @@ export function TaskModelModal({
                 onChange={(event) => updateFormValue("responsible2_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={loadingOptions && users.length === 0}
+                disabled={!formData.responsible_id || (loadingOptions && users.length === 0)}
+                aria-describedby={
+                  !formData.responsible_id ? "task-model-responsible2-help" : undefined
+                }
               >
                 <option value="">{getUserPlaceholder(true)}</option>
                 {shouldRenderCurrentUserOption(formData.responsible2_id) ? (
@@ -529,6 +552,14 @@ export function TaskModelModal({
                   </option>
                 ))}
               </select>
+              {!formData.responsible_id ? (
+                <span
+                  id="task-model-responsible2-help"
+                  className="text-xs text-slate-500 dark:text-slate-400"
+                >
+                  Selecione o responsável antes de definir o responsável 2.
+                </span>
+              ) : null}
             </label>
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
@@ -540,7 +571,10 @@ export function TaskModelModal({
                 onChange={(event) => updateFormValue("responsible3_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={loadingOptions && users.length === 0}
+                disabled={!formData.responsible2_id || (loadingOptions && users.length === 0)}
+                aria-describedby={
+                  !formData.responsible2_id ? "task-model-responsible3-help" : undefined
+                }
               >
                 <option value="">{getUserPlaceholder(true)}</option>
                 {shouldRenderCurrentUserOption(formData.responsible3_id) ? (
@@ -552,6 +586,14 @@ export function TaskModelModal({
                   </option>
                 ))}
               </select>
+              {!formData.responsible2_id ? (
+                <span
+                  id="task-model-responsible3-help"
+                  className="text-xs text-slate-500 dark:text-slate-400"
+                >
+                  Selecione o responsável 2 antes de definir o responsável 3.
+                </span>
+              ) : null}
             </label>
           </div>
 
