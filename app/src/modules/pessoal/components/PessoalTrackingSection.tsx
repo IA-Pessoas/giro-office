@@ -21,6 +21,7 @@ import {
   useCreatePessoalLddMutation,
   useCreatePessoalSituationMutation,
   useDeletePessoalLddMutation,
+  useDeletePessoalSituationMutation,
   usePessoalLdd,
   usePessoalSituationDetail,
   usePessoalSituations,
@@ -138,6 +139,7 @@ export function PessoalTrackingSection({
   const createLddMutation = useCreatePessoalLddMutation();
   const deleteLddMutation = useDeletePessoalLddMutation(selectedClientId);
   const createSituationMutation = useCreatePessoalSituationMutation();
+  const deleteSituationMutation = useDeletePessoalSituationMutation(selectedClientId);
   const [selectedLdd, setSelectedLdd] = useState<PessoalLdd | null>(null);
   const [lddToDelete, setLddToDelete] = useState<PessoalLdd | null>(null);
   const [isLddFormOpen, setIsLddFormOpen] = useState(false);
@@ -147,6 +149,7 @@ export function PessoalTrackingSection({
     selectedClientId,
   );
   const [selectedSituationId, setSelectedSituationId] = useState("");
+  const [situationToDelete, setSituationToDelete] = useState<PessoalSituation | null>(null);
   const [isSituationFormOpen, setIsSituationFormOpen] = useState(false);
   const situationDetailQuery = usePessoalSituationDetail(
     selectedSituationId,
@@ -164,7 +167,9 @@ export function PessoalTrackingSection({
   const isLddSubmitting =
     createLddMutation.isPending || updateLddMutation.isPending || deleteLddMutation.isPending;
   const isSituationSubmitting =
-    createSituationMutation.isPending || updateSituationMutation.isPending;
+    createSituationMutation.isPending ||
+    updateSituationMutation.isPending ||
+    deleteSituationMutation.isPending;
 
   useEffect(() => {
     setSelectedLdd(null);
@@ -172,6 +177,7 @@ export function PessoalTrackingSection({
     setIsLddFormOpen(false);
     setLddFormValues(emptyLddFormValues);
     setSelectedSituationId("");
+    setSituationToDelete(null);
     setIsSituationFormOpen(false);
     setSituationFormValues(emptySituationFormValues);
     setFormError(null);
@@ -310,6 +316,40 @@ export function PessoalTrackingSection({
     setSelectedSituationId(situation.id);
     setSituationFormValues(buildSituationFormValues(situation));
     setIsSituationFormOpen(true);
+  }
+
+  function openDeleteSituationDialog(situation: PessoalSituation) {
+    if (!canEdit) {
+      return;
+    }
+
+    clearFeedback();
+    setSituationToDelete(situation);
+  }
+
+  async function handleConfirmDeleteSituation() {
+    if (!canEdit || !situationToDelete) {
+      return;
+    }
+
+    const situation = situationToDelete;
+
+    clearFeedback();
+
+    try {
+      await deleteSituationMutation.mutateAsync(situation.id);
+
+      if (selectedSituationId === situation.id) {
+        setSelectedSituationId("");
+        setSituationFormValues(emptySituationFormValues);
+        setIsSituationFormOpen(false);
+      }
+
+      setSituationToDelete(null);
+      setSuccessMessage("Situação removida.");
+    } catch (error) {
+      setFormError(getPessoalErrorMessage(error, "Não foi possível remover a situação."));
+    }
   }
 
   async function handleSituationSubmit(event: FormEvent<HTMLFormElement>) {
@@ -540,14 +580,27 @@ export function PessoalTrackingSection({
                         </p>
                       ) : null}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => startSituationDetail(situation)}
-                      className={pessoalSecondaryButtonClassName}
-                    >
-                      <FileText className="h-4 w-4" />
-                      Detalhar
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startSituationDetail(situation)}
+                        className={pessoalSecondaryButtonClassName}
+                      >
+                        <FileText className="h-4 w-4" />
+                        Detalhar
+                      </button>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => openDeleteSituationDialog(situation)}
+                          disabled={deleteSituationMutation.isPending}
+                          className={pessoalSecondaryButtonClassName}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Remover
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -600,6 +653,58 @@ export function PessoalTrackingSection({
         {lddToDelete ? (
           <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
             {lddToDelete.type} - {formatDate(lddToDelete.due_date)}
+          </p>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={Boolean(situationToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deleteSituationMutation.isPending) {
+            setSituationToDelete(null);
+          }
+        }}
+        title="Remover situação"
+        description="Confirmação de remoção de situação"
+        contentClassName="w-[min(92vw,520px)]"
+        bodyClassName="space-y-3"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setSituationToDelete(null)}
+              disabled={deleteSituationMutation.isPending}
+              className={pessoalSecondaryButtonClassName}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDeleteSituation}
+              disabled={deleteSituationMutation.isPending}
+              className={pessoalDangerButtonClassName}
+            >
+              {deleteSituationMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Confirmar remoção
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-700 dark:text-slate-300">
+          Não será possível recuperar a situação, mesmo quando ela já estiver finalizada.
+        </p>
+        {situationToDelete ? (
+          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
+            {situationToDelete.title}
+          </p>
+        ) : null}
+        {formError ? (
+          <p role="alert" className="text-sm text-red-600 dark:text-red-300">
+            {formError}
           </p>
         ) : null}
       </Dialog>

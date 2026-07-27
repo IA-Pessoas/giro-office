@@ -63,6 +63,38 @@ runTest("pessoal endpoints match the gateway public contract", () => {
   assert.equal(PESSOAL_ENDPOINTS.passwordDetail("password-1"), "/pessoal/passwords/password-1");
 });
 
+runTest("pessoal situation deletion client uses the detail endpoint and refreshes cached state", () => {
+  const service = readFileSync("src/modules/pessoal/services/pessoalService.ts", "utf8");
+  const trackingHook = readFileSync("src/modules/pessoal/hooks/usePessoalTracking.ts", "utf8");
+
+  assert.match(
+    service,
+    /async deleteSituation\(id: string\): Promise<PessoalSituation> \{[\s\S]*?api\.delete\(PESSOAL_ENDPOINTS\.situationDetail\(id\)\)/,
+  );
+  assert.match(
+    trackingHook,
+    /export function useDeletePessoalSituationMutation\(\s*clientId: string,?\s*\)[\s\S]*?mutationFn: \(id\) => pessoalService\.deleteSituation\(id\)[\s\S]*?situationsKey\(clientId\)[\s\S]*?situationDetailKey\(id\)/,
+  );
+});
+
+runTest("pessoal situations expose a permissioned delete confirmation with feedback", () => {
+  const section = readFileSync(
+    "src/modules/pessoal/components/PessoalTrackingSection.tsx",
+    "utf8",
+  );
+
+  assert.match(section, /useDeletePessoalSituationMutation\(selectedClientId\)/);
+  assert.match(section, /const \[situationToDelete, setSituationToDelete\] = useState<PessoalSituation \| null>\(null\)/);
+  assert.match(section, /function openDeleteSituationDialog\(situation: PessoalSituation\) \{[\s\S]*?if \(!canEdit\) \{[\s\S]*?return;/);
+  assert.match(section, /async function handleConfirmDeleteSituation\(\) \{[\s\S]*?await deleteSituationMutation\.mutateAsync\(situation\.id\)/);
+  assert.match(section, /setSuccessMessage\("Situação removida\."\)/);
+  assert.match(section, /title="Remover situação"/);
+  assert.match(section, /Não será possível recuperar a situação, mesmo quando ela já estiver finalizada\./);
+  assert.match(section, /disabled=\{deleteSituationMutation\.isPending\}/);
+  assert.match(section, /onClick=\{\(\) => setSituationToDelete\(null\)\}/);
+  assert.match(section, /\{canEdit \? \([\s\S]*?onClick=\{\(\) => openDeleteSituationDialog\(situation\)\}/);
+});
+
 runTest("pessoal tabs stay stable for branch integration", () => {
   assert.deepEqual(
     PESSOAL_TABS.map((tab) => tab.id),

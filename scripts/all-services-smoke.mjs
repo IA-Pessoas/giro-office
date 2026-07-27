@@ -2740,6 +2740,13 @@ const handlers = {
     });
   },
 
+  async pessoalSituationDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/situations/${requireState("pessoalSituationId")}`,
+    });
+  },
+
   async pessoalUnionList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },

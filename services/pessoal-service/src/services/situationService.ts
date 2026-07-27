@@ -167,6 +167,40 @@ export class SituationService {
     }
   }
 
+  async delete(context: PessoalAuthContext, id: string): Promise<SituationRecord> {
+    try {
+      const userId = requireUserId(context);
+      const existing = await this.prisma.situationsPessoal.findFirst({
+        where: { id, organization_id: context.organizationId },
+        select: situationSelect,
+      });
+
+      if (!existing) {
+        throw new ServiceError(404, "Situacao nao encontrada.");
+      }
+
+      await this.prisma.situationsPessoal.delete({ where: { id } });
+
+      await this.auditService.recordChange({
+        requestId: context.requestId,
+        organizationId: context.organizationId,
+        userId,
+        permission: context.permission,
+        action: "Exclusao",
+        referring: "pessoal.situations",
+        referringId: id,
+        changes: existing,
+        path: `/pessoal/situations/${id}`,
+      });
+
+      return existing;
+    } catch (err: unknown) {
+      logError("Erro ao remover situacao de pessoal", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro ao remover situacao de pessoal.", err);
+    }
+  }
+
   private async ensureClient(organizationId: string, clientId: string): Promise<void> {
     const client = await this.prisma.client.findFirst({
       where: { id: clientId, organization_id: organizationId },

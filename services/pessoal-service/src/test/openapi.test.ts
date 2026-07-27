@@ -121,4 +121,24 @@ describe("pessoal-service OpenAPI", () => {
     expect(operation?.responses?.["404"]).toBeDefined();
     expect(operation?.responses?.["409"]).toBeDefined();
   });
+
+  it("documenta a exclusao de situacao sem conflito de dominio", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const operation = (
+      spec.paths as Record<
+        string,
+        { delete?: { parameters?: Array<{ name?: string }>; responses?: Record<string, unknown> } }
+      >
+    )["/pessoal/situations/{id}"]?.delete;
+
+    expect(operation?.parameters).toEqual([
+      expect.objectContaining({ name: "id", in: "path", required: true }),
+    ]);
+    expect(operation?.responses).toMatchObject({
+      "200": expect.any(Object),
+      "400": expect.any(Object),
+      "404": expect.any(Object),
+    });
+    expect(operation?.responses?.["409"]).toBeUndefined();
+  });
 });

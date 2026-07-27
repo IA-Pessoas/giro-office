@@ -6,6 +6,7 @@ import {
   clientId,
   createAuditMock,
   organizationId,
+  otherOrganizationId,
   recordId,
   userId,
 } from "./pessoalCoreTestUtils.js";
@@ -15,9 +16,15 @@ function createPrismaMock() {
     client: { findFirst: vi.fn(async () => ({ id: clientId })) },
     situationsPessoal: {
       create: vi.fn(async ({ data }) => ({ id: recordId, ...data })),
-      findFirst: vi.fn(async () => ({ id: recordId, organization_id: organizationId })),
+      findFirst: vi.fn(
+        async (): Promise<{ id: string; organization_id: string; status?: string } | null> => ({
+          id: recordId,
+          organization_id: organizationId,
+        }),
+      ),
       findMany: vi.fn(async () => []),
       update: vi.fn(async ({ data }) => ({ id: recordId, ...data })),
+      delete: vi.fn(async () => ({ id: recordId, organization_id: organizationId })),
     },
   };
 }
@@ -118,5 +125,75 @@ describe("SituationService", () => {
     expect(prisma.situationsPessoal.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: recordId, organization_id: organizationId } }),
     );
+  });
+
+  it("remove situacao escopada e audita o snapshot", async () => {
+    const prisma = createPrismaMock();
+    const audit = createAuditMock();
+    const service = new SituationService(prisma as never, audit);
+
+    await service.delete({ organizationId, userId, requestId: "request-491" }, recordId);
+
+    expect(prisma.situationsPessoal.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: recordId, organization_id: organizationId } }),
+    );
+    expect(prisma.situationsPessoal.delete).toHaveBeenCalledWith({ where: { id: recordId } });
+    expect(audit.recordChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: "request-491",
+        organizationId,
+        userId,
+        action: "Exclusao",
+        referring: "pessoal.situations",
+        referringId: recordId,
+        changes: expect.objectContaining({ id: recordId, organization_id: organizationId }),
+        path: `/pessoal/situations/${recordId}`,
+      }),
+    );
+  });
+
+  it("permite remover uma situacao finalizada", async () => {
+    const prisma = createPrismaMock();
+    prisma.situationsPessoal.findFirst.mockResolvedValueOnce({
+      id: recordId,
+      organization_id: organizationId,
+      status: "Finalizado",
+    });
+    const service = new SituationService(prisma as never, createAuditMock());
+
+    await expect(service.delete({ organizationId, userId }, recordId)).resolves.toMatchObject({
+      id: recordId,
+      status: "Finalizado",
+    });
+    expect(prisma.situationsPessoal.delete).toHaveBeenCalledWith({ where: { id: recordId } });
+  });
+
+  it("rejeita exclusao de situacao inexistente", async () => {
+    const prisma = createPrismaMock();
+    prisma.situationsPessoal.findFirst.mockResolvedValueOnce(null);
+    const service = new SituationService(prisma as never, createAuditMock());
+
+    await expect(service.delete({ organizationId, userId }, recordId)).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Situacao nao encontrada.",
+    });
+    expect(prisma.situationsPessoal.delete).not.toHaveBeenCalled();
+  });
+
+  it("rejeita exclusao de situacao de outra organizacao", async () => {
+    const prisma = createPrismaMock();
+    prisma.situationsPessoal.findFirst.mockResolvedValueOnce(null);
+    const service = new SituationService(prisma as never, createAuditMock());
+
+    await expect(
+      service.delete({ organizationId: otherOrganizationId, userId }, recordId),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Situacao nao encontrada.",
+    });
+    expect(prisma.situationsPessoal.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: recordId, organization_id: otherOrganizationId } }),
+    );
+    expect(prisma.situationsPessoal.delete).not.toHaveBeenCalled();
   });
 });
