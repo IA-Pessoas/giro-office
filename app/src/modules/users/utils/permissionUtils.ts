@@ -1,4 +1,7 @@
-import { KNOWN_PERMISSION_MODULE_KEYS } from "../constants/permissionConfig";
+import {
+  KNOWN_PERMISSION_MODULE_KEYS,
+  normalizePermissionForModule,
+} from "../constants/permissionConfig.ts";
 import type {
   KnownPermissionModuleKey,
   KnownPermissionRecord,
@@ -40,7 +43,7 @@ function normalizePermissionValue(value: unknown): number | null {
 
 function createEmptyKnownPermissionRecord(): KnownPermissionRecord {
   return KNOWN_PERMISSION_MODULE_KEYS.reduce<KnownPermissionRecord>((acc, moduleKey) => {
-    acc[moduleKey] = null;
+    acc[moduleKey] = normalizePermissionForModule(moduleKey, undefined);
     return acc;
   }, {} as KnownPermissionRecord);
 }
@@ -62,7 +65,10 @@ export function normalizePermissionResponse(raw: Record<string, unknown>): Permi
       continue;
     }
 
-    known[moduleKey] = normalizePermissionValue(raw[moduleKey]);
+    known[moduleKey] = normalizePermissionForModule(
+      moduleKey,
+      normalizePermissionValue(raw[moduleKey]),
+    );
   }
 
   for (const [key, value] of Object.entries(raw)) {
@@ -103,7 +109,10 @@ export function normalizePermissionDraft(
   const normalizedDraft: PermissionDraft = createEmptyKnownPermissionRecord();
 
   for (const moduleKey of KNOWN_PERMISSION_MODULE_KEYS) {
-    normalizedDraft[moduleKey] = normalizePermissionValue(draft[moduleKey]);
+    normalizedDraft[moduleKey] = normalizePermissionForModule(
+      moduleKey,
+      normalizePermissionValue(draft[moduleKey]),
+    );
   }
 
   for (const extraKey of allowedExtraKeys) {

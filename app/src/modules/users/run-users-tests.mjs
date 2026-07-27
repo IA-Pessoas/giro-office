@@ -14,6 +14,13 @@ import {
   getPermissionSelectOptions,
   normalizePermissionForModule,
 } from "./constants/permissionConfig.ts";
+import {
+  arePermissionDraftsEqual,
+  buildPermissionUpdatePayload,
+  freezePermissionSnapshot,
+  normalizePermissionDraft,
+  normalizePermissionResponse,
+} from "./utils/permissionUtils.ts";
 
 const administracaoSource = readFileSync(
   new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
@@ -81,6 +88,47 @@ runTest("module permission normalization changes only values below a configured 
   assert.equal(normalizePermissionForModule("ti", 2), 2);
   assert.equal(normalizePermissionForModule("fiscal", null), null);
   assert.equal(normalizePermissionForModule("fiscal", 1), 1);
+});
+
+runTest("legacy RH and Technology no-access values normalize to Viewer", () => {
+  const response = normalizePermissionResponse({
+    rh: null,
+    ti: null,
+    fiscal: null,
+  });
+
+  assert.equal(response.known.rh, 0);
+  assert.equal(response.known.ti, 0);
+  assert.equal(response.known.fiscal, null);
+
+  const missingDraft = normalizePermissionDraft({});
+  assert.equal(missingDraft.rh, 0);
+  assert.equal(missingDraft.ti, 0);
+});
+
+runTest("normalized legacy permissions do not become dirty solely on load", () => {
+  const draft = normalizePermissionDraft({
+    rh: null,
+    ti: null,
+    fiscal: null,
+  });
+  const snapshot = freezePermissionSnapshot(draft);
+
+  assert.equal(arePermissionDraftsEqual(draft, snapshot), true);
+});
+
+runTest("permission update payload enforces only RH and Technology minimums", () => {
+  const payload = buildPermissionUpdatePayload({
+    rh: null,
+    ti: null,
+    fiscal: null,
+    contabil: 2,
+  });
+
+  assert.equal(payload.rh, 0);
+  assert.equal(payload.ti, 0);
+  assert.equal(payload.fiscal, null);
+  assert.equal(payload.contabil, 2);
 });
 
 runTest("create user additional modules hide unavailable services", () => {
