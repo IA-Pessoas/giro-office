@@ -32,7 +32,6 @@ const DEFAULT_NON_OWNER_PERMISSION = 1;
 const OWNER_MAX_MODULE_VALUE = 2;
 const SELF_SERVICE_PERMISSION = 1;
 const MODULE_FIELDS = [
-  "atendimento",
   "certificado",
   "comercial",
   "contabil",
@@ -41,13 +40,11 @@ const MODULE_FIELDS = [
   "integracao",
   "marketing",
   "parcelamento",
-  "pec",
   "pessoal",
   "regularize",
   "rh",
   "ti",
   "triagem",
-  "wiki",
 ] as const;
 type ModuleField = (typeof MODULE_FIELDS)[number];
 type ModulePatch = Partial<Record<ModuleField, number | null>>;
@@ -60,7 +57,6 @@ const EMPTY_MODULES = Object.fromEntries(MODULE_FIELDS.map((field) => [field, nu
   null
 >;
 const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleField> = {
-  atendimento: "atendimento",
   certificado: "certificado",
   comercial: "comercial",
   contabil: "contabil",
@@ -71,7 +67,6 @@ const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleField> = {
   integracao_de_clientes: "integracao",
   marketing: "marketing",
   parcelamento: "parcelamento",
-  pec: "pec",
   pessoal: "pessoal",
   departamento_pessoal: "pessoal",
   regularize: "regularize",
@@ -80,7 +75,6 @@ const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleField> = {
   tecnologia: "ti",
   ti: "ti",
   triagem: "triagem",
-  wiki: "wiki",
 };
 
 interface CreateUserInput {

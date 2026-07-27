@@ -7,7 +7,6 @@ const PERMISSION_PUBLIC_SELECT = {
   id: true,
   user_id: true,
   organization_id: true,
-  atendimento: true,
   certificado: true,
   comercial: true,
   contabil: true,
@@ -16,13 +15,11 @@ const PERMISSION_PUBLIC_SELECT = {
   integracao: true,
   marketing: true,
   parcelamento: true,
-  pec: true,
   pessoal: true,
   regularize: true,
   rh: true,
   ti: true,
   triagem: true,
-  wiki: true,
 } as const;
 
 const PERMISSION_SPECIFIC_SELECT = {
@@ -32,7 +29,6 @@ const PERMISSION_SPECIFIC_SELECT = {
 } as const;
 
 const MODULE_FIELDS = [
-  "atendimento",
   "certificado",
   "comercial",
   "contabil",
@@ -41,13 +37,11 @@ const MODULE_FIELDS = [
   "integracao",
   "marketing",
   "parcelamento",
-  "pec",
   "pessoal",
   "regularize",
   "rh",
   "ti",
   "triagem",
-  "wiki",
 ] as const;
 
 type ModuleField = (typeof MODULE_FIELDS)[number];
@@ -58,7 +52,6 @@ type PermissionSpecificRow = Prisma.PermissionSpecificGetPayload<{
 }>;
 
 interface UpdatePermissionInput {
-  atendimento?: number | null;
   certificado?: number | null;
   comercial?: number | null;
   contabil?: number | null;
@@ -67,13 +60,11 @@ interface UpdatePermissionInput {
   integracao?: number | null;
   marketing?: number | null;
   parcelamento?: number | null;
-  pec?: number | null;
   pessoal?: number | null;
   regularize?: number | null;
   rh?: number | null;
   ti?: number | null;
   triagem?: number | null;
-  wiki?: number | null;
 }
 
 class PermissionService {

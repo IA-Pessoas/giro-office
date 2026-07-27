@@ -223,7 +223,7 @@ Cria um novo usuário.
 | organization_id | string  | Condicional | UUID da organização (obrigatório se `type` ou `modules` forem enviados) |
 | type            | string  | Não         | `owner`, `admin` ou `user` |
 | first_owner_flag| boolean | Não         | `true` apenas quando `type` é `owner` |
-| modules         | object  | Não         | Permissões por módulo (ex: `{ "atendimento": 2, "fiscal": 1 }`) |
+| modules         | object  | Não         | Permissões por módulo (ex: `{ "certificado": 2, "fiscal": 1 }`) |
 
 **Regras de validação:**
 - `organization_id` é obrigatório quando `type` ou `modules` forem enviados
@@ -268,7 +268,7 @@ Cria um novo usuário.
   "organization_id": "uuid-da-organizacao",
   "type": "user",
   "modules": {
-    "atendimento": 2,
+    "certificado": 2,
     "fiscal": 1,
     "comercial": 0
   }
@@ -430,9 +430,9 @@ Busca as permissões de um usuário.
 **Query params:**
 | Parametro | Tipo   | Obrigatório | Descrição |
 |-----------|--------|-------------|-----------|
-| modulo    | string | Não         | Filtra apenas um módulo (ex: `atendimento`) |
+| modulo    | string | Não         | Filtra apenas um módulo (ex: `certificado`) |
 
-**Exemplo:** `GET /user/permission/uuid-do-usuario?modulo=atendimento`
+**Exemplo:** `GET /user/permission/uuid-do-usuario?modulo=certificado`
 
 **Resposta:** `200 OK`
 ```json
@@ -442,7 +442,7 @@ Busca as permissões de um usuário.
     "id": "uuid",
     "user_id": "uuid",
     "organization_id": "uuid",
-    "atendimento": 2,
+    "certificado": 2,
     "certificado": 0,
     "comercial": 1,
     ...
@@ -468,7 +468,7 @@ Atualiza as permissões de um usuário.
 **Body (JSON):** Objeto com chaves = nome do módulo, valor = nível (0, 1 ou 2)
 | Módulos suportados |
 |--------------------|
-| atendimento, certificado, comercial, contabil, financeiro, fiscal, integracao, marketing, parcelamento, pec, pessoal, regularize, rh, triagem, wiki |
+| certificado, comercial, contabil, financeiro, fiscal, integracao, marketing, parcelamento, pessoal, regularize, rh, ti, triagem |
 
 **Níveis de permissão:**
 - `0` - Sem acesso
@@ -478,7 +478,7 @@ Atualiza as permissões de um usuário.
 **Exemplo:**
 ```json
 {
-  "atendimento": 2,
+  "certificado": 2,
   "fiscal": 1,
   "comercial": 0
 }
