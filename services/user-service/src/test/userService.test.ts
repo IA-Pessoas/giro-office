@@ -316,7 +316,7 @@ describe("UserService", () => {
     );
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
       "user-admin-contabil",
-      { financeiro: 1, contabil: 2, rh: 1, ti: 1 },
+      { financeiro: 1, contabil: 3, rh: 1, ti: 1 },
       "org-1",
     );
   });
@@ -355,7 +355,7 @@ describe("UserService", () => {
 
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
       "owner-1",
-      expect.objectContaining({ ti: 2 }),
+      expect.objectContaining({ ti: 3, rh: 3, certificado: 3 }),
       "org-1",
     );
   });
@@ -432,7 +432,7 @@ describe("UserService", () => {
       expect.objectContaining({
         rh: 1,
         ti: 1,
-        contabil: null,
+        contabil: 0,
       }),
       "org-1",
     );

@@ -327,14 +327,14 @@ describe("ti-service app", () => {
 });
 
 describe("ti-service permission middleware", () => {
-  it("aceita permissao 2 como nivel administrativo do TI", async () => {
+  it("aceita permissao 3 como nivel administrativo do TI", async () => {
     const app = createPermissionTestApp();
 
     const response = await request(app)
       .get("/admin")
       .set(FORWARDED_AUTH_USER_ID_HEADER, "user-1")
       .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, "org-1")
-      .set(FORWARDED_AUTH_PERMISSION_HEADER, "2")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "3")
       .expect(200);
 
     expect(response.body).toEqual({ ok: true });

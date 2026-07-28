@@ -15,9 +15,9 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const categoryId = "20000000-0000-4000-8000-000000000001";
 const requestId = "30000000-0000-4000-8000-000000000001";
-const TI_VIEWER_PERMISSION = 0;
+const TI_VIEWER_PERMISSION = 1;
 const TI_REQUESTER_PERMISSION = 1;
-const TI_ADMIN_PERMISSION = 2;
+const TI_ADMIN_PERMISSION = 3;
 const otherUserId = "00000000-0000-4000-8000-000000000002";
 const validPng = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 
@@ -114,7 +114,7 @@ describe("ti request routes", () => {
     });
   });
 
-  it("PATCH /ti/requests/:id/assign accepts admin level 2", async () => {
+  it("PATCH /ti/requests/:id/assign accepts admin level 3", async () => {
     const response = await request(createTestApp())
       .patch(`/ti/requests/${requestId}/assign`)
       .set(gatewayHeaders(TI_ADMIN_PERMISSION))
@@ -373,9 +373,13 @@ describe("ti request routes", () => {
   });
 
   it("POST /ti/requests/:id/messages allows Viewer to send a secure image attachment", async () => {
-    const objectPath = `ti/organizations/${organizationId}/requests/${requestId}/viewer-message.png`;
+    const objectPath =
+      `ti/organizations/${organizationId}/requests/${requestId}/` +
+      "00000000-0000-4000-8000-000000000003.png";
     const upload = vi.fn(async () => objectPath);
-    const createSignedAccessUrl = vi.fn(async () => "https://storage.example/signed/viewer-message.png");
+    const createSignedAccessUrl = vi.fn(
+      async () => "https://storage.example/signed/viewer-message.png",
+    );
 
     const response = await request(
       createTestApp(createPrismaMock(), { requestImageStorage: { upload, createSignedAccessUrl } }),

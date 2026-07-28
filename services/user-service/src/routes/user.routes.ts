@@ -111,11 +111,14 @@ router.post(
         requireOwnerUserAuth(request);
       }
 
-      const user = await userService.create({
-        ...body,
-        organization_id: auth.organization_id,
-        first_owner_flag: body.first_owner_flag ?? false,
-      });
+      const user = await userService.create(
+        {
+          ...body,
+          organization_id: auth.organization_id,
+          first_owner_flag: body.first_owner_flag ?? false,
+        },
+        auth.user_id,
+      );
 
       response.status(201).json(createSuccessResponse(user));
     } catch (err) {
@@ -137,7 +140,7 @@ router.patch(
         requireOwnerUserAuth(request);
       }
 
-      const user = await userService.update(id, body, auth.organization_id);
+      const user = await userService.update(id, body, auth.organization_id, auth.user_id);
 
       response.json(createSuccessResponse(user));
     } catch (err) {
