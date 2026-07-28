@@ -36,7 +36,7 @@ const validBody = {
   note: "n/a",
 };
 
-function gatewayHeaders(permission = 1): Record<string, string> {
+function gatewayHeaders(permission = 2): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
@@ -149,6 +149,32 @@ describe("relationship routes", () => {
       validBody,
       expect.objectContaining({ userId: USER_ID, organizationId: ORG_ID }),
     );
+  });
+
+  it("bloqueia visualizador em escritas de relacionamentos contábeis", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, relationshipRouteDeps: deps });
+
+    const post = await request(app)
+      .post("/contabil/relationships")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(1))
+      .send(validBody);
+    const put = await request(app)
+      .put(`/contabil/relationships/${RELATIONSHIP_ID}`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(1))
+      .send({ note: "updated" });
+    const del = await request(app)
+      .delete(`/contabil/relationships/${RELATIONSHIP_ID}`)
+      .set(gatewayHeaders(1));
+
+    expect(post.status).toBe(403);
+    expect(put.status).toBe(403);
+    expect(del.status).toBe(403);
+    expect(deps.create).not.toHaveBeenCalled();
+    expect(deps.update).not.toHaveBeenCalled();
+    expect(deps.delete).not.toHaveBeenCalled();
   });
 
   it("POST /contabil/relationships com body inválido retorna 400", async () => {
