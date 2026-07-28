@@ -34,6 +34,10 @@ const fiscalSources = {
   ncmRoute: await readSource("../../../../services/fiscal-service/src/routes/ncm.routes.ts"),
   icmsRoute: await readSource("../../../../services/fiscal-service/src/routes/icms.routes.ts"),
   ipiRoute: await readSource("../../../../services/fiscal-service/src/routes/ipi.routes.ts"),
+  ncmRouteTest: await readSource("../../../../services/fiscal-service/src/test/ncm.routes.test.ts"),
+  icmsRouteTest: await readSource("../../../../services/fiscal-service/src/test/icms.routes.test.ts"),
+  ipiRouteTest: await readSource("../../../../services/fiscal-service/src/test/ipi.routes.test.ts"),
+  authMiddleware: await readSource("../../../../services/fiscal-service/src/middlewares/isAuthenticated.ts"),
   ncmService: await readSource("../../../../services/fiscal-service/src/services/ncmService.ts"),
   icmsService: await readSource("../../../../services/fiscal-service/src/services/icmsService.ts"),
   ipiService: await readSource("../../../../services/fiscal-service/src/services/ipiService.ts"),
@@ -56,6 +60,19 @@ await runTest("fiscal viewer keeps NCM, ICMS and IPI sections read-only", () => 
     assert.match(source, /if \(panelIntent && canEdit\)/);
     assert.match(source, /onEdit=\{canEdit \? \(item\) => setPanelIntent/);
     assert.match(source, /\{onEdit \? \(/);
+  }
+});
+
+await runTest("fiscal-service blocks viewer writes and allows editor writes", () => {
+  assert.match(fiscalSources.authMiddleware, /const FISCAL_WRITE_PERMISSION = 2;/);
+
+  for (const source of [
+    fiscalSources.ncmRouteTest,
+    fiscalSources.icmsRouteTest,
+    fiscalSources.ipiRouteTest,
+  ]) {
+    assert.match(source, /function gatewayHeaders\(permission = 2\)/);
+    assert.match(source, /\.set\(gatewayHeaders\(1\)\)/);
   }
 });
 

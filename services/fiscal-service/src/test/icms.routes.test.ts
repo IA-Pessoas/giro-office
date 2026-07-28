@@ -26,7 +26,7 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-function gatewayHeaders(permission = 1): Record<string, string> {
+function gatewayHeaders(permission = 2): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
@@ -105,7 +105,7 @@ describe("icms routes", () => {
     const res = await request(app)
       .post("/fiscal/icms")
       .set("Content-Type", "application/json")
-      .set(gatewayHeaders(0))
+      .set(gatewayHeaders(1))
       .send({});
 
     expect(res.status).toBe(403);
@@ -119,7 +119,7 @@ describe("icms routes", () => {
     const res = await request(app)
       .put("/fiscal/icms")
       .set("Content-Type", "application/json")
-      .set(gatewayHeaders(0))
+      .set(gatewayHeaders(1))
       .send({});
 
     expect(res.status).toBe(403);
