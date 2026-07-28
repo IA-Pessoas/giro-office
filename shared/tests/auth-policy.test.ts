@@ -39,7 +39,7 @@ test("manageUsers permite admin RH por permissao modular", () => {
         organization_id: "org-1",
         permission: 1,
         type: "admin",
-        modules: { rh: 2 },
+        modules: { rh: 3 },
       }),
       manageUsersPolicy,
     ),
@@ -63,7 +63,7 @@ test("manageUsers bloqueia admin de outro modulo", () => {
   );
 });
 
-test("manageUsers permite admin global legado sem type", () => {
+test("manageUsers bloqueia permissao global sem owner explicito", () => {
   assert.equal(
     canAccessRoute(
       authContext({
@@ -73,7 +73,7 @@ test("manageUsers permite admin global legado sem type", () => {
       }),
       manageUsersPolicy,
     ),
-    true,
+    false,
   );
 });
 
@@ -108,7 +108,7 @@ test("ownerOnly nao permite admin RH", () => {
   );
 });
 
-test("ownerOnly permite admin global legado sem type", () => {
+test("ownerOnly bloqueia permissao global sem owner explicito", () => {
   assert.equal(
     canAccessRoute(
       authContext({
@@ -118,7 +118,7 @@ test("ownerOnly permite admin global legado sem type", () => {
       }),
       ownerOnlyPolicy,
     ),
-    true,
+    false,
   );
 });
 
