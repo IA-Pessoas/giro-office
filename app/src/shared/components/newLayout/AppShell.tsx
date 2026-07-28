@@ -36,6 +36,7 @@ import {
   getModulePermissionLevel,
   canAccessAdministration,
   canCreateOrganizationOwner,
+  normalizeRoutePath,
   useModuleAccessMap,
   type ModuleKey,
   type ModulePermissionSubject,
@@ -156,14 +157,6 @@ const MODULE_NAV_LOADING_MESSAGE = "Carregando modulos";
 const NOTIFICATIONS_PANEL_ID = "app-shell-notifications-panel";
 const USER_MENU_PANEL_ID = "app-shell-user-menu";
 const AI_CHAT_DIALOG_DESCRIPTION_ID = "app-shell-ai-chat-description";
-
-function normalizeRoutePath(routePath: string): string {
-  const pathWithoutQuery = routePath.split("?")[0]?.split("#")[0] ?? "";
-  const normalizedPath =
-    pathWithoutQuery.length > 1 ? pathWithoutQuery.replace(/\/+$/, "") : pathWithoutQuery;
-
-  return normalizedPath || "/";
-}
 
 function getModuleKeyFromRoutePath(routePath: string): ModuleKey | null {
   const normalizedPath = normalizeRoutePath(routePath);

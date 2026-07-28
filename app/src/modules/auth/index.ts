@@ -8,6 +8,7 @@ export {
   APP_ROUTE_MODULE_MAP,
   canViewIntegrationRoute,
   getModulePermissionLevel,
+  normalizeRoutePath,
   MODULE_KEYS,
   resolveDepartmentModuleKey,
   resolveModuleAccess,

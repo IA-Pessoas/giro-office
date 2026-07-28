@@ -74,7 +74,7 @@ function isWithinRoute(routePath: string, basePath: string): boolean {
   return routePath === basePath || routePath.startsWith(`${basePath}/`);
 }
 
-function normalizeRoutePath(routePath: string): string {
+export function normalizeRoutePath(routePath: string): string {
   const pathWithoutQuery = routePath.split("?")[0]?.split("#")[0] ?? "";
   const normalizedPath =
     pathWithoutQuery.length > 1 ? pathWithoutQuery.replace(/\/+$/, "") : pathWithoutQuery;
