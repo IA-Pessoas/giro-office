@@ -502,12 +502,15 @@ runTest("task model modal allows retrying failed options before saving", () => {
   const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
 
   assert.match(source, /const \[optionsRetryKey, setOptionsRetryKey\] = useState\(0\)/);
+  assert.match(source, /const \[requiredOptionsWarning, setRequiredOptionsWarning\] = useState\(false\)/);
+  assert.match(source, /const \[taskModelsWarning, setTaskModelsWarning\] = useState\(false\)/);
   assert.match(source, /onClick=\{\(\) => setOptionsRetryKey\(\(currentKey\) => currentKey \+ 1\)\}/);
   assert.match(source, />\s*Tentar novamente\s*<\/button>/);
   assert.match(
     source,
-    /const optionsUnavailable = loadingOptions \|\| Boolean\(optionsWarning\);[\s\S]*const saveDisabled = saving \|\| loadingDetail \|\| detailError \|\| optionsUnavailable;/,
+    /const optionsUnavailable = loadingOptions \|\| requiredOptionsWarning;[\s\S]*const taskModelsUnavailable = loadingOptions \|\| taskModelsWarning;[\s\S]*const saveDisabled = saving \|\| loadingDetail \|\| detailError \|\| optionsUnavailable;/,
   );
+  assert.match(source, /disabled=\{taskModelsUnavailable\}/);
 });
 
 runTest("buildDeleteTaskModelPayload maps task_id body", () => {

@@ -144,7 +144,10 @@ const gatewayEnvSchema = z
       .transform((value, ctx) => parseJsonBodyLimit(value, ctx)),
   })
   .transform((env) => {
-    const clientServiceInternalToken = env.clientServiceInternalToken ?? env.auditServiceToken;
+    const clientServiceInternalToken =
+      env.nodeEnv === "production"
+        ? env.clientServiceInternalToken
+        : (env.clientServiceInternalToken ?? env.auditServiceToken);
 
     validateProductionInternalServiceToken({
       nodeEnv: env.nodeEnv,

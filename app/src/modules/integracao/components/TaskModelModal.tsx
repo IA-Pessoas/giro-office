@@ -104,6 +104,8 @@ export function TaskModelModal({
   const [detailError, setDetailError] = useState(false);
   const [optionsWarning, setOptionsWarning] = useState<string | null>(null);
   const [optionsRetryKey, setOptionsRetryKey] = useState(0);
+  const [requiredOptionsWarning, setRequiredOptionsWarning] = useState(false);
+  const [taskModelsWarning, setTaskModelsWarning] = useState(false);
 
   const availableDependentTasks = useMemo(
     () => allTasks.filter((task) => task.id !== initialData?.id),
@@ -118,6 +120,8 @@ export function TaskModelModal({
       setDetailError(false);
       setOptionsWarning(null);
       setOptionsRetryKey(0);
+      setRequiredOptionsWarning(false);
+      setTaskModelsWarning(false);
       return;
     }
 
@@ -126,6 +130,8 @@ export function TaskModelModal({
     async function loadOptions() {
       setLoadingOptions(true);
       setOptionsWarning(null);
+      setRequiredOptionsWarning(false);
+      setTaskModelsWarning(false);
 
       const [optionsResult, taskModelsResult] = await Promise.allSettled([
         taskModelService.listOptions(),
@@ -144,6 +150,7 @@ export function TaskModelModal({
       } else {
         setUsers([]);
         setDepartments([]);
+        setRequiredOptionsWarning(true);
         failedLists.push("usuários e departamentos");
       }
 
@@ -151,6 +158,7 @@ export function TaskModelModal({
         setAllTasks(taskModelsResult.value);
       } else {
         setAllTasks([]);
+        setTaskModelsWarning(true);
         failedLists.push("modelos");
       }
 
@@ -407,7 +415,8 @@ export function TaskModelModal({
     }
   }
 
-  const optionsUnavailable = loadingOptions || Boolean(optionsWarning);
+  const optionsUnavailable = loadingOptions || requiredOptionsWarning;
+  const taskModelsUnavailable = loadingOptions || taskModelsWarning;
   const saveDisabled = saving || loadingDetail || detailError || optionsUnavailable;
 
   return (
@@ -686,7 +695,7 @@ export function TaskModelModal({
                     }
                     className={PROJECT_SELECT_CLASSNAME}
                     style={PROJECT_SELECT_ARROW_STYLE}
-                    disabled={optionsUnavailable}
+                    disabled={taskModelsUnavailable}
                   >
                     <option value="">{getDependentPlaceholder()}</option>
                     {availableDependentTasks.map((task) => (
