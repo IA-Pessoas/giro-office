@@ -768,6 +768,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
             uuidQueryParameter("location_id", "Local do ativo"),
             uuidQueryParameter("user_id", "Usuario vinculado ao ativo"),
             stringQueryParameter("asset_code", "Codigo patrimonial"),
+            enumQueryParameter("status", "Disponibilidade do ativo", ["available", "assigned"]),
             ...paginationParameters(),
           ],
           successDescription: "Ativos listados",

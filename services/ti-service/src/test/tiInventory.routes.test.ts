@@ -9,7 +9,7 @@ import {
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { createTestApp } from "./tiServiceTestUtils.js";
+import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
@@ -52,6 +52,39 @@ describe("ti inventory routes", () => {
       success: true,
       data: [],
     });
+  });
+
+  it("GET /ti/inventory/list accepts available status for term selectors", async () => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
+      .get("/ti/inventory/list")
+      .query({ status: "available", page_size: "100" })
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: [],
+    });
+    expect(prisma.inventoryTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          user_id: null,
+        }),
+        take: 100,
+      }),
+    );
+  });
+
+  it("GET /ti/inventory/list rejects unknown availability status", async () => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
+      .get("/ti/inventory/list")
+      .query({ status: "retired" })
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
+
+    expect(response.status).toBe(400);
+    expect(prisma.inventoryTecnologia.findMany).not.toHaveBeenCalled();
   });
 
   it("POST /ti/inventory creates an asset", async () => {
