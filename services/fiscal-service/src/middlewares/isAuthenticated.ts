@@ -13,6 +13,7 @@ import type { NextFunction, Request, Response } from "express";
 import { getFiscalServiceEnv } from "../config/env.js";
 
 const FISCAL_WRITE_PERMISSION = 1;
+const FISCAL_ADMIN_PERMISSION = 3;
 
 function parseForwardedPermission(headerValue: string | undefined): number | undefined {
   if (headerValue === undefined || headerValue === "") {
@@ -70,6 +71,19 @@ export function requireFiscalWritePermission(
 ): void {
   if (Number(request.permission ?? 0) < FISCAL_WRITE_PERMISSION) {
     next(new ServiceError(403, "Permissao insuficiente para alterar dados fiscais."));
+    return;
+  }
+
+  next();
+}
+
+export function requireFiscalAdminPermission(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  if (Number(request.permission ?? 0) < FISCAL_ADMIN_PERMISSION) {
+    next(new ServiceError(403, "Permissao insuficiente para excluir dados fiscais."));
     return;
   }
 

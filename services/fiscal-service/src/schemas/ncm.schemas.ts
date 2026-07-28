@@ -49,6 +49,8 @@ export const detailNcmQuerySchema = z
   })
   .strict();
 
+export const deleteNcmQuerySchema = detailNcmQuerySchema;
+
 export const listNcmQuerySchema = z
   .object({
     ...paginationQuerySchema.shape,

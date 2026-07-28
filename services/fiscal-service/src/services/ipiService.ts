@@ -37,6 +37,10 @@ export interface UpdateIpiRequest extends IpiAuthContext {
   aliquot?: string;
 }
 
+export interface DeleteIpiRequest extends IpiAuthContext {
+  ipi_id: string;
+}
+
 export interface ListIpiRequest extends PaginationQuery {
   ipiCodes?: string[];
 }
@@ -139,6 +143,40 @@ export class IpiService {
       logError("Erro ao atualizar IPI", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao atualizar.", err);
+    }
+  }
+
+  async delete(data: DeleteIpiRequest): Promise<{ deleted: unknown }> {
+    try {
+      const exists = await this.prisma.ipi.findFirst({
+        where: { id: data.ipi_id, organization_id: data.organizationId },
+        select: IPI_SELECT,
+      });
+
+      if (!exists) {
+        throw new ServiceError(404, "IPI nao existe.");
+      }
+
+      const deleted = await this.prisma.ipi.delete({
+        where: { id: data.ipi_id },
+        select: IPI_SELECT,
+      });
+
+      await this.audit.createLog({
+        userId: data.userId,
+        organizationId: data.organizationId,
+        permission: data.permission ?? null,
+        action: "Exclusao",
+        referring: "fiscal.ipi",
+        referringId: data.ipi_id,
+        changes: exists as unknown as Record<string, unknown>,
+      });
+
+      return { deleted };
+    } catch (err: unknown) {
+      logError("Erro ao excluir IPI", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro ao excluir.", err);
     }
   }
 
