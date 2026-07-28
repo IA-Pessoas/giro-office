@@ -1,4 +1,10 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import {
+  INTEGRACAO_PERMISSION_LEVEL,
+  type IntegracaoPermissionLevel,
+  error as logError,
+  requireIntegracaoRouteAccess,
+  ServiceError,
+} from "@workspace/shared";
 import type { TaskDependentGetPayload } from "../generated/prisma/models/TaskDependent.js";
 
 import * as audit from "../integrations/audit.js";
@@ -11,12 +17,16 @@ export interface AddDependentRequest {
   dependent_id: string;
   wait: boolean;
   observation: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
 }
 
 export interface DeleteDependentRequest {
   id: string;
   user_id: string;
   organization_id: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
 }
 
 const TASK_DEPENDENT_SELECT = {
@@ -40,6 +50,13 @@ export class TaskDependentService {
       if (data.task_model_id === data.dependent_id) {
         throw new ServiceError(400, "Uma tarefa não pode depender de si mesma.");
       }
+
+      requireIntegracaoRouteAccess("POST", "/task/model/dependent", {
+        userId: data.user_id,
+        level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId: data.organization_id,
+        isOwner: data.isOwner === true,
+      });
 
       const taskModel = await prismaClient.taskModel.findFirst({
         where: { id: data.task_model_id, organization_id: data.organization_id },
@@ -100,8 +117,29 @@ export class TaskDependentService {
   async listDependents(
     taskModelId: string,
     organizationId: string,
+    authorization: {
+      userId: string;
+      integracaoLevel?: IntegracaoPermissionLevel;
+      isOwner?: boolean;
+    } = { userId: "" },
   ): Promise<TaskDependentSelected[]> {
     try {
+      requireIntegracaoRouteAccess("GET", "/task/model/dependent", {
+        userId: authorization.userId,
+        level: authorization.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId,
+        resourceOrganizationId: organizationId,
+        isOwner: authorization.isOwner === true,
+      });
+
+      const taskModel = await prismaClient.taskModel.findFirst({
+        where: { id: taskModelId, organization_id: organizationId },
+        select: { id: true },
+      });
+      if (!taskModel) {
+        throw new ServiceError(404, "Tarefa modelo não encontrada.");
+      }
+
       const list = await prismaClient.taskDependent.findMany({
         where: {
           task_id: taskModelId,
@@ -127,6 +165,14 @@ export class TaskDependentService {
       if (!exists) {
         throw new ServiceError(404, "Dependência não encontrada.");
       }
+
+      requireIntegracaoRouteAccess("DELETE", "/task/model/dependent", {
+        userId: data.user_id,
+        level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId: data.organization_id,
+        resourceOrganizationId: data.organization_id,
+        isOwner: data.isOwner === true,
+      });
 
       const deleted = await prismaClient.taskDependent.deleteMany({
         where: { id: data.id, organization_id: data.organization_id },

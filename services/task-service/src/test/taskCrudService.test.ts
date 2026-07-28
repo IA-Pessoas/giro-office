@@ -67,6 +67,7 @@ describe("TaskCrudService", () => {
         prospecting_status: "Fechado",
         observations: "obs",
         urgency: "Alta",
+        integracaoLevel: 2,
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
   });
@@ -86,6 +87,7 @@ describe("TaskCrudService", () => {
         prospecting_status: "Fechado",
         observations: "obs",
         urgency: "Alta",
+        integracaoLevel: 2,
       }),
     ).rejects.toMatchObject({
       statusCode: 400,
@@ -109,6 +111,7 @@ describe("TaskCrudService", () => {
         prospecting_status: "Fechado",
         observations: "obs",
         urgency: "Alta",
+        integracaoLevel: 2,
       }),
     ).rejects.toMatchObject({
       statusCode: 404,
@@ -141,6 +144,7 @@ describe("TaskCrudService", () => {
       prospecting_status: "Fechado",
       observations: "obs",
       urgency: "Alta",
+      integracaoLevel: 2,
     });
 
     expect(prismaMock.project.findFirst).toHaveBeenCalledWith({
@@ -175,12 +179,14 @@ describe("TaskCrudService", () => {
 
     const result = await service.listTasks({
       organization_id: "org-1",
+      user_id: "user-1",
       status: "Todos",
       ref: "",
       ref_id: "",
       search: "registro",
       page: 2,
       limit: 20,
+      integracaoLevel: 1,
     });
 
     expect(result).toEqual({
@@ -222,6 +228,98 @@ describe("TaskCrudService", () => {
     });
   });
 
+  it("listTasks mantém a responsabilidade própria quando nível 0 pesquisa", async () => {
+    prismaMock.task.findMany.mockResolvedValue([]);
+    prismaMock.task.count.mockResolvedValue(0);
+    const service = new TaskCrudService();
+
+    await service.listTasks({
+      organization_id: "org-1",
+      user_id: "user-1",
+      status: "Todos",
+      ref: "",
+      ref_id: "",
+      search: "registro",
+      page: 1,
+      limit: 20,
+      integracaoLevel: 0,
+    });
+
+    expect(prismaMock.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: "org-1",
+          AND: [
+            { status: { in: ["Em Andamento", "A Realizar", "Em Espera"] } },
+            {
+              OR: [
+                { responsible_id: "user-1" },
+                { responsible2_id: "user-1" },
+                { responsible3_id: "user-1" },
+              ],
+            },
+            { OR: [{ name: { contains: "registro", mode: "insensitive" } }] },
+          ],
+        },
+      }),
+    );
+  });
+
+  it("não permite concluir diretamente uma tarefa sem o fluxo de aprovação", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      organization_id: "org-1",
+      name: "Tarefa",
+      status: "Em Andamento",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    const service = new TaskCrudService();
+
+    await expect(
+      service.updateTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        status: "Concluída",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+  });
+
+  it("detailTask permite nível 0 apenas para um dos três responsáveis", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    const service = new TaskCrudService();
+
+    await expect(
+      service.detailTask("task-1", "org-1", {
+        user_id: "user-1",
+        integracaoLevel: 0,
+      }),
+    ).resolves.toMatchObject({ detail: { id: "task-1" } });
+
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      responsible_id: "other-user",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    await expect(
+      service.detailTask("task-1", "org-1", {
+        user_id: "user-1",
+        integracaoLevel: 0,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
   it("deleteTask lança 403 quando usuário não tem permissão", async () => {
     prismaMock.task.findFirst.mockResolvedValue({ id: "task-1", organization_id: "org-1" });
     prismaMock.user.findFirst.mockResolvedValue({ id: "user-1", permission: 1 });
@@ -232,6 +330,7 @@ describe("TaskCrudService", () => {
         task_id: "task-1",
         user_id: "user-1",
         organization_id: "org-1",
+        integracaoLevel: 1,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
