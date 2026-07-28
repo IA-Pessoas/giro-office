@@ -15,6 +15,10 @@ const rhSources = {
     "../services/rh-service/src/routes/scoreQuarter.routes.ts",
     "utf8",
   ),
+  scoreQuarterService: readFileSync(
+    "../services/rh-service/src/services/scoreQuarterService.ts",
+    "utf8",
+  ),
   timeBankReleaseRoute: readFileSync(
     "../services/rh-service/src/routes/timeBankRelease.routes.ts",
     "utf8",
@@ -92,7 +96,11 @@ runTest("RH viewer self-service flow stays enabled and scoped", () => {
   );
   assert.match(
     rhSources.scoreQuarterRoute,
-    /router\.get\([\s\S]*"\/:id"[\s\S]*requireRhPermission\(RH_SELF_SERVICE_PERMISSION\)[\s\S]*result\.user_id !== userId/,
+    /router\.get\([\s\S]*"\/:id"[\s\S]*requireRhPermission\(RH_SELF_SERVICE_PERMISSION\)[\s\S]*user_id:\s*userId[\s\S]*can_manage:\s*canManageRh\(req\)/,
+  );
+  assert.match(
+    rhSources.scoreQuarterService,
+    /if \(!input\.can_manage && score\.user_id !== userId\)/,
   );
   assert.match(
     rhSources.timeBankReleaseRoute,
