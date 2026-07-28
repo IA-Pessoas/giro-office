@@ -10,6 +10,7 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
+  canManageRh,
   RH_MANAGEMENT_PERMISSION,
   RH_SELF_SERVICE_PERMISSION,
   requireRhPermission,
@@ -88,12 +89,17 @@ router.get(
 router.get(
   "/list",
   isAuthenticated,
-  requireRhPermission(RH_MANAGEMENT_PERMISSION),
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
+      const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+        statusCode: 400,
+      });
+      const canManageTimeBankReleases = canManageRh(req);
       const queryInput = {
-        user_id: getSingleTrimmedQueryValue(req.query.user_id),
+        user_id: canManageTimeBankReleases
+          ? getSingleTrimmedQueryValue(req.query.user_id)
+          : user_id,
         is_approved: getSingleTrimmedQueryValue(req.query.is_approved),
         date_from: getSingleTrimmedQueryValue(req.query.date_from),
         date_to: getSingleTrimmedQueryValue(req.query.date_to),
@@ -101,8 +107,9 @@ router.get(
       const parsed = parseWithZod(listTimeBankReleasesQuerySchema, queryInput);
 
       const filters: TimeBankReleaseListFilters = {};
-      if (parsed.user_id !== undefined) {
-        filters.user_id = parsed.user_id;
+      const scopedUserId = canManageTimeBankReleases ? parsed.user_id : user_id;
+      if (scopedUserId !== undefined) {
+        filters.user_id = scopedUserId;
       }
       if (parsed.is_approved !== undefined) {
         filters.is_approved = parsed.is_approved === "true";

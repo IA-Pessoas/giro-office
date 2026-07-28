@@ -9,6 +9,7 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
+  canManageRh,
   RH_MANAGEMENT_PERMISSION,
   RH_SELF_SERVICE_PERMISSION,
   requireRhPermission,
@@ -114,7 +115,7 @@ router.get(
 router.get(
   "/:id",
   isAuthenticated,
-  requireRhPermission(RH_MANAGEMENT_PERMISSION),
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = req.organization_id;
@@ -128,10 +129,13 @@ router.get(
 
       const { id } = parseWithZod(scoreQuarterIdParamSchema, req.params);
 
-      const result = await scoreQuarterService.getDetail({
+      const result = (await scoreQuarterService.getDetail({
         organization_id: organizationId,
         score_id: id,
-      });
+      })) as { user_id: string };
+      if (!canManageRh(req) && result.user_id !== userId) {
+        throw new ServiceError(403, "Permissao insuficiente para acessar score de terceiro.");
+      }
 
       res.status(200).json(createSuccessResponse(result));
     } catch (err) {

@@ -198,11 +198,15 @@ vi.mock("../services/scoreNitroService.js", () => ({
   }),
 }));
 
+const testAuthContext = vi.hoisted(() => ({
+  rhPermission: 3,
+}));
+
 vi.mock("../middlewares/isAuthenticated.js", () => ({
   isAuthenticated: (req: Express.Request, _res: Express.Response, next: NextFunction) => {
     req.user_id = "00000000-0000-4000-8000-000000000001";
     req.organization_id = "00000000-0000-4000-8000-000000000002";
-    req.rh_permission ??= 3;
+    req.rh_permission ??= testAuthContext.rhPermission;
     next();
   },
 }));
@@ -210,7 +214,9 @@ vi.mock("../middlewares/isAuthenticated.js", () => ({
 import { createApp } from "../app.js";
 import type { RhEnv } from "../config/env.js";
 
-export function createTestApp() {
+export function createTestApp(options: { rhPermission?: number } = {}) {
+  testAuthContext.rhPermission = options.rhPermission ?? 3;
+
   const env = {
     port: 3034,
     databaseUrl: "postgresql://localhost/rh_test",
@@ -270,7 +276,10 @@ export function resetRhRouteMocks() {
   categoryServiceMock.delete.mockResolvedValue({ ok: true });
   requestServiceMock.create.mockResolvedValue({ ok: true });
   requestServiceMock.list.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
-  requestServiceMock.getById.mockResolvedValue({ id: "00000000-0000-4000-8000-000000000010" });
+  requestServiceMock.getById.mockResolvedValue({
+    id: "00000000-0000-4000-8000-000000000010",
+    requester_user_id: "00000000-0000-4000-8000-000000000001",
+  });
   requestServiceMock.update.mockResolvedValue({ ok: true });
   requestServiceMock.delete.mockResolvedValue({ ok: true });
   operationalUserServiceMock.list.mockResolvedValue([
@@ -292,6 +301,7 @@ export function resetRhRouteMocks() {
   ]);
   scoreQuarterServiceMock.getDetail.mockResolvedValue({
     id: "00000000-0000-4000-8000-000000000010",
+    user_id: "00000000-0000-4000-8000-000000000001",
   });
   scoreEvaluationServiceMock.listPendingEvaluations.mockResolvedValue([
     { id: "00000000-0000-4000-8000-000000000010" },
@@ -326,6 +336,7 @@ export function resetRhRouteMocks() {
   timeSheetServiceMock.list.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000010" }]);
   timeSheetServiceMock.getById.mockResolvedValue({
     id: "00000000-0000-4000-8000-000000000010",
+    user_id: "00000000-0000-4000-8000-000000000001",
     status: "Gerada",
     days: [],
     totals: { worked_minutes: 0, expected_minutes: 0, balance_minutes: 0, absence_count: 0 },

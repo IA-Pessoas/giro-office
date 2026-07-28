@@ -50,4 +50,23 @@ describe("scoreQuarter routes", () => {
     expect(res.status).toBe(200);
     expect(scoreQuarterServiceMock.getDetail).toHaveBeenCalledTimes(1);
   });
+
+  it("GET /rh/score/quarters/:id permite visualizador abrir o proprio score", async () => {
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).get(`/rh/score/quarters/${itemId}`);
+
+    expect(res.status).toBe(200);
+    expect(scoreQuarterServiceMock.getDetail).toHaveBeenCalledTimes(1);
+  });
+
+  it("GET /rh/score/quarters/:id bloqueia visualizador em score de terceiro", async () => {
+    scoreQuarterServiceMock.getDetail.mockResolvedValueOnce({
+      id: itemId,
+      user_id: "00000000-0000-4000-8000-000000000099",
+    });
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).get(`/rh/score/quarters/${itemId}`);
+
+    expect(res.status).toBe(403);
+  });
 });

@@ -8,6 +8,7 @@ import { Dialog } from "@shared/components";
 import { useCreateRhRequestMutation, useUpdateRhRequestMutation } from "../hooks/useRhRequests";
 import type {
   AssignableUser,
+  CreateRhRequestPayload,
   RhCategory,
   RhRequest,
   RhRequestStatus,
@@ -73,7 +74,6 @@ export function RhRequestFormModal({
 
   const isEditing = Boolean(request);
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
-  const isSelfServiceCreateBlocked = !canManageRequests && !isEditing;
 
   useEffect(() => {
     setFormState(buildFormState(request));
@@ -95,16 +95,11 @@ export function RhRequestFormModal({
   }
 
   async function handleSubmit() {
-    if (isSelfServiceCreateBlocked) {
-      toast.info("Você poderá abrir solicitações assim que esse fluxo for liberado.");
-      return;
-    }
-
     if (
       !formState.title.trim() ||
       !formState.description.trim() ||
       !formState.category_id ||
-      !formState.assigned_to_user_id
+      (canManageRequests && !formState.assigned_to_user_id)
     ) {
       toast.warn("Preencha os campos obrigatórios.");
       return;
@@ -123,13 +118,17 @@ export function RhRequestFormModal({
         });
         toast.success("Solicitação atualizada com sucesso.");
       } else {
-        await createMutation.mutateAsync({
+        const payload: CreateRhRequestPayload = {
           title: formState.title.trim(),
           description: formState.description.trim(),
           category_id: formState.category_id,
-          assigned_to_user_id: formState.assigned_to_user_id,
           urgency: formState.urgency,
-        });
+        };
+        if (canManageRequests && formState.assigned_to_user_id) {
+          payload.assigned_to_user_id = formState.assigned_to_user_id;
+        }
+
+        await createMutation.mutateAsync(payload);
         toast.success("Solicitação criada com sucesso.");
       }
 
@@ -169,28 +168,20 @@ export function RhRequestFormModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting || isSelfServiceCreateBlocked}
+            disabled={isSubmitting}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting
               ? "Salvando..."
-              : isSelfServiceCreateBlocked
-                ? "Indisponível no momento"
-                : isEditing
-                  ? "Salvar alterações"
-                  : "Criar solicitação"}
+              : isEditing
+                ? "Salvar alterações"
+                : "Criar solicitação"}
           </button>
         </>
       }
       contentClassName="w-[min(92vw,720px)]"
       bodyClassName="space-y-4"
     >
-      {isSelfServiceCreateBlocked ? (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
-          Você poderá abrir solicitações assim que esse fluxo for liberado.
-        </div>
-      ) : null}
-
       {canManageRequests && assignableUsersUnavailableMessage ? (
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
           Não foi possível carregar os responsáveis agora.
