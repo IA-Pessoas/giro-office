@@ -51,6 +51,7 @@ import {
   TASK_TABLE_NAME_CELL_CLASSNAME,
   TASK_TABLE_NAME_HEAD_CELL_CLASSNAME,
   TASK_TABLE_SCROLL_AREA_CLASSNAME,
+  canEditIntegracaoTask,
   formatTasksFooterSummary,
 } from "./components/taskWorkspaceUi.ts";
 import {
@@ -541,6 +542,7 @@ runTest("integration write actions use the modular access level", () => {
 
   assert.match(tasksSource, /const canCreate = integracaoAccess\.canEdit;/);
   assert.match(tasksSource, /const canManageTaskModels = integracaoAccess\.isAdmin;/);
+  assert.match(tasksSource, /canEditIntegracaoTask\(integracaoAccess, task\)/);
   assert.match(taskFormSource, /const isRestrictedEdit =/);
   assert.match(taskFormSource, /enabled: open && isEditing && !isRestrictedEdit/);
   assert.match(taskFormSource, /task_id: taskId,\s*status,\s*observations/);
@@ -601,6 +603,13 @@ runTest("tasks delete permission follows integration module admin level", () => 
   assert.equal(source.includes('import { useModuleAccess } from "@modules/auth";'), true);
   assert.equal(source.includes("const canDelete = integracaoAccess.isAdmin;"), true);
   assert.equal(source.includes("const canDelete = meQuery.data?.permission === 2;"), false);
+});
+
+runTest("task list hides restricted edit actions from non-responsible users", () => {
+  assert.equal(canEditIntegracaoTask({ level: "view" }, { isOwn: true }), true);
+  assert.equal(canEditIntegracaoTask({ level: "view" }, { isOwn: false }), false);
+  assert.equal(canEditIntegracaoTask({ level: "edit" }, { isOwn: false }), true);
+  assert.equal(canEditIntegracaoTask({ level: "admin" }, { isOwn: false }), true);
 });
 
 runTest("task form modal uses compact layout classes", () => {

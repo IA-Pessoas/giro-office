@@ -1,3 +1,7 @@
+import type { ModuleAccess } from "@modules/auth";
+
+import type { IntegracaoTaskListItem } from "../types";
+
 export const TASK_TABLE_HEAD_CELL_CLASSNAME =
   "px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-blue-200/80";
 
@@ -37,4 +41,11 @@ export function formatTasksFooterSummary({ count }: FormatTasksFooterSummaryPara
   }
 
   return count === 1 ? "1 tarefa carregada." : `${count} tarefas carregadas.`;
+}
+
+export function canEditIntegracaoTask(
+  access: Pick<ModuleAccess, "level">,
+  task: Pick<IntegracaoTaskListItem, "isOwn">,
+): boolean {
+  return access.level === "edit" || access.level === "admin" || task.isOwn;
 }
