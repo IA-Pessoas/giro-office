@@ -29,6 +29,7 @@ export type TaskBilling = "Realizar" | "Não Realizar";
 
 export interface IntegracaoTaskListItem {
   id: string;
+  isOwn: boolean;
   name: string;
   status: string;
   billing: string;

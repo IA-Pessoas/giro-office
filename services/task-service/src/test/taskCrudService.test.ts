@@ -184,6 +184,7 @@ describe("TaskCrudService", () => {
       observations: "Observação específica",
       billing: "Não Realizar",
       urgency: "Alta",
+      integracaoLevel: 2,
       responsible_id: "user-1",
       responsible2_id: "user-2",
       responsible3_id: "user-3",
@@ -235,6 +236,7 @@ describe("TaskCrudService", () => {
       observations: "obs",
       urgency: "Alta",
       billing: "Realizar",
+      integracaoLevel: 2,
     });
 
     expect(prismaMock.task.create).toHaveBeenCalledWith(
@@ -269,6 +271,7 @@ describe("TaskCrudService", () => {
       observations: "obs",
       urgency: "Alta",
       status: "Em Espera",
+      integracaoLevel: 2,
     });
 
     expect(prismaMock.task.create).toHaveBeenCalledWith(
@@ -302,6 +305,7 @@ describe("TaskCrudService", () => {
       prospecting_status: "Fechado",
       observations: "obs",
       urgency: "Alta",
+      integracaoLevel: 2,
     });
 
     expect(prismaMock.task.create).toHaveBeenCalledWith(
@@ -332,6 +336,9 @@ describe("TaskCrudService", () => {
         name: "Registro 21",
         status: "Em Andamento",
         billing: "Realizar",
+        responsible_id: "other-user",
+        responsible2_id: null,
+        responsible3_id: null,
       },
     ];
     prismaMock.task.findMany.mockResolvedValue(pageRows);
@@ -354,7 +361,15 @@ describe("TaskCrudService", () => {
     });
 
     expect(result).toEqual({
-      data: pageRows,
+      data: [
+        {
+          id: "task-21",
+          name: "Registro 21",
+          status: "Em Andamento",
+          billing: "Realizar",
+          isOwn: false,
+        },
+      ],
       total: 41,
       hasMore: true,
       summary: { inProgress: 9, billable: 14 },
@@ -427,6 +442,130 @@ describe("TaskCrudService", () => {
         },
       }),
     );
+  });
+
+  it("listTasks reutiliza o filtro de tarefas próprias nos totais", async () => {
+    prismaMock.task.findMany.mockResolvedValue([
+      {
+        id: "task-1",
+        name: "Tarefa própria",
+        responsible_id: "user-1",
+        responsible2_id: null,
+        responsible3_id: null,
+      },
+    ]);
+    prismaMock.task.count
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1);
+    const service = new TaskCrudService();
+
+    const result = await service.listTasks({
+      organization_id: "org-1",
+      user_id: "user-1",
+      status: "Todos",
+      ref: "",
+      ref_id: "",
+      search: "própria",
+      page: 1,
+      limit: 20,
+      integracaoLevel: 0,
+    });
+
+    const ownTaskWhere = {
+      organization_id: "org-1",
+      AND: [
+        { status: { in: ["Em Andamento", "A Realizar", "Em Espera"] } },
+        {
+          OR: [
+            { responsible_id: "user-1" },
+            { responsible2_id: "user-1" },
+            { responsible3_id: "user-1" },
+          ],
+        },
+        { OR: [{ name: { contains: "própria", mode: "insensitive" } }] },
+      ],
+    };
+
+    expect(result).toMatchObject({
+      total: 1,
+      summary: { inProgress: 1, billable: 1 },
+    });
+    expect(prismaMock.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: ownTaskWhere, skip: 0, take: 20 }),
+    );
+    expect(prismaMock.task.count).toHaveBeenNthCalledWith(1, { where: ownTaskWhere });
+    expect(prismaMock.task.count).toHaveBeenNthCalledWith(2, {
+      where: {
+        AND: [ownTaskWhere, { status: { contains: "andamento", mode: "insensitive" } }],
+      },
+    });
+    expect(prismaMock.task.count).toHaveBeenNthCalledWith(3, {
+      where: {
+        AND: [ownTaskWhere, { NOT: { billing: { contains: "não", mode: "insensitive" } } }],
+      },
+    });
+  });
+
+  it.each([
+    "responsible_id",
+    "responsible2_id",
+    "responsible3_id",
+  ] as const)("listTasks marca tarefa própria quando o usuário é %s", async (responsibleField) => {
+    prismaMock.task.findMany.mockResolvedValue([
+      {
+        id: "task-1",
+        name: "Tarefa própria",
+        [responsibleField]: "user-1",
+      },
+    ]);
+    prismaMock.task.count.mockResolvedValue(1);
+    const service = new TaskCrudService();
+
+    const result = await service.listTasks({
+      organization_id: "org-1",
+      user_id: "user-1",
+      status: "Todos",
+      ref: "",
+      ref_id: "",
+      search: "",
+      page: 1,
+      limit: 20,
+      integracaoLevel: 1,
+    });
+
+    expect(result.data[0]).toMatchObject({ id: "task-1", isOwn: true });
+    expect(result.data[0]).not.toHaveProperty("responsible_id");
+    expect(result.data[0]).not.toHaveProperty("responsible2_id");
+    expect(result.data[0]).not.toHaveProperty("responsible3_id");
+  });
+
+  it("listTasks marca como não própria uma tarefa de outro usuário", async () => {
+    prismaMock.task.findMany.mockResolvedValue([
+      {
+        id: "task-1",
+        name: "Tarefa de terceiro",
+        responsible_id: "other-user",
+        responsible2_id: null,
+        responsible3_id: null,
+      },
+    ]);
+    prismaMock.task.count.mockResolvedValue(1);
+    const service = new TaskCrudService();
+
+    const result = await service.listTasks({
+      organization_id: "org-1",
+      user_id: "user-1",
+      status: "Todos",
+      ref: "",
+      ref_id: "",
+      search: "",
+      page: 1,
+      limit: 20,
+      integracaoLevel: 1,
+    });
+
+    expect(result.data[0]).toMatchObject({ id: "task-1", isOwn: false });
   });
 
   it("não permite concluir diretamente uma tarefa sem o fluxo de aprovação", async () => {

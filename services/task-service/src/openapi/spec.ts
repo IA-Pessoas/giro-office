@@ -445,7 +445,17 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                         type: "object",
                         required: ["data", "total", "hasMore", "summary"],
                         properties: {
-                          data: { type: "array", items: { type: "object" } },
+                          data: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              required: ["id", "isOwn"],
+                              properties: {
+                                id: { type: "string" },
+                                isOwn: { type: "boolean" },
+                              },
+                            },
+                          },
                           total: { type: "integer", minimum: 0 },
                           hasMore: { type: "boolean" },
                           summary: {

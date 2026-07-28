@@ -43,6 +43,7 @@ import {
   TASK_TABLE_NAME_CELL_CLASSNAME,
   TASK_TABLE_NAME_HEAD_CELL_CLASSNAME,
   TASK_TABLE_SCROLL_AREA_CLASSNAME,
+  canEditIntegracaoTask,
   formatTasksFooterSummary,
 } from "./taskWorkspaceUi";
 
@@ -452,16 +453,18 @@ export function TasksWorkspace() {
                     </td>
                     <td className={TASK_TABLE_ACTION_CELL_CLASSNAME}>
                       <div className="flex justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setEditingTaskId(task.id)}
-                          className={TASK_TABLE_ACTION_BUTTON_CLASSNAME}
-                          disabled={deleteTaskMutation.isPending}
-                          aria-label={`Editar tarefa ${task.name}`}
-                          title="Editar tarefa"
-                        >
-                          <Edit3 className="h-4 w-4" />
-                        </button>
+                        {canEditIntegracaoTask(integracaoAccess, task) ? (
+                          <button
+                            type="button"
+                            onClick={() => setEditingTaskId(task.id)}
+                            className={TASK_TABLE_ACTION_BUTTON_CLASSNAME}
+                            disabled={deleteTaskMutation.isPending}
+                            aria-label={`Editar tarefa ${task.name}`}
+                            title="Editar tarefa"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </button>
+                        ) : null}
 
                         {canDelete ? (
                           <button
