@@ -103,8 +103,16 @@ export interface CreateTaskCrudRequest {
   project_id: string;
   client_id: string;
   prospecting_status: ProspectingStatus;
+  name?: string;
+  status?: IntegracaoTaskStatus;
+  department_id?: string;
   observations: string;
+  billing?: TaskBilling;
   urgency: string;
+  responsible_id?: string;
+  responsible2_id?: string | null;
+  responsible3_id?: string | null;
+  prevision_date?: Date | string | null;
   integracaoLevel?: IntegracaoPermissionLevel;
   isOwner?: boolean;
 }
@@ -281,15 +289,23 @@ export class TaskCrudService {
         throw new ServiceError(404, "Tarefa modelo não existe.");
       }
 
-      let status = "A Realizar";
+      const billing = data.billing ?? model.billing;
+      let defaultStatus = "A Realizar";
       if (data.prospecting_status === "Fechado") {
-        status = "Em Andamento";
+        defaultStatus = "Em Andamento";
       }
-      if (model.billing === "Realizar") {
-        status = "A Realizar";
+      if (billing === "Realizar") {
+        defaultStatus = "A Realizar";
       }
 
-      const charge_comercial = model.billing !== "Não Realizar";
+      const status = data.status ?? defaultStatus;
+      const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
+      const previsionDate =
+        data.prevision_date === undefined || data.prevision_date === null
+          ? null
+          : typeof data.prevision_date === "string"
+            ? new Date(`${data.prevision_date}T00:00:00.000Z`)
+            : data.prevision_date;
 
       const { create, dependentCreates } = await this.#runTransaction(async (tx) => {
         const create = await tx.task.create({
@@ -298,16 +314,17 @@ export class TaskCrudService {
             model_id: data.model_id,
             project_id: data.project_id,
             client_id: data.client_id,
-            name: model.name,
+            name: data.name ?? model.name,
             status,
-            department_id: model.department_id,
+            department_id: data.department_id ?? model.department_id,
             observations: data.observations,
-            billing: model.billing,
+            billing,
             urgency: data.urgency,
-            responsible_id: model.responsible_id,
-            responsible2_id: model.responsible2_id,
-            responsible3_id: model.responsible3_id,
+            responsible_id: data.responsible_id ?? model.responsible_id,
+            responsible2_id: data.responsible2_id ?? model.responsible2_id,
+            responsible3_id: data.responsible3_id ?? model.responsible3_id,
             start_date: status === "Em Andamento" ? new Date() : null,
+            prevision_date: previsionDate,
             pending_approval: false,
             charge_comercial,
             charge_financeiro: false,
