@@ -2,7 +2,6 @@ import { createSuccessResponse, error as logError, parseWithZod } from "@workspa
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
-import { requireRegularizeWritePermission } from "../middlewares/requireRegularizeWritePermission.js";
 import {
   createMunicipalTaxesBodySchema,
   listMunicipalTaxesQuerySchema,
@@ -19,7 +18,6 @@ export function createMunicipalTaxesRoutes(deps: RegularizeRouteDeps): Router {
   router.post(
     "/municipal-taxes",
     isAuthenticated,
-    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(createMunicipalTaxesBodySchema, request.body);
@@ -39,7 +37,6 @@ export function createMunicipalTaxesRoutes(deps: RegularizeRouteDeps): Router {
   router.put(
     "/municipal-taxes",
     isAuthenticated,
-    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(updateMunicipalTaxesBodySchema, request.body);

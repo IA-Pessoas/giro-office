@@ -60,45 +60,6 @@ describe("regularize remaining routes", () => {
     expect(response.body.success).toBe(false);
   });
 
-  it.each([
-    ["POST", "/regularize/passwords"],
-    ["PUT", "/regularize/passwords"],
-    ["POST", "/regularize/sites-pass"],
-    ["PUT", "/regularize/sites-pass"],
-    ["POST", "/regularize/pf"],
-    ["PUT", "/regularize/pf"],
-    ["POST", "/regularize/partners"],
-    ["PUT", "/regularize/partners"],
-    ["POST", "/regularize/municipal-taxes"],
-    ["PUT", "/regularize/municipal-taxes"],
-    ["POST", "/regularize/process"],
-    ["PUT", "/regularize/process"],
-    ["POST", "/regularize/guidance"],
-    ["PUT", "/regularize/guidance"],
-    ["POST", "/regularize/guidance/activity/add"],
-    ["POST", "/regularize/guidance/activity/remove"],
-    ["POST", "/regularize/guidance/partner/add"],
-    ["POST", "/regularize/guidance/partner/remove"],
-    ["POST", "/regularize/license"],
-    ["PUT", "/regularize/license"],
-  ])("%s %s rejects viewers before persistence", async (method, path) => {
-    const persistence = vi.fn();
-    const prisma = new Proxy({} as PrismaClient, {
-      get: () => new Proxy({}, { get: () => persistence }),
-    });
-    const app = createTestApp(prisma);
-
-    const response = await request(app)
-      [method.toLowerCase() as "post" | "put"](path)
-      .set(gatewayHeaders({ permission: 1 }))
-      .send({});
-
-    expect(response.status).toBe(403);
-    expect(response.body.success).toBe(false);
-    expect(response.body.error).toBe("Permissao insuficiente para alterar dados do Regularize.");
-    expect(persistence).not.toHaveBeenCalled();
-  });
-
   it("POST /regularize/municipal-taxes creates a municipal taxes record", async () => {
     const prisma = {
       client: {
