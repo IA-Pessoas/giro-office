@@ -97,6 +97,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.regularizeServiceUrl,
       auditTarget: "regularize-service",
       routePrefixes: [...REGULARIZE_SERVICE_PREFIXES],
+      permissionModule: "regularize",
     },
     {
       key: "fiscal-service",
