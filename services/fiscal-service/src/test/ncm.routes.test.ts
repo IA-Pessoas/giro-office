@@ -36,6 +36,13 @@ function gatewayHeaders(permission = 1): Record<string, string> {
 }
 
 const emptyListResult = { data: [], total: 0, page: 1, limit: 50, hasMore: false };
+const validNcmBody = {
+  tax_regime: "Simples Nacional",
+  ncm_code: "84719012",
+  federal_taxation_type: "Monofásica",
+  description: "Unidade de processamento",
+  validity_start_date: "2026-01-01T00:00:00.000Z",
+};
 
 function createMockDeps(): NcmRouteDeps {
   return {
@@ -97,6 +104,28 @@ describe("ncm routes", () => {
 
     expect(res.status).toBe(400);
     expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("POST e PUT /fiscal/ncm rejeitam codigo NCM com letras antes do servico", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, ncmRouteDeps: deps });
+
+    const createResponse = await request(app)
+      .post("/fiscal/ncm")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ ...validNcmBody, ncm_code: "8471.AB" });
+
+    const updateResponse = await request(app)
+      .put("/fiscal/ncm")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ ...validNcmBody, ncm_id: NCM_ID, ncm_code: "ABC123" });
+
+    expect(createResponse.status).toBe(400);
+    expect(updateResponse.status).toBe(400);
+    expect(deps.create).not.toHaveBeenCalled();
+    expect(deps.update).not.toHaveBeenCalled();
   });
 
   it("POST /fiscal/ncm com Visualizador retorna 403 antes do servico", async () => {
