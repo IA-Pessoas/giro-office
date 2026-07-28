@@ -155,7 +155,7 @@ export function TasksWorkspace() {
 
   async function handleDelete(task: IntegracaoTaskListItem) {
     if (!canDelete) {
-      toast.error("Somente usuários com permissão 2 podem excluir tarefas.");
+      toast.error("Somente usuários com permissão administrativa na Integração podem excluir tarefas.");
       return;
     }
 
@@ -179,7 +179,7 @@ export function TasksWorkspace() {
           : null;
 
       if (statusCode === 403) {
-        toast.error("Somente usuários com permissão 2 podem excluir tarefas.");
+        toast.error("Somente usuários com permissão administrativa na Integração podem excluir tarefas.");
         return;
       }
 

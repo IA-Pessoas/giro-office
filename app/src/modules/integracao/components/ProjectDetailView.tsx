@@ -60,7 +60,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           : null;
 
       if (statusCode === 403) {
-        toast.error("Somente usuários com permissão 2 podem excluir projetos.");
+      toast.error("Somente usuários com permissão administrativa na Integração podem excluir projetos.");
         return;
       }
 
