@@ -12,7 +12,7 @@ import type { NextFunction, Request, Response } from "express";
 
 import { getFiscalServiceEnv } from "../config/env.js";
 
-const FISCAL_WRITE_PERMISSION = 1;
+const FISCAL_WRITE_PERMISSION = 2;
 
 function parseForwardedPermission(headerValue: string | undefined): number | undefined {
   if (headerValue === undefined || headerValue === "") {
