@@ -606,7 +606,7 @@ runTest("task edit form only blocks while the task detail is loading", () => {
   );
 });
 
-runTest("task create validation requires observations before submit", () => {
+runTest("task create validation accepts blank observations before submit", () => {
   const validValues = {
     clientId: "client-1",
     projectId: "project-1",
@@ -619,8 +619,28 @@ runTest("task create validation requires observations before submit", () => {
   assert.equal(getTaskCreateValidationMessage(validValues), null);
   assert.equal(
     getTaskCreateValidationMessage({ ...validValues, observations: "   " }),
-    "Preencha as observações da tarefa.",
+    null,
   );
+});
+
+runTest("task create form marks observations as optional", () => {
+  const source = readFileSync("src/modules/integracao/components/TaskFormModal.tsx", "utf8");
+  const observationsField = source.match(
+    /<textarea\s+value=\{createValues\.observations\}[\s\S]*?\/>/,
+  )?.[0];
+
+  assert.ok(observationsField, "create observations textarea not found");
+  assert.doesNotMatch(observationsField, /\srequired(?:\s|>|$)/);
+});
+
+runTest("task create OpenAPI contract keeps observations optional", () => {
+  const source = readFileSync("../services/task-service/src/openapi/spec.ts", "utf8");
+  const createTaskRequired = source.match(
+    /const createTaskRequestBody = createObjectRequestBody\(\{[\s\S]*?required: \[([\s\S]*?)\]/,
+  )?.[1];
+
+  assert.ok(createTaskRequired, "create task required list not found");
+  assert.doesNotMatch(createTaskRequired, /"observations"/);
 });
 
 runTest("task model config uses clear empty and department fallback copy", () => {

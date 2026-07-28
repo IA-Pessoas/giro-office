@@ -699,7 +699,6 @@ export function TaskFormModal({
                 onChange={(event) => updateCreateValue("observations", event.target.value)}
                 className={`${PROJECT_INPUT_CLASSNAME} ${TASK_FORM_TEXTAREA_CLASSNAME}`}
                 placeholder="Detalhes de criação da tarefa."
-                required
               />
             </div>
           </label>
