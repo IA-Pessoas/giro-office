@@ -89,8 +89,14 @@ test("migration declara a mesma constraint 0..3 para cada módulo ativo", () => 
 });
 
 test("migration real transforma os níveis e permanece idempotente em PostgreSQL", {
-  skip: !process.env.PERMISSION_MIGRATION_DATABASE_URL,
+  skip:
+    !process.env.PERMISSION_MIGRATION_DATABASE_URL &&
+    process.env.PERMISSION_MIGRATION_REQUIRED !== "1",
 }, () => {
+  assert.ok(
+    process.env.PERMISSION_MIGRATION_DATABASE_URL,
+    "PERMISSION_MIGRATION_DATABASE_URL é obrigatória no modo de rollout",
+  );
   const schemaName = `permission_regression_${randomUUID().replaceAll("-", "")}`;
   const moduleColumns = ACTIVE_MODULE_KEYS.map((moduleKey) => `"${moduleKey}" INTEGER`).join(",\n");
   const moduleNames = ACTIVE_MODULE_KEYS.map((moduleKey) => `"${moduleKey}"`).join(", ");

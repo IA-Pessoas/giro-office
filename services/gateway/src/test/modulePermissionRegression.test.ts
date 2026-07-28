@@ -43,6 +43,16 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(level >= 1);
   });
 
+  it.each([1, 2, 3])("respeita o limiar modular %i em toda a matriz 0-3", (minPermission) => {
+    const observed = [0, 1, 2, 3].map((level) =>
+      canAccessRoute(authContext({ modules: { fiscal: level } }), {
+        modulePermission: { module: "fiscal", minPermission },
+      }),
+    );
+
+    expect(observed).toEqual([0, 1, 2, 3].map((level) => level >= minPermission));
+  });
+
   it("não usa permission global nem departamento como bypass modular", () => {
     const policy = requiredRoutePolicy("GET", "/client/list");
     expect(

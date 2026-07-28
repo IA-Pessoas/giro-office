@@ -6,6 +6,7 @@ import {
   getAccessStoreState,
   resetAccessStoreState,
   setAccessStoreState,
+  shouldSyncAccessStore,
 } from "../store/accessStore";
 import { useModuleAccessMap } from "./useModuleAccess";
 import { MODULE_KEYS } from "../utils/moduleAccess";
@@ -42,21 +43,7 @@ export function useAccessStoreSync() {
       return;
     }
 
-    const currentState = getAccessStoreState();
-    const shouldSync =
-      !currentState.isInitialized ||
-      currentState.user?.id !== nextState.user?.id ||
-      currentState.user?.permission !== nextState.user?.permission ||
-      currentState.user?.department_id !== nextState.user?.department_id ||
-      currentState.user?.organization_id !== nextState.user?.organization_id ||
-      currentState.user?.modules !== nextState.user?.modules ||
-      currentState.departmentName !== nextState.departmentName ||
-      currentState.departmentModule !== nextState.departmentModule ||
-      currentState.isLoading !== nextState.isLoading ||
-      currentState.error !== nextState.error ||
-      currentState.accessMap !== nextState.accessMap;
-
-    if (shouldSync) {
+    if (shouldSyncAccessStore(getAccessStoreState(), nextState)) {
       setAccessStoreState(nextState);
     }
   }, [nextState, user]);
