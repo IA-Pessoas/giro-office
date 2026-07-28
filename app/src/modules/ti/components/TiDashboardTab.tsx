@@ -160,9 +160,11 @@ export function TiDashboardTab() {
   const summary = dashboardQuery.data;
   const isLoading = dashboardQuery.isLoading || dashboardQuery.isFetching;
   const isEmpty = !summary || Object.keys(summary).length === 0;
+  const isSelfSummary = summary?.scope === "self";
   const openRequests = Number(summary?.openRequests ?? 0);
   const criticalRequests = Number(summary?.criticalRequests ?? 0);
   const resolvedLastSevenDays = Number(summary?.resolvedLastSevenDays ?? 0);
+  const closedRequests = Number(summary?.closedRequests ?? 0);
 
   if (isLoading) {
     return (
@@ -179,7 +181,7 @@ export function TiDashboardTab() {
       <DashboardStatePanel
         icon={AlertCircle}
         title="Não foi possível carregar"
-        description={dashboardQuery.error?.message ?? "Tente novamente."}
+        description="Não foi possível carregar seu resumo de chamados. Tente novamente."
       />
     );
   }
@@ -191,6 +193,45 @@ export function TiDashboardTab() {
         title="Nenhum indicador encontrado"
         description="Quando houver dados de Tecnologia, os principais sinais operacionais aparecem aqui."
       />
+    );
+  }
+
+  if (isSelfSummary) {
+    return (
+      <section className="space-y-5">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] xl:items-stretch">
+          <DashboardHeroCard
+            icon={ClipboardList}
+            label={openRequests > 0 ? "Meus chamados em acompanhamento" : "Meus chamados em dia"}
+            value={formatMetric(openRequests)}
+            description={
+              openRequests > 0
+                ? "Chamados que ainda exigem acompanhamento, retorno ou conclusão."
+                : "Nenhum chamado aberto no momento. Novas demandas passam a aparecer aqui."
+            }
+          />
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-1">
+            <MetricTile
+              icon={Ticket}
+              label="Críticos"
+              value={formatMetric(criticalRequests)}
+              supporting="Meus chamados em maior urgência"
+            />
+            <MetricTile
+              icon={BarChart3}
+              label="Resolvidos"
+              value={formatMetric(resolvedLastSevenDays)}
+              supporting="Nos últimos 7 dias"
+            />
+            <MetricTile
+              icon={ClipboardList}
+              label="Fechados"
+              value={formatMetric(closedRequests)}
+            />
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -241,6 +282,11 @@ export function TiDashboardTab() {
               icon={ClipboardList}
               label="Resolvidos em 7 dias"
               value={formatMetric(resolvedLastSevenDays)}
+            />
+            <DashboardSummaryRow
+              icon={ClipboardList}
+              label="Fechados"
+              value={formatMetric(closedRequests)}
             />
           </div>
         </DashboardSectionCard>
