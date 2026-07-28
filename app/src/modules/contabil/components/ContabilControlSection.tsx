@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, CheckSquare, Loader2, Lock } from "lucide-re
 
 import {
   useContabilControlBootstrapMutation,
+  useContabilControlDetail,
   usePatchContabilControlFieldMutation,
 } from "../hooks";
 import { getContabilErrorMessage } from "../services";
@@ -48,6 +49,8 @@ export function ContabilControlSection({
   const bootstrapMutation = useContabilControlBootstrapMutation();
   const patchMutation = usePatchContabilControlFieldMutation();
   const [competence, setCompetence] = useState(() => getCurrentContabilCompetence());
+  const detailQuery = useContabilControlDetail({ clientId, competence }, { enabled: !canEdit });
+  const remoteControl = canEdit ? bootstrapMutation.data : detailQuery.data;
   const [controlId, setControlId] = useState<string | null>(null);
   const [control, setControl] = useState<ContabilControl | null>(null);
   const [fieldStatuses, setFieldStatuses] = useState(() =>
@@ -75,6 +78,7 @@ export function ContabilControlSection({
   );
 
   const notesValue = control?.notes ?? "";
+  const isLoadingControl = canEdit ? bootstrapMutation.isPending : detailQuery.isFetching;
   const isAnyFieldSaving = useMemo(
     () => Object.values(fieldStatuses).some((status) => status === "saving"),
     [fieldStatuses],
@@ -85,12 +89,41 @@ export function ContabilControlSection({
       return;
     }
 
+    if (!canEdit) {
+      clearAllTimers();
+      setBootstrapError(null);
+      setControlId(null);
+      setControl(null);
+      setFieldStatuses(createContabilFieldStatusMap(CONTABIL_CONTROL_FIELDS));
+      confirmedControlRef.current = null;
+
+      return () => {
+        clearAllTimers();
+      };
+    }
+
     void bootstrapControl(clientId, competence);
 
     return () => {
       clearAllTimers();
     };
-  }, [clientId, competence]);
+  }, [clientId, competence, canEdit]);
+
+  useEffect(() => {
+    if (canEdit) {
+      return;
+    }
+
+    if (detailQuery.error) {
+      setBootstrapError(getContabilErrorMessage(detailQuery.error));
+      return;
+    }
+
+    setBootstrapError(null);
+    setControl(remoteControl ?? null);
+    setControlId(remoteControl?.id ?? null);
+    confirmedControlRef.current = remoteControl ?? null;
+  }, [canEdit, detailQuery.error, remoteControl]);
 
   useEffect(() => {
     return () => {
@@ -250,7 +283,7 @@ export function ContabilControlSection({
         </ContabilStateBox>
       ) : null}
 
-      {bootstrapMutation.isPending && !control ? (
+      {isLoadingControl && !control ? (
         <ContabilStateBox icon={Loader2} tone="loading" title="Carregando controle" compact>
           Estamos preparando o checklist mensal desta competência.
         </ContabilStateBox>
@@ -267,7 +300,7 @@ export function ContabilControlSection({
         </ContabilStateBox>
       ) : null}
 
-      {!bootstrapMutation.isPending && !bootstrapError && !control ? (
+      {!isLoadingControl && !bootstrapError && !control ? (
         <ContabilStateBox icon={AlertCircle} title="Controle indisponível" compact>
           O backend não retornou um controle válido para esta competência.
         </ContabilStateBox>
@@ -401,6 +434,3 @@ function FieldStatusBadge({ status }: { status: ContabilControlFieldSaveStatus }
     </span>
   );
 }
-
-
-
