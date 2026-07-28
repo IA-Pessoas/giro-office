@@ -2,6 +2,7 @@ import { createSuccessResponse, error as logError, parseWithZod } from "@workspa
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { requireRegularizeWritePermission } from "../middlewares/requireRegularizeWritePermission.js";
 import {
   addGuidanceActivityBodySchema,
   addGuidancePartnerBodySchema,
@@ -22,6 +23,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
   router.post(
     "/guidance",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(createGuidanceBodySchema, request.body);
@@ -41,6 +43,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
   router.put(
     "/guidance",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(updateGuidanceBodySchema, request.body);
@@ -90,6 +93,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
   router.post(
     "/guidance/activity/add",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(addGuidanceActivityBodySchema, request.body);
@@ -110,6 +114,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
   router.post(
     "/guidance/activity/remove",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(removeGuidanceActivityBodySchema, request.body);
@@ -130,6 +135,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
   router.post(
     "/guidance/partner/add",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(addGuidancePartnerBodySchema, request.body);
@@ -150,6 +156,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
   router.post(
     "/guidance/partner/remove",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(removeGuidancePartnerBodySchema, request.body);

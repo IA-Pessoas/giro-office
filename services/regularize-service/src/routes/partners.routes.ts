@@ -2,6 +2,7 @@ import { createSuccessResponse, error as logError, parseWithZod } from "@workspa
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { requireRegularizeWritePermission } from "../middlewares/requireRegularizeWritePermission.js";
 import {
   createPartnerBodySchema,
   listPartnersQuerySchema,
@@ -18,6 +19,7 @@ export function createPartnersRoutes(deps: RegularizeRouteDeps): Router {
   router.post(
     "/partners",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(createPartnerBodySchema, request.body);
@@ -37,6 +39,7 @@ export function createPartnersRoutes(deps: RegularizeRouteDeps): Router {
   router.put(
     "/partners",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(updatePartnerBodySchema, request.body);

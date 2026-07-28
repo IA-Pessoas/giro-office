@@ -7,6 +7,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { requireRegularizeWritePermission } from "../middlewares/requireRegularizeWritePermission.js";
 import {
   createPasswordBodySchema,
   createSitePasswordBodySchema,
@@ -35,6 +36,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
   router.post(
     "/passwords",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(createPasswordBodySchema, request.body);
@@ -54,6 +56,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
   router.put(
     "/passwords",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(updatePasswordBodySchema, request.body);
@@ -103,6 +106,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
   router.post(
     "/sites-pass",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(createSitePasswordBodySchema, request.body);
@@ -122,6 +126,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
   router.put(
     "/sites-pass",
     isAuthenticated,
+    requireRegularizeWritePermission,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(updateSitePasswordBodySchema, request.body);
