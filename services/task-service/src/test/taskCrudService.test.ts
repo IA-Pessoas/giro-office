@@ -444,6 +444,69 @@ describe("TaskCrudService", () => {
     );
   });
 
+  it("listTasks reutiliza o filtro de tarefas próprias nos totais", async () => {
+    prismaMock.task.findMany.mockResolvedValue([
+      {
+        id: "task-1",
+        name: "Tarefa própria",
+        responsible_id: "user-1",
+        responsible2_id: null,
+        responsible3_id: null,
+      },
+    ]);
+    prismaMock.task.count
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1);
+    const service = new TaskCrudService();
+
+    const result = await service.listTasks({
+      organization_id: "org-1",
+      user_id: "user-1",
+      status: "Todos",
+      ref: "",
+      ref_id: "",
+      search: "própria",
+      page: 1,
+      limit: 20,
+      integracaoLevel: 0,
+    });
+
+    const ownTaskWhere = {
+      organization_id: "org-1",
+      AND: [
+        { status: { in: ["Em Andamento", "A Realizar", "Em Espera"] } },
+        {
+          OR: [
+            { responsible_id: "user-1" },
+            { responsible2_id: "user-1" },
+            { responsible3_id: "user-1" },
+          ],
+        },
+        { OR: [{ name: { contains: "própria", mode: "insensitive" } }] },
+      ],
+    };
+
+    expect(result).toMatchObject({
+      total: 1,
+      summary: { inProgress: 1, billable: 1 },
+    });
+    expect(prismaMock.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: ownTaskWhere, skip: 0, take: 20 }),
+    );
+    expect(prismaMock.task.count).toHaveBeenNthCalledWith(1, { where: ownTaskWhere });
+    expect(prismaMock.task.count).toHaveBeenNthCalledWith(2, {
+      where: {
+        AND: [ownTaskWhere, { status: { contains: "andamento", mode: "insensitive" } }],
+      },
+    });
+    expect(prismaMock.task.count).toHaveBeenNthCalledWith(3, {
+      where: {
+        AND: [ownTaskWhere, { NOT: { billing: { contains: "não", mode: "insensitive" } } }],
+      },
+    });
+  });
+
   it.each([
     "responsible_id",
     "responsible2_id",
