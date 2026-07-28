@@ -26,6 +26,7 @@ import {
 export function ProjectDetailView({ projectId }: { projectId: string }) {
   const router = useRouter();
   const { access: integracaoAccess } = useModuleAccess("integracao");
+  const canEdit = integracaoAccess.canEdit;
   const projectQuery = useProjectDetail(projectId);
   const deleteProjectMutation = useDeleteProjectMutation();
   const recalculateProgressMutation = useRecalculateProjectProgressMutation();
@@ -86,7 +87,9 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
 
   if (projectQuery.isLoading) {
     return (
-      <section className={`${PROJECT_PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
+      <section
+        className={`${PROJECT_PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}
+      >
         Carregando projeto...
       </section>
     );
@@ -94,7 +97,9 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
 
   if (projectQuery.isError || !project) {
     return (
-      <section className={`${PROJECT_PANEL_CLASSNAME} p-6 text-sm text-rose-600 dark:text-rose-300`}>
+      <section
+        className={`${PROJECT_PANEL_CLASSNAME} p-6 text-sm text-rose-600 dark:text-rose-300`}
+      >
         Não foi possível carregar o detalhe do projeto.
       </section>
     );
@@ -102,12 +107,14 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
-      <ProjectFormModal
-        open={isEditModalOpen}
-        onOpenChange={setIsEditModalOpen}
-        clientId={project.client_id}
-        projectId={project.id}
-      />
+      {canEdit ? (
+        <ProjectFormModal
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          clientId={project.client_id}
+          projectId={project.id}
+        />
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-2">
@@ -161,7 +168,9 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
               <ListTodo className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Tarefas vinculadas</h2>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                Tarefas vinculadas
+              </h2>
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 Leitura apenas nesta primeira versão.
               </p>
@@ -201,36 +210,44 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
               ))}
             </div>
           ) : (
-            <div className={`${PROJECT_SUBPANEL_CLASSNAME} p-5 text-sm text-slate-500 dark:text-slate-400`}>
+            <div
+              className={`${PROJECT_SUBPANEL_CLASSNAME} p-5 text-sm text-slate-500 dark:text-slate-400`}
+            >
               Nenhuma tarefa retornada para este projeto.
             </div>
           )}
         </section>
 
         <aside className={`${PROJECT_PANEL_CLASSNAME} p-6`}>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Progresso e ações</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+            Progresso e ações
+          </h2>
           <div className="mt-5 space-y-4">
             <ProjectProgressBar progress={project.porcentage} />
 
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-              <button
-                type="button"
-                onClick={() => void handleRecalculate()}
-                className={PROJECT_COMPACT_PRIMARY_BUTTON_CLASSNAME}
-                disabled={recalculateProgressMutation.isPending}
-              >
-                <FolderSync className="h-3.5 w-3.5" />
-                {recalculateProgressMutation.isPending ? "Recalculando..." : "Recalcular"}
-              </button>
+              {canEdit ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void handleRecalculate()}
+                    className={PROJECT_COMPACT_PRIMARY_BUTTON_CLASSNAME}
+                    disabled={recalculateProgressMutation.isPending}
+                  >
+                    <FolderSync className="h-3.5 w-3.5" />
+                    {recalculateProgressMutation.isPending ? "Recalculando..." : "Recalcular"}
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setIsEditModalOpen(true)}
-                className={PROJECT_COMPACT_BUTTON_CLASSNAME}
-              >
-                <Edit3 className="h-3.5 w-3.5" />
-                Editar
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className={PROJECT_COMPACT_BUTTON_CLASSNAME}
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                    Editar
+                  </button>
+                </>
+              ) : null}
 
               {integracaoAccess.isAdmin ? (
                 <button

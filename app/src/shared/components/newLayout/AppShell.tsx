@@ -31,11 +31,14 @@ import {
 
 import {
   APP_ROUTE_MODULE_MAP,
+  canViewIntegrationRoute,
   MODULE_KEYS,
+  getModulePermissionLevel,
   canAccessAdministration,
   canCreateOrganizationOwner,
   useModuleAccessMap,
   type ModuleKey,
+  type ModulePermissionSubject,
 } from "@modules/auth";
 import { useMe } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
@@ -64,16 +67,8 @@ function Logo({ showText }: { showText: boolean }) {
         className="flex-shrink-0"
       >
         <path d="M16 4L26 10V22L16 28L6 22V10L16 4Z" fill="#3b82f6" opacity="0.9" />
-        <path
-          d="M16 4L26 10L16 16L16 28L26 22V10L16 4Z"
-          fill="#60a5fa"
-          opacity="0.7"
-        />
-        <path
-          d="M16 4L6 10L16 16L16 28L6 22V10L16 4Z"
-          fill="#2563eb"
-          opacity="0.5"
-        />
+        <path d="M16 4L26 10L16 16L16 28L26 22V10L16 4Z" fill="#60a5fa" opacity="0.7" />
+        <path d="M16 4L6 10L16 16L16 28L6 22V10L16 4Z" fill="#2563eb" opacity="0.5" />
         <path
           d="M16 4L26 10M16 4L6 10M16 28L26 22M16 28L6 22M26 10V22M6 10V22M16 16V28"
           stroke="#1e40af"
@@ -121,12 +116,27 @@ const moduleCategories: NavigationCategory[] = [
     name: "Módulos",
     isModuleAccessCategory: true,
     modules: [
-      { path: "/certificados", name: "Certificados", icon: FileCheck, moduleKey: "certificado" as ModuleKey },
-      { path: "/regularize", name: "Regularize", icon: ShieldCheck, moduleKey: "regularize" as ModuleKey },
+      {
+        path: "/certificados",
+        name: "Certificados",
+        icon: FileCheck,
+        moduleKey: "certificado" as ModuleKey,
+      },
+      {
+        path: "/regularize",
+        name: "Regularize",
+        icon: ShieldCheck,
+        moduleKey: "regularize" as ModuleKey,
+      },
       { path: "/fiscal", name: "Fiscal", icon: Receipt, moduleKey: "fiscal" as ModuleKey },
       { path: "/contabil", name: "Contábil", icon: Calculator },
       { path: "/rh", name: "RH", icon: Users, moduleKey: "rh" as ModuleKey },
-      { path: "/departamento-pessoal", name: "Dep. Pessoal", icon: UserRoundCog, moduleKey: "pessoal" as ModuleKey },
+      {
+        path: "/departamento-pessoal",
+        name: "Dep. Pessoal",
+        icon: UserRoundCog,
+        moduleKey: "pessoal" as ModuleKey,
+      },
       { path: "/tecnologia", name: "Tecnologia", icon: Code, moduleKey: "ti" as ModuleKey },
     ],
   },
@@ -199,6 +209,17 @@ function getModuleKeyFromRoutePath(routePath: string): ModuleKey | null {
   return null;
 }
 
+function getNavigationModuleName(
+  module: NavigationModule,
+  accessUser: ModulePermissionSubject,
+): string {
+  if (module.path === "/tasks" && getModulePermissionLevel(accessUser, "integracao") === 0) {
+    return "Minhas tarefas";
+  }
+
+  return module.name;
+}
+
 function ModuleAccessDeniedState() {
   return (
     <section className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center">
@@ -253,9 +274,7 @@ function ModuleNavLoadingItem({ showText }: { showText: boolean }) {
       title={!showText ? MODULE_NAV_LOADING_MESSAGE : undefined}
     >
       <Loader2 aria-hidden="true" className="h-5 w-5 flex-shrink-0 animate-spin" />
-      {showText ? (
-        <span className="text-sm font-medium">{MODULE_NAV_LOADING_MESSAGE}</span>
-      ) : null}
+      {showText ? <span className="text-sm font-medium">{MODULE_NAV_LOADING_MESSAGE}</span> : null}
     </div>
   );
 }
@@ -285,8 +304,11 @@ export function AppShell({
   const router = useRouter();
   const { user, logoutUser } = useAuth();
   const meQuery = useMe();
-  const { accessMap: moduleAccessMap, isLoading: isModuleAccessLoading } =
-    useModuleAccessMap(MODULE_KEYS);
+  const {
+    accessMap: moduleAccessMap,
+    isLoading: isModuleAccessLoading,
+    user: moduleAccessUser,
+  } = useModuleAccessMap(MODULE_KEYS);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -314,15 +336,16 @@ export function AppShell({
   const rhAccess = moduleAccessMap.rh;
   const canManageOrganization = canCreateOrganizationOwner(accessUser);
   const canManageUsers = canAccessAdministration(accessUser, { rhAccess });
-  const isAdministrationAccessLoading =
-    !canManageOrganization && isModuleAccessLoading;
+  const isAdministrationAccessLoading = !canManageOrganization && isModuleAccessLoading;
   const currentModuleKey = getModuleKeyFromRoutePath(pathname);
   const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
   const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;
+  const canViewCurrentModuleRoute =
+    currentModuleKey === "integracao"
+      ? canViewIntegrationRoute(pathname, moduleAccessUser)
+      : currentModuleAccess?.canView === true;
   const shouldRenderModuleAccessDenied =
-    Boolean(currentModuleKey) &&
-    !isModuleAccessLoading &&
-    currentModuleAccess?.canView === false;
+    Boolean(currentModuleKey) && !isModuleAccessLoading && !canViewCurrentModuleRoute;
 
   const canViewModuleFromPath = (modulePath: string): boolean => {
     if (modulePath === "/departments") {
@@ -347,6 +370,10 @@ export function AppShell({
       return true;
     }
 
+    if (moduleKey === "integracao") {
+      return canViewIntegrationRoute(modulePath, moduleAccessUser);
+    }
+
     const moduleAccess = moduleAccessMap[moduleKey];
     return Boolean(moduleAccess?.canView);
   };
@@ -363,19 +390,7 @@ export function AppShell({
       return {
         ...category,
         modules: category.modules.filter((module) => {
-          const moduleKey =
-            ("moduleKey" in module ? module.moduleKey : undefined) ??
-            APP_ROUTE_MODULE_MAP[module.path];
-          if (!moduleKey) {
-            return canViewModuleFromPath(module.path);
-          }
-
-          const moduleAccess = moduleAccessMap[moduleKey];
-          if (isModuleAccessLoading) {
-            return true;
-          }
-
-          return moduleAccess?.canView ?? false;
+          return canViewModuleFromPath(module.path);
         }),
       };
     })
@@ -384,11 +399,13 @@ export function AppShell({
         category.modules.length > 0 ||
         (category.isModuleAccessCategory === true && isModuleAccessLoading),
     );
-  const mainContent = shouldRenderModuleAccessLoading
-    ? <ModuleAccessLoadingState />
-    : shouldRenderModuleAccessDenied
-      ? <ModuleAccessDeniedState />
-      : children;
+  const mainContent = shouldRenderModuleAccessLoading ? (
+    <ModuleAccessLoadingState />
+  ) : shouldRenderModuleAccessDenied ? (
+    <ModuleAccessDeniedState />
+  ) : (
+    children
+  );
 
   useEffect(() => {
     setHasUserPhotoLoadError(false);
@@ -497,7 +514,10 @@ export function AppShell({
     if (!showAiChat) {
       return;
     }
-    chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
+    chatScrollRef.current?.scrollTo({
+      top: chatScrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [chatMessages, showAiChat]);
 
   if (isIframeView) {
@@ -577,7 +597,9 @@ export function AppShell({
                         >
                           <Icon className="w-5 h-5 flex-shrink-0" />
                           {isSidebarOpen ? (
-                            <span className="text-sm font-medium">{module.name}</span>
+                            <span className="text-sm font-medium">
+                              {getNavigationModuleName(module, moduleAccessUser)}
+                            </span>
                           ) : null}
                         </Link>
                       );
@@ -590,7 +612,9 @@ export function AppShell({
         </nav>
       </aside>
 
-      <div className={`flex flex-col min-h-screen transition-all duration-300 ${isSidebarOpen ? "lg:ml-64" : "lg:ml-20"}`}>
+      <div
+        className={`flex flex-col min-h-screen transition-all duration-300 ${isSidebarOpen ? "lg:ml-64" : "lg:ml-20"}`}
+      >
         <header className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 py-3 sticky top-0 z-40">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 max-w-2xl">
@@ -652,7 +676,9 @@ export function AppShell({
                     className="absolute right-6 top-16 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
                   >
                     <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notificações</h3>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        Notificações
+                      </h3>
                     </div>
                     <div className="max-h-96 overflow-y-auto">
                       {notifications.length > 0 ? (
@@ -667,8 +693,12 @@ export function AppShell({
                                 className={`mt-1 h-2 w-2 rounded-full ${item.unread ? "bg-red-500" : "bg-gray-300 dark:bg-gray-600"}`}
                               />
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">{item.title}</p>
-                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{item.description}</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {item.title}
+                                </p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                  {item.description}
+                                </p>
                               </div>
                               <span className="text-[11px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
                                 {item.time}
@@ -706,7 +736,9 @@ export function AppShell({
                         onError={() => setHasUserPhotoLoadError(true)}
                       />
                     ) : (
-                      <span className="text-xs font-semibold text-white">{displayUserInitials}</span>
+                      <span className="text-xs font-semibold text-white">
+                        {displayUserInitials}
+                      </span>
                     )}
                   </div>
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300 hidden md:block">
@@ -731,7 +763,9 @@ export function AppShell({
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
                           {displayUserName}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{displayUserLogin}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {displayUserLogin}
+                        </p>
                       </div>
                       <Link
                         href="/configuracoes"
@@ -760,9 +794,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
-          {mainContent}
-        </main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8">{mainContent}</main>
       </div>
 
       <DialogPrimitive.Root open={showAiChat} onOpenChange={setShowAiChat}>
@@ -786,10 +818,7 @@ export function AppShell({
                 <DialogPrimitive.Title className="text-sm font-semibold text-gray-900 dark:text-white">
                   Assistente IA
                 </DialogPrimitive.Title>
-                <DialogPrimitive.Description
-                  id={AI_CHAT_DIALOG_DESCRIPTION_ID}
-                  className="sr-only"
-                >
+                <DialogPrimitive.Description id={AI_CHAT_DIALOG_DESCRIPTION_ID} className="sr-only">
                   Chat do Assistente IA com histórico de mensagens e campo de texto para envio.
                 </DialogPrimitive.Description>
               </div>
@@ -804,7 +833,10 @@ export function AppShell({
               </DialogPrimitive.Close>
             </div>
 
-            <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-slate-950/40">
+            <div
+              ref={chatScrollRef}
+              className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-slate-950/40"
+            >
               {chatMessages.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-center">
                   <p className="text-sm text-gray-600 dark:text-slate-400">
@@ -827,7 +859,9 @@ export function AppShell({
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
                       <p
                         className={`text-[11px] mt-1 ${
-                          message.sender === "user" ? "text-blue-100" : "text-gray-500 dark:text-slate-400"
+                          message.sender === "user"
+                            ? "text-blue-100"
+                            : "text-gray-500 dark:text-slate-400"
                         }`}
                       >
                         {message.time}

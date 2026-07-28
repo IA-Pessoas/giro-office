@@ -100,7 +100,7 @@ export function ClientProjectsSection({
           <p className="text-sm text-slate-600 dark:text-slate-400">{description}</p>
         </div>
 
-        {showCreateButton ? (
+        {showCreateButton && integracaoAccess.canEdit ? (
           <button
             type="button"
             onClick={() => setIsCreateModalOpen(true)}
@@ -121,6 +121,7 @@ export function ClientProjectsSection({
         onEdit={(project) => setEditingProjectId(project.id)}
         onDelete={handleDelete}
         onRecalculateProgress={handleRecalculate}
+        canEdit={integracaoAccess.canEdit}
         canDelete={integracaoAccess.isAdmin}
         actionsDisabled={deleteProjectMutation.isPending || recalculateProgressMutation.isPending}
       />

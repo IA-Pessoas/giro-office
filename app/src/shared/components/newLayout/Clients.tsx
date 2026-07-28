@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Building2, ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 
+import { useModuleAccess } from "@modules/auth";
 import { ClientCreateModal } from "@modules/clients/components/ClientCreateModal";
 import { useClients } from "@modules/clients/hooks/useClients";
 import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
@@ -48,6 +49,8 @@ function formatCpfCnpj(value: string): string {
 }
 
 export function Clients() {
+  const { access: integracaoAccess } = useModuleAccess("integracao");
+  const canCreateClient = integracaoAccess.canEdit;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -102,10 +105,9 @@ export function Clients() {
 
   return (
     <div className="space-y-6">
-      <ClientCreateModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-      />
+      {canCreateClient ? (
+        <ClientCreateModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+      ) : null}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -121,31 +123,33 @@ export function Clients() {
         </div>
 
         <div className="flex flex-wrap justify-end gap-3">
-          <Link
-            href="/clients/integration/new"
-            className={`inline-flex w-fit items-center gap-2 rounded-xl px-4 py-2.5 text-white ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
-          >
-            <Plus className="h-5 w-5" />
-            Nova integração
-          </Link>
+          {canCreateClient ? (
+            <>
+              <Link
+                href="/clients/integration/new"
+                className={`inline-flex w-fit items-center gap-2 rounded-xl px-4 py-2.5 text-white ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
+              >
+                <Plus className="h-5 w-5" />
+                Nova integração
+              </Link>
 
-          <button
-            type="button"
-            onClick={() => setIsCreateModalOpen(true)}
-            className={`self-end lg:self-auto w-fit flex items-center gap-2 rounded-xl px-4 py-2.5 text-white ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
-          >
-            <Plus className="h-5 w-5" />
-            Novo cliente
-          </button>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(true)}
+                className={`self-end lg:self-auto w-fit flex items-center gap-2 rounded-xl px-4 py-2.5 text-white ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
+              >
+                <Plus className="h-5 w-5" />
+                Novo cliente
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_180px]">
         <div className={`${CLIENTS_SUBPANEL_CLASSNAME} p-4`}>
           <label className="space-y-2">
-            <span className="block text-sm font-medium text-slate-700 dark:text-white">
-              Busca
-            </span>
+            <span className="block text-sm font-medium text-slate-700 dark:text-white">Busca</span>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -164,9 +168,7 @@ export function Clients() {
 
         <div className={`${CLIENTS_SUBPANEL_CLASSNAME} p-4`}>
           <label className="space-y-2">
-            <span className="block text-sm font-medium text-slate-700 dark:text-white">
-              Status
-            </span>
+            <span className="block text-sm font-medium text-slate-700 dark:text-white">Status</span>
             <select
               value={status}
               onChange={(event) => {
@@ -227,12 +229,19 @@ export function Clients() {
                   const uiStatus = mapClientStatusFromApi(client.status);
 
                   return (
-                    <tr key={client.id} className="border-b border-slate-200/80 last:border-b-0 dark:border-slate-800">
+                    <tr
+                      key={client.id}
+                      className="border-b border-slate-200/80 last:border-b-0 dark:border-slate-800"
+                    >
                       <td className="px-6 py-4">
                         <div>
-                          <p className="font-medium text-slate-900 dark:text-white">{client.name}</p>
+                          <p className="font-medium text-slate-900 dark:text-white">
+                            {client.name}
+                          </p>
                           {client.company_name ? (
-                            <p className="text-sm text-slate-500 dark:text-slate-400">{client.company_name}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                              {client.company_name}
+                            </p>
                           ) : null}
                         </div>
                       </td>
