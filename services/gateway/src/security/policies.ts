@@ -1,19 +1,27 @@
 import type { AuthPolicy } from "@workspace/shared";
 
 const userManagementPolicy: AuthPolicy = { special: "manageUsers" };
-const moduleAccessPermission = 1;
+const moduleReadPermission = 1;
+const moduleWritePermission = 2;
 
 const rhModulePolicy: AuthPolicy = {
   modulePermission: {
     module: "rh",
-    minPermission: moduleAccessPermission,
+    minPermission: moduleReadPermission,
   },
 };
 
 const pessoalModulePolicy: AuthPolicy = {
   modulePermission: {
     module: "pessoal",
-    minPermission: moduleAccessPermission,
+    minPermission: moduleReadPermission,
+  },
+};
+
+const regularizeModulePolicy: AuthPolicy = {
+  modulePermission: {
+    module: "regularize",
+    minPermission: moduleReadPermission,
   },
 };
 
@@ -27,10 +35,17 @@ const clientRelatedModules = [
   "regularize",
 ] as const;
 
-const clientModulePolicy: AuthPolicy = {
+const clientModuleReadPolicy: AuthPolicy = {
   anyModulePermission: {
     modules: [...clientRelatedModules],
-    minPermission: moduleAccessPermission,
+    minPermission: moduleReadPermission,
+  },
+};
+
+const clientModuleWritePolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: [...clientRelatedModules],
+    minPermission: moduleWritePermission,
   },
 };
 
@@ -44,7 +59,9 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
-  { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
+  { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModuleReadPolicy },
+  { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModuleWritePolicy },
+  { method: "ANY", path: /^\/regularize(?:\/|$)/, policy: regularizeModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },

@@ -2866,6 +2866,114 @@ it("allows limited users with client-related module permission to proxy /client"
   }
 });
 
+it("blocks users without Regularize module permission before proxying /regularize", async () => {
+  const token = createToken({
+    user_id: "regularize-without-access",
+    organization_id: "org-1",
+    permission: 0,
+    modules: { regularize: 0 },
+  });
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const regularizeServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ regularizeServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/regularize/smoke`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(403);
+    expect(body.code).toBe("FORBIDDEN");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("blocks Regularize viewers from mutating /client", async () => {
+  const token = createToken({
+    user_id: "regularize-viewer",
+    organization_id: "org-1",
+    permission: 0,
+    modules: { regularize: 1 },
+  });
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(403);
+    expect(body.code).toBe("FORBIDDEN");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("allows Regularize module editors to update client regularize data", async () => {
+  const token = createToken({
+    user_id: "regularize-editor",
+    organization_id: "org-1",
+    permission: 0,
+    modules: { regularize: 2 },
+  });
+  let seenMethod = "";
+  let seenUrl = "";
+  let upstreamHits = 0;
+  const upstream = createServer((request, response) => {
+    upstreamHits += 1;
+    seenMethod = request.method ?? "";
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/client-1/regularize`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenMethod).toBe("PATCH");
+    expect(seenUrl).toBe("/client/client-1/regularize");
+    expect(upstreamHits).toBe(1);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("proxies /rh to the rh microservice", async () => {
   const token = createToken({
     user_id: "user-1",
