@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
   parseWithZod,
   requireAuthenticatedRequestContext,
   ServiceError,
@@ -10,9 +11,7 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { taskModelListQuerySchema } from "../schemas/taskModelList.schemas.js";
-import {
-  parseTaskModelResponsibleSequence,
-} from "../schemas/taskModelResponsibleSequence.schemas.js";
+import { parseTaskModelResponsibleSequence } from "../schemas/taskModelResponsibleSequence.schemas.js";
 import { TaskModelService } from "../services/taskModelService.js";
 
 const router: ReturnType<typeof Router> = Router();
@@ -57,6 +56,8 @@ router.post("/model", isAuthenticated, async (req: Request, res: Response, next:
       billing,
       prevision: Number(prevision),
       type: type ?? null,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.status(201).json(createSuccessResponse(result));
@@ -75,7 +76,11 @@ router.get("/model", isAuthenticated, async (req: Request, res: Response, next: 
       throw new ServiceError(400, "task_id Ã© obrigatÃ³rio (body ou query).");
     }
 
-    const result = await taskModelService.detailModel(task_id, organization_id);
+    const result = await taskModelService.detailModel(task_id, organization_id, {
+      userId: req.user_id,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
+    });
     res.json(createSuccessResponse(result));
   } catch (err) {
     logError("Erro ao buscar task model", { err });
@@ -131,6 +136,8 @@ router.put("/model", isAuthenticated, async (req: Request, res: Response, next: 
       billing,
       prevision: Number(prevision),
       type: type ?? null,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.json(createSuccessResponse(result));
@@ -154,7 +161,10 @@ router.get(
       });
       const result = await taskModelService.listModel({
         organizationId: organization_id,
+        userId: req.user_id,
         paginationRequested,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
         ...query,
       });
 
@@ -182,6 +192,8 @@ router.delete(
         task_id,
         user_id,
         organization_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
       });
 
       res.json(createSuccessResponse(result));

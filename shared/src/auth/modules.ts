@@ -1,3 +1,5 @@
+import { error as logError } from "../logger/index.js";
+
 export const ACTIVE_MODULE_KEYS = [
   "certificado",
   "comercial",
@@ -36,4 +38,21 @@ export function normalizeModulePermissions(value: unknown): ModulePermissions {
   }
 
   return modules;
+}
+
+export function parseModulePermissions(value: string | undefined): ModulePermissions | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return undefined;
+    }
+    return normalizeModulePermissions(parsed);
+  } catch (err: unknown) {
+    logError("Erro ao interpretar permissões modulares encaminhadas", { err });
+    return undefined;
+  }
 }

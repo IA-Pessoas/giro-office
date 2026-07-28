@@ -28,7 +28,11 @@ describe("task dependent routes", () => {
     const res = await request(app).get("/task/model/dependent").query({ task_model_id: "model-1" });
 
     expect(res.status).toBe(200);
-    expect(taskDependentServiceMock.listDependents).toHaveBeenCalledWith("model-1", "org-1");
+    expect(taskDependentServiceMock.listDependents).toHaveBeenCalledWith("model-1", "org-1", {
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
+    });
   });
 
   it("DELETE /task/model/dependent remove dependente", async () => {

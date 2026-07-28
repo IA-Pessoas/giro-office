@@ -129,11 +129,12 @@ function buildPAPrismaMock() {
   } as unknown as PrismaClient;
 }
 
-function bearerToken(organizationId: string, permission?: number): string {
+function bearerToken(organizationId: string, permission?: number, integracao = 1): string {
   return jwt.sign(
     {
       user_id: "user-test-1",
       organization_id: organizationId,
+      modules: { integracao },
       ...(permission !== undefined ? { permission } : {}),
     },
     TEST_JWT_SECRET,
@@ -242,13 +243,17 @@ describe("client-service", () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data).toEqual(page);
-    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, {
-      ref: undefined,
-      status: undefined,
-      page: 1,
-      pageSize: 20,
-      search: undefined,
-    });
+    expect(mock.listByOrganization).toHaveBeenCalledWith(
+      TEST_ORG_ID,
+      {
+        ref: undefined,
+        status: undefined,
+        page: 1,
+        pageSize: 20,
+        search: undefined,
+      },
+      { userId: "user-test-1", level: 1, isOwner: false },
+    );
   });
 
   it("GET /client/commercial/overview returns overview scoped to authenticated organization", async () => {
@@ -301,13 +306,17 @@ describe("client-service", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, {
-      ref: undefined,
-      status: "Ativo",
-      page: 1,
-      pageSize: 20,
-      search: undefined,
-    });
+    expect(mock.listByOrganization).toHaveBeenCalledWith(
+      TEST_ORG_ID,
+      {
+        ref: undefined,
+        status: "Ativo",
+        page: 1,
+        pageSize: 20,
+        search: undefined,
+      },
+      { userId: "user-test-1", level: 1, isOwner: false },
+    );
   });
 
   it("GET /client maps Prospect to Prospecção for list filter", async () => {
@@ -325,13 +334,17 @@ describe("client-service", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, {
-      ref: undefined,
-      status: "Prospect",
-      page: 1,
-      pageSize: 20,
-      search: undefined,
-    });
+    expect(mock.listByOrganization).toHaveBeenCalledWith(
+      TEST_ORG_ID,
+      {
+        ref: undefined,
+        status: "Prospect",
+        page: 1,
+        pageSize: 20,
+        search: undefined,
+      },
+      { userId: "user-test-1", level: 1, isOwner: false },
+    );
   });
 
   it("GET /client/list passes page, limit and search to service", async () => {
@@ -349,13 +362,17 @@ describe("client-service", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(mock.listByOrganization).toHaveBeenCalledWith(TEST_ORG_ID, {
-      ref: undefined,
-      status: undefined,
-      page: 2,
-      pageSize: 10,
-      search: "  acme  ",
-    });
+    expect(mock.listByOrganization).toHaveBeenCalledWith(
+      TEST_ORG_ID,
+      {
+        ref: undefined,
+        status: undefined,
+        page: 2,
+        pageSize: 10,
+        search: "  acme  ",
+      },
+      { userId: "user-test-1", level: 1, isOwner: false },
+    );
   });
 
   it("GET /client/list returns 400 for invalid status query", async () => {
@@ -386,7 +403,7 @@ describe("client-service", () => {
       create: vi.fn().mockResolvedValue(created),
     };
     const app = buildTestApp(mock);
-    const token = bearerToken(TEST_ORG_ID);
+    const token = bearerToken(TEST_ORG_ID, undefined, 2);
 
     const res = await request(app).post("/client").set("Authorization", `Bearer ${token}`).send({
       organization_id: TEST_ORG_ID,
@@ -405,6 +422,7 @@ describe("client-service", () => {
         status: "Ativo",
         service_unique: true,
       }),
+      { userId: "user-test-1", level: 2, isOwner: false },
     );
   });
 
@@ -419,7 +437,7 @@ describe("client-service", () => {
       update: vi.fn().mockResolvedValue(updated),
     };
     const app = buildTestApp(mock);
-    const token = bearerToken(TEST_ORG_ID);
+    const token = bearerToken(TEST_ORG_ID, undefined, 2);
 
     const res = await request(app)
       .patch(`/client/${TEST_CLIENT_ID}`)
@@ -437,11 +455,15 @@ describe("client-service", () => {
         cpf_cnpj: "12345678000199",
         company_name: "ACME",
       }),
+      { userId: "user-test-1", level: 2, isOwner: false },
     );
   });
 
   it("DELETE /client/:id devolve 403 sem permission=2 no token", async () => {
-    const mock: IClientService = { ...mockServiceBase() };
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      deactivate: vi.fn().mockRejectedValue(new ServiceError(403, "Acesso negado.")),
+    };
     const app = buildTestApp(mock);
     const token = bearerToken(TEST_ORG_ID);
 
@@ -450,7 +472,11 @@ describe("client-service", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(403);
-    expect(mock.deactivate).not.toHaveBeenCalled();
+    expect(mock.deactivate).toHaveBeenCalledWith(TEST_CLIENT_ID, TEST_ORG_ID, {
+      userId: "user-test-1",
+      level: 1,
+      isOwner: false,
+    });
   });
 
   it("DELETE /client/:id desativa via service e devolve envelope", async () => {
@@ -463,7 +489,7 @@ describe("client-service", () => {
       deactivate: vi.fn().mockResolvedValue(deactivated),
     };
     const app = buildTestApp(mock);
-    const token = bearerToken(TEST_ORG_ID, 2);
+    const token = bearerToken(TEST_ORG_ID, 2, 3);
 
     const res = await request(app)
       .delete(`/client/${TEST_CLIENT_ID}`)
@@ -472,7 +498,11 @@ describe("client-service", () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data).toEqual(deactivated);
-    expect(mock.deactivate).toHaveBeenCalledWith(TEST_CLIENT_ID, TEST_ORG_ID);
+    expect(mock.deactivate).toHaveBeenCalledWith(TEST_CLIENT_ID, TEST_ORG_ID, {
+      userId: "user-test-1",
+      level: 3,
+      isOwner: false,
+    });
   });
 
   it("DELETE /client/:id aceita superadmin permission=999", async () => {
@@ -485,14 +515,27 @@ describe("client-service", () => {
       deactivate: vi.fn().mockResolvedValue(deactivated),
     };
     const app = buildTestApp(mock);
-    const token = bearerToken(TEST_ORG_ID, 999);
+    const token = jwt.sign(
+      {
+        user_id: "user-test-1",
+        organization_id: TEST_ORG_ID,
+        permission: 999,
+        type: "owner",
+        modules: { integracao: 0 },
+      },
+      TEST_JWT_SECRET,
+    );
 
     const res = await request(app)
       .delete(`/client/${TEST_CLIENT_ID}`)
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(mock.deactivate).toHaveBeenCalledWith(TEST_CLIENT_ID, TEST_ORG_ID);
+    expect(mock.deactivate).toHaveBeenCalledWith(TEST_CLIENT_ID, TEST_ORG_ID, {
+      userId: "user-test-1",
+      level: 0,
+      isOwner: true,
+    });
   });
 
   it("POST /client/:id/activate reativa via service e devolve envelope", async () => {
@@ -502,7 +545,7 @@ describe("client-service", () => {
       activate: vi.fn().mockResolvedValue(activated),
     };
     const app = buildTestApp(mock);
-    const token = bearerToken(TEST_ORG_ID);
+    const token = bearerToken(TEST_ORG_ID, undefined, 3);
 
     const res = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/activate`)
@@ -511,7 +554,11 @@ describe("client-service", () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data).toEqual(activated);
-    expect(mock.activate).toHaveBeenCalledWith(TEST_CLIENT_ID, TEST_ORG_ID);
+    expect(mock.activate).toHaveBeenCalledWith(TEST_CLIENT_ID, TEST_ORG_ID, {
+      userId: "user-test-1",
+      level: 3,
+      isOwner: false,
+    });
   });
 
   it("POST /client returns 400 when service rejects unknown organization", async () => {
@@ -567,6 +614,7 @@ describe("client-service", () => {
     expect(res.status).toBe(201);
     expect(mock.create).toHaveBeenCalledWith(
       expect.objectContaining({ organization_id: TEST_ORG_ID }),
+      { userId: "user-test-1", level: 1, isOwner: false },
     );
   });
 
@@ -814,16 +862,19 @@ describe("ClientService", () => {
     const missingOrgId = "880e8400-e29b-41d4-a716-446655440099";
 
     await expect(
-      service.create({
-        name: "X",
-        organization_id: missingOrgId,
-        status: "Ativo",
-        cpf_cnpj: "",
-        prospecting_status: "Lead",
-        type: "PJ",
-        type_registration: "Novo",
-        service_unique: false,
-      }),
+      service.create(
+        {
+          name: "X",
+          organization_id: missingOrgId,
+          status: "Ativo",
+          cpf_cnpj: "",
+          prospecting_status: "Lead",
+          type: "PJ",
+          type_registration: "Novo",
+          service_unique: false,
+        },
+        { userId: "user-1", level: 2, isOwner: false },
+      ),
     ).rejects.toMatchObject({
       statusCode: 400,
       message: "Organização não encontrada.",

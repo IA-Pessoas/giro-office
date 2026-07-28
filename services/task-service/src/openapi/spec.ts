@@ -321,7 +321,9 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       title: "task-service",
       version: "1.0.0",
       description:
-        "Tarefas, modelos, integracao Regularize, financeiro e comercial. Endpoints marcados exigem JWT.",
+        "Tarefas, modelos, integracao Regularize, financeiro e comercial. Endpoints marcados exigem JWT. " +
+        "modules.integracao aplica tarefas próprias nos níveis 0–1, leitura organizacional a partir de 1, " +
+        "criação/edição a partir de 2 e administração/exclusão a partir de 3; modelos são consultáveis a partir de 2.",
     },
     servers: [{ url: baseUrl }],
     tags: [

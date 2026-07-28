@@ -51,10 +51,14 @@ describe("ClientService.listByOrganization", () => {
     } as unknown as PrismaClient;
     const service = new ClientService(prisma);
 
-    await service.listByOrganization(TEST_ORG_ID, {
-      page: 1,
-      pageSize: 10,
-    });
+    await service.listByOrganization(
+      TEST_ORG_ID,
+      {
+        page: 1,
+        pageSize: 10,
+      },
+      { userId: "user-1", level: 1, isOwner: false },
+    );
 
     expect(maxActiveQueries).toBe(1);
   });
@@ -91,10 +95,14 @@ describe("ClientService.listByOrganization", () => {
     } as unknown as PrismaClient;
     const service = new ClientService(prisma);
 
-    const page = await service.listByOrganization(TEST_ORG_ID, {
-      page: 1,
-      pageSize: 20,
-    });
+    const page = await service.listByOrganization(
+      TEST_ORG_ID,
+      {
+        page: 1,
+        pageSize: 20,
+      },
+      { userId: "user-1", level: 1, isOwner: false },
+    );
 
     expect(page).toEqual({
       items: [
@@ -224,7 +232,11 @@ describe("ClientService.getById", () => {
     } as unknown as PrismaClient;
     const service = new ClientService(prisma);
 
-    const client = await service.getById(TEST_CLIENT_ID, TEST_ORG_ID);
+    const client = await service.getById(TEST_CLIENT_ID, TEST_ORG_ID, {
+      userId: "user-1",
+      level: 1,
+      isOwner: false,
+    });
 
     expect(client).toMatchObject({
       id: TEST_CLIENT_ID,
@@ -278,5 +290,50 @@ describe("ClientService.getById", () => {
         participants_meet: true,
       }),
     });
+  });
+
+  it("bloqueia criação no nível 1 antes de consultar a organização", async () => {
+    const findUniqueOrg = vi.fn();
+    const prisma = {
+      organization: { findUnique: findUniqueOrg },
+      client: { create: vi.fn() },
+    } as unknown as PrismaClient;
+    const service = new ClientService(prisma);
+
+    await expect(
+      service.create(
+        {
+          name: "Cliente",
+          organization_id: TEST_ORG_ID,
+          status: "Ativo",
+          cpf_cnpj: "",
+          prospecting_status: "Lead",
+          type: "PJ",
+          type_registration: "Novo",
+          service_unique: false,
+        },
+        { userId: "user-1", level: 1, isOwner: false },
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(findUniqueOrg).not.toHaveBeenCalled();
+  });
+
+  it("impede nível 2 de inativar cliente pelo PATCH", async () => {
+    const findFirst = vi.fn().mockResolvedValue({ id: TEST_CLIENT_ID });
+    const update = vi.fn();
+    const prisma = {
+      client: { findFirst, update },
+    } as unknown as PrismaClient;
+    const service = new ClientService(prisma);
+
+    await expect(
+      service.update(
+        TEST_CLIENT_ID,
+        TEST_ORG_ID,
+        { status: "Inativo" },
+        { userId: "user-1", level: 2, isOwner: false },
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(update).not.toHaveBeenCalled();
   });
 });

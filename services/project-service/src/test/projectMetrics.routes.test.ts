@@ -135,6 +135,10 @@ describe("project-metrics routes", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true, data: payload });
     expect(metricsDeps.getGlobalMetrics).toHaveBeenCalledTimes(1);
-    expect(metricsDeps.getGlobalMetrics).toHaveBeenCalledWith(ORG_ID);
+    expect(metricsDeps.getGlobalMetrics).toHaveBeenCalledWith(ORG_ID, {
+      userId: USER_ID,
+      integracaoLevel: 0,
+      isOwner: false,
+    });
   });
 });

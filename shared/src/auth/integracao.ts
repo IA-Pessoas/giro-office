@@ -1,7 +1,15 @@
+import { ServiceError } from "../http/errors.js";
+
 export const INTEGRACAO_MODULE_KEY = "integracao" as const;
 
 export const INTEGRACAO_PERMISSION_LEVELS = [0, 1, 2, 3] as const;
 export type IntegracaoPermissionLevel = (typeof INTEGRACAO_PERMISSION_LEVELS)[number];
+export const INTEGRACAO_PERMISSION_LEVEL = {
+  BASIC: 0,
+  VIEWER: 1,
+  USER: 2,
+  ADMIN: 3,
+} as const satisfies Record<string, IntegracaoPermissionLevel>;
 
 export type IntegracaoResource = "client" | "project" | "task" | "taskModel";
 export type IntegracaoAction =
@@ -55,6 +63,11 @@ export interface IntegracaoAuthorizationInput {
   requestedFields?: readonly string[];
 }
 
+export interface IntegracaoServiceAuthorization {
+  level: IntegracaoPermissionLevel;
+  isOwner: boolean;
+}
+
 export type IntegracaoAuthorizationDecision = "allow" | "forbidden" | "not_found";
 
 const CLIENT_CREATE_FIELDS = [
@@ -76,10 +89,30 @@ const CLIENT_CREATE_FIELDS = [
   "meet_type",
   "type_registration",
   "service_unique",
+  "status",
+  "prospecting_status",
 ] as const;
 
 const CLIENT_UPDATE_FIELDS = [
-  ...CLIENT_CREATE_FIELDS,
+  "type",
+  "name",
+  "company_name",
+  "fantasy_name",
+  "cpf_cnpj",
+  "opening_date",
+  "responsible",
+  "cpf_responsible",
+  "number",
+  "email",
+  "agent",
+  "cpf_agent",
+  "instagram",
+  "indication",
+  "participants_meet",
+  "meet_type",
+  "type_registration",
+  "service_unique",
+  "prospecting_status",
   "address",
   "cep",
   "neighborhood",
@@ -185,12 +218,20 @@ function routePolicy(
   };
 }
 
-const readOrganization = [1, 2, 3] as const;
-const writeUser = [2, 3] as const;
-const admin = [3] as const;
+const readOrganization = [
+  INTEGRACAO_PERMISSION_LEVEL.VIEWER,
+  INTEGRACAO_PERMISSION_LEVEL.USER,
+  INTEGRACAO_PERMISSION_LEVEL.ADMIN,
+] as const;
+const writeUser = [INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN] as const;
+const admin = [INTEGRACAO_PERMISSION_LEVEL.ADMIN] as const;
+const taskModelRead = [
+  INTEGRACAO_PERMISSION_LEVEL.USER,
+  INTEGRACAO_PERMISSION_LEVEL.ADMIN,
+] as const;
 
 export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
-  routePolicy("GET", "/client/list", "client", "read", [readRule([1, 2, 3])], {
+  routePolicy("GET", "/client/list", "client", "read", [readRule(readOrganization)], {
     test: "client.list",
   }),
   routePolicy("GET", "/client/:id", "client", "read", [readRule(readOrganization)], {
@@ -273,7 +314,7 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     "/task/list",
     "task",
     "read",
-    [readRule([0], "responsible"), readRule(readOrganization)],
+    [readRule([INTEGRACAO_PERMISSION_LEVEL.BASIC], "responsible"), readRule(readOrganization)],
     { test: "task.list" },
   ),
   routePolicy(
@@ -281,7 +322,7 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     "/task",
     "task",
     "read",
-    [readRule([0], "responsible"), readRule(readOrganization)],
+    [readRule([INTEGRACAO_PERMISSION_LEVEL.BASIC], "responsible"), readRule(readOrganization)],
     { test: "task.detail" },
   ),
   routePolicy("POST", "/task", "task", "create", [writeRule(writeUser, TASK_CREATE_FIELDS)], {
@@ -294,8 +335,16 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     "task",
     "update",
     [
-      writeRule([0, 1], TASK_OWN_FIELDS, "responsible"),
-      writeRule([2, 3], TASK_UPDATE_FIELDS, "organization"),
+      writeRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        TASK_OWN_FIELDS,
+        "responsible",
+      ),
+      writeRule(
+        [INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN],
+        TASK_UPDATE_FIELDS,
+        "organization",
+      ),
     ],
     { audit: "required", test: "task.update" },
   ),
@@ -309,7 +358,13 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     "/task/conclusion",
     "task",
     "requestCompletion",
-    [writeRule([0, 1], ["status", "observations"], "responsible")],
+    [
+      writeRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        ["status", "observations"],
+        "responsible",
+      ),
+    ],
     { audit: "required", test: "task.requestCompletion" },
   ),
   routePolicy(
@@ -317,13 +372,19 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     "/task/complete-request",
     "task",
     "approveCompletion",
-    [completionApprovalRule([2], true), completionApprovalRule([3])],
+    [
+      completionApprovalRule([INTEGRACAO_PERMISSION_LEVEL.USER], true),
+      completionApprovalRule([INTEGRACAO_PERMISSION_LEVEL.ADMIN]),
+    ],
     { audit: "required", test: "task.approveCompletion" },
   ),
-  routePolicy("GET", "/task/model/list", "taskModel", "read", [readRule(admin)], {
+  routePolicy("GET", "/task/model/list", "taskModel", "read", [readRule(taskModelRead)], {
     test: "taskModel.list",
   }),
-  routePolicy("GET", "/task/model", "taskModel", "read", [readRule(admin)], {
+  routePolicy("GET", "/task/deps/list", "taskModel", "read", [readRule(taskModelRead)], {
+    test: "taskModel.dependencies.list",
+  }),
+  routePolicy("GET", "/task/model", "taskModel", "read", [readRule(taskModelRead)], {
     test: "taskModel.detail",
   }),
   routePolicy("POST", "/task/model", "taskModel", "manage", [writeRule(admin, TASK_MODEL_FIELDS)], {
@@ -425,4 +486,26 @@ export function evaluateIntegracaoAction(
   }
 
   return "allow";
+}
+
+export function requireIntegracaoRouteAccess(
+  method: string,
+  path: string,
+  input: IntegracaoAuthorizationInput,
+): void {
+  const policy = findIntegracaoRoutePolicy(method, path);
+  if (!policy) {
+    throw new ServiceError(500, `Política de autorização ausente para ${method} ${path}.`);
+  }
+
+  const decision = evaluateIntegracaoAction(policy, input);
+  if (decision === "allow") {
+    return;
+  }
+
+  if (decision === "not_found") {
+    throw new ServiceError(404, "Recurso não encontrado.");
+  }
+
+  throw new ServiceError(403, "Acesso negado para esta operação.");
 }

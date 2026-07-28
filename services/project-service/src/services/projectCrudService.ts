@@ -1,4 +1,10 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import {
+  INTEGRACAO_PERMISSION_LEVEL,
+  type IntegracaoPermissionLevel,
+  error as logError,
+  requireIntegracaoRouteAccess,
+  ServiceError,
+} from "@workspace/shared";
 
 import {
   type CreateLogParams,
@@ -19,6 +25,8 @@ export interface ProjectCrudAuthContext {
   userId: string;
   organizationId: string;
   permission?: number;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
 }
 
 export interface CreateProjectCrudRequest extends ProjectCrudAuthContext {
@@ -85,6 +93,15 @@ export class ProjectCrudService {
   ) {}
 
   async create(data: CreateProjectCrudRequest): Promise<{ create: unknown }> {
+    requireIntegracaoRouteAccess("POST", "/project", {
+      userId: data.userId,
+      level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+      organizationId: data.organizationId,
+      resourceOrganizationId: data.organizationId,
+      isOwner: data.isOwner === true,
+      requestedFields: ["name", "client_id", "start_date", "objective", "sponsor_id"],
+    });
+
     const client = await this.prisma.client.findFirst({
       where: { id: data.client_id, organization_id: data.organizationId },
     });
@@ -132,7 +149,11 @@ export class ProjectCrudService {
     return { create };
   }
 
-  async detail(projectId: string, organizationId: string): Promise<{ detail: unknown }> {
+  async detail(
+    projectId: string,
+    organizationId: string,
+    auth: ProjectCrudAuthContext = { userId: "", organizationId },
+  ): Promise<{ detail: unknown }> {
     const detail = await this.prisma.project.findFirst({
       where: {
         id: projectId,
@@ -144,6 +165,14 @@ export class ProjectCrudService {
     if (!detail) {
       throw new ServiceError(404, "Projeto não existe");
     }
+
+    requireIntegracaoRouteAccess("GET", "/project", {
+      userId: auth.userId,
+      level: auth.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+      organizationId,
+      resourceOrganizationId: organizationId,
+      isOwner: auth.isOwner === true,
+    });
 
     return { detail };
   }
@@ -157,6 +186,15 @@ export class ProjectCrudService {
       if (!exists) {
         throw new ServiceError(404, "Projeto não existe");
       }
+
+      requireIntegracaoRouteAccess("PUT", "/project", {
+        userId: data.userId,
+        level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId: data.organizationId,
+        resourceOrganizationId: data.organizationId,
+        isOwner: data.isOwner === true,
+        requestedFields: ["name", "start_date", "end_date", "objective", "sponsor_id"],
+      });
 
       const updated = await this.prisma.project.update({
         where: {
@@ -197,7 +235,15 @@ export class ProjectCrudService {
     ref: "client" | "status" | "sponsor",
     id: string,
     organizationId: string,
+    auth: ProjectCrudAuthContext = { userId: "", organizationId },
   ): Promise<unknown[]> {
+    requireIntegracaoRouteAccess("GET", "/project/list", {
+      userId: auth.userId,
+      level: auth.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+      organizationId,
+      isOwner: auth.isOwner === true,
+    });
+
     if (ref === "client") {
       return this.prisma.project.findMany({
         where: { client_id: id, organization_id: organizationId },
@@ -219,10 +265,6 @@ export class ProjectCrudService {
   }
 
   async delete(data: DeleteProjectCrudRequest): Promise<{ response: unknown }> {
-    if (data.permission !== 2) {
-      throw new ServiceError(403, "Usuário não tem permissão");
-    }
-
     const exists = await this.prisma.project.findFirst({
       where: { id: data.project_id, organization_id: data.organizationId },
     });
@@ -231,10 +273,35 @@ export class ProjectCrudService {
       throw new ServiceError(404, "Projeto não existe");
     }
 
-    const response = await this.prisma.project.delete({
-      where: { id: data.project_id },
+    requireIntegracaoRouteAccess("DELETE", "/project", {
+      userId: data.userId,
+      level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+      organizationId: data.organizationId,
+      resourceOrganizationId: data.organizationId,
+      isOwner: data.isOwner === true,
     });
 
-    return { response };
+    try {
+      const response = await this.prisma.project.delete({
+        where: { id: data.project_id },
+      });
+
+      await this.audit.createLog({
+        userId: data.userId,
+        organizationId: data.organizationId,
+        action: "Exclusão",
+        referring: "integracao.projects",
+        referringId: data.project_id,
+        changes: "{}",
+      });
+
+      return { response };
+    } catch (err: unknown) {
+      logError("Erro ao excluir projeto no banco", { err });
+      if (typeof err === "object" && err !== null && "code" in err && err.code === "P2003") {
+        throw new ServiceError(409, "Não é possível excluir projeto com dependências.");
+      }
+      throw err;
+    }
   }
 }
