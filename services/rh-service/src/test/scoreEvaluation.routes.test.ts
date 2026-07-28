@@ -60,7 +60,7 @@ describe("scoreEvaluation routes", () => {
   });
 
   it("POST /rh/score/evaluations/submit preserva contexto gerencial", async () => {
-    setRhRoutePermission(2);
+    setRhRoutePermission(3);
     const app = createTestApp();
     const res = await request(app)
       .post("/rh/score/evaluations/submit")

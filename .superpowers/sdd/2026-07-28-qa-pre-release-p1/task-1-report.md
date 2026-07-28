@@ -81,7 +81,7 @@ Implementado na branch `fix/issue-521-rh-own-evaluations`.
 
 ### Alteracao
 
-- Adicionado teste explicito em `services/rh-service/src/test/scoreEvaluation.routes.test.ts` para `POST /rh/score/evaluations/submit` com `rh_permission=2`, verificando que `scoreEvaluationServiceMock.submitEvaluation` recebe `can_manage: true`.
+- Adicionado teste explicito em `services/rh-service/src/test/scoreEvaluation.routes.test.ts` para `POST /rh/score/evaluations/submit` com `rh_permission=3`, verificando que `scoreEvaluationServiceMock.submitEvaluation` recebe `can_manage: true`.
 - Nenhum arquivo de producao foi alterado.
 
 ### Verificacoes
@@ -98,3 +98,24 @@ Implementado na branch `fix/issue-521-rh-own-evaluations`.
 ### Riscos
 
 - A cobertura foi adicionada, mas a execucao runtime do Vitest continua bloqueada pelo Node 24 nesta maquina.
+## Complemento da re-revisao - fixture POST submit gerencial
+
+### Alteracao
+
+- Corrigido `services/rh-service/src/test/scoreEvaluation.routes.test.ts` para usar `setRhRoutePermission(3)` no teste gerencial de `POST /rh/score/evaluations/submit`, alinhando o fixture com `canManageRh` (`rh_permission >= 3`) e mantendo a prova de `can_manage: true`.
+- Nenhum arquivo de producao foi alterado.
+
+### Verificacoes
+
+- `corepack pnpm --filter @workspace/rh-service test -- src/test/scoreEvaluation.routes.test.ts`
+  - Nao executou testes por falha de startup do Vitest:
+    - `ERR_PACKAGE_IMPORT_NOT_DEFINED: Package import specifier "#module-evaluator" is not defined`.
+    - Ambiente observado: Node `v24.13.1`.
+- `corepack pnpm exec biome check services/rh-service/src/test/scoreEvaluation.routes.test.ts .superpowers/sdd/2026-07-28-qa-pre-release-p1/task-1-report.md`
+  - Passou; Biome checou 1 arquivo TS e nao aplicou fixes.
+- `$env:DATABASE_URL='postgresql://user:pass@localhost:5432/db'; corepack pnpm --filter @workspace/rh-service typecheck`
+  - Passou.
+
+### Riscos
+
+- A execucao runtime do Vitest continua bloqueada pelo Node 24 nesta maquina; a validacao automatizada executavel nesta rodada ficou em Biome e typecheck.
