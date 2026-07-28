@@ -739,7 +739,7 @@ export function PessoalPasswordsSection({
           ) : null}
         </div>
 
-        {formError ? (
+        {formError && !isFormOpen ? (
           <p role="alert" className="mt-4 text-sm text-red-600 dark:text-red-300">
             {formError}
           </p>
@@ -831,6 +831,12 @@ export function PessoalPasswordsSection({
                   <X className="h-4 w-4" />
                 </button>
               </div>
+
+              {formError ? (
+                <p role="alert" className="text-sm text-red-600 dark:text-red-300">
+                  {formError}
+                </p>
+              ) : null}
 
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="flex flex-col gap-1.5 text-sm text-gray-700 dark:text-gray-300">

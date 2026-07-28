@@ -13,7 +13,7 @@ import { SessionTransitionScreen } from "@shared/components/SessionTransitionScr
 import { SocketProvider } from '../context/SocketContext'
 import { AppShell } from "../shared/components/newLayout/AppShell";
 
-function AppLayout({ children }) {
+function AppLayout({ children, isIframeView = false }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   useAccessStoreSync();
@@ -38,7 +38,7 @@ function AppLayout({ children }) {
   }
 
   return (
-    <AppShell>
+    <AppShell isIframeView={isIframeView}>
       {children}
     </AppShell>
   );
@@ -102,13 +102,9 @@ function MyApp({ Component, pageProps }: AppProps) {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <SocketProvider>
-            {isIframeView ? (
+            <AppLayout isIframeView={isIframeView}>
               <Component {...pageProps} />
-            ) : (
-              <AppLayout>
-                <Component {...pageProps} />
-              </AppLayout>
-            )}
+            </AppLayout>
             <ToastContainer
               position="bottom-right"
               autoClose={5000}

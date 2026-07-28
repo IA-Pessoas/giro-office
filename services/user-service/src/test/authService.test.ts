@@ -4,6 +4,7 @@ const { prismaMock, bcryptMock, jwtMock } = vi.hoisted(() => ({
   prismaMock: {
     user: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
     },
     organization: {
@@ -71,7 +72,6 @@ describe("AuthService", () => {
       permissions: [
         {
           organization_id: "org-1",
-          atendimento: null,
           certificado: null,
           comercial: null,
           contabil: null,
@@ -80,13 +80,11 @@ describe("AuthService", () => {
           integracao: null,
           marketing: null,
           parcelamento: null,
-          pec: null,
           pessoal: null,
           regularize: null,
           rh: null,
           ti: 2,
           triagem: null,
-          wiki: null,
         },
       ],
     });
@@ -103,22 +101,19 @@ describe("AuthService", () => {
       permission: 2,
       type: "admin",
       modules: {
-        atendimento: null,
-        certificado: null,
-        comercial: null,
-        contabil: null,
-        financeiro: null,
-        fiscal: null,
-        integracao: null,
-        marketing: null,
-        parcelamento: null,
-        pec: null,
-        pessoal: null,
-        regularize: null,
-        rh: null,
+        certificado: 0,
+        comercial: 0,
+        contabil: 0,
+        financeiro: 0,
+        fiscal: 0,
+        integracao: 0,
+        marketing: 0,
+        parcelamento: 0,
+        pessoal: 0,
+        regularize: 0,
+        rh: 0,
         ti: 2,
-        triagem: null,
-        wiki: null,
+        triagem: 0,
       },
       department_id: "dep-1",
       organization_id: "org-1",
@@ -161,6 +156,17 @@ describe("AuthService", () => {
         permission: 2,
         department_id: "dep-1",
       },
+    });
+  });
+
+  it("rejeita token quando a versão persistida da sessão mudou", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ status: "active", session_version: 2 });
+    const service = new AuthService();
+
+    await expect(
+      service.validateSession({ user_id: "user-1", session_version: 1 }),
+    ).rejects.toMatchObject({
+      statusCode: 401,
     });
   });
 });

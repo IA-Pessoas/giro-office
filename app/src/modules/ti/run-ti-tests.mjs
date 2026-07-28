@@ -22,12 +22,109 @@ async function runTest(name, fn) {
   }
 }
 
+await runTest("ti request message attachments accept supported images without trusting arbitrary URL hosts", async () => {
+  const {
+    MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES,
+    validateTiRequestMessageImage,
+  } = await import("./utils/requestMessageAttachment.ts");
+
+  assert.equal(MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES, 5 * 1024 * 1024);
+  assert.equal(
+    validateTiRequestMessageImage({
+      type: "image/png",
+      size: MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES,
+    }),
+    null,
+  );
+  assert.equal(
+    validateTiRequestMessageImage({ type: "image/gif", size: 10 }),
+    "Selecione uma imagem PNG, JPEG ou WebP.",
+  );
+  assert.equal(
+    validateTiRequestMessageImage({
+      type: "image/webp",
+      size: MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES + 1,
+    }),
+    "A imagem deve ter no máximo 5 MB.",
+  );
+});
+
+await runTest("ti request messages use multipart only when an image is attached", async () => {
+  const { buildTiRequestMessageSubmission } = await import(
+    "./utils/requestMessageAttachment.ts"
+  );
+  const attachment = new File(["test image"], "evidence.png", { type: "image/png" });
+
+  const multipartSubmission = buildTiRequestMessageSubmission({
+    message: "Segue a evidência.",
+    attachment,
+  });
+
+  assert.equal(multipartSubmission instanceof FormData, true);
+  assert.equal(multipartSubmission.get("message"), "Segue a evidência.");
+  assert.equal(multipartSubmission.get("file"), attachment);
+
+  assert.deepEqual(buildTiRequestMessageSubmission({ message: "Mensagem sem anexo." }), {
+    message: "Mensagem sem anexo.",
+  });
+});
+
+await runTest("ti request message uploads prefer domain errors and hide technical Axios messages", async () => {
+  const { getTiRequestMessageActionError } = await import(
+    "./utils/requestMessageAttachment.ts"
+  );
+
+  assert.equal(
+    getTiRequestMessageActionError({
+      message: "Request failed with status code 413",
+      response: { data: { error: "A imagem excede o limite permitido." } },
+    }),
+    "A imagem excede o limite permitido.",
+  );
+  assert.equal(
+    getTiRequestMessageActionError(new Error("Request failed with status code 500")),
+    "Não foi possível enviar a mensagem. Tente novamente.",
+  );
+});
+
+await runTest("ti request attachment UI retains the accessible upload flow and clears context-bound drafts", async () => {
+  const requestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(requestsTabSource, /type="file"/);
+  assert.match(requestsTabSource, /accept="image\/png,image\/jpeg,image\/webp"/);
+  assert.match(requestsTabSource, /focus-within:ring-2/);
+  assert.match(requestsTabSource, /onChange=\{handleMessageAttachmentChange\}/);
+  assert.match(requestsTabSource, /URL\.createObjectURL\(messageAttachment\)/);
+  assert.match(requestsTabSource, /URL\.revokeObjectURL\(previewUrl\)/);
+  assert.match(requestsTabSource, /alt=\{`Prévia de \$\{messageAttachment\.name\}`\}/);
+  assert.match(requestsTabSource, /onClick=\{handleRemoveMessageAttachment\}/);
+  assert.match(requestsTabSource, /disabled=\{createMessageMutation\.isPending\}/);
+  assert.doesNotMatch(requestsTabSource, /getTiRequestMessageAttachmentUrl\(/);
+  assert.match(requestsTabSource, /target="_blank"/);
+  assert.match(requestsTabSource, /rel="noreferrer"/);
+  assert.match(requestsTabSource, /toast\.error\(validationError\)/);
+  assert.match(requestsTabSource, /toast\.error\(feedback\)/);
+  assert.match(
+    requestsTabSource,
+    /function resetMessageComposer\(\) \{[\s\S]*setMessageDraft\(""\);[\s\S]*setMessageAttachment\(null\);[\s\S]*setActionError\(null\);[\s\S]*\}/,
+  );
+  assert.match(requestsTabSource, /if \(!nextOpen\) \{[\s\S]*resetMessageComposer\(\);/);
+  assert.match(
+    requestsTabSource,
+    /onClick=\{\(\) => \{[\s\S]*resetMessageComposer\(\);[\s\S]*setSelectedRequestId\(request\.id\);/,
+  );
+});
+
 async function readModuleSource(relativePath) {
   return readFile(join(moduleRoot, relativePath), "utf8");
 }
 
 async function readAppSource(relativePath) {
   return readFile(join(appRoot, relativePath), "utf8");
+}
+
+async function readWorkspaceSource(relativePath) {
+  return readFile(join(appRoot, "..", relativePath), "utf8");
 }
 
 async function collectSourceFiles(directory) {
@@ -385,6 +482,119 @@ await runTest("ti stock location display never falls back to a raw id", async ()
     resolveTiStockLocationName({ id: 3, location_id: 99 }, locations),
     "Local não informado",
   );
+});
+
+await runTest("ti stock mutation error preserves the domain message returned by the API", async () => {
+  const { getTiStockMutationErrorMessage } = await import("./utils/stockMutationError.ts");
+  const axiosStyleError = {
+    isAxiosError: true,
+    message: "Request failed with status code 409",
+    response: {
+      status: 409,
+      data: {
+        success: false,
+        error: "Saldo insuficiente no estoque de TI.",
+        code: "CONFLICT",
+      },
+    },
+  };
+
+  const message = getTiStockMutationErrorMessage(
+    axiosStyleError,
+    "Não foi possível registrar a saída.",
+  );
+
+  assert.equal(message, "Saldo insuficiente no estoque de TI.");
+  assert.notEqual(message, "Request failed with status code 409");
+});
+
+await runTest("ti stock mutation error rejects a technical API error message for a 409", async () => {
+  const { getTiStockMutationErrorMessage } = await import("./utils/stockMutationError.ts");
+  const axiosStyleError = {
+    isAxiosError: true,
+    message: "Request failed with status code 409",
+    response: {
+      status: 409,
+      data: {
+        success: false,
+        error: "Request failed with status code 409",
+        code: "CONFLICT",
+      },
+    },
+  };
+
+  const message = getTiStockMutationErrorMessage(
+    axiosStyleError,
+    "Não foi possível registrar a saída.",
+  );
+
+  assert.equal(message, "Não foi possível registrar a saída: o saldo disponível é insuficiente.");
+  assert.notEqual(message, "Request failed with status code 409");
+});
+
+await runTest("ti stock mutation error uses an actionable fallback for a 409 without domain message", async () => {
+  const { getTiStockMutationErrorMessage } = await import("./utils/stockMutationError.ts");
+  const axiosStyleError = {
+    isAxiosError: true,
+    message: "Request failed with status code 409",
+    response: {
+      status: 409,
+      data: {
+        success: false,
+        error: "   ",
+        code: "CONFLICT",
+      },
+    },
+  };
+
+  const message = getTiStockMutationErrorMessage(
+    axiosStyleError,
+    "Não foi possível registrar a saída.",
+  );
+
+  assert.equal(message, "Não foi possível registrar a saída: o saldo disponível é insuficiente.");
+  assert.notEqual(message, "Request failed with status code 409");
+});
+
+await runTest("ti stock exit feedback uses the scoped mutation error normalizer", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+  const exitHandlerStart = tabSource.indexOf("async function handleSubmitExit");
+  const exitHandlerEnd = tabSource.indexOf("async function handleSubmitCategory", exitHandlerStart);
+  const exitHandlerSource = tabSource.slice(exitHandlerStart, exitHandlerEnd);
+
+  assert.match(
+    tabSource,
+    /import \{ getTiStockMutationErrorMessage \} from "\.\.\/utils\/stockMutationError"/,
+  );
+  assert.match(
+    exitHandlerSource,
+    /getTiStockMutationErrorMessage\(error, "Não foi possível registrar a saída\."\)/,
+  );
+});
+
+await runTest("ti stock locations filter progressively and identify normalized active duplicates", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+  const {
+    filterTiStockLocations,
+    hasActiveTiStockLocation,
+    normalizeTiStockLocationName,
+  } = await import("./utils/stockDisplay.ts");
+  const locations = [
+    { id: 1, name: "Almoxarifado São", status: true },
+    { id: 2, name: "Sala de reuniões", status: true },
+    { id: 3, name: "Almoxarifado antigo", status: false },
+  ];
+
+  assert.equal(typeof normalizeTiStockLocationName, "function");
+  assert.equal(normalizeTiStockLocationName("  Almoxarifado   São  "), "almoxarifado sao");
+  assert.deepEqual(
+    filterTiStockLocations(locations, "almox"),
+    [locations[0], locations[2]],
+  );
+  assert.equal(hasActiveTiStockLocation(locations, "ALMOXARIFADO SAO"), true);
+  assert.equal(hasActiveTiStockLocation(locations, "Sala"), false);
+  assert.match(tabSource, /hasActiveTiStockLocation\(stockLocations, name\)/);
+  assert.match(tabSource, /rows=\{filteredStockLocations\}/);
 });
 
 await runTest("ti stock filters reset and render server pagination", async () => {
@@ -854,7 +1064,8 @@ await runTest("ti password reveal copy uses copy icon without toggling visibilit
 
   assert.match(tabSource, /Copy,/);
   assert.match(tabSource, /<Copy className="h-4 w-4" \/>/);
-  assert.match(tabSource, /navigator\.clipboard\.writeText\(secret\)/);
+  assert.match(tabSource, /const copied = await copySensitiveText\(secret, clipboard\)/);
+  assert.doesNotMatch(tabSource, /navigator\.clipboard\.writeText\(secret\)/);
   assert.doesNotMatch(tabSource, /<EyeOff className="h-4 w-4" \/>[\s\S]*?<span>Copiar senha<\/span>/);
 });
 
@@ -872,12 +1083,13 @@ await runTest("ti password reveal clears sensitive detail cache when hidden", as
   assert.match(tabSource, /setRevealPasswordId\(null\)/);
 });
 
-await runTest("ti user selects reuse the paginated assignable users source", async () => {
+await runTest("ti user selects reuse the operational users source", async () => {
   const hookSource = await readAppSource("src/modules/rh/hooks/useAssignableUsers.ts");
   const rhTypesSource = await readAppSource("src/modules/rh/types.ts");
   const userTypesSource = await readAppSource("src/modules/users/types/index.ts");
 
-  assert.match(hookSource, /listAdminUsers\("active"\)/);
+  assert.match(hookSource, /api\.get\(RH_ENDPOINTS\.operationalUsers\)/);
+  assert.match(hookSource, /unwrapRhEnvelope<RhOperationalUser\[\]>/);
   assert.doesNotMatch(hookSource, /cpf: user\.cpf \?\? null/);
   assert.doesNotMatch(rhTypesSource, /cpf\?: string \| null/);
   assert.doesNotMatch(userTypesSource, /cpf\?: string \| null/);
@@ -1071,6 +1283,17 @@ await runTest("ti request detail opens in a dialog instead of a stretched side p
   assert.doesNotMatch(tabSource, /title="Selecione um chamado"/);
 });
 
+await runTest("issue 495 ti request messages preserve line breaks and wrap long text", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+  const messageDisplay =
+    tabSource.match(
+      /<p className="[^"]*">\s*\{message\.message \?\? getStringField\(message, \["content", "body"\], ""\)\}\s*<\/p>/,
+    )?.[0] ?? "";
+
+  assert.match(messageDisplay, /whitespace-pre-wrap/);
+  assert.match(messageDisplay, /break-words/);
+});
+
 await runTest("ti request detail keeps secondary actions compact", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 
@@ -1171,6 +1394,16 @@ await runTest("ti requests tab exposes request category management actions", asy
   assert.doesNotMatch(tabSource, /Salvar categoria/);
   assert.doesNotMatch(tabSource, /handleStartEditCategory/);
   assert.doesNotMatch(tabSource, /editingCategoryId/);
+});
+
+await runTest("ti request categories are managed by users and hidden from viewers", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(tabSource, /const canManageCategories = access\.canEdit/);
+  assert.match(tabSource, /\{canManageCategories \? \(/);
+  assert.match(tabSource, /label="Categorias"/);
+  assert.match(tabSource, /open=\{isCategoryDialogOpen\}/);
+  assert.match(tabSource, /categoriesQuery\.data \?\? \[\]/);
 });
 
 await runTest("ti native select uses a centered chevron instead of the browser default arrow", async () => {
@@ -1410,9 +1643,21 @@ await runTest("ti terms tab exposes term create, edit, detail and signing action
   assert.match(source, /useTiTerm\(/);
   assert.match(source, /useTiInventory\(/);
   assert.match(source, /const canManage = access\.isAdmin/);
-  assert.match(source, /useTiInventory\(undefined, \{ enabled: canManage \}\)/);
+  assert.match(source, /useTiInventory\([\s\S]*status: "available"[\s\S]*page_size: 100[\s\S]*enabled: canManage/);
+  assert.doesNotMatch(source, /useTiInventory\(undefined, \{ enabled: canManage \}\)/);
   assert.match(source, /departmentService\.list\(\),\s*\{ retry: false, enabled: canManage \}/);
   assert.match(source, /confirm\(/);
+});
+
+await runTest("ti inventory list exposes availability status for term asset selectors", async () => {
+  const schemaSource = await readWorkspaceSource("services/ti-service/src/schemas/tiInventory.schemas.ts");
+  const serviceSource = await readWorkspaceSource("services/ti-service/src/services/tiInventoryService.ts");
+  const openApiSource = await readWorkspaceSource("services/ti-service/src/openapi/spec.ts");
+
+  assert.match(schemaSource, /status: z\.enum\(\["available", "assigned"\]\)\.optional\(\)/);
+  assert.match(serviceSource, /query\.status === "available"[\s\S]*\{ user_id: null \}/);
+  assert.match(serviceSource, /query\.status === "assigned"[\s\S]*\{ user_id: \{ not: null \} \}/);
+  assert.match(openApiSource, /enumQueryParameter\("status", "Disponibilidade do ativo", \["available", "assigned"\]\)/);
 });
 
 await runTest("ti terms keeps primary action clear and opens term detail in a dialog", async () => {
@@ -1462,6 +1707,26 @@ await runTest("ti terms filters stay local because the backend list only support
   assert.doesNotMatch(source, /inventory_id: assetId/);
   assert.doesNotMatch(source, /asset_id: assetId/);
   assert.doesNotMatch(source, /status,\s*inventory_id/);
+});
+
+await runTest("ti terms list paginates locally and keeps actions compact", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+  const controlsSource = await readModuleSource("components/tiFormControls.tsx");
+
+  assert.match(source, /import \{ PaginationControls \} from "@shared\/components";/);
+  assert.match(source, /const TERMS_PAGE_SIZE = 10;/);
+  assert.match(source, /const \[termsPage, setTermsPage\] = useState\(1\);/);
+  assert.match(source, /useEffect\(\(\) => \{\s*setTermsPage\(1\);/);
+  assert.match(source, /const paginatedTerms = useMemo\(/);
+  assert.match(source, /filteredTerms\.slice\(/);
+  assert.match(source, /paginatedTerms\.map\(\(term\)/);
+  assert.doesNotMatch(source, /filteredTerms\.map\(\(term\)/);
+  assert.match(source, /<PaginationControls/);
+  assert.match(source, /total=\{filteredTerms\.length\}/);
+  assert.match(source, /totalPages=\{termsPageCount\}/);
+  assert.match(source, /onPageChange=\{\(page\) => setTermsPage\(page\)\}/);
+  assert.match(source, /iconOnly/);
+  assert.match(controlsSource, /iconOnly \? "w-8 px-0" : "px-2\.5"/);
 });
 
 await runTest("ti terms create uses assignable user selection and edit keeps identity read-only", async () => {

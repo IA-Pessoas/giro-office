@@ -13,19 +13,16 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { isAdminPermission } from "@modules/auth";
+import { useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
-import { useDebouncedValue, useMe } from "@shared/hooks";
+import { useDebouncedValue } from "@shared/hooks";
 
 import { INTEGRACAO_TASK_STATUS_VALUES, type IntegracaoTaskListItem } from "../types";
 import {
   useDeleteIntegracaoTaskMutation,
   useIntegracaoTasksList,
 } from "../hooks";
-import {
-  TASK_MODEL_CONFIG_ENTRY,
-  canManageTaskModelConfig,
-} from "../navigation/taskModelConfigNavigation";
+import { TASK_MODEL_CONFIG_ENTRY } from "../navigation/taskModelConfigNavigation";
 import { TaskFormModal } from "./TaskFormModal";
 import {
   getProjectStatusTone,
@@ -91,7 +88,7 @@ function mergeTaskPages(currentTasks: IntegracaoTaskListItem[], nextTasks: Integ
 }
 
 export function TasksWorkspace() {
-  const meQuery = useMe();
+  const { access: integracaoAccess } = useModuleAccess("integracao");
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [refFilter, setRefFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -116,8 +113,8 @@ export function TasksWorkspace() {
 
   const tasksQuery = useIntegracaoTasksList(listParams);
   const deleteTaskMutation = useDeleteIntegracaoTaskMutation();
-  const canDelete = isAdminPermission(meQuery.data?.permission);
-  const canManageTaskModels = canManageTaskModelConfig(meQuery.data?.permission);
+  const canDelete = integracaoAccess.isAdmin;
+  const canManageTaskModels = integracaoAccess.canEdit;
 
   useEffect(() => {
     setPage(1);

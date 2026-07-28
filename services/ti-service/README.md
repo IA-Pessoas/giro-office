@@ -17,10 +17,28 @@ As variaveis sao lidas em `src/config/env.ts`.
 - `AUDIT_SERVICE_TOKEN`
 - `TI_SERVICE_INTERNAL_TOKEN`
 - `MTK_ENCRYPTION_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `TI_REQUEST_IMAGE_BUCKET`
 - `SERVICE_ALLOWED_ORIGINS`
 - `ENABLE_API_DOCS`
 - `LOG_LEVEL`
 - `LOG_PRETTY`
+
+## Imagens em mensagens de chamados
+
+`POST /ti/requests/{id}/messages` aceita os dois formatos abaixo:
+
+- `application/json`: mensagem de texto no formato existente (`message`, com `type` opcional).
+- `multipart/form-data`: campo `message`, `type` opcional e um unico campo `file` com imagem JPEG,
+  PNG ou WebP de ate 5 MiB.
+
+O arquivo e validado antes do armazenamento. Entrada ou assinatura de arquivo invalida retorna `400`;
+arquivo acima do limite retorna `413`; uma falha ao armazenar a imagem retorna `500`, sem expor a
+configuracao ou as credenciais do Supabase. O upload guarda apenas a chave privada no banco e devolve
+uma URL assinada de cinco minutos depois de validar o acesso ao chamado. Configure
+`TI_REQUEST_IMAGE_BUCKET` como um bucket privado dedicado; `SUPABASE_URL` e
+`SUPABASE_SERVICE_ROLE_KEY` devem permanecer apenas no ambiente do servico.
 
 ## Gateway
 

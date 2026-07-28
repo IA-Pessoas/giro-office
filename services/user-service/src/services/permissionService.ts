@@ -1,4 +1,10 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import {
+  ACTIVE_MODULE_KEYS,
+  error as logError,
+  ServiceError,
+  type ModulePermissionKey,
+  type ModulePermissions,
+} from "@workspace/shared";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import prismaClient from "../prisma/index.js";
@@ -7,7 +13,6 @@ const PERMISSION_PUBLIC_SELECT = {
   id: true,
   user_id: true,
   organization_id: true,
-  atendimento: true,
   certificado: true,
   comercial: true,
   contabil: true,
@@ -16,13 +21,11 @@ const PERMISSION_PUBLIC_SELECT = {
   integracao: true,
   marketing: true,
   parcelamento: true,
-  pec: true,
   pessoal: true,
   regularize: true,
   rh: true,
   ti: true,
   triagem: true,
-  wiki: true,
 } as const;
 
 const PERMISSION_SPECIFIC_SELECT = {
@@ -31,49 +34,19 @@ const PERMISSION_SPECIFIC_SELECT = {
   task_completion: true,
 } as const;
 
-const MODULE_FIELDS = [
-  "atendimento",
-  "certificado",
-  "comercial",
-  "contabil",
-  "financeiro",
-  "fiscal",
-  "integracao",
-  "marketing",
-  "parcelamento",
-  "pec",
-  "pessoal",
-  "regularize",
-  "rh",
-  "ti",
-  "triagem",
-  "wiki",
-] as const;
+const MODULE_FIELDS = [...ACTIVE_MODULE_KEYS] as const;
 
-type ModuleField = (typeof MODULE_FIELDS)[number];
+type ModuleField = ModulePermissionKey;
 
 type PermissionPublicRow = Prisma.PermissionGetPayload<{ select: typeof PERMISSION_PUBLIC_SELECT }>;
 type PermissionSpecificRow = Prisma.PermissionSpecificGetPayload<{
   select: typeof PERMISSION_SPECIFIC_SELECT;
 }>;
 
-interface UpdatePermissionInput {
-  atendimento?: number | null;
-  certificado?: number | null;
-  comercial?: number | null;
-  contabil?: number | null;
-  financeiro?: number | null;
-  fiscal?: number | null;
-  integracao?: number | null;
-  marketing?: number | null;
-  parcelamento?: number | null;
-  pec?: number | null;
-  pessoal?: number | null;
-  regularize?: number | null;
-  rh?: number | null;
-  ti?: number | null;
-  triagem?: number | null;
-  wiki?: number | null;
+type UpdatePermissionInput = Partial<ModulePermissions>;
+
+interface PermissionChangeAudit {
+  actorUserId?: string;
 }
 
 class PermissionService {
@@ -124,7 +97,7 @@ class PermissionService {
         throw new ServiceError(400, `Módulo '${modulo}' inválido.`);
       }
 
-      if (permission[modulo as ModuleField] === null) {
+      if (permission[modulo as ModuleField] === 0) {
         throw new ServiceError(403, `Usuário sem acesso ao módulo '${modulo}'.`);
       }
     }
@@ -136,10 +109,11 @@ class PermissionService {
     userId: string,
     data: UpdatePermissionInput,
     organizationId?: string,
+    audit: PermissionChangeAudit = {},
   ): Promise<PermissionPublicRow> {
-    await this.getByUserId(userId, undefined, organizationId);
+    const previousPermission = await this.getByUserId(userId, undefined, organizationId);
 
-    const updateData: Record<string, unknown> = {};
+    const updateData: Partial<Record<ModuleField, number>> = {};
 
     for (const field of MODULE_FIELDS) {
       if (data[field] !== undefined) {
@@ -148,19 +122,56 @@ class PermissionService {
     }
 
     try {
-      const permission = await prismaClient.permission.updateMany({
-        where: {
-          user_id: userId,
-          ...(organizationId ? { organization_id: organizationId } : {}),
-        },
-        data: updateData,
+      return await prismaClient.$transaction(async (transaction) => {
+        const permission = await transaction.permission.updateMany({
+          where: {
+            user_id: userId,
+            ...(organizationId ? { organization_id: organizationId } : {}),
+          },
+          data: updateData,
+        });
+
+        if (permission.count === 0) {
+          throw new ServiceError(404, "Permissão não encontrada.");
+        }
+
+        const nextPermission = await transaction.permission.findFirst({
+          where: {
+            user_id: userId,
+            ...(organizationId ? { organization_id: organizationId } : {}),
+          },
+          select: PERMISSION_PUBLIC_SELECT,
+        });
+
+        if (!nextPermission) {
+          throw new ServiceError(404, "Permissão não encontrada.");
+        }
+
+        await transaction.user.update({
+          where: { id: userId },
+          data: { session_version: { increment: 1 } },
+        });
+
+        if (audit.actorUserId) {
+          await transaction.logs.create({
+            data: {
+              user_id: audit.actorUserId,
+              organization_id: organizationId ?? nextPermission.organization_id,
+              action: "UPDATE",
+              referring: "Permission",
+              referring_id: userId,
+              changes: {
+                affected_user_id: userId,
+                organization_id: organizationId ?? nextPermission.organization_id,
+                previous: previousPermission,
+                next: nextPermission,
+              },
+            },
+          });
+        }
+
+        return nextPermission;
       });
-
-      if (permission.count === 0) {
-        throw new ServiceError(404, "Permissão não encontrada.");
-      }
-
-      return this.getByUserId(userId, undefined, organizationId);
     } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
       logError("Erro ao atualizar permissão", { err });

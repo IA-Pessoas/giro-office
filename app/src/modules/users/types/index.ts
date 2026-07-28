@@ -20,20 +20,22 @@ export type UserType = "user" | "admin" | "owner";
 export type UserPermission = -1 | 0 | 1 | 2;
 
 export type KnownPermissionModuleKey =
-  | "atendimento"
   | "certificado"
+  | "comercial"
   | "contabil"
+  | "financeiro"
   | "fiscal"
   | "integracao"
-  | "pec"
+  | "marketing"
+  | "parcelamento"
   | "pessoal"
   | "regularize"
   | "rh"
   | "ti"
-  | "wiki";
+  | "triagem"
 
-export type KnownPermissionRecord = Record<KnownPermissionModuleKey, number | null>;
-export type PermissionDraft = Record<string, number | null>;
+export type KnownPermissionRecord = Record<KnownPermissionModuleKey, number>;
+export type PermissionDraft = Record<string, number>;
 
 export interface PermissionNormalizationResult {
   known: KnownPermissionRecord;
@@ -53,7 +55,7 @@ export interface CreateUserData {
   status?: string;
   invited_by?: string;
   first_owner_flag?: boolean;
-  modules?: Record<string, number | null>;
+  modules?: Record<string, number>;
 }
 
 export interface AdminCreateUserData extends CreateUserData {
@@ -70,5 +72,5 @@ export interface UpdateUserData {
   department_id?: string;
   status?: string;
   file?: File;
-  modules?: Record<string, number | null>;
+  modules?: Record<string, number>;
 }

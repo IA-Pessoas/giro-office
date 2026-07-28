@@ -19,7 +19,6 @@ type FiscalNcmFormPanelMode = "create" | "edit";
 interface FiscalNcmFormPanelProps {
   mode: FiscalNcmFormPanelMode;
   ncmId?: string;
-  searchCodes: string[];
   onClose: () => void;
   showHeader?: boolean;
   bare?: boolean;
@@ -84,7 +83,6 @@ function normalizeOptionalText(value: string) {
 export function FiscalNcmFormPanel({
   mode,
   ncmId,
-  searchCodes,
   onClose,
   showHeader = true,
   bare = false,
@@ -193,13 +191,8 @@ export function FiscalNcmFormPanel({
         });
         toast.success("NCM atualizado com sucesso.");
       } else {
-        const createdNcm = await createMutation.mutateAsync(basePayload);
-
-        if (!searchCodes.includes(createdNcm.ncm_code)) {
-          toast.success("Cadastro criado. Inclua o código NCM na busca para visualizar.");
-        } else {
-          toast.success("NCM cadastrado com sucesso.");
-        }
+        await createMutation.mutateAsync(basePayload);
+        toast.success("NCM cadastrado com sucesso.");
       }
 
       setFormState(DEFAULT_FORM_STATE);

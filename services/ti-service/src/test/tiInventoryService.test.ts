@@ -61,6 +61,44 @@ describe("TiInventoryService", () => {
     );
   });
 
+  it("list filters available inventory by missing user", async () => {
+    const prisma = {
+      inventoryTecnologia: {
+        findMany: vi.fn(async () => []),
+      },
+    };
+    const service = new TiInventoryService(prisma as never);
+
+    await service.list(context, { status: "available" });
+
+    expect(prisma.inventoryTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          user_id: null,
+        }),
+      }),
+    );
+  });
+
+  it("list filters assigned inventory by present user", async () => {
+    const prisma = {
+      inventoryTecnologia: {
+        findMany: vi.fn(async () => []),
+      },
+    };
+    const service = new TiInventoryService(prisma as never);
+
+    await service.list(context, { status: "assigned" });
+
+    expect(prisma.inventoryTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          user_id: { not: null },
+        }),
+      }),
+    );
+  });
+
   it("getById selects only safe user fields", async () => {
     const prisma = {
       inventoryTecnologia: {

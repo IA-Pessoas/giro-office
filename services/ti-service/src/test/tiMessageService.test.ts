@@ -13,7 +13,7 @@ const requestId = "30000000-0000-4000-8000-000000000001";
 const requesterContext = {
   organizationId,
   userId,
-  permission: TiPermissionLevel.Requester,
+  permission: TiPermissionLevel.Viewer,
 };
 
 describe("TiMessageService", () => {
