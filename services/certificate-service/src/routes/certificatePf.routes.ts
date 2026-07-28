@@ -10,6 +10,7 @@ import multer from "multer";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import {
+  requireCertificateDeletePermission,
   CERTIFICATE_ELEVATED_PERMISSION,
   requireCertificatePermission,
   requireCertificateReadPermission,
@@ -167,7 +168,7 @@ export function createCertificatePfRoutes(options: CreateCertificatePfRoutesOpti
     }
   });
 
-  router.delete("/:id/file", requireCertificatePermission, async (request, response, next) => {
+  router.delete("/:id/file", requireCertificateDeletePermission, async (request, response, next) => {
     try {
       const authContext = requireAuthenticatedRequestContext(request);
       const params = parseWithZod(certificatePfIdParamSchema, request.params);

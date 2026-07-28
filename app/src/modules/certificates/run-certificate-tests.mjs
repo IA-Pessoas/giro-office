@@ -159,7 +159,10 @@ const certificatesWorkspaceSource = readFileSync(
 runTest("separa permissao de edicao e remocao de arquivos", () => {
   assert.match(certificateFileActionsSource, /canDelete: boolean/);
   assert.match(certificateFileActionsSource, /\{canDelete \?/);
-  assert.match(certificatesWorkspaceSource, /canDelete=\{access\.isAdmin\}/);
+  assert.equal(
+    (certificatesWorkspaceSource.match(/canDelete=\{access\.isAdmin\}/g) ?? []).length,
+    4,
+  );
 });
 
 console.log("certificates contract tests passed");
