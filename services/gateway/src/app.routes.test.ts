@@ -1216,6 +1216,7 @@ it("proxies project-service routes mapped in the gateway", async () => {
     user_id: "user-1",
     organization_id: "org-1",
     permission: 2,
+    modules: { integracao: 1 },
   });
   const projectService = createServer((request, response) => {
     response.statusCode = 200;
@@ -2795,12 +2796,12 @@ it("blocks limited users without client-related module permission before proxyin
   }
 });
 
-it("allows Contabil viewers to proxy client list", async () => {
+it("allows Integration viewers to proxy client list", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
     permission: 1,
-    modules: { contabil: 0 },
+    modules: { integracao: 1 },
   });
   let seenUrl = "";
 

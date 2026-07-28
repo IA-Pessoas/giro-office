@@ -5,6 +5,7 @@ import {
   evaluateIntegracaoAction,
   findIntegracaoRoutePolicy,
   INTEGRACAO_ROUTE_POLICIES,
+  requireIntegracaoRouteAccess,
 } from "../src/auth/integracao.js";
 
 const expectedRoutes = [
@@ -31,6 +32,7 @@ const expectedRoutes = [
   "PUT /task/conclusion",
   "PUT /task/complete-request",
   "GET /task/model/list",
+  "GET /task/deps/list",
   "GET /task/model",
   "POST /task/model",
   "PUT /task/model",
@@ -79,7 +81,7 @@ test("resolve parâmetros e mantém o escopo da organização ativa", () => {
       isOwner: false,
       requestedFields: ["status"],
     }),
-    "not_found",
+    "forbidden",
   );
 });
 
@@ -158,6 +160,49 @@ test("nível 2 exige task_completion para aprovar conclusão", () => {
       level: 3,
     }),
     "allow",
+  );
+});
+
+test("nível 2 pode consultar modelos, mas não administrá-los", () => {
+  const listPolicy = requirePolicy("GET", "/task/model/list");
+  const dependenciesPolicy = requirePolicy("GET", "/task/deps/list");
+  const createPolicy = requirePolicy("POST", "/task/model");
+  const input = {
+    userId: "user-1",
+    level: 2 as const,
+    organizationId: "org-1",
+    resourceOrganizationId: "org-1",
+    isOwner: false,
+  };
+
+  assert.equal(evaluateIntegracaoAction(listPolicy, input), "allow");
+  assert.equal(evaluateIntegracaoAction(dependenciesPolicy, input), "allow");
+  assert.equal(evaluateIntegracaoAction(createPolicy, input), "forbidden");
+});
+
+test("helper traduz a decisão de política em 403 ou 404", () => {
+  assert.throws(
+    () =>
+      requireIntegracaoRouteAccess("GET", "/client/list", {
+        userId: "user-1",
+        level: 0,
+        organizationId: "org-1",
+        isOwner: false,
+      }),
+    { statusCode: 403 },
+  );
+
+  assert.throws(
+    () =>
+      requireIntegracaoRouteAccess("GET", "/task", {
+        userId: "user-1",
+        level: 0,
+        organizationId: "org-1",
+        resourceOrganizationId: "org-1",
+        responsibleId: "other-user",
+        isOwner: false,
+      }),
+    { statusCode: 404 },
   );
 });
 
