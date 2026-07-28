@@ -35,12 +35,22 @@ registerHooks({
       return nextResolve(`${specifier}.ts`, context);
     }
 
+    if (
+      specifier === "../utils/moduleAccess" &&
+      context.parentURL?.endsWith("/modules/auth/store/accessStore.ts")
+    ) {
+      return nextResolve(`${specifier}.ts`, context);
+    }
+
     return nextResolve(specifier, context);
   },
 });
 
 const { canSSRAdmin } = await import("./utils/canSSRAdmin.ts");
 const { getModulePermissionsFromToken } = await import("./utils/sessionToken.ts");
+const { getAccessStoreState, resetAccessStoreState, setAccessStoreState } = await import(
+  "./store/accessStore.ts",
+);
 
 async function runTest(name, fn) {
   try {
@@ -111,10 +121,6 @@ function createSsrContext(token) {
 
 const authContextSource = await readFile(
   new URL("../../context/AuthContext.tsx", import.meta.url),
-  "utf8",
-);
-const accessStoreSource = await readFile(
-  new URL("./store/accessStore.ts", import.meta.url),
   "utf8",
 );
 const accessStoreSyncSource = await readFile(
@@ -233,12 +239,28 @@ await (async () => {
   });
 
   await runTest("access store isolates snapshots by active organization", () => {
-    assert.match(accessStoreSource, /organization_id\?: string/);
     assert.match(accessStoreSyncSource, /organization_id: user\.organization_id/);
     assert.match(
       accessStoreSyncSource,
       /currentState\.user\?\.organization_id !== nextState\.user\?\.organization_id/,
     );
+
+    const initialState = getAccessStoreState();
+    try {
+      setAccessStoreState({
+        ...initialState,
+        user: { id: "user-1", permission: 0, organization_id: "org-a" },
+      });
+      assert.equal(getAccessStoreState().user?.organization_id, "org-a");
+
+      setAccessStoreState({
+        ...initialState,
+        user: { id: "user-1", permission: 0, organization_id: "org-b" },
+      });
+      assert.equal(getAccessStoreState().user?.organization_id, "org-b");
+    } finally {
+      resetAccessStoreState();
+    }
   });
 
   await runTest("resolveModuleAccess does not turn department admin into global admin", () => {
