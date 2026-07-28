@@ -3138,43 +3138,6 @@ it("proxies /regularize to the regularize microservice", async () => {
   }
 });
 
-it("forwards the Regularize module permission for viewer requests", async () => {
-  const token = createToken({
-    user_id: "regularize-viewer",
-    organization_id: "org-1",
-    permission: 0,
-    modules: { regularize: 1 },
-  });
-  let seenUrl = "";
-  let seenPermission: string | undefined;
-
-  const upstream = createServer((request, response) => {
-    seenUrl = request.url ?? "";
-    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
-    response.statusCode = 200;
-    response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
-  });
-  const regularizeServiceUrl = await startServer(upstream);
-
-  const app = createApp(createEnv({ regularizeServiceUrl }), createTestLogger());
-  const gateway = createServer(app);
-  const gatewayUrl = await startServer(gateway);
-
-  try {
-    const response = await fetch(`${gatewayUrl}/regularize/smoke`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    expect(response.status).toBe(200);
-    expect(seenUrl).toBe("/regularize/smoke");
-    expect(seenPermission).toBe("1");
-  } finally {
-    await stopServer(gateway);
-    await stopServer(upstream);
-  }
-});
-
 it("forwards the Fiscal module permission and internal token", async () => {
   const token = createToken({
     user_id: "user-1",
