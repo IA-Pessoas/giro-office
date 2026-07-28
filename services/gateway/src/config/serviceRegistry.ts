@@ -97,7 +97,6 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.regularizeServiceUrl,
       auditTarget: "regularize-service",
       routePrefixes: [...REGULARIZE_SERVICE_PREFIXES],
-      internalServiceToken: env.auditServiceToken,
       permissionModule: "regularize",
     },
     {

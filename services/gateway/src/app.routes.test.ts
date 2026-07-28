@@ -3147,12 +3147,10 @@ it("forwards the Regularize module permission for viewer requests", async () => 
   });
   let seenUrl = "";
   let seenPermission: string | undefined;
-  let seenInternalToken: string | undefined;
 
   const upstream = createServer((request, response) => {
     seenUrl = request.url ?? "";
     seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
-    seenInternalToken = request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined;
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ success: true, data: { proxied: true } }));
@@ -3171,7 +3169,6 @@ it("forwards the Regularize module permission for viewer requests", async () => 
     expect(response.status).toBe(200);
     expect(seenUrl).toBe("/regularize/smoke");
     expect(seenPermission).toBe("1");
-    expect(seenInternalToken).toBe("audit-service-token");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
