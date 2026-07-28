@@ -762,12 +762,9 @@ await (async () => {
     assert.equal(handleSavePermissionsSource.includes("refetchPermissionUsers"), false);
   });
 
-  await runTest("admin permissions tab is available to RH module admins", () => {
-    assert.match(administracaoSource, /const canManagePermissions = hasAdminAccess;/);
-    assert.equal(
-      administracaoSource.includes("const canManagePermissions = canManageOrganizationOwners;"),
-      false,
-    );
+  await runTest("admin permissions tab is available only to organization owners", () => {
+    assert.match(administracaoSource, /const canManagePermissions = canManageOrganizationOwners;/);
+    assert.equal(administracaoSource.includes("const canManagePermissions = hasAdminAccess;"), false);
   });
 
   await runTest("admin create user action uses native disabled state when context is unavailable", () => {
