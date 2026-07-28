@@ -66,5 +66,18 @@ export function createSituationRoutes(service: SituationService): Router {
     }
   });
 
+  router.delete("/:id", async (request, response, next) => {
+    try {
+      const context = getPessoalRouteContext(request);
+      const params = parseWithZod(situationIdParamsSchema, request.params);
+      const result = await service.delete(context, params.id);
+
+      response.status(200).json(createSuccessResponse(result));
+    } catch (err: unknown) {
+      logError("Erro ao remover situacao de pessoal", { err });
+      next(err);
+    }
+  });
+
   return router;
 }

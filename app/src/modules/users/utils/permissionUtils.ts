@@ -1,5 +1,6 @@
 import {
   KNOWN_PERMISSION_MODULE_KEYS,
+  RETIRED_PERMISSION_MODULE_KEYS,
   normalizePermissionForModule,
 } from "../constants/permissionConfig";
 import type {
@@ -11,6 +12,7 @@ import type {
 } from "../types";
 
 const PERMISSION_METADATA_KEYS = new Set(["id", "user_id", "organization_id"]);
+const RETIRED_PERMISSION_MODULE_KEY_SET = new Set<string>(RETIRED_PERMISSION_MODULE_KEYS);
 
 function isDevelopmentEnvironment(): boolean {
   return process.env.NODE_ENV === "development";
@@ -33,12 +35,16 @@ function isKnownPermissionModuleKey(key: string): key is KnownPermissionModuleKe
   return KNOWN_PERMISSION_MODULE_KEYS.includes(key as KnownPermissionModuleKey);
 }
 
-function normalizePermissionValue(value: unknown): number | null {
-  if (value === 0 || value === 1 || value === 2) {
+function isRetiredPermissionModuleKey(key: string): boolean {
+  return RETIRED_PERMISSION_MODULE_KEY_SET.has(key);
+}
+
+function normalizePermissionValue(value: unknown): number {
+  if (value === 0 || value === 1 || value === 2 || value === 3) {
     return value;
   }
 
-  return null;
+  return 0;
 }
 
 function createEmptyKnownPermissionRecord(): KnownPermissionRecord {
@@ -76,14 +82,14 @@ export function normalizePermissionResponse(raw: Record<string, unknown>): Permi
       continue;
     }
 
-    if (PERMISSION_METADATA_KEYS.has(key)) {
+    if (PERMISSION_METADATA_KEYS.has(key) || isRetiredPermissionModuleKey(key)) {
       continue;
     }
 
     warnPermissionInDev("Extra permission module returned by backend.", { moduleKey: key });
 
     const normalizedValue = normalizePermissionValue(value);
-    if (value !== null && normalizedValue === null) {
+    if (value !== undefined && ![0, 1, 2, 3].includes(value as number)) {
       invalidExtraKeys.push(key);
       warnPermissionInDev("Extra permission module returned invalid value.", {
         moduleKey: key,
@@ -116,7 +122,7 @@ export function normalizePermissionDraft(
   }
 
   for (const extraKey of allowedExtraKeys) {
-    if (!extraKey || isKnownPermissionModuleKey(extraKey)) {
+    if (!extraKey || isKnownPermissionModuleKey(extraKey) || isRetiredPermissionModuleKey(extraKey)) {
       continue;
     }
 
@@ -168,7 +174,7 @@ export function buildPermissionUpdatePayload(
   const payload: PermissionDraft = {};
 
   for (const moduleKey of KNOWN_PERMISSION_MODULE_KEYS) {
-    payload[moduleKey] = normalizedDraft[moduleKey] ?? null;
+    payload[moduleKey] = normalizedDraft[moduleKey] ?? 0;
   }
 
   if (extraKeys.length > 0) {
@@ -178,11 +184,11 @@ export function buildPermissionUpdatePayload(
   }
 
   for (const extraKey of extraKeys) {
-    if (!extraKey || isKnownPermissionModuleKey(extraKey)) {
+    if (!extraKey || isKnownPermissionModuleKey(extraKey) || isRetiredPermissionModuleKey(extraKey)) {
       continue;
     }
 
-    payload[extraKey] = normalizedDraft[extraKey] ?? null;
+    payload[extraKey] = normalizedDraft[extraKey] ?? 0;
   }
 
   return payload;

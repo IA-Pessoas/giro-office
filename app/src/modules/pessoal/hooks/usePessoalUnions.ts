@@ -58,3 +58,14 @@ export function useUpdatePessoalUnionMutation(
     },
   });
 }
+
+export function useDeletePessoalUnionMutation(): UseMutationResult<PessoalUnion, Error, string> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => pessoalService.deleteUnion(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: unionsKey });
+    },
+  });
+}

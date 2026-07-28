@@ -31,6 +31,8 @@ const errorDescriptions: Record<number, string> = {
   403: "Permissao insuficiente",
   404: "Recurso nao encontrado",
   409: "Conflito de dominio",
+  413: "Arquivo excede o limite permitido",
+  500: "Falha ao armazenar imagem",
 };
 
 function successResponse(description: string, schema?: OpenApiSchema): OpenApiResponse {
@@ -137,6 +139,41 @@ function jsonRequestBody(schemaRef: string): Record<string, unknown> {
     content: {
       "application/json": {
         schema: { $ref: schemaRef },
+      },
+    },
+  };
+}
+
+function tiMessageRequestBody(): Record<string, unknown> {
+  return {
+    required: true,
+    content: {
+      "application/json": {
+        schema: { $ref: "#/components/schemas/TiMessageInput" },
+      },
+      "multipart/form-data": {
+        schema: {
+          type: "object",
+          required: ["message"],
+          properties: {
+            message: { type: "string", minLength: 1 },
+            type: {
+              type: "string",
+              enum: ["Message", "Solution", "Rejection", "Acceptance"],
+            },
+            file: {
+              type: "string",
+              format: "binary",
+              description: "Imagem JPEG, PNG ou WebP de ate 5 MiB.",
+            },
+          },
+          additionalProperties: false,
+        },
+        encoding: {
+          file: {
+            contentType: "image/jpeg, image/png, image/webp",
+          },
+        },
       },
     },
   };
@@ -333,7 +370,6 @@ const schemas: Record<string, OpenApiSchema> = {
     required: ["message"],
     properties: {
       message: { type: "string", minLength: 1 },
-      attachment: { type: "string", format: "uri" },
       type: {
         type: "string",
         enum: ["Message", "Solution", "Rejection", "Acceptance"],
@@ -732,6 +768,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
             uuidQueryParameter("location_id", "Local do ativo"),
             uuidQueryParameter("user_id", "Usuario vinculado ao ativo"),
             stringQueryParameter("asset_code", "Codigo patrimonial"),
+            enumQueryParameter("status", "Disponibilidade do ativo", ["available", "assigned"]),
             ...paginationParameters(),
           ],
           successDescription: "Ativos listados",
@@ -1206,10 +1243,10 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           tags: ["TI Requests"],
           summary: "Cria mensagem em chamado de TI",
           parameters: [pathIdParameter("Chamado de TI")],
-          requestBody: jsonRequestBody("#/components/schemas/TiMessageInput"),
+          requestBody: tiMessageRequestBody(),
           successStatus: 201,
           successDescription: "Mensagem criada",
-          errors: [400, 401, 403, 404],
+          errors: [400, 401, 403, 404, 413, 500],
         }),
       },
       "/ti/request-categories/list": {

@@ -4,6 +4,7 @@ import type {
   CreateFiscalNcmPayload,
   FiscalNcm,
   FiscalNcmListFilters,
+  FiscalNcmListResult,
   UpdateFiscalNcmPayload,
 } from "../types";
 import {
@@ -12,18 +13,21 @@ import {
   FISCAL_ENDPOINTS,
   unwrapFiscalCreate,
   unwrapFiscalDetail,
-  unwrapFiscalEnvelope,
+  unwrapFiscalPaginatedEnvelope,
   unwrapFiscalMutation,
 } from "./fiscalService.contract";
 
 export const fiscalNcmService = {
-  async list(filters: FiscalNcmListFilters = {}): Promise<FiscalNcm[]> {
+  async list(filters: FiscalNcmListFilters = {}): Promise<FiscalNcmListResult> {
     const api = setupAPIClient();
     const response = await api.get(FISCAL_ENDPOINTS.ncmList, {
       params: buildFiscalNcmListParams(filters),
     });
 
-    return unwrapFiscalEnvelope<FiscalNcm[]>(response.data);
+    return unwrapFiscalPaginatedEnvelope<FiscalNcm>(response.data, {
+      page: filters.page ?? 1,
+      limit: filters.page_size ?? 50,
+    });
   },
 
   async detail(ncmId: string): Promise<FiscalNcm> {

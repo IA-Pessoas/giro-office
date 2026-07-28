@@ -7,12 +7,15 @@ import { getSmokeSpecFiles } from "./service-registry.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const EXEMPT_ROUTE_KEYS = new Set([
+export const EXEMPT_ROUTE_KEYS = new Set([
   "GET|/health",
   "GET|/ready",
   "POST|/user/session",
   "POST|/user/start-config",
+  "GET|/user/session/validate",
 ]);
+
+export const EXEMPT_SPEC_OPERATION_KEYS = new Set(["user-service|GET|/user/session/validate"]);
 
 const GOOD_STATUS_OVERRIDES = new Map([
   ["userStartConfig", [200, 409]],
@@ -2352,6 +2355,14 @@ const baseManifest = [
   }),
   op({
     service: "pessoal-service",
+    method: "DELETE",
+    path: "/pessoal/situations/{id}",
+    action: "pessoalSituationDelete",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "pessoal-service",
     method: "GET",
     path: "/pessoal/unions",
     action: "pessoalUnionList",
@@ -2379,6 +2390,14 @@ const baseManifest = [
     method: "PATCH",
     path: "/pessoal/unions/{id}",
     action: "pessoalUnionPatch",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "pessoal-service",
+    method: "DELETE",
+    path: "/pessoal/unions/{id}",
+    action: "pessoalUnionDelete",
     target: "gateway",
     auth: "bearer",
   }),

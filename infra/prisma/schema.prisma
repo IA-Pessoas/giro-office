@@ -254,6 +254,7 @@ model User {
   organization_id             String?
   type                        enumType?
   first_owner_flag            Boolean?               @default(false)
+  session_version             Int                    @default(0)
   permission_id               String?                @unique
   department_id               String
   invited_by                  String?
@@ -342,22 +343,19 @@ model User {
 model Permission {
   id              String       @id @default(uuid())
   user_id         String
-  atendimento     Int?
-  certificado     Int?
-  comercial       Int?
-  contabil        Int?
-  financeiro      Int?
-  fiscal          Int?
-  integracao      Int?
-  marketing       Int?
-  parcelamento    Int?
-  pec             Int?
-  pessoal         Int?
-  regularize      Int?
-  rh              Int?
-  ti              Int?
-  triagem         Int?
-  wiki            Int?
+  certificado     Int      @default(0)
+  comercial       Int      @default(0)
+  contabil        Int      @default(0)
+  financeiro      Int      @default(0)
+  fiscal          Int      @default(0)
+  integracao      Int      @default(0)
+  marketing       Int      @default(0)
+  parcelamento    Int      @default(0)
+  pessoal         Int      @default(0)
+  regularize      Int      @default(0)
+  rh              Int      @default(0)
+  ti              Int      @default(0)
+  triagem         Int      @default(0)
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
   user            User         @relation(fields: [user_id], references: [id])
@@ -1444,7 +1442,7 @@ model Payroll {
   organization_id String
   organization    Organization  @relation(fields: [organization_id], references: [id])
   responsible     User?         @relation(fields: [responsible_id], references: [id])
-  union           UnionPessoal? @relation(fields: [union_id], references: [id])
+  union           UnionPessoal? @relation(fields: [union_id], references: [id], onDelete: Restrict)
 
   @@map("pessoal.payroll")
 }

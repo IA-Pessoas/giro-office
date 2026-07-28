@@ -1,4 +1,10 @@
-import { type AuthUserType, error as logError, ServiceError } from "@workspace/shared";
+import {
+  ACTIVE_MODULE_KEYS,
+  type AuthUserType,
+  error as logError,
+  ServiceError,
+  type ModulePermissionKey,
+} from "@workspace/shared";
 import bcrypt from "bcryptjs";
 
 import type { Prisma } from "../generated/prisma/client.js";
@@ -29,38 +35,21 @@ const USER_CREATE_SELECT = {
 } as const;
 
 const DEFAULT_NON_OWNER_PERMISSION = 1;
-const OWNER_MAX_MODULE_VALUE = 2;
+const OWNER_GLOBAL_PERMISSION = 2;
+const MAX_MODULE_PERMISSION = 3;
 const SELF_SERVICE_PERMISSION = 1;
-const MODULE_FIELDS = [
-  "atendimento",
-  "certificado",
-  "comercial",
-  "contabil",
-  "financeiro",
-  "fiscal",
-  "integracao",
-  "marketing",
-  "parcelamento",
-  "pec",
-  "pessoal",
-  "regularize",
-  "rh",
-  "ti",
-  "triagem",
-  "wiki",
-] as const;
-type ModuleField = (typeof MODULE_FIELDS)[number];
-type ModulePatch = Partial<Record<ModuleField, number | null>>;
+const MODULE_FIELDS = [...ACTIVE_MODULE_KEYS] as const;
+type ModuleField = ModulePermissionKey;
+type ModulePatch = Partial<Record<ModuleField, number>>;
 
 const MAX_MODULES = Object.fromEntries(
-  MODULE_FIELDS.map((field) => [field, OWNER_MAX_MODULE_VALUE]),
+  MODULE_FIELDS.map((field) => [field, MAX_MODULE_PERMISSION]),
 ) as Record<ModuleField, number>;
-const EMPTY_MODULES = Object.fromEntries(MODULE_FIELDS.map((field) => [field, null])) as Record<
+const EMPTY_MODULES = Object.fromEntries(MODULE_FIELDS.map((field) => [field, 0])) as Record<
   ModuleField,
-  null
+  0
 >;
 const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleField> = {
-  atendimento: "atendimento",
   certificado: "certificado",
   comercial: "comercial",
   contabil: "contabil",
@@ -71,7 +60,6 @@ const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleField> = {
   integracao_de_clientes: "integracao",
   marketing: "marketing",
   parcelamento: "parcelamento",
-  pec: "pec",
   pessoal: "pessoal",
   departamento_pessoal: "pessoal",
   regularize: "regularize",
@@ -80,7 +68,6 @@ const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleField> = {
   tecnologia: "ti",
   ti: "ti",
   triagem: "triagem",
-  wiki: "wiki",
 };
 
 interface CreateUserInput {
@@ -95,7 +82,7 @@ interface CreateUserInput {
   organization_id?: string;
   type?: AuthUserType;
   first_owner_flag?: boolean;
-  modules?: Record<string, number | null>;
+  modules?: Record<string, number>;
 }
 
 interface UpdateUserInput {
@@ -109,7 +96,7 @@ interface UpdateUserInput {
   organization_id?: string | null;
   type?: AuthUserType | null;
   first_owner_flag?: boolean;
-  modules?: Record<string, number | null>;
+  modules?: Record<string, number>;
 }
 
 interface ListUsersParams {
@@ -165,7 +152,7 @@ function normalizeUserType(value: unknown): AuthUserType | null {
   return value === "owner" || value === "admin" || value === "user" ? value : null;
 }
 
-function pickKnownModules(modules: Record<string, number | null> | undefined): ModulePatch {
+function pickKnownModules(modules: Record<string, number> | undefined): ModulePatch {
   const modulePatch: ModulePatch = {};
 
   if (!modules) {
@@ -187,10 +174,10 @@ function hasModulePatch(modulePatch: ModulePatch): boolean {
 
 function normalizePermissionForType(type: AuthUserType | null, permission: number): number {
   if (type === "owner") {
-    return OWNER_MAX_MODULE_VALUE;
+    return OWNER_GLOBAL_PERMISSION;
   }
 
-  if (type === "admin" && permission >= OWNER_MAX_MODULE_VALUE) {
+  if (type === "admin" && permission >= OWNER_GLOBAL_PERMISSION) {
     return DEFAULT_NON_OWNER_PERMISSION;
   }
 
@@ -213,7 +200,7 @@ function withDepartmentAdminModule(
 
   return {
     ...modules,
-    [departmentModule]: OWNER_MAX_MODULE_VALUE,
+    [departmentModule]: MAX_MODULE_PERMISSION,
   };
 }
 
@@ -270,7 +257,10 @@ class UserService {
     return normalizeUserOrganization(user, organizationId);
   }
 
-  async create(data: CreateUserInput): Promise<UserPublicRow | UserCreateRow> {
+  async create(
+    data: CreateUserInput,
+    actorUserId?: string,
+  ): Promise<UserPublicRow | UserCreateRow> {
     const department = data.organization_id
       ? await this.#requireDepartmentInOrganization(data.department_id, data.organization_id)
       : null;
@@ -314,7 +304,13 @@ class UserService {
           const permission = await permissionService.create(user.id, data.organization_id);
 
           if (hasModulePatch(modulesToApply)) {
-            await permissionService.update(user.id, modulesToApply, data.organization_id);
+            if (actorUserId) {
+              await permissionService.update(user.id, modulesToApply, data.organization_id, {
+                actorUserId,
+              });
+            } else {
+              await permissionService.update(user.id, modulesToApply, data.organization_id);
+            }
           }
 
           await prismaClient.user.update({
@@ -347,7 +343,12 @@ class UserService {
     }
   }
 
-  async update(id: string, data: UpdateUserInput, organizationId: string): Promise<UserPublicRow> {
+  async update(
+    id: string,
+    data: UpdateUserInput,
+    organizationId: string,
+    actorUserId?: string,
+  ): Promise<UserPublicRow> {
     const existingUser = await prismaClient.user.findFirst({
       where: userOrganizationWhere(id, organizationId),
       select: { ...USER_PUBLIC_SELECT, permission_id: true },
@@ -374,18 +375,18 @@ class UserService {
     if (data.permission !== undefined) {
       updateData.permission = normalizePermissionForType(requestedType, data.permission);
     } else if (data.type !== undefined && requestedType === "owner") {
-      updateData.permission = OWNER_MAX_MODULE_VALUE;
+      updateData.permission = OWNER_GLOBAL_PERMISSION;
     } else if (
       data.type !== undefined &&
       requestedType === "admin" &&
       typeof existingUser.permission === "number" &&
-      existingUser.permission >= OWNER_MAX_MODULE_VALUE
+      existingUser.permission >= OWNER_GLOBAL_PERMISSION
     ) {
       updateData.permission = DEFAULT_NON_OWNER_PERMISSION;
     } else if (
       data.type === "user" &&
       typeof existingUser.permission === "number" &&
-      existingUser.permission >= OWNER_MAX_MODULE_VALUE
+      existingUser.permission >= OWNER_GLOBAL_PERMISSION
     ) {
       updateData.permission = DEFAULT_NON_OWNER_PERMISSION;
     }
@@ -469,7 +470,11 @@ class UserService {
           throw new ServiceError(400, "Usuario nao possui permissao. Crie a permissao primeiro.");
         }
         const permissionService = new PermissionService();
-        await permissionService.update(id, modulesToApply, organizationId);
+        if (actorUserId) {
+          await permissionService.update(id, modulesToApply, organizationId, { actorUserId });
+        } else {
+          await permissionService.update(id, modulesToApply, organizationId);
+        }
       }
 
       return normalizeUserOrganization(user, organizationId);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   Activity,
   ArrowRight,
@@ -169,6 +169,8 @@ type ListQuery<T> = {
   isLoading: boolean;
   refetch: () => Promise<unknown>;
 };
+
+type ProcessSelectionOrigin = "automatic" | "manual";
 
 const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "dashboard", label: "Dashboard", icon: BarChart3 },
@@ -599,9 +601,21 @@ function DataTable({
   );
 }
 
-function DetailPanel({ children, title }: { children: ReactNode; title: string }) {
+function DetailPanel({
+  children,
+  panelRef,
+  title,
+}: {
+  children: ReactNode;
+  panelRef?: RefObject<HTMLElement | null>;
+  title: string;
+}) {
   return (
-    <aside className="flex h-full min-h-32 flex-col rounded-lg border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+    <aside
+      ref={panelRef}
+      tabIndex={panelRef ? -1 : undefined}
+      className="flex h-full min-h-32 flex-col rounded-lg border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+    >
       <h3 className="text-sm font-semibold text-gray-950 dark:text-white">{title}</h3>
       <div className="mt-3 flex flex-1 flex-col space-y-2 text-sm text-gray-600 dark:text-slate-300">
         {children}
@@ -680,6 +694,10 @@ export function RegularizePage() {
   const [selectedCredentialClient, setSelectedCredentialClient] =
     useState<ClientPickerOption | null>(null);
   const [selectedProcessId, setSelectedProcessId] = useState<RegularizeId>();
+  const [processSelectionOrigin, setProcessSelectionOrigin] = useState<ProcessSelectionOrigin>(
+    "automatic",
+  );
+  const selectedProcessDetailRef = useRef<HTMLElement | null>(null);
   const [activePasswordId, setActivePasswordId] = useState<RegularizeId>();
   const [activeSitePasswordId, setActiveSitePasswordId] = useState<RegularizeId>();
   const [activeForm, setActiveForm] = useState<RegularizeFormState | null>(null);
@@ -764,10 +782,11 @@ export function RegularizePage() {
   const updateLicenseMutation = useUpdateRegularizeLicenseMutation();
 
   const firstClientPfId = pfQuery.data?.[0]?.id;
-  const firstProcessId = processQuery.data?.[0]?.id;
+  const visibleProcessRows = isProcessSearchPending ? [] : processPageQuery.data?.data ?? [];
+  const automaticProcessId = visibleProcessRows[0]?.id;
   const currentCredentialClientId = selectedCredentialClientId;
   const currentClientPfId = selectedClientPfId ?? firstClientPfId;
-  const currentProcessId = selectedProcessId ?? firstProcessId;
+  const currentProcessId = selectedProcessId ?? automaticProcessId;
 
   const partnerQuery = useRegularizePartners(
     currentClientPfId ? { type: "pf", client_id: currentClientPfId } : undefined,
@@ -815,14 +834,10 @@ export function RegularizePage() {
   }, [firstClientPfId, selectedClientPfId]);
 
   useEffect(() => {
-    if (!selectedProcessId && firstProcessId) {
-      setSelectedProcessId(firstProcessId);
-    }
-  }, [firstProcessId, selectedProcessId]);
-
-  useEffect(() => {
     const result = processPageQuery.data;
     if (result && result.data.length === 0 && result.total > 0 && processPage > 1) {
+      setSelectedProcessId(undefined);
+      setProcessSelectionOrigin("automatic");
       setProcessPage(getLastPage(result.total, REGULARIZE_PAGE_SIZE));
     }
   }, [processPage, processPageQuery.data]);
@@ -836,7 +851,7 @@ export function RegularizePage() {
 
   const processTableQuery: ListQuery<RegularizeProcessListItem> = {
     ...processPageQuery,
-    data: isProcessSearchPending ? undefined : processPageQuery.data?.data,
+    data: isProcessSearchPending ? undefined : visibleProcessRows,
     isLoading: isProcessSearchPending || processPageQuery.isLoading,
   };
   const siteTableQuery: ListQuery<RegularizeSitePasswordListItem> = {
@@ -846,7 +861,7 @@ export function RegularizePage() {
   };
 
   const dashboardRequestId = getRegularizeRequestId(dashboardQuery.error);
-  const hasProcessRows = (processQuery.data?.length ?? 0) > 0;
+  const hasProcessRows = visibleProcessRows.length > 0;
   const hasSiteRows = (siteQuery.data?.length ?? 0) > 0;
 
   const pfOptions = useMemo<RegularizeFormOption[]>(
@@ -913,6 +928,25 @@ export function RegularizePage() {
       : null;
   const activePartnerForForm =
     activeForm?.type === "partner" && activeForm.mode === "edit" ? activeForm.partner : null;
+
+  function resetProcessSelection() {
+    setSelectedProcessId(undefined);
+    setProcessSelectionOrigin("automatic");
+  }
+
+  function selectProcessManually(processId: RegularizeId) {
+    setSelectedProcessId(processId);
+    setProcessSelectionOrigin("manual");
+
+    if (typeof window === "undefined" || window.matchMedia("(min-width: 1280px)").matches) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      selectedProcessDetailRef.current?.focus({ preventScroll: true });
+      selectedProcessDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   function handleRefreshRegularize() {
     const refreshes: Promise<unknown>[] = [];
@@ -1056,6 +1090,7 @@ export function RegularizePage() {
           : await createProcessMutation.mutateAsync(payload);
 
       setSelectedProcessId(savedProcess.id);
+      setProcessSelectionOrigin("manual");
       toast.success("Processo salvo com sucesso.");
       closeCoreForm();
     } catch (error) {
@@ -1415,6 +1450,7 @@ export function RegularizePage() {
                 <input
                   value={processSearch}
                   onChange={(event) => {
+                    resetProcessSelection();
                     setProcessSearch(event.target.value);
                     setProcessPage(1);
                   }}
@@ -1428,6 +1464,7 @@ export function RegularizePage() {
               <RegularizeNativeSelect
                 value={processStatus}
                 onChange={(event) => {
+                  resetProcessSelection();
                   setProcessStatus(event.target.value);
                   setProcessPage(1);
                 }}
@@ -1453,7 +1490,14 @@ export function RegularizePage() {
                 <div>
                   <DataTable headers={["Processo", "Cliente", "Documento", "Status", ""]}>
                     {processRows.map((item) => (
-                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                    <tr
+                      key={item.id}
+                      aria-selected={currentProcessId === item.id}
+                      className={cn(
+                        "text-gray-700 transition-colors dark:text-slate-200",
+                        currentProcessId === item.id && "bg-blue-50 dark:bg-blue-950/30",
+                      )}
+                    >
                       <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
                       <td className="px-4 py-3">{getProcessClientName(item)}</td>
                       <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
@@ -1465,14 +1509,14 @@ export function RegularizePage() {
                           <TableActionButton
                             icon={Eye}
                             title="Ver detalhe"
-                            onClick={() => setSelectedProcessId(item.id)}
+                            onClick={() => selectProcessManually(item.id)}
                           />
                           {canManageRegularizeCore ? (
                             <TableActionButton
                               icon={Pencil}
                               title="Editar processo"
                               onClick={() => {
-                                setSelectedProcessId(item.id);
+                                selectProcessManually(item.id);
                                 setActiveForm({ type: "process", mode: "edit", id: item.id });
                               }}
                             />
@@ -1489,15 +1533,30 @@ export function RegularizePage() {
                     count={processRows.length}
                     hasMore={processPageQuery.data?.hasMore ?? false}
                     isFetching={processPageQuery.isFetching || isProcessSearchPending}
-                    onPrevious={() => setProcessPage((current) => Math.max(1, current - 1))}
-                    onNext={() => setProcessPage((current) => current + 1)}
+                    onPrevious={() => {
+                      resetProcessSelection();
+                      setProcessPage((current) => Math.max(1, current - 1));
+                    }}
+                    onNext={() => {
+                      resetProcessSelection();
+                      setProcessPage((current) => current + 1);
+                    }}
                   />
                 </div>
               )}
             </QueryStatePanel>
 
             {hasProcessRows ? (
-              <DetailPanel title="Processo selecionado">
+              <DetailPanel title="Processo selecionado" panelRef={selectedProcessDetailRef}>
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="text-xs font-medium text-gray-500 dark:text-slate-400"
+                >
+                  {processSelectionOrigin === "manual"
+                    ? "Processo selecionado manualmente."
+                    : "Primeiro processo desta página selecionado automaticamente."}
+                </p>
                 {processDetailQuery.isLoading ? (
                   <FieldLine label="Status" value="Carregando..." />
                 ) : processDetailQuery.data ? (

@@ -30,7 +30,7 @@ export function createTiRequestCategoryRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const organizationId = requireOrganizationId(request.organization_id);
@@ -47,7 +47,7 @@ export function createTiRequestCategoryRoutes(prisma: PrismaClient): Router {
 
   router.post(
     "/",
-    requireTiPermission(TiPermissionLevel.Admin),
+    requireTiPermission(TiPermissionLevel.Requester),
     async (request, response, next) => {
       try {
         const organizationId = requireOrganizationId(request.organization_id);
@@ -64,7 +64,7 @@ export function createTiRequestCategoryRoutes(prisma: PrismaClient): Router {
 
   router.patch(
     "/:id",
-    requireTiPermission(TiPermissionLevel.Admin),
+    requireTiPermission(TiPermissionLevel.Requester),
     async (request, response, next) => {
       try {
         const organizationId = requireOrganizationId(request.organization_id);

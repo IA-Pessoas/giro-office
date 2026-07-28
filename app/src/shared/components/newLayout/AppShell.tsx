@@ -157,6 +157,26 @@ function normalizeRoutePath(routePath: string): string {
 
 function getModuleKeyFromRoutePath(routePath: string): ModuleKey | null {
   const normalizedPath = normalizeRoutePath(routePath);
+
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/commercial")) {
+    return "comercial";
+  }
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/contabil")) {
+    return "contabil";
+  }
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/finance")) {
+    return "financeiro";
+  }
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/integration")) {
+    return "integracao";
+  }
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/regularize")) {
+    return "regularize";
+  }
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/pa")) {
+    return "pessoal";
+  }
+
   const mappedRoute = Object.entries(APP_ROUTE_MODULE_MAP).find(([modulePath]) => {
     return normalizedPath === modulePath || normalizedPath.startsWith(`${modulePath}/`);
   });
@@ -255,7 +275,13 @@ type AppShellNotification = {
   unread: boolean;
 };
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  isIframeView = false,
+}: {
+  children: React.ReactNode;
+  isIframeView?: boolean;
+}) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
   const meQuery = useMe();
@@ -473,6 +499,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
     chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
   }, [chatMessages, showAiChat]);
+
+  if (isIframeView) {
+    return <div className="min-h-screen bg-gray-50 dark:bg-slate-950">{mainContent}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">

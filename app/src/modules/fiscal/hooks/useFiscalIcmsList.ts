@@ -3,18 +3,24 @@ import { keepPreviousData, type UseQueryResult } from "@tanstack/react-query";
 import { useFetch } from "@shared/hooks";
 
 import { fiscalIcmsService } from "../services";
-import type { FiscalIcms } from "../types";
-import { fiscalIcmsListQueryKey } from "./queryKeys";
+import type { FiscalIcmsListFilters, FiscalIcmsListResult } from "../types";
+import { FISCAL_LIST_PAGE_SIZE, fiscalIcmsListQueryKey } from "./queryKeys";
 
 export function useFiscalIcmsList(
-  icmsTerms: string[],
+  filters: FiscalIcmsListFilters = {},
   enabled = true,
-): UseQueryResult<FiscalIcms[], Error> {
+): UseQueryResult<FiscalIcmsListResult, Error> {
+  const listFilters = {
+    ...filters,
+    page: filters.page ?? 1,
+    page_size: filters.page_size ?? FISCAL_LIST_PAGE_SIZE,
+  };
+
   return useFetch(
-    fiscalIcmsListQueryKey(icmsTerms),
-    () => fiscalIcmsService.list({ icmsCodes: icmsTerms }),
+    fiscalIcmsListQueryKey(listFilters),
+    () => fiscalIcmsService.list(listFilters),
     {
-      enabled: enabled && icmsTerms.length > 0,
+      enabled,
       placeholderData: keepPreviousData,
     },
   );

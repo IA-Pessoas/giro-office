@@ -1,6 +1,8 @@
 import { zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+import { commaSeparatedListSchema, paginationQuerySchema } from "./pagination.schemas.js";
+
 const ipiIdSchema = z.string().uuid({ message: "ipi_id inválido." });
 
 export const createIpiBodySchema = z
@@ -30,13 +32,7 @@ export const detailIpiQuerySchema = z
 
 export const listIpiQuerySchema = z
   .object({
-    ipiCodes: z.preprocess(
-      (value) => {
-        if (Array.isArray(value)) return value;
-        if (typeof value === "string") return value.split(",").filter(Boolean);
-        return [];
-      },
-      z.array(z.string().min(1)).min(1, "ipiCodes é obrigatório."),
-    ),
+    ...paginationQuerySchema.shape,
+    ipiCodes: commaSeparatedListSchema,
   })
   .strict();

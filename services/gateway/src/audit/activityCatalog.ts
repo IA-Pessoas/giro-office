@@ -91,6 +91,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "concluiu", item: "uma tarefa" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dashboard$/,
+    description: { action: "consultou", item: "o painel de regularização" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/task\/project-plan\/hire$/,
     description: { action: "contratou", item: "um plano de projeto" },

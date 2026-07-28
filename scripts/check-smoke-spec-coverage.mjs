@@ -16,7 +16,7 @@ const harnessModule = await import(
   pathToFileURL(path.join(__dirname, "service-harness-lib.mjs")).href
 );
 
-const { manifest, specFiles } = manifestModule;
+const { EXEMPT_SPEC_OPERATION_KEYS, manifest, specFiles } = manifestModule;
 const { serviceRegistry } = registryModule;
 const { extractOpenApiOperationsFromSource } = harnessModule;
 
@@ -92,7 +92,11 @@ for (const [key, entries] of routeGroups.entries()) {
   }
 }
 
-const specKeys = new Set(specOperations.map(asKey));
+const specKeys = new Set(
+  specOperations
+    .filter((operation) => !EXEMPT_SPEC_OPERATION_KEYS.has(asKey(operation)))
+    .map(asKey),
+);
 const manifestKeys = new Set(manifestOperations.map(asKey));
 
 const missing = [...specKeys].filter((key) => !manifestKeys.has(key));

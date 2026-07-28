@@ -4,6 +4,9 @@ import type { Prisma } from "../generated/prisma/client.js";
 
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
+import {
+  parseTaskModelResponsibleSequence,
+} from "../schemas/taskModelResponsibleSequence.schemas.js";
 
 export interface CreateModelRequest {
   user_id: string;
@@ -103,6 +106,11 @@ export class TaskModelService {
 
   async createModel(data: CreateModelRequest): Promise<{ create: TaskModelRow }> {
     try {
+      const responsibleSequence = parseTaskModelResponsibleSequence({
+        responsible_id: data.responsible_id,
+        responsible2_id: data.responsible2_id ?? null,
+        responsible3_id: data.responsible3_id ?? null,
+      });
       const exists = await prismaClient.taskModel.findFirst({
         where: {
           name: data.name,
@@ -121,9 +129,9 @@ export class TaskModelService {
         data: {
           name: data.name,
           department_id: data.department_id,
-          responsible_id: data.responsible_id,
-          responsible2_id: data.responsible2_id ?? null,
-          responsible3_id: data.responsible3_id ?? null,
+          responsible_id: responsibleSequence.responsible_id,
+          responsible2_id: responsibleSequence.responsible2_id,
+          responsible3_id: responsibleSequence.responsible3_id,
           observations: data.observations ?? null,
           billing: data.billing,
           prevision: data.prevision,
@@ -171,6 +179,11 @@ export class TaskModelService {
 
   async updateModel(data: UpdateModelRequest): Promise<TaskModelRow> {
     try {
+      const responsibleSequence = parseTaskModelResponsibleSequence({
+        responsible_id: data.responsible_id,
+        responsible2_id: data.responsible2_id ?? null,
+        responsible3_id: data.responsible3_id ?? null,
+      });
       const organizationId = data.organization_id ?? "";
       const exists = await prismaClient.taskModel.findFirst({
         where: { id: data.task_id, organization_id: organizationId },
@@ -187,9 +200,9 @@ export class TaskModelService {
         data: {
           name: data.name,
           department_id: data.department_id,
-          responsible_id: data.responsible_id,
-          responsible2_id: data.responsible2_id ?? null,
-          responsible3_id: data.responsible3_id ?? null,
+          responsible_id: responsibleSequence.responsible_id,
+          responsible2_id: responsibleSequence.responsible2_id,
+          responsible3_id: responsibleSequence.responsible3_id,
           observations: data.observations ?? null,
           billing: data.billing,
           prevision: data.prevision,
