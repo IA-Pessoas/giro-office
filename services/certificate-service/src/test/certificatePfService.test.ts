@@ -620,6 +620,35 @@ describe("CertificatePfService", () => {
     );
   });
 
+  it("deleteCertificatePf keeps the tenant record when storage deletion fails", async () => {
+    const { storage, crypto } = createCertificateFileDeps();
+    const objectPath =
+      "organizations/10000000-0000-4000-8000-000000000001/certificate-pf/30000000-0000-4000-8000-000000000001/file.pfx.enc";
+    storage.deleteObject.mockRejectedValueOnce(new Error("storage unavailable"));
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () => createCertificatePfRecord({ file_path: objectPath })),
+        delete: vi.fn(),
+      },
+    };
+    const service = new CertificatePfService(prisma as never, {
+      fileStorage: storage,
+      fileCrypto: crypto,
+      storageProvider: "local",
+      storageBucket: "Certificados",
+    });
+
+    await expect(
+      service.deleteCertificatePf({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+      }),
+    ).rejects.toThrow("storage unavailable");
+
+    expect(storage.deleteObject).toHaveBeenCalledWith(objectPath);
+    expect(prisma.certificatePF.delete).not.toHaveBeenCalled();
+  });
+
   it("deleteCertificatePf deletes a tenant record without a stored file", async () => {
     const prisma = {
       certificatePF: {

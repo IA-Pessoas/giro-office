@@ -587,6 +587,35 @@ describe("CertificatePjService", () => {
     expect(prisma.certificatePJ.update).not.toHaveBeenCalled();
   });
 
+  it("deleteCertificatePj keeps the tenant record when storage deletion fails", async () => {
+    const { storage, crypto } = createCertificateFileDeps();
+    const objectPath =
+      "organizations/10000000-0000-4000-8000-000000000001/certificate-pj/20000000-0000-4000-8000-000000000001/file.pfx.enc";
+    storage.deleteObject.mockRejectedValueOnce(new Error("storage unavailable"));
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => createCertificatePjRecord({ file_path: objectPath })),
+        delete: vi.fn(),
+      },
+    };
+    const service = new CertificatePjService(prisma as never, {
+      fileStorage: storage,
+      fileCrypto: crypto,
+      storageProvider: "local",
+      storageBucket: "Certificados",
+    });
+
+    await expect(
+      service.deleteCertificatePj({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+      }),
+    ).rejects.toThrow("storage unavailable");
+
+    expect(storage.deleteObject).toHaveBeenCalledWith(objectPath);
+    expect(prisma.certificatePJ.delete).not.toHaveBeenCalled();
+  });
+
   it("deleteCertificatePj returns 404 without touching storage outside the organization", async () => {
     const { storage, crypto } = createCertificateFileDeps();
     const prisma = {

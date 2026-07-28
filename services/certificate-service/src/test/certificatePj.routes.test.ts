@@ -478,6 +478,37 @@ describe("certificate PJ routes", () => {
     expect(fileStorage.deleteObject).toHaveBeenCalledWith(objectPath);
   });
 
+  it("DELETE /certificate/pj/:id returns 500 and keeps the record when storage deletion fails", async () => {
+    const objectPath =
+      "organizations/10000000-0000-4000-8000-000000000001/certificate-pj/20000000-0000-4000-8000-000000000001/file.pfx.enc";
+    const prisma = createCertificatePrismaMock();
+    vi.mocked(prisma.certificatePJ.findFirst).mockResolvedValueOnce({
+      id: certificateId,
+      organization_id: certificateOrganizationId,
+      file_path: objectPath,
+    } as never);
+    const fileStorage = {
+      putObject: vi.fn(),
+      getObject: vi.fn(),
+      deleteObject: vi.fn(async () => {
+        throw new Error("storage unavailable");
+      }),
+    };
+    const app = createCertificateTestApp(prisma, { fileStorage });
+
+    const response = await request(app)
+      .delete(`/certificate/pj/${certificateId}`)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(500);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "INTERNAL_ERROR",
+    });
+    expect(fileStorage.deleteObject).toHaveBeenCalledWith(objectPath);
+    expect(prisma.certificatePJ.delete).not.toHaveBeenCalled();
+  });
+
   it("DELETE /certificate/pj/:id returns 404 for a certificate outside the organization", async () => {
     const prisma = createCertificatePrismaMock();
     vi.mocked(prisma.certificatePJ.findFirst).mockResolvedValueOnce(null);
