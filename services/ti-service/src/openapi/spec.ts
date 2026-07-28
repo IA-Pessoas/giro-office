@@ -1067,7 +1067,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Categoria de estoque de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiStockCategoryUpdateInput"),
           successDescription: "Categoria de estoque atualizada",
-          errors: [400, 401, 403, 404],
+          errors: [400, 401, 403, 404, 409],
         }),
       },
       "/ti/stock/locations/list": {
