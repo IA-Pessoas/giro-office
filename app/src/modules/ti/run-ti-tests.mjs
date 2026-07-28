@@ -572,6 +572,22 @@ await runTest("ti stock exit feedback uses the scoped mutation error normalizer"
   );
 });
 
+await runTest("ti stock category dialog filters matches and makes new category creation explicit", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+
+  assert.match(tabSource, /function normalizeStockCategoryName\(value: unknown\): string/);
+  assert.match(tabSource, /const normalizedCategorySearch = normalizeStockCategoryName\(categoryName\)/);
+  assert.match(tabSource, /const filteredStockCategories = useMemo\(/);
+  assert.match(
+    tabSource,
+    /stockCategories\.filter\(\(category\) =>\s*normalizeStockCategoryName\(category\.name\)\.includes\(normalizedCategorySearch\)/,
+  );
+  assert.match(tabSource, /const hasExactCategoryName = stockCategories\.some\(/);
+  assert.match(tabSource, /rows=\{filteredStockCategories\}/);
+  assert.match(tabSource, /Nenhuma categoria correspondente\. Você pode criar uma nova categoria\./);
+  assert.match(tabSource, /disabled=\{!canEditStock \|\| createCategoryMutation\.isPending \|\| hasExactCategoryName\}/);
+});
+
 await runTest("ti stock locations filter progressively and identify normalized active duplicates", async () => {
   const tabSource = await readModuleSource("components/TiStockTab.tsx");
   const {
@@ -1215,12 +1231,13 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.doesNotMatch(`${pageSource}\n${workspaceUiSource}`, /indigo-/);
 });
 
-await runTest("ti shell limits self-service tabs to chamados and meus termos", async () => {
+await runTest("ti shell exposes dashboard for self-service users", async () => {
   const pageSource = await readModuleSource("components/TiPage.tsx");
 
   assert.match(pageSource, /SELF_SERVICE_TI_TABS/);
   assert.match(pageSource, /const canManageTi = access\.isAdmin/);
   assert.match(pageSource, /const visibleTabs = canManageTi \? TI_TABS : SELF_SERVICE_TI_TABS/);
+  assert.match(pageSource, /SELF_SERVICE_TI_TABS[\s\S]*id: "dashboard"/);
   assert.match(pageSource, /label: "Meus termos"/);
 });
 
@@ -1425,18 +1442,38 @@ await runTest("ti dashboard tab consumes the consolidated backend summary", asyn
   const dashboardTypesSource = await readModuleSource("types/dashboard.ts");
 
   assert.match(tabSource, /useTiDashboard\(/);
+  assert.match(tabSource, /summary\?\.scope === "self"/);
   assert.match(tabSource, /openRequests/);
   assert.match(tabSource, /criticalRequests/);
   assert.match(tabSource, /resolvedLastSevenDays/);
+  assert.match(tabSource, /closedRequests/);
+  assert.match(tabSource, /Não foi possível carregar seu resumo de chamados\. Tente novamente\./);
   assert.match(tabSource, /inventoryAssets/);
   assert.match(tabSource, /lowStockItems/);
   assert.match(tabSource, /activeRobots/);
+  assert.match(dashboardTypesSource, /scope: "self"/);
+  assert.match(dashboardTypesSource, /scope: "organization"/);
   assert.match(dashboardTypesSource, /openRequests: number/);
+  assert.match(dashboardTypesSource, /closedRequests: number/);
   assert.match(dashboardTypesSource, /inventoryAssets: number/);
   assert.doesNotMatch(tabSource, /requests_open/);
   assert.doesNotMatch(tabSource, /inventory_total/);
   assert.match(tabSource, /isLoading|isFetching/);
   assert.match(tabSource, /isError/);
+});
+
+await runTest("ti dashboard error keeps technical API messages out of the viewer UI", async () => {
+  const tabSource = await readModuleSource("components/TiDashboardTab.tsx");
+  const errorState =
+    tabSource.match(
+      /if \(dashboardQuery\.isError\) \{\s*return \(\s*<DashboardStatePanel[\s\S]*?\/>\s*\);\s*\}/,
+    )?.[0] ?? "";
+
+  assert.doesNotMatch(errorState, /dashboardQuery\.error/);
+  assert.match(
+    errorState,
+    /description="Não foi possível carregar seu resumo de chamados\. Tente novamente\."/,
+  );
 });
 
 await runTest("ti inventory and terms expose PR4 mutations through hooks", async () => {

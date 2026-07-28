@@ -8,6 +8,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
+  canManageRh,
   RH_SELF_SERVICE_PERMISSION,
   requireRhPermission,
 } from "../middlewares/requireRhPermission.js";
@@ -32,7 +33,11 @@ router.get(
         throw new ServiceError(400, "user_id é obrigatório.");
       }
 
-      const result = await scoreEvaluationService.listPendingEvaluations(organizationId, userId);
+      const result = await scoreEvaluationService.listPendingEvaluations(
+        organizationId,
+        userId,
+        canManageRh(req),
+      );
       res.status(200).json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro ao listar avaliações pendentes de score", { err });
@@ -61,6 +66,7 @@ router.post(
       const result = await scoreEvaluationService.submitEvaluation({
         organization_id: organizationId,
         user_id: userId,
+        can_manage: canManageRh(req),
         evaluation_id: body.evaluation_id,
         answers: body.answers,
       });

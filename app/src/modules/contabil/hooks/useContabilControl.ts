@@ -2,11 +2,15 @@ import {
   useMutation,
   useQueryClient,
   type UseMutationResult,
+  type UseQueryResult,
 } from "@tanstack/react-query";
+
+import { useFetch } from "@shared/hooks";
 
 import { contabilControlService } from "../services";
 import type {
   ContabilControl,
+  ContabilCompetence,
   CreateOrGetContabilControlPayload,
   PatchContabilControlFieldPayload,
 } from "../types";
@@ -20,6 +24,19 @@ interface PatchContabilControlFieldMutationPayload {
     field: PatchContabilControlFieldPayload["field"];
     value: boolean | string;
   };
+}
+
+export function useContabilControlDetail(
+  filters: { clientId: string; competence: ContabilCompetence },
+  options?: { enabled?: boolean },
+): UseQueryResult<ContabilControl | null, Error> {
+  return useFetch(
+    contabilControlQueryKey(filters.clientId, filters.competence),
+    () => contabilControlService.getControl(filters),
+    {
+      enabled: (options?.enabled ?? true) && Boolean(filters.clientId),
+    },
+  );
 }
 
 export function useContabilControlBootstrapMutation(): UseMutationResult<

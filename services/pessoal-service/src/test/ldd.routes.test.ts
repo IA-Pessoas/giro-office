@@ -84,4 +84,27 @@ describe("LDD routes", () => {
       { status: "Regular" },
     );
   });
+
+  it("rejeita saldo negativo antes do service", async () => {
+    const service = {
+      create: vi.fn(),
+      update: vi.fn(),
+    };
+    const app = createRouteTestApp("/pessoal/ldd", createLddRoutes(service as never));
+
+    const createResponse = await request(app).post("/pessoal/ldd").set(gatewayHeaders()).send({
+      client_id: clientId,
+      type: "INSS",
+      balance_amount: -1,
+    });
+    const updateResponse = await request(app)
+      .patch(`/pessoal/ldd/${recordId}`)
+      .set(gatewayHeaders())
+      .send({ balance_amount: -1 });
+
+    expect(createResponse.status).toBe(400);
+    expect(updateResponse.status).toBe(400);
+    expect(service.create).not.toHaveBeenCalled();
+    expect(service.update).not.toHaveBeenCalled();
+  });
 });

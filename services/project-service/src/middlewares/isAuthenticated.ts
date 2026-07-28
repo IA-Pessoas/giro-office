@@ -1,10 +1,13 @@
 import {
   extractBearerToken,
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
+  parseModulePermissions,
   ServiceError,
   verifyJwtToken,
 } from "@workspace/shared";
@@ -36,6 +39,14 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
     request.user_id = forwardedUserId;
     request.organization_id = forwardedOrgId;
     request.permission = forwardedPermission;
+    request.user_type = request.get(FORWARDED_AUTH_TYPE_HEADER) as
+      | "owner"
+      | "admin"
+      | "user"
+      | undefined;
+    request.modules = parseModulePermissions(
+      request.get(FORWARDED_AUTH_MODULES_HEADER) ?? undefined,
+    );
     next();
     return;
   }
@@ -54,6 +65,8 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
     request.user_id = claims.user_id;
     request.organization_id = claims.organization_id ?? "";
     request.permission = claims.permission;
+    request.user_type = claims.type;
+    request.modules = claims.modules;
     next();
   } catch (err) {
     logError("Erro ao validar autenticação", { err });

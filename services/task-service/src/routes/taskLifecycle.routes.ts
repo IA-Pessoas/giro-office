@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
   parseWithZod,
   requireAuthenticatedRequestContext,
 } from "@workspace/shared";
@@ -31,6 +32,8 @@ router.put(
           observations: body.observations ?? "",
           justification: body.justification ?? "",
         },
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
       });
 
       res.json(createSuccessResponse(result));
@@ -53,6 +56,8 @@ router.put(
         user_id,
         organization_id,
         task_id: parsed.task_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
       });
 
       res.json(createSuccessResponse(result));

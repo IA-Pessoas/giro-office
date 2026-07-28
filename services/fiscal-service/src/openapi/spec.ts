@@ -162,7 +162,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                   type: "object",
                   properties: {
                     tax_regime: { type: "string" },
-                    ncm_code: { type: "string" },
+                    ncm_code: { type: "string", pattern: "^\\d+$" },
                     federal_taxation_type: { type: "string" },
                     description: { type: "string" },
                     ncm_notes: { type: "string" },
@@ -234,7 +234,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                   properties: {
                     ncm_id: { type: "string", format: "uuid" },
                     tax_regime: { type: "string" },
-                    ncm_code: { type: "string" },
+                    ncm_code: { type: "string", pattern: "^\\d+$" },
                     federal_taxation_type: { type: "string" },
                     description: { type: "string" },
                     ncm_notes: { type: "string" },

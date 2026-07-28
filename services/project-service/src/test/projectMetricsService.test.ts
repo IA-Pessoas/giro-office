@@ -33,7 +33,7 @@ describe("ProjectMetricsService", () => {
     ]);
     const service = new ProjectMetricsService(prisma);
 
-    const result = await service.getGlobalMetrics(ORG_ID);
+    const result = await service.getGlobalMetrics(ORG_ID, { userId: "user-1", integracaoLevel: 1 });
 
     expect(result.completed).toBe(1);
     expect(prisma.project.findMany).toHaveBeenCalledWith({
@@ -106,6 +106,8 @@ describe("ProjectMetricsService", () => {
     });
     const service = new ProjectMetricsService(prisma);
 
-    await expect(service.getGlobalMetrics(ORG_ID)).rejects.toMatchObject({ statusCode: 500 });
+    await expect(
+      service.getGlobalMetrics(ORG_ID, { userId: "user-1", integracaoLevel: 1 }),
+    ).rejects.toMatchObject({ statusCode: 500 });
   });
 });

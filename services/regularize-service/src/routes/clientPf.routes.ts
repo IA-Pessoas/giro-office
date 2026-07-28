@@ -74,7 +74,10 @@ export function createClientPfRoutes(deps: RegularizeRouteDeps): Router {
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(listClientPfQuerySchema, request.query);
-        const list = await clientPfService.list(request.organization_id, query.status);
+        const list = await clientPfService.list({
+          organizationId: request.organization_id,
+          ...query,
+        });
         response.json(createSuccessResponse(list));
       } catch (err) {
         logError("Erro ao listar clientes PF do regularize", { err });

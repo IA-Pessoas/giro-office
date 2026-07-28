@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
   parseWithZod,
   ServiceError,
 } from "@workspace/shared";
@@ -21,6 +22,14 @@ import {
 } from "../services/clientIntegrationService.js";
 import { resolveOrganizationId } from "../utils/organizationContext.js";
 
+function getIntegrationAuthorization(request: Request) {
+  return {
+    userId: request.user_id,
+    level: normalizeModulePermission(request.modules?.integracao),
+    isOwner: request.user_type === "owner",
+  } as const;
+}
+
 export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
   const { prisma } = deps;
   const router: ReturnType<typeof Router> = Router();
@@ -38,10 +47,14 @@ export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
         if (body.organization_id && body.organization_id !== organizationId) {
           throw new ServiceError(403, "Integração não permitida para outra organização.");
         }
-        const created = await createIntegrationClient(prisma, {
-          ...body,
-          organization_id: organizationId,
-        });
+        const created = await createIntegrationClient(
+          prisma,
+          {
+            ...body,
+            organization_id: organizationId,
+          },
+          getIntegrationAuthorization(request),
+        );
         response.status(201).json(createSuccessResponse(created));
       } catch (err) {
         logError("Erro ao criar cliente (integração)", { err });
@@ -58,7 +71,13 @@ export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const body = parseWithZod(updateIntegrationBodySchema, request.body);
         const organizationId = resolveOrganizationId(request, undefined);
-        const updated = await updateIntegrationClient(prisma, params.id, organizationId, body);
+        const updated = await updateIntegrationClient(
+          prisma,
+          params.id,
+          organizationId,
+          body,
+          getIntegrationAuthorization(request),
+        );
         response.json(createSuccessResponse(updated));
       } catch (err) {
         logError("Erro ao atualizar cliente (integração)", { err });

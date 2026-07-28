@@ -16,6 +16,8 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
     throw new Error("Token JWT inválido: payload em formato inesperado.");
   }
 
+  const modulePermissionsPresent = Object.prototype.hasOwnProperty.call(payload, "modules");
+
   const user_id =
     (typeof payload.user_id === "string" ? payload.user_id : undefined) ??
     (typeof payload.sub === "string" ? payload.sub : undefined);
@@ -30,6 +32,7 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
       typeof payload.organization_id === "string" ? payload.organization_id : undefined,
     permission: typeof payload.permission === "number" ? payload.permission : undefined,
     modules: normalizeModulePermissions(payload.modules),
+    modulePermissionsPresent,
     session_version:
       typeof payload.session_version === "number" &&
       Number.isInteger(payload.session_version) &&

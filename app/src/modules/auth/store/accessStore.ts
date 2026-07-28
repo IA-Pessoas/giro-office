@@ -11,6 +11,7 @@ type AccessStoreUser = {
   id: string;
   permission: number;
   department_id?: string;
+  organization_id?: string | null;
   modules?: Record<string, number>;
 } | null;
 
@@ -49,6 +50,39 @@ type AccessStoreActions = {
 };
 
 type AccessStoreSnapshot = AccessStoreState & AccessStoreActions;
+
+export function createAccessStoreUserSnapshot(
+  user: Exclude<AccessStoreUser, null> | null,
+): AccessStoreUser {
+  return user
+    ? {
+        id: user.id,
+        permission: user.permission,
+        department_id: user.department_id,
+        organization_id: user.organization_id,
+        modules: user.modules,
+      }
+    : null;
+}
+
+export function shouldSyncAccessStore(
+  currentState: AccessStoreState,
+  nextState: AccessStoreState,
+): boolean {
+  return (
+    !currentState.isInitialized ||
+    currentState.user?.id !== nextState.user?.id ||
+    currentState.user?.permission !== nextState.user?.permission ||
+    currentState.user?.department_id !== nextState.user?.department_id ||
+    currentState.user?.organization_id !== nextState.user?.organization_id ||
+    currentState.user?.modules !== nextState.user?.modules ||
+    currentState.departmentName !== nextState.departmentName ||
+    currentState.departmentModule !== nextState.departmentModule ||
+    currentState.isLoading !== nextState.isLoading ||
+    currentState.error !== nextState.error ||
+    currentState.accessMap !== nextState.accessMap
+  );
+}
 
 export const useAccessStore = create<AccessStoreSnapshot>((set) => ({
   ...INITIAL_ACCESS_STORE_STATE,
