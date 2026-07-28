@@ -1,6 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type { CreateClientPfBody, UpdateClientPfBody } from "../schemas/clientPf.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 import type { RegularizeReconciliationService } from "./regularizeReconciliationService.js";
@@ -32,6 +32,21 @@ const clientPfSelect = {
   notes: true,
   status: true,
 } as const;
+
+type ClientPfListItem = {
+  id: string;
+  code: string | null;
+  name: string;
+  cpf: string | null;
+};
+
+type ClientPfListPage = {
+  data: ClientPfListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+};
 
 export class ClientPfService {
   readonly #logs: RegularizeLogService;
@@ -122,24 +137,51 @@ export class ClientPfService {
     return { detail };
   }
 
-  async list(organizationId: string, status: string): Promise<Record<string, unknown>[]> {
-    const list = await this.prisma.clientPF.findMany({
-      where: {
-        organization_id: organizationId,
-        status,
-      },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        cpf: true,
-      },
-      orderBy: {
-        name: "asc",
-      },
-    });
+  async list(params: {
+    organizationId: string;
+    status: string;
+    search: string;
+    page: number;
+    limit: number;
+  }): Promise<ClientPfListPage> {
+    const where: Prisma.ClientPFWhereInput = {
+      organization_id: params.organizationId,
+      ...(params.status === "Todos" ? {} : { status: params.status }),
+      ...(params.search
+        ? {
+            OR: [
+              { name: { contains: params.search, mode: "insensitive" } },
+              { code: { contains: params.search, mode: "insensitive" } },
+              { cpf: { contains: params.search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+    const [list, total] = await Promise.all([
+      this.prisma.clientPF.findMany({
+        where,
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          cpf: true,
+        },
+        orderBy: {
+          name: "asc",
+        },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      this.prisma.clientPF.count({ where }),
+    ]);
 
-    return list as unknown as Record<string, unknown>[];
+    return {
+      data: list as ClientPfListItem[],
+      total,
+      page: params.page,
+      limit: params.limit,
+      hasMore: params.page * params.limit < total,
+    };
   }
 
   private async ensureUnique(
