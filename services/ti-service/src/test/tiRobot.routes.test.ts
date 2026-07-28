@@ -15,7 +15,7 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const robotId = "90000000-0000-4000-8000-000000000001";
 const TI_REQUESTER_PERMISSION = 1;
-const TI_ADMIN_PERMISSION = 2;
+const TI_ADMIN_PERMISSION = 3;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -52,7 +52,7 @@ describe("ti robot routes", () => {
     });
   });
 
-  it("POST /ti/robots creates a robot with admin level 2", async () => {
+  it("POST /ti/robots creates a robot with admin level 3", async () => {
     const response = await request(createTestApp())
       .post("/ti/robots")
       .set(gatewayHeaders(TI_ADMIN_PERMISSION))

@@ -286,6 +286,7 @@ export function TiRequestsTab() {
   const { user: currentUser } = useAuth();
   const { access } = useModuleAccess("ti");
   const canManageRequests = access.isAdmin;
+  const canManageCategories = access.canEdit;
   const [filters, setFilters] = useState<TiListFilters>({ status: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRequestId, setSelectedRequestId] = useState<TiId | undefined>();
@@ -616,7 +617,7 @@ export function TiRequestsTab() {
         }
         action={
           <div className="flex flex-col gap-2 sm:flex-row">
-            {canManageRequests ? (
+            {canManageCategories ? (
               <TiIconAction
                 icon={Tags}
                 label="Categorias"

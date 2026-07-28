@@ -8,7 +8,7 @@ import {
   permissionUserIdParamsSchema,
   updatePermissionBodySchema,
 } from "../schemas/permission.schemas.js";
-import { requireManageUsersAuth } from "../security/userManagementAuth.js";
+import { requireManageUsersAuth, requireOwnerUserAuth } from "../security/userManagementAuth.js";
 import { PermissionService } from "../services/permissionService.js";
 
 const router: ReturnType<typeof Router> = Router();
@@ -38,14 +38,16 @@ router.put(
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireManageUsersAuth(request);
+      const auth = requireOwnerUserAuth(request);
       const { userId } = parseWithZod(permissionUserIdParamsSchema, request.params);
       const modules = parseWithZod(updatePermissionBodySchema, request.body) as Record<
         string,
-        number | null
+        number
       >;
 
-      const permission = await permissionService.update(userId, modules, auth.organization_id);
+      const permission = await permissionService.update(userId, modules, auth.organization_id, {
+        actorUserId: auth.user_id,
+      });
 
       response.json(createSuccessResponse(permission));
     } catch (err) {

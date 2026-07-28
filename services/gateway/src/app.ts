@@ -21,7 +21,11 @@ import {
   buildAuditErrorCaptureMiddleware,
   buildAuditLifecycleMiddleware,
 } from "./middlewares/audit.js";
-import { buildAuthenticateMiddleware } from "./middlewares/authenticate.js";
+import {
+  buildAuthenticateMiddleware,
+  createUserServiceSessionValidator,
+  type SessionValidator,
+} from "./middlewares/authenticate.js";
 import { authorizeRequest } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
@@ -35,6 +39,7 @@ type GatewayProxy = ReturnType<typeof buildHttpProxyMiddleware>;
 
 export interface GatewayAppDeps {
   dashboardStatsService?: DashboardStatsProvider;
+  sessionValidator?: SessionValidator;
 }
 
 function getRequestLogger(request: Request, logger: Logger): Logger {
@@ -307,14 +312,18 @@ function mountPublicBlockedRoutes(app: express.Express, env: GatewayEnv): void {
   }
 }
 
-function mountAuthenticationBoundary(app: express.Express, env: GatewayEnv): void {
+function mountAuthenticationBoundary(
+  app: express.Express,
+  env: GatewayEnv,
+  sessionValidator?: SessionValidator,
+): void {
   const generalRateLimit = createRateLimitMiddleware({
     key: "gateway:general",
     max: env.rateLimitMax,
     windowMs: env.rateLimitWindowMs,
   });
 
-  app.use(buildAuthenticateMiddleware(env.jwtSecret));
+  app.use(buildAuthenticateMiddleware(env.jwtSecret, sessionValidator));
   app.use(generalRateLimit);
   mountProtectedBlockedRoutes(app);
   app.use(authorizeRequest);
@@ -431,7 +440,12 @@ export function createApp(
   mountPublicRoutes(app, env, gatewayOpenApiSpec);
   mountAuthRateLimits(app, env);
   mountPublicBlockedRoutes(app, env);
-  mountAuthenticationBoundary(app, env);
+  const sessionValidator =
+    deps.sessionValidator ??
+    (env.nodeEnv === "test"
+      ? undefined
+      : createUserServiceSessionValidator(env.userServiceUrl, env.auditServiceToken));
+  mountAuthenticationBoundary(app, env, sessionValidator);
   mountDashboardRoutes(app, dashboardStatsService);
   mountServiceRoutes(app, env);
   mountFallbackRoute(app);

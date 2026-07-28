@@ -520,12 +520,12 @@ runTest("tasks table actions use inline square icon buttons", () => {
   assert.equal(TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME.includes("w-9"), true);
 });
 
-runTest("tasks delete permission follows shared admin helper", () => {
+runTest("tasks delete permission follows integration module admin level", () => {
   const source = readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8");
 
-  assert.equal(source.includes('import { isAdminPermission } from "@modules/auth";'), true);
+  assert.equal(source.includes('import { useModuleAccess } from "@modules/auth";'), true);
   assert.equal(
-    source.includes("const canDelete = isAdminPermission(meQuery.data?.permission);"),
+    source.includes("const canDelete = integracaoAccess.isAdmin;"),
     true,
   );
   assert.equal(source.includes("const canDelete = meQuery.data?.permission === 2;"), false);

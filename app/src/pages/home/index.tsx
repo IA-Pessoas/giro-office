@@ -19,7 +19,6 @@ const LOGO_INTEGRACAO_URL = "/logos/lions/Integracao.webp";
 interface PermsItem {
     id: string
     user_id: string
-    atendimento: number
     certificado: number
     comercial: number
     contabil: number
@@ -28,12 +27,10 @@ interface PermsItem {
     integracao: number
     marketing: number
     parcelamento: number
-    pec: number
     pessoal: number
     regularize: number
     rh: number
     triagem: number
-    wiki: number
 }
 interface Props {
     perm: PermsItem;
@@ -58,7 +55,7 @@ export default function Dashboard({ perm }: Props) {
 
         console.log(perm.integracao)
     
-        if (perm.integracao !== null) {
+        if (perm.integracao > 0) {
             listModulesTemp.push(
                 {
                     name: 'Integração',

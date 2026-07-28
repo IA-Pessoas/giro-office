@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
+const { formatRhDate } = await import("./utils/rhDate.ts");
+
 function runTest(name, fn) {
   try {
     fn();
@@ -34,4 +36,9 @@ runTest("RH modal fields disclose required inputs before submission", () => {
     assert.match(source, /RequiredFieldLabel/);
     assert.match(source, /aria-required/);
   }
+});
+
+runTest("RH civil dates do not move when an API value is UTC midnight", () => {
+  assert.equal(formatRhDate("2026-07-23T00:00:00.000Z"), "23/07/2026");
+  assert.equal(formatRhDate("2026-01-01"), "01/01/2026");
 });

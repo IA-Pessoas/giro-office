@@ -1,7 +1,7 @@
 export const GLOBAL_ADMIN_PERMISSION = 2;
-export const MODULE_VIEW_PERMISSION = 0;
-export const MODULE_EDIT_PERMISSION = 1;
-export const MODULE_ADMIN_PERMISSION = 2;
+export const MODULE_VIEW_PERMISSION = 1;
+export const MODULE_EDIT_PERMISSION = 2;
+export const MODULE_ADMIN_PERMISSION = 3;
 
 export const MODULE_KEYS = [
   "certificado",
@@ -38,7 +38,7 @@ export type ModuleAccess = {
   source: AccessSource;
 };
 
-export type AdditionalModulePermissions = Record<string, number | null>;
+export type AdditionalModulePermissions = Record<string, number>;
 
 export interface ResolveModuleAccessParams {
   userPermission?: number | null;
@@ -49,6 +49,8 @@ export interface ResolveModuleAccessParams {
 }
 
 export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
+  "/clients": "integracao",
+  "/projects": "integracao",
   "/certificados": "certificado",
   "/regularize": "regularize",
   "/fiscal": "fiscal",
@@ -98,19 +100,6 @@ export function isModuleDisabled(module: ModuleKey): boolean {
   return DISABLED_MODULE_KEY_SET.has(module);
 }
 
-const ACCESS_LEVEL_RANK: Record<AccessLevel, number> = {
-  none: 0,
-  view: 1,
-  edit: 2,
-  admin: 3,
-};
-
-function getHighestAccessLevel(firstLevel: AccessLevel, secondLevel: AccessLevel): AccessLevel {
-  return ACCESS_LEVEL_RANK[secondLevel] > ACCESS_LEVEL_RANK[firstLevel]
-    ? secondLevel
-    : firstLevel;
-}
-
 function normalizeDepartmentName(value?: string | null): string {
   if (!value) {
     return "";
@@ -123,24 +112,8 @@ function normalizeDepartmentName(value?: string | null): string {
     .toLowerCase();
 }
 
-function resolveAccessLevelFromGlobalPermission(permission?: number | null): AccessLevel {
-  if (typeof permission === "number" && permission >= GLOBAL_ADMIN_PERMISSION) {
-    return "admin";
-  }
-
-  if (permission === MODULE_EDIT_PERMISSION) {
-    return "edit";
-  }
-
-  if (permission === MODULE_VIEW_PERMISSION) {
-    return "view";
-  }
-
-  return "none";
-}
-
 export function resolveAccessLevelFromAdditionalPermission(
-  permission: number | null | undefined,
+  permission: number | undefined,
 ): AccessLevel {
   if (permission === MODULE_ADMIN_PERMISSION) {
     return "admin";
@@ -168,8 +141,6 @@ export function resolveDepartmentModuleKey(departmentName?: string | null): Modu
 }
 
 export function resolveModuleAccess({
-  userPermission,
-  departmentModule,
   module,
   additionalModulePermissions,
   isGlobalAdmin = false,
@@ -184,16 +155,6 @@ export function resolveModuleAccess({
 
   const additionalPermission = additionalModulePermissions?.[module];
   const additionalLevel = resolveAccessLevelFromAdditionalPermission(additionalPermission);
-
-  if (departmentModule === module) {
-    return createModuleAccess(
-      getHighestAccessLevel(
-        resolveAccessLevelFromGlobalPermission(userPermission),
-        additionalLevel,
-      ),
-      "department",
-    );
-  }
 
   if (additionalLevel !== "none") {
     return createModuleAccess(additionalLevel, "additional-module");

@@ -9,7 +9,7 @@ import {
 import { prismaClient } from "../integrations/prisma.js";
 
 /** Heurística herdada do legado (`ScoreController.listPendingEvaluations`). */
-const RH_PERMISSION_ADMIN_LEVEL = 2;
+const RH_PERMISSION_ADMIN_LEVEL = 3;
 const USER_PERMISSION_TI = 1;
 const USER_PERMISSION_DIRECTOR = 2;
 

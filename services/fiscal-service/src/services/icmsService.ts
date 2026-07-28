@@ -7,6 +7,7 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
+import { getPaginationParams, type PaginationQuery } from "../schemas/pagination.schemas.js";
 
 export type IcmsServicePrisma = typeof prismaClient;
 
@@ -42,6 +43,18 @@ export interface UpdateIcmsRequest extends IcmsAuthContext {
   applied_original_mva?: string;
   adjusted_mva?: string;
   original_mva?: string;
+}
+
+export interface ListIcmsRequest extends PaginationQuery {
+  icmsCodes?: string[];
+}
+
+export interface IcmsListResult {
+  data: unknown[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
 }
 
 const ICMS_SELECT = {
@@ -166,18 +179,37 @@ export class IcmsService {
     return { detail };
   }
 
-  async list(icmsCodes: string[], organizationId: string): Promise<unknown[]> {
-    if (!icmsCodes || icmsCodes.length === 0) {
-      return [];
-    }
+  async list(query: ListIcmsRequest, organizationId: string): Promise<IcmsListResult> {
+    const page = query.page ?? 1;
+    const { skip, take } = getPaginationParams(query);
+    const terms = query.icmsCodes?.map((code) => code.trim()).filter(Boolean) ?? [];
+    const where = {
+      organization_id: organizationId,
+      ...(terms.length > 0
+        ? {
+            OR: terms.map((code) => ({
+              description: { contains: code, mode: "insensitive" as const },
+            })),
+          }
+        : {}),
+    };
+    const [total, data] = await Promise.all([
+      this.prisma.icms.count({ where }),
+      this.prisma.icms.findMany({
+        where,
+        select: ICMS_SELECT,
+        orderBy: { description: "asc" },
+        skip,
+        take,
+      }),
+    ]);
 
-    return this.prisma.icms.findMany({
-      where: {
-        organization_id: organizationId,
-        description: { in: icmsCodes },
-      },
-      select: ICMS_SELECT,
-      orderBy: { description: "asc" },
-    });
+    return {
+      data,
+      total,
+      page,
+      limit: take,
+      hasMore: page * take < total,
+    };
   }
 }

@@ -2,7 +2,7 @@ import { ServiceError } from "@workspace/shared";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 export const RH_SELF_SERVICE_PERMISSION = 1;
-export const RH_MANAGEMENT_PERMISSION = 2;
+export const RH_MANAGEMENT_PERMISSION = 3;
 
 export function getRhPermissionLevel(request: Request): number {
   return typeof request.rh_permission === "number" ? request.rh_permission : 0;

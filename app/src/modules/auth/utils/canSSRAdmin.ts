@@ -2,6 +2,8 @@ import type { GetServerSideProps, GetServerSidePropsContext, GetServerSidePropsR
 import { jwtDecode } from "jwt-decode";
 import { destroyCookie, parseCookies } from "nookies";
 
+import { MODULE_KEYS } from "./moduleAccess";
+
 function redirectTo(destination: string) {
   return {
     redirect: {
@@ -24,28 +26,22 @@ interface SessionTokenPayload {
 type SessionAccessPayload = {
   permission: number | null;
   type: SessionTokenPayload["type"];
-  modules: Record<string, number | null> | null;
+  modules: Record<string, number> | null;
 };
 
-const ADMIN_PERMISSION = 2;
-
-function isAdminPermission(permission?: number | null): boolean {
-  return typeof permission === "number" && permission >= ADMIN_PERMISSION;
-}
-
-function normalizeModuleValue(value: unknown): number | null {
-  return value === 0 || value === 1 || value === 2 ? value : null;
+function normalizeModuleValue(value: unknown): number {
+  return value === 0 || value === 1 || value === 2 || value === 3 ? value : 0;
 }
 
 function normalizeModules(
   modules?: Record<string, unknown> | null,
-): Record<string, number | null> | null {
+): Record<string, number> | null {
   if (!modules || typeof modules !== "object") {
     return null;
   }
 
-  return Object.entries(modules).reduce<Record<string, number | null>>((acc, [moduleKey, value]) => {
-    acc[moduleKey] = normalizeModuleValue(value);
+  return MODULE_KEYS.reduce<Record<string, number>>((acc, moduleKey) => {
+    acc[moduleKey] = normalizeModuleValue(modules[moduleKey]);
     return acc;
   }, {});
 }
@@ -88,11 +84,7 @@ function canAccessAdministrationFromTokenPayload({
     return true;
   }
 
-  if (type === null && isAdminPermission(permission)) {
-    return true;
-  }
-
-  return modules?.rh === ADMIN_PERMISSION;
+  return modules?.rh === 3;
 }
 
 function isAuthTokenFailure(err: unknown): boolean {

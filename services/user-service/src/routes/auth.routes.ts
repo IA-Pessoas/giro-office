@@ -40,6 +40,19 @@ router.post("/start-config", async (_request: Request, response: Response, next:
 });
 
 router.get(
+  "/session/validate",
+  isAuthenticated,
+  async (_request: Request, response: Response, next: NextFunction) => {
+    try {
+      response.json(createSuccessResponse({ valid: true }));
+    } catch (err) {
+      logError("Erro ao validar sessão", { err });
+      next(err);
+    }
+  },
+);
+
+router.get(
   "/me",
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
