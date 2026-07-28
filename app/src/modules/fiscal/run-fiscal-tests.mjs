@@ -18,6 +18,8 @@ async function runTest(name, fn) {
 const fiscalSources = {
   shell: await readSource("./components/FiscalShell.tsx"),
   ncmSection: await readSource("./components/FiscalNcmSection.tsx"),
+  ncmForm: await readSource("./components/FiscalNcmFormPanel.tsx"),
+  searchSection: await readSource("./components/FiscalSearchSection.tsx"),
   icmsSection: await readSource("./components/FiscalIcmsSection.tsx"),
   ipiSection: await readSource("./components/FiscalIpiSection.tsx"),
   queryKeys: await readSource("./hooks/queryKeys.ts"),
@@ -130,6 +132,16 @@ await runTest("fiscal-service list schemas accept optional terms and pagination"
     assert.match(source, /commaSeparatedListSchema/);
     assert.doesNotMatch(source, /\.min\(1, .*obrigat/);
   }
+});
+
+await runTest("NCM create and edit keep codes numeric while search keeps eight-digit behavior", () => {
+  assert.match(fiscalSources.ncmForm, /handleChange\("ncm_code", value\.replace\(\/\\D\/g, ""\)\)/);
+  assert.match(fiscalSources.ncmForm, /inputMode="numeric"/);
+  assert.match(fiscalSources.ncmForm, /pattern="\[0-9\]\*"/);
+  assert.match(fiscalSources.ncmForm, /Informe apenas números no código NCM\./);
+  assert.match(fiscalSources.ncmSchema, /\.regex\(\/\^\\d\+\$\//);
+  assert.match(fiscalSources.searchSection, /\.replace\(\/\\D\/g, ""\)\s*\.slice\(0, NCM_CODE_LENGTH\)/);
+  assert.match(fiscalSources.searchSection, /trimmedCode\.length !== NCM_CODE_LENGTH/);
 });
 
 await runTest("fiscal-service list routes pass pagination and optional search terms", () => {

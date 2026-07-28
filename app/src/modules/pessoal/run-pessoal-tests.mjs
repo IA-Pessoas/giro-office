@@ -138,6 +138,20 @@ runTest("pessoal error message prefers api fields before local fallback", () => 
   );
 });
 
+runTest("password form errors are rendered inside the open modal", () => {
+  const source = readFileSync(
+    "src/modules/pessoal/components/PessoalPasswordsSection.tsx",
+    "utf8",
+  );
+  const dialogStart = source.indexOf('<form onSubmit={handleSubmit} className="space-y-3">');
+  const alertIndex = source.indexOf('role="alert"', dialogStart);
+  const serviceFieldIndex = source.indexOf("Serviço", dialogStart);
+
+  assert.ok(dialogStart >= 0);
+  assert.ok(alertIndex > dialogStart && alertIndex < serviceFieldIndex);
+  assert.match(source, /formError && !isFormOpen/);
+});
+
 runTest("departamento pessoal page uses the pessoal module instead of the old mock", () => {
   const page = readFileSync("src/pages/departamento-pessoal/index.tsx", "utf8");
 
@@ -278,6 +292,37 @@ runTest("payroll payload builder keeps backend payroll fields", () => {
 
   assert.equal(buildPessoalPayrollPayload(payload).client_id, "client-1");
   assert.equal("client_id" in buildPessoalPayrollUpdatePayload(payload), false);
+});
+
+runTest("payroll and LDD forms reject negative money values before submit", () => {
+  const payroll = readFileSync(
+    "src/modules/pessoal/components/PessoalPayrollSection.tsx",
+    "utf8",
+  );
+  const tracking = readFileSync(
+    "src/modules/pessoal/components/PessoalTrackingSection.tsx",
+    "utf8",
+  );
+
+  assert.match(payroll, /payload\.advance_amount < 0/);
+  assert.match(payroll, /payload\.vt_value < 0/);
+  assert.match(tracking, /payload\.balance_amount < 0/);
+  assert.match(payroll, /min=\{0\}/);
+  assert.match(tracking, /min=\{field\.name === "balance_amount" \? 0 : undefined\}/);
+});
+
+runTest("payroll responsible field uses a user selector instead of raw IDs", () => {
+  const payroll = readFileSync(
+    "src/modules/pessoal/components/PessoalPayrollSection.tsx",
+    "utf8",
+  );
+
+  assert.match(payroll, /listAdminUsers\("active"\)/);
+  assert.match(payroll, /departmentService\.list\(\)/);
+  assert.match(payroll, /departmentNameById\.get\(user\.department_id\)/);
+  assert.match(payroll, /resolveDepartmentModuleKey\(departmentName\) === "pessoal"/);
+  assert.match(payroll, /<select[\s\S]*value=\{formValues\.responsible_id\}/);
+  assert.doesNotMatch(payroll, /label: "Responsável ID"/);
 });
 
 runTest("obligation params map client and competence", () => {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import { ChevronDown } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -135,8 +136,13 @@ export function RhRequestFormModal({
       setFormState(DEFAULT_FORM_STATE);
       onClose();
     } catch (error) {
+      const responseMessage = isAxiosError(error) ? error.response?.data?.error : undefined;
       const message =
-        error instanceof Error ? error.message : "Não foi possível salvar a solicitação.";
+        typeof responseMessage === "string"
+          ? responseMessage
+          : error instanceof Error
+            ? error.message
+            : "Não foi possível salvar a solicitação.";
       toast.error(message);
     }
   }

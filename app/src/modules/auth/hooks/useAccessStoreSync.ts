@@ -4,8 +4,10 @@ import { useAuth } from "@/context/AuthContext";
 
 import {
   getAccessStoreState,
+  createAccessStoreUserSnapshot,
   resetAccessStoreState,
   setAccessStoreState,
+  shouldSyncAccessStore,
 } from "../store/accessStore";
 import { useModuleAccessMap } from "./useModuleAccess";
 import { MODULE_KEYS } from "../utils/moduleAccess";
@@ -17,14 +19,7 @@ export function useAccessStoreSync() {
 
   const nextState = useMemo(
     () => ({
-      user: user
-        ? {
-            id: user.id,
-            permission: user.permission,
-            department_id: user.department_id,
-            modules: user.modules ?? null,
-          }
-        : null,
+      user: createAccessStoreUserSnapshot(user),
       departmentName,
       departmentModule,
       accessMap,
@@ -41,20 +36,7 @@ export function useAccessStoreSync() {
       return;
     }
 
-    const currentState = getAccessStoreState();
-    const shouldSync =
-      !currentState.isInitialized ||
-      currentState.user?.id !== nextState.user?.id ||
-      currentState.user?.permission !== nextState.user?.permission ||
-      currentState.user?.department_id !== nextState.user?.department_id ||
-      currentState.user?.modules !== nextState.user?.modules ||
-      currentState.departmentName !== nextState.departmentName ||
-      currentState.departmentModule !== nextState.departmentModule ||
-      currentState.isLoading !== nextState.isLoading ||
-      currentState.error !== nextState.error ||
-      currentState.accessMap !== nextState.accessMap;
-
-    if (shouldSync) {
+    if (shouldSyncAccessStore(getAccessStoreState(), nextState)) {
       setAccessStoreState(nextState);
     }
   }, [nextState, user]);

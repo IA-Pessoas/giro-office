@@ -11,6 +11,7 @@ import {
     getAuthCookieOptions,
 } from "@modules/auth/utils/authCookie";
 import { getModulePermissionsFromToken } from "@modules/auth/utils/sessionToken";
+import { MODULE_KEYS } from "@modules/auth/utils/moduleAccess";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
 import { ME_QUERY_KEY } from "@shared/hooks";
@@ -24,7 +25,7 @@ interface UserProps {
     department_id?: string;
     organization_id?: string | null;
     type?: "owner" | "admin" | "user" | null;
-    modules?: Record<string, number | null> | null;
+    modules?: Record<string, number>;
 }
 
 interface SignInProps {
@@ -99,8 +100,15 @@ function isValidAuthUser(data: unknown): data is UserProps {
 
 function buildCurrentUser(
     data: UserProps,
-    fallbackModules?: Record<string, number | null> | null,
+    fallbackModules?: Record<string, number> | null,
 ): UserProps {
+    const sourceModules = data.modules ?? fallbackModules ?? {};
+    const modules = MODULE_KEYS.reduce<Record<string, number>>((acc, moduleKey) => {
+        const value = sourceModules[moduleKey];
+        acc[moduleKey] = value === 0 || value === 1 || value === 2 || value === 3 ? value : 0;
+        return acc;
+    }, {});
+
     return {
         id: data.id,
         name: data.name,
@@ -112,7 +120,7 @@ function buildCurrentUser(
             data.type === "owner" || data.type === "admin" || data.type === "user"
                 ? data.type
                 : null,
-        modules: data.modules ?? fallbackModules ?? null,
+        modules,
     };
 }
 

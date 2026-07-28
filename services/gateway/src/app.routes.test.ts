@@ -199,7 +199,13 @@ function createToken(
   },
   secret = "test-secret",
 ): string {
-  return jwt.sign(claims, secret);
+  return jwt.sign(
+    {
+      ...claims,
+      type: claims.type ?? (claims.permission >= 2 ? "owner" : "user"),
+    },
+    secret,
+  );
 }
 
 it("returns real dashboard stats for the authenticated organization", async () => {
@@ -402,7 +408,7 @@ it("allows RH module admins to proxy user-management routes", async () => {
     organization_id: "org-1",
     permission: 1,
     type: "admin",
-    modules: { rh: 2 },
+    modules: { rh: 3 },
   });
 
   try {
@@ -417,7 +423,7 @@ it("allows RH module admins to proxy user-management routes", async () => {
     expect(seenHeaders.organizationId).toBe("org-1");
     expect(seenHeaders.permission).toBe("1");
     expect(seenHeaders.type).toBe("admin");
-    expect(JSON.parse(seenHeaders.modules ?? "{}")).toMatchObject({ rh: 2 });
+    expect(JSON.parse(seenHeaders.modules ?? "{}")).toMatchObject({ rh: 3 });
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -474,7 +480,7 @@ it("allows RH module admins to proxy permission update routes", async () => {
     organization_id: "org-1",
     permission: 2,
     type: "admin",
-    modules: { rh: 2 },
+    modules: { rh: 3 },
   });
 
   try {
@@ -487,8 +493,8 @@ it("allows RH module admins to proxy permission update routes", async () => {
       body: JSON.stringify({ rh: 2 }),
     });
 
-    expect(response.status).toBe(200);
-    expect(seenRequest).toBe(true);
+    expect(response.status).toBe(403);
+    expect(seenRequest).toBe(false);
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -583,7 +589,7 @@ it("strips client-supplied internal auth headers before proxying", async () => {
     expect(seenHeaders.organizationId).toBe("org-1");
     expect(seenHeaders.permission).toBe("2");
     expect(seenHeaders.type).toBe("owner");
-    expect(seenHeaders.modules).toBe(JSON.stringify({ rh: 2 }));
+    expect(JSON.parse(seenHeaders.modules ?? "{}")).toMatchObject({ rh: 2 });
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -1210,6 +1216,7 @@ it("proxies project-service routes mapped in the gateway", async () => {
     user_id: "user-1",
     organization_id: "org-1",
     permission: 2,
+    modules: { integracao: 1 },
   });
   const projectService = createServer((request, response) => {
     response.statusCode = 200;
@@ -1365,7 +1372,7 @@ it("proxies ti-service routes mapped in the gateway for global admin level 2", a
       success: true,
       data: { service: "ti-service", path: "/ti/requests/list" },
     });
-    expect(seenPermission).toBe("2");
+    expect(seenPermission).toBe("3");
   } finally {
     await stopServer(gateway);
     await stopServer(tiService);
@@ -1556,6 +1563,7 @@ it("forwards modular certificate permission and internal token to certificate-se
     user_id: "user-1",
     organization_id: "org-1",
     permission: 3,
+    type: "user",
     modules: { certificado: 1 },
   });
   let seenPermission: string | undefined;
@@ -1623,7 +1631,7 @@ it("forwards elevated certificate permission for global admins without modular c
     });
 
     expect(response.status).toBe(200);
-    expect(seenPermission).toBe("2");
+    expect(seenPermission).toBe("3");
   } finally {
     await stopServer(gateway);
     await stopServer(certificateService);
@@ -1657,7 +1665,7 @@ it("does not forward certificate permission for non-admin users without modular 
     });
 
     expect(response.status).toBe(200);
-    expect(seenPermission).toBeUndefined();
+    expect(seenPermission).toBe("0");
   } finally {
     await stopServer(gateway);
     await stopServer(certificateService);
@@ -2756,14 +2764,7 @@ it("blocks limited users without client-related module permission before proxyin
     organization_id: "org-1",
     permission: 1,
     modules: {
-      atendimento: 0,
-      comercial: 0,
-      contabil: 0,
-      financeiro: 0,
-      fiscal: 0,
-      integracao: 0,
-      pessoal: 0,
-      regularize: 0,
+      atendimento: 2,
     },
   });
   let upstreamHits = 0;
@@ -2789,6 +2790,40 @@ it("blocks limited users without client-related module permission before proxyin
     expect(response.status).toBe(403);
     expect(body.code).toBe("FORBIDDEN");
     expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("allows Integration viewers to proxy client list", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { integracao: 1 },
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenUrl).toBe("/client/list");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -3161,6 +3196,74 @@ it("forwards the Fiscal module permission and internal token", async () => {
     expect(response.status).toBe(200);
     expect(seenPermission).toBe("0");
     expect(seenInternalToken).toBe("audit-service-token");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("forwards the Contabil module permission and internal token", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { contabil: 0 },
+  });
+  let seenPermission: string | undefined;
+  let seenInternalToken: string | undefined;
+  const upstream = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    seenInternalToken = request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const contabilServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ contabilServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/contabil/controls`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("0");
+    expect(seenInternalToken).toBe("audit-service-token");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("forwards legacy global permission to Contabil when module claims are absent", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+  });
+  let seenPermission: string | undefined;
+  const upstream = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const contabilServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ contabilServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/contabil/controls`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("1");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

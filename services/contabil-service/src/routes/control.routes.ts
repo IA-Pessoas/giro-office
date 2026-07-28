@@ -7,7 +7,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { isAuthenticated, requireContabilWritePermission } from "../middlewares/isAuthenticated.js";
 import {
   controlIdParamsSchema,
   createControlBodySchema,
@@ -43,6 +43,7 @@ export function createControlRoutes(service: ControlRouteDeps): ReturnType<typeo
   router.post(
     "/controls",
     isAuthenticated,
+    requireContabilWritePermission,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(createControlBodySchema, req.body);
@@ -93,6 +94,7 @@ export function createControlRoutes(service: ControlRouteDeps): ReturnType<typeo
   router.patch(
     "/controls/:id",
     isAuthenticated,
+    requireContabilWritePermission,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const params = parseWithZod(controlIdParamsSchema, req.params);

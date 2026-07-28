@@ -13,9 +13,9 @@ import { createTestApp } from "./tiServiceTestUtils.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
-const TI_VIEWER_PERMISSION = 0;
-const TI_REQUESTER_PERMISSION = 1;
-const TI_ADMIN_PERMISSION = 2;
+const TI_VIEWER_PERMISSION = 1;
+const TI_REQUESTER_PERMISSION = 2;
+const TI_ADMIN_PERMISSION = 3;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -81,7 +81,7 @@ describe("ti request category routes", () => {
     });
   });
 
-  it("POST /ti/request-categories validates body after admin level 2 passes auth", async () => {
+  it("POST /ti/request-categories validates body after admin level 3 passes auth", async () => {
     const app = createTestApp();
 
     const response = await request(app)

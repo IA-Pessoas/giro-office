@@ -16,8 +16,8 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
+import { useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
-import { useMe } from "@shared/hooks";
 
 import {
   useDeleteProjectMutation,
@@ -108,7 +108,7 @@ function formatDeadlineHint(daysUntil: number | null) {
 
 export function ProjectsWorkspace() {
   const router = useRouter();
-  const meQuery = useMe();
+  const { access: integracaoAccess } = useModuleAccess("integracao");
   const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
   const [projectSearch, setProjectSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -701,7 +701,7 @@ export function ProjectsWorkspace() {
                         Recalcular
                       </button>
 
-                      {meQuery.data?.permission === 2 ? (
+                      {integracaoAccess.isAdmin ? (
                         <button
                           type="button"
                           onClick={() => void handleDelete(project)}

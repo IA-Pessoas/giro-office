@@ -254,6 +254,7 @@ model User {
   organization_id             String?
   type                        enumType?
   first_owner_flag            Boolean?               @default(false)
+  session_version             Int                    @default(0)
   permission_id               String?                @unique
   department_id               String
   invited_by                  String?
@@ -342,22 +343,19 @@ model User {
 model Permission {
   id              String       @id @default(uuid())
   user_id         String
-  atendimento     Int?
-  certificado     Int?
-  comercial       Int?
-  contabil        Int?
-  financeiro      Int?
-  fiscal          Int?
-  integracao      Int?
-  marketing       Int?
-  parcelamento    Int?
-  pec             Int?
-  pessoal         Int?
-  regularize      Int?
-  rh              Int?
-  ti              Int?
-  triagem         Int?
-  wiki            Int?
+  certificado     Int      @default(0)
+  comercial       Int      @default(0)
+  contabil        Int      @default(0)
+  financeiro      Int      @default(0)
+  fiscal          Int      @default(0)
+  integracao      Int      @default(0)
+  marketing       Int      @default(0)
+  parcelamento    Int      @default(0)
+  pessoal         Int      @default(0)
+  regularize      Int      @default(0)
+  rh              Int      @default(0)
+  ti              Int      @default(0)
+  triagem         Int      @default(0)
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
   user            User         @relation(fields: [user_id], references: [id])
@@ -1194,6 +1192,7 @@ model ControlContabil {
   client                           Client       @relation(fields: [client_id], references: [id])
   organization                     Organization @relation(fields: [organization_id], references: [id])
 
+  @@index([client_id, competence, organization_id], map: "idx_contabil_control_client_competence_org")
   @@map("contabil.control")
 }
 
@@ -2008,6 +2007,8 @@ model TIRequest {
   requester       User              @relation("TiRequester", fields: [requester_id], references: [id])
 
   @@index([organization_id, status, updated_at], map: "idx_tecnologia_requests_org_status_updated")
+  @@index([organization_id, requester_id, status, updated_at], map: "idx_tecnologia_requests_org_requester_status_updated")
+  @@index([organization_id, requester_id, urgency, status], map: "idx_tecnologia_requests_org_requester_urgency_status")
   @@index([organization_id, urgency, status], map: "idx_tecnologia_requests_org_urgency_status")
   @@map("tecnologia.requests")
 }

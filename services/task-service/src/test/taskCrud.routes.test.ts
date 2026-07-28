@@ -111,12 +111,15 @@ describe("task crud routes", () => {
     expect(res.status).toBe(200);
     expect(taskCrudServiceMock.listTasks).toHaveBeenCalledWith({
       organization_id: "org-1",
+      user_id: "user-1",
       status: "Todos",
       ref: "",
       ref_id: "",
       search: "",
       page: 1,
       limit: 20,
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 
@@ -130,12 +133,15 @@ describe("task crud routes", () => {
     expect(res.status).toBe(200);
     expect(taskCrudServiceMock.listTasks).toHaveBeenCalledWith({
       organization_id: "org-1",
+      user_id: "user-1",
       status: "Todos",
       ref: "",
       ref_id: "",
       search: "registro 21",
       page: 2,
       limit: 20,
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 
@@ -163,7 +169,11 @@ describe("task crud routes", () => {
     const res = await request(app).get("/task").query({ task_id: "task-1" });
 
     expect(res.status).toBe(200);
-    expect(taskCrudServiceMock.detailTask).toHaveBeenCalledWith("task-1", "org-1");
+    expect(taskCrudServiceMock.detailTask).toHaveBeenCalledWith("task-1", "org-1", {
+      user_id: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
+    });
   });
 
   it("DELETE /task remove tarefa", async () => {

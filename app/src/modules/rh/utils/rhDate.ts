@@ -4,11 +4,19 @@ export function formatRhDate(value: string | null | undefined) {
   }
 
   const trimmedValue = value.trim();
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmedValue);
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})(?:T|$)/.exec(trimmedValue);
 
   if (dateOnlyMatch) {
     const [, year, month, day] = dateOnlyMatch;
-    return `${day}/${month}/${year}`;
+    const civilDate = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+
+    if (
+      civilDate.getUTCFullYear() === Number(year) &&
+      civilDate.getUTCMonth() + 1 === Number(month) &&
+      civilDate.getUTCDate() === Number(day)
+    ) {
+      return `${day}/${month}/${year}`;
+    }
   }
 
   const date = new Date(trimmedValue);

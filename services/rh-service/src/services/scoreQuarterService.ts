@@ -45,6 +45,8 @@ export interface UpdateNitroInput {
 export interface GetScoreDetailInput {
   organization_id: string;
   score_id: string;
+  user_id: string;
+  can_manage: boolean;
 }
 
 class ScoreQuarterService {
@@ -341,6 +343,7 @@ class ScoreQuarterService {
     try {
       const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
       const scoreId = assertNonEmptyString(input.score_id, "score_id");
+      const userId = assertNonEmptyString(input.user_id, "user_id");
 
       const score = await this.db.scoreQuarter.findUnique({
         where: { id: scoreId },
@@ -358,6 +361,10 @@ class ScoreQuarterService {
       }
       if (score.organization_id !== organizationId) {
         throw new ServiceError(403, "Score não pertence à organização.");
+      }
+
+      if (!input.can_manage && score.user_id !== userId) {
+        throw new ServiceError(403, "Permissao insuficiente para acessar score de terceiro.");
       }
 
       return score;

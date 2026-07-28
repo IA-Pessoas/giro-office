@@ -29,6 +29,8 @@ const SCORE_STATUS_LABELS: Record<string, string> = {
 };
 
 const QUARTER_PATTERN = /^(\d{4})-Q([1-4])$/i;
+const RH_SCORE_QUARTER_YEARS_BEFORE = 2;
+const RH_SCORE_QUARTER_YEARS_AFTER = 2;
 
 export function getRhScoreTypeLabel(type: RhScoreQuestionType | string | null | undefined) {
   if (!type) {
@@ -60,7 +62,11 @@ export function getRhQuarterOptions(referenceDate = new Date()) {
   const currentYear = referenceDate.getFullYear();
   const options: Array<{ value: string; label: string }> = [];
 
-  for (let year = currentYear; year <= currentYear + 1; year += 1) {
+  for (
+    let year = currentYear - RH_SCORE_QUARTER_YEARS_BEFORE;
+    year <= currentYear + RH_SCORE_QUARTER_YEARS_AFTER;
+    year += 1
+  ) {
     for (let quarter = 1; quarter <= 4; quarter += 1) {
       const value = buildRhQuarterValue(year, quarter);
       options.push({

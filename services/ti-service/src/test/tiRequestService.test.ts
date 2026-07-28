@@ -9,7 +9,7 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const otherUserId = "00000000-0000-4000-8000-000000000002";
 const categoryId = "20000000-0000-4000-8000-000000000001";
-const TI_ADMIN_PERMISSION = 2;
+const TI_ADMIN_PERMISSION = 3;
 
 const context = {
   organizationId,
@@ -18,7 +18,7 @@ const context = {
 };
 
 describe("TiRequestService", () => {
-  it("documents admin TI permission as level 2", () => {
+  it("documents admin TI permission as level 3", () => {
     expect(TiPermissionLevel.Admin).toBe(TI_ADMIN_PERMISSION);
   });
 
@@ -73,7 +73,7 @@ describe("TiRequestService", () => {
     );
   });
 
-  it("forces requester filter for requester permission", async () => {
+  it("forces requester filter for viewer permission", async () => {
     const prisma = {
       tIRequest: {
         findMany: vi.fn(async () => []),
@@ -82,7 +82,7 @@ describe("TiRequestService", () => {
     const service = new TiRequestService(prisma as never);
 
     await service.list(
-      { ...context, permission: TiPermissionLevel.Requester },
+      { ...context, permission: TiPermissionLevel.Viewer },
       {
         requester_id: otherUserId,
       },
@@ -204,7 +204,7 @@ describe("TiRequestService", () => {
     );
   });
 
-  it("hides another user's request from requester permission", async () => {
+  it("hides another user's request from viewer permission", async () => {
     const prisma = {
       tIRequest: {
         findFirst: vi.fn(async () => ({
@@ -218,7 +218,7 @@ describe("TiRequestService", () => {
 
     await expect(
       service.getById(
-        { ...context, permission: TiPermissionLevel.Requester },
+        { ...context, permission: TiPermissionLevel.Viewer },
         "30000000-0000-4000-8000-000000000001",
       ),
     ).rejects.toMatchObject({
@@ -263,7 +263,7 @@ describe("TiRequestService", () => {
     });
   });
 
-  it("allows admin level 2 to reopen resolved request", async () => {
+  it("allows admin level 3 to reopen resolved request", async () => {
     const prisma = {
       tIRequest: {
         findFirst: vi.fn(async () => ({ id: "req-1", status: "Resolved" })),

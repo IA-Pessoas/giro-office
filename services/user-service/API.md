@@ -281,6 +281,16 @@ Cria um novo usuário.
 
 ---
 
+### GET /user/session/validate
+
+Valida o JWT atual contra o usuário ativo e a versão de sessão persistida. O gateway usa esta rota para revogar sessões imediatamente após alterações sensíveis.
+
+**Autenticação:** Bearer JWT obrigatório
+
+**Resposta:** `200 OK` quando a sessão é válida; `401` quando o token está expirado, o usuário está inativo ou a versão da sessão foi revogada.
+
+---
+
 ### PATCH /user/:id
 
 Atualiza um usuário existente.
@@ -443,7 +453,6 @@ Busca as permissões de um usuário.
     "user_id": "uuid",
     "organization_id": "uuid",
     "certificado": 2,
-    "certificado": 0,
     "comercial": 1,
     ...
   }
@@ -458,22 +467,23 @@ Busca as permissões de um usuário.
 
 Atualiza as permissões de um usuário.
 
-**Autenticação:** Obrigatória (minPermission: 2 no gateway)
+**Autenticação:** Obrigatória. Alterações são permitidas ao owner da organização.
 
 **Path params:**
 | Parametro | Tipo   | Descrição |
 |-----------|--------|-----------|
 | userId    | string | UUID do usuário |
 
-**Body (JSON):** Objeto com chaves = nome do módulo, valor = nível (0, 1 ou 2)
+**Body (JSON):** Objeto parcial com chaves = nome do módulo, valor = nível (0 a 3). Chaves ausentes são persistidas como `0` quando o registro é criado; módulos aposentados e chaves desconhecidas são rejeitados.
 | Módulos suportados |
 |--------------------|
 | certificado, comercial, contabil, financeiro, fiscal, integracao, marketing, parcelamento, pessoal, regularize, rh, ti, triagem |
 
 **Níveis de permissão:**
 - `0` - Sem acesso
-- `1` - Leitura
-- `2` - Leitura e escrita
+- `1` - Visualizador
+- `2` - Usuário
+- `3` - Administrador
 
 **Exemplo:**
 ```json

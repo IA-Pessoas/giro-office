@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
   parseWithZod,
   requireAuthenticatedRequestContext,
   ServiceError,
@@ -39,6 +40,8 @@ router.post("/", isAuthenticated, async (req: Request, res: Response, next: Next
       responsible2_id: body.responsible2_id,
       responsible3_id: body.responsible3_id,
       prevision_date: body.prevision_date,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.status(201).json(createSuccessResponse(result));
@@ -50,12 +53,15 @@ router.post("/", isAuthenticated, async (req: Request, res: Response, next: Next
 
 router.get("/list", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { organization_id } = requireAuthenticatedRequestContext(req);
+    const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
     const query = parseWithZod(taskListQuerySchema, req.query);
 
     const result = await taskCrudService.listTasks({
       organization_id,
+      user_id,
       ...query,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.json(createSuccessResponse(result));
@@ -76,6 +82,8 @@ router.put("/", isAuthenticated, async (req: Request, res: Response, next: NextF
       organization_id,
       task_id,
       ...patch,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.json(createSuccessResponse(result));
@@ -88,13 +96,17 @@ router.put("/", isAuthenticated, async (req: Request, res: Response, next: NextF
 router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const task_id = (req.body.task_id ?? req.query.task_id) as string;
-    const { organization_id } = requireAuthenticatedRequestContext(req);
+    const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
 
     if (!task_id) {
       throw new ServiceError(400, "task_id Ã© obrigatÃ³rio (body ou query).");
     }
 
-    const result = await taskCrudService.detailTask(task_id, organization_id);
+    const result = await taskCrudService.detailTask(task_id, organization_id, {
+      user_id,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
+    });
     res.json(createSuccessResponse(result));
   } catch (err) {
     logError("Erro ao detalhar tarefa", { err });
@@ -115,6 +127,8 @@ router.delete("/", isAuthenticated, async (req: Request, res: Response, next: Ne
       task_id,
       user_id,
       organization_id,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.json(createSuccessResponse(result));

@@ -157,6 +157,26 @@ function normalizeRoutePath(routePath: string): string {
 
 function getModuleKeyFromRoutePath(routePath: string): ModuleKey | null {
   const normalizedPath = normalizeRoutePath(routePath);
+
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/commercial")) {
+    return "comercial";
+  }
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/contabil")) {
+    return "contabil";
+  }
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/finance")) {
+    return "financeiro";
+  }
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/integration")) {
+    return "integracao";
+  }
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/regularize")) {
+    return "regularize";
+  }
+  if (normalizedPath.startsWith("/clients/") && normalizedPath.includes("/pa")) {
+    return "pessoal";
+  }
+
   const mappedRoute = Object.entries(APP_ROUTE_MODULE_MAP).find(([modulePath]) => {
     return normalizedPath === modulePath || normalizedPath.startsWith(`${modulePath}/`);
   });

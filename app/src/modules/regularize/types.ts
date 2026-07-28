@@ -23,6 +23,9 @@ export type RegularizeSitePasswordListFilters = {
 
 export type RegularizeClientPfListFilters = {
   status: string;
+  search?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizePartnerListFilters = {

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { registerHooks } from "node:module";
 
 import { AuthTokenError } from "../../shared/services/errors/AuthTokenError.ts";
-import { canSSRAdmin } from "./utils/canSSRAdmin.ts";
 import {
   AUTH_COOKIE_MAX_AGE_SECONDS,
   AUTH_COOKIE_NAME,
@@ -24,6 +24,37 @@ import {
   DISABLED_MODULE_KEYS,
   isModuleDisabled,
 } from "./utils/moduleAccess.ts";
+
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (
+      specifier === "./moduleAccess" &&
+      (context.parentURL?.endsWith("/modules/auth/utils/canSSRAdmin.ts") ||
+        context.parentURL?.endsWith("/modules/auth/utils/sessionToken.ts"))
+    ) {
+      return nextResolve(`${specifier}.ts`, context);
+    }
+
+    if (
+      specifier === "../utils/moduleAccess" &&
+      context.parentURL?.endsWith("/modules/auth/store/accessStore.ts")
+    ) {
+      return nextResolve(`${specifier}.ts`, context);
+    }
+
+    return nextResolve(specifier, context);
+  },
+});
+
+const { canSSRAdmin } = await import("./utils/canSSRAdmin.ts");
+const { getModulePermissionsFromToken } = await import("./utils/sessionToken.ts");
+const {
+  getAccessStoreState,
+  createAccessStoreUserSnapshot,
+  resetAccessStoreState,
+  setAccessStoreState,
+  shouldSyncAccessStore,
+} = await import("./store/accessStore.ts");
 
 async function runTest(name, fn) {
   try {
@@ -164,47 +195,74 @@ await (async () => {
   });
 
   await runTest("administration access allows owners and RH admins only", () => {
-    assert.equal(canAccessAdministration(2), true);
-    assert.equal(canAccessAdministration(100), true);
+    assert.equal(canAccessAdministration(2), false);
+    assert.equal(canAccessAdministration(100), false);
     assert.equal(canAccessAdministration(1), false);
     assert.equal(canAccessAdministration({ permission: 2, type: "owner" }), true);
     assert.equal(canAccessAdministration({ permission: 2, type: "admin" }), false);
-    assert.equal(canAccessAdministration({ permission: 2, type: "admin", modules: { rh: 2 } }), true);
+    assert.equal(canAccessAdministration({ permission: 2, type: "admin", modules: { rh: 3 } }), true);
     assert.equal(canAccessAdministration({ permission: 2, type: "admin", modules: { comercial: 2 } }), false);
-    assert.equal(canAccessAdministration({ permission: 2, type: "admin" }, { departmentModule: "rh" }), true);
+    assert.equal(canAccessAdministration({ permission: 2, type: "admin" }, { departmentModule: "rh" }), false);
     assert.equal(canAccessAdministration({ permission: 1, type: "admin" }, { departmentModule: "rh" }), false);
     assert.equal(canAccessAdministration({ permission: 2, type: "admin" }, { rhAccess: { isAdmin: true } }), true);
     assert.equal(canAccessAdministration({ permission: 2, type: "user" }), false);
-    assert.equal(canAccessAdministration({ permission: 999, type: null }), true);
-    assert.equal(canAccessAdministration({ permission: 2 }), true);
+    assert.equal(canAccessAdministration({ permission: 999, type: null }), false);
+    assert.equal(canAccessAdministration({ permission: 2 }), false);
     assert.equal(canAccessAdministration({ permission: 1 }), false);
-    assert.equal(canAccessAdministration({ permission: 1, modules: { rh: 2 } }), true);
+    assert.equal(canAccessAdministration({ permission: 1, modules: { rh: 3 } }), true);
     assert.equal(canAccessAdministration({ permission: 1, modules: { rh: 1 } }), false);
     assert.equal(canAccessAdministration(undefined), false);
   });
 
   await runTest("user creation and organization owner creation use different gates", () => {
     assert.equal(canCreateUsers({ permission: 2, type: "owner" }), true);
-    assert.equal(canCreateUsers({ permission: 2, type: "admin", modules: { rh: 2 } }), true);
-    assert.equal(canCreateUsers({ permission: 2, type: "admin" }, { departmentModule: "rh" }), true);
+    assert.equal(canCreateUsers({ permission: 2, type: "admin", modules: { rh: 3 } }), true);
+    assert.equal(canCreateUsers({ permission: 2, type: "admin" }, { departmentModule: "rh" }), false);
     assert.equal(canCreateUsers({ permission: 2, type: "admin", modules: { rh: 1 } }), false);
     assert.equal(canCreateUsers({ permission: 2, type: "admin", modules: { comercial: 2 } }), false);
     assert.equal(canCreateOrganizationOwner({ permission: 2, type: "owner" }), true);
     assert.equal(canCreateOrganizationOwner({ permission: 2, type: "admin", modules: { rh: 2 } }), false);
-    assert.equal(canCreateOrganizationOwner({ permission: 999, type: null }), true);
+    assert.equal(canCreateOrganizationOwner({ permission: 999, type: null }), false);
   });
 
-  await runTest("isOrganizationOwner accepts explicit owners and numeric legacy fallback", () => {
+  await runTest("isOrganizationOwner accepts only explicit owners", () => {
     assert.equal(isOrganizationOwner({ permission: 2, type: "owner" }), true);
     assert.equal(isOrganizationOwner({ permission: 2, type: "admin" }), false);
-    assert.equal(isOrganizationOwner({ permission: 2, type: null }), true);
-    assert.equal(isOrganizationOwner(2), true);
+    assert.equal(isOrganizationOwner({ permission: 2, type: null }), false);
+    assert.equal(isOrganizationOwner(2), false);
     assert.equal(isOrganizationOwner(1), false);
   });
 
   await runTest("app shell checks full user access for administration navigation", () => {
     assert.match(appShellSource, /const accessUser = meQuery\.data \?\? user;/);
     assert.match(appShellSource, /canAccessAdministration\(accessUser, \{ rhAccess \}\)/);
+  });
+
+  await runTest("access store isolates snapshots by active organization", () => {
+    const initialState = getAccessStoreState();
+    const organizationA = {
+      ...initialState,
+      isInitialized: true,
+      user: createAccessStoreUserSnapshot({
+        id: "user-1",
+        permission: 0,
+        organization_id: "org-a",
+      }),
+    };
+    const organizationB = {
+      ...organizationA,
+      user: createAccessStoreUserSnapshot({
+        ...organizationA.user,
+        organization_id: "org-b",
+      }),
+    };
+
+    assert.equal(shouldSyncAccessStore(organizationA, organizationB), true);
+    setAccessStoreState(organizationA);
+    assert.equal(getAccessStoreState().user?.organization_id, "org-a");
+    setAccessStoreState(organizationB);
+    assert.equal(getAccessStoreState().user?.organization_id, "org-b");
+    resetAccessStoreState();
   });
 
   await runTest("resolveModuleAccess does not turn department admin into global admin", () => {
@@ -242,7 +300,7 @@ await (async () => {
     );
   });
 
-  await runTest("resolveModuleAccess grants department access from user permission level", () => {
+  await runTest("resolveModuleAccess ignores department and global permission levels", () => {
     assert.deepEqual(
       resolveModuleAccess({
         userPermission: 1,
@@ -250,16 +308,16 @@ await (async () => {
         module: "regularize",
       }),
       {
-        level: "edit",
-        canView: true,
-        canEdit: true,
+        level: "none",
+        canView: false,
+        canEdit: false,
         isAdmin: false,
-        source: "department",
+        source: "none",
       },
     );
   });
 
-  await runTest("resolveModuleAccess honors explicit department module permission", () => {
+  await runTest("resolveModuleAccess uses the persisted module level", () => {
     assert.deepEqual(
       resolveModuleAccess({
         userPermission: 1,
@@ -270,31 +328,29 @@ await (async () => {
         },
       }),
       {
-        level: "admin",
+        level: "edit",
         canView: true,
         canEdit: true,
-        isAdmin: true,
-        source: "department",
+        isAdmin: false,
+        source: "additional-module",
       },
     );
   });
 
-  await runTest("resolveModuleAccess allows denied department permission to remove the module", () => {
+  await runTest("resolveModuleAccess maps zero and invalid levels to no access", () => {
     assert.deepEqual(
       resolveModuleAccess({
         userPermission: -1,
         departmentModule: "rh",
         module: "rh",
-        additionalModulePermissions: {
-          rh: null,
-        },
+        additionalModulePermissions: { rh: 0 },
       }),
       {
         level: "none",
         canView: false,
         canEdit: false,
         isAdmin: false,
-        source: "department",
+        source: "none",
       },
     );
 
@@ -303,18 +359,39 @@ await (async () => {
         userPermission: 0,
         departmentModule: "rh",
         module: "rh",
-        additionalModulePermissions: {
-          rh: null,
-        },
+        additionalModulePermissions: { rh: 99 },
       }),
       {
-        level: "view",
-        canView: true,
+        level: "none",
+        canView: false,
         canEdit: false,
         isAdmin: false,
-        source: "department",
+        source: "none",
       },
     );
+  });
+
+  await runTest("session token preserves the complete 0-3 matrix and drops retired modules", () => {
+    const token = createToken({
+      modules: {
+        certificado: 0,
+        comercial: 1,
+        contabil: 2,
+        fiscal: 3,
+        atendimento: 3,
+        pec: 2,
+        wiki: 1,
+      },
+    });
+    const modules = getModulePermissionsFromToken(token);
+
+    assert.equal(modules.certificado, 0);
+    assert.equal(modules.comercial, 1);
+    assert.equal(modules.contabil, 2);
+    assert.equal(modules.fiscal, 3);
+    assert.equal(Object.hasOwn(modules, "atendimento"), false);
+    assert.equal(Object.hasOwn(modules, "pec"), false);
+    assert.equal(Object.hasOwn(modules, "wiki"), false);
   });
 
   await runTest("resolveModuleAccess grants additional module access outside department", () => {
@@ -328,9 +405,9 @@ await (async () => {
         },
       }),
       {
-        level: "edit",
+        level: "view",
         canView: true,
-        canEdit: true,
+        canEdit: false,
         isAdmin: false,
         source: "additional-module",
       },
@@ -387,9 +464,10 @@ await (async () => {
     assert.equal(resolveDepartmentModuleKey("Atendimento"), null);
     assert.equal(resolveDepartmentModuleKey("PEC"), null);
     assert.equal(resolveDepartmentModuleKey("Wiki"), null);
-    assert.equal(resolveAccessLevelFromAdditionalPermission(2), "admin");
-    assert.equal(resolveAccessLevelFromAdditionalPermission(1), "edit");
-    assert.equal(resolveAccessLevelFromAdditionalPermission(0), "view");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(3), "admin");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(2), "edit");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(1), "view");
+    assert.equal(resolveAccessLevelFromAdditionalPermission(0), "none");
     assert.equal(resolveAccessLevelFromAdditionalPermission(null), "none");
   });
 
@@ -411,7 +489,7 @@ await (async () => {
     assert.match(appShellSource, /const rhAccess = moduleAccessMap\.rh/);
   });
 
-  await runTest("disabled modules are not registered in navigation or quick actions", () => {
+  await runTest("retired modules are not registered in navigation or quick actions", () => {
     for (const blockedPath of ["/comercial", "/marketing", "/parcelamento", "/triagem"]) {
       assert.equal(appShellSource.includes(`path: "${blockedPath}"`), false);
       assert.equal(quickActionsSource.includes(`href: "${blockedPath}"`), false);
@@ -445,9 +523,13 @@ await (async () => {
     assert.equal(clientDetailPageSource.includes("Abrir comercial"), false);
   });
 
-  await runTest("disabled modules are hidden from user permission configuration", () => {
+  await runTest("active modules remain configurable while retired modules are absent", () => {
     for (const moduleKey of DISABLED_MODULE_KEYS) {
-      assert.equal(permissionConfigSource.includes(`"${moduleKey}"`), false);
+      assert.equal(permissionConfigSource.includes(`"${moduleKey}"`), true);
+      assert.equal(createUserConfigSource.includes(`key: "${moduleKey}"`), true);
+    }
+    for (const moduleKey of ["atendimento", "pec", "wiki"]) {
+      assert.equal(permissionConfigSource.includes(`  "${moduleKey}":`), false);
       assert.equal(createUserConfigSource.includes(`key: "${moduleKey}"`), false);
     }
   });
@@ -537,25 +619,25 @@ await (async () => {
     assert.deepEqual(result, { props: { forbidden: true } });
   });
 
-  await runTest("canSSRAdmin allows admin users through", async () => {
+  await runTest("canSSRAdmin allows explicit owners through", async () => {
     const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
-    const result = await guard(createSsrContext(createToken({ permission: 2 })));
+    const result = await guard(createSsrContext(createToken({ permission: 2, type: "owner" })));
 
     assert.deepEqual(result, { props: { ok: true } });
   });
 
   await runTest("canSSRAdmin allows RH module admins through", async () => {
     const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
-    const result = await guard(createSsrContext(createToken({ permission: 1, modules: { rh: 2 } })));
+    const result = await guard(createSsrContext(createToken({ permission: 1, modules: { rh: 3 } })));
 
     assert.deepEqual(result, { props: { ok: true } });
   });
 
-  await runTest("canSSRAdmin allows high-permission admins through", async () => {
+  await runTest("canSSRAdmin rejects legacy global permission without owner scope", async () => {
     const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
     const result = await guard(createSsrContext(createToken({ permission: 999 })));
 
-    assert.deepEqual(result, { props: { ok: true } });
+    assert.deepEqual(result, { redirect: { destination: "/dashboard", permanent: false } });
   });
 
   await runTest("canSSRAdmin redirects auth-token failures to login", async () => {
@@ -563,7 +645,7 @@ await (async () => {
       throw new AuthTokenError();
     });
 
-    const result = await guard(createSsrContext(createToken({ permission: 2 })));
+    const result = await guard(createSsrContext(createToken({ permission: 2, type: "owner" })));
 
     assert.deepEqual(result, {
       redirect: {
@@ -680,12 +762,9 @@ await (async () => {
     assert.equal(handleSavePermissionsSource.includes("refetchPermissionUsers"), false);
   });
 
-  await runTest("admin permissions tab is available to RH module admins", () => {
-    assert.match(administracaoSource, /const canManagePermissions = hasAdminAccess;/);
-    assert.equal(
-      administracaoSource.includes("const canManagePermissions = canManageOrganizationOwners;"),
-      false,
-    );
+  await runTest("admin permissions tab is available only to organization owners", () => {
+    assert.match(administracaoSource, /const canManagePermissions = canManageOrganizationOwners;/);
+    assert.equal(administracaoSource.includes("const canManagePermissions = hasAdminAccess;"), false);
   });
 
   await runTest("admin create user action uses native disabled state when context is unavailable", () => {

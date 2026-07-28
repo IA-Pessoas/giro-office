@@ -48,6 +48,7 @@ export const listTiInventoryQuerySchema = paginationQuerySchema
       location_id: z.string().uuid({ message: "Local de inventario invalido." }).optional(),
       user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
       asset_code: z.string().optional(),
+      status: z.enum(["available", "assigned"]).optional(),
     }),
   )
   .strict();

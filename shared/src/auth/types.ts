@@ -1,3 +1,5 @@
+import type { ModulePermissions } from "./modules.js";
+
 export type AuthUserType = "owner" | "admin" | "user";
 export type AuthSpecialPolicy = "manageUsers" | "ownerOnly";
 
@@ -5,7 +7,9 @@ export interface AuthIdentity {
   user_id: string;
   organization_id?: string;
   permission?: number;
-  modules?: Record<string, number | null>;
+  modules?: ModulePermissions;
+  modulePermissionsPresent?: boolean;
+  session_version?: number;
   type?: AuthUserType;
   name?: string;
   login?: string;

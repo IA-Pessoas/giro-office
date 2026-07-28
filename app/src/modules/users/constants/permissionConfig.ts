@@ -2,32 +2,42 @@ import type { KnownPermissionModuleKey } from "../types";
 
 export const KNOWN_PERMISSION_MODULE_KEYS = [
   "certificado",
+  "comercial",
   "contabil",
+  "financeiro",
   "fiscal",
   "integracao",
+  "marketing",
+  "parcelamento",
   "pessoal",
   "regularize",
   "rh",
   "ti",
+  "triagem",
 ] as const satisfies readonly KnownPermissionModuleKey[];
 
 export const RETIRED_PERMISSION_MODULE_KEYS = ["atendimento", "pec", "wiki"] as const;
 
 export const PERMISSION_MODULE_LABELS: Record<KnownPermissionModuleKey, string> = {
   certificado: "Certificado",
+  comercial: "Comercial",
   contabil: "Contábil",
+  financeiro: "Financeiro",
   fiscal: "Fiscal",
   integracao: "Integração",
+  marketing: "Marketing",
+  parcelamento: "Parcelamento",
   pessoal: "Pessoal",
   regularize: "Regularize",
   rh: "RH",
   ti: "Tecnologia",
+  triagem: "Triagem",
 };
 
 export const PERMISSION_MODULE_GROUPS = [
   {
     title: "Fiscal",
-    keys: ["contabil", "fiscal", "regularize"],
+    keys: ["contabil", "financeiro", "fiscal", "regularize", "parcelamento"],
   },
   {
     title: "Certificados",
@@ -39,7 +49,7 @@ export const PERMISSION_MODULE_GROUPS = [
   },
   {
     title: "Plataforma e Conhecimento",
-    keys: ["integracao", "ti"],
+    keys: ["integracao", "ti", "comercial", "marketing", "triagem"],
   },
 ] as const satisfies ReadonlyArray<{
   title: string;
@@ -47,13 +57,13 @@ export const PERMISSION_MODULE_GROUPS = [
 }>;
 
 export const PERMISSION_SELECT_OPTIONS = [
-  { value: "null", label: "Sem acesso" },
-  { value: "0", label: "Visualizador" },
-  { value: "1", label: "Usuário" },
-  { value: "2", label: "Administrador" },
+  { value: "0", label: "Sem acesso" },
+  { value: "1", label: "Visualizador" },
+  { value: "2", label: "Usuário" },
+  { value: "3", label: "Administrador" },
 ] as const;
 
-export type PermissionLevel = 0 | 1 | 2;
+export type PermissionLevel = 0 | 1 | 2 | 3;
 export type PermissionSelectOption = (typeof PERMISSION_SELECT_OPTIONS)[number];
 
 export const MINIMUM_PERMISSION_LEVEL_BY_MODULE: Partial<
@@ -69,13 +79,13 @@ export function getMinimumPermissionLevel(moduleKey: string): PermissionLevel | 
 
 export function normalizePermissionForModule(
   moduleKey: string,
-  value: number | null | undefined,
-): PermissionLevel | null {
-  const normalizedValue: PermissionLevel | null =
-    value === 0 || value === 1 || value === 2 ? value : null;
+  value: number | undefined,
+): PermissionLevel {
+  const normalizedValue: PermissionLevel =
+    value === 0 || value === 1 || value === 2 || value === 3 ? value : 0;
   const minimumLevel = getMinimumPermissionLevel(moduleKey);
 
-  if (minimumLevel !== null && (normalizedValue === null || normalizedValue < minimumLevel)) {
+  if (minimumLevel !== null && normalizedValue < minimumLevel) {
     return minimumLevel;
   }
 
@@ -83,17 +93,9 @@ export function normalizePermissionForModule(
 }
 
 export function getPermissionSelectOptions(
-  moduleKey: string,
+  _moduleKey: string,
 ): readonly PermissionSelectOption[] {
-  const minimumLevel = getMinimumPermissionLevel(moduleKey);
-
-  if (minimumLevel === null) {
-    return PERMISSION_SELECT_OPTIONS;
-  }
-
-  return PERMISSION_SELECT_OPTIONS.filter(
-    (option) => option.value !== "null" && Number(option.value) >= minimumLevel,
-  );
+  return PERMISSION_SELECT_OPTIONS;
 }
 
 export function getPermissionModuleLabel(moduleKey: KnownPermissionModuleKey): string {

@@ -114,6 +114,8 @@ const {
   scoreNitroServiceMock,
 } = rhMocks;
 
+let rhRoutePermission = 3;
+
 vi.mock("../services/pointConfigService.js", () => ({
   PointConfigService: vi.fn(function PointConfigService() {
     return rhMocks.pointConfigServiceMock;
@@ -202,7 +204,7 @@ vi.mock("../middlewares/isAuthenticated.js", () => ({
   isAuthenticated: (req: Express.Request, _res: Express.Response, next: NextFunction) => {
     req.user_id = "00000000-0000-4000-8000-000000000001";
     req.organization_id = "00000000-0000-4000-8000-000000000002";
-    req.rh_permission ??= 2;
+    req.rh_permission ??= rhRoutePermission;
     next();
   },
 }));
@@ -234,6 +236,7 @@ export function createTestApp() {
 
 export function resetRhRouteMocks() {
   vi.clearAllMocks();
+  rhRoutePermission = 3;
 
   pointConfigServiceMock.upsert.mockResolvedValue({ ok: true });
   pointConfigServiceMock.getByUserId.mockResolvedValue({ ok: true });
@@ -332,6 +335,10 @@ export function resetRhRouteMocks() {
   });
   timeSheetServiceMock.sign.mockResolvedValue({ ok: true });
   scoreNitroServiceMock.updateMetric.mockResolvedValue({ ok: true });
+}
+
+export function setRhRoutePermission(permission: number) {
+  rhRoutePermission = permission;
 }
 
 export {

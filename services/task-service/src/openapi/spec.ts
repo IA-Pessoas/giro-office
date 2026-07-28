@@ -53,14 +53,7 @@ const createTaskRequestBody = createObjectRequestBody({
     responsible3_id: null,
     prevision_date: "2026-04-10",
   },
-  required: [
-    "model_id",
-    "project_id",
-    "client_id",
-    "prospecting_status",
-    "observations",
-    "urgency",
-  ],
+  required: ["model_id", "project_id", "client_id", "prospecting_status", "urgency"],
   properties: {
     model_id: { type: "string" },
     project_id: { type: "string" },
@@ -344,7 +337,9 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       title: "task-service",
       version: "1.0.0",
       description:
-        "Tarefas, modelos, integracao Regularize, financeiro e comercial. Endpoints marcados exigem JWT.",
+        "Tarefas, modelos, integracao Regularize, financeiro e comercial. Endpoints marcados exigem JWT. " +
+        "modules.integracao aplica tarefas próprias nos níveis 0–1, leitura organizacional a partir de 1, " +
+        "criação/edição a partir de 2 e administração/exclusão a partir de 3; modelos são consultáveis a partir de 2.",
     },
     servers: [{ url: baseUrl }],
     tags: [

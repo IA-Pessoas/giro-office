@@ -12,6 +12,11 @@ const { prismaMock } = vi.hoisted(() => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    user: { update: vi.fn() },
+    logs: { create: vi.fn() },
+    $transaction: vi.fn(async (callback: (client: typeof prismaMock) => unknown) =>
+      callback(prismaMock),
+    ),
   },
 }));
 
@@ -75,21 +80,19 @@ describe("PermissionService", () => {
       id: "permission-1",
       user_id: "user-1",
       organization_id: "org-1",
-      atendimento: null,
-      certificado: null,
-      comercial: null,
-      contabil: null,
-      financeiro: null,
-      fiscal: null,
-      integracao: null,
-      marketing: null,
-      parcelamento: null,
-      pec: null,
-      pessoal: null,
-      regularize: null,
-      rh: null,
-      triagem: null,
-      wiki: null,
+      certificado: 0,
+      comercial: 0,
+      contabil: 0,
+      financeiro: 0,
+      fiscal: 0,
+      integracao: 0,
+      marketing: 0,
+      parcelamento: 0,
+      pessoal: 0,
+      regularize: 0,
+      rh: 0,
+      ti: 0,
+      triagem: 0,
     });
     const service = new PermissionService();
 
@@ -132,5 +135,47 @@ describe("PermissionService", () => {
       where: { user_id: "user-1", organization_id: "org-1" },
       data: expect.objectContaining({ ti: 3 }),
     });
+  });
+
+  it("atualiza sessão e registra auditoria na mesma transação", async () => {
+    prismaMock.permission.findFirst
+      .mockResolvedValueOnce({
+        id: "permission-1",
+        user_id: "user-1",
+        organization_id: "org-1",
+        fiscal: 1,
+      })
+      .mockResolvedValueOnce({
+        id: "permission-1",
+        user_id: "user-1",
+        organization_id: "org-1",
+        fiscal: 2,
+      });
+    prismaMock.permission.updateMany.mockResolvedValue({ count: 1 });
+    const service = new PermissionService();
+
+    await service.update("user-1", { fiscal: 2 }, "org-1", { actorUserId: "actor-1" });
+
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { session_version: { increment: 1 } },
+    });
+    expect(prismaMock.logs.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          user_id: "actor-1",
+          organization_id: "org-1",
+          referring: "Permission",
+          referring_id: "user-1",
+          changes: expect.objectContaining({
+            affected_user_id: "user-1",
+            organization_id: "org-1",
+            previous: expect.objectContaining({ fiscal: 1 }),
+            next: expect.objectContaining({ fiscal: 2 }),
+          }),
+        }),
+      }),
+    );
   });
 });

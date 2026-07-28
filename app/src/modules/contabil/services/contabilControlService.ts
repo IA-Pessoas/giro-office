@@ -9,6 +9,7 @@ import type {
 import {
   buildContabilControlParams,
   CONTABIL_ENDPOINTS,
+  executeNullableContabilRequest,
   unwrapContabilEnvelope,
 } from "./contabilService.contract";
 
@@ -22,13 +23,13 @@ export const contabilControlService = {
     return unwrapContabilEnvelope<ContabilControl>(response.data);
   },
 
-  async getControl(filters: ContabilControlFilters): Promise<ContabilControl> {
+  async getControl(filters: ContabilControlFilters): Promise<ContabilControl | null> {
     const api = setupAPIClient();
-    const response = await api.get(CONTABIL_ENDPOINTS.controls, {
-      params: buildContabilControlParams(filters),
-    });
-
-    return unwrapContabilEnvelope<ContabilControl>(response.data);
+    return executeNullableContabilRequest<ContabilControl>(() =>
+      api.get(CONTABIL_ENDPOINTS.controls, {
+        params: buildContabilControlParams(filters),
+      }),
+    );
   },
 
   async patchControlField(

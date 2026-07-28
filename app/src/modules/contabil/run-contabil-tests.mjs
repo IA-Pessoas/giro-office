@@ -93,6 +93,23 @@ await (async () => {
     );
   });
 
+  await runTest("viewer control section reads existing control without bootstrap write", () => {
+    const componentSource = readFileSync(
+      new URL("./components/ContabilControlSection.tsx", import.meta.url),
+      "utf8",
+    );
+    const hookSource = readFileSync(
+      new URL("./hooks/useContabilControl.ts", import.meta.url),
+      "utf8",
+    );
+
+    assert.match(hookSource, /useContabilControlDetail/);
+    assert.match(componentSource, /enabled:\s*!canEdit/);
+    assert.match(componentSource, /canEdit\s*\?\s*bootstrapMutation\.data\s*:\s*detailQuery\.data/);
+    assert.match(componentSource, /if\s*\(!canEdit\)\s*\{/);
+    assert.match(hookSource, /contabilControlService\.getControl/);
+  });
+
   await runTest("unwrapContabilEnvelope extracts data directly from the backend response", () => {
     const payload = {
       id: "control-1",
@@ -334,7 +351,7 @@ await (async () => {
     });
   });
 
-  await runTest("resolveModuleAccess enables read-only mode for the module of the current department", () => {
+  await runTest("resolveModuleAccess ignores the current department without a module grant", () => {
     assert.deepEqual(
       resolveModuleAccess({
         module: "contabil",
@@ -342,16 +359,16 @@ await (async () => {
         departmentModule: "contabil",
       }),
       {
-        level: "view",
-        canView: true,
+        level: "none",
+        canView: false,
         canEdit: false,
         isAdmin: false,
-        source: "department",
+        source: "none",
       },
     );
   });
 
-  await runTest("resolveModuleAccess enables edit mode for department users", () => {
+  await runTest("resolveModuleAccess ignores legacy user permission levels", () => {
     assert.deepEqual(
       resolveModuleAccess({
         module: "contabil",
@@ -359,22 +376,22 @@ await (async () => {
         departmentModule: "contabil",
       }),
       {
-        level: "edit",
-        canView: true,
-        canEdit: true,
+        level: "none",
+        canView: false,
+        canEdit: false,
         isAdmin: false,
-        source: "department",
+        source: "none",
       },
     );
   });
 
-  await runTest("resolveModuleAccess uses additional modules outside the primary department", () => {
+  await runTest("resolveModuleAccess uses persisted module permissions", () => {
     assert.deepEqual(
       resolveModuleAccess({
         module: "contabil",
         userPermission: 1,
         departmentModule: "rh",
-        additionalModulePermissions: { contabil: 0 },
+        additionalModulePermissions: { contabil: 1 },
       }),
       {
         level: "view",
@@ -386,7 +403,7 @@ await (async () => {
     );
   });
 
-  await runTest("resolveModuleAccess keeps department precedence over matching additional module values", () => {
+  await runTest("resolveModuleAccess does not restore department access when module permission is absent", () => {
     assert.deepEqual(
       resolveModuleAccess({
         module: "contabil",
@@ -395,11 +412,11 @@ await (async () => {
         additionalModulePermissions: { contabil: null },
       }),
       {
-        level: "edit",
-        canView: true,
-        canEdit: true,
+        level: "none",
+        canView: false,
+        canEdit: false,
         isAdmin: false,
-        source: "department",
+        source: "none",
       },
     );
   });
