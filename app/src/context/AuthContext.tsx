@@ -15,7 +15,11 @@ import { MODULE_KEYS } from "@modules/auth/utils/moduleAccess";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
 import { ME_QUERY_KEY } from "@shared/hooks";
-import { invalidateAuthSession, registerAuthInvalidationHandler } from "./authInvalidation";
+import {
+    createAuthInvalidationHandler,
+    invalidateAuthSession,
+    registerAuthInvalidationHandler,
+} from "./authInvalidation";
 
 interface UserProps {
     id: string;
@@ -169,12 +173,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     useEffect(() => {
-        return registerAuthInvalidationHandler(() => {
-            authRequestVersionRef.current += 1;
-            setUser(null);
-            setLoading(false);
-            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
-        });
+        return registerAuthInvalidationHandler(
+            createAuthInvalidationHandler({
+                invalidateRequests: () => {
+                    authRequestVersionRef.current += 1;
+                },
+                clearUser: () => setUser(null),
+                stopLoading: () => setLoading(false),
+                clearCache: () => queryClient.removeQueries({ queryKey: ME_QUERY_KEY }),
+            }),
+        );
     }, [queryClient]);
 
     async function refreshSession(): Promise<UserProps | null> {

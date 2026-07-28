@@ -57,7 +57,11 @@ const {
   setAccessStoreState,
   shouldSyncAccessStore,
 } = await import("./store/accessStore.ts");
-const { invalidateAuthSession, registerAuthInvalidationHandler } = await import(
+const {
+  createAuthInvalidationHandler,
+  invalidateAuthSession,
+  registerAuthInvalidationHandler,
+} = await import(
   "../../context/authInvalidation.ts",
 );
 
@@ -863,6 +867,25 @@ await (async () => {
     } finally {
       unregister();
     }
+  });
+
+  await runTest("invalidação de sessão aplica todas as transições em runtime", () => {
+    const events = [];
+    const handler = createAuthInvalidationHandler({
+      invalidateRequests: () => events.push("invalidate-requests"),
+      clearUser: () => events.push("clear-user"),
+      stopLoading: () => events.push("stop-loading"),
+      clearCache: () => events.push("clear-cache"),
+    });
+
+    handler();
+
+    assert.deepEqual(events, [
+      "invalidate-requests",
+      "clear-user",
+      "stop-loading",
+      "clear-cache",
+    ]);
   });
 
   await runTest("rotas protegidas redirecionam quando não há sessão", () => {
