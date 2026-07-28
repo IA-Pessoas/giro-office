@@ -80,6 +80,7 @@ function getConnectionHeaderTokens(request: Request): Set<string> {
 function resolveForwardedPermission(
   permission: number | undefined,
   modules: Record<string, number> | undefined,
+  modulePermissionsPresent: boolean | undefined,
   type: unknown,
   permissionModule?: string,
 ): number | undefined {
@@ -87,11 +88,16 @@ function resolveForwardedPermission(
     return permission;
   }
 
-  const modulePermission = modules?.[permissionModule];
   const isExplicitOwner = type === "owner";
   if (isExplicitOwner) {
     return OWNER_MODULE_PERMISSION;
   }
+
+  if (modulePermissionsPresent === false) {
+    return permission;
+  }
+
+  const modulePermission = modules?.[permissionModule];
 
   if (typeof modulePermission === "number") {
     return modulePermission;
@@ -145,6 +151,7 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     const forwardedPermission = resolveForwardedPermission(
       request.auth.claims.permission,
       modules,
+      request.auth.claims.modulePermissionsPresent,
       request.auth.claims.type,
       options.permissionModule,
     );

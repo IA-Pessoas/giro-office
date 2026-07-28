@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  buildRegularizeClientPfListParams,
   buildRegularizeProcessListParams,
   buildRegularizeSitePasswordListParams,
   unwrapRegularizePage,
@@ -74,6 +75,65 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   ]) {
     assert.match(contractSource, new RegExp(endpoint.replaceAll("/", "\\/")));
   }
+});
+
+await runTest("regularize PF list contract preserves explicit search status and pagination", async () => {
+  assert.deepEqual(
+    buildRegularizeClientPfListParams({
+      status: "Ativo",
+      search: "ana",
+      page: 2,
+      limit: 20,
+    }),
+    { status: "Ativo", search: "ana", page: 2, limit: 20 },
+  );
+
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const peopleSource = await readModuleSource("hooks/useRegularizePeople.ts");
+  const queryKeysSource = await readModuleSource("hooks/queryKeys.ts");
+
+  assert.match(pageSource, /const \[pfSearch, setPfSearch\] = useState\(""\)/);
+  assert.match(pageSource, /const \[pfStatus, setPfStatus\] = useState\("Todos"\)/);
+  assert.match(pageSource, /usePaginatedRegularizeClientPfs/);
+  assert.match(pageSource, /placeholder="Buscar por nome, código ou CPF"/);
+  assert.match(pageSource, /label="Status"/);
+  assert.match(pageSource, /<PaginationControls/);
+  assert.match(peopleSource, /usePaginatedRegularizeClientPfs/);
+  assert.match(queryKeysSource, /clientPfsPage/);
+});
+
+await runTest("regularize PF forms search every paginated PF option and preserve linked clients", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.doesNotMatch(pageSource, /limit: 100/);
+
+  const [partnerFormSource, processFormSource] = await Promise.all([
+    readModuleSource("components/RegularizePartnerForm.tsx"),
+    readModuleSource("components/RegularizeProcessForm.tsx"),
+  ]);
+  assert.match(partnerFormSource, /RegularizeClientPfSelect/);
+  assert.match(processFormSource, /RegularizeClientPfSelect/);
+  assert.match(partnerFormSource, /<fieldset/);
+  assert.match(partnerFormSource, /<legend[^>]*>[\s\S]*<span>Cliente PF<\/span>/);
+  assert.match(processFormSource, /<fieldset/);
+  assert.doesNotMatch(partnerFormSource, /<RegularizeFormField label="Cliente PF"/);
+  assert.match(partnerFormSource, /onChange=\{\(id\) => handleChange\("pf_id", id\)\}/);
+  assert.match(processFormSource, /handleClientPfChange\(id, option\?\.cpf\)/);
+
+  const selectSource = await readModuleSource("components/RegularizeClientPfSelect.tsx");
+  assert.match(selectSource, /usePaginatedRegularizeClientPfs/);
+  assert.match(selectSource, /useRegularizeClientPfDetail/);
+  assert.match(selectSource, /placeholder="Buscar PF por nome, código ou CPF"/);
+  assert.match(selectSource, /page: pfPage/);
+  assert.match(selectSource, /onNext/);
+  assert.match(selectSource, /selectedPfQuery\.data/);
+  assert.match(selectSource, /aria-label="Buscar cliente PF"/);
+  assert.match(selectSource, /aria-label="Selecionar cliente PF"/);
+  assert.match(selectSource, /role="status"/);
+  assert.match(selectSource, /role="alert"/);
+  assert.match(selectSource, /Tentar novamente/);
+  assert.match(selectSource, /const error = listQuery\.error \?\? selectedPfQuery\.error/);
+  assert.match(selectSource, /listQuery\.refetch/);
 });
 
 await runTest("regularize dashboard has a centralized aggregate data contract", async () => {
@@ -496,6 +556,7 @@ await runTest("regularize process empty state is centered across the process vie
 
 await runTest("regularize client documents are consistently formatted", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const pfSelectSource = await readModuleSource("components/RegularizeClientPfSelect.tsx");
   const rawDocumentMatches = pageSource.match(/formatText\(item\.cpf_cnpj\)/g) ?? [];
   const formattedDocumentMatches = pageSource.match(/formatDocument\(item\.cpf_cnpj\)/g) ?? [];
 
@@ -504,8 +565,9 @@ await runTest("regularize client documents are consistently formatted", async ()
   assert.deepEqual(rawDocumentMatches, []);
   assert.ok(formattedDocumentMatches.length >= 3);
   assert.doesNotMatch(pageSource, /description: client\.cpf_cnpj/);
-  assert.doesNotMatch(pageSource, /description: clientPf\.cpf/);
-  assert.match(pageSource, /description: formatDocumentDescription\(clientPf\.cpf\)/);
+  assert.match(pfSelectSource, /import \{ formatCPF_CNPJ \} from "@shared\/utils\/formatters";/);
+  assert.match(pfSelectSource, /cpf: clientPf\.cpf/);
+  assert.match(pfSelectSource, /formatCPF_CNPJ\(option\.cpf\)/);
   assert.match(
     pageSource,
     /return item\.clientPJ\?\.name \?\? item\.clientPF\?\.name \?\? formatDocument\(item\.cpf_cnpj\);/,

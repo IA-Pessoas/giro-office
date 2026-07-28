@@ -65,6 +65,58 @@ function createMockDeps(): RelationshipRouteDeps {
 }
 
 describe("relationship routes", () => {
+  it("GET /contabil/relationships/client/:clientId permite viewer", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, relationshipRouteDeps: deps });
+
+    const res = await request(app)
+      .get(`/contabil/relationships/client/${CLIENT_ID}`)
+      .set(gatewayHeaders(0));
+
+    expect(res.status).toBe(200);
+    expect(deps.getByClientId).toHaveBeenCalledWith(CLIENT_ID, ORG_ID);
+  });
+
+  it("POST /contabil/relationships rejeita viewer sem chamar service", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, relationshipRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/contabil/relationships")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(0))
+      .send(validBody);
+
+    expect(res.status).toBe(403);
+    expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("PUT /contabil/relationships/:id rejeita viewer sem chamar service", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, relationshipRouteDeps: deps });
+
+    const res = await request(app)
+      .put(`/contabil/relationships/${RELATIONSHIP_ID}`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(0))
+      .send({ note: "updated" });
+
+    expect(res.status).toBe(403);
+    expect(deps.update).not.toHaveBeenCalled();
+  });
+
+  it("DELETE /contabil/relationships/:id rejeita viewer sem chamar service", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, relationshipRouteDeps: deps });
+
+    const res = await request(app)
+      .delete(`/contabil/relationships/${RELATIONSHIP_ID}`)
+      .set(gatewayHeaders(0));
+
+    expect(res.status).toBe(403);
+    expect(deps.delete).not.toHaveBeenCalled();
+  });
+
   it("POST /contabil/relationships sem auth retorna 401", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, relationshipRouteDeps: deps });

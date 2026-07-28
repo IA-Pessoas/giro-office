@@ -56,6 +56,58 @@ function createMockDeps(): ResponsibleRouteDeps {
 }
 
 describe("responsible routes", () => {
+  it("GET /contabil/responsibles/client/:clientId permite viewer", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, responsibleRouteDeps: deps });
+
+    const res = await request(app)
+      .get(`/contabil/responsibles/client/${CLIENT_ID}`)
+      .set(gatewayHeaders(0));
+
+    expect(res.status).toBe(200);
+    expect(deps.getByClientId).toHaveBeenCalledWith(CLIENT_ID, ORG_ID);
+  });
+
+  it("POST /contabil/responsibles rejeita viewer sem chamar service", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, responsibleRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/contabil/responsibles")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(0))
+      .send({ client_id: CLIENT_ID });
+
+    expect(res.status).toBe(403);
+    expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("PUT /contabil/responsibles/:id rejeita viewer sem chamar service", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, responsibleRouteDeps: deps });
+
+    const res = await request(app)
+      .put(`/contabil/responsibles/${RESPONSIBLE_ID}`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(0))
+      .send({ customer_with_movement: true });
+
+    expect(res.status).toBe(403);
+    expect(deps.update).not.toHaveBeenCalled();
+  });
+
+  it("DELETE /contabil/responsibles/:id rejeita viewer sem chamar service", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, responsibleRouteDeps: deps });
+
+    const res = await request(app)
+      .delete(`/contabil/responsibles/${RESPONSIBLE_ID}`)
+      .set(gatewayHeaders(0));
+
+    expect(res.status).toBe(403);
+    expect(deps.delete).not.toHaveBeenCalled();
+  });
+
   it("POST /contabil/responsibles sem auth retorna 401", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, responsibleRouteDeps: deps });

@@ -156,6 +156,23 @@ await (async () => {
     );
   });
 
+  await runTest("viewer control section reads existing control without bootstrap write", () => {
+    const componentSource = readFileSync(
+      new URL("./components/ContabilControlSection.tsx", import.meta.url),
+      "utf8",
+    );
+    const hookSource = readFileSync(
+      new URL("./hooks/useContabilControl.ts", import.meta.url),
+      "utf8",
+    );
+
+    assert.match(hookSource, /useContabilControlDetail/);
+    assert.match(componentSource, /enabled:\s*!canEdit/);
+    assert.match(componentSource, /canEdit\s*\?\s*bootstrapMutation\.data\s*:\s*detailQuery\.data/);
+    assert.match(componentSource, /if\s*\(!canEdit\)\s*\{/);
+    assert.match(hookSource, /contabilControlService\.getControl/);
+  });
+
   await runTest("unwrapContabilEnvelope extracts data directly from the backend response", () => {
     const payload = {
       id: "control-1",

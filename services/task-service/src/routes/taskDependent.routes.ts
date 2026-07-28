@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
   requireAuthenticatedRequestContext,
   ServiceError,
 } from "@workspace/shared";
@@ -35,6 +36,8 @@ router.post(
         dependent_id,
         wait: Boolean(wait),
         observation: String(observation),
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
       });
 
       res.status(201).json(createSuccessResponse(result));
@@ -57,7 +60,11 @@ router.get(
         throw new ServiceError(400, "task_model_id Ã© obrigatÃ³rio (body ou query).");
       }
 
-      const result = await taskDependentService.listDependents(task_model_id, organization_id);
+      const result = await taskDependentService.listDependents(task_model_id, organization_id, {
+        userId: req.user_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
+      });
       res.json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro ao listar dependentes", { err });
@@ -82,6 +89,8 @@ router.delete(
         id,
         user_id,
         organization_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
       });
 
       res.json(createSuccessResponse(result));
