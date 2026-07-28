@@ -226,58 +226,96 @@ describe("TaskCrudService", () => {
     workflowMock.afterTaskCreated.mockResolvedValue(undefined);
 
     await new TaskCrudService().createTask({
-      user_id: "user-creator", organization_id: "org-1", model_id: "model-1", project_id: "project-1",
-      client_id: "client-1", prospecting_status: "Fechado", observations: "obs", urgency: "Alta", billing: "Realizar",
+      user_id: "user-creator",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      observations: "obs",
+      urgency: "Alta",
+      billing: "Realizar",
     });
 
-    expect(prismaMock.task.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ status: "A Realizar", billing: "Realizar" }),
-    }));
+    expect(prismaMock.task.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "A Realizar", billing: "Realizar" }),
+      }),
+    );
   });
 
   it("createTask disables charges for an Em Espera task regardless of billing", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
-      name: "Nome do modelo", department_id: "department-model", billing: "Realizar",
-      responsible_id: "user-model-1", responsible2_id: null, responsible3_id: null,
+      name: "Nome do modelo",
+      department_id: "department-model",
+      billing: "Realizar",
+      responsible_id: "user-model-1",
+      responsible2_id: null,
+      responsible3_id: null,
     });
     prismaMock.task.create.mockResolvedValue({ id: "task-1" });
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
     workflowMock.afterTaskCreated.mockResolvedValue(undefined);
 
     await new TaskCrudService().createTask({
-      user_id: "user-creator", organization_id: "org-1", model_id: "model-1", project_id: "project-1",
-      client_id: "client-1", prospecting_status: "Fechado", observations: "obs", urgency: "Alta", status: "Em Espera",
+      user_id: "user-creator",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      observations: "obs",
+      urgency: "Alta",
+      status: "Em Espera",
     });
 
-    expect(prismaMock.task.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ charge_comercial: false, charge_financeiro: false }),
-    }));
+    expect(prismaMock.task.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ charge_comercial: false, charge_financeiro: false }),
+      }),
+    );
   });
 
   it("createTask retains model defaults when optional details are omitted", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
-      name: "Nome do modelo", department_id: "department-model", billing: "Não Realizar",
-      responsible_id: "user-model-1", responsible2_id: "user-model-2", responsible3_id: "user-model-3",
+      name: "Nome do modelo",
+      department_id: "department-model",
+      billing: "Não Realizar",
+      responsible_id: "user-model-1",
+      responsible2_id: "user-model-2",
+      responsible3_id: "user-model-3",
     });
     prismaMock.task.create.mockResolvedValue({ id: "task-1" });
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
     workflowMock.afterTaskCreated.mockResolvedValue(undefined);
 
     await new TaskCrudService().createTask({
-      user_id: "user-creator", organization_id: "org-1", model_id: "model-1", project_id: "project-1",
-      client_id: "client-1", prospecting_status: "Fechado", observations: "obs", urgency: "Alta",
+      user_id: "user-creator",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      observations: "obs",
+      urgency: "Alta",
     });
 
-    expect(prismaMock.task.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        name: "Nome do modelo", department_id: "department-model", billing: "Não Realizar",
-        responsible_id: "user-model-1", responsible2_id: "user-model-2", responsible3_id: "user-model-3",
+    expect(prismaMock.task.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: "Nome do modelo",
+          department_id: "department-model",
+          billing: "Não Realizar",
+          responsible_id: "user-model-1",
+          responsible2_id: "user-model-2",
+          responsible3_id: "user-model-3",
+        }),
       }),
-    }));
+    );
   });
 
   it("detailTask lança 404 quando tarefa não existe", async () => {

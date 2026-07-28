@@ -420,9 +420,7 @@ export class CertificatePjService {
     return { ok: true };
   }
 
-  async deleteCertificatePj(
-    input: CertificatePjFileInput,
-  ): Promise<CertificatePjFileDeleteResult> {
+  async deleteCertificatePj(input: CertificatePjFileInput): Promise<CertificatePjFileDeleteResult> {
     const record = await this.findCertificatePjForFile(input);
 
     if (record.file_path) {

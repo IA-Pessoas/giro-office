@@ -109,7 +109,9 @@ describe("TiStockService", () => {
     };
     const service = new TiStockService(prisma as never);
 
-    await expect(service.updateCategory(context, categoryId, { status: true })).rejects.toMatchObject({
+    await expect(
+      service.updateCategory(context, categoryId, { status: true }),
+    ).rejects.toMatchObject({
       statusCode: 409,
       message: "Ja existe uma categoria de estoque de TI ativa com este nome.",
     });
