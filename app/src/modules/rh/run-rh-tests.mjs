@@ -24,6 +24,19 @@ runTest("assignable RH users are loaded from rh-service, not user-service", () =
   assert.doesNotMatch(hookSource, /listAdminUsers/);
 });
 
+runTest("RH managers can filter requests by requester without changing non-manager scope", () => {
+  const sectionSource = readFileSync("src/modules/rh/components/RhRequestsSection.tsx", "utf8");
+  const filtersSource = readFileSync("src/modules/rh/components/RhRequestsFilters.tsx", "utf8");
+
+  assert.match(
+    sectionSource,
+    /requester_user_id:\s*canManageRhRequests\s*\?\s*requesterFilter\s*\|\|\s*undefined\s*:\s*user\?\.id/,
+  );
+  assert.match(sectionSource, /requesters=\{canManageRhRequests \? assignableUsers : undefined\}/);
+  assert.match(filtersSource, /selectedRequesterId\?: string/);
+  assert.match(filtersSource, /<span>Solicitante<\/span>/);
+});
+
 runTest("RH request form preserves validation errors returned by the API", () => {
   const source = readFileSync("src/modules/rh/components/RhRequestFormModal.tsx", "utf8");
 

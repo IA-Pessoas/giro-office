@@ -31,6 +31,7 @@ const MISSING_REQUESTER_LABEL = "Solicitante não identificado";
 export function RhRequestsSection() {
   const [statusFilter, setStatusFilter] = useState<RhRequestStatus | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [requesterFilter, setRequesterFilter] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [editingRequest, setEditingRequest] = useState<RhRequest | null>(null);
@@ -43,7 +44,7 @@ export function RhRequestsSection() {
   const requestsQuery = useRhRequests({
     status: statusFilter === "all" ? undefined : statusFilter,
     category_id: categoryFilter || undefined,
-    requester_user_id: canManageRhRequests ? undefined : user?.id,
+    requester_user_id: canManageRhRequests ? requesterFilter || undefined : user?.id,
   });
 
   const categories = categoriesQuery.data ?? [];
@@ -185,8 +186,10 @@ export function RhRequestsSection() {
     <div className="space-y-6">
       <RhRequestsFilters
         categories={categories}
+        requesters={canManageRhRequests ? assignableUsers : undefined}
         selectedStatus={statusFilter}
         selectedCategoryId={categoryFilter}
+        selectedRequesterId={requesterFilter}
         title={canManageRhRequests ? "Solicitações" : "Minhas solicitações"}
         description={
           canManageRhRequests
@@ -195,6 +198,7 @@ export function RhRequestsSection() {
         }
         onStatusChange={setStatusFilter}
         onCategoryChange={setCategoryFilter}
+        onRequesterChange={setRequesterFilter}
         onOpenCreate={handleOpenCreate}
       />
 
