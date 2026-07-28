@@ -833,6 +833,22 @@ await (async () => {
     assert.equal(authContextSource.includes('console.error("Erro de autentica'), false);
   });
 
+  await runTest("sessão inválida encerra o loading e orienta o retorno ao login", () => {
+    assert.match(
+      authContextSource,
+      /toast\.error\("Sessão expirada\. Faça login novamente\.",\s*\{\s*toastId: "auth-session-expired"/,
+    );
+    assert.match(authContextSource, /isCurrentAuthTransition\(requestVersion\)\)/);
+    assert.match(authContextSource, /finally[\s\S]*setLoading\(false\)/);
+  });
+
+  await runTest("rotas protegidas redirecionam quando não há sessão", () => {
+    assert.match(
+      appSource,
+      /useEffect\(\(\) => \{[\s\S]*if \(isPublicRoute \|\| loading \|\| user\) \{[\s\S]*return;[\s\S]*\}[\s\S]*void router\.push\("\/login"\)/,
+    );
+  });
+
   await runTest(
     "admin permission updates refresh the authenticated session when editing self",
     () => {

@@ -126,8 +126,17 @@ function buildCurrentUser(
 
 export function signOut() {
     try {
+        const { [AUTH_COOKIE_NAME]: token } = parseCookies();
+
+        if (!token) {
+            return;
+        }
+
         clearAuthCookie();
-        Router.push("/login");
+        toast.error("Sessão expirada. Faça login novamente.", {
+            toastId: "auth-session-expired",
+        });
+        void Router.push("/login");
     } catch (error) {
         logAuthError("Erro ao deslogar", error);
     }
@@ -225,7 +234,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
                 }
             }).catch((error) => {
-                if (!isCurrentAuthTransition(requestVersion, token)) {
+                if (!isCurrentAuthTransition(requestVersion)) {
                     return;
                 }
 
@@ -234,7 +243,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 setUser(null);
                 queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             }).finally(() => {
-                if (isCurrentAuthTransition(requestVersion, token)) {
+                if (isCurrentAuthTransition(requestVersion)) {
                     setLoading(false);
                 }
             });
