@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 
 import {
+  KNOWN_PERMISSION_MODULE_KEYS,
+  PERMISSION_MODULE_GROUPS,
+  PERMISSION_MODULE_LABELS,
   getMinimumPermissionLevel,
   getPermissionSelectOptions,
   normalizePermissionForModule,
@@ -63,8 +66,18 @@ const baseFormData = {
   isOrganizationOwner: false,
 };
 
+function expectedModules(overrides = {}) {
+  return Object.fromEntries(
+    KNOWN_PERMISSION_MODULE_KEYS.map((moduleKey) => [moduleKey, overrides[moduleKey] ?? 0]),
+  );
+}
+
 const createUserModalSource = readFileSync(
   new URL("./components/CreateUserModal.tsx", import.meta.url),
+  "utf8",
+);
+const adminUserDetailsPanelSource = readFileSync(
+  new URL("./components/AdminUserDetailsPanel.tsx", import.meta.url),
   "utf8",
 );
 const createUserConfigSource = readFileSync(
@@ -77,37 +90,53 @@ const permissionConfigSource = readFileSync(
 );
 const userTypesSource = readFileSync(new URL("./types/index.ts", import.meta.url), "utf8");
 
+runTest("create user password visibility control remains explicit and accessible", () => {
+  assert.match(createUserModalSource, /const \[isPasswordVisible, setIsPasswordVisible\] = useState\(false\);/);
+  assert.match(createUserModalSource, /aria-label=\{isPasswordVisible \? 'Ocultar senha' : 'Mostrar senha'\}/);
+  assert.match(createUserModalSource, /aria-pressed=\{isPasswordVisible\}/);
+  assert.match(createUserModalSource, /type=\{isPasswordVisible \? 'text' : 'password'\}/);
+  assert.match(createUserModalSource, /autoComplete="new-password"/);
+});
+
+runTest("retired department modules are never sent by create-user payloads", () => {
+  const modules = buildCreateUserModulesPayload({}, null, 1);
+
+  for (const retiredKey of ["atendimento", "pec", "wiki"]) {
+    assert.equal(Object.hasOwn(modules, retiredKey), false);
+  }
+});
+
 runTest("RH and Technology define Viewer as their frontend minimum", () => {
   assert.equal(getMinimumPermissionLevel("rh"), 0);
   assert.equal(getMinimumPermissionLevel("ti"), 0);
   assert.equal(getMinimumPermissionLevel("fiscal"), null);
 });
 
-runTest("minimum module options omit no access and preserve higher levels", () => {
+runTest("module options expose the complete 0-3 matrix", () => {
   assert.deepEqual(
     getPermissionSelectOptions("rh").map((option) => option.value),
-    ["0", "1", "2"],
+    ["0", "1", "2", "3"],
   );
   assert.deepEqual(
     getPermissionSelectOptions("ti").map((option) => option.value),
-    ["0", "1", "2"],
+    ["0", "1", "2", "3"],
   );
   assert.deepEqual(
     getPermissionSelectOptions("fiscal").map((option) => option.value),
-    ["null", "0", "1", "2"],
+    ["0", "1", "2", "3"],
   );
 });
 
-runTest("module permission normalization changes only values below a configured minimum", () => {
+runTest("module permission normalization maps invalid values to no access", () => {
   assert.equal(normalizePermissionForModule("rh", null), 0);
   assert.equal(normalizePermissionForModule("ti", undefined), 0);
   assert.equal(normalizePermissionForModule("rh", 1), 1);
   assert.equal(normalizePermissionForModule("ti", 2), 2);
-  assert.equal(normalizePermissionForModule("fiscal", null), null);
+  assert.equal(normalizePermissionForModule("fiscal", null), 0);
   assert.equal(normalizePermissionForModule("fiscal", 1), 1);
 });
 
-runTest("legacy RH and Technology no-access values normalize to Viewer", () => {
+runTest("missing and legacy module values normalize to zero", () => {
   const response = normalizePermissionResponse({
     rh: null,
     ti: null,
@@ -116,7 +145,7 @@ runTest("legacy RH and Technology no-access values normalize to Viewer", () => {
 
   assert.equal(response.known.rh, 0);
   assert.equal(response.known.ti, 0);
-  assert.equal(response.known.fiscal, null);
+  assert.equal(response.known.fiscal, 0);
 
   const missingDraft = normalizePermissionDraft({});
   assert.equal(missingDraft.rh, 0);
@@ -134,7 +163,7 @@ runTest("normalized legacy permissions do not become dirty solely on load", () =
   assert.equal(arePermissionDraftsEqual(draft, snapshot), true);
 });
 
-runTest("legacy minimum normalization does not request RH or Technology department sync", () => {
+runTest("legacy null values are detected for normalization", () => {
   for (const moduleKey of ["rh", "ti"]) {
     const rawPermissions = {
       [moduleKey]: null,
@@ -155,7 +184,7 @@ runTest("legacy minimum normalization does not request RH or Technology departme
         rawPermissions,
       );
 
-    assert.equal(isDirty, false);
+    assert.equal(isDirty, true);
   }
 });
 
@@ -194,21 +223,52 @@ runTest("permission update payload enforces only RH and Technology minimums", ()
 
   assert.equal(payload.rh, 0);
   assert.equal(payload.ti, 0);
-  assert.equal(payload.fiscal, null);
+  assert.equal(payload.fiscal, 0);
   assert.equal(payload.contabil, 2);
 });
 
-runTest("create user additional modules hide unavailable services", () => {
-  assert.equal(createUserConfigSource.includes('key: "comercial"'), false);
-  assert.equal(createUserConfigSource.includes('key: "financeiro"'), false);
+runTest("retired PEC, Atendimento and Wiki modules are absent from every user permission UI config", () => {
+  const retiredKeys = ["pec", "atendimento", "wiki"];
+
+  for (const retiredKey of retiredKeys) {
+    assert.equal(KNOWN_PERMISSION_MODULE_KEYS.includes(retiredKey), false);
+    assert.equal(Object.hasOwn(PERMISSION_MODULE_LABELS, retiredKey), false);
+    assert.equal(PERMISSION_MODULE_GROUPS.flatMap((group) => group.keys).includes(retiredKey), false);
+    assert.equal(createUserConfigSource.includes(`key: "${retiredKey}"`), false);
+    assert.equal(userTypesSource.includes(`| "${retiredKey}"`), false);
+  }
 });
 
-runTest("admin permissions hide finance and use the Fiscal group title", () => {
-  assert.equal(permissionConfigSource.includes('"financeiro"'), false);
-  assert.equal(permissionConfigSource.includes('financeiro: "Financeiro"'), false);
+runTest("retired permission modules from a legacy response are never re-sent as extras", () => {
+  const normalization = normalizePermissionResponse({
+    atendimento: 1,
+    pec: 2,
+    wiki: 0,
+    custom_module: 1,
+  });
+  const payload = buildPermissionUpdatePayload(
+    { ...normalization.known, ...normalization.extras },
+    Object.keys(normalization.extras),
+  );
+
+  assert.deepEqual(normalization.extras, { custom_module: 1 });
+  assert.equal(Object.hasOwn(payload, "atendimento"), false);
+  assert.equal(Object.hasOwn(payload, "pec"), false);
+  assert.equal(Object.hasOwn(payload, "wiki"), false);
+  assert.equal(payload.custom_module, 1);
+});
+
+runTest("create user additional modules include active services", () => {
+  assert.equal(createUserConfigSource.includes('key: "comercial"'), true);
+  assert.equal(createUserConfigSource.includes('key: "financeiro"'), true);
+});
+
+runTest("admin permissions include finance in the Fiscal group", () => {
+  assert.equal(permissionConfigSource.includes('"financeiro"'), true);
+  assert.equal(permissionConfigSource.includes('financeiro: "Financeiro"'), true);
   assert.equal(permissionConfigSource.includes('title: "Financeiro e Fiscal"'), false);
   assert.equal(permissionConfigSource.includes('title: "Fiscal"'), true);
-  assert.equal(userTypesSource.includes('| "financeiro"'), false);
+  assert.equal(userTypesSource.includes('| "financeiro"'), true);
 });
 
 runTest("department admin is not created as organization owner", () => {
@@ -233,11 +293,7 @@ runTest("department admin is not created as organization owner", () => {
     organization_id: "org-1",
     type: "admin",
     status: "active",
-    modules: {
-      rh: 2,
-      comercial: 1,
-      ti: 1,
-    },
+    modules: expectedModules({ rh: 2, comercial: 1, ti: 1 }),
     invited_by: "owner-1",
   });
 });
@@ -286,11 +342,7 @@ runTest("non-owner creator cannot build organization owner payload", () => {
     organization_id: "org-1",
     type: "admin",
     status: "active",
-    modules: {
-      rh: 2,
-      comercial: 1,
-      ti: 1,
-    },
+    modules: expectedModules({ rh: 2, comercial: 1, ti: 1 }),
   });
 });
 
@@ -304,11 +356,7 @@ runTest("department module permission is always explicit for non-owner users", (
       "rh",
       2,
     ),
-    {
-      rh: 2,
-      fiscal: 0,
-      ti: 1,
-    },
+    expectedModules({ rh: 2, ti: 1 }),
   );
 });
 
@@ -323,11 +371,7 @@ runTest("eligible non-RH user receives RH and TI self-service by default", () =>
       "fiscal",
       1,
     ),
-    {
-      fiscal: 1,
-      rh: 1,
-      ti: 1,
-    },
+    expectedModules({ fiscal: 1, rh: 1, ti: 1 }),
   );
 });
 
@@ -342,11 +386,7 @@ runTest("explicit RH and TI management are preserved on user creation", () => {
       "fiscal",
       1,
     ),
-    {
-      fiscal: 1,
-      rh: 2,
-      ti: 2,
-    },
+    expectedModules({ fiscal: 1, rh: 2, ti: 2 }),
   );
 });
 
@@ -361,11 +401,7 @@ runTest("Viewer creation payload includes RH and Technology at Viewer minimum", 
       "fiscal",
       0,
     ),
-    {
-      fiscal: 0,
-      rh: 0,
-      ti: 0,
-    },
+    expectedModules(),
   );
 });
 
@@ -433,6 +469,40 @@ runTest("organization owner scope field uses a checkbox toggle", () => {
   assert.equal(createUserModalSource.includes('name="isOrganizationOwner"'), false);
 });
 
+runTest("admin user password update asks for explicit confirmation", () => {
+  const dialogStart = adminUserDetailsPanelSource.indexOf("<Dialog");
+  const dialogEnd = adminUserDetailsPanelSource.indexOf("</Dialog>", dialogStart);
+  const dialogSource = adminUserDetailsPanelSource.slice(dialogStart, dialogEnd);
+  const confirmHandlerBody = adminUserDetailsPanelSource.match(
+    /const handleConfirmPasswordUpdate = async \(\) => \{[\s\S]*?\n  \};/,
+  )?.[0] ?? "";
+
+  assert.match(adminUserDetailsPanelSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog";/);
+  assert.match(adminUserDetailsPanelSource, /isPasswordConfirmationOpen/);
+  assert.match(adminUserDetailsPanelSource, /Confirmar alteração de senha/);
+  assert.match(adminUserDetailsPanelSource, /A senha do usuário selecionado será alterada/);
+  assert.doesNotMatch(adminUserDetailsPanelSource, /O valor digitado não será exibido nesta confirmação/);
+  assert.match(adminUserDetailsPanelSource, /!w-\[min\(92vw,520px\)\]/);
+  assert.match(adminUserDetailsPanelSource, /!rounded-lg/);
+  assert.match(adminUserDetailsPanelSource, /bodyClassName="!px-4 !py-3"/);
+  assert.match(dialogSource, /onClick=\{\(\) => setIsPasswordConfirmationOpen\(false\)\}/);
+  assert.match(dialogSource, /onClick=\{\(\) => void handleConfirmPasswordUpdate\(\)\}/);
+  assert.doesNotMatch(dialogSource, /formData\.password/);
+  assert.match(confirmHandlerBody, /await persistUserUpdate\(\)/);
+  assert.match(
+    adminUserDetailsPanelSource,
+    /formData\.password\.trim\(\)[\s\S]*setIsPasswordConfirmationOpen\(true\)[\s\S]*return;/,
+  );
+});
+
+runTest("admin user details keeps non-password updates direct", () => {
+  const handleSaveBody = adminUserDetailsPanelSource.match(
+    /const handleSave = async \(\) => \{[\s\S]*?\n  \};/,
+  )?.[0] ?? "";
+
+  assert.match(handleSaveBody, /await persistUserUpdate\(\)/);
+});
+
 runTest("department permission sync payload mirrors the department module level", () => {
   const modules = {
     rh: 1,
@@ -453,20 +523,20 @@ runTest("department permission sync payload mirrors the department module level"
   });
 
   assert.deepEqual(buildDepartmentPermissionSyncPayload("financeiro", modules), {
-    permission: -1,
+    permission: 0,
     type: "user",
     modules,
   });
 });
 
-runTest("department permission sync payload uses denied permission for no access", () => {
+runTest("department permission sync payload uses zero for no access", () => {
   const modules = {
     rh: null,
     ti: 1,
   };
 
   assert.deepEqual(buildDepartmentPermissionSyncPayload("rh", modules), {
-    permission: -1,
+    permission: 0,
     type: "user",
     modules,
   });

@@ -22,7 +22,7 @@ export function useAccessStoreSync() {
             id: user.id,
             permission: user.permission,
             department_id: user.department_id,
-            modules: user.modules ?? null,
+            modules: user.modules,
           }
         : null,
       departmentName,

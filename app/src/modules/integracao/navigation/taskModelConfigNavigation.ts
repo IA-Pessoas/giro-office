@@ -6,5 +6,5 @@ export const TASK_MODEL_CONFIG_ENTRY = {
 } as const;
 
 export function canManageTaskModelConfig(permission?: number | null): boolean {
-  return typeof permission === "number" && permission >= 2;
+  return permission === 2 || permission === 3;
 }

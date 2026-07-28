@@ -27,6 +27,9 @@ const tiTestEnv = {
   auditServiceToken: "audit-service-token-test",
   internalServiceToken: "ti-service-internal-token-test",
   passwordEncryptionKey: "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=",
+  supabaseUrl: "https://example.supabase.co",
+  supabaseServiceRoleKey: "test-supabase-service-role-key",
+  tiRequestImageBucket: "ti-request-attachments-private",
   allowedOrigins: ["*"],
   enableApiDocs: false,
   logLevel: "info",
@@ -296,18 +299,42 @@ describe("ti-service app", () => {
         },
       },
     });
+
+    const createMessageOperation = response.body.paths["/ti/requests/{id}/messages"].post;
+
+    expect(createMessageOperation.requestBody.content["application/json"].schema).toEqual({
+      $ref: "#/components/schemas/TiMessageInput",
+    });
+    expect(createMessageOperation.requestBody.content["multipart/form-data"]).toMatchObject({
+      schema: {
+        type: "object",
+        required: ["message"],
+        properties: {
+          message: { type: "string", minLength: 1 },
+          file: { type: "string", format: "binary" },
+        },
+      },
+      encoding: {
+        file: {
+          contentType: "image/jpeg, image/png, image/webp",
+        },
+      },
+    });
+    expect(createMessageOperation.responses).toHaveProperty("400");
+    expect(createMessageOperation.responses).toHaveProperty("413");
+    expect(createMessageOperation.responses).toHaveProperty("500");
   });
 });
 
 describe("ti-service permission middleware", () => {
-  it("aceita permissao 2 como nivel administrativo do TI", async () => {
+  it("aceita permissao 3 como nivel administrativo do TI", async () => {
     const app = createPermissionTestApp();
 
     const response = await request(app)
       .get("/admin")
       .set(FORWARDED_AUTH_USER_ID_HEADER, "user-1")
       .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, "org-1")
-      .set(FORWARDED_AUTH_PERMISSION_HEADER, "2")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "3")
       .expect(200);
 
     expect(response.body).toEqual({ ok: true });

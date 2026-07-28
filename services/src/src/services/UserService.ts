@@ -30,7 +30,6 @@ interface UpdateRequest {
 }
 interface UpdatePermissionRequest {
     user_id: string
-    atendimento?: number
     certificado?: number
     comercial?: number
     contabil?: number
@@ -39,12 +38,10 @@ interface UpdatePermissionRequest {
     integracao?: number
     marketing?: number
     parcelamento?: number
-    pec?: number
     pessoal?: number
     regularize?: number
     rh?: number
     triagem?: number
-    wiki?: number
 }
 interface PermissionSpecificRequest {
     my_id: string
@@ -401,21 +398,18 @@ class UserService {
         const permission = await prismaClient.permission.create({
             data:{
                 user_id: user_id,
-                atendimento: null,
-                certificado: null,
-                comercial: null,
-                contabil: null,
-                financeiro: null,
-                fiscal: null,
-                integracao: null,
-                marketing: null,
-                parcelamento: null,
-                pec: null,
-                pessoal: null,
-                regularize: null,
-                rh: null,
-                triagem: null,
-                wiki: null,
+                certificado: 0,
+                comercial: 0,
+                contabil: 0,
+                financeiro: 0,
+                fiscal: 0,
+                integracao: 0,
+                marketing: 0,
+                parcelamento: 0,
+                pessoal: 0,
+                regularize: 0,
+                rh: 0,
+                triagem: 0,
             },
             select:{
                 id: true,
@@ -427,7 +421,6 @@ class UserService {
     }
     async updatePermission({ 
         user_id, 
-        atendimento,
         certificado,
         comercial,
         contabil,
@@ -436,12 +429,10 @@ class UserService {
         integracao,
         marketing,
         parcelamento,
-        pec,
         pessoal,
         regularize,
         rh,
         triagem,
-        wiki,
     }: UpdatePermissionRequest) {
         try{
             const exists = this.findPermission(user_id);
@@ -455,7 +446,6 @@ class UserService {
                 },
                 data:{
                     user_id,
-                    atendimento,
                     certificado,
                     comercial,
                     contabil,
@@ -464,16 +454,13 @@ class UserService {
                     integracao,
                     marketing,
                     parcelamento,
-                    pec,
                     pessoal,
                     regularize,
                     rh,
                     triagem,
-                    wiki,
                 },
                 select:{
                     user_id: true,
-                    atendimento: true,
                     certificado: true,
                     comercial: true,
                     contabil: true,
@@ -482,12 +469,10 @@ class UserService {
                     integracao: true,
                     marketing: true,
                     parcelamento: true,
-                    pec: true,
                     pessoal: true,
                     regularize: true,
                     rh: true,
                     triagem: true,
-                    wiki: true,
                 }
             })
 
@@ -505,7 +490,6 @@ class UserService {
             select:{
                 id: true,
                 user_id: true,
-                atendimento: true,
                 certificado: true,
                 comercial: true,
                 contabil: true,
@@ -514,12 +498,10 @@ class UserService {
                 integracao: true,
                 marketing: true,
                 parcelamento: true,
-                pec: true,
                 pessoal: true,
                 regularize: true,
                 rh: true,
                 triagem: true,
-                wiki: true,
             }
         })
 
@@ -527,11 +509,6 @@ class UserService {
             throw new Error("Permissão não existe");
         }
 
-        if (modulo === 'atendimento') {
-            if (permission.atendimento === null) {
-                throw new Error("Permissão não existe");
-            }
-        }
         if (modulo === 'certificado') {
             if (permission.certificado === null) {
                 throw new Error("Permissão não existe");
@@ -572,11 +549,6 @@ class UserService {
                 throw new Error("Permissão não existe");
             }
         }
-        if (modulo === 'pec') {
-            if (permission.pec === null) {
-                throw new Error("Permissão não existe");
-            }
-        }
         if (modulo === 'pessoal') {
             if (permission.pessoal === null) {
                 throw new Error("Permissão não existe");
@@ -597,12 +569,6 @@ class UserService {
                 throw new Error("Permissão não existe");
             }
         }
-        if (modulo === 'wiki') {
-            if (permission.wiki === null) {
-                throw new Error("Permissão não existe");
-            }
-        }        
-
         return { permission }
     }
 

@@ -4,6 +4,7 @@ import { createLogger } from "@workspace/shared";
 
 import { createApp } from "./app.js";
 import { getGatewayEnv } from "./config/env.js";
+import { createUserServiceSessionValidator } from "./middlewares/authenticate.js";
 import { proxyWebSocketUpgrade } from "./proxy/wsProxy.js";
 
 function getUpstreamContext(url: string): { host?: string; path?: string } {
@@ -25,7 +26,9 @@ const logger = createLogger({
   level: env.logLevel,
   pretty: env.logPretty,
 });
-const app = createApp(env, logger);
+const app = createApp(env, logger, {
+  sessionValidator: createUserServiceSessionValidator(env.userServiceUrl, env.auditServiceToken),
+});
 const server = createServer(app);
 
 server.on("upgrade", (request, socket, head) => {

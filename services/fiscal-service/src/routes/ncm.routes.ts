@@ -93,11 +93,22 @@ export function createNcmRoutes(service: NcmRouteDeps): ReturnType<typeof Router
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const rawObj = { ncmCodes: req.query.ncmCodes };
+        const rawObj = {
+          ncmCodes: req.query.ncmCodes,
+          page: req.query.page,
+          page_size: req.query.page_size,
+        };
         const query = parseWithZod(listNcmQuerySchema, rawObj);
         const auth = requireAuthenticatedRequestContext(req);
 
-        const result = await service.list(query.ncmCodes, auth.organization_id);
+        const result = await service.list(
+          {
+            ncmCodes: query.ncmCodes,
+            page: query.page,
+            page_size: query.page_size,
+          },
+          auth.organization_id,
+        );
 
         res.json(createSuccessResponse(result));
       } catch (err) {

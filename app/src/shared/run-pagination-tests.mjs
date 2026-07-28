@@ -30,4 +30,16 @@ assert.match(hookSource, /clearTimeout/);
 assert.match(controlsSource, /Anterior/);
 assert.match(controlsSource, /Próxima/);
 
+assert.match(controlsSource, /totalPages\?: number;/);
+assert.match(controlsSource, /onPageChange\?: \(page: number\) => void;/);
+assert.match(controlsSource, /P.gina/);
+assert.match(controlsSource, /Exibindo \{count\} de \{total\}/);
+assert.match(controlsSource, /type="text"/);
+assert.match(controlsSource, /inputMode="numeric"/);
+assert.match(controlsSource, /min=\{1\}/);
+assert.match(controlsSource, /max=\{totalPages\}/);
+assert.match(controlsSource, /h-6 w-8/);
+assert.doesNotMatch(controlsSource, /type="number"/);
+assert.doesNotMatch(controlsSource, /getPaginationRange\(page, limit, count\)/);
+
 console.log("pagination contract tests passed");

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const { getRhQuarterOptions } = await import("./utils/rhScoreUi.ts");
+const { formatRhDate } = await import("./utils/rhDate.ts");
 
 function runTest(name, fn) {
   try {
@@ -31,4 +32,9 @@ runTest("RH score periods include a relative history window and do not hard-code
   assert.ok(options.some((option) => option.value === "2024-Q1"));
   assert.ok(options.some((option) => option.value === "2028-Q4"));
   assert.doesNotMatch(historySource, /startsWith\("2026-Q"\)/);
+});
+
+runTest("RH civil dates do not move when an API value is UTC midnight", () => {
+  assert.equal(formatRhDate("2026-07-23T00:00:00.000Z"), "23/07/2026");
+  assert.equal(formatRhDate("2026-01-01"), "01/01/2026");
 });

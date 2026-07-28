@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
   prismaMock: {
+    project: {
+      findFirst: vi.fn(),
+    },
     task: {
       findFirst: vi.fn(),
       create: vi.fn(),
@@ -50,6 +53,7 @@ describe("TaskCrudService", () => {
   });
 
   it("createTask lança 409 quando já existe tarefa em andamento", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue({ id: "task-1" });
     const service = new TaskCrudService();
 
@@ -65,6 +69,85 @@ describe("TaskCrudService", () => {
         urgency: "Alta",
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it("createTask rejeita projeto de outro cliente antes de criar a tarefa", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-2" });
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    const service = new TaskCrudService();
+
+    await expect(
+      service.createTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        model_id: "model-1",
+        project_id: "project-1",
+        client_id: "client-1",
+        prospecting_status: "Fechado",
+        observations: "obs",
+        urgency: "Alta",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Projeto nao pertence ao cliente informado.",
+    });
+    expect(prismaMock.task.create).not.toHaveBeenCalled();
+  });
+
+  it("createTask rejeita projeto ausente na organização", async () => {
+    prismaMock.project.findFirst.mockResolvedValue(null);
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    const service = new TaskCrudService();
+
+    await expect(
+      service.createTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        model_id: "model-1",
+        project_id: "project-1",
+        client_id: "client-1",
+        prospecting_status: "Fechado",
+        observations: "obs",
+        urgency: "Alta",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Projeto nao encontrado.",
+    });
+    expect(prismaMock.task.create).not.toHaveBeenCalled();
+  });
+
+  it("createTask cria a tarefa quando o projeto pertence ao cliente", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      name: "Modelo 1",
+      billing: "Não Realizar",
+      department_id: "department-1",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.task.create.mockResolvedValue({ id: "task-1" });
+    prismaMock.taskDependent.findMany.mockResolvedValue([]);
+    const service = new TaskCrudService();
+
+    await service.createTask({
+      user_id: "user-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      observations: "obs",
+      urgency: "Alta",
+    });
+
+    expect(prismaMock.project.findFirst).toHaveBeenCalledWith({
+      where: { id: "project-1", organization_id: "org-1" },
+      select: { client_id: true },
+    });
+    expect(prismaMock.task.create).toHaveBeenCalledTimes(1);
   });
 
   it("detailTask lança 404 quando tarefa não existe", async () => {
