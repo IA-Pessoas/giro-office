@@ -3,6 +3,7 @@ import "./envBootstrap.js";
 import {
   createLogger,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
@@ -26,11 +27,12 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-function gatewayHeaders(): Record<string, string> {
+function gatewayHeaders(permission = 2): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORG_ID,
+    [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
   };
 }
 
@@ -86,6 +88,32 @@ describe("responsible routes", () => {
       { client_id: CLIENT_ID },
       expect.objectContaining({ userId: USER_ID, organizationId: ORG_ID }),
     );
+  });
+
+  it("bloqueia visualizador em escritas de responsáveis contábeis", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, responsibleRouteDeps: deps });
+
+    const post = await request(app)
+      .post("/contabil/responsibles")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(1))
+      .send({ client_id: CLIENT_ID });
+    const put = await request(app)
+      .put(`/contabil/responsibles/${RESPONSIBLE_ID}`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(1))
+      .send({ customer_with_movement: true });
+    const del = await request(app)
+      .delete(`/contabil/responsibles/${RESPONSIBLE_ID}`)
+      .set(gatewayHeaders(1));
+
+    expect(post.status).toBe(403);
+    expect(put.status).toBe(403);
+    expect(del.status).toBe(403);
+    expect(deps.create).not.toHaveBeenCalled();
+    expect(deps.update).not.toHaveBeenCalled();
+    expect(deps.delete).not.toHaveBeenCalled();
   });
 
   it("POST /contabil/responsibles com body inválido retorna 400", async () => {

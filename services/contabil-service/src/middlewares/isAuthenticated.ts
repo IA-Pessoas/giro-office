@@ -12,12 +12,27 @@ import type { NextFunction, Request, Response } from "express";
 
 import { getContabilServiceEnv } from "../config/env.js";
 
+const CONTABIL_WRITE_PERMISSION = 2;
+
 function parseForwardedPermission(headerValue: string | undefined): number | undefined {
   if (headerValue === undefined || headerValue === "") {
     return undefined;
   }
   const n = Number.parseInt(headerValue, 10);
   return Number.isNaN(n) ? undefined : n;
+}
+
+export function requireContabilWritePermission(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  if (Number(request.permission ?? 0) < CONTABIL_WRITE_PERMISSION) {
+    next(new ServiceError(403, "Permissão insuficiente para alterar dados contábeis."));
+    return;
+  }
+
+  next();
 }
 
 export function isAuthenticated(request: Request, _response: Response, next: NextFunction): void {

@@ -54,6 +54,37 @@ async function runTest(name, fn) {
   }
 }
 
+function readWorkspaceSource(relativePath) {
+  return readFileSync(new URL(relativePath, import.meta.url), "utf8");
+}
+
+const contabilServiceSources = {
+  authMiddleware: readWorkspaceSource(
+    "../../../../services/contabil-service/src/middlewares/isAuthenticated.ts",
+  ),
+  controlRoute: readWorkspaceSource(
+    "../../../../services/contabil-service/src/routes/control.routes.ts",
+  ),
+  responsibleRoute: readWorkspaceSource(
+    "../../../../services/contabil-service/src/routes/responsible.routes.ts",
+  ),
+  relationshipRoute: readWorkspaceSource(
+    "../../../../services/contabil-service/src/routes/relationship.routes.ts",
+  ),
+  controlRouteTest: readWorkspaceSource(
+    "../../../../services/contabil-service/src/test/control.routes.test.ts",
+  ),
+  responsibleRouteTest: readWorkspaceSource(
+    "../../../../services/contabil-service/src/test/responsible.routes.test.ts",
+  ),
+  relationshipRouteTest: readWorkspaceSource(
+    "../../../../services/contabil-service/src/test/relationship.routes.test.ts",
+  ),
+  gatewayServiceRegistry: readWorkspaceSource(
+    "../../../../services/gateway/src/config/serviceRegistry.ts",
+  ),
+};
+
 await (async () => {
   await runTest("contabil page filters the client picker by accounting department", () => {
     const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
@@ -77,6 +108,38 @@ await (async () => {
     assert.equal(
       CONTABIL_ENDPOINTS.relationshipByClient("30"),
       "/contabil/relationships/client/30",
+    );
+  });
+
+  await runTest("contabil-service blocks viewer writes and allows editor writes", () => {
+    assert.match(contabilServiceSources.authMiddleware, /const CONTABIL_WRITE_PERMISSION = 2;/);
+    assert.match(contabilServiceSources.authMiddleware, /requireContabilWritePermission/);
+
+    assert.equal(
+      contabilServiceSources.controlRoute.match(/requireContabilWritePermission/g)?.length,
+      3,
+    );
+    assert.equal(
+      contabilServiceSources.responsibleRoute.match(/requireContabilWritePermission/g)?.length,
+      4,
+    );
+    assert.equal(
+      contabilServiceSources.relationshipRoute.match(/requireContabilWritePermission/g)?.length,
+      4,
+    );
+
+    for (const source of [
+      contabilServiceSources.controlRouteTest,
+      contabilServiceSources.responsibleRouteTest,
+      contabilServiceSources.relationshipRouteTest,
+    ]) {
+      assert.match(source, /function gatewayHeaders\(permission = 2\)/);
+      assert.match(source, /gatewayHeaders\(1\)/);
+    }
+
+    assert.match(
+      contabilServiceSources.gatewayServiceRegistry,
+      /key:\s*"contabil-service",[\s\S]*internalServiceToken:\s*env\.auditServiceToken,[\s\S]*permissionModule:\s*"contabil"/,
     );
   });
 
