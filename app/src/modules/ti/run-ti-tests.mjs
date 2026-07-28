@@ -1446,6 +1446,20 @@ await runTest("ti dashboard tab consumes the consolidated backend summary", asyn
   assert.match(tabSource, /isError/);
 });
 
+await runTest("ti dashboard error keeps technical API messages out of the viewer UI", async () => {
+  const tabSource = await readModuleSource("components/TiDashboardTab.tsx");
+  const errorState =
+    tabSource.match(
+      /if \(dashboardQuery\.isError\) \{\s*return \(\s*<DashboardStatePanel[\s\S]*?\/>\s*\);\s*\}/,
+    )?.[0] ?? "";
+
+  assert.doesNotMatch(errorState, /dashboardQuery\.error/);
+  assert.match(
+    errorState,
+    /description="Não foi possível carregar seu resumo de chamados\. Tente novamente\."/,
+  );
+});
+
 await runTest("ti inventory and terms expose PR4 mutations through hooks", async () => {
   const inventoryHooksSource = await readModuleSource("hooks/useTiInventory.ts");
   const termsHooksSource = await readModuleSource("hooks/useTiTerms.ts");
