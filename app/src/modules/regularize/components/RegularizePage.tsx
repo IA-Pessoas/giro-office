@@ -1270,7 +1270,7 @@ export function RegularizePage() {
               setSelectedCredentialClient(client);
               setSelectedCredentialClientId(client?.id);
             }}
-            filters={{ status: "Ativo" }}
+            filters={{ status: "Ativo", legacyIntegrationStatusFilter: false }}
             allowClearSelection
           />
           <button
