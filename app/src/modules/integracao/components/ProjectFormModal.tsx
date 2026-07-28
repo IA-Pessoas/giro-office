@@ -3,6 +3,7 @@ import { CalendarDays, FileText, LoaderCircle, Save } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { Dialog } from "@shared/components/ui/Dialog";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
 import { useProjectForm } from "../hooks/useProjectForm";
 import {
@@ -138,18 +139,23 @@ export function ProjectFormModal({
         >
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700 dark:text-white">Nome</span>
+              <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
+                Nome
+              </RequiredFieldLabel>
               <input
                 type="text"
                 value={values.name}
                 onChange={(event) => updateValue("name", event.target.value)}
                 className={PROJECT_INPUT_CLASSNAME}
                 placeholder="Ex.: Implantação fiscal"
+                aria-required="true"
               />
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700 dark:text-white">Data de início</span>
+              <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
+                Data de início
+              </RequiredFieldLabel>
               <div className="relative">
                 <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
@@ -157,6 +163,7 @@ export function ProjectFormModal({
                   value={values.start_date}
                   onChange={(event) => updateValue("start_date", event.target.value)}
                   className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                  aria-required="true"
                 />
               </div>
             </label>
@@ -178,7 +185,9 @@ export function ProjectFormModal({
           </label>
 
           <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-700 dark:text-white">Objetivo</span>
+            <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
+              Objetivo
+            </RequiredFieldLabel>
             <div className="relative">
               <FileText className="pointer-events-none absolute left-3 top-4 h-4 w-4 text-slate-400" />
               <textarea
@@ -186,6 +195,7 @@ export function ProjectFormModal({
                 onChange={(event) => updateValue("objective", event.target.value)}
                 className={`${PROJECT_INPUT_CLASSNAME} min-h-32 resize-y pl-10`}
                 placeholder="Descreva o objetivo do projeto."
+                aria-required="true"
               />
             </div>
           </label>

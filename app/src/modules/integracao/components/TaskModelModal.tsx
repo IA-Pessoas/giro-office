@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { departmentService, type DepItem } from "@modules/departments";
 import { listAdminUsers, type UserItem } from "@modules/users";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
 import { taskModelService } from "../services/taskModelService";
 import { normalizeTaskModelResponsibleSequence } from "../services/taskModelService.contract";
@@ -470,26 +471,30 @@ export function TaskModelModal({
 
           <div className={TASK_FORM_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">Nome</span>
+              <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
+                Nome
+              </RequiredFieldLabel>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(event) => updateFormValue("name", event.target.value)}
                 className={PROJECT_INPUT_CLASSNAME}
                 placeholder="Nome do modelo"
+                aria-required="true"
               />
             </label>
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">
+              <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
                 Departamento
-              </span>
+              </RequiredFieldLabel>
               <select
                 value={formData.department_id}
                 onChange={(event) => updateFormValue("department_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={loadingOptions && departments.length === 0}
+                aria-required="true"
               >
                 <option value="">{getDepartmentPlaceholder()}</option>
                 {shouldRenderCurrentDepartmentOption() ? (
@@ -506,15 +511,16 @@ export function TaskModelModal({
 
           <div className={TASK_FORM_THREE_COLUMN_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">
+              <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
                 Responsável
-              </span>
+              </RequiredFieldLabel>
               <select
                 value={formData.responsible_id}
                 onChange={(event) => updateFormValue("responsible_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={loadingOptions && users.length === 0}
+                aria-required="true"
               >
                 <option value="">{getUserPlaceholder(false)}</option>
                 {shouldRenderCurrentUserOption(formData.responsible_id) ? (

@@ -161,4 +161,13 @@ runTest("certificate refresh keeps rows while a new first page is requested", ()
   );
 });
 
+runTest("certificate required fields are disclosed only while creating", () => {
+  const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /RequiredFieldLabel/);
+  assert.match(source, /<RequiredFieldLabel[\s\S]*required=\{isCreate\}/);
+  assert.match(source, /aria-required=\{isCreate\}/);
+  assert.match(source, /isPj \? "CNPJ" : "CPF"/);
+});
+
 console.log("certificates contract tests passed");

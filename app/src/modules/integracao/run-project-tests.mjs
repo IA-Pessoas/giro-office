@@ -748,3 +748,13 @@ runTest("integration client selection lives in workspace headers and forms show 
   assert.doesNotMatch(projects, /page:\s*1/);
   assert.doesNotMatch(tasks, /page:\s*1/);
 });
+
+runTest("project and task model forms disclose their required fields", () => {
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+  const taskModelForm = readFileSync("src/modules/integracao/components/TaskModelModal.tsx", "utf8");
+
+  for (const source of [projectForm, taskModelForm]) {
+    assert.match(source, /RequiredFieldLabel/);
+    assert.match(source, /aria-required/);
+  }
+});
