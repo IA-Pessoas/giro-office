@@ -16,10 +16,9 @@ export function RhScoreHistoryPanel({ canManageScore }: { canManageScore: boolea
   const [selectedScoreId, setSelectedScoreId] = useState<string | null>(null);
 
   const scoreHistory = historyQuery.data ?? [];
-  const scoreHistory2026 = useMemo(
+  const sortedScoreHistory = useMemo(
     () =>
       [...scoreHistory]
-        .filter((score) => score.quarter?.startsWith("2026-Q"))
         .sort((left, right) => left.quarter.localeCompare(right.quarter)),
     [scoreHistory],
   );
@@ -38,7 +37,7 @@ export function RhScoreHistoryPanel({ canManageScore }: { canManageScore: boolea
             "Não foi possível carregar o histórico trimestral.",
           )}
         </div>
-      ) : scoreHistory2026.length === 0 ? (
+      ) : sortedScoreHistory.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-200 bg-white p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">
             <Eye className="h-5 w-5" />
@@ -49,16 +48,16 @@ export function RhScoreHistoryPanel({ canManageScore }: { canManageScore: boolea
           </h3>
 
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Seus trimestres de 2026 aparecerão aqui assim que forem gerados.
+            Seus trimestres aparecerão aqui assim que forem gerados.
           </p>
         </div>
       ) : (
         <div
           className={`grid gap-4 ${
-            scoreHistory2026.length >= 3 ? "lg:grid-cols-2 xl:grid-cols-3" : "lg:grid-cols-2"
+            sortedScoreHistory.length >= 3 ? "lg:grid-cols-2 xl:grid-cols-3" : "lg:grid-cols-2"
           }`}
         >
-          {scoreHistory2026.map((score) => (
+          {sortedScoreHistory.map((score) => (
             <article
               key={score.id}
               className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"

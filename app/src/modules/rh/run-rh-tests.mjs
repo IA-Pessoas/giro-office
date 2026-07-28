@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
+const { getRhQuarterOptions } = await import("./utils/rhScoreUi.ts");
 const { formatRhDate } = await import("./utils/rhDate.ts");
 
 function runTest(name, fn) {
@@ -29,6 +30,16 @@ runTest("RH request form preserves validation errors returned by the API", () =>
   assert.match(source, /import \{ isAxiosError \} from "axios"/);
   assert.match(source, /isAxiosError\(error\) \? error\.response\?\.data\?\.error : undefined/);
   assert.match(source, /typeof responseMessage === "string"[\s\S]*?\? responseMessage/);
+});
+
+runTest("RH score periods include a relative history window and do not hard-code 2026", () => {
+  const options = getRhQuarterOptions(new Date("2026-07-01T12:00:00"));
+  const historySource = readFileSync("src/modules/rh/components/score/RhScoreHistoryPanel.tsx", "utf8");
+
+  assert.equal(options.length, 20);
+  assert.ok(options.some((option) => option.value === "2024-Q1"));
+  assert.ok(options.some((option) => option.value === "2028-Q4"));
+  assert.doesNotMatch(historySource, /startsWith\("2026-Q"\)/);
 });
 
 runTest("RH civil dates do not move when an API value is UTC midnight", () => {
