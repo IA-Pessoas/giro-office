@@ -1192,6 +1192,7 @@ model ControlContabil {
   client                           Client       @relation(fields: [client_id], references: [id])
   organization                     Organization @relation(fields: [organization_id], references: [id])
 
+  @@index([client_id, competence, organization_id], map: "idx_contabil_control_client_competence_org")
   @@map("contabil.control")
 }
 

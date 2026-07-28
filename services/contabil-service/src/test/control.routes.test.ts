@@ -3,9 +3,11 @@ import "./envBootstrap.js";
 import {
   createLogger,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
@@ -26,12 +28,26 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-function gatewayHeaders(): Record<string, string> {
+function gatewayHeaders(permission = 1): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORG_ID,
+    [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
   };
+}
+
+function bearerToken(permission: number, modules?: Record<string, number>): string {
+  const payload: Record<string, unknown> = {
+    user_id: USER_ID,
+    organization_id: ORG_ID,
+    permission,
+  };
+  if (modules !== undefined) {
+    payload.modules = modules;
+  }
+
+  return `Bearer ${jwt.sign(payload, env.jwtSecret)}`;
 }
 
 function createMockDeps(): ControlRouteDeps {
@@ -49,6 +65,80 @@ function createMockDeps(): ControlRouteDeps {
 }
 
 describe("control routes", () => {
+  it("GET /contabil/controls permite viewer", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/contabil/controls")
+      .query({ client_id: CLIENT_ID, competence: "2024-01" })
+      .set(gatewayHeaders(0));
+
+    expect(res.status).toBe(200);
+    expect(deps.detail).toHaveBeenCalledWith(CLIENT_ID, "2024-01", ORG_ID);
+  });
+
+  it("POST /contabil/controls rejeita viewer sem chamar service", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/contabil/controls")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(0))
+      .send({ client_id: CLIENT_ID, competence: "2024-01" });
+
+    expect(res.status).toBe(403);
+    expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /contabil/controls/:id rejeita viewer sem chamar service", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/contabil/controls/${CONTROL_ID}`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders(0))
+      .send({ field: "depreciation", value: true });
+
+    expect(res.status).toBe(403);
+    expect(deps.updateField).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /contabil/controls/:id rejeita JWT com permissao global write e contabil viewer", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/contabil/controls/${CONTROL_ID}`)
+      .set("Content-Type", "application/json")
+      .set("Authorization", bearerToken(1, { contabil: 0 }))
+      .send({ field: "depreciation", value: true });
+
+    expect(res.status).toBe(403);
+    expect(deps.updateField).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /contabil/controls/:id permite JWT legado com permissao global write sem modules", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/contabil/controls/${CONTROL_ID}`)
+      .set("Content-Type", "application/json")
+      .set("Authorization", bearerToken(1))
+      .send({ field: "depreciation", value: true });
+
+    expect(res.status).toBe(200);
+    expect(deps.updateField).toHaveBeenCalledWith(
+      CONTROL_ID,
+      "depreciation",
+      true,
+      expect.objectContaining({ userId: USER_ID, organizationId: ORG_ID }),
+    );
+  });
+
   it("POST /contabil/controls sem auth retorna 401", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, controlRouteDeps: deps });
