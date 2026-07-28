@@ -12,24 +12,42 @@ const migration = await readFile(
 );
 const seed = await readFile(new URL("../infra/prisma/seed.ts", import.meta.url), "utf8");
 
+const ACTIVE_MODULE_KEYS = [
+  "certificado",
+  "comercial",
+  "contabil",
+  "financeiro",
+  "fiscal",
+  "integracao",
+  "marketing",
+  "parcelamento",
+  "pessoal",
+  "regularize",
+  "rh",
+  "ti",
+  "triagem",
+];
+
+function migratePermissionValue(value) {
+  return value === null ? 0 : value + 1;
+}
+
+function applyMigration(values, migrationAlreadyApplied) {
+  return migrationAlreadyApplied ? values : values.map(migratePermissionValue);
+}
+
+function countPermissionValues(values) {
+  return values.reduce((counts, value) => {
+    const key = String(value);
+    counts[key] = (counts[key] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
 test("schema usa níveis modulares obrigatórios 0..3 e remove os módulos aposentados", () => {
   const permissionModel = schema.match(/model Permission \{[\s\S]*?\n\}/)?.[0] ?? "";
 
-  for (const moduleKey of [
-    "certificado",
-    "comercial",
-    "contabil",
-    "financeiro",
-    "fiscal",
-    "integracao",
-    "marketing",
-    "parcelamento",
-    "pessoal",
-    "regularize",
-    "rh",
-    "ti",
-    "triagem",
-  ]) {
+  for (const moduleKey of ACTIVE_MODULE_KEYS) {
     assert.match(permissionModel, new RegExp(`\\s${moduleKey}\\s+Int\\s+@default\\(0\\)`));
   }
 
@@ -48,4 +66,22 @@ test("migration desloca uma vez, impõe default/check e remove as colunas aposen
   assert.doesNotMatch(seed, /\batendimento\s*:/);
   assert.doesNotMatch(seed, /\bpec\s*:/);
   assert.doesNotMatch(seed, /\bwiki\s*:/);
+});
+
+test("harness de contagens comprova a transformação e a proteção contra reaplicação", () => {
+  const before = [null, null, 0, 1, 1, 2, 2, 2];
+  const after = before.map(migratePermissionValue);
+
+  assert.deepEqual(countPermissionValues(before), { 0: 1, 1: 2, 2: 3, null: 2 });
+  assert.deepEqual(countPermissionValues(after), { 0: 2, 1: 1, 2: 2, 3: 3 });
+  assert.deepEqual(applyMigration(after, true), after);
+  assert.match(migration, /migration_applied/);
+  assert.match(migration, /IF NOT migration_applied/);
+});
+
+test("migration declara a mesma constraint 0..3 para cada módulo ativo", () => {
+  for (const moduleKey of ACTIVE_MODULE_KEYS) {
+    assert.match(migration, new RegExp(`'${moduleKey}'`));
+  }
+  assert.match(migration, /CHECK \(%I BETWEEN 0 AND 3\)/);
 });

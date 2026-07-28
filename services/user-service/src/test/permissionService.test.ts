@@ -138,12 +138,19 @@ describe("PermissionService", () => {
   });
 
   it("atualiza sessão e registra auditoria na mesma transação", async () => {
-    prismaMock.permission.findFirst.mockResolvedValue({
-      id: "permission-1",
-      user_id: "user-1",
-      organization_id: "org-1",
-      fiscal: 1,
-    });
+    prismaMock.permission.findFirst
+      .mockResolvedValueOnce({
+        id: "permission-1",
+        user_id: "user-1",
+        organization_id: "org-1",
+        fiscal: 1,
+      })
+      .mockResolvedValueOnce({
+        id: "permission-1",
+        user_id: "user-1",
+        organization_id: "org-1",
+        fiscal: 2,
+      });
     prismaMock.permission.updateMany.mockResolvedValue({ count: 1 });
     const service = new PermissionService();
 
@@ -155,7 +162,20 @@ describe("PermissionService", () => {
       data: { session_version: { increment: 1 } },
     });
     expect(prismaMock.logs.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ user_id: "actor-1" }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          user_id: "actor-1",
+          organization_id: "org-1",
+          referring: "Permission",
+          referring_id: "user-1",
+          changes: expect.objectContaining({
+            affected_user_id: "user-1",
+            organization_id: "org-1",
+            previous: expect.objectContaining({ fiscal: 1 }),
+            next: expect.objectContaining({ fiscal: 2 }),
+          }),
+        }),
+      }),
     );
   });
 });

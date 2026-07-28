@@ -22,6 +22,7 @@ export function useAccessStoreSync() {
             id: user.id,
             permission: user.permission,
             department_id: user.department_id,
+            organization_id: user.organization_id,
             modules: user.modules,
           }
         : null,
@@ -47,6 +48,7 @@ export function useAccessStoreSync() {
       currentState.user?.id !== nextState.user?.id ||
       currentState.user?.permission !== nextState.user?.permission ||
       currentState.user?.department_id !== nextState.user?.department_id ||
+      currentState.user?.organization_id !== nextState.user?.organization_id ||
       currentState.user?.modules !== nextState.user?.modules ||
       currentState.departmentName !== nextState.departmentName ||
       currentState.departmentModule !== nextState.departmentModule ||

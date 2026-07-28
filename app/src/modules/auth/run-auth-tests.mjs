@@ -29,7 +29,8 @@ registerHooks({
   resolve(specifier, context, nextResolve) {
     if (
       specifier === "./moduleAccess" &&
-      context.parentURL?.endsWith("/modules/auth/utils/canSSRAdmin.ts")
+      (context.parentURL?.endsWith("/modules/auth/utils/canSSRAdmin.ts") ||
+        context.parentURL?.endsWith("/modules/auth/utils/sessionToken.ts"))
     ) {
       return nextResolve(`${specifier}.ts`, context);
     }
@@ -39,6 +40,7 @@ registerHooks({
 });
 
 const { canSSRAdmin } = await import("./utils/canSSRAdmin.ts");
+const { getModulePermissionsFromToken } = await import("./utils/sessionToken.ts");
 
 async function runTest(name, fn) {
   try {
@@ -109,6 +111,14 @@ function createSsrContext(token) {
 
 const authContextSource = await readFile(
   new URL("../../context/AuthContext.tsx", import.meta.url),
+  "utf8",
+);
+const accessStoreSource = await readFile(
+  new URL("./store/accessStore.ts", import.meta.url),
+  "utf8",
+);
+const accessStoreSyncSource = await readFile(
+  new URL("./hooks/useAccessStoreSync.ts", import.meta.url),
   "utf8",
 );
 const appShellSource = await readFile(
@@ -222,6 +232,15 @@ await (async () => {
     assert.match(appShellSource, /canAccessAdministration\(accessUser, \{ rhAccess \}\)/);
   });
 
+  await runTest("access store isolates snapshots by active organization", () => {
+    assert.match(accessStoreSource, /organization_id\?: string/);
+    assert.match(accessStoreSyncSource, /organization_id: user\.organization_id/);
+    assert.match(
+      accessStoreSyncSource,
+      /currentState\.user\?\.organization_id !== nextState\.user\?\.organization_id/,
+    );
+  });
+
   await runTest("resolveModuleAccess does not turn department admin into global admin", () => {
     assert.deepEqual(
       resolveModuleAccess({
@@ -326,6 +345,29 @@ await (async () => {
         source: "none",
       },
     );
+  });
+
+  await runTest("session token preserves the complete 0-3 matrix and drops retired modules", () => {
+    const token = createToken({
+      modules: {
+        certificado: 0,
+        comercial: 1,
+        contabil: 2,
+        fiscal: 3,
+        atendimento: 3,
+        pec: 2,
+        wiki: 1,
+      },
+    });
+    const modules = getModulePermissionsFromToken(token);
+
+    assert.equal(modules.certificado, 0);
+    assert.equal(modules.comercial, 1);
+    assert.equal(modules.contabil, 2);
+    assert.equal(modules.fiscal, 3);
+    assert.equal(Object.hasOwn(modules, "atendimento"), false);
+    assert.equal(Object.hasOwn(modules, "pec"), false);
+    assert.equal(Object.hasOwn(modules, "wiki"), false);
   });
 
   await runTest("resolveModuleAccess grants additional module access outside department", () => {

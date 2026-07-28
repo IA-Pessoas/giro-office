@@ -11,6 +11,7 @@ type AccessStoreUser = {
   id: string;
   permission: number;
   department_id?: string;
+  organization_id?: string | null;
   modules?: Record<string, number>;
 } | null;
 
