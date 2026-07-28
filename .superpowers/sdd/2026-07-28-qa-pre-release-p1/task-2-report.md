@@ -11,6 +11,12 @@ Implementado somente o escopo da issue #522 na branch `fix/issue-522-contabil-vi
 - `contabil-service` adiciona `requireContabilWritePermission` e bloqueia `POST`, `PUT`, `PATCH` e `DELETE` para permissao menor que 1.
 - UI do controle contabil usa `GET /contabil/controls` para viewer e preserva bootstrap `POST` apenas para editores.
 
+## Correcoes pos-review
+
+- Alta: no caminho JWT direto do `contabil-service`, `request.permission` agora usa `claims.modules.contabil` quando essa claim e numerica, mantendo fallback legacy para `claims.permission` quando a permissao modular estiver ausente.
+- Alta: adicionado teste de rota para `PATCH /contabil/controls/:id` com JWT assinado real onde `permission: 1` e `modules.contabil: 0` devem receber `403` sem chamar `updateField`.
+- Media: adicionado indice nao-unique de lookup em `ControlContabil` para `[client_id, competence, organization_id]`, com migration SQL somente de `CREATE INDEX`.
+
 ## TDD
 
 - Red do app confirmado: `@workspace/app test:contabil` falhou em `viewer control section reads existing control without bootstrap write` por ausencia de `useContabilControlDetail`.
@@ -28,6 +34,7 @@ Implementado somente o escopo da issue #522 na branch `fix/issue-522-contabil-vi
 - `corepack pnpm --filter @workspace/contabil-service prisma:generate` com `DATABASE_URL` dummy e escalado: passou.
 - `corepack pnpm --filter @workspace/contabil-service exec tsc --noEmit`: passou.
 - `corepack pnpm --filter @workspace/contabil-service check`: passou.
+- `corepack pnpm --filter @workspace/contabil-service exec tsx --eval "<smoke PATCH JWT>"`: passou com `status: 403` e `called: 0`.
 - `corepack pnpm --filter @workspace/gateway exec biome check src/security/policies.ts src/config/serviceRegistry.ts src/app.routes.test.ts`: passou.
 - `corepack pnpm --filter @workspace/contabil-service exec biome check ...arquivos tocados...`: passou.
 - `corepack pnpm --filter @workspace/app exec tsc --noEmit --pretty false`: passou.
@@ -37,6 +44,8 @@ Implementado somente o escopo da issue #522 na branch `fix/issue-522-contabil-vi
 
 - `corepack pnpm --filter @workspace/gateway test -- src/app.routes.test.ts` falhou antes dos testes por erro de bootstrap do Vitest: `ERR_PACKAGE_IMPORT_NOT_DEFINED: #module-evaluator`.
 - `corepack pnpm --filter @workspace/contabil-service test -- src/test/control.routes.test.ts src/test/responsible.routes.test.ts src/test/relationship.routes.test.ts` falhou pelo mesmo erro de bootstrap do Vitest.
+- `corepack pnpm --filter @workspace/contabil-service exec vitest run src/test/control.routes.test.ts` ainda falha antes dos testes por `ERR_PACKAGE_IMPORT_NOT_DEFINED: #module-evaluator`.
+- `corepack pnpm --filter @workspace/contabil-service typecheck` sem decompor ainda falha no Windows porque o script interno chama `pnpm prisma:generate` e o processo nao encontra `pnpm`; a validacao equivalente passou via `prisma:generate` + `tsc --noEmit` executados explicitamente com `corepack pnpm`.
 - `corepack pnpm --filter @workspace/gateway check` completo falhou em `src/app.ts` por organizeImports preexistente em arquivo nao alterado nesta issue.
 
 ## Auto-revisao

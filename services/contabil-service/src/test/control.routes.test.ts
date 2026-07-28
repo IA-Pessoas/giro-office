@@ -7,6 +7,7 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
@@ -34,6 +35,18 @@ function gatewayHeaders(permission = 1): Record<string, string> {
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORG_ID,
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
   };
+}
+
+function bearerToken(permission: number, modules?: Record<string, number>): string {
+  return `Bearer ${jwt.sign(
+    {
+      user_id: USER_ID,
+      organization_id: ORG_ID,
+      permission,
+      modules,
+    },
+    env.jwtSecret,
+  )}`;
 }
 
 function createMockDeps(): ControlRouteDeps {
@@ -86,6 +99,20 @@ describe("control routes", () => {
       .patch(`/contabil/controls/${CONTROL_ID}`)
       .set("Content-Type", "application/json")
       .set(gatewayHeaders(0))
+      .send({ field: "depreciation", value: true });
+
+    expect(res.status).toBe(403);
+    expect(deps.updateField).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /contabil/controls/:id rejeita JWT com permissao global write e contabil viewer", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/contabil/controls/${CONTROL_ID}`)
+      .set("Content-Type", "application/json")
+      .set("Authorization", bearerToken(1, { contabil: 0 }))
       .send({ field: "depreciation", value: true });
 
     expect(res.status).toBe(403);

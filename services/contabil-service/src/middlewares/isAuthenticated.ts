@@ -22,6 +22,13 @@ function parseForwardedPermission(headerValue: string | undefined): number | und
   return Number.isNaN(n) ? undefined : n;
 }
 
+function getContabilPermission(claims: {
+  modules?: { contabil?: number };
+  permission?: number;
+}): number | undefined {
+  return typeof claims.modules?.contabil === "number" ? claims.modules.contabil : claims.permission;
+}
+
 export function requireContabilWritePermission(
   request: Request,
   _response: Response,
@@ -70,7 +77,7 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
 
     request.user_id = claims.user_id;
     request.organization_id = claims.organization_id ?? "";
-    request.permission = claims.permission;
+    request.permission = getContabilPermission(claims);
     next();
   } catch (err) {
     logError("Erro ao validar autenticação", { err });
