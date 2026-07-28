@@ -129,13 +129,12 @@ router.get(
 
       const { id } = parseWithZod(scoreQuarterIdParamSchema, req.params);
 
-      const result = (await scoreQuarterService.getDetail({
+      const result = await scoreQuarterService.getDetail({
         organization_id: organizationId,
         score_id: id,
-      })) as { user_id: string };
-      if (!canManageRh(req) && result.user_id !== userId) {
-        throw new ServiceError(403, "Permissao insuficiente para acessar score de terceiro.");
-      }
+        user_id: userId,
+        can_manage: canManageRh(req),
+      });
 
       res.status(200).json(createSuccessResponse(result));
     } catch (err) {

@@ -1,7 +1,9 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
   requireAuthenticatedRequestContext,
+  requireIntegracaoRouteAccess,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
@@ -23,6 +25,12 @@ export function createDepsTasksRoutes(service: DepsTasksRouteDeps): ReturnType<t
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { organization_id } = requireAuthenticatedRequestContext(req);
+        requireIntegracaoRouteAccess("GET", "/task/deps/list", {
+          userId: req.user_id,
+          level: normalizeModulePermission(req.modules?.integracao),
+          organizationId: organization_id,
+          isOwner: req.user_type === "owner",
+        });
         const result = await service.listDepartmentsWithTaskModels(organization_id);
         res.json(createSuccessResponse(result));
       } catch (err) {

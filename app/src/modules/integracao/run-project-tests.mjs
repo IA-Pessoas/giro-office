@@ -250,6 +250,43 @@ runTest("buildCreateIntegracaoTaskPayload maps create body", () => {
   );
 });
 
+runTest("buildCreateIntegracaoTaskPayload preserves optional operational details", () => {
+  assert.deepEqual(
+    buildCreateIntegracaoTaskPayload({
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      name: "Revisar documentação assinada",
+      status: "Em Espera",
+      department_id: "department-1",
+      observations: "Aguardar o retorno do cliente.",
+      billing: "Não Realizar",
+      urgency: "Alta",
+      responsible_id: "user-1",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+      prevision_date: "2026-08-15",
+    }),
+    {
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      name: "Revisar documentação assinada",
+      status: "Em Espera",
+      department_id: "department-1",
+      observations: "Aguardar o retorno do cliente.",
+      billing: "Não Realizar",
+      urgency: "Alta",
+      responsible_id: "user-1",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+      prevision_date: "2026-08-15",
+    },
+  );
+});
+
 runTest("buildUpdateIntegracaoTaskPayload keeps task_id", () => {
   assert.deepEqual(
     buildUpdateIntegracaoTaskPayload({
@@ -606,7 +643,7 @@ runTest("task edit form only blocks while the task detail is loading", () => {
   );
 });
 
-runTest("task create validation requires observations before submit", () => {
+runTest("task create validation accepts blank observations before submit", () => {
   const validValues = {
     clientId: "client-1",
     projectId: "project-1",
@@ -619,8 +656,28 @@ runTest("task create validation requires observations before submit", () => {
   assert.equal(getTaskCreateValidationMessage(validValues), null);
   assert.equal(
     getTaskCreateValidationMessage({ ...validValues, observations: "   " }),
-    "Preencha as observações da tarefa.",
+    null,
   );
+});
+
+runTest("task create form marks observations as optional", () => {
+  const source = readFileSync("src/modules/integracao/components/TaskFormModal.tsx", "utf8");
+  const observationsField = source.match(
+    /<textarea\s+value=\{createValues\.observations\}[\s\S]*?\/>/,
+  )?.[0];
+
+  assert.ok(observationsField, "create observations textarea not found");
+  assert.doesNotMatch(observationsField, /\srequired(?:\s|>|$)/);
+});
+
+runTest("task create OpenAPI contract keeps observations optional", () => {
+  const source = readFileSync("../services/task-service/src/openapi/spec.ts", "utf8");
+  const createTaskRequired = source.match(
+    /const createTaskRequestBody = createObjectRequestBody\(\{[\s\S]*?required: \[([\s\S]*?)\]/,
+  )?.[1];
+
+  assert.ok(createTaskRequired, "create task required list not found");
+  assert.doesNotMatch(createTaskRequired, /"observations"/);
 });
 
 runTest("task model config uses clear empty and department fallback copy", () => {
@@ -727,4 +784,14 @@ runTest("integration client selection lives in workspace headers and forms show 
   assert.doesNotMatch(tasks, /useClients\(/);
   assert.doesNotMatch(projects, /page:\s*1/);
   assert.doesNotMatch(tasks, /page:\s*1/);
+});
+
+runTest("project and task model forms disclose their required fields", () => {
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+  const taskModelForm = readFileSync("src/modules/integracao/components/TaskModelModal.tsx", "utf8");
+
+  for (const source of [projectForm, taskModelForm]) {
+    assert.match(source, /RequiredFieldLabel/);
+    assert.match(source, /aria-required/);
+  }
 });

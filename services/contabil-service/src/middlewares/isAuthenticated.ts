@@ -12,12 +12,35 @@ import type { NextFunction, Request, Response } from "express";
 
 import { getContabilServiceEnv } from "../config/env.js";
 
+const CONTABIL_WRITE_PERMISSION = 1;
+
 function parseForwardedPermission(headerValue: string | undefined): number | undefined {
   if (headerValue === undefined || headerValue === "") {
     return undefined;
   }
   const n = Number.parseInt(headerValue, 10);
   return Number.isNaN(n) ? undefined : n;
+}
+
+function getContabilPermission(claims: {
+  modules?: { contabil?: number };
+  modulePermissionsPresent?: boolean;
+  permission?: number;
+}): number | undefined {
+  return claims.modulePermissionsPresent ? (claims.modules?.contabil ?? 0) : claims.permission;
+}
+
+export function requireContabilWritePermission(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  if (Number(request.permission ?? 0) < CONTABIL_WRITE_PERMISSION) {
+    next(new ServiceError(403, "Permissao insuficiente para alterar dados contabeis."));
+    return;
+  }
+
+  next();
 }
 
 export function isAuthenticated(request: Request, _response: Response, next: NextFunction): void {
@@ -55,7 +78,7 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
 
     request.user_id = claims.user_id;
     request.organization_id = claims.organization_id ?? "";
-    request.permission = claims.permission;
+    request.permission = getContabilPermission(claims);
     next();
   } catch (err) {
     logError("Erro ao validar autenticação", { err });

@@ -1,6 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AlertCircle, ChevronDown, Loader2, RefreshCw, Save, WalletCards } from "lucide-react";
 
+import { resolveDepartmentModuleKey } from "@modules/auth";
+import { departmentService } from "@modules/departments";
+import { listAdminUsers } from "@modules/users";
+import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -8,6 +12,7 @@ import {
   usePessoalPayroll,
   useUpdatePessoalPayrollMutation,
 } from "../hooks/usePessoalPayroll";
+import { pessoalQueryKey } from "../hooks/queryKeys";
 import { usePessoalUnions } from "../hooks/usePessoalUnions";
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
@@ -72,7 +77,6 @@ const emptyPayrollFormValues: PayrollFormValues = {
 const textFields = [
   { name: "info", label: "Informações", type: "text", required: true },
   { name: "group", label: "Grupo", type: "text", required: true },
-  { name: "responsible_id", label: "Responsável ID", type: "text", required: false },
   { name: "advance_type", label: "Tipo de adiantamento", type: "text", required: false },
   { name: "vt_type", label: "Tipo de VT", type: "text", required: false },
   { name: "contact", label: "Contato", type: "text", required: false },
@@ -162,12 +166,42 @@ export function PessoalPayrollSection({
   const hasClient = selectedClientId.length > 0;
   const payrollQuery = usePessoalPayroll(selectedClientId, hasClient);
   const unionsQuery = usePessoalUnions();
+  const responsibleUsersQuery = useFetch(
+    pessoalQueryKey("payroll", "users", "active"),
+    () => listAdminUsers("active"),
+    { enabled: canEdit },
+  );
+  const departmentsQuery = useFetch(
+    pessoalQueryKey("payroll", "departments"),
+    () => departmentService.list(),
+    { enabled: canEdit },
+  );
   const createMutation = useCreatePessoalPayrollMutation();
   const updateMutation = useUpdatePessoalPayrollMutation(selectedClientId);
   const [formValues, setFormValues] = useState<PayrollFormValues>(emptyPayrollFormValues);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const payroll = payrollQuery.data ?? null;
+  const departmentNameById = useMemo(
+    () =>
+      new Map(
+        (departmentsQuery.data ?? []).map((department) => [department.id, department.name]),
+      ),
+    [departmentsQuery.data],
+  );
+  const responsibleUsers = useMemo(
+    () =>
+      (responsibleUsersQuery.data ?? []).filter((user) => {
+        const departmentName =
+          departmentNameById.get(user.department_id) ?? user.department?.name ?? null;
+
+        return resolveDepartmentModuleKey(departmentName) === "pessoal";
+      }),
+    [departmentNameById, responsibleUsersQuery.data],
+  );
+  const hasSelectedResponsible = responsibleUsers.some(
+    (user) => user.id === formValues.responsible_id,
+  );
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const isFormDisabled = !canEdit || payrollQuery.isLoading || isSubmitting;
 
@@ -215,8 +249,17 @@ export function PessoalPayrollSection({
       return;
     }
 
+    const hasNegativeMoneyValue =
+      (typeof payload.advance_amount === "number" && payload.advance_amount < 0) ||
+      (typeof payload.vt_value === "number" && payload.vt_value < 0);
+
     if (hasInvalidNumber || payload.employees < 0) {
       setFormError("Revise os campos numéricos.");
+      return;
+    }
+
+    if (hasNegativeMoneyValue) {
+      setFormError("Valores monetários não podem ser negativos.");
       return;
     }
 
@@ -312,6 +355,35 @@ export function PessoalPayrollSection({
             </label>
           ))}
 
+          <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+            Responsável
+            <div className="relative">
+              <select
+                value={formValues.responsible_id}
+                onChange={(event) => handleFieldChange("responsible_id", event.target.value)}
+                disabled={
+                  isFormDisabled || responsibleUsersQuery.isLoading || departmentsQuery.isLoading
+                }
+                className={`${pessoalTextFieldClassName} appearance-none pr-12`}
+              >
+                <option value="">
+                  {responsibleUsersQuery.isLoading || departmentsQuery.isLoading
+                    ? "Carregando responsáveis"
+                    : "Sem responsável"}
+                </option>
+                {formValues.responsible_id && !hasSelectedResponsible ? (
+                  <option value={formValues.responsible_id}>Responsável atual</option>
+                ) : null}
+                {responsibleUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name || user.login}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+            </div>
+          </label>
+
           {numberFields.map((field) => (
             <label
               key={field.name}
@@ -321,7 +393,7 @@ export function PessoalPayrollSection({
               <input
                 type="number"
                 required={field.required}
-                min={field.name === "employees" ? 0 : undefined}
+                min={0}
                 step={field.name === "employees" ? 1 : "0.01"}
                 value={String(formValues[field.name])}
                 onChange={(event) => handleFieldChange(field.name, event.target.value)}

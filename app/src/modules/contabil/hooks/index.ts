@@ -14,6 +14,7 @@ export {
 } from "./queryKeys";
 export {
   useContabilControlBootstrapMutation,
+  useContabilControlDetail,
   usePatchContabilControlFieldMutation,
 } from "./useContabilControl";
 export {

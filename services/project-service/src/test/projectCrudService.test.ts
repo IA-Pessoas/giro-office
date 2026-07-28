@@ -17,6 +17,7 @@ const baseCreateInput = {
   client_id: CLIENT_ID,
   start_date: new Date("2025-01-15"),
   objective: "Objetivo",
+  integracaoLevel: 2,
 };
 
 function createMockPrisma(): ProjectCrudPrisma {
@@ -85,7 +86,13 @@ describe("ProjectCrudService", () => {
       logUpdateIfChanged: vi.fn(async () => {}),
     });
 
-    await expect(service.detail(PROJECT_ID, ORG_ID)).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      service.detail(PROJECT_ID, ORG_ID, {
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        integracaoLevel: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it("detail retorna registro quando existe", async () => {
@@ -97,7 +104,11 @@ describe("ProjectCrudService", () => {
       logUpdateIfChanged: vi.fn(async () => {}),
     });
 
-    const result = await service.detail(PROJECT_ID, ORG_ID);
+    const result = await service.detail(PROJECT_ID, ORG_ID, {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      integracaoLevel: 1,
+    });
     expect(result).toEqual({ detail: row });
   });
 
@@ -118,6 +129,7 @@ describe("ProjectCrudService", () => {
         start_date: new Date(),
         end_date: new Date(),
         objective: "O",
+        integracaoLevel: 2,
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
   });
@@ -139,7 +151,11 @@ describe("ProjectCrudService", () => {
       logUpdateIfChanged: vi.fn(async () => {}),
     });
 
-    await service.list("client", CLIENT_ID, ORG_ID);
+    await service.list("client", CLIENT_ID, ORG_ID, {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      integracaoLevel: 1,
+    });
 
     expect(findMany.mock.calls.length).toBe(1);
     const firstCall = findMany.mock.calls[0];
@@ -154,6 +170,7 @@ describe("ProjectCrudService", () => {
 
   it("delete lança 403 quando permissão não é 2", async () => {
     const prisma = createMockPrisma();
+    prisma.project.findFirst = vi.fn(async () => ({ id: PROJECT_ID }));
     const service = new ProjectCrudService(prisma, {
       createLog: vi.fn(async () => {}),
       logUpdateIfChanged: vi.fn(async () => {}),
@@ -164,6 +181,7 @@ describe("ProjectCrudService", () => {
         userId: USER_ID,
         organizationId: ORG_ID,
         permission: 1,
+        integracaoLevel: 1,
         project_id: PROJECT_ID,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
@@ -182,6 +200,7 @@ describe("ProjectCrudService", () => {
       userId: USER_ID,
       organizationId: ORG_ID,
       permission: 2,
+      integracaoLevel: 3,
       project_id: PROJECT_ID,
     });
 

@@ -70,6 +70,9 @@ export function buildRegularizeClientPfListParams(
 ) {
   return {
     status: filters.status,
+    ...(filters.search ? { search: filters.search.trim() } : {}),
+    ...(filters.page !== undefined ? { page: filters.page } : {}),
+    ...(filters.limit !== undefined ? { limit: filters.limit } : {}),
   };
 }
 

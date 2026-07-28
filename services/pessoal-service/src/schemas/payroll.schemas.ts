@@ -14,19 +14,26 @@ const optionalUuid = (fieldName: string) =>
     .nullable()
     .optional();
 
+const optionalNonNegativeNumber = (fieldName: string) =>
+  z
+    .number()
+    .nonnegative({ message: `${fieldName} não pode ser negativo.` })
+    .nullable()
+    .optional();
+
 export const createPayrollBodySchema = z
   .object({
     client_id: z.string().uuid({ message: "client_id invalido." }),
     responsible_id: optionalUuid("responsible_id"),
     advance: z.boolean(),
     advance_type: z.string().trim().min(1).nullable().optional(),
-    advance_amount: z.number().nullable().optional(),
+    advance_amount: optionalNonNegativeNumber("advance_amount"),
     info: zNonEmptyText("info"),
     previous: z.boolean(),
     onvio: z.boolean(),
     group: zNonEmptyText("group"),
     vt: z.boolean(),
-    vt_value: z.number().nullable().optional(),
+    vt_value: optionalNonNegativeNumber("vt_value"),
     vt_type: z.string().trim().min(1).nullable().optional(),
     va: z.boolean(),
     assistance_fee: z.boolean(),

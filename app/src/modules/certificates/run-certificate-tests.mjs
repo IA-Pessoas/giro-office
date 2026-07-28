@@ -33,6 +33,20 @@ runTest("certificate endpoints match gateway public contract", () => {
   assert.equal(CERTIFICATE_ENDPOINTS.notifications, "/certificate/notifications");
 });
 
+runTest("certificate record deletion uses the detail endpoints and an internal dialog", () => {
+  const clientSource = readFileSync(new URL("./services/certificateService.ts", import.meta.url), "utf8");
+  const actionsSource = readFileSync(
+    new URL("./components/CertificateFileActions.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(clientSource, /async deletePj\(id: string\): Promise<void>/);
+  assert.match(clientSource, /async deletePf\(id: string\): Promise<void>/);
+  assert.match(actionsSource, /Excluir certificado/);
+  assert.match(actionsSource, /<Dialog/);
+  assert.doesNotMatch(actionsSource, /window\.confirm/);
+});
+
 runTest("buildCertificateListParams removes empty values", () => {
   assert.deepEqual(
     buildCertificateListParams({
@@ -145,6 +159,15 @@ runTest("certificate refresh keeps rows while a new first page is requested", ()
     workspaceSource,
     /if \(activeTab === "notifications"[\s\S]*setNotificationPage\(FIRST_PAGE\)/,
   );
+});
+
+runTest("certificate required fields are disclosed only while creating", () => {
+  const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /RequiredFieldLabel/);
+  assert.match(source, /<RequiredFieldLabel[\s\S]*required=\{isCreate\}/);
+  assert.match(source, /aria-required=\{isCreate\}/);
+  assert.match(source, /isPj \? "CNPJ" : "CPF"/);
 });
 
 console.log("certificates contract tests passed");

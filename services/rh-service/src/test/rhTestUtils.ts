@@ -215,7 +215,9 @@ import { createApp } from "../app.js";
 import type { RhEnv } from "../config/env.js";
 
 export function createTestApp(options: { rhPermission?: number } = {}) {
-  testAuthContext.rhPermission = options.rhPermission ?? 3;
+  if (options.rhPermission !== undefined) {
+    testAuthContext.rhPermission = options.rhPermission;
+  }
 
   const env = {
     port: 3034,
@@ -240,6 +242,7 @@ export function createTestApp(options: { rhPermission?: number } = {}) {
 
 export function resetRhRouteMocks() {
   vi.clearAllMocks();
+  testAuthContext.rhPermission = 3;
 
   pointConfigServiceMock.upsert.mockResolvedValue({ ok: true });
   pointConfigServiceMock.getByUserId.mockResolvedValue({ ok: true });
@@ -343,6 +346,10 @@ export function resetRhRouteMocks() {
   });
   timeSheetServiceMock.sign.mockResolvedValue({ ok: true });
   scoreNitroServiceMock.updateMetric.mockResolvedValue({ ok: true });
+}
+
+export function setRhRoutePermission(permission: number) {
+  testAuthContext.rhPermission = permission;
 }
 
 export {

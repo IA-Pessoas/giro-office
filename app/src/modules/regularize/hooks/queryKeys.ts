@@ -33,8 +33,15 @@ export const regularizeQueryKeys = {
   passwordDetail: (id?: RegularizeId | null) =>
     [...regularizeQueryKeys.credentials(), "passwords", "detail", id ?? ""] as const,
   people: () => [...regularizeQueryKeys.root, "people"] as const,
-  clientPfs: (filters: RegularizeClientPfListFilters) =>
-    [...regularizeQueryKeys.people(), "client-pfs", filters.status] as const,
+  clientPfsPage: (filters: RegularizeClientPfListFilters) =>
+    [
+      ...regularizeQueryKeys.people(),
+      "client-pfs-page",
+      filters.status,
+      filters.search ?? "",
+      filters.page ?? 1,
+      filters.limit ?? 20,
+    ] as const,
   clientPfDetail: (id?: RegularizeId | null) =>
     [...regularizeQueryKeys.people(), "client-pfs", "detail", id ?? ""] as const,
   partners: (filters: RegularizePartnerListFilters) =>

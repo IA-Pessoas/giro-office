@@ -31,12 +31,12 @@ function requiredRoutePolicy(method: string, path: string): AuthPolicy {
 }
 
 describe("matriz de regressão das políticas modulares", () => {
-  it.each([0, 1, 2, 3])("avalia o módulo Fiscal no nível %i", (level) => {
+  it.each([0, 1, 2, 3])("avalia o módulo Integração no nível %i", (level) => {
     const policy = requiredRoutePolicy("GET", "/client/list");
     expect(
       canAccessRoute(
         authContext({
-          modules: { fiscal: level },
+          modules: { integracao: level },
         }),
         policy,
       ),
@@ -45,8 +45,8 @@ describe("matriz de regressão das políticas modulares", () => {
 
   it.each([1, 2, 3])("respeita o limiar modular %i em toda a matriz 0-3", (minPermission) => {
     const observed = [0, 1, 2, 3].map((level) =>
-      canAccessRoute(authContext({ modules: { fiscal: level } }), {
-        modulePermission: { module: "fiscal", minPermission },
+      canAccessRoute(authContext({ modules: { integracao: level } }), {
+        modulePermission: { module: "integracao", minPermission },
       }),
     );
 
@@ -59,11 +59,17 @@ describe("matriz de regressão das políticas modulares", () => {
       canAccessRoute(
         authContext({
           permission: 999,
-          modules: { fiscal: 0 },
+          modules: { integracao: 0 },
         }),
         policy,
       ),
     ).toBe(false);
+  });
+
+  it("protege os endpoints de projeto pelo módulo Integração", () => {
+    const policy = requiredRoutePolicy("GET", "/project/list");
+    expect(canAccessRoute(authContext({ modules: { integracao: 0 } }), policy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { integracao: 1 } }), policy)).toBe(true);
   });
 
   it("mantém owner como único bypass global explícito", () => {
@@ -73,11 +79,17 @@ describe("matriz de regressão das políticas modulares", () => {
         authContext({
           type: "owner",
           permission: 0,
-          modules: { fiscal: 0 },
+          modules: { integracao: 0 },
         }),
         policy,
       ),
     ).toBe(true);
+  });
+
+  it("não usa Integração como bypass para mutações verticais de cliente", () => {
+    const policy = requiredRoutePolicy("PATCH", "/client/client-1/finance");
+    expect(canAccessRoute(authContext({ modules: { integracao: 3 } }), policy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { financeiro: 1 } }), policy)).toBe(true);
   });
 
   it("reserva a alteração modular ao owner, inclusive contra RH administrador", () => {
