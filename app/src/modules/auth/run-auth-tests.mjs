@@ -73,14 +73,29 @@ await runTest("integration routes preserve the level 0 own-tasks exception", () 
   assert.equal(getModulePermissionLevel(users.level3, "integracao"), 3);
   assert.equal(getModulePermissionLevel(users.owner, "integracao"), 3);
 
-  assert.equal(canViewIntegrationRoute("/tasks", users.level0), true);
-  assert.equal(canViewIntegrationRoute("/clients", users.level0), false);
-  assert.equal(canViewIntegrationRoute("/projects", users.level1), true);
-  assert.equal(canViewIntegrationRoute("/tasks", users.level1), true);
-  assert.equal(canViewIntegrationRoute("/clients", users.level2), true);
-  assert.equal(canViewIntegrationRoute("/configs/integracao/tasks", users.level2), false);
-  assert.equal(canViewIntegrationRoute("/configs/integracao/tasks", users.level3), true);
-  assert.equal(canViewIntegrationRoute("/configs/integracao/tasks", users.owner), true);
+  const directRoutes = [
+    "/tasks/123?status=Todos",
+    "/clients/123/",
+    "/projects/123?tab=tasks",
+    "/configs/integracao/tasks/",
+  ];
+  const expectedByProfile = {
+    level0: [true, false, false, false],
+    level1: [true, true, true, false],
+    level2: [true, true, true, false],
+    level3: [true, true, true, true],
+    owner: [true, true, true, true],
+  };
+
+  for (const [profile, expected] of Object.entries(expectedByProfile)) {
+    directRoutes.forEach((route, index) => {
+      assert.equal(
+        canViewIntegrationRoute(route, users[profile]),
+        expected[index],
+        `${profile} ${route}`,
+      );
+    });
+  }
 });
 
 async function runTest(name, fn) {
