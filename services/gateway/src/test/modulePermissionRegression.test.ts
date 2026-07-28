@@ -31,8 +31,23 @@ function requiredRoutePolicy(method: string, path: string): AuthPolicy {
 }
 
 describe("matriz de regressão das políticas modulares", () => {
-  it.each([0, 1, 2, 3])("avalia o módulo Fiscal no nível %i", (level) => {
+  it("permite Viewer global consultar a lista de clientes sem módulo", () => {
     const policy = requiredRoutePolicy("GET", "/client/list");
+
+    expect(policy).toEqual({ minPermission: 1 });
+    expect(
+      canAccessRoute(
+        authContext({
+          permission: 1,
+          modules: {},
+        }),
+        policy,
+      ),
+    ).toBe(true);
+  });
+
+  it.each([0, 1, 2, 3])("avalia o módulo Fiscal no nível %i", (level) => {
+    const policy = requiredRoutePolicy("GET", "/client/123");
     expect(
       canAccessRoute(
         authContext({
@@ -54,7 +69,7 @@ describe("matriz de regressão das políticas modulares", () => {
   });
 
   it("não usa permission global nem departamento como bypass modular", () => {
-    const policy = requiredRoutePolicy("GET", "/client/list");
+    const policy = requiredRoutePolicy("GET", "/client/123");
     expect(
       canAccessRoute(
         authContext({
@@ -67,7 +82,7 @@ describe("matriz de regressão das políticas modulares", () => {
   });
 
   it("mantém owner como único bypass global explícito", () => {
-    const policy = requiredRoutePolicy("GET", "/client/list");
+    const policy = requiredRoutePolicy("GET", "/client/123");
     expect(
       canAccessRoute(
         authContext({

@@ -35,6 +35,7 @@ const clientModulePolicy: AuthPolicy = {
 };
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
+  ["GET /client/list", { minPermission: moduleAccessPermission }],
   ["GET /user", userManagementPolicy],
   ["POST /user", userManagementPolicy],
 ]);
