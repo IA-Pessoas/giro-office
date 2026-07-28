@@ -10,6 +10,13 @@ const rhModulePolicy: AuthPolicy = {
   },
 };
 
+const operationalUsersCatalogPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["rh", "contabil"],
+    minPermission: moduleAccessPermission,
+  },
+};
+
 const pessoalModulePolicy: AuthPolicy = {
   modulePermission: {
     module: "pessoal",
@@ -53,6 +60,7 @@ const integracaoClientPath =
 const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /user", userManagementPolicy],
   ["GET /client/list", integracaoClientPolicy],
+  ["GET /rh/operational-users", operationalUsersCatalogPolicy],
   ["POST /user", userManagementPolicy],
 ]);
 

@@ -1,5 +1,5 @@
+import { FORWARDED_AUTH_MODULES_HEADER, FORWARDED_AUTH_PERMISSION_HEADER } from "@workspace/shared";
 import request from "supertest";
-import { FORWARDED_AUTH_PERMISSION_HEADER } from "@workspace/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -41,6 +41,17 @@ describe("request routes", () => {
   it("GET /rh/operational-users lista colaboradores elegiveis para operacao RH", async () => {
     const app = createTestApp();
     const res = await request(app).get("/rh/operational-users");
+
+    expect(res.status).toBe(200);
+    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);
+  });
+
+  it("GET /rh/operational-users aceita modulo Contabil para seletores operacionais", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .get("/rh/operational-users")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "0")
+      .set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify({ contabil: 3, rh: 0 }));
 
     expect(res.status).toBe(200);
     expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);

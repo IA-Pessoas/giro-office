@@ -57,8 +57,11 @@ export function ContabilResponsibleSection({
   );
 
   const responsible = responsibleQuery.data ?? null;
+  const hasResponsibleUserIds = Boolean(
+    responsible?.person_responsible_id || responsible?.posted_by_id,
+  );
   const assignableUsersQuery = useAssignableUsers({
-    enabled: canEdit && isEditorOpen,
+    enabled: Boolean((canEdit && isEditorOpen) || hasResponsibleUserIds),
   });
 
   const assignableOptions = useMemo(

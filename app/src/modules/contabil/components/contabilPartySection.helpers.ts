@@ -63,7 +63,7 @@ export function getContabilSelectLabel(
     return "Não informado";
   }
 
-  return options.find((option) => option.value === value)?.label ?? value;
+  return options.find((option) => option.value === value)?.label ?? "Usuário não encontrado";
 }
 
 export function isContabilTextValueFilled(value: string) {
