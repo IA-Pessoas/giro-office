@@ -76,3 +76,25 @@ Implementado na branch `fix/issue-521-rh-own-evaluations`.
 
 - A suíte Vitest não pôde ser executada nesta máquina por erro de startup do runner no Node atual.
 - O typecheck oficial passou, mas a confirmação runtime dos testes adicionados depende de rodar Vitest em ambiente compatível.
+
+## Complemento da revisao - POST submit gerencial
+
+### Alteracao
+
+- Adicionado teste explicito em `services/rh-service/src/test/scoreEvaluation.routes.test.ts` para `POST /rh/score/evaluations/submit` com `rh_permission=2`, verificando que `scoreEvaluationServiceMock.submitEvaluation` recebe `can_manage: true`.
+- Nenhum arquivo de producao foi alterado.
+
+### Verificacoes
+
+- `corepack pnpm --filter @workspace/rh-service test -- src/test/scoreEvaluation.routes.test.ts`
+  - Nao executou testes por falha de startup do Vitest:
+    - `ERR_PACKAGE_IMPORT_NOT_DEFINED: Package import specifier "#module-evaluator" is not defined`.
+    - Ambiente observado: Node `v24.13.1`.
+- `$env:DATABASE_URL='postgresql://user:pass@localhost:5432/db'; corepack pnpm --filter @workspace/rh-service typecheck`
+  - Passou.
+- `corepack pnpm exec biome check services/rh-service/src/test/scoreEvaluation.routes.test.ts`
+  - Passou.
+
+### Riscos
+
+- A cobertura foi adicionada, mas a execucao runtime do Vitest continua bloqueada pelo Node 24 nesta maquina.

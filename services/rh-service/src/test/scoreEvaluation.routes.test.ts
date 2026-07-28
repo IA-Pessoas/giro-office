@@ -58,4 +58,20 @@ describe("scoreEvaluation routes", () => {
       true,
     );
   });
+
+  it("POST /rh/score/evaluations/submit preserva contexto gerencial", async () => {
+    setRhRoutePermission(2);
+    const app = createTestApp();
+    const res = await request(app)
+      .post("/rh/score/evaluations/submit")
+      .send({
+        evaluation_id: itemId,
+        answers: [{ question_id: itemId, answer: 5 }],
+      });
+
+    expect(res.status).toBe(200);
+    expect(scoreEvaluationServiceMock.submitEvaluation).toHaveBeenCalledWith(
+      expect.objectContaining({ can_manage: true }),
+    );
+  });
 });
