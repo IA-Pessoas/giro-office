@@ -53,6 +53,45 @@ function dualListSuccessEnvelopeContent() {
   };
 }
 
+function paginatedClientPfSuccessEnvelopeContent() {
+  return {
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              required: ["data", "total", "page", "limit", "hasMore"],
+              properties: {
+                data: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["id", "name"],
+                    properties: {
+                      id: { type: "string", format: "uuid" },
+                      code: { type: "string", nullable: true },
+                      name: { type: "string" },
+                      cpf: { type: "string", nullable: true },
+                    },
+                  },
+                },
+                total: { type: "integer", minimum: 0 },
+                page: { type: "integer", minimum: 1 },
+                limit: { type: "integer", minimum: 1, maximum: 100 },
+                hasMore: { type: "boolean" },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
 export function buildRegularizeServiceOpenApiSpec(
   env: RegularizeServiceOpenApiEnv,
 ): OpenApiDocument {
@@ -251,11 +290,23 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/pfs": {
         get: {
           tags: ["PF"],
-          summary: "Listar clientes PF",
+          summary: "Listar clientes PF com busca e paginação",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "status", in: "query", required: true, schema: { type: "string" } }],
+          parameters: [
+            { name: "status", in: "query", required: true, schema: { type: "string" } },
+            { name: "search", in: "query", schema: { type: "string" } },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
           responses: {
-            "200": { description: "Lista de clientes PF", ...successEnvelopeContent() },
+            "200": {
+              description: "Página de clientes PF",
+              ...paginatedClientPfSuccessEnvelopeContent(),
+            },
           },
         },
       },

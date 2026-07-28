@@ -572,6 +572,22 @@ await runTest("ti stock exit feedback uses the scoped mutation error normalizer"
   );
 });
 
+await runTest("ti stock category dialog filters matches and makes new category creation explicit", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+
+  assert.match(tabSource, /function normalizeStockCategoryName\(value: unknown\): string/);
+  assert.match(tabSource, /const normalizedCategorySearch = normalizeStockCategoryName\(categoryName\)/);
+  assert.match(tabSource, /const filteredStockCategories = useMemo\(/);
+  assert.match(
+    tabSource,
+    /stockCategories\.filter\(\(category\) =>\s*normalizeStockCategoryName\(category\.name\)\.includes\(normalizedCategorySearch\)/,
+  );
+  assert.match(tabSource, /const hasExactCategoryName = stockCategories\.some\(/);
+  assert.match(tabSource, /rows=\{filteredStockCategories\}/);
+  assert.match(tabSource, /Nenhuma categoria correspondente\. Você pode criar uma nova categoria\./);
+  assert.match(tabSource, /disabled=\{!canEditStock \|\| createCategoryMutation\.isPending \|\| hasExactCategoryName\}/);
+});
+
 await runTest("ti stock locations filter progressively and identify normalized active duplicates", async () => {
   const tabSource = await readModuleSource("components/TiStockTab.tsx");
   const {
@@ -2103,4 +2119,13 @@ await runTest("ti automation metrics stay inside the robots tab for this PR", as
   assert.doesNotMatch(dashboardTypeSource, /robot_runs_recent\?: number/);
   assert.doesNotMatch(dashboardTypeSource, /robot_runs_failed\?: number/);
   assert.doesNotMatch(dashboardSource, /api\.(get|post|patch|put|delete)\(/);
+});
+
+await runTest("new TI request discloses required fields before submission", async () => {
+  const source = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(source, /RequiredFieldLabel/);
+  assert.match(source, /id="ti-request-title"[\s\S]*aria-required/);
+  assert.match(source, /value=\{requestDraft\.category_id\}[\s\S]*aria-required/);
+  assert.match(source, /<textarea[\s\S]*aria-required/);
 });

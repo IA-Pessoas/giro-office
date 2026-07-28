@@ -244,6 +244,43 @@ runTest("buildCreateIntegracaoTaskPayload maps create body", () => {
   );
 });
 
+runTest("buildCreateIntegracaoTaskPayload preserves optional operational details", () => {
+  assert.deepEqual(
+    buildCreateIntegracaoTaskPayload({
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      name: "Revisar documentação assinada",
+      status: "Em Espera",
+      department_id: "department-1",
+      observations: "Aguardar o retorno do cliente.",
+      billing: "Não Realizar",
+      urgency: "Alta",
+      responsible_id: "user-1",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+      prevision_date: "2026-08-15",
+    }),
+    {
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      name: "Revisar documentação assinada",
+      status: "Em Espera",
+      department_id: "department-1",
+      observations: "Aguardar o retorno do cliente.",
+      billing: "Não Realizar",
+      urgency: "Alta",
+      responsible_id: "user-1",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+      prevision_date: "2026-08-15",
+    },
+  );
+});
+
 runTest("buildUpdateIntegracaoTaskPayload keeps task_id", () => {
   assert.deepEqual(
     buildUpdateIntegracaoTaskPayload({
@@ -798,3 +835,12 @@ runTest(
     assert.doesNotMatch(tasks, /page:\s*1/);
   },
 );
+runTest("project and task model forms disclose their required fields", () => {
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+  const taskModelForm = readFileSync("src/modules/integracao/components/TaskModelModal.tsx", "utf8");
+
+  for (const source of [projectForm, taskModelForm]) {
+    assert.match(source, /RequiredFieldLabel/);
+    assert.match(source, /aria-required/);
+  }
+});

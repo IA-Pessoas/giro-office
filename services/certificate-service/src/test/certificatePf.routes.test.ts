@@ -504,4 +504,24 @@ describe("certificate PF routes", () => {
     });
     expect(fileStorage.deleteObject).toHaveBeenCalledWith(objectPath);
   });
+
+  it("DELETE /certificate/pf/:id deletes a certificate without a file", async () => {
+    const prisma = createCertificatePrismaMock();
+    vi.mocked(prisma.certificatePF.findFirst).mockResolvedValueOnce({
+      id: certificateId,
+      organization_id: certificateOrganizationId,
+      file_path: null,
+    } as never);
+    const app = createCertificateTestApp(prisma);
+
+    const response = await request(app)
+      .delete(`/certificate/pf/${certificateId}`)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, data: { ok: true } });
+    expect(prisma.certificatePF.delete).toHaveBeenCalledWith({
+      where: { id: certificateId, organization_id: certificateOrganizationId },
+    });
+  });
 });

@@ -2,6 +2,7 @@ import type { ChangeEvent } from "react";
 
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import type { ClientFormValues } from "../types";
 import { validateCpfCnpjDocument } from "../utils/documentValidation";
 
@@ -35,13 +36,16 @@ export function ClientForm({
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-1.5">
-          <span className="block text-sm font-medium text-slate-700 dark:text-white">Nome</span>
+          <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
+            Nome
+          </RequiredFieldLabel>
           <input
             name="name"
             value={values.name}
             onChange={onChange}
             disabled={disabled}
             className={clientTextFieldClassName}
+            aria-required="true"
           />
         </label>
 
@@ -72,7 +76,9 @@ export function ClientForm({
         ) : null}
 
         <label className="space-y-1.5">
-          <span className="block text-sm font-medium text-slate-700 dark:text-white">{documentLabel}</span>
+          <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
+            {documentLabel}
+          </RequiredFieldLabel>
           <input
             name="cpf_cnpj"
             value={values.cpf_cnpj}
@@ -90,6 +96,7 @@ export function ClientForm({
                 : "Somente números"
             }
             className={clientTextFieldClassName}
+            aria-required="true"
           />
           {documentError ? (
             <span
