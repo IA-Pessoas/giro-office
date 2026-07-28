@@ -52,7 +52,7 @@ export class DepsTasksService {
             status: "active",
             OR: [
               { organization_id: organizationId },
-              { department: { organization_id: organizationId } },
+              { organization_id: null, department: { organization_id: organizationId } },
             ],
           },
           select: { id: true, name: true },

@@ -838,6 +838,12 @@ await (async () => {
       authContextSource,
       /toast\.error\("Sessão expirada\. Faça login novamente\.",\s*\{\s*toastId: "auth-session-expired"/,
     );
+    assert.match(authContextSource, /registerAuthInvalidationHandler/);
+    assert.match(authContextSource, /setUser\(null\);/);
+    assert.match(
+      authContextSource,
+      /queryClient\.removeQueries\(\{ queryKey: ME_QUERY_KEY \}\);/,
+    );
     assert.match(authContextSource, /isCurrentAuthTransition\(requestVersion\)\)/);
     assert.match(authContextSource, /finally[\s\S]*setLoading\(false\)/);
   });

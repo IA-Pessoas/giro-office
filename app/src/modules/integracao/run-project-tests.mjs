@@ -488,14 +488,26 @@ runTest("task model modal gates dependent responsible controls", () => {
 
   assert.match(
     source,
-    /disabled=\{!formData\.responsible_id \|\| \(loadingOptions && users\.length === 0\)\}/,
+    /disabled=\{!formData\.responsible_id \|\| optionsUnavailable\}/,
   );
   assert.match(
     source,
-    /disabled=\{!formData\.responsible2_id \|\| \(loadingOptions && users\.length === 0\)\}/,
+    /disabled=\{!formData\.responsible2_id \|\| optionsUnavailable\}/,
   );
   assert.match(source, /Selecione o responsável antes de definir o responsável 2\./);
   assert.match(source, /Selecione o responsável 2 antes de definir o responsável 3\./);
+});
+
+runTest("task model modal allows retrying failed options before saving", () => {
+  const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /const \[optionsRetryKey, setOptionsRetryKey\] = useState\(0\)/);
+  assert.match(source, /onClick=\{\(\) => setOptionsRetryKey\(\(currentKey\) => currentKey \+ 1\)\}/);
+  assert.match(source, />\s*Tentar novamente\s*<\/button>/);
+  assert.match(
+    source,
+    /const optionsUnavailable = loadingOptions \|\| Boolean\(optionsWarning\);[\s\S]*const saveDisabled = saving \|\| loadingDetail \|\| detailError \|\| optionsUnavailable;/,
+  );
 });
 
 runTest("buildDeleteTaskModelPayload maps task_id body", () => {

@@ -64,7 +64,10 @@ describe("DepsTasksService", () => {
     expect(userFindMany).toHaveBeenCalledWith({
       where: {
         status: "active",
-        OR: [{ organization_id: "org-1" }, { department: { organization_id: "org-1" } }],
+        OR: [
+          { organization_id: "org-1" },
+          { organization_id: null, department: { organization_id: "org-1" } },
+        ],
       },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
@@ -77,6 +80,28 @@ describe("DepsTasksService", () => {
     expect(result).toEqual({
       users: [{ id: "user-1", name: "Ana" }],
       departments: [{ id: "dep-1", name: "Fiscal" }],
+    });
+  });
+
+  it("envolve falha ao listar usuários em ServiceError 500", async () => {
+    const service = new DepsTasksService({
+      user: { findMany: vi.fn().mockRejectedValue(new Error("user db down")) },
+      department: { findMany: vi.fn().mockResolvedValue([]) },
+    } as never);
+
+    await expect(service.listTaskModelOptions("org-1")).rejects.toMatchObject({
+      statusCode: 500,
+    });
+  });
+
+  it("envolve falha ao listar departamentos em ServiceError 500", async () => {
+    const service = new DepsTasksService({
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+      department: { findMany: vi.fn().mockRejectedValue(new Error("department db down")) },
+    } as never);
+
+    await expect(service.listTaskModelOptions("org-1")).rejects.toMatchObject({
+      statusCode: 500,
     });
   });
 });

@@ -53,6 +53,17 @@ type AuthProviderProps = {
 export const AuthContext = createContext({} as AuthContextData);
 const SESSION_TRANSITION_MIN_DURATION_MS = 380;
 const AUTH_DIAGNOSTIC_LOGS_ENABLED = process.env.NODE_ENV !== "production";
+let authInvalidationHandler: (() => void) | null = null;
+
+export function registerAuthInvalidationHandler(handler: () => void) {
+    authInvalidationHandler = handler;
+
+    return () => {
+        if (authInvalidationHandler === handler) {
+            authInvalidationHandler = null;
+        }
+    };
+}
 
 function logAuthError(message: string, details?: unknown) {
     if (!AUTH_DIAGNOSTIC_LOGS_ENABLED) {
@@ -128,15 +139,15 @@ export function signOut() {
     try {
         const { [AUTH_COOKIE_NAME]: token } = parseCookies();
 
-        if (!token) {
-            return;
-        }
-
         clearAuthCookie();
-        toast.error("Sessão expirada. Faça login novamente.", {
-            toastId: "auth-session-expired",
-        });
-        void Router.push("/login");
+        authInvalidationHandler?.();
+
+        if (token) {
+            toast.error("Sessão expirada. Faça login novamente.", {
+                toastId: "auth-session-expired",
+            });
+            void Router.push("/login");
+        }
     } catch (error) {
         logAuthError("Erro ao deslogar", error);
     }
@@ -166,6 +177,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         return true;
     }
+
+    useEffect(() => {
+        return registerAuthInvalidationHandler(() => {
+            authRequestVersionRef.current += 1;
+            setUser(null);
+            setLoading(false);
+            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+        });
+    }, [queryClient]);
 
     async function refreshSession(): Promise<UserProps | null> {
         const requestVersion = beginAuthTransition();

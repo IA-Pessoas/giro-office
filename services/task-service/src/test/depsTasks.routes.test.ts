@@ -91,6 +91,13 @@ describe("depsTasks routes", () => {
     });
   });
 
+  it("GET /task/deps/options sem autenticacao retorna 401", async () => {
+    const app = createTestApp();
+    const response = await request(app).get("/task/deps/options");
+
+    expect(response.status).toBe(401);
+  });
+
   it("GET /task/deps/options exige nível 2 da Integração", async () => {
     const app = createTestApp();
     const response = await request(app)
