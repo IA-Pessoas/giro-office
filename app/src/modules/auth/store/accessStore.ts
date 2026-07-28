@@ -11,7 +11,7 @@ type AccessStoreUser = {
   id: string;
   permission: number;
   department_id?: string;
-  modules?: Record<string, number | null> | null;
+  modules?: Record<string, number>;
 } | null;
 
 type ModuleAccessMap = Record<ModuleKey, ModuleAccess>;

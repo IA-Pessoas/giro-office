@@ -9,7 +9,7 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const departmentId = "20000000-0000-4000-8000-000000000001";
 const termId = "30000000-0000-4000-8000-000000000001";
-const TI_ADMIN_PERMISSION = 2;
+const TI_ADMIN_PERMISSION = 3;
 
 const context = {
   organizationId,

@@ -17,7 +17,7 @@ const categoryId = "60000000-0000-4000-8000-000000000001";
 const locationId = "70000000-0000-4000-8000-000000000001";
 const stockId = "80000000-0000-4000-8000-000000000001";
 const TI_REQUESTER_PERMISSION = 1;
-const TI_ADMIN_PERMISSION = 2;
+const TI_ADMIN_PERMISSION = 3;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -60,7 +60,7 @@ describe("ti stock routes", () => {
     });
   });
 
-  it("POST /ti/stock/items creates a stock item with admin level 2", async () => {
+  it("POST /ti/stock/items creates a stock item with admin level 3", async () => {
     const response = await request(createTestApp())
       .post("/ti/stock/items")
       .set(gatewayHeaders(TI_ADMIN_PERMISSION))

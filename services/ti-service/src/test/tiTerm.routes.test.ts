@@ -17,9 +17,9 @@ const userId = "00000000-0000-4000-8000-000000000001";
 const departmentId = "20000000-0000-4000-8000-000000000001";
 const termId = "30000000-0000-4000-8000-000000000001";
 const otherUserId = "90000000-0000-4000-8000-000000000001";
-const TI_VIEWER_PERMISSION = 0;
+const TI_VIEWER_PERMISSION = 1;
 const TI_REQUESTER_PERMISSION = 1;
-const TI_ADMIN_PERMISSION = 2;
+const TI_ADMIN_PERMISSION = 3;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -177,7 +177,7 @@ describe("ti term routes", () => {
     });
   });
 
-  it("PATCH /ti/terms/:id/sign allows admin level 2 to sign another user's term", async () => {
+  it("PATCH /ti/terms/:id/sign allows admin level 3 to sign another user's term", async () => {
     const prisma = createPrismaMock();
     vi.mocked(prisma.termTecnologia.findFirst).mockResolvedValueOnce({
       id: termId,

@@ -39,12 +39,12 @@ function isRetiredPermissionModuleKey(key: string): boolean {
   return RETIRED_PERMISSION_MODULE_KEY_SET.has(key);
 }
 
-function normalizePermissionValue(value: unknown): number | null {
-  if (value === 0 || value === 1 || value === 2) {
+function normalizePermissionValue(value: unknown): number {
+  if (value === 0 || value === 1 || value === 2 || value === 3) {
     return value;
   }
 
-  return null;
+  return 0;
 }
 
 function createEmptyKnownPermissionRecord(): KnownPermissionRecord {
@@ -89,7 +89,7 @@ export function normalizePermissionResponse(raw: Record<string, unknown>): Permi
     warnPermissionInDev("Extra permission module returned by backend.", { moduleKey: key });
 
     const normalizedValue = normalizePermissionValue(value);
-    if (value !== null && normalizedValue === null) {
+    if (value !== undefined && ![0, 1, 2, 3].includes(value as number)) {
       invalidExtraKeys.push(key);
       warnPermissionInDev("Extra permission module returned invalid value.", {
         moduleKey: key,
@@ -174,7 +174,7 @@ export function buildPermissionUpdatePayload(
   const payload: PermissionDraft = {};
 
   for (const moduleKey of KNOWN_PERMISSION_MODULE_KEYS) {
-    payload[moduleKey] = normalizedDraft[moduleKey] ?? null;
+    payload[moduleKey] = normalizedDraft[moduleKey] ?? 0;
   }
 
   if (extraKeys.length > 0) {
@@ -188,7 +188,7 @@ export function buildPermissionUpdatePayload(
       continue;
     }
 
-    payload[extraKey] = normalizedDraft[extraKey] ?? null;
+    payload[extraKey] = normalizedDraft[extraKey] ?? 0;
   }
 
   return payload;
