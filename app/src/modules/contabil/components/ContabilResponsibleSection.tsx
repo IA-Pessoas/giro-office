@@ -62,8 +62,12 @@ export function ContabilResponsibleSection({
   });
 
   const assignableOptions = useMemo(
-    () => mapAssignableUsersToContabilOptions(assignableUsersQuery.data ?? []),
-    [assignableUsersQuery.data],
+    () =>
+      mapAssignableUsersToContabilOptions(assignableUsersQuery.data ?? [], [
+        formValues.person_responsible_id,
+        formValues.posted_by_id,
+      ]),
+    [assignableUsersQuery.data, formValues.person_responsible_id, formValues.posted_by_id],
   );
 
   useEffect(() => {

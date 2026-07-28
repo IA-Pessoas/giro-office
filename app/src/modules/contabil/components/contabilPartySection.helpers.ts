@@ -24,6 +24,16 @@ export interface ContabilSelectOption {
   label: string;
 }
 
+function isContabilDepartment(departmentName: string | null): boolean {
+  return departmentName
+    ? departmentName
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .includes("contabil")
+    : false;
+}
+
 export function buildContabilResponsibleFormValues(
   responsible: ContabilResponsible | null,
 ): ContabilResponsibleFormValues {
@@ -48,11 +58,19 @@ export function buildContabilRelationshipFormValues(
 
 export function mapAssignableUsersToContabilOptions(
   users: AssignableUser[],
+  currentUserIds: readonly string[] = [],
 ): ContabilSelectOption[] {
-  return users.map((user) => ({
-    value: user.id,
-    label: [user.name.trim(), user.departmentName].filter(Boolean).join(" - "),
-  }));
+  const currentUserIdSet = new Set(currentUserIds.filter(Boolean));
+
+  return users
+    .filter(
+      (user) =>
+        isContabilDepartment(user.departmentName) || currentUserIdSet.has(user.id),
+    )
+    .map((user) => ({
+      value: user.id,
+      label: [user.name.trim(), user.departmentName].filter(Boolean).join(" - "),
+    }));
 }
 
 export function getContabilSelectLabel(

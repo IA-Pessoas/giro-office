@@ -304,7 +304,7 @@ await (async () => {
     });
   });
 
-  await runTest("assignable user helper maps active users into select labels", () => {
+  await runTest("assignable user helper limits selector options to accounting users", () => {
     const options = mapAssignableUsersToContabilOptions([
       {
         id: "user-1",
@@ -317,6 +317,20 @@ await (async () => {
         id: "user-2",
         name: "Bruno",
         status: "active",
+        departmentName: "RH",
+        photoUrl: null,
+      },
+      {
+        id: "user-3",
+        name: "Carla",
+        status: "active",
+        departmentName: "Contabil Fiscal",
+        photoUrl: null,
+      },
+      {
+        id: "user-4",
+        name: "Diego",
+        status: "active",
         departmentName: null,
         photoUrl: null,
       },
@@ -327,13 +341,22 @@ await (async () => {
         value: "user-1",
         label: "Ana - Contábil",
       },
-      {
-        value: "user-2",
-        label: "Bruno",
-      },
+      { value: "user-3", label: "Carla - Contabil Fiscal" },
     ]);
     assert.equal(getContabilSelectLabel("user-1", options), "Ana - Contábil");
     assert.equal(getContabilSelectLabel(null, options), "Não informado");
+    assert.deepEqual(
+      mapAssignableUsersToContabilOptions([
+        {
+          id: "user-2",
+          name: "Bruno",
+          status: "active",
+          departmentName: "RH",
+          photoUrl: null,
+        },
+      ], ["user-2"]),
+      [{ value: "user-2", label: "Bruno - RH" }],
+    );
   });
 
   await runTest("text helper distinguishes filled and blank values", () => {
