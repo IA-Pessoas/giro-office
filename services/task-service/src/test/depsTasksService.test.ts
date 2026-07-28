@@ -50,4 +50,30 @@ describe("DepsTasksService", () => {
       ServiceError,
     );
   });
+
+  it("lista usuários e departamentos ativos da organização para o formulário de modelos", async () => {
+    const userFindMany = vi.fn().mockResolvedValue([{ id: "user-1", name: "Ana" }]);
+    const departmentFindMany = vi.fn().mockResolvedValue([{ id: "dep-1", name: "Fiscal" }]);
+    const service = new DepsTasksService({
+      user: { findMany: userFindMany },
+      department: { findMany: departmentFindMany },
+    } as never);
+
+    const result = await service.listTaskModelOptions("org-1");
+
+    expect(userFindMany).toHaveBeenCalledWith({
+      where: { organization_id: "org-1", status: "active" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+    expect(departmentFindMany).toHaveBeenCalledWith({
+      where: { organization_id: "org-1", status: "Ativo" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+    expect(result).toEqual({
+      users: [{ id: "user-1", name: "Ana" }],
+      departments: [{ id: "dep-1", name: "Fiscal" }],
+    });
+  });
 });

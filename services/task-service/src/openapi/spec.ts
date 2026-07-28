@@ -731,6 +731,14 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: { "200": { description: "Lista", ...successJson } },
         },
       },
+      "/task/deps/options": {
+        get: {
+          tags: ["TaskDependent"],
+          summary: "Listar opções ativas para modelos de tarefa",
+          security: bearer,
+          responses: { "200": { description: "Opções", ...successJson } },
+        },
+      },
     },
   };
 }

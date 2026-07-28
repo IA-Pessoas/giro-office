@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { departmentService, type DepItem } from "@modules/departments";
-import { listAdminUsers, type UserItem } from "@modules/users";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
@@ -14,6 +12,7 @@ import type {
   TaskDependent,
   TaskModel,
   TaskModelListItem,
+  TaskModelOption,
 } from "../types";
 import {
   PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME,
@@ -89,8 +88,8 @@ export function TaskModelModal({
 }: TaskModelModalProps) {
   const isEditing = Boolean(initialData?.id);
   const [formData, setFormData] = useState<CreateTaskModelData>(EMPTY_FORM_DATA);
-  const [users, setUsers] = useState<UserItem[]>([]);
-  const [departments, setDepartments] = useState<DepItem[]>([]);
+  const [users, setUsers] = useState<TaskModelOption[]>([]);
+  const [departments, setDepartments] = useState<TaskModelOption[]>([]);
   const [allTasks, setAllTasks] = useState<TaskModelListItem[]>([]);
   const [dependents, setDependents] = useState<TaskDependent[]>([]);
   const [newDependent, setNewDependent] = useState({
@@ -126,9 +125,8 @@ export function TaskModelModal({
       setLoadingOptions(true);
       setOptionsWarning(null);
 
-      const [usersResult, departmentsResult, taskModelsResult] = await Promise.allSettled([
-        listAdminUsers("active"),
-        departmentService.list({ status: "Ativo" }),
+      const [optionsResult, taskModelsResult] = await Promise.allSettled([
+        taskModelService.listOptions(),
         taskModelService.list({ type: "Projeto" }),
       ]);
 
@@ -138,18 +136,13 @@ export function TaskModelModal({
 
       const failedLists: string[] = [];
 
-      if (usersResult.status === "fulfilled") {
-        setUsers(usersResult.value);
+      if (optionsResult.status === "fulfilled") {
+        setUsers(optionsResult.value.users);
+        setDepartments(optionsResult.value.departments);
       } else {
         setUsers([]);
-        failedLists.push("usuários");
-      }
-
-      if (departmentsResult.status === "fulfilled") {
-        setDepartments(departmentsResult.value);
-      } else {
         setDepartments([]);
-        failedLists.push("departamentos");
+        failedLists.push("usuários e departamentos");
       }
 
       if (taskModelsResult.status === "fulfilled") {

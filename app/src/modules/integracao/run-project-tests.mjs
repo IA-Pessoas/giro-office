@@ -22,6 +22,7 @@ import {
   unwrapCreatedTaskModel,
   unwrapTaskModelDetail,
   unwrapTaskModelList,
+  unwrapTaskModelOptions,
   unwrapTaskModelPage,
 } from "./services/taskModelService.contract.ts";
 import {
@@ -341,6 +342,20 @@ runTest("task model endpoints match task-service contract", () => {
   assert.equal(TASK_MODEL_ENDPOINTS.crud, "/task/model");
   assert.equal(TASK_MODEL_ENDPOINTS.list, "/task/model/list");
   assert.equal(TASK_MODEL_ENDPOINTS.dependent, "/task/model/dependent");
+  assert.equal(TASK_MODEL_ENDPOINTS.options, "/task/deps/options");
+});
+
+runTest("task model options keep active users and departments in one response", () => {
+  const options = {
+    users: [{ id: "user-1", name: "Ana" }],
+    departments: [{ id: "dep-1", name: "Fiscal" }],
+  };
+
+  assert.deepEqual(unwrapTaskModelOptions({ success: true, data: options }), options);
+  assert.doesNotMatch(
+    readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8"),
+    /listAdminUsers|departmentService\.list/,
+  );
 });
 
 runTest("task model list params include remote search and pagination", () => {

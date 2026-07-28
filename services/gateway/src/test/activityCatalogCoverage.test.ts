@@ -19,6 +19,7 @@ function createCoverageEnv(): GatewayEnv {
     taskServiceUrl: "http://127.0.0.1:3032",
     projectServiceUrl: "http://127.0.0.1:3033",
     clientServiceUrl: "http://127.0.0.1:3035",
+    clientServiceInternalToken: "client-service-token",
     departmentServiceUrl: "http://127.0.0.1:3336",
     fiscalServiceUrl: "http://127.0.0.1:3037",
     contabilServiceUrl: "http://127.0.0.1:3038",

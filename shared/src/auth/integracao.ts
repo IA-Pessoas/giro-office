@@ -384,6 +384,9 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
   routePolicy("GET", "/task/deps/list", "taskModel", "read", [readRule(taskModelRead)], {
     test: "taskModel.dependencies.list",
   }),
+  routePolicy("GET", "/task/deps/options", "taskModel", "read", [readRule(taskModelRead)], {
+    test: "taskModel.options.list",
+  }),
   routePolicy("GET", "/task/model", "taskModel", "read", [readRule(taskModelRead)], {
     test: "taskModel.detail",
   }),

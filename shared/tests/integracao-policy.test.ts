@@ -33,6 +33,7 @@ const expectedRoutes = [
   "PUT /task/complete-request",
   "GET /task/model/list",
   "GET /task/deps/list",
+  "GET /task/deps/options",
   "GET /task/model",
   "POST /task/model",
   "PUT /task/model",
@@ -208,6 +209,7 @@ test("a matriz de níveis mantém leitura, edição e administração separadas"
     },
     { method: "GET", path: "/task/model/list", allowedLevels: [2, 3] },
     { method: "GET", path: "/task/deps/list", allowedLevels: [2, 3] },
+    { method: "GET", path: "/task/deps/options", allowedLevels: [2, 3] },
     { method: "GET", path: "/task/model", allowedLevels: [2, 3] },
     { method: "POST", path: "/task/model", allowedLevels: [3] },
     { method: "PUT", path: "/task/model", allowedLevels: [3] },
@@ -281,6 +283,7 @@ test("nível 2 exige task_completion para aprovar conclusão", () => {
 test("nível 2 pode consultar modelos, mas não administrá-los", () => {
   const listPolicy = requirePolicy("GET", "/task/model/list");
   const dependenciesPolicy = requirePolicy("GET", "/task/deps/list");
+  const optionsPolicy = requirePolicy("GET", "/task/deps/options");
   const createPolicy = requirePolicy("POST", "/task/model");
   const input = {
     userId: "user-1",
@@ -292,6 +295,7 @@ test("nível 2 pode consultar modelos, mas não administrá-los", () => {
 
   assert.equal(evaluateIntegracaoAction(listPolicy, input), "allow");
   assert.equal(evaluateIntegracaoAction(dependenciesPolicy, input), "allow");
+  assert.equal(evaluateIntegracaoAction(optionsPolicy, input), "allow");
   assert.equal(evaluateIntegracaoAction(createPolicy, input), "forbidden");
 });
 

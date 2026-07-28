@@ -48,6 +48,9 @@ function createTestApp() {
       async listDepartmentsWithTaskModels() {
         return [];
       },
+      async listTaskModelOptions() {
+        return { users: [], departments: [] };
+      },
     }),
   );
   app.use(
@@ -75,5 +78,28 @@ describe("depsTasks routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty("success", true);
+  });
+
+  it("GET /task/deps/options retorna opções para o formulário de modelos", async () => {
+    const app = createTestApp();
+    const response = await request(app).get("/task/deps/options").set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: { users: [], departments: [] },
+    });
+  });
+
+  it("GET /task/deps/options exige nível 2 da Integração", async () => {
+    const app = createTestApp();
+    const response = await request(app)
+      .get("/task/deps/options")
+      .set({
+        ...gatewayHeaders(),
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 1 }),
+      });
+
+    expect(response.status).toBe(403);
   });
 });
