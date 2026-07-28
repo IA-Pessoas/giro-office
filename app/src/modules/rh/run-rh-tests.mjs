@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
+const { formatRhDate } = await import("./utils/rhDate.ts");
+
 function runTest(name, fn) {
   try {
     fn();
@@ -19,4 +21,9 @@ runTest("assignable RH users are loaded from rh-service, not user-service", () =
   assert.match(hookSource, /RH_ENDPOINTS\.operationalUsers/);
   assert.doesNotMatch(hookSource, /@modules\/users/);
   assert.doesNotMatch(hookSource, /listAdminUsers/);
+});
+
+runTest("RH civil dates do not move when an API value is UTC midnight", () => {
+  assert.equal(formatRhDate("2026-07-23T00:00:00.000Z"), "23/07/2026");
+  assert.equal(formatRhDate("2026-01-01"), "01/01/2026");
 });
