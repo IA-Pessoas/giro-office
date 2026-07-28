@@ -147,4 +147,19 @@ runTest("certificate refresh keeps rows while a new first page is requested", ()
   );
 });
 
+const certificateFileActionsSource = readFileSync(
+  "src/modules/certificates/components/CertificateFileActions.tsx",
+  "utf8",
+);
+const certificatesWorkspaceSource = readFileSync(
+  "src/modules/certificates/components/CertificatesWorkspace.tsx",
+  "utf8",
+);
+
+runTest("separa permissao de edicao e remocao de arquivos", () => {
+  assert.match(certificateFileActionsSource, /canDelete: boolean/);
+  assert.match(certificateFileActionsSource, /\{canDelete \?/);
+  assert.match(certificatesWorkspaceSource, /canDelete=\{access\.isAdmin\}/);
+});
+
 console.log("certificates contract tests passed");
