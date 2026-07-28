@@ -24,9 +24,10 @@ function parseForwardedPermission(headerValue: string | undefined): number | und
 
 function getContabilPermission(claims: {
   modules?: { contabil?: number };
+  modulePermissionsPresent?: boolean;
   permission?: number;
 }): number | undefined {
-  return typeof claims.modules?.contabil === "number" ? claims.modules.contabil : claims.permission;
+  return claims.modulePermissionsPresent ? (claims.modules?.contabil ?? 0) : claims.permission;
 }
 
 export function requireContabilWritePermission(

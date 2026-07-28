@@ -38,15 +38,16 @@ function gatewayHeaders(permission = 1): Record<string, string> {
 }
 
 function bearerToken(permission: number, modules?: Record<string, number>): string {
-  return `Bearer ${jwt.sign(
-    {
-      user_id: USER_ID,
-      organization_id: ORG_ID,
-      permission,
-      modules,
-    },
-    env.jwtSecret,
-  )}`;
+  const payload: Record<string, unknown> = {
+    user_id: USER_ID,
+    organization_id: ORG_ID,
+    permission,
+  };
+  if (modules !== undefined) {
+    payload.modules = modules;
+  }
+
+  return `Bearer ${jwt.sign(payload, env.jwtSecret)}`;
 }
 
 function createMockDeps(): ControlRouteDeps {
@@ -117,6 +118,25 @@ describe("control routes", () => {
 
     expect(res.status).toBe(403);
     expect(deps.updateField).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /contabil/controls/:id permite JWT legado com permissao global write sem modules", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/contabil/controls/${CONTROL_ID}`)
+      .set("Content-Type", "application/json")
+      .set("Authorization", bearerToken(1))
+      .send({ field: "depreciation", value: true });
+
+    expect(res.status).toBe(200);
+    expect(deps.updateField).toHaveBeenCalledWith(
+      CONTROL_ID,
+      "depreciation",
+      true,
+      expect.objectContaining({ userId: USER_ID, organizationId: ORG_ID }),
+    );
   });
 
   it("POST /contabil/controls sem auth retorna 401", async () => {
