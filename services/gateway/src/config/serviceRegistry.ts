@@ -91,6 +91,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.clientServiceUrl,
       auditTarget: "client-service",
       routePrefixes: [...CLIENT_SERVICE_PREFIXES],
+      internalServiceToken: env.clientServiceInternalToken,
     },
     {
       key: "regularize-service",

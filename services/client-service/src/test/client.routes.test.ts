@@ -1,4 +1,12 @@
 import { ServiceError } from "@workspace/shared";
+import {
+  FORWARDED_AUTH_MODULES_HEADER,
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+} from "@workspace/shared/http";
 import { createLogger } from "@workspace/shared/logger";
 import jwt from "jsonwebtoken";
 import request from "supertest";
@@ -19,6 +27,7 @@ const TEST_JWT_SECRET = "test-jwt-secret-for-client-service";
 const TEST_ORG_ID = "550e8400-e29b-41d4-a716-446655440000";
 const TEST_CLIENT_ID = "660e8400-e29b-41d4-a716-446655440001";
 const TEST_PENDING_ID = "770e8400-e29b-41d4-a716-446655440002";
+const TEST_INTERNAL_SERVICE_TOKEN = "client-service-gateway-token";
 
 function testOrganization(overrides: Partial<OrganizationPublic> = {}): OrganizationPublic {
   return {
@@ -72,6 +81,7 @@ beforeAll(() => {
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "test-supabase-service-role-key";
   process.env.ENABLE_API_DOCS = "true";
+  process.env.CLIENT_SERVICE_INTERNAL_TOKEN = TEST_INTERNAL_SERVICE_TOKEN;
 });
 
 function buildTestApp(
@@ -455,6 +465,38 @@ describe("client-service", () => {
         cpf_cnpj: "12345678000199",
         company_name: "ACME",
       }),
+      { userId: "user-test-1", level: 2, isOwner: false },
+    );
+  });
+
+  it("PATCH /client/:id aceita o contexto encaminhado pelo gateway", async () => {
+    const updated = baseClient({ name: "Nome atualizado pelo gateway" });
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      update: vi.fn().mockResolvedValue(updated),
+    };
+    const app = buildTestApp(mock, {
+      env: { internalServiceToken: TEST_INTERNAL_SERVICE_TOKEN },
+    });
+
+    const res = await request(app)
+      .patch(`/client/${TEST_CLIENT_ID}`)
+      .set({
+        [INTERNAL_SERVICE_TOKEN_HEADER]: TEST_INTERNAL_SERVICE_TOKEN,
+        [FORWARDED_AUTH_USER_ID_HEADER]: "user-test-1",
+        [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: TEST_ORG_ID,
+        [FORWARDED_AUTH_PERMISSION_HEADER]: "2",
+        [FORWARDED_AUTH_TYPE_HEADER]: "user",
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 2 }),
+      })
+      .send({ name: "Nome atualizado pelo gateway" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(updated);
+    expect(mock.update).toHaveBeenCalledWith(
+      TEST_CLIENT_ID,
+      TEST_ORG_ID,
+      expect.objectContaining({ name: "Nome atualizado pelo gateway" }),
       { userId: "user-test-1", level: 2, isOwner: false },
     );
   });
