@@ -24,6 +24,21 @@ runTest("assignable RH users are loaded from rh-service, not user-service", () =
   assert.doesNotMatch(hookSource, /listAdminUsers/);
 });
 
+runTest("RH modal fields disclose required inputs before submission", () => {
+  const sources = [
+    "components/RhRequestFormModal.tsx",
+    "components/RhHolidayFormPanel.tsx",
+    "components/RhTimeBankFormPanel.tsx",
+    "components/RhPointAdjustmentRequestModal.tsx",
+    "components/score/RhScoreQuestionEditor.tsx",
+  ].map((path) => readFileSync(`src/modules/rh/${path}`, "utf8"));
+
+  for (const source of sources) {
+    assert.match(source, /RequiredFieldLabel/);
+    assert.match(source, /aria-required/);
+  }
+});
+
 runTest("RH managers can filter requests by requester without changing non-manager scope", () => {
   const sectionSource = readFileSync("src/modules/rh/components/RhRequestsSection.tsx", "utf8");
   const filtersSource = readFileSync("src/modules/rh/components/RhRequestsFilters.tsx", "utf8");

@@ -85,7 +85,12 @@ describe.skipIf(!runIntegration)("client-service Postgres integration", () => {
     const app = createApp({ clientService, env, logger, prisma, historyStorage });
 
     const token = jwt.sign(
-      { user_id: "integration-user", organization_id: organizationId, permission: 2 },
+      {
+        user_id: "integration-user",
+        organization_id: organizationId,
+        permission: 2,
+        modules: { integracao: 3 },
+      },
       INTEGRATION_JWT_SECRET,
     );
 
@@ -149,7 +154,12 @@ describe.skipIf(!runIntegration)("client-service Postgres integration", () => {
     const app = createApp({ clientService, env, logger, prisma, historyStorage });
 
     const token = jwt.sign(
-      { user_id: "integration-user", organization_id: organizationId, permission: 2 },
+      {
+        user_id: "integration-user",
+        organization_id: organizationId,
+        permission: 2,
+        modules: { integracao: 3 },
+      },
       INTEGRATION_JWT_SECRET,
     );
 

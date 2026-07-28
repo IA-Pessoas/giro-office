@@ -17,6 +17,7 @@ import { Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";
 import { useModuleAccess } from "@modules/auth";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -794,7 +795,9 @@ export function TiRequestsTab() {
               </p>
             </div>
             <label className="flex min-w-0 flex-col gap-2 md:col-span-2">
-              <span className={tiLabelClassName}>Título</span>
+              <RequiredFieldLabel className={tiLabelClassName} required>
+                Título
+              </RequiredFieldLabel>
               <input
                 id="ti-request-title"
                 className={tiInputClassName}
@@ -806,10 +809,11 @@ export function TiRequestsTab() {
                     title: event.target.value,
                   }))
                 }
+                aria-required="true"
               />
             </label>
             <TiNativeSelect
-              label="Categoria"
+              label={<RequiredFieldLabel required>Categoria</RequiredFieldLabel>}
               value={requestDraft.category_id}
               options={createCategoryOptions}
               onChange={(event) =>
@@ -818,6 +822,7 @@ export function TiRequestsTab() {
                   category_id: event.target.value,
                 }))
               }
+              aria-required="true"
             />
             <TiNativeSelect
               label="Urgência"
@@ -831,7 +836,9 @@ export function TiRequestsTab() {
               }
             />
             <label className="flex min-w-0 flex-col gap-2 md:col-span-2">
-              <span className={tiLabelClassName}>Descrição</span>
+              <RequiredFieldLabel className={tiLabelClassName} required>
+                Descrição
+              </RequiredFieldLabel>
               <textarea
                 className={cn(tiInputClassName, "h-auto min-h-24 py-2")}
                 value={requestDraft.description}
@@ -842,6 +849,7 @@ export function TiRequestsTab() {
                     description: event.target.value,
                   }))
                 }
+                aria-required="true"
               />
             </label>
           </div>

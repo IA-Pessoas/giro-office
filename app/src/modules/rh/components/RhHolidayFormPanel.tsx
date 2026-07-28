@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import {
   useCreateRhHolidayMutation,
   useUpdateRhHolidayMutation,
@@ -118,22 +119,24 @@ export function RhHolidayFormPanel({
 
       <div className="mt-4 grid gap-4 md:grid-cols-[1fr,200px]">
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Nome</span>
+          <RequiredFieldLabel required>Nome</RequiredFieldLabel>
           <input
             value={formState.name}
             onChange={(event) => handleChange("name", event.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             placeholder="Ex.: Carnaval"
+            aria-required="true"
           />
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Data</span>
+          <RequiredFieldLabel required>Data</RequiredFieldLabel>
           <input
             type="date"
             value={formState.date}
             onChange={(event) => handleChange("date", event.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            aria-required="true"
           />
         </label>
       </div>

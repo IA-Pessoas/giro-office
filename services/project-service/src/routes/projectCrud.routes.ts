@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
   parseWithZod,
   requireAuthenticatedRequestContext,
 } from "@workspace/shared";
@@ -26,6 +27,19 @@ function firstQueryValue(value: unknown): unknown {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function integrationAuth(
+  req: Request,
+  auth: ReturnType<typeof requireAuthenticatedRequestContext>,
+) {
+  return {
+    userId: auth.user_id,
+    organizationId: auth.organization_id,
+    permission: auth.permission,
+    integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+    isOwner: req.user_type === "owner",
+  } as const;
+}
+
 export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
 
@@ -35,9 +49,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
       const auth = requireAuthenticatedRequestContext(req);
 
       const result = await service.create({
-        userId: auth.user_id,
-        organizationId: auth.organization_id,
-        permission: auth.permission,
+        ...integrationAuth(req, auth),
         name: body.name,
         client_id: body.client_id,
         start_date: body.start_date,
@@ -61,7 +73,12 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
       const query = parseWithZod(integracaoProjectListQuerySchema, rawObj);
       const auth = requireAuthenticatedRequestContext(req);
 
-      const list = await service.list(query.ref, query.id as string, auth.organization_id);
+      const list = await service.list(
+        query.ref,
+        query.id as string,
+        auth.organization_id,
+        integrationAuth(req, auth),
+      );
 
       res.json(createSuccessResponse(list));
     } catch (err) {
@@ -76,9 +93,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
       const auth = requireAuthenticatedRequestContext(req);
 
       const result = await service.update({
-        userId: auth.user_id,
-        organizationId: auth.organization_id,
-        permission: auth.permission,
+        ...integrationAuth(req, auth),
         project_id: body.project_id,
         name: body.name,
         start_date: body.start_date,
@@ -102,7 +117,11 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
       const query = parseWithZod(integracaoProjectDetailQuerySchema, rawObj);
       const auth = requireAuthenticatedRequestContext(req);
 
-      const result = await service.detail(query.project_id, auth.organization_id);
+      const result = await service.detail(
+        query.project_id,
+        auth.organization_id,
+        integrationAuth(req, auth),
+      );
 
       res.json(createSuccessResponse(result));
     } catch (err) {
@@ -122,9 +141,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
       const auth = requireAuthenticatedRequestContext(req);
 
       const result = await service.delete({
-        userId: auth.user_id,
-        organizationId: auth.organization_id,
-        permission: auth.permission,
+        ...integrationAuth(req, auth),
         project_id: params.project_id,
       });
 

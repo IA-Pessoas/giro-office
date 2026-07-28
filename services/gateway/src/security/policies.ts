@@ -22,7 +22,6 @@ const clientRelatedModules = [
   "contabil",
   "financeiro",
   "fiscal",
-  "integracao",
   "pessoal",
   "regularize",
 ] as const;
@@ -34,9 +33,27 @@ const clientModulePolicy: AuthPolicy = {
   },
 };
 
+const integracaoProjectPolicy: AuthPolicy = {
+  modulePermission: {
+    module: "integracao",
+    minPermission: moduleAccessPermission,
+  },
+};
+
+const integracaoClientPolicy: AuthPolicy = {
+  modulePermission: {
+    module: "integracao",
+    minPermission: moduleAccessPermission,
+  },
+};
+
+const integracaoClientPath =
+  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/[^/]+)?\/?$/;
+
 const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /client/list", { minPermission: moduleAccessPermission }],
   ["GET /user", userManagementPolicy],
+  ["GET /client/list", integracaoClientPolicy],
   ["POST /user", userManagementPolicy],
 ]);
 
@@ -45,7 +62,9 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
+  { method: "ANY", path: integracaoClientPath, policy: integracaoClientPolicy },
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
+  { method: "ANY", path: /^\/project(?:\/|$)/, policy: integracaoProjectPolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },

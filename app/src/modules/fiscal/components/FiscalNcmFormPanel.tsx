@@ -80,6 +80,10 @@ function normalizeOptionalText(value: string) {
   return normalizedValue ? normalizedValue : undefined;
 }
 
+function isNumericNcmCode(value: string) {
+  return /^\d+$/.test(value);
+}
+
 export function FiscalNcmFormPanel({
   mode,
   ncmId,
@@ -163,6 +167,11 @@ export function FiscalNcmFormPanel({
       setValidationMessage(
         "Preencha regime, código NCM, tributação federal, descrição e vigência inicial.",
       );
+      return;
+    }
+
+    if (!isNumericNcmCode(formState.ncm_code.trim())) {
+      setValidationMessage("Informe apenas números no código NCM.");
       return;
     }
 
@@ -290,8 +299,10 @@ export function FiscalNcmFormPanel({
         <TextField
           label="Código NCM"
           value={formState.ncm_code}
-          onChange={(value) => handleChange("ncm_code", value)}
+          onChange={(value) => handleChange("ncm_code", value.replace(/\D/g, ""))}
           placeholder="Ex.: 84719012"
+          inputMode="numeric"
+          pattern="[0-9]*"
           required
         />
         <TextField
@@ -393,13 +404,17 @@ export function FiscalNcmFormPanel({
 
 function TextField({
   label,
+  inputMode,
   onChange,
+  pattern,
   placeholder,
   required = false,
   value,
 }: {
   label: string;
+  inputMode?: "numeric";
   onChange: (value: string) => void;
+  pattern?: string;
   placeholder?: string;
   required?: boolean;
   value: string;
@@ -413,6 +428,8 @@ function TextField({
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        inputMode={inputMode}
+        pattern={pattern}
         placeholder={placeholder}
         className="h-9 rounded-lg border border-gray-300 px-3 text-[13px] text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
       />

@@ -7,7 +7,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { isAuthenticated, requireContabilWritePermission } from "../middlewares/isAuthenticated.js";
 import {
   createResponsibleBodySchema,
   responsibleClientIdParamsSchema,
@@ -27,6 +27,7 @@ export function createResponsibleRoutes(service: ResponsibleRouteDeps): ReturnTy
   router.post(
     "/responsibles",
     isAuthenticated,
+    requireContabilWritePermission,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(createResponsibleBodySchema, req.body);
@@ -49,6 +50,7 @@ export function createResponsibleRoutes(service: ResponsibleRouteDeps): ReturnTy
   router.put(
     "/responsibles/:id",
     isAuthenticated,
+    requireContabilWritePermission,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const params = parseWithZod(responsibleIdParamsSchema, req.params);
@@ -90,6 +92,7 @@ export function createResponsibleRoutes(service: ResponsibleRouteDeps): ReturnTy
   router.delete(
     "/responsibles/:id",
     isAuthenticated,
+    requireContabilWritePermission,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const params = parseWithZod(responsibleIdParamsSchema, req.params);

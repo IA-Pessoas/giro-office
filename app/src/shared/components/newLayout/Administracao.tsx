@@ -146,7 +146,7 @@ export function Administracao() {
   const { access: rhAccess, isLoading: isRhAccessLoading } = useModuleAccess("rh");
   const canManageOrganizationOwners = canCreateOrganizationOwner(user);
   const hasAdminAccess = canAccessAdministration(user, { rhAccess });
-  const canManagePermissions = hasAdminAccess;
+  const canManagePermissions = canManageOrganizationOwners;
   const isAdministrationAccessLoading =
     !canManageOrganizationOwners && isRhAccessLoading;
   const queryClient = useQueryClient();

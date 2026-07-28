@@ -13,13 +13,20 @@ export const listLddQuerySchema = z
   })
   .strict();
 
+const optionalNonNegativeNumber = (fieldName: string) =>
+  z
+    .number()
+    .nonnegative({ message: `${fieldName} não pode ser negativo.` })
+    .nullable()
+    .optional();
+
 export const createLddBodySchema = z
   .object({
     client_id: z.string().uuid({ message: "client_id invalido." }),
     type: zNonEmptyText("type"),
     period: z.string().trim().min(1, "period e obrigatorio.").nullable().optional(),
     due_date: zIsoDate("due_date").nullable().optional(),
-    balance_amount: z.number().nullable().optional(),
+    balance_amount: optionalNonNegativeNumber("balance_amount"),
     registration_status: z.string().trim().min(1).nullable().optional(),
     status: z.string().trim().min(1).nullable().optional(),
   })
@@ -30,7 +37,7 @@ export const updateLddBodySchema = z
     type: zNonEmptyText("type").optional(),
     period: z.string().trim().min(1, "period e obrigatorio.").nullable().optional(),
     due_date: zIsoDate("due_date").nullable().optional(),
-    balance_amount: z.number().nullable().optional(),
+    balance_amount: optionalNonNegativeNumber("balance_amount"),
     registration_status: z.string().trim().min(1).nullable().optional(),
     status: z.string().trim().min(1).nullable().optional(),
   })

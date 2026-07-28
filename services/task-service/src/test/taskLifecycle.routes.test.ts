@@ -32,6 +32,8 @@ describe("task lifecycle routes", () => {
       user_id: "user-1",
       organization_id: "org-1",
       task_id: "task-1",
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 });

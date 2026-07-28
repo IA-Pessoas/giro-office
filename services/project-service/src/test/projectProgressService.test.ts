@@ -64,7 +64,9 @@ describe("ProjectProgressService", () => {
     prisma.project.findFirst = vi.fn(async () => null);
     const service = new ProjectProgressService(prisma);
 
-    await expect(service.recalculateFromTasks(PROJECT_ID, ORG_ID)).rejects.toMatchObject({
+    await expect(
+      service.recalculateFromTasks(PROJECT_ID, ORG_ID, { userId: "user-1", integracaoLevel: 2 }),
+    ).rejects.toMatchObject({
       statusCode: 404,
     });
   });
@@ -80,7 +82,10 @@ describe("ProjectProgressService", () => {
     prisma.project.update = vi.fn(async () => updated);
     const service = new ProjectProgressService(prisma);
 
-    const result = await service.recalculateFromTasks(PROJECT_ID, ORG_ID);
+    const result = await service.recalculateFromTasks(PROJECT_ID, ORG_ID, {
+      userId: "user-1",
+      integracaoLevel: 2,
+    });
 
     expect(result).toEqual({ project: updated });
     const updateMock = prisma.project.update as ReturnType<typeof vi.fn>;
@@ -106,7 +111,10 @@ describe("ProjectProgressService", () => {
     prisma.project.update = vi.fn(async () => updated);
     const service = new ProjectProgressService(prisma);
 
-    const result = await service.recalculateFromTasks(PROJECT_ID, ORG_ID);
+    const result = await service.recalculateFromTasks(PROJECT_ID, ORG_ID, {
+      userId: "user-1",
+      integracaoLevel: 2,
+    });
 
     expect(result).toEqual({ project: updated });
     expect((prisma.$transaction as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
@@ -130,7 +138,10 @@ describe("ProjectProgressService", () => {
     prisma.project.update = vi.fn(async () => updated);
     const service = new ProjectProgressService(prisma);
 
-    const result = await service.recalculateFromTasks(PROJECT_ID, ORG_ID);
+    const result = await service.recalculateFromTasks(PROJECT_ID, ORG_ID, {
+      userId: "user-1",
+      integracaoLevel: 2,
+    });
 
     expect(result).toEqual({ project: updated });
     const groupByArg = (prisma.task.groupBy as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
@@ -162,11 +173,38 @@ describe("ProjectProgressService", () => {
     tx.client.update = vi.fn(async () => ({}));
     const service = new ProjectProgressService(prisma);
 
-    const result = await service.recalculateFromTasks(PROJECT_ID, ORG_ID);
+    const result = await service.recalculateFromTasks(PROJECT_ID, ORG_ID, {
+      userId: "user-1",
+      integracaoLevel: 3,
+    });
 
     expect(result).toEqual({ project: updated });
     expect((prisma.$transaction as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
     expect((tx.client.update as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+  });
+
+  it("nível 2 não pode concluir progresso que inativa cliente", async () => {
+    const { prisma } = createMockPrisma();
+    prisma.project.findFirst = vi.fn(async () => ({
+      id: PROJECT_ID,
+      client_id: CLIENT_ID,
+    }));
+    prisma.task.groupBy = vi.fn(
+      async () =>
+        [{ status: "Concluída", _count: { status: 1 } }] as {
+          status: string;
+          _count: { status: number };
+        }[],
+    );
+    const service = new ProjectProgressService(prisma);
+
+    await expect(
+      service.recalculateFromTasks(PROJECT_ID, ORG_ID, {
+        userId: "user-1",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("recalculateFromTasks em 100% lança 404 se cliente não existe", async () => {
@@ -190,7 +228,9 @@ describe("ProjectProgressService", () => {
     tx.client.findFirst = vi.fn(async () => null);
     const service = new ProjectProgressService(prisma);
 
-    await expect(service.recalculateFromTasks(PROJECT_ID, ORG_ID)).rejects.toMatchObject({
+    await expect(
+      service.recalculateFromTasks(PROJECT_ID, ORG_ID, { userId: "user-1", integracaoLevel: 3 }),
+    ).rejects.toMatchObject({
       statusCode: 404,
     });
   });
@@ -202,7 +242,9 @@ describe("ProjectProgressService", () => {
     });
     const service = new ProjectProgressService(prisma);
 
-    await expect(service.recalculateFromTasks(PROJECT_ID, ORG_ID)).rejects.toMatchObject({
+    await expect(
+      service.recalculateFromTasks(PROJECT_ID, ORG_ID, { userId: "user-1", integracaoLevel: 2 }),
+    ).rejects.toMatchObject({
       statusCode: 500,
     });
   });

@@ -1,5 +1,12 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import {
+  INTEGRACAO_PERMISSION_LEVEL,
+  type IntegracaoPermissionLevel,
+  error as logError,
+  requireIntegracaoRouteAccess,
+  ServiceError,
+} from "@workspace/shared";
 
+import * as audit from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
 
 /** Status de tarefa considerados no cálculo de progresso (legado ProjectService). */
@@ -33,6 +40,12 @@ export type ProjectProgressResult = {
   project: ProjectProgressRow;
 };
 
+export interface ProjectProgressAuthorization {
+  userId: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
+}
+
 export type ProjectProgressPrisma = typeof prismaClient;
 type ProjectProgressTransaction = Pick<ProjectProgressPrisma, "project" | "client">;
 
@@ -45,6 +58,7 @@ export class ProjectProgressService {
   async recalculateFromTasks(
     projectId: string,
     organizationId: string,
+    authorization: ProjectProgressAuthorization = { userId: "" },
   ): Promise<ProjectProgressResult> {
     try {
       const exists = await this.prisma.project.findFirst({
@@ -55,6 +69,15 @@ export class ProjectProgressService {
       if (!exists) {
         throw new ServiceError(404, "Projeto não existe");
       }
+
+      requireIntegracaoRouteAccess("POST", "/project/progress", {
+        userId: authorization.userId,
+        level: authorization.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId,
+        resourceOrganizationId: organizationId,
+        isOwner: authorization.isOwner === true,
+        requestedFields: ["project_id"],
+      });
 
       const statusCounts = await this.prisma.task.groupBy({
         by: ["status"],
@@ -71,6 +94,14 @@ export class ProjectProgressService {
           where: { id: projectId },
           data: { porcentage: 0 },
           select: PROGRESS_SELECT,
+        });
+        await audit.createLog({
+          userId: authorization.userId,
+          organizationId,
+          action: "Atualização de progresso",
+          referring: "integracao.projects",
+          referringId: projectId,
+          changes: { porcentage: 0 },
         });
         return { project };
       }
@@ -91,7 +122,14 @@ export class ProjectProgressService {
         roundedPercentage === 100 ? PROJECT_STATUS_COMPLETED : PROJECT_STATUS_IN_PROGRESS;
 
       if (roundedPercentage === 100) {
-        return await this.prisma.$transaction(async (tx: ProjectProgressTransaction) => {
+        if (
+          authorization.integracaoLevel !== INTEGRACAO_PERMISSION_LEVEL.ADMIN &&
+          authorization.isOwner !== true
+        ) {
+          throw new ServiceError(403, "Acesso negado para inativar o cliente pelo progresso.");
+        }
+
+        const project = await this.prisma.$transaction(async (tx: ProjectProgressTransaction) => {
           const project = await tx.project.update({
             where: { id: projectId },
             data: {
@@ -110,12 +148,23 @@ export class ProjectProgressService {
           if (client.service_unique === true) {
             await tx.client.update({
               where: { id: client.id },
-              data: { status: "Inativo" },
+              data: { status: "Inativo", deletion_date: new Date() },
             });
           }
 
-          return { project };
+          return project;
         });
+
+        await audit.createLog({
+          userId: authorization.userId,
+          organizationId,
+          action: "Atualização de progresso",
+          referring: "integracao.projects",
+          referringId: projectId,
+          changes: { status: newStatus, porcentage: roundedPercentage },
+        });
+
+        return { project };
       }
 
       const project = await this.prisma.project.update({
@@ -125,6 +174,15 @@ export class ProjectProgressService {
           porcentage: roundedPercentage,
         },
         select: PROGRESS_SELECT,
+      });
+
+      await audit.createLog({
+        userId: authorization.userId,
+        organizationId,
+        action: "Atualização de progresso",
+        referring: "integracao.projects",
+        referringId: projectId,
+        changes: { status: newStatus, porcentage: roundedPercentage },
       });
 
       return { project };
