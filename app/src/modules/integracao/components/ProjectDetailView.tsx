@@ -4,7 +4,7 @@ import { ArrowLeft, Edit3, FolderSync, ListTodo, Trash2 } from "lucide-react";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
-import { useMe } from "@shared/hooks";
+import { useModuleAccess } from "@modules/auth";
 
 import {
   useDeleteProjectMutation,
@@ -25,7 +25,7 @@ import {
 
 export function ProjectDetailView({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const meQuery = useMe();
+  const { access: integracaoAccess } = useModuleAccess("integracao");
   const projectQuery = useProjectDetail(projectId);
   const deleteProjectMutation = useDeleteProjectMutation();
   const recalculateProgressMutation = useRecalculateProjectProgressMutation();
@@ -232,7 +232,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                 Editar
               </button>
 
-              {meQuery.data?.permission === 2 ? (
+              {integracaoAccess.isAdmin ? (
                 <button
                   type="button"
                   onClick={() => void handleDelete()}

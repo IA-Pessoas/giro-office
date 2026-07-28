@@ -1,7 +1,7 @@
 import { useAuth } from "@/context/AuthContext";
-import { isAdminPermission, useAccessStore } from "@modules/auth";
+import { isOrganizationOwner, useAccessStore } from "@modules/auth";
 
-const RH_ADMIN_PERMISSION = 2;
+const RH_ADMIN_PERMISSION = 3;
 
 interface RhPermissionState {
   isLoading: boolean;
@@ -33,7 +33,7 @@ export function useRhPermissions(scope: string): UseRhPermissionsResult {
       explicitRhPermission !== undefined &&
       explicitRhPermission >= RH_ADMIN_PERMISSION,
   );
-  const isGlobalAdmin = isAdminPermission(user?.permission);
+  const isGlobalAdmin = isOrganizationOwner(user);
   const isRhResponsible = hasRhAdminPermission;
   const canManageRh = hasRhAdminPermission || isGlobalAdmin;
   const canViewRhDashboard = canManageRh;

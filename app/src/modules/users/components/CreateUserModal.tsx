@@ -13,8 +13,9 @@ import {
   getMinimumPermissionLevel,
   getPermissionSelectOptions,
   normalizePermissionForModule,
+  type PermissionLevel,
 } from '../constants/permissionConfig';
-import type { UserItem, UserPermission } from '../types';
+import type { UserItem } from '../types';
 import {
   buildAdminCreateUserPayload,
   type CreateUserFormState,
@@ -45,14 +46,15 @@ const INITIAL_FORM_DATA: CreateUserFormState = {
 
 type ModuleKey = (typeof CREATE_USER_MODULE_OPTIONS)[number]['key'];
 
-type ModuleSelectionState = Record<ModuleKey, { enabled: boolean; level: 0 | 1 | 2 }>;
-type ModuleSelectValue = 'none' | '0' | '1' | '2';
+type ModuleSelectionState = Record<ModuleKey, { enabled: boolean; level: PermissionLevel }>;
+type ModuleSelectValue = 'none' | '0' | '1' | '2' | '3';
 
 const CREATE_MODULE_OPTION_LABELS: Record<ModuleSelectValue, string> = {
   none: 'Sem acesso',
-  '0': 'Visualizador',
-  '1': 'Usuário',
-  '2': 'Administrador',
+  '0': 'Sem acesso',
+  '1': 'Visualizador',
+  '2': 'Usuário',
+  '3': 'Administrador',
 };
 
 const FIELD_CLASSNAME =
@@ -101,7 +103,7 @@ function getModuleSelectValue(selection: ModuleSelectionState[ModuleKey]): Modul
   return String(selection.level) as Exclude<ModuleSelectValue, 'none'>;
 }
 
-function getPermissionLabel(permission: UserPermission): string {
+function getPermissionLabel(permission: PermissionLevel): string {
   return (
     CREATE_USER_PERMISSION_OPTIONS.find((option) => option.value === permission)?.label ??
     'Acesso pelo departamento'
@@ -149,7 +151,7 @@ export function CreateUserModal({
       if (name === 'departmentPermission') {
         return {
           ...prev,
-          departmentPermission: Number(value) as UserPermission,
+          departmentPermission: Number(value) as PermissionLevel,
         };
       }
 
@@ -169,14 +171,14 @@ export function CreateUserModal({
   };
 
   const handleModuleLevelChange = (moduleKey: ModuleKey, value: ModuleSelectValue) => {
-    const normalizedLevel = normalizePermissionForModule(moduleKey, value === 'none' ? null : Number(value));
+    const normalizedLevel = normalizePermissionForModule(moduleKey, value === 'none' ? 0 : Number(value));
 
     setSubmitError(null);
     setModuleSelections((prev) => ({
       ...prev,
       [moduleKey]: {
-        enabled: normalizedLevel !== null,
-        level: normalizedLevel ?? 0,
+        enabled: value !== 'none',
+        level: normalizedLevel,
       },
     }));
   };
@@ -432,8 +434,7 @@ export function CreateUserModal({
                         style={SELECT_ARROW_STYLE}
                       >
                         {getPermissionSelectOptions(moduleOption.key).map((option) => {
-                          const createValue: ModuleSelectValue =
-                            option.value === 'null' ? 'none' : option.value;
+                          const createValue = option.value as ModuleSelectValue;
 
                           return (
                             <option key={option.value} value={createValue}>

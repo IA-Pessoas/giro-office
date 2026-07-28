@@ -88,11 +88,11 @@ const adminUsersSummaryRootQueryKey = ["admin-users-summary"] as const;
 const adminUsersQueryKey = (status: AdminUserStatus) => [...adminUsersRootQueryKey, status] as const;
 
 function getPermissionSelectValue(value: number | null | undefined): PermissionSelectValue {
-  if (value === 0 || value === 1 || value === 2) {
+  if (value === 0 || value === 1 || value === 2 || value === 3) {
     return String(value) as Exclude<PermissionSelectValue, "null">;
   }
 
-  return "null";
+  return "0";
 }
 
 function getPermissionErrorMessage(error: unknown, fallbackMessage: string): string {
@@ -541,7 +541,7 @@ export function Administracao() {
   const handlePermissionChange = (moduleKey: string, nextValue: PermissionSelectValue) => {
     const normalizedValue = normalizePermissionForModule(
       moduleKey,
-      nextValue === "null" ? null : Number(nextValue),
+      Number(nextValue),
     );
 
     setPermissionDraft((currentDraft) =>
