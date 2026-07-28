@@ -39,7 +39,9 @@ pnpm --filter @workspace/gateway exec vitest run src/test/modulePermissionRegres
 pnpm --filter @workspace/user-service exec vitest run src/test/authService.test.ts src/test/auth.routes.test.ts src/test/permissionService.test.ts src/test/permission.routes.test.ts
 pnpm --filter @workspace/app test:auth
 pnpm --filter @workspace/app test:users
-node --test scripts/permission-normalization.test.mjs
+command -v psql
+PERMISSION_MIGRATION_REQUIRED=1 PERMISSION_MIGRATION_DATABASE_URL="$DATABASE_URL" \
+  node --test scripts/permission-normalization.test.mjs
 pnpm smoke:coverage
 ```
 
@@ -49,6 +51,10 @@ pnpm smoke:coverage
 5. Executar smoke autenticado para níveis `0`, `1`, `2`, `3` e `owner`, incluindo organização A/B,
    sessão revogada, tentativa de alteração por não-owner, URL protegida direta e navegação visível.
 6. Liberar as escritas somente após os checks anteriores e registrar os resultados na issue #567.
+
+O teste PostgreSQL deve terminar sem `skipped`; se `DATABASE_URL` ou `psql` não estiverem disponíveis,
+a janela deve permanecer bloqueada. O modo padrão local pode pular esse ensaio por não ter um banco,
+mas não substitui a evidência do ambiente controlado.
 
 ## Falha antes da reabertura
 
