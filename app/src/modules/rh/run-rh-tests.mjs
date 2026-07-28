@@ -24,6 +24,14 @@ runTest("assignable RH users are loaded from rh-service, not user-service", () =
   assert.doesNotMatch(hookSource, /listAdminUsers/);
 });
 
+runTest("RH request form preserves validation errors returned by the API", () => {
+  const source = readFileSync("src/modules/rh/components/RhRequestFormModal.tsx", "utf8");
+
+  assert.match(source, /import \{ isAxiosError \} from "axios"/);
+  assert.match(source, /isAxiosError\(error\) \? error\.response\?\.data\?\.error : undefined/);
+  assert.match(source, /typeof responseMessage === "string"[\s\S]*?\? responseMessage/);
+});
+
 runTest("RH score periods include a relative history window and do not hard-code 2026", () => {
   const options = getRhQuarterOptions(new Date("2026-07-01T12:00:00"));
   const historySource = readFileSync("src/modules/rh/components/score/RhScoreHistoryPanel.tsx", "utf8");
