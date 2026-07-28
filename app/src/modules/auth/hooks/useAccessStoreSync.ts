@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 
 import {
   getAccessStoreState,
+  createAccessStoreUserSnapshot,
   resetAccessStoreState,
   setAccessStoreState,
   shouldSyncAccessStore,
@@ -18,15 +19,7 @@ export function useAccessStoreSync() {
 
   const nextState = useMemo(
     () => ({
-      user: user
-        ? {
-            id: user.id,
-            permission: user.permission,
-            department_id: user.department_id,
-            organization_id: user.organization_id,
-            modules: user.modules,
-          }
-        : null,
+      user: createAccessStoreUserSnapshot(user),
       departmentName,
       departmentModule,
       accessMap,

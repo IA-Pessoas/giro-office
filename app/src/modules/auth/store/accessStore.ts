@@ -51,6 +51,20 @@ type AccessStoreActions = {
 
 type AccessStoreSnapshot = AccessStoreState & AccessStoreActions;
 
+export function createAccessStoreUserSnapshot(
+  user: Exclude<AccessStoreUser, null> | null,
+): AccessStoreUser {
+  return user
+    ? {
+        id: user.id,
+        permission: user.permission,
+        department_id: user.department_id,
+        organization_id: user.organization_id,
+        modules: user.modules,
+      }
+    : null;
+}
+
 export function shouldSyncAccessStore(
   currentState: AccessStoreState,
   nextState: AccessStoreState,

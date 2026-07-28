@@ -106,6 +106,7 @@ test("migration real transforma os níveis e permanece idempotente em PostgreSQL
   const moduleUnion = ACTIVE_MODULE_KEYS.map(
     (moduleKey) => `SELECT "${moduleKey}" AS level FROM "permissions"`,
   ).join(" UNION ALL ");
+  const activeModuleArray = ACTIVE_MODULE_KEYS.map((moduleKey) => `'${moduleKey}'`).join(", ");
   const sql = `
 BEGIN;
 CREATE SCHEMA "${schemaName}";
@@ -125,12 +126,46 @@ CREATE TABLE "users" ("id" TEXT PRIMARY KEY);
     ('permission-4', ${rowValues(2)}, NULL, NULL, NULL);
 ${migration}
 ${migration}
+SAVEPOINT permission_constraints;
+INSERT INTO "permissions" ("id") VALUES ('permission-default');
+DO $$
+DECLARE
+    module_name TEXT;
+    module_value INTEGER;
+BEGIN
+    FOREACH module_name IN ARRAY ARRAY[${activeModuleArray}] LOOP
+        EXECUTE format('SELECT %I FROM "permissions" WHERE "id" = $1', module_name)
+            INTO module_value USING 'permission-default';
+        IF module_value <> 0 THEN
+            RAISE EXCEPTION 'default for % was %, expected 0', module_name, module_value;
+        END IF;
+    END LOOP;
+END $$;
+DO $$
+BEGIN
+    BEGIN
+        UPDATE "permissions" SET "fiscal" = 4 WHERE "id" = 'permission-1';
+        RAISE EXCEPTION 'range constraint did not reject level 4';
+    EXCEPTION WHEN check_violation THEN
+        NULL;
+    END;
+    BEGIN
+        UPDATE "permissions" SET "fiscal" = NULL WHERE "id" = 'permission-1';
+        RAISE EXCEPTION 'NOT NULL constraint did not reject NULL';
+    EXCEPTION WHEN not_null_violation THEN
+        NULL;
+    END;
+END $$;
+ROLLBACK TO SAVEPOINT permission_constraints;
 SELECT json_build_object(
     'level_0', (SELECT count(*) FROM (${moduleUnion}) AS levels WHERE level = 0),
     'level_1', (SELECT count(*) FROM (${moduleUnion}) AS levels WHERE level = 1),
     'level_2', (SELECT count(*) FROM (${moduleUnion}) AS levels WHERE level = 2),
     'level_3', (SELECT count(*) FROM (${moduleUnion}) AS levels WHERE level = 3),
     'invalid', (SELECT count(*) FROM (${moduleUnion}) AS levels WHERE level IS NULL OR level NOT BETWEEN 0 AND 3),
+    'not_null_columns', (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'permissions' AND column_name = ANY(ARRAY[${activeModuleArray}]) AND is_nullable = 'NO'),
+    'default_zero_columns', (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'permissions' AND column_name = ANY(ARRAY[${activeModuleArray}]) AND column_default = '0'),
+    'range_constraints', (SELECT count(*) FROM pg_constraint WHERE conrelid = '"permissions"'::regclass AND conname LIKE 'permissions_%_range'),
     'retired_columns', (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'permissions' AND column_name IN ('atendimento', 'pec', 'wiki')),
     'session_version_default', (SELECT column_default FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'session_version'),
     'session_version_nullable', (SELECT is_nullable FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'session_version'),
@@ -150,16 +185,19 @@ ROLLBACK;
       "ON_ERROR_STOP=1",
       process.env.PERMISSION_MIGRATION_DATABASE_URL,
     ],
-    { input: sql, encoding: "utf8" },
+    { input: sql, encoding: "utf8", timeout: 30_000 },
   );
 
-  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
   assert.deepEqual(JSON.parse(result.stdout.trim()), {
     level_0: 13,
     level_1: 13,
     level_2: 13,
     level_3: 13,
     invalid: 0,
+    not_null_columns: 13,
+    default_zero_columns: 13,
+    range_constraints: 13,
     retired_columns: 0,
     session_version_default: "0",
     session_version_nullable: "NO",

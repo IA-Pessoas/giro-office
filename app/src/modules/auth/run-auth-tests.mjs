@@ -50,6 +50,7 @@ const { canSSRAdmin } = await import("./utils/canSSRAdmin.ts");
 const { getModulePermissionsFromToken } = await import("./utils/sessionToken.ts");
 const {
   getAccessStoreState,
+  createAccessStoreUserSnapshot,
   resetAccessStoreState,
   setAccessStoreState,
   shouldSyncAccessStore,
@@ -242,11 +243,18 @@ await (async () => {
     const organizationA = {
       ...initialState,
       isInitialized: true,
-      user: { id: "user-1", permission: 0, organization_id: "org-a" },
+      user: createAccessStoreUserSnapshot({
+        id: "user-1",
+        permission: 0,
+        organization_id: "org-a",
+      }),
     };
     const organizationB = {
       ...organizationA,
-      user: { ...organizationA.user, organization_id: "org-b" },
+      user: createAccessStoreUserSnapshot({
+        ...organizationA.user,
+        organization_id: "org-b",
+      }),
     };
 
     assert.equal(shouldSyncAccessStore(organizationA, organizationB), true);
