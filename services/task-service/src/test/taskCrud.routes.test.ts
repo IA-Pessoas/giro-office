@@ -1,6 +1,7 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { buildTaskServiceOpenApiSpec } from "../openapi/spec.js";
 import { createTestApp, resetTaskRouteMocks, taskCrudServiceMock } from "./taskTestUtils.js";
 
 describe("task crud routes", () => {
@@ -46,6 +47,8 @@ describe("task crud routes", () => {
       responsible2_id: "user-2",
       responsible3_id: "user-3",
       prevision_date: "2026-08-15",
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 
@@ -121,6 +124,46 @@ describe("task crud routes", () => {
       integracaoLevel: 0,
       isOwner: false,
     });
+  });
+
+  it("GET /task/list expõe autoria calculada no contrato HTTP", async () => {
+    const listResult = {
+      data: [
+        {
+          id: "task-1",
+          isOwn: true,
+        },
+      ],
+      total: 1,
+      hasMore: false,
+      summary: { inProgress: 1, billable: 1 },
+    };
+    taskCrudServiceMock.listTasks.mockResolvedValue(listResult);
+    const app = createTestApp();
+
+    const res = await request(app).get("/task/list").query({ status: "Todos" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(listResult);
+
+    const pathSpec = JSON.stringify(
+      buildTaskServiceOpenApiSpec({
+        port: 3032,
+        databaseUrl: "postgresql://localhost/task_test",
+        jwtSecret: "test-secret",
+        nodeEnv: "test",
+        logLevel: "silent",
+        logPretty: false,
+        auditEnabled: false,
+        auditServiceUrl: "http://localhost:3020",
+        auditServiceToken: "audit-service-token",
+        projectServiceUrl: "http://localhost:3033",
+        enableApiDocs: false,
+      }).paths["/task/list"],
+    );
+
+    expect(pathSpec).toContain('"isOwn":{"type":"boolean"}');
+    expect(pathSpec).toContain('"required":["id","isOwn"]');
   });
 
   it("GET /task/list encaminha busca e pagina validadas", async () => {
