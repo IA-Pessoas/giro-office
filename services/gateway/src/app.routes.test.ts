@@ -3237,6 +3237,38 @@ it("forwards the Contabil module permission and internal token", async () => {
   }
 });
 
+it("forwards legacy global permission to Contabil when module claims are absent", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+  });
+  let seenPermission: string | undefined;
+  const upstream = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const contabilServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ contabilServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/contabil/controls`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("1");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("proxies task-service paths from the gateway", async () => {
   const token = createToken({
     user_id: "user-1",
