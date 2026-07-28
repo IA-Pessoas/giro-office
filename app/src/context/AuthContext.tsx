@@ -15,6 +15,7 @@ import { MODULE_KEYS } from "@modules/auth/utils/moduleAccess";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
 import { ME_QUERY_KEY } from "@shared/hooks";
+import { invalidateAuthSession, registerAuthInvalidationHandler } from "./authInvalidation";
 
 interface UserProps {
     id: string;
@@ -53,17 +54,6 @@ type AuthProviderProps = {
 export const AuthContext = createContext({} as AuthContextData);
 const SESSION_TRANSITION_MIN_DURATION_MS = 380;
 const AUTH_DIAGNOSTIC_LOGS_ENABLED = process.env.NODE_ENV !== "production";
-let authInvalidationHandler: (() => void) | null = null;
-
-export function registerAuthInvalidationHandler(handler: () => void) {
-    authInvalidationHandler = handler;
-
-    return () => {
-        if (authInvalidationHandler === handler) {
-            authInvalidationHandler = null;
-        }
-    };
-}
 
 function logAuthError(message: string, details?: unknown) {
     if (!AUTH_DIAGNOSTIC_LOGS_ENABLED) {
@@ -140,7 +130,7 @@ export function signOut() {
         const { [AUTH_COOKIE_NAME]: token } = parseCookies();
 
         clearAuthCookie();
-        authInvalidationHandler?.();
+        invalidateAuthSession();
 
         if (token) {
             toast.error("Sessão expirada. Faça login novamente.", {

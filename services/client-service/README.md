@@ -12,8 +12,8 @@ Ver `src/config/env.ts`:
 
 - `DATABASE_URL`, `JWT_SECRET`
 - `CLIENT_HISTORY_STORAGE_DIR` - diretorio base para uploads de historico (alternativa ao Firebase do legado)
-- `CLIENT_SERVICE_INTERNAL_TOKEN` - token compartilhado com o gateway para o contexto encaminhado e para `POST /internal/competence-output-update` (header `x-internal-service-token`); se omitido, usa `AUDIT_SERVICE_TOKEN`
-- `AUDIT_SERVICE_TOKEN` - fallback local do token interno quando `CLIENT_SERVICE_INTERNAL_TOKEN` não é informado
+- `CLIENT_SERVICE_INTERNAL_TOKEN` - token compartilhado com o gateway para o contexto encaminhado e para `POST /internal/competence-output-update` (header `x-internal-service-token`); obrigatório em produção
+- `AUDIT_SERVICE_TOKEN` - fallback local do token interno apenas fora de produção, quando `CLIENT_SERVICE_INTERNAL_TOKEN` não é informado
 
 ## Gateway
 

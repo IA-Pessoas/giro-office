@@ -57,6 +57,9 @@ const {
   setAccessStoreState,
   shouldSyncAccessStore,
 } = await import("./store/accessStore.ts");
+const { invalidateAuthSession, registerAuthInvalidationHandler } = await import(
+  "../../context/authInvalidation.ts",
+);
 
 await runTest("integration routes preserve the level 0 own-tasks exception", () => {
   const users = {
@@ -846,6 +849,20 @@ await (async () => {
     );
     assert.match(authContextSource, /isCurrentAuthTransition\(requestVersion\)\)/);
     assert.match(authContextSource, /finally[\s\S]*setLoading\(false\)/);
+  });
+
+  await runTest("invalidação de sessão notifica o estado autenticado em runtime", () => {
+    let invalidationCount = 0;
+    const unregister = registerAuthInvalidationHandler(() => {
+      invalidationCount += 1;
+    });
+
+    try {
+      invalidateAuthSession();
+      assert.equal(invalidationCount, 1);
+    } finally {
+      unregister();
+    }
   });
 
   await runTest("rotas protegidas redirecionam quando não há sessão", () => {
