@@ -151,6 +151,7 @@ describe("TaskCrudService", () => {
   });
 
   it("createTask persists supplied operational details instead of model defaults", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
       name: "Nome do modelo",
@@ -206,6 +207,7 @@ describe("TaskCrudService", () => {
   });
 
   it("createTask derives the default status from the effective billing", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
       name: "Nome do modelo",
@@ -230,6 +232,7 @@ describe("TaskCrudService", () => {
   });
 
   it("createTask disables charges for an Em Espera task regardless of billing", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
       name: "Nome do modelo", department_id: "department-model", billing: "Realizar",
@@ -250,6 +253,7 @@ describe("TaskCrudService", () => {
   });
 
   it("createTask retains model defaults when optional details are omitted", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
       name: "Nome do modelo", department_id: "department-model", billing: "Não Realizar",
