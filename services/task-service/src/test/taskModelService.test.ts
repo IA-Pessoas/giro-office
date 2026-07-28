@@ -27,7 +27,7 @@ import { TaskModelService } from "../services/taskModelService.js";
 
 describe("TaskModelService", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("createModel lança 409 quando já existe modelo com mesmo nome", async () => {
@@ -43,6 +43,7 @@ describe("TaskModelService", () => {
         responsible_id: "user-1",
         billing: "Realizar",
         prevision: 2,
+        integracaoLevel: 3,
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
   });
@@ -61,6 +62,7 @@ describe("TaskModelService", () => {
         responsible3_id: "user-3",
         billing: "Realizar",
         prevision: 2,
+        integracaoLevel: 3,
       }),
     ).rejects.toMatchObject({
       statusCode: 400,
@@ -84,6 +86,7 @@ describe("TaskModelService", () => {
         responsible2_id: "user-2",
         billing: "Realizar",
         prevision: 2,
+        integracaoLevel: 3,
       }),
     ).rejects.toMatchObject({
       statusCode: 400,
@@ -112,6 +115,8 @@ describe("TaskModelService", () => {
       search: "",
       page: 1,
       limit: 20,
+      userId: "user-1",
+      integracaoLevel: 2,
     });
 
     expect(result).toEqual([{ id: "model-1", name: "Modelo" }]);
@@ -141,6 +146,8 @@ describe("TaskModelService", () => {
       search: "fiscal",
       page: 2,
       limit: 20,
+      userId: "user-1",
+      integracaoLevel: 2,
     });
 
     const where = {
@@ -177,12 +184,13 @@ describe("TaskModelService", () => {
         responsible_id: "user-1",
         billing: "Realizar",
         prevision: 2,
+        integracaoLevel: 2,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it("updateModel lança 403 quando usuário não tem permissão", async () => {
-    prismaMock.taskModel.findFirst.mockResolvedValueOnce({
+    prismaMock.taskModel.findFirst.mockResolvedValue({
       id: "model-1",
       organization_id: "org-1",
     });
@@ -199,12 +207,13 @@ describe("TaskModelService", () => {
         responsible_id: "user-1",
         billing: "Realizar",
         prevision: 2,
+        integracaoLevel: 1,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it("deleteModel lança 403 quando usuário não tem permissão", async () => {
-    prismaMock.taskModel.findFirst.mockResolvedValueOnce({
+    prismaMock.taskModel.findFirst.mockResolvedValue({
       id: "model-1",
       organization_id: "org-1",
     });
@@ -216,6 +225,7 @@ describe("TaskModelService", () => {
         task_id: "model-1",
         user_id: "user-1",
         organization_id: "org-1",
+        integracaoLevel: 1,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });

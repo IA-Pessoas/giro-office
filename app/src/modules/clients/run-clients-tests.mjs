@@ -524,3 +524,11 @@ runTest("clients list exposes compact page jump input", () => {
   assert.match(clients, /onBlur=\{\(event\) => goToPage\(event\.target\.value\)\}/);
   assert.match(clients, /onKeyDown=\{\(event\) =>/);
 });
+
+runTest("client creation discloses name and document as required", () => {
+  const source = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+
+  assert.match(source, /RequiredFieldLabel/);
+  assert.match(source, /name="name"[\s\S]*aria-required/);
+  assert.match(source, /name="cpf_cnpj"[\s\S]*aria-required/);
+});

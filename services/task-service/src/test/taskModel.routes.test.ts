@@ -34,6 +34,8 @@ describe("task model routes", () => {
       billing: "Realizar",
       prevision: 2,
       type: null,
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 
@@ -63,7 +65,11 @@ describe("task model routes", () => {
     const res = await request(app).get("/task/model").query({ task_id: "model-1" });
 
     expect(res.status).toBe(200);
-    expect(taskModelServiceMock.detailModel).toHaveBeenCalledWith("model-1", "org-1");
+    expect(taskModelServiceMock.detailModel).toHaveBeenCalledWith("model-1", "org-1", {
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
+    });
   });
 
   it("PUT /task/model atualiza modelo", async () => {
@@ -93,6 +99,8 @@ describe("task model routes", () => {
       billing: "Realizar",
       prevision: 4,
       type: null,
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 
@@ -112,6 +120,9 @@ describe("task model routes", () => {
       paginationRequested: false,
       page: 1,
       limit: 20,
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 
@@ -129,6 +140,9 @@ describe("task model routes", () => {
       paginationRequested: false,
       page: 1,
       limit: 20,
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 
@@ -148,6 +162,9 @@ describe("task model routes", () => {
       paginationRequested: false,
       page: 1,
       limit: 20,
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 
@@ -157,6 +174,9 @@ describe("task model routes", () => {
       total: 21,
       page: 2,
       limit: 20,
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
       hasMore: false,
     });
     const app = createTestApp();
@@ -175,6 +195,9 @@ describe("task model routes", () => {
       paginationRequested: true,
       page: 2,
       limit: 20,
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 
@@ -198,6 +221,8 @@ describe("task model routes", () => {
       task_id: "model-1",
       user_id: "user-1",
       organization_id: "org-1",
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 

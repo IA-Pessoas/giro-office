@@ -47,7 +47,12 @@ describe("ScoreQuarterService", () => {
     prismaMock.scoreQuarter.findUnique.mockResolvedValue(null);
     const service = new ScoreQuarterService();
     await expect(
-      service.getDetail({ organization_id: "org-1", score_id: "score-1" }),
+      service.getDetail({
+        organization_id: "org-1",
+        score_id: "score-1",
+        user_id: "user-1",
+        can_manage: false,
+      }),
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 
@@ -63,7 +68,12 @@ describe("ScoreQuarterService", () => {
 
     const service = new ScoreQuarterService();
     await expect(
-      service.getDetail({ organization_id: "org-1", score_id: "score-1" }),
+      service.getDetail({
+        organization_id: "org-1",
+        score_id: "score-1",
+        user_id: "user-1",
+        can_manage: false,
+      }),
     ).resolves.toMatchObject({
       id: "score-1",
       user: { id: "user-1", name: "Ana Silva" },
@@ -75,5 +85,47 @@ describe("ScoreQuarterService", () => {
         }),
       }),
     );
+  });
+
+  it("getDetail bloqueia usuario comum ao acessar score de terceiro", async () => {
+    prismaMock.scoreQuarter.findUnique.mockResolvedValue({
+      id: "score-1",
+      user_id: "other-user",
+      organization_id: "org-1",
+      user: { id: "other-user", name: "Outra Pessoa" },
+      nitro: null,
+      evaluations: [],
+    });
+
+    const service = new ScoreQuarterService();
+    await expect(
+      service.getDetail({
+        organization_id: "org-1",
+        score_id: "score-1",
+        user_id: "user-1",
+        can_manage: false,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("getDetail permite gestor acessar score de terceiro", async () => {
+    prismaMock.scoreQuarter.findUnique.mockResolvedValue({
+      id: "score-1",
+      user_id: "other-user",
+      organization_id: "org-1",
+      user: { id: "other-user", name: "Outra Pessoa" },
+      nitro: null,
+      evaluations: [],
+    });
+
+    const service = new ScoreQuarterService();
+    await expect(
+      service.getDetail({
+        organization_id: "org-1",
+        score_id: "score-1",
+        user_id: "manager-1",
+        can_manage: true,
+      }),
+    ).resolves.toMatchObject({ id: "score-1", user_id: "other-user" });
   });
 });

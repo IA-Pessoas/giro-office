@@ -126,6 +126,10 @@ describe("project-progress routes", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true, data: payload });
     expect(progressDeps.recalculateFromTasks).toHaveBeenCalledTimes(1);
-    expect(progressDeps.recalculateFromTasks).toHaveBeenCalledWith(PROJECT_ID, ORG_ID);
+    expect(progressDeps.recalculateFromTasks).toHaveBeenCalledWith(PROJECT_ID, ORG_ID, {
+      userId: USER_ID,
+      integracaoLevel: 0,
+      isOwner: false,
+    });
   });
 });

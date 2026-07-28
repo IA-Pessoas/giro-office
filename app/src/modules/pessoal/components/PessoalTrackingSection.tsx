@@ -247,6 +247,11 @@ export function PessoalTrackingSection({
       return;
     }
 
+    if (typeof payload.balance_amount === "number" && payload.balance_amount < 0) {
+      setFormError("Saldo não pode ser negativo.");
+      return;
+    }
+
     clearFeedback();
 
     try {
@@ -791,6 +796,7 @@ export function PessoalTrackingSection({
                         <input
                           type={"type" in field ? field.type : "text"}
                           step={field.name === "balance_amount" ? "0.01" : undefined}
+                          min={field.name === "balance_amount" ? 0 : undefined}
                           value={fieldValue}
                           onChange={(event) =>
                             setLddFormValues((current) => ({

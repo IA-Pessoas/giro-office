@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 
 import { resolveDepartmentModuleKey } from '@modules/auth';
 import { Dialog } from '@shared/components';
+import { RequiredFieldLabel } from '@shared/components/RequiredFieldLabel';
 
 import {
   CREATE_USER_MODULE_OPTIONS,
@@ -315,15 +316,21 @@ export function CreateUserModal({
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="md:col-span-3">
-              <label htmlFor="user-name" className={FIELD_LABEL_CLASSNAME}>Nome</label>
-              <input id="user-name" name="name" value={formData.name} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+              <label htmlFor="user-name" className={FIELD_LABEL_CLASSNAME}>
+                <RequiredFieldLabel required>Nome</RequiredFieldLabel>
+              </label>
+              <input id="user-name" name="name" value={formData.name} onChange={handleInputChange} className={FIELD_CLASSNAME} required aria-required="true" />
             </div>
             <div className="md:col-span-2">
-              <label htmlFor="user-login" className={FIELD_LABEL_CLASSNAME}>Login</label>
-              <input id="user-login" name="login" value={formData.login} onChange={handleInputChange} className={FIELD_CLASSNAME} required />
+              <label htmlFor="user-login" className={FIELD_LABEL_CLASSNAME}>
+                <RequiredFieldLabel required>Login</RequiredFieldLabel>
+              </label>
+              <input id="user-login" name="login" value={formData.login} onChange={handleInputChange} className={FIELD_CLASSNAME} required aria-required="true" />
             </div>
             <div className="md:col-span-1">
-              <label htmlFor="user-password" className={FIELD_LABEL_CLASSNAME}>Senha</label>
+              <label htmlFor="user-password" className={FIELD_LABEL_CLASSNAME}>
+                <RequiredFieldLabel required>Senha</RequiredFieldLabel>
+              </label>
               <div className="relative">
                 <input
                   id="user-password"
@@ -334,6 +341,7 @@ export function CreateUserModal({
                   className={`${FIELD_CLASSNAME} pr-11`}
                   autoComplete="new-password"
                   required
+                  aria-required="true"
                 />
                 <button
                   type="button"
@@ -350,7 +358,9 @@ export function CreateUserModal({
 
           <div className={`grid grid-cols-1 gap-4 ${canCreateOrganizationOwner ? 'md:grid-cols-[minmax(0,1fr)_196px_160px]' : 'md:grid-cols-[minmax(0,1fr)_220px]'}`}>
             <div>
-              <label htmlFor="user-department" className={FIELD_LABEL_CLASSNAME}>Departamento</label>
+              <label htmlFor="user-department" className={FIELD_LABEL_CLASSNAME}>
+                <RequiredFieldLabel required>Departamento</RequiredFieldLabel>
+              </label>
               <select
                 id="user-department"
                 name="department_id"
@@ -360,6 +370,7 @@ export function CreateUserModal({
                 style={SELECT_ARROW_STYLE}
                 disabled={departmentsLoading || departmentsError || departments.length === 0}
                 required
+                aria-required="true"
               >
                 <option value="">Selecione um departamento</option>
                 {departments.map((department) => (

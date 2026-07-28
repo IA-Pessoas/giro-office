@@ -17,10 +17,10 @@ import {
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
-  type RegularizeFormOption,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
+import { RegularizeClientPfSelect } from "./RegularizeClientPfSelect";
 
 type RegularizePartnerFormState = {
   pj_id: string;
@@ -68,7 +68,6 @@ export function RegularizePartnerForm({
   onSubmit,
   open,
   partner,
-  pfOptions,
 }: {
   defaultPfId: string;
   defaultPjId: string;
@@ -79,7 +78,6 @@ export function RegularizePartnerForm({
   ) => Promise<void>;
   open: boolean;
   partner: RegularizePartner | null;
-  pfOptions: RegularizeFormOption[];
 }) {
   const [formState, setFormState] = useState<RegularizePartnerFormState>(
     buildPartnerFormState(partner, defaultPfId, defaultPjId),
@@ -165,20 +163,16 @@ export function RegularizePartnerForm({
             <ClientSelectionField clientId={formState.pj_id} />
           </RegularizeFormField>
 
-          <RegularizeFormField label="Cliente PF" required>
-            <RegularizeNativeSelect
+          <fieldset className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <legend className="inline-flex items-center gap-1">
+              <span>Cliente PF</span>
+              <span className="text-red-500">*</span>
+            </legend>
+            <RegularizeClientPfSelect
               value={formState.pf_id}
-              onChange={(event) => handleChange("pf_id", event.target.value)}
-            >
-              <option value="">Selecione</option>
-              {pfOptions.map((clientPf) => (
-                <option key={clientPf.id} value={clientPf.id}>
-                  {clientPf.label}
-                  {clientPf.description ? `, ${clientPf.description}` : ""}
-                </option>
-              ))}
-            </RegularizeNativeSelect>
-          </RegularizeFormField>
+              onChange={(id) => handleChange("pf_id", id)}
+            />
+          </fieldset>
 
           <RegularizeFormField label="Participação" required>
             <input

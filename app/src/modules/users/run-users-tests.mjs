@@ -592,3 +592,11 @@ runTest("admin permission editor uses module-specific options and normalization"
     /\{PERMISSION_SELECT_OPTIONS\.map\(\(option\) => \(/,
   );
 });
+
+runTest("create user modal discloses required account fields", () => {
+  const source = readFileSync("src/modules/users/components/CreateUserModal.tsx", "utf8");
+
+  assert.match(source, /RequiredFieldLabel/);
+  assert.match(source, /aria-required/);
+  assert.match(source, /htmlFor="user-department"/);
+});

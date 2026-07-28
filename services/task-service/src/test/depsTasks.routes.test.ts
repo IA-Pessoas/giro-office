@@ -1,5 +1,6 @@
 import { createExpressErrorHandler } from "@workspace/shared";
 import {
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -32,6 +33,7 @@ function gatewayHeaders(): Record<string, string> {
     [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORG_ID,
+    [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 2 }),
   };
 }
 
