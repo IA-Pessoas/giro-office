@@ -170,7 +170,7 @@ describe("TiDashboardService", () => {
         organization_id: context.organizationId,
         requester_id: context.userId,
         status: "Resolved",
-        updated_at: expect.any(Date),
+        updated_at: { gte: expect.any(Date) },
       },
     });
     expect(prisma.tIRequest.count).toHaveBeenCalledWith({
