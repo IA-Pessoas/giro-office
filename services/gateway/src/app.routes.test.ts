@@ -2895,6 +2895,59 @@ it("allows limited users with client-related module permission to proxy /client"
   }
 });
 
+it("forwards the authenticated Integration context to client-service", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    type: "user",
+    modules: { integracao: 2 },
+  });
+  let seenHeaders: Record<string, string | undefined> = {};
+
+  const upstream = createServer((request, response) => {
+    seenHeaders = {
+      internalToken: request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined,
+      userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
+      organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined,
+      permission: request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined,
+      type: request.headers[FORWARDED_AUTH_TYPE_HEADER] as string | undefined,
+      modules: request.headers[FORWARDED_AUTH_MODULES_HEADER] as string | undefined,
+    };
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/client-1`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Cliente atualizado" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenHeaders).toMatchObject({
+      internalToken: "client-service-token",
+      userId: "user-1",
+      organizationId: "org-1",
+      permission: "1",
+      type: "user",
+    });
+    expect(JSON.parse(seenHeaders.modules ?? "{}")).toMatchObject({ integracao: 2 });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("proxies /rh to the rh microservice", async () => {
   const token = createToken({
     user_id: "user-1",

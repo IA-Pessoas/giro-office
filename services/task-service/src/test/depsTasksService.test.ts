@@ -62,7 +62,10 @@ describe("DepsTasksService", () => {
     const result = await service.listTaskModelOptions("org-1");
 
     expect(userFindMany).toHaveBeenCalledWith({
-      where: { organization_id: "org-1", status: "active" },
+      where: {
+        status: "active",
+        OR: [{ organization_id: "org-1" }, { department: { organization_id: "org-1" } }],
+      },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });

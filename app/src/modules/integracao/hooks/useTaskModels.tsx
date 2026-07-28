@@ -15,6 +15,23 @@ import type {
 import { taskModelsListQueryKey } from "./queryKeys";
 import { taskModelService } from "../services/taskModelService";
 
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  const response = (
+    error as {
+      response?: {
+        status?: number;
+        data?: { error?: string; message?: string };
+      };
+    }
+  ).response;
+
+  if (response?.status === 409) {
+    return response.data?.error ?? response.data?.message ?? fallback;
+  }
+
+  return fallback;
+}
+
 interface UseTaskModelsResult {
   models: TaskModel[];
   total: number;
@@ -84,7 +101,7 @@ export const useTaskModels = (
       });
       return true;
     } catch (error) {
-      toast.error("Erro ao remover.");
+      toast.error(getApiErrorMessage(error, "Erro ao remover."));
       return false;
     }
   };

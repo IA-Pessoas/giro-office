@@ -23,13 +23,30 @@ type JwtClaims = {
   modules?: Record<string, number>;
 };
 
-function parseForwardedPermission(headerValue: string | undefined): number | undefined {
+function parseForwardedPermission(headerValue: string | undefined): number | undefined | null {
   if (headerValue === undefined || headerValue === "") {
     return undefined;
   }
 
-  const parsed = Number.parseInt(headerValue, 10);
-  return Number.isNaN(parsed) ? undefined : parsed;
+  const normalized = headerValue.trim();
+  if (!/^-?\d+$/.test(normalized)) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function parseForwardedUserType(
+  headerValue: string | undefined,
+): JwtClaims["type"] | undefined | null {
+  if (headerValue === undefined || headerValue === "") {
+    return undefined;
+  }
+
+  return headerValue === "owner" || headerValue === "admin" || headerValue === "user"
+    ? headerValue
+    : null;
 }
 
 function isValidClaims(claims: unknown): claims is JwtClaims {
@@ -66,16 +83,22 @@ export async function isAuthenticated(
     forwardedUserId &&
     forwardedOrganizationId
   ) {
-    request.user_id = forwardedUserId;
-    request.organization_id = forwardedOrganizationId;
-    request.permission = parseForwardedPermission(
+    const forwardedPermission = parseForwardedPermission(
       request.get(FORWARDED_AUTH_PERMISSION_HEADER) ?? undefined,
     );
-    request.user_type = request.get(FORWARDED_AUTH_TYPE_HEADER) as
-      | "owner"
-      | "admin"
-      | "user"
-      | undefined;
+    const forwardedUserType = parseForwardedUserType(
+      request.get(FORWARDED_AUTH_TYPE_HEADER) ?? undefined,
+    );
+
+    if (forwardedPermission === null || forwardedUserType === null) {
+      next(new ServiceError(401, "Contexto de autenticação encaminhado inválido."));
+      return;
+    }
+
+    request.user_id = forwardedUserId;
+    request.organization_id = forwardedOrganizationId;
+    request.permission = forwardedPermission;
+    request.user_type = forwardedUserType;
     request.modules = parseModulePermissions(
       request.get(FORWARDED_AUTH_MODULES_HEADER) ?? undefined,
     );

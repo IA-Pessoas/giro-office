@@ -48,7 +48,13 @@ export class DepsTasksService {
     try {
       const [users, departments] = await Promise.all([
         this.prisma.user.findMany({
-          where: { organization_id: organizationId, status: "active" },
+          where: {
+            status: "active",
+            OR: [
+              { organization_id: organizationId },
+              { department: { organization_id: organizationId } },
+            ],
+          },
           select: { id: true, name: true },
           orderBy: { name: "asc" },
         }),

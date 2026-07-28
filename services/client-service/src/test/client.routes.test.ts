@@ -501,6 +501,31 @@ describe("client-service", () => {
     );
   });
 
+  it("rejeita contexto encaminhado com permissao ou tipo invalidos", async () => {
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      update: vi.fn().mockResolvedValue(baseClient()),
+    };
+    const app = buildTestApp(mock, {
+      env: { internalServiceToken: TEST_INTERNAL_SERVICE_TOKEN },
+    });
+
+    const res = await request(app)
+      .patch(`/client/${TEST_CLIENT_ID}`)
+      .set({
+        [INTERNAL_SERVICE_TOKEN_HEADER]: TEST_INTERNAL_SERVICE_TOKEN,
+        [FORWARDED_AUTH_USER_ID_HEADER]: "user-test-1",
+        [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: TEST_ORG_ID,
+        [FORWARDED_AUTH_PERMISSION_HEADER]: "2abc",
+        [FORWARDED_AUTH_TYPE_HEADER]: "attacker",
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 2 }),
+      })
+      .send({ name: "Tentativa inválida" });
+
+    expect(res.status).toBe(401);
+    expect(mock.update).not.toHaveBeenCalled();
+  });
+
   it("DELETE /client/:id devolve 403 sem permission=2 no token", async () => {
     const mock: IClientService = {
       ...mockServiceBase(),
