@@ -34,6 +34,12 @@ const clientListPolicy: AuthPolicy = {
         minPermission: moduleAccessPermission,
       },
     },
+    {
+      modulePermission: {
+        module: "regularize",
+        minPermission: moduleAccessPermission,
+      },
+    },
   ],
 };
 

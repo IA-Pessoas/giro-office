@@ -79,6 +79,30 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(false);
   });
 
+  it("permite Viewer do Regularize listar clientes sem ampliar outros acessos de cliente", () => {
+    const listPolicy = requiredRoutePolicy("GET", "/client/list");
+    const clientDetailPolicy = requiredRoutePolicy("GET", "/client/client-1");
+
+    expect(
+      canAccessRoute(
+        authContext({
+          permission: 0,
+          modules: { regularize: 1 },
+        }),
+        listPolicy,
+      ),
+    ).toBe(true);
+    expect(
+      canAccessRoute(
+        authContext({
+          permission: 0,
+          modules: { regularize: 1 },
+        }),
+        clientDetailPolicy,
+      ),
+    ).toBe(false);
+  });
+
   it.each([0, 1, 2, 3])("avalia o módulo Integração no nível %i", (level) => {
     const policy = requiredRoutePolicy("GET", "/client/123");
     expect(
