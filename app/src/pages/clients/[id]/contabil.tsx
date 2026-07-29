@@ -61,6 +61,8 @@ export default function ClientContabilPage() {
     content = (
       <AccessDeniedPanel description="Você não possui permissão para acessar o fluxo contábil deste cliente." />
     );
+  } else if (client.contabil === false) {
+    content = <PanelMessage>Serviço contábil não contratado para este cliente.</PanelMessage>;
   } else {
     content = (
       <ContabilShell

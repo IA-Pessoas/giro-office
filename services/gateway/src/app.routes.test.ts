@@ -3115,6 +3115,41 @@ it("forwards RH module permission to rh-service", async () => {
   }
 });
 
+it("allows Contabil module users to load RH operational users for selectors", async () => {
+  const token = createToken({
+    user_id: "contabil-admin",
+    organization_id: "org-1",
+    permission: 1,
+    type: "admin",
+    modules: { contabil: 3, rh: 0 },
+  });
+  let seenModules: string | undefined;
+
+  const upstream = createServer((request, response) => {
+    seenModules = request.headers[FORWARDED_AUTH_MODULES_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: [] }));
+  });
+  const rhServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ rhServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/rh/operational-users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(seenModules ?? "{}")).toMatchObject({ contabil: 3, rh: 0 });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("blocks limited users without pessoal module permission before proxying /pessoal", async () => {
   const token = createToken({
     user_id: "user-1",
