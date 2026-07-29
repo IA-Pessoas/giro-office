@@ -32,7 +32,9 @@ function isIsoCalendarDate(value: string): boolean {
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
 
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  );
 }
 
 const optionalTextZod = z.preprocess(normalizeOptionalText, z.string().optional());
@@ -44,7 +46,10 @@ const optionalResponsibleIdZod = z.preprocess(
 );
 const optionalIsoDateZod = z.preprocess(
   normalizeOptionalText,
-  z.string().refine(isIsoCalendarDate, "prevision_date deve ser uma data YYYY-MM-DD válida.").optional(),
+  z
+    .string()
+    .refine(isIsoCalendarDate, "prevision_date deve ser uma data YYYY-MM-DD válida.")
+    .optional(),
 );
 
 export const integracaoTaskCreateBodySchema = z

@@ -161,6 +161,24 @@ runTest("certificate refresh keeps rows while a new first page is requested", ()
   );
 });
 
+const certificateFileActionsSource = readFileSync(
+  "src/modules/certificates/components/CertificateFileActions.tsx",
+  "utf8",
+);
+const certificatesWorkspaceSource = readFileSync(
+  "src/modules/certificates/components/CertificatesWorkspace.tsx",
+  "utf8",
+);
+
+runTest("separa permissao de edicao e remocao de arquivos", () => {
+  assert.match(certificateFileActionsSource, /canDelete: boolean/);
+  assert.match(certificateFileActionsSource, /\{canDelete \?/);
+  assert.equal(
+    (certificatesWorkspaceSource.match(/canDelete=\{access\.isAdmin\}/g) ?? []).length,
+    4,
+  );
+});
+
 runTest("certificate required fields are disclosed only while creating", () => {
   const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
 

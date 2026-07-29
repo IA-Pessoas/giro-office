@@ -52,4 +52,11 @@ export const fiscalIcmsService = {
 
     return unwrapFiscalMutation<FiscalIcms>(response.data);
   },
+
+  async delete(icmsId: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.delete(FISCAL_ENDPOINTS.icms, {
+      params: buildFiscalIcmsDetailParams(icmsId),
+    });
+  },
 };

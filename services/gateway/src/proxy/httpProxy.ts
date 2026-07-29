@@ -7,6 +7,7 @@ import {
   FORWARDED_AUTH_SESSION_VERSION_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  INTEGRACAO_PERMISSION_LEVEL,
   INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
   ServiceError,
@@ -37,7 +38,6 @@ function getRequestBody(request: Request): string | ReadableStream | undefined {
 interface HttpProxyOptions {
   internalServiceToken?: string;
   permissionModule?: string;
-  fallbackToGlobalPermission?: boolean;
 }
 
 const OWNER_MODULE_PERMISSION = 3;
@@ -84,7 +84,6 @@ function resolveForwardedPermission(
   modulePermissionsPresent: boolean | undefined,
   type: unknown,
   permissionModule?: string,
-  fallbackToGlobalPermission = true,
 ): number | undefined {
   if (!permissionModule) {
     return permission;
@@ -96,7 +95,7 @@ function resolveForwardedPermission(
   }
 
   if (modulePermissionsPresent === false) {
-    return fallbackToGlobalPermission ? permission : 0;
+    return INTEGRACAO_PERMISSION_LEVEL.BASIC;
   }
 
   const modulePermission = modules?.[permissionModule];
@@ -156,7 +155,6 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
       request.auth.claims.modulePermissionsPresent,
       request.auth.claims.type,
       options.permissionModule,
-      options.fallbackToGlobalPermission,
     );
 
     if (typeof forwardedPermission === "number") {

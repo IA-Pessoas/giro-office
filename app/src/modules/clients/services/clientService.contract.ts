@@ -24,9 +24,15 @@ export const CLIENT_ENDPOINTS = {
 const LEGACY_CLIENT_STATUS_FILTERS = new Set(["Ativo", "Inativo"]);
 
 export function buildClientListParams(filters: ClientListFilters) {
+  const shouldUseLegacyIntegrationStatusFilter =
+    filters.legacyIntegrationStatusFilter !== false;
   const ref =
     filters.ref ??
-    (filters.status && LEGACY_CLIENT_STATUS_FILTERS.has(filters.status) ? "integracao" : undefined);
+    (shouldUseLegacyIntegrationStatusFilter &&
+    filters.status &&
+    LEGACY_CLIENT_STATUS_FILTERS.has(filters.status)
+      ? "integracao"
+      : undefined);
 
   return Object.fromEntries(
     Object.entries({

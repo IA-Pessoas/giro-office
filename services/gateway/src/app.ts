@@ -359,7 +359,6 @@ function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
       buildHttpProxyMiddleware(service.targetUrl, {
         internalServiceToken: service.internalServiceToken,
         permissionModule: service.permissionModule,
-        fallbackToGlobalPermission: service.fallbackToGlobalPermission,
       }),
     );
   }

@@ -27,6 +27,7 @@ function createMockPrisma(): NcmServicePrisma {
       findMany: vi.fn(async () => []),
       create: vi.fn(async () => ({})),
       update: vi.fn(async () => ({})),
+      delete: vi.fn(async () => ({})),
     },
   } as unknown as NcmServicePrisma;
 }
@@ -122,6 +123,59 @@ describe("NcmService", () => {
 
     expect(result).toEqual(updated);
     expect(audit.logUpdateIfChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("delete lança 404 quando NCM não existe", async () => {
+    const prisma = createMockPrisma();
+    prisma.ncm.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as NcmServicePrisma["ncm"]["findFirst"];
+    const service = new NcmService(prisma, createMockAudit());
+
+    await expect(
+      service.delete({
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        permission: 3,
+        ncm_id: NCM_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(prisma.ncm.delete).not.toHaveBeenCalled();
+  });
+
+  it("delete remove NCM e registra auditoria quando existe", async () => {
+    const prisma = createMockPrisma();
+    const existing = { id: NCM_ID, ncm_code: "84719012" };
+    prisma.ncm.findFirst = vi.fn(
+      async () => existing,
+    ) as unknown as NcmServicePrisma["ncm"]["findFirst"];
+    prisma.ncm.delete = vi.fn(async () => existing) as unknown as NcmServicePrisma["ncm"]["delete"];
+    const audit = createMockAudit();
+    const service = new NcmService(prisma, audit);
+
+    const result = await service.delete({
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      permission: 3,
+      ncm_id: NCM_ID,
+    });
+
+    expect(result).toEqual({ deleted: existing });
+    expect(prisma.ncm.findFirst).toHaveBeenCalledWith({
+      where: { id: NCM_ID, organization_id: ORG_ID },
+      select: expect.any(Object),
+    });
+    expect(prisma.ncm.delete).toHaveBeenCalledWith({
+      where: { id: NCM_ID },
+      select: expect.any(Object),
+    });
+    expect(audit.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Exclusao",
+        referring: "fiscal.ncm",
+        referringId: NCM_ID,
+      }),
+    );
   });
 
   it("list retorna pagina quando nao ha codigos", async () => {

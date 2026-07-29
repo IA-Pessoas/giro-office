@@ -90,6 +90,7 @@ const gatewayEnvSchema = z
     taskServiceUrl: z.string().url().default("http://localhost:3032"),
     projectServiceUrl: z.string().url().default("http://localhost:3033"),
     clientServiceUrl: z.string().url().default("http://localhost:3035"),
+    clientServiceInternalToken: z.string().optional().transform(parseOptionalString),
     fiscalServiceUrl: z.string().url().default("http://localhost:3037"),
     contabilServiceUrl: z.string().url().default("http://localhost:3038"),
     regularizeServiceUrl: z.string().url().default("http://localhost:3039"),
@@ -143,6 +144,11 @@ const gatewayEnvSchema = z
       .transform((value, ctx) => parseJsonBodyLimit(value, ctx)),
   })
   .transform((env) => {
+    const clientServiceInternalToken =
+      env.nodeEnv === "production"
+        ? env.clientServiceInternalToken
+        : (env.clientServiceInternalToken ?? env.auditServiceToken);
+
     validateProductionInternalServiceToken({
       nodeEnv: env.nodeEnv,
       serviceName: "gateway",
@@ -161,6 +167,12 @@ const gatewayEnvSchema = z
       envName: "CERTIFICATE_SERVICE_INTERNAL_TOKEN",
       token: env.certificateServiceInternalToken,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: env.nodeEnv,
+      serviceName: "gateway",
+      envName: "CLIENT_SERVICE_INTERNAL_TOKEN",
+      token: clientServiceInternalToken,
+    });
     validateProductionCorsOrigins({
       nodeEnv: env.nodeEnv,
       serviceName: "gateway",
@@ -170,6 +182,7 @@ const gatewayEnvSchema = z
 
     return {
       ...env,
+      clientServiceInternalToken,
       logPretty: env.nodeEnv !== "production" && env.logPretty,
     };
   });
@@ -187,6 +200,7 @@ export interface GatewayEnv {
   taskServiceUrl: string;
   projectServiceUrl: string;
   clientServiceUrl: string;
+  clientServiceInternalToken: string;
   fiscalServiceUrl: string;
   contabilServiceUrl: string;
   regularizeServiceUrl: string;
@@ -224,6 +238,7 @@ export function getGatewayEnv(): GatewayEnv {
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
     clientServiceUrl: process.env.CLIENT_SERVICE_URL,
+    clientServiceInternalToken: process.env.CLIENT_SERVICE_INTERNAL_TOKEN,
     fiscalServiceUrl: process.env.FISCAL_SERVICE_URL,
     contabilServiceUrl: process.env.CONTABIL_SERVICE_URL,
     regularizeServiceUrl: process.env.REGULARIZE_SERVICE_URL,

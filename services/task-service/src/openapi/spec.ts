@@ -445,7 +445,17 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                         type: "object",
                         required: ["data", "total", "hasMore", "summary"],
                         properties: {
-                          data: { type: "array", items: { type: "object" } },
+                          data: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              required: ["id", "isOwn"],
+                              properties: {
+                                id: { type: "string" },
+                                isOwn: { type: "boolean" },
+                              },
+                            },
+                          },
                           total: { type: "integer", minimum: 0 },
                           hasMore: { type: "boolean" },
                           summary: {
@@ -719,6 +729,14 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           summary: "Listar departamentos com modelos de tarefa",
           security: bearer,
           responses: { "200": { description: "Lista", ...successJson } },
+        },
+      },
+      "/task/deps/options": {
+        get: {
+          tags: ["TaskDependent"],
+          summary: "Listar opções ativas para modelos de tarefa",
+          security: bearer,
+          responses: { "200": { description: "Opções", ...successJson } },
         },
       },
     },

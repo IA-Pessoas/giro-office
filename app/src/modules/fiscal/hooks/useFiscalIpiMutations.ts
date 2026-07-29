@@ -41,3 +41,14 @@ export function useUpdateFiscalIpiMutation(): UseMutationResult<
     },
   });
 }
+
+export function useDeleteFiscalIpiMutation(): UseMutationResult<void, Error, string> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => fiscalIpiService.delete(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: FISCAL_QUERY_KEY });
+    },
+  });
+}

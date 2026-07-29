@@ -58,8 +58,8 @@ const integracaoClientPath =
   /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
+  ["GET /client/list", { minPermission: moduleAccessPermission }],
   ["GET /user", userManagementPolicy],
-  ["GET /client/list", integracaoClientPolicy],
   ["GET /rh/operational-users", operationalUsersCatalogPolicy],
   ["POST /user", userManagementPolicy],
 ]);

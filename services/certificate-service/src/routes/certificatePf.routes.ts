@@ -11,6 +11,7 @@ import multer from "multer";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import {
   CERTIFICATE_ELEVATED_PERMISSION,
+  requireCertificateDeletePermission,
   requireCertificatePermission,
   requireCertificateReadPermission,
 } from "../middlewares/requireCertificatePermission.js";
@@ -167,21 +168,25 @@ export function createCertificatePfRoutes(options: CreateCertificatePfRoutesOpti
     }
   });
 
-  router.delete("/:id/file", requireCertificatePermission, async (request, response, next) => {
-    try {
-      const authContext = requireAuthenticatedRequestContext(request);
-      const params = parseWithZod(certificatePfIdParamSchema, request.params);
-      const result = await service.deleteCertificatePfFile({
-        id: params.id,
-        organizationId: authContext.organization_id,
-      });
+  router.delete(
+    "/:id/file",
+    requireCertificateDeletePermission,
+    async (request, response, next) => {
+      try {
+        const authContext = requireAuthenticatedRequestContext(request);
+        const params = parseWithZod(certificatePfIdParamSchema, request.params);
+        const result = await service.deleteCertificatePfFile({
+          id: params.id,
+          organizationId: authContext.organization_id,
+        });
 
-      response.status(200).json(createSuccessResponse(result));
-    } catch (err: unknown) {
-      logError("Erro ao remover arquivo do certificado PF", { err });
-      next(err);
-    }
-  });
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao remover arquivo do certificado PF", { err });
+        next(err);
+      }
+    },
+  );
 
   router.delete("/:id", requireCertificatePermission, async (request, response, next) => {
     try {

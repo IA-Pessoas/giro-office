@@ -30,6 +30,14 @@ const DISABLED_MODULE_KEY_SET = new Set<ModuleKey>(DISABLED_MODULE_KEYS);
 export type AccessLevel = "none" | "view" | "edit" | "admin";
 export type AccessSource = "admin" | "department" | "additional-module" | "none";
 
+export type ModulePermissionSubject =
+  | {
+      type?: "owner" | "admin" | "user" | null;
+      modules?: Record<string, number> | null;
+    }
+  | null
+  | undefined;
+
 export type ModuleAccess = {
   level: AccessLevel;
   canView: boolean;
@@ -51,6 +59,8 @@ export interface ResolveModuleAccessParams {
 export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/clients": "integracao",
   "/projects": "integracao",
+  "/tasks": "integracao",
+  "/configs/integracao": "integracao",
   "/certificados": "certificado",
   "/regularize": "regularize",
   "/fiscal": "fiscal",
@@ -60,6 +70,56 @@ export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/tecnologia": "ti",
 };
 
+function isWithinRoute(routePath: string, basePath: string): boolean {
+  return routePath === basePath || routePath.startsWith(`${basePath}/`);
+}
+
+export function normalizeRoutePath(routePath: string): string {
+  const pathWithoutQuery = routePath.split("?")[0]?.split("#")[0] ?? "";
+  const normalizedPath =
+    pathWithoutQuery.length > 1 ? pathWithoutQuery.replace(/\/+$/, "") : pathWithoutQuery;
+
+  return normalizedPath || "/";
+}
+
+export function getModulePermissionLevel(
+  subject: ModulePermissionSubject,
+  module: ModuleKey,
+): number | null {
+  if (subject?.type === "owner") {
+    return MODULE_ADMIN_PERMISSION;
+  }
+
+  const permission = subject?.modules?.[module];
+
+  return permission === 0 || permission === 1 || permission === 2 || permission === 3
+    ? permission
+    : null;
+}
+
+export function canViewIntegrationRoute(
+  routePath: string,
+  subject: ModulePermissionSubject,
+): boolean {
+  const integrationLevel = getModulePermissionLevel(subject, "integracao");
+
+  if (integrationLevel === null) {
+    return false;
+  }
+
+  const normalizedPath = normalizeRoutePath(routePath);
+
+  if (isWithinRoute(normalizedPath, "/tasks")) {
+    return true;
+  }
+
+  if (isWithinRoute(normalizedPath, "/configs/integracao")) {
+    return integrationLevel >= MODULE_VIEW_PERMISSION;
+  }
+
+  return integrationLevel >= MODULE_VIEW_PERMISSION;
+}
+
 const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
   certificado: "certificado",
   comercial: "comercial",
@@ -68,12 +128,12 @@ const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
   "contabil societario": "contabil",
   "contabil societário": "contabil",
   "contabil tributario": "contabil",
-  "contábil": "contabil",
+  contábil: "contabil",
   financeiro: "financeiro",
   fiscal: "fiscal",
   integracao: "integracao",
   "integracao de sistemas": "integracao",
-  "integração": "integracao",
+  integração: "integracao",
   marketing: "marketing",
   parcelamento: "parcelamento",
   pessoal: "pessoal",

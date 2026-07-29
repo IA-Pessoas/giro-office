@@ -52,4 +52,11 @@ export const fiscalIpiService = {
 
     return unwrapFiscalMutation<FiscalIpi>(response.data);
   },
+
+  async delete(ipiId: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.delete(FISCAL_ENDPOINTS.ipi, {
+      params: buildFiscalIpiDetailParams(ipiId),
+    });
+  },
 };
