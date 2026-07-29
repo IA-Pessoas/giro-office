@@ -20,6 +20,9 @@ describe("message routes", () => {
 
     expect(res.status).toBe(200);
     expect(messageServiceMock.create).toHaveBeenCalledTimes(1);
+    expect(messageServiceMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({ can_manage_rh: true }),
+    );
   });
 
   it("GET /rh/messages lista mensagens", async () => {
@@ -28,5 +31,8 @@ describe("message routes", () => {
 
     expect(res.status).toBe(200);
     expect(messageServiceMock.listByRequest).toHaveBeenCalledTimes(1);
+    expect(messageServiceMock.listByRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ can_manage_rh: true }),
+    );
   });
 });

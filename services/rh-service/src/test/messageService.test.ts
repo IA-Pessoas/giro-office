@@ -51,4 +51,48 @@ describe("MessageService", () => {
       service.listByRequest({ organization_id: "org-1", user_id: "user-1", request_id: "req-1" }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
+
+  it("listByRequest permite gestor RH listar mensagens de chamado de terceiro", async () => {
+    const messages = [{ id: "msg-1" }];
+    prismaMock.rhRequest.findFirst.mockResolvedValue({
+      id: "req-1",
+      requester_user_id: "user-2",
+      assigned_to_user_id: "user-3",
+    });
+    prismaMock.rhMessage.findMany.mockResolvedValue(messages);
+
+    const service = new MessageService();
+    const result = await service.listByRequest({
+      organization_id: "org-1",
+      user_id: "user-1",
+      request_id: "req-1",
+      can_manage_rh: true,
+    });
+
+    expect(result).toBe(messages);
+  });
+
+  it("create permite gestor RH responder chamado de terceiro", async () => {
+    const created = { id: "msg-1" };
+    prismaMock.rhRequest.findFirst.mockResolvedValue({
+      id: "req-1",
+      title: "Pedido",
+      requester_user_id: "user-2",
+      assigned_to_user_id: "user-3",
+    });
+    prismaMock.rhMessage.create.mockResolvedValue(created);
+    prismaMock.rhRequest.update.mockResolvedValue({ id: "req-1" });
+
+    const service = new MessageService();
+    const result = await service.create({
+      organization_id: "org-1",
+      sender_user_id: "user-1",
+      request_id: "req-1",
+      message: "Resposta RH",
+      type: "Message",
+      can_manage_rh: true,
+    });
+
+    expect(result).toBe(created);
+  });
 });
