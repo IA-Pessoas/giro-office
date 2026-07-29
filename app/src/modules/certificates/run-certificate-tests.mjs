@@ -34,6 +34,59 @@ runTest("certificate endpoints match gateway public contract", () => {
   assert.equal(CERTIFICATE_ENDPOINTS.notifications, "/certificate/notifications");
 });
 
+runTest("certificate service exposes full-record deletion for PJ and PF", () => {
+  const serviceSource = readFileSync(
+    new URL("./services/certificateService.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    serviceSource,
+    /async deletePj\(id: string\)[\s\S]*?api\.delete\(CERTIFICATE_ENDPOINTS\.pjDetail\(id\)\)/,
+  );
+  assert.match(
+    serviceSource,
+    /async deletePf\(id: string\)[\s\S]*?api\.delete\(CERTIFICATE_ENDPOINTS\.pfDetail\(id\)\)/,
+  );
+});
+
+runTest("certificate deletion mutations invalidate lists and details", () => {
+  const hooksSource = readFileSync(
+    new URL("./hooks/useCertificates.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(hooksSource, /useDeleteCertificatePjMutation/);
+  assert.match(hooksSource, /useDeleteCertificatePfMutation/);
+  assert.match(hooksSource, /certificateService\.deletePj/);
+  assert.match(hooksSource, /certificateService\.deletePf/);
+  assert.match(
+    hooksSource,
+    /useDeleteCertificatePjMutation[\s\S]*?CERTIFICATE_QUERY_KEY[\s\S]*?certificatePjDetailQueryKey/,
+  );
+  assert.match(
+    hooksSource,
+    /useDeleteCertificatePfMutation[\s\S]*?CERTIFICATE_QUERY_KEY[\s\S]*?certificatePfDetailQueryKey/,
+  );
+});
+
+runTest("certificate table exposes admin-only full-record deletion", () => {
+  const workspaceSource = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workspaceSource, /useDeleteCertificatePjMutation/);
+  assert.match(workspaceSource, /useDeleteCertificatePfMutation/);
+  assert.match(workspaceSource, /Trash2/);
+  assert.match(workspaceSource, /window\.confirm\(`Excluir o certificado/);
+  assert.match(workspaceSource, /setVisiblePjItems\(\(current\) => current\.filter/);
+  assert.match(workspaceSource, /setVisiblePfItems\(\(current\) => current\.filter/);
+  assert.match(workspaceSource, /toast\.success\("Certificado/);
+  assert.match(workspaceSource, /toast\.error\(/);
+  assert.match(workspaceSource, /canManageCertificateModule &&/);
+});
+
 runTest("certificate record deletion uses the detail endpoints and an internal dialog", () => {
   const clientSource = readFileSync(new URL("./services/certificateService.ts", import.meta.url), "utf8");
   const actionsSource = readFileSync(

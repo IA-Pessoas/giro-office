@@ -152,6 +152,7 @@ function publicCertificateOperation({
       "403": errorResponse("Permissao insuficiente"),
       "404": errorResponse(notFoundDescription),
       "409": errorResponse("Conflito de dominio"),
+      "500": errorResponse("Erro interno do servidor"),
     },
   };
 }
