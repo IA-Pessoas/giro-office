@@ -416,6 +416,7 @@ export function buildRegularizeServiceOpenApiSpec(
               in: "query",
               schema: { type: "string", enum: ["Todos", "Criado", "Pendente"], default: "Todos" },
             },
+            { name: "type", in: "query", schema: { type: "string", enum: ["TFF", "TLP", "TLL"] } },
             { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
             {
               name: "limit",

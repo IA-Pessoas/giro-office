@@ -712,6 +712,7 @@ export function RegularizePage() {
   const [pfPage, setPfPage] = useState(1);
   const [taxSearch, setTaxSearch] = useState("");
   const [taxStatus, setTaxStatus] = useState<"Todos" | "Criado" | "Pendente">("Todos");
+  const [taxType, setTaxType] = useState<"Todos" | "TFF" | "TLP" | "TLL">("Todos");
   const [taxYear, setTaxYear] = useState(() => new Date().getFullYear());
   const [taxPage, setTaxPage] = useState(1);
   const debouncedProcessSearch = useDebouncedValue(processSearch.trim(), 300);
@@ -750,6 +751,7 @@ export function RegularizePage() {
       year: taxYear,
       search: debouncedTaxSearch,
       status: taxStatus,
+      type: taxType === "Todos" ? undefined : taxType,
       page: taxPage,
       limit: REGULARIZE_PAGE_SIZE,
     },
@@ -2272,7 +2274,7 @@ export function RegularizePage() {
             }
           />
 
-          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_160px_180px] dark:border-gray-700 dark:bg-gray-800">
+          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_160px_160px_180px] dark:border-gray-700 dark:bg-gray-800">
             <label className="space-y-1.5">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
                 Buscar tributo
@@ -2322,12 +2324,28 @@ export function RegularizePage() {
                 ))}
               </RegularizeNativeSelect>
             </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Tipo</span>
+              <RegularizeNativeSelect
+                value={taxType}
+                onChange={(event) => {
+                  setTaxType(event.target.value as "Todos" | "TFF" | "TLP" | "TLL");
+                  setTaxPage(1);
+                }}
+              >
+                {["Todos", "TFF", "TLP", "TLL"].map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </label>
           </div>
 
           <QueryStatePanel
             query={taxTableQuery}
             emptyTitle={
-              taxSearch || taxStatus !== "Todos" || taxYear !== currentYear
+              taxSearch || taxStatus !== "Todos" || taxType !== "Todos" || taxYear !== currentYear
                 ? "Nenhum tributo corresponde aos filtros."
                 : "Nenhum tributo encontrado."
             }

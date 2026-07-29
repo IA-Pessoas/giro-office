@@ -3,6 +3,7 @@ import { ServiceError } from "@workspace/shared";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type {
   CreateMunicipalTaxesBody,
+  MunicipalTaxesType,
   UpdateMunicipalTaxesBody,
 } from "../schemas/municipalTaxes.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
@@ -35,11 +36,18 @@ const municipalTaxesSelect = {
   tll_analysis_notes: true,
 } as const;
 
+const municipalTaxesApplicabilityFields = {
+  TFF: "tff_is_applicable",
+  TLP: "tlp_is_applicable",
+  TLL: "tll_is_applicable",
+} as const;
+
 export type MunicipalTaxesListParams = {
   organizationId: string;
   year: number;
   search: string;
   status: "Todos" | "Criado" | "Pendente";
+  type?: MunicipalTaxesType;
   page: number;
   limit: number;
 };
@@ -155,6 +163,11 @@ export class MunicipalTaxesService {
   }
 
   async list(params: MunicipalTaxesListParams): Promise<MunicipalTaxesListPage> {
+    const municipalTaxesWhere: Prisma.MunicipalTaxesWhereInput = {
+      organization_id: params.organizationId,
+      year: params.year,
+      ...(params.type ? { [municipalTaxesApplicabilityFields[params.type]]: true } : {}),
+    };
     const where: Prisma.ClientWhereInput = {
       organization_id: params.organizationId,
       status: "Ativo",
@@ -172,8 +185,7 @@ export class MunicipalTaxesService {
         : {
             municipalTaxes: {
               [params.status === "Criado" ? "some" : "none"]: {
-                organization_id: params.organizationId,
-                year: params.year,
+                ...municipalTaxesWhere,
               },
             },
           }),
@@ -189,8 +201,7 @@ export class MunicipalTaxesService {
           city: true,
           municipalTaxes: {
             where: {
-              organization_id: params.organizationId,
-              year: params.year,
+              ...municipalTaxesWhere,
             },
             select: { id: true },
           },

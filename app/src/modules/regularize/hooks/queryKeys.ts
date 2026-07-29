@@ -61,6 +61,7 @@ export const regularizeQueryKeys = {
       filters.year,
       filters.search ?? "",
       filters.status ?? "Todos",
+      filters.type ?? "Todos",
       filters.page ?? 1,
       filters.limit ?? 20,
     ] as const,

@@ -287,16 +287,19 @@ await runTest("regularize list params carry server search and pagination", async
 });
 
 await runTest("regularize municipal tax contract carries filters and unwraps a page", async () => {
-  assert.deepEqual(
-    buildRegularizeMunicipalTaxesListParams({
-      year: 2026,
-      search: " Castelo ",
-      status: "Criado",
-      page: 2,
-      limit: 20,
-    }),
-    { year: 2026, search: "Castelo", status: "Criado", page: 2, limit: 20 },
-  );
+  for (const type of ["TFF", "TLP", "TLL"]) {
+    assert.deepEqual(
+      buildRegularizeMunicipalTaxesListParams({
+        year: 2026,
+        search: " Castelo ",
+        status: "Criado",
+        type,
+        page: 2,
+        limit: 20,
+      }),
+      { year: 2026, search: "Castelo", status: "Criado", type, page: 2, limit: 20 },
+    );
+  }
 
   const [queryKeysSource, serviceSource, hookSource] = await Promise.all([
     readModuleSource("hooks/queryKeys.ts"),
@@ -306,7 +309,7 @@ await runTest("regularize municipal tax contract carries filters and unwraps a p
 
   assert.match(
     queryKeysSource,
-    /"municipal-taxes",\s*filters\.year,\s*filters\.search \?\? "",\s*filters\.status \?\? "Todos",\s*filters\.page \?\? 1,\s*filters\.limit \?\? 20/,
+    /"municipal-taxes",\s*filters\.year,\s*filters\.search \?\? "",\s*filters\.status \?\? "Todos",\s*filters\.type \?\? "Todos",\s*filters\.page \?\? 1,\s*filters\.limit \?\? 20/,
   );
   assert.match(serviceSource, /Promise<RegularizeMunicipalTaxesPage>/);
   assert.match(serviceSource, /unwrapRegularizeEnvelope<RegularizeMunicipalTaxesPage>\(response\.data\)/);
@@ -322,15 +325,22 @@ await runTest("regularize municipal tax tab uses debounced filters and paginated
     /const \[taxStatus, setTaxStatus\] = useState(?:<"Todos" \| "Criado" \| "Pendente">)?\("Todos"\)/,
   );
   assert.match(pageSource, /const \[taxYear, setTaxYear\] = useState\(\(\) => new Date\(\)\.getFullYear\(\)\)/);
+  assert.match(pageSource, /const \[taxType, setTaxType\] = useState<"Todos" \| "TFF" \| "TLP" \| "TLL">\("Todos"\)/);
   assert.match(pageSource, /useDebouncedValue\(taxSearch\.trim\(\), 300\)/);
   assert.match(pageSource, /setTaxPage\(1\)/);
   assert.match(pageSource, /year: taxYear/);
   assert.match(pageSource, /search: debouncedTaxSearch/);
   assert.match(pageSource, /status: taxStatus/);
+  assert.match(pageSource, /type: taxType/);
   assert.match(pageSource, /limit: REGULARIZE_PAGE_SIZE/);
   assert.match(pageSource, /data: isTaxSearchPending \? undefined : taxQuery\.data\?\.data/);
   assert.match(pageSource, /total=\{taxQuery\.data\?\.total \?\? 0\}/);
   assert.match(pageSource, /hasMore=\{taxQuery\.data\?\.hasMore \?\? false\}/);
+  assert.match(pageSource, /<span className="text-sm font-medium text-gray-700 dark:text-gray-200">Tipo<\/span>/);
+  assert.match(pageSource, /value=\{taxType\}[\s\S]{0,180}setTaxType\(event\.target\.value as "Todos" \| "TFF" \| "TLP" \| "TLL"\);[\s\S]{0,80}setTaxPage\(1\)/);
+  for (const type of ["Todos", "TFF", "TLP", "TLL"]) {
+    assert.match(pageSource, new RegExp(`\\["Todos", "TFF", "TLP", "TLL"\\]|<option[^>]*>${type}<\\/option>`));
+  }
 });
 
 await runTest("regularize management tables use debounced paginated hooks", async () => {

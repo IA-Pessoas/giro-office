@@ -90,6 +90,7 @@ export function buildRegularizeMunicipalTaxesListParams(
     year: filters.year,
     ...(filters.search ? { search: filters.search.trim() } : {}),
     ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.type ? { type: filters.type } : {}),
     ...(filters.page !== undefined ? { page: filters.page } : {}),
     ...(filters.limit !== undefined ? { limit: filters.limit } : {}),
   };

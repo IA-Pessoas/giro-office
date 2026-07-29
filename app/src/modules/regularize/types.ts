@@ -4,6 +4,8 @@ export type RegularizeStatus = string | boolean;
 
 export type RegularizePartnerType = "pf" | "pj";
 
+export type RegularizeMunicipalTaxType = "TFF" | "TLP" | "TLL";
+
 export type RegularizeOptionalDate = string | undefined;
 
 export type RegularizeIdFilter = {
@@ -37,6 +39,7 @@ export type RegularizeMunicipalTaxesListFilters = {
   year: number;
   search?: string;
   status?: "Todos" | "Criado" | "Pendente";
+  type?: RegularizeMunicipalTaxType;
   page?: number;
   limit?: number;
 };
