@@ -103,6 +103,34 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(false);
   });
 
+  it.each([
+    ["PATCH", "/client/client-1/regularize"],
+    ["PATCH", "/client/client-1/termination"],
+    ["POST", "/client/client-1/histories"],
+    ["PATCH", "/client/client-1/pa"],
+  ])("bloqueia Viewer do Regularize em %s %s", (method, path) => {
+    const policy = requiredRoutePolicy(method, path);
+
+    expect(
+      canAccessRoute(
+        authContext({
+          permission: 0,
+          modules: { regularize: 1 },
+        }),
+        policy,
+      ),
+    ).toBe(false);
+    expect(
+      canAccessRoute(
+        authContext({
+          permission: 0,
+          modules: { regularize: 2 },
+        }),
+        policy,
+      ),
+    ).toBe(true);
+  });
+
   it.each([0, 1, 2, 3])("avalia o módulo Integração no nível %i", (level) => {
     const policy = requiredRoutePolicy("GET", "/client/123");
     expect(
@@ -184,10 +212,11 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(true);
   });
 
-  it("não usa Integração como bypass para mutações verticais de cliente", () => {
+  it("não usa Integração como bypass e reserva mutações verticais ao Editor", () => {
     const policy = requiredRoutePolicy("PATCH", "/client/client-1/finance");
     expect(canAccessRoute(authContext({ modules: { integracao: 3 } }), policy)).toBe(false);
-    expect(canAccessRoute(authContext({ modules: { financeiro: 1 } }), policy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { financeiro: 1 } }), policy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { financeiro: 2 } }), policy)).toBe(true);
   });
 
   it("reserva a alteração modular ao owner, inclusive contra RH administrador", () => {

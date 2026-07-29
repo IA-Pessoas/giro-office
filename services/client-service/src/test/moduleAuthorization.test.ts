@@ -23,6 +23,19 @@ describe("requireClientDomainModule", () => {
     ).not.toThrow();
   });
 
+  it("exige nível de edição do Regularize para mutações diretas", () => {
+    expect(() =>
+      requireClientDomainModule(requestWithModules({ regularize: 1 }), "regularize", 2),
+    ).toThrowError(ServiceError);
+    expect(() => requireClientDomainAccess(requestWithModules({ regularize: 1 }), 2)).toThrowError(
+      ServiceError,
+    );
+    expect(() =>
+      requireClientDomainModule(requestWithModules({ regularize: 2 }), "regularize", 2),
+    ).not.toThrow();
+    expect(() => requireClientDomainAccess(requestWithModules({ regularize: 2 }), 2)).not.toThrow();
+  });
+
   it("nega contexto modular ausente para chamadas diretas", () => {
     expect(() => requireClientDomainAccess({ user_type: "user" } as unknown as Request)).toThrow(
       ServiceError,

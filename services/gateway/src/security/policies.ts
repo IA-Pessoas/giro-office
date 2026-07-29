@@ -59,6 +59,13 @@ const clientModulePolicy: AuthPolicy = {
   },
 };
 
+const clientEditPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: [...clientRelatedModules],
+    minPermission: moduleEditPermission,
+  },
+};
+
 const integracaoProjectPolicy: AuthPolicy = {
   modulePermission: {
     module: "integracao",
@@ -88,7 +95,8 @@ const routePolicyMatchers: Array<{
   policy: AuthPolicy;
 }> = [
   { method: "ANY", path: integracaoClientPath, policy: integracaoClientPolicy },
-  { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
+  { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
+  { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientEditPolicy },
   { method: "ANY", path: /^\/project(?:\/|$)/, policy: integracaoProjectPolicy },
   { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
