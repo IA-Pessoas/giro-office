@@ -52,4 +52,11 @@ export const fiscalNcmService = {
 
     return unwrapFiscalMutation<FiscalNcm>(response.data);
   },
+
+  async delete(ncmId: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.delete(FISCAL_ENDPOINTS.ncm, {
+      params: buildFiscalNcmDetailParams(ncmId),
+    });
+  },
 };
