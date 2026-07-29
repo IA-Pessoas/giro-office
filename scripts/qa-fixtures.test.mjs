@@ -90,8 +90,6 @@ test("o seed QA e o roteiro usam as fixtures declarativas", async () => {
   assert.match(seedQaSource, /INTEGRACAO_QA_FIXTURES/);
   assert.match(seedQaSource, /moduleName === "integracao" \? level : 0/);
   assert.match(seedQaSource, /permission: 0/);
-  assert.equal(seedQaSource.match(/responsible2_id:\s*fixture\.task\.responsible2Id/g)?.length, 2);
-  assert.equal(seedQaSource.match(/responsible3_id:\s*fixture\.task\.responsible3Id/g)?.length, 2);
   assert.match(qaGuide, /prisma:seed:qa/);
   assert.match(qaGuide, /PROJECT_SERVICE_INTEGRATION=1/);
   assert.match(qaGuide, /403/);

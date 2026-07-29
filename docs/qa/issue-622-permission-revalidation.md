@@ -20,11 +20,11 @@ Os comandos de contexto do Graphify inicialmente reportaram ausência de grafos 
 
 | Perfil | Navegação/UI | Backend observado |
 | --- | --- | --- |
-| Nível 0 | Dashboard, Minhas tarefas e Configurações visíveis; `/projects` direto mostrou “Acesso indisponível”. `/tasks` exibiu a tarefa QA e o botão de edição da tarefa própria. | `GET /task/list` = 200, 1 tarefa, `isOwn: true`; `PUT /task` próprio em `observations` = 200. |
+| Nível 0 | Dashboard, Minhas tarefas e Configurações visíveis; `/projects` direto mostrou “Acesso indisponível”. `/tasks` exibiu a tarefa QA e o botão de edição da tarefa própria. A visibilidade de Dashboard/Configurações é um achado contra a regra “somente Minhas tarefas” de #551/#581, não um critério aprovado. | `GET /task/list` = 200, 1 tarefa, `isOwn: true`; `PUT /task` próprio em `observations` = 200. |
 | Nível 1 | Clientes e Projetos visíveis em modo leitura: não exibiu “Novo cliente” nem ações de edição do projeto. Em Tarefas, a linha própria exibiu “Editar tarefa”. | `GET /client/list` = 200; leitura cross-org de cliente/projeto/tarefa = 404; `PATCH /client/:id` e `PUT /project` = 403; `PUT /task` próprio em `observations` = 200; `GET /task/list` = 200, `isOwn: true`. |
 | Nível 2 | Clientes exibiu “Novo cliente”; Projetos exibiu “Novo projeto” após selecionar o cliente e exibiu “Editar”/“Recalcular” no projeto. | Criação/edição real de cliente = 201/200; criação/edição real de projeto = 201/200; criação/edição real de tarefa = 201/200. A massa temporária foi removida/inativada ao fim da prova. `GET /task/list` = 200, `isOwn: true`. Exclusão de projeto = 403. |
 | Nível 3 | `/configs/integracao/tasks` direto carregou “Modelos de tarefas”, com “Novo modelo”, “Editar modelo” e “Excluir modelo”. | CRUD real de modelo = 201/200/200; exclusão do projeto QA com tarefa dependente = 409; o recurso dependente não foi removido. `GET /task/list` = 200. |
-| Owner | Dashboard exibiu a navegação ampliada, incluindo Departamentos, módulos e Administração. `/administracao` direto carregou as abas “Usuários” e “Permissões” e “Novo usuário”. | `GET /task/list` = 200; o owner manteve a leitura global e a gestão de permissões prevista pela matriz. |
+| Owner | Dashboard exibiu a navegação ampliada, incluindo Departamentos, módulos e Administração. `/administracao` direto carregou as abas “Usuários” e “Permissões” e “Novo usuário”. | `GET /task/list` = 200; o owner manteve a leitura global e a gestão de permissões prevista pela matriz. A persistência de auditoria da alteração administrativa não foi consultada separadamente nesta execução. |
 
 As três posições de ownership foram exercitadas pelo mesmo registro semeado: nível 0, nível 1 e nível 2 receberam `isOwn: true` ao consultar `/task/list`; nível 3 e owner receberam a tarefa administrativa sem ownership próprio. O teste de fixture também valida os três mapeamentos de IDs.
 
@@ -41,12 +41,14 @@ pnpm qa:integracao
 
 As evidências HTTP foram coletadas contra o gateway local com os usuários reais semeados (`qa.alfa.level0`, `qa.alfa.level1`, `qa.alfa.level2`, `qa.alfa.level3` e `qa.alfa.owner`) e senha descartável local. Tokens não foram registrados neste documento.
 
+A suíte de política compartilhada também valida as três posições de ownership para tarefas próprias e não-próprias, incluindo as decisões `403/404`: `pnpm --filter @workspace/shared test -- tests/integracao-policy.test.ts` passou com 32/32.
+
 ## Roteiro reproduzível
 
 Fluxos visíveis executados: login de cada perfil; `/tasks`; `/clients`; `/projects`; `/projects?clientId=34000000-0000-4000-8000-000000000001`; `/configs/integracao/tasks`; `/administracao`; logout e novo login entre perfis. As verificações diretas usaram `GET /task/list`, `GET /client/list`, `GET|PUT /task`, `GET|PATCH /client/:id`, `GET|PUT|DELETE /project` e detalhes cross-org com os IDs das fixtures.
 
-Os testes automatizados de autenticação também cobrem invalidação da sessão, encerramento do loading e orientação de retorno ao login: `pnpm --filter @workspace/app test:auth` passou. A prova real de downgrade foi `PUT /user/permission/:userId` pelo owner = 200, token aberto do nível 3 invalidado = 401 e novo token com leitura de modelos = 200; o seed foi executado novamente para restaurar a fixture.
+Os testes automatizados de autenticação também cobrem invalidação da sessão, encerramento do loading e orientação de retorno ao login: `pnpm --filter @workspace/app test:auth` passou. A prova real de downgrade foi `PUT /user/permission/:userId` pelo owner, reduzindo `3 → 1` = 200; o token aberto do nível 3 foi invalidado = 401; o novo token nível 1 manteve leitura de tarefas/modelos permitida, sem mutações administrativas; o seed foi executado novamente para restaurar a fixture.
 
-Após o seed real, `QA_INTEGRACAO_DATABASE_URL=$DATABASE_URL pnpm qa:integracao:db` consulta diretamente `integracao.tasks` e confirma os três IDs persistidos. Sem `QA_INTEGRACAO_DATABASE_URL`, esse teste fica skip para preservar o ciclo unitário.
+Após o seed real, defina uma URL QA explícita (`QA_DB_URL='postgresql://postgres:postgres@127.0.0.1:55432/issue622'`), execute `DATABASE_URL="$QA_DB_URL" pnpm --filter @workspace/infra prisma:seed:qa` e depois `QA_INTEGRACAO_DATABASE_URL="$QA_DB_URL" pnpm qa:integracao:db`; o gate gera o cliente Prisma, consulta diretamente `integracao.tasks` e confirma a organização e os três IDs persistidos. Sem `QA_INTEGRACAO_DATABASE_URL`, esse gate falha deliberadamente; `pnpm qa:integracao` permanece o ciclo unitário sem banco.
 
 A troca A→B mantendo a sessão continua bloqueada pelo modelo atual de uma organização por usuário/token e está registrada acima, sem substituí-la por logout/login.
