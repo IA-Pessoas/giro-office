@@ -10,6 +10,7 @@ import {
   parseCertificateFilename,
   unwrapCertificateEnvelope,
 } from "./services/certificateService.contract.ts";
+import * as certificateWorkspaceUi from "./components/certificateWorkspaceUi.ts";
 
 function runTest(name, fn) {
   try {
@@ -170,11 +171,109 @@ const certificatesWorkspaceSource = readFileSync(
   "utf8",
 );
 
-runTest("separa permissao de edicao e remocao de arquivos", () => {
-  assert.match(certificateFileActionsSource, /canDelete: boolean/);
-  assert.match(certificateFileActionsSource, /\{canDelete \?/);
+runTest("Viewer de certificados pode consultar sem receber ações de escrita", () => {
   assert.equal(
-    (certificatesWorkspaceSource.match(/canDelete=\{access\.isAdmin\}/g) ?? []).length,
+    typeof certificateWorkspaceUi.resolveCertificateWorkspaceCapabilities,
+    "function",
+  );
+  assert.deepEqual(
+    certificateWorkspaceUi.resolveCertificateWorkspaceCapabilities({
+      canView: true,
+      canEdit: false,
+      isAdmin: false,
+    }),
+    {
+      canReadRecords: true,
+      canManageRecords: false,
+      canManageFiles: false,
+      canDeleteRecords: false,
+      canDeleteFiles: false,
+    },
+  );
+  assert.deepEqual(
+    certificateWorkspaceUi.resolveCertificateWorkspaceCapabilities({
+      canView: true,
+      canEdit: true,
+      isAdmin: false,
+    }),
+    {
+      canReadRecords: true,
+      canManageRecords: true,
+      canManageFiles: true,
+      canDeleteRecords: true,
+      canDeleteFiles: false,
+    },
+  );
+  assert.deepEqual(
+    certificateWorkspaceUi.resolveCertificateWorkspaceCapabilities({
+      canView: true,
+      canEdit: true,
+      isAdmin: true,
+    }),
+    {
+      canReadRecords: true,
+      canManageRecords: true,
+      canManageFiles: true,
+      canDeleteRecords: true,
+      canDeleteFiles: true,
+    },
+  );
+});
+
+runTest("workspace aplica a mesma política de acesso nas consultas e ações", () => {
+  assert.match(
+    certificatesWorkspaceSource,
+    /resolveCertificateWorkspaceCapabilities\(access\)/,
+  );
+  assert.match(
+    certificatesWorkspaceSource,
+    /const shouldFetchCertificates =\s*certificateCapabilities\.canReadRecords &&\s*!isModuleAccessLoading/,
+  );
+  assert.match(
+    certificatesWorkspaceSource,
+    /enabled: shouldFetchCertificates && activeTab === "pj"/,
+  );
+  assert.match(
+    certificatesWorkspaceSource,
+    /enabled: shouldFetchCertificates && activeTab === "pf"/,
+  );
+  assert.equal(
+    (
+      certificatesWorkspaceSource.match(
+        /canEdit=\{certificateCapabilities\.canManageFiles\}/g,
+      ) ?? []
+    ).length,
+    4,
+  );
+  assert.equal(
+    (
+      certificatesWorkspaceSource.match(
+        /canDeleteFile=\{certificateCapabilities\.canDeleteFiles\}/g,
+      ) ?? []
+    ).length,
+    4,
+  );
+  assert.equal(
+    (
+      certificatesWorkspaceSource.match(
+        /canDeleteRecord=\{certificateCapabilities\.canDeleteRecords\}/g,
+      ) ?? []
+    ).length,
+    4,
+  );
+});
+
+runTest("separa permissao de edicao e remocao de arquivos", () => {
+  assert.match(certificateFileActionsSource, /canDeleteFile: boolean/);
+  assert.match(certificateFileActionsSource, /canDeleteRecord: boolean/);
+  assert.match(certificateFileActionsSource, /\{canDeleteFile \?/);
+  assert.match(certificateFileActionsSource, /\{canDeleteRecord \?/);
+  assert.equal(
+    (
+      certificatesWorkspaceSource.match(
+        /canDeleteFile=\{certificateCapabilities\.canDeleteFiles\}/g,
+      ) ?? []
+    ).length,
     4,
   );
 });

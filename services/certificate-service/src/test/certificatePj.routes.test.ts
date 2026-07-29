@@ -82,6 +82,50 @@ describe("certificate PJ routes", () => {
     expect(response.body.data).not.toHaveProperty("file_path");
   });
 
+  it("GET /certificate/pj/:id allows Viewer without exposing private fields", async () => {
+    const app = createCertificateTestApp();
+
+    const response = await request(app)
+      .get(`/certificate/pj/${certificateId}`)
+      .set(certificateGatewayHeaders(1));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: certificateId,
+        name: "Empresa Castelo",
+        cnpj: "11222333000144",
+      },
+    });
+    expect(response.body.data).not.toHaveProperty("password");
+    expect(response.body.data).not.toHaveProperty("file_path");
+    expect(response.body.data).not.toHaveProperty("file_encryption_iv");
+    expect(response.body.data).not.toHaveProperty("file_encryption_tag");
+  });
+
+  it("blocks every certificate PJ write and file access for Viewer", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+    const viewerHeaders = certificateGatewayHeaders(1);
+
+    const responses = await Promise.all([
+      request(app).post("/certificate/pj").set(viewerHeaders),
+      request(app).patch(`/certificate/pj/${certificateId}`).set(viewerHeaders),
+      request(app).delete(`/certificate/pj/${certificateId}`).set(viewerHeaders),
+      request(app).post(`/certificate/pj/${certificateId}/file`).set(viewerHeaders),
+      request(app).get(`/certificate/pj/${certificateId}/file`).set(viewerHeaders),
+      request(app).delete(`/certificate/pj/${certificateId}/file`).set(viewerHeaders),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([403, 403, 403, 403, 403, 403]);
+    for (const response of responses) {
+      expect(response.body).toMatchObject({
+        success: false,
+        code: "FORBIDDEN",
+      });
+    }
+  });
+
   it("POST /certificate/pj rejects storage-managed metadata in JSON body", async () => {
     const app = createCertificateTestApp(createCertificatePrismaMock());
 

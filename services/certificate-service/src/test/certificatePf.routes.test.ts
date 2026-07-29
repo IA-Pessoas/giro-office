@@ -119,6 +119,50 @@ describe("certificate PF routes", () => {
     expect(response.body.data).not.toHaveProperty("file_storage_bucket");
   });
 
+  it("GET /certificate/pf/:id allows Viewer without exposing private fields", async () => {
+    const app = createCertificateTestApp();
+
+    const response = await request(app)
+      .get(`/certificate/pf/${certificateId}`)
+      .set(certificateGatewayHeaders(1));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: certificateId,
+        name: "Joao Silva",
+        cpf: "12345678901",
+      },
+    });
+    expect(response.body.data).not.toHaveProperty("password");
+    expect(response.body.data).not.toHaveProperty("file_path");
+    expect(response.body.data).not.toHaveProperty("file_encryption_iv");
+    expect(response.body.data).not.toHaveProperty("file_encryption_tag");
+  });
+
+  it("blocks every certificate PF write and file access for Viewer", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+    const viewerHeaders = certificateGatewayHeaders(1);
+
+    const responses = await Promise.all([
+      request(app).post("/certificate/pf").set(viewerHeaders),
+      request(app).patch(`/certificate/pf/${certificateId}`).set(viewerHeaders),
+      request(app).delete(`/certificate/pf/${certificateId}`).set(viewerHeaders),
+      request(app).post(`/certificate/pf/${certificateId}/file`).set(viewerHeaders),
+      request(app).get(`/certificate/pf/${certificateId}/file`).set(viewerHeaders),
+      request(app).delete(`/certificate/pf/${certificateId}/file`).set(viewerHeaders),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([403, 403, 403, 403, 403, 403]);
+    for (const response of responses) {
+      expect(response.body).toMatchObject({
+        success: false,
+        code: "FORBIDDEN",
+      });
+    }
+  });
+
   it("POST /certificate/pf preserves explicit string false booleans", async () => {
     const prisma = {
       certificatePF: {
