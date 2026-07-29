@@ -127,6 +127,23 @@ runTest("RH sem acesso nao e tratado como usuario autorizado", () => {
   assert.equal(capabilities.canManageRhRequests, false);
 });
 
+runTest("RH shell distingue erro de permissao de ausencia de acesso", () => {
+  const shellSource = readFileSync("src/shared/components/newLayout/RH.tsx", "utf8");
+
+  assert.match(
+    shellSource,
+    /if \(!permissionQuery\.isLoading && permissionQuery\.error\) \{/,
+  );
+  assert.match(
+    shellSource,
+    /validar o acesso ao RH agora\./,
+  );
+  assert.match(
+    shellSource,
+    /if \(!permissionQuery\.isLoading && !permissionQuery\.error && !canAccessRhPortal\) \{/,
+  );
+});
+
 runTest("RH score periods include a relative history window and do not hard-code 2026", () => {
   const options = getRhQuarterOptions(new Date("2026-07-01T12:00:00"));
   const historySource = readFileSync("src/modules/rh/components/score/RhScoreHistoryPanel.tsx", "utf8");
