@@ -97,6 +97,12 @@ const TI_TABS: TiTabConfig[] = [
 
 const SELF_SERVICE_TI_TABS: TiTabConfig[] = [
   {
+    id: "dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    panel: TiDashboardTab,
+  },
+  {
     id: "requests",
     label: "Chamados",
     icon: Ticket,
@@ -107,6 +113,12 @@ const SELF_SERVICE_TI_TABS: TiTabConfig[] = [
     label: "Meus termos",
     icon: FileCheck2,
     panel: TiTermsTab,
+  },
+  {
+    id: "extensions",
+    label: "Ramais",
+    icon: Phone,
+    panel: TiExtensionsTab,
   },
 ];
 

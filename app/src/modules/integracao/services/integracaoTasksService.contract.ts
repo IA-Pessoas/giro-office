@@ -29,8 +29,16 @@ export function buildCreateIntegracaoTaskPayload(payload: CreateIntegracaoTaskBo
     project_id: payload.project_id,
     client_id: payload.client_id,
     prospecting_status: payload.prospecting_status,
+    ...(payload.name ? { name: payload.name } : {}),
+    ...(payload.status ? { status: payload.status } : {}),
+    ...(payload.department_id ? { department_id: payload.department_id } : {}),
     observations: payload.observations ?? "",
+    ...(payload.billing ? { billing: payload.billing } : {}),
     urgency: payload.urgency,
+    ...(payload.responsible_id ? { responsible_id: payload.responsible_id } : {}),
+    ...(payload.responsible2_id ? { responsible2_id: payload.responsible2_id } : {}),
+    ...(payload.responsible3_id ? { responsible3_id: payload.responsible3_id } : {}),
+    ...(payload.prevision_date ? { prevision_date: payload.prevision_date } : {}),
   };
 }
 

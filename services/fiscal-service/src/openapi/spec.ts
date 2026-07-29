@@ -162,7 +162,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                   type: "object",
                   properties: {
                     tax_regime: { type: "string" },
-                    ncm_code: { type: "string" },
+                    ncm_code: { type: "string", pattern: "^\\d+$" },
                     federal_taxation_type: { type: "string" },
                     description: { type: "string" },
                     ncm_notes: { type: "string" },
@@ -234,7 +234,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                   properties: {
                     ncm_id: { type: "string", format: "uuid" },
                     tax_regime: { type: "string" },
-                    ncm_code: { type: "string" },
+                    ncm_code: { type: "string", pattern: "^\\d+$" },
                     federal_taxation_type: { type: "string" },
                     description: { type: "string" },
                     ncm_notes: { type: "string" },
@@ -269,6 +269,30 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                 },
               },
             },
+          },
+        },
+        delete: {
+          tags: ["NCM"],
+          summary: "Excluir NCM",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "ncm_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Excluido",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Permissao fiscal admin requerida" },
           },
         },
       },
@@ -400,6 +424,30 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
             },
           },
         },
+        delete: {
+          tags: ["ICMS"],
+          summary: "Excluir ICMS",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "icms_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Excluido",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Permissao fiscal admin requerida" },
+          },
+        },
       },
       "/fiscal/icms/list": {
         get: {
@@ -519,6 +567,30 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                 },
               },
             },
+          },
+        },
+        delete: {
+          tags: ["IPI"],
+          summary: "Excluir IPI",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "ipi_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Excluido",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Permissao fiscal admin requerida" },
           },
         },
       },

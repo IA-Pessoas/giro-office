@@ -164,6 +164,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     taskServiceUrl: "http://127.0.0.1:3032",
     projectServiceUrl: "http://127.0.0.1:3033",
     clientServiceUrl: "http://127.0.0.1:3035",
+    clientServiceInternalToken: "client-service-token",
     departmentServiceUrl: "http://127.0.0.1:3336",
     fiscalServiceUrl: "http://127.0.0.1:3037",
     contabilServiceUrl: "http://127.0.0.1:3038",
@@ -1216,6 +1217,7 @@ it("proxies project-service routes mapped in the gateway", async () => {
     user_id: "user-1",
     organization_id: "org-1",
     permission: 2,
+    modules: { integracao: 1 },
   });
   const projectService = createServer((request, response) => {
     response.statusCode = 200;
@@ -1596,6 +1598,60 @@ it("forwards modular certificate permission and internal token to certificate-se
     expect(response.status).toBe(200);
     expect(seenPermission).toBe("1");
     expect(seenInternalToken).toBe("certificate-service-token");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(certificateService);
+  }
+});
+
+it("allows certificate Viewers to list, filter and open PJ and PF records", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    type: "user",
+    modules: { certificado: 1 },
+  });
+  const seenRequests: Array<{ path: string; permission?: string }> = [];
+  const certificateService = createServer((request, response) => {
+    seenRequests.push({
+      path: request.url ?? "",
+      permission: request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined,
+    });
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const certificateServiceUrl = await startServer(certificateService);
+  const app = createApp(createEnv({ certificateServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const certificateId = "20000000-0000-4000-8000-000000000001";
+
+  try {
+    const paths = [
+      "/certificate/pj/list?name=Castelo",
+      `/certificate/pj/${certificateId}`,
+      "/certificate/pf/list?search=Joao",
+      `/certificate/pf/${certificateId}`,
+    ];
+    const statuses: number[] = [];
+    for (const path of paths) {
+      const response = await fetch(`${gatewayUrl}${path}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      statuses.push(response.status);
+    }
+
+    expect(statuses).toEqual([200, 200, 200, 200]);
+    expect(seenRequests).toEqual(
+      paths.map((path) => ({
+        path,
+        permission: "1",
+      })),
+    );
   } finally {
     await stopServer(gateway);
     await stopServer(certificateService);
@@ -2757,26 +2813,19 @@ it("blocks disabled commercial routes before proxying even for global admins", a
   }
 });
 
-it("blocks limited users without client-related module permission before proxying /client", async () => {
+it("allows Viewers without client-related module permission to proxy /client/list", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
     permission: 1,
     modules: {
-      atendimento: 0,
-      comercial: 0,
-      contabil: 0,
-      financeiro: 0,
-      fiscal: 0,
-      integracao: 0,
-      pessoal: 0,
-      regularize: 0,
+      atendimento: 2,
     },
   });
-  let upstreamHits = 0;
+  let seenUrl = "";
 
-  const upstream = createServer((_request, response) => {
-    upstreamHits += 1;
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ success: true, data: { proxied: true } }));
@@ -2793,9 +2842,77 @@ it("blocks limited users without client-related module permission before proxyin
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    expect(response.status).toBe(403);
-    expect(body.code).toBe("FORBIDDEN");
-    expect(upstreamHits).toBe(0);
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl).toBe("/client/list");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("allows Integration viewers to proxy client list", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { integracao: 1 },
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenUrl).toBe("/client/list");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("allows Integration viewers without global permission to proxy client list", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 0,
+    modules: { integracao: 1 },
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenUrl).toBe("/client/list");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -2860,6 +2977,59 @@ it("allows limited users with client-related module permission to proxy /client"
 
     expect(response.status).toBe(200);
     expect(seenUrl).toBe("/client/list");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("forwards the authenticated Integration context to client-service", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    type: "user",
+    modules: { integracao: 2 },
+  });
+  let seenHeaders: Record<string, string | undefined> = {};
+
+  const upstream = createServer((request, response) => {
+    seenHeaders = {
+      internalToken: request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined,
+      userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
+      organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined,
+      permission: request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined,
+      type: request.headers[FORWARDED_AUTH_TYPE_HEADER] as string | undefined,
+      modules: request.headers[FORWARDED_AUTH_MODULES_HEADER] as string | undefined,
+    };
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/client-1`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Cliente atualizado" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenHeaders).toMatchObject({
+      internalToken: "client-service-token",
+      userId: "user-1",
+      organizationId: "org-1",
+      permission: "1",
+      type: "user",
+    });
+    expect(JSON.parse(seenHeaders.modules ?? "{}")).toMatchObject({ integracao: 2 });
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -3033,6 +3203,41 @@ it("forwards RH module permission to rh-service", async () => {
   }
 });
 
+it("allows Contabil module users to load RH operational users for selectors", async () => {
+  const token = createToken({
+    user_id: "contabil-admin",
+    organization_id: "org-1",
+    permission: 1,
+    type: "admin",
+    modules: { contabil: 3, rh: 0 },
+  });
+  let seenModules: string | undefined;
+
+  const upstream = createServer((request, response) => {
+    seenModules = request.headers[FORWARDED_AUTH_MODULES_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: [] }));
+  });
+  const rhServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ rhServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/rh/operational-users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(seenModules ?? "{}")).toMatchObject({ contabil: 3, rh: 0 });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("blocks limited users without pessoal module permission before proxying /pessoal", async () => {
   const token = createToken({
     user_id: "user-1",
@@ -3168,6 +3373,74 @@ it("forwards the Fiscal module permission and internal token", async () => {
     expect(response.status).toBe(200);
     expect(seenPermission).toBe("0");
     expect(seenInternalToken).toBe("audit-service-token");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("forwards the Contabil module permission and internal token", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { contabil: 0 },
+  });
+  let seenPermission: string | undefined;
+  let seenInternalToken: string | undefined;
+  const upstream = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    seenInternalToken = request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const contabilServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ contabilServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/contabil/controls`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("0");
+    expect(seenInternalToken).toBe("audit-service-token");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("does not forward legacy global permission to Contabil when module claims are absent", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+  });
+  let seenPermission: string | undefined;
+  const upstream = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const contabilServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ contabilServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/contabil/controls`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("0");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

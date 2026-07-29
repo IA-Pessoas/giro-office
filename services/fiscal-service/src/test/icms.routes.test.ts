@@ -26,7 +26,7 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-function gatewayHeaders(permission = 1): Record<string, string> {
+function gatewayHeaders(permission = 2): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
@@ -41,6 +41,7 @@ function createMockDeps(): IcmsRouteDeps {
   return {
     create: vi.fn(async () => ({ create: {} })),
     update: vi.fn(async () => ({})),
+    delete: vi.fn(async () => ({ deleted: {} })),
     detail: vi.fn(async () => ({ detail: {} })),
     list: vi.fn(async () => emptyListResult),
   };
@@ -105,7 +106,7 @@ describe("icms routes", () => {
     const res = await request(app)
       .post("/fiscal/icms")
       .set("Content-Type", "application/json")
-      .set(gatewayHeaders(0))
+      .set(gatewayHeaders(1))
       .send({});
 
     expect(res.status).toBe(403);
@@ -119,11 +120,45 @@ describe("icms routes", () => {
     const res = await request(app)
       .put("/fiscal/icms")
       .set("Content-Type", "application/json")
-      .set(gatewayHeaders(0))
+      .set(gatewayHeaders(1))
       .send({});
 
     expect(res.status).toBe(403);
     expect(deps.update).not.toHaveBeenCalled();
+  });
+
+  it("DELETE /fiscal/icms com Editor retorna 403 antes do servico", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, icmsRouteDeps: deps });
+
+    const res = await request(app)
+      .delete("/fiscal/icms")
+      .query({ icms_id: ICMS_ID })
+      .set(gatewayHeaders(2));
+
+    expect(res.status).toBe(403);
+    expect(deps.delete).not.toHaveBeenCalled();
+  });
+
+  it("DELETE /fiscal/icms com Admin fiscal exclui registro", async () => {
+    const payload = { deleted: { id: ICMS_ID, description: "ICMS route test" } };
+    const deps = createMockDeps();
+    deps.delete = vi.fn(async () => payload);
+    const app = createFiscalApp({ env, logger, icmsRouteDeps: deps });
+
+    const res = await request(app)
+      .delete("/fiscal/icms")
+      .query({ icms_id: ICMS_ID })
+      .set(gatewayHeaders(3));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: payload });
+    expect(deps.delete).toHaveBeenCalledWith({
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      permission: 3,
+      icms_id: ICMS_ID,
+    });
   });
 
   it("GET /fiscal/icms sem icms_id válido retorna 400", async () => {

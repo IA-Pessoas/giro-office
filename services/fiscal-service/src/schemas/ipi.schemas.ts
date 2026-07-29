@@ -30,6 +30,8 @@ export const detailIpiQuerySchema = z
   })
   .strict();
 
+export const deleteIpiQuerySchema = detailIpiQuerySchema;
+
 export const listIpiQuerySchema = z
   .object({
     ...paginationQuerySchema.shape,

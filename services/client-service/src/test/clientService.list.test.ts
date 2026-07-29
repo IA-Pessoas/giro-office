@@ -6,6 +6,39 @@ const TEST_ORG_ID = "550e8400-e29b-41d4-a716-446655440000";
 const TEST_CLIENT_ID = "660e8400-e29b-41d4-a716-446655440001";
 
 describe("ClientService.listByOrganization", () => {
+  it("permite lista generica para acesso de cliente fora da Integração", async () => {
+    const prisma = {
+      organization: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: TEST_ORG_ID,
+          name: "Org Test",
+          slug: "org-test",
+          logo_url: null,
+          status: "active",
+          subscription_plan: "trial",
+        }),
+      },
+      client: {
+        findMany: vi.fn().mockResolvedValue([]),
+        count: vi.fn().mockResolvedValue(0),
+      },
+    } as unknown as PrismaClient;
+    const service = new ClientService(prisma);
+
+    await expect(
+      service.listByOrganization(
+        TEST_ORG_ID,
+        { page: 1, pageSize: 20 },
+        {
+          userId: "user-1",
+          level: 0,
+          isOwner: false,
+          hasClientListAccess: true,
+        },
+      ),
+    ).resolves.toMatchObject({ items: [], total: 0 });
+  });
+
   it("executa consultas em sequencia para evitar esgotar o pool de sessoes", async () => {
     let activeQueries = 0;
     let maxActiveQueries = 0;
@@ -51,10 +84,14 @@ describe("ClientService.listByOrganization", () => {
     } as unknown as PrismaClient;
     const service = new ClientService(prisma);
 
-    await service.listByOrganization(TEST_ORG_ID, {
-      page: 1,
-      pageSize: 10,
-    });
+    await service.listByOrganization(
+      TEST_ORG_ID,
+      {
+        page: 1,
+        pageSize: 10,
+      },
+      { userId: "user-1", level: 1, isOwner: false },
+    );
 
     expect(maxActiveQueries).toBe(1);
   });
@@ -91,10 +128,14 @@ describe("ClientService.listByOrganization", () => {
     } as unknown as PrismaClient;
     const service = new ClientService(prisma);
 
-    const page = await service.listByOrganization(TEST_ORG_ID, {
-      page: 1,
-      pageSize: 20,
-    });
+    const page = await service.listByOrganization(
+      TEST_ORG_ID,
+      {
+        page: 1,
+        pageSize: 20,
+      },
+      { userId: "user-1", level: 1, isOwner: false },
+    );
 
     expect(page).toEqual({
       items: [
@@ -224,7 +265,11 @@ describe("ClientService.getById", () => {
     } as unknown as PrismaClient;
     const service = new ClientService(prisma);
 
-    const client = await service.getById(TEST_CLIENT_ID, TEST_ORG_ID);
+    const client = await service.getById(TEST_CLIENT_ID, TEST_ORG_ID, {
+      userId: "user-1",
+      level: 1,
+      isOwner: false,
+    });
 
     expect(client).toMatchObject({
       id: TEST_CLIENT_ID,
@@ -278,5 +323,50 @@ describe("ClientService.getById", () => {
         participants_meet: true,
       }),
     });
+  });
+
+  it("bloqueia criação no nível 1 antes de consultar a organização", async () => {
+    const findUniqueOrg = vi.fn();
+    const prisma = {
+      organization: { findUnique: findUniqueOrg },
+      client: { create: vi.fn() },
+    } as unknown as PrismaClient;
+    const service = new ClientService(prisma);
+
+    await expect(
+      service.create(
+        {
+          name: "Cliente",
+          organization_id: TEST_ORG_ID,
+          status: "Ativo",
+          cpf_cnpj: "",
+          prospecting_status: "Lead",
+          type: "PJ",
+          type_registration: "Novo",
+          service_unique: false,
+        },
+        { userId: "user-1", level: 1, isOwner: false },
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(findUniqueOrg).not.toHaveBeenCalled();
+  });
+
+  it("impede nível 2 de inativar cliente pelo PATCH", async () => {
+    const findFirst = vi.fn().mockResolvedValue({ id: TEST_CLIENT_ID });
+    const update = vi.fn();
+    const prisma = {
+      client: { findFirst, update },
+    } as unknown as PrismaClient;
+    const service = new ClientService(prisma);
+
+    await expect(
+      service.update(
+        TEST_CLIENT_ID,
+        TEST_ORG_ID,
+        { status: "Inativo" },
+        { userId: "user-1", level: 2, isOwner: false },
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(update).not.toHaveBeenCalled();
   });
 });

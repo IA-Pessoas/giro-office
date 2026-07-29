@@ -1,7 +1,13 @@
+import { ServiceError } from "@workspace/shared";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createTestApp, resetRhRouteMocks, scoreQuarterServiceMock } from "./rhTestUtils.js";
+import {
+  createTestApp,
+  resetRhRouteMocks,
+  scoreQuarterServiceMock,
+  setRhRoutePermission,
+} from "./rhTestUtils.js";
 
 describe("scoreQuarter routes", () => {
   const itemId = "00000000-0000-4000-8000-000000000010";
@@ -43,11 +49,41 @@ describe("scoreQuarter routes", () => {
     expect(scoreQuarterServiceMock.listForUser).toHaveBeenCalledWith(organizationId, userId);
   });
 
-  it("GET /rh/score/quarters/:id detalha score", async () => {
+  it("GET /rh/score/quarters/:id permite usuario comum detalhar o proprio score", async () => {
+    setRhRoutePermission(1);
     const app = createTestApp();
     const res = await request(app).get(`/rh/score/quarters/${itemId}`);
 
     expect(res.status).toBe(200);
+    expect(scoreQuarterServiceMock.getDetail).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      score_id: itemId,
+      user_id: userId,
+      can_manage: false,
+    });
+  });
+
+  it("GET /rh/score/quarters/:id permite visualizador abrir o proprio score", async () => {
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).get(`/rh/score/quarters/${itemId}`);
+
+    expect(res.status).toBe(200);
     expect(scoreQuarterServiceMock.getDetail).toHaveBeenCalledTimes(1);
+  });
+
+  it("GET /rh/score/quarters/:id bloqueia visualizador em score de terceiro", async () => {
+    scoreQuarterServiceMock.getDetail.mockRejectedValueOnce(
+      new ServiceError(403, "Permissao insuficiente para acessar score de terceiro."),
+    );
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).get(`/rh/score/quarters/${itemId}`);
+
+    expect(res.status).toBe(403);
+    expect(scoreQuarterServiceMock.getDetail).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      score_id: itemId,
+      user_id: userId,
+      can_manage: false,
+    });
   });
 });

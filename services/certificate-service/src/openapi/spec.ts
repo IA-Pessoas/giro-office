@@ -152,6 +152,7 @@ function publicCertificateOperation({
       "403": errorResponse("Permissao insuficiente"),
       "404": errorResponse(notFoundDescription),
       "409": errorResponse("Conflito de dominio"),
+      "500": errorResponse("Erro interno do servidor"),
     },
   };
 }
@@ -253,6 +254,37 @@ function certificateFileDeleteOperation({
       "401": errorResponse("Autenticacao obrigatoria"),
       "403": errorResponse("Permissao insuficiente"),
       "404": errorResponse(`Arquivo do certificado ${typeLabel} nao encontrado`),
+      "500": errorResponse("Erro interno"),
+    },
+  };
+}
+
+function certificateDeleteOperation({
+  idParameter,
+  operationIdSuffix,
+  tag,
+  typeLabel,
+}: {
+  idParameter: Record<string, unknown>;
+  operationIdSuffix: "Pj" | "Pf";
+  tag: "Certificate PJ" | "Certificate PF";
+  typeLabel: "PJ" | "PF";
+}) {
+  return {
+    operationId: `deleteCertificate${operationIdSuffix}`,
+    tags: [tag],
+    summary: `Exclui certificado ${typeLabel}`,
+    security: [{ bearerAuth: [] }],
+    parameters: [idParameter],
+    responses: {
+      "200": successResponse(
+        `Certificado ${typeLabel} excluido`,
+        componentRef("CertificateFileDeleteResult"),
+      ),
+      "400": errorResponse("Requisicao invalida"),
+      "401": errorResponse("Autenticacao obrigatoria"),
+      "403": errorResponse("Permissao insuficiente"),
+      "404": errorResponse(`Certificado ${typeLabel} nao encontrado`),
       "500": errorResponse("Erro interno"),
     },
   };
@@ -431,6 +463,12 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           parameters: [certificatePjIdParameter()],
           requestBody: certificatePjRequestBody(false),
         }),
+        delete: certificateDeleteOperation({
+          idParameter: certificatePjIdParameter(),
+          operationIdSuffix: "Pj",
+          tag: "Certificate PJ",
+          typeLabel: "PJ",
+        }),
       },
       "/certificate/pj/{id}/file": {
         post: certificateFileUploadOperation({
@@ -535,6 +573,12 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           notFoundDescription: "Certificado PF nao encontrado",
           parameters: [certificatePfIdParameter()],
           requestBody: certificatePfRequestBody(false),
+        }),
+        delete: certificateDeleteOperation({
+          idParameter: certificatePfIdParameter(),
+          operationIdSuffix: "Pf",
+          tag: "Certificate PF",
+          typeLabel: "PF",
         }),
       },
       "/certificate/pf/{id}/file": {

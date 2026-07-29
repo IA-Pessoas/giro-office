@@ -1,4 +1,10 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import {
+  INTEGRACAO_PERMISSION_LEVEL,
+  type IntegracaoPermissionLevel,
+  error as logError,
+  requireIntegracaoRouteAccess,
+  ServiceError,
+} from "@workspace/shared";
 
 import prismaClient from "../integrations/prisma.js";
 
@@ -47,6 +53,12 @@ export type ProjectMetricsResult = {
 
 export type ProjectMetricsPrisma = typeof prismaClient;
 
+export interface ProjectMetricsAuthorization {
+  userId: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
+}
+
 function normalizeStatus(status: string | null | undefined): string {
   return status?.trim().toLocaleLowerCase("pt-BR") ?? "";
 }
@@ -72,8 +84,18 @@ function hasNonCompletedTaskWithStatus(tasks: ProjectMetricsTask[]): boolean {
 export class ProjectMetricsService {
   constructor(private readonly prisma: ProjectMetricsPrisma = prismaClient) {}
 
-  async getGlobalMetrics(organizationId: string): Promise<ProjectMetricsResult> {
+  async getGlobalMetrics(
+    organizationId: string,
+    authorization: ProjectMetricsAuthorization = { userId: "" },
+  ): Promise<ProjectMetricsResult> {
     try {
+      requireIntegracaoRouteAccess("GET", "/project/metrics", {
+        userId: authorization.userId,
+        level: authorization.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId,
+        isOwner: authorization.isOwner === true,
+      });
+
       const projects = await this.prisma.project.findMany({
         where: { organization_id: organizationId },
         select: {

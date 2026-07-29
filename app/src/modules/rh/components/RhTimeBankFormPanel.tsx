@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { Dialog } from "@shared/components";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { useCreateRhTimeBankReleaseMutation } from "../hooks/useRhCalendar";
 import type { AssignableUser } from "../types";
 
@@ -193,12 +194,13 @@ export function RhTimeBankFormPanel({
       <div className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <span>Colaborador</span>
+            <RequiredFieldLabel required>Colaborador</RequiredFieldLabel>
             <div className="relative">
               <select
                 value={formState.userId}
                 onChange={(event) => handleChange("userId", event.target.value)}
                 className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                aria-required="true"
               >
                 <option value="">Selecione</option>
                 {assignableUsers.map((user) => (
@@ -234,35 +236,38 @@ export function RhTimeBankFormPanel({
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <span>Data</span>
+            <RequiredFieldLabel required>Data</RequiredFieldLabel>
             <input
               type="date"
               value={formState.date}
               onChange={(event) => handleChange("date", event.target.value)}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              aria-required="true"
             />
           </label>
 
           <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <span>Duração</span>
+            <RequiredFieldLabel required>Duração</RequiredFieldLabel>
             <input
               inputMode="numeric"
               value={formState.duration}
               onChange={(event) => handleDurationChange(event.target.value)}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="00:00"
+              aria-required="true"
             />
           </label>
         </div>
 
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Motivo</span>
+          <RequiredFieldLabel required>Motivo</RequiredFieldLabel>
           <textarea
             value={formState.reason}
             onChange={(event) => handleChange("reason", event.target.value)}
             rows={5}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            placeholder="Descreva o contexto do ajuste manual"
+          placeholder="Descreva o contexto do ajuste manual"
+          aria-required="true"
           />
         </label>
       </div>

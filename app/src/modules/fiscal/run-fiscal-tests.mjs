@@ -18,13 +18,21 @@ async function runTest(name, fn) {
 const fiscalSources = {
   shell: await readSource("./components/FiscalShell.tsx"),
   ncmSection: await readSource("./components/FiscalNcmSection.tsx"),
+  ncmForm: await readSource("./components/FiscalNcmFormPanel.tsx"),
+  searchSection: await readSource("./components/FiscalSearchSection.tsx"),
   icmsSection: await readSource("./components/FiscalIcmsSection.tsx"),
   ipiSection: await readSource("./components/FiscalIpiSection.tsx"),
   queryKeys: await readSource("./hooks/queryKeys.ts"),
   ncmHook: await readSource("./hooks/useFiscalNcmList.ts"),
   icmsHook: await readSource("./hooks/useFiscalIcmsList.ts"),
   ipiHook: await readSource("./hooks/useFiscalIpiList.ts"),
+  ncmMutations: await readSource("./hooks/useFiscalNcmMutations.ts"),
+  icmsMutations: await readSource("./hooks/useFiscalIcmsMutations.ts"),
+  ipiMutations: await readSource("./hooks/useFiscalIpiMutations.ts"),
   contract: await readSource("./services/fiscalService.contract.ts"),
+  ncmClient: await readSource("./services/fiscalNcmService.ts"),
+  icmsClient: await readSource("./services/fiscalIcmsService.ts"),
+  ipiClient: await readSource("./services/fiscalIpiService.ts"),
   types: await readSource("./types/index.ts"),
   ncmSchema: await readSource("../../../../services/fiscal-service/src/schemas/ncm.schemas.ts"),
   icmsSchema: await readSource("../../../../services/fiscal-service/src/schemas/icms.schemas.ts"),
@@ -32,6 +40,10 @@ const fiscalSources = {
   ncmRoute: await readSource("../../../../services/fiscal-service/src/routes/ncm.routes.ts"),
   icmsRoute: await readSource("../../../../services/fiscal-service/src/routes/icms.routes.ts"),
   ipiRoute: await readSource("../../../../services/fiscal-service/src/routes/ipi.routes.ts"),
+  ncmRouteTest: await readSource("../../../../services/fiscal-service/src/test/ncm.routes.test.ts"),
+  icmsRouteTest: await readSource("../../../../services/fiscal-service/src/test/icms.routes.test.ts"),
+  ipiRouteTest: await readSource("../../../../services/fiscal-service/src/test/ipi.routes.test.ts"),
+  authMiddleware: await readSource("../../../../services/fiscal-service/src/middlewares/isAuthenticated.ts"),
   ncmService: await readSource("../../../../services/fiscal-service/src/services/ncmService.ts"),
   icmsService: await readSource("../../../../services/fiscal-service/src/services/icmsService.ts"),
   ipiService: await readSource("../../../../services/fiscal-service/src/services/ipiService.ts"),
@@ -40,20 +52,66 @@ const fiscalSources = {
 await runTest("fiscal derives write access from the fiscal module", () => {
   assert.match(fiscalSources.shell, /import \{ useModuleAccess \} from "@modules\/auth";/);
   assert.match(fiscalSources.shell, /const \{ access: fiscalAccess \} = useModuleAccess\("fiscal"\);/);
-  assert.match(fiscalSources.shell, /<FiscalNcmTab canEdit=\{canEdit\} \/>/);
-  assert.match(fiscalSources.shell, /<FiscalIcmsTab canEdit=\{canEdit\} \/>/);
-  assert.match(fiscalSources.shell, /<FiscalIpiTab canEdit=\{canEdit\} \/>/);
-  assert.match(fiscalSources.shell, /<FiscalNcmSection canEdit=\{canEdit\} \/>/);
-  assert.match(fiscalSources.shell, /<FiscalIcmsSection canEdit=\{canEdit\} \/>/);
-  assert.match(fiscalSources.shell, /<FiscalIpiSection canEdit=\{canEdit\} \/>/);
+  assert.match(fiscalSources.shell, /canDelete=\{fiscalAccess\.isAdmin\}/);
+  assert.match(fiscalSources.shell, /<FiscalNcmTab canEdit=\{canEdit\} canDelete=\{canDelete\} \/>/);
+  assert.match(fiscalSources.shell, /<FiscalIcmsTab canEdit=\{canEdit\} canDelete=\{canDelete\} \/>/);
+  assert.match(fiscalSources.shell, /<FiscalIpiTab canEdit=\{canEdit\} canDelete=\{canDelete\} \/>/);
+  assert.match(fiscalSources.shell, /<FiscalNcmSection canEdit=\{canEdit\} canDelete=\{canDelete\} \/>/);
+  assert.match(fiscalSources.shell, /<FiscalIcmsSection canEdit=\{canEdit\} canDelete=\{canDelete\} \/>/);
+  assert.match(fiscalSources.shell, /<FiscalIpiSection canEdit=\{canEdit\} canDelete=\{canDelete\} \/>/);
 });
 
 await runTest("fiscal viewer keeps NCM, ICMS and IPI sections read-only", () => {
   for (const source of [fiscalSources.ncmSection, fiscalSources.icmsSection, fiscalSources.ipiSection]) {
-    assert.match(source, /export function Fiscal\w+Section\(\{ canEdit \}/);
+    assert.match(source, /export function Fiscal\w+Section\(\{\s*canEdit,\s*canDelete,/);
     assert.match(source, /if \(panelIntent && canEdit\)/);
     assert.match(source, /onEdit=\{canEdit \? \(item\) => setPanelIntent/);
-    assert.match(source, /\{onEdit \? \(/);
+    assert.match(source, /\{onEdit \|\| onDelete \? \(/);
+    assert.doesNotMatch(source, /onDelete=\{canEdit \?/);
+  }
+});
+
+await runTest("fiscal admins can delete NCM, ICMS and IPI from the list", () => {
+  for (const source of [fiscalSources.ncmSection, fiscalSources.icmsSection, fiscalSources.ipiSection]) {
+    assert.match(source, /Trash2/);
+    assert.match(source, /Dialog/);
+    assert.match(source, /canDelete \? \(item\) => setDeleteTarget\(item\) : undefined/);
+    assert.match(source, /onDelete=\{canDelete \?/);
+    assert.match(source, /title="Excluir/);
+    assert.match(source, /Confirmar exclus/);
+  }
+
+  assert.match(fiscalSources.ncmSection, /useDeleteFiscalNcmMutation/);
+  assert.match(fiscalSources.icmsSection, /useDeleteFiscalIcmsMutation/);
+  assert.match(fiscalSources.ipiSection, /useDeleteFiscalIpiMutation/);
+});
+
+await runTest("fiscal clients and hooks expose DELETE endpoints", () => {
+  assert.match(fiscalSources.ncmClient, /async delete\(ncmId: string\): Promise<void>/);
+  assert.match(fiscalSources.ncmClient, /api\.delete\(FISCAL_ENDPOINTS\.ncm/);
+  assert.match(fiscalSources.icmsClient, /async delete\(icmsId: string\): Promise<void>/);
+  assert.match(fiscalSources.icmsClient, /api\.delete\(FISCAL_ENDPOINTS\.icms/);
+  assert.match(fiscalSources.ipiClient, /async delete\(ipiId: string\): Promise<void>/);
+  assert.match(fiscalSources.ipiClient, /api\.delete\(FISCAL_ENDPOINTS\.ipi/);
+
+  assert.match(fiscalSources.ncmMutations, /useDeleteFiscalNcmMutation/);
+  assert.match(fiscalSources.ncmMutations, /mutationFn: \(id\) => fiscalNcmService\.delete\(id\)/);
+  assert.match(fiscalSources.icmsMutations, /useDeleteFiscalIcmsMutation/);
+  assert.match(fiscalSources.icmsMutations, /mutationFn: \(id\) => fiscalIcmsService\.delete\(id\)/);
+  assert.match(fiscalSources.ipiMutations, /useDeleteFiscalIpiMutation/);
+  assert.match(fiscalSources.ipiMutations, /mutationFn: \(id\) => fiscalIpiService\.delete\(id\)/);
+});
+
+await runTest("fiscal-service blocks viewer writes and allows editor writes", () => {
+  assert.match(fiscalSources.authMiddleware, /const FISCAL_WRITE_PERMISSION = 2;/);
+
+  for (const source of [
+    fiscalSources.ncmRouteTest,
+    fiscalSources.icmsRouteTest,
+    fiscalSources.ipiRouteTest,
+  ]) {
+    assert.match(source, /function gatewayHeaders\(permission = 2\)/);
+    assert.match(source, /\.set\(gatewayHeaders\(1\)\)/);
   }
 });
 
@@ -130,6 +188,16 @@ await runTest("fiscal-service list schemas accept optional terms and pagination"
     assert.match(source, /commaSeparatedListSchema/);
     assert.doesNotMatch(source, /\.min\(1, .*obrigat/);
   }
+});
+
+await runTest("NCM create and edit keep codes numeric while search keeps eight-digit behavior", () => {
+  assert.match(fiscalSources.ncmForm, /handleChange\("ncm_code", value\.replace\(\/\\D\/g, ""\)\)/);
+  assert.match(fiscalSources.ncmForm, /inputMode="numeric"/);
+  assert.match(fiscalSources.ncmForm, /pattern="\[0-9\]\*"/);
+  assert.match(fiscalSources.ncmForm, /Informe apenas números no código NCM\./);
+  assert.match(fiscalSources.ncmSchema, /\.regex\(\/\^\\d\+\$\//);
+  assert.match(fiscalSources.searchSection, /\.replace\(\/\\D\/g, ""\)\s*\.slice\(0, NCM_CODE_LENGTH\)/);
+  assert.match(fiscalSources.searchSection, /trimmedCode\.length !== NCM_CODE_LENGTH/);
 });
 
 await runTest("fiscal-service list routes pass pagination and optional search terms", () => {

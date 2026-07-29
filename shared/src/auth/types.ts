@@ -8,6 +8,7 @@ export interface AuthIdentity {
   organization_id?: string;
   permission?: number;
   modules?: ModulePermissions;
+  modulePermissionsPresent?: boolean;
   session_version?: number;
   type?: AuthUserType;
   name?: string;
@@ -36,5 +37,6 @@ export interface AuthPolicy {
   minPermission?: number;
   modulePermission?: AuthModulePolicy;
   anyModulePermission?: AuthAnyModulePolicy;
+  anyOf?: readonly AuthPolicy[];
   special?: AuthSpecialPolicy;
 }

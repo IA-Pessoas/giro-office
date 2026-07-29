@@ -586,4 +586,136 @@ describe("CertificatePjService", () => {
     expect(storage.deleteObject).toHaveBeenCalledWith(objectPath);
     expect(prisma.certificatePJ.update).not.toHaveBeenCalled();
   });
+
+  it("deleteCertificatePj removes the stored object before deleting the organization-scoped record", async () => {
+    const { storage, crypto } = createCertificateFileDeps();
+    const objectPath = "/certificates/pj/empresa.pfx";
+    const events: string[] = [];
+    const deleteNotifications = vi.fn(async () => {
+      events.push("prisma:delete-notifications");
+    });
+    storage.deleteObject.mockImplementation(async (path) => {
+      events.push(`storage:${path}`);
+    });
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async ({ where }) =>
+          createCertificatePjRecord({
+            id: where.id,
+            organization_id: where.organization_id,
+            file_path: objectPath,
+          }),
+        ),
+        delete: vi.fn(async () => {
+          events.push("prisma:delete");
+        }),
+      },
+      certificateNotification: {
+        deleteMany: deleteNotifications,
+      },
+    };
+    const service = new CertificatePjService(prisma as never, {
+      fileStorage: storage,
+      fileCrypto: crypto,
+      storageProvider: "local",
+      storageBucket: "Certificados",
+    });
+
+    const result = await service.deleteCertificatePj({
+      id: certificateId,
+      organizationId: certificateOrganizationId,
+    });
+
+    expect(storage.deleteObject).toHaveBeenCalledWith(objectPath);
+    expect(prisma.certificatePJ.delete).toHaveBeenCalledWith({
+      where: { id: certificateId, organization_id: certificateOrganizationId },
+    });
+    expect(deleteNotifications).toHaveBeenCalledWith({
+      where: {
+        certificate_id: certificateId,
+        organization_id: certificateOrganizationId,
+        type: "PJ",
+      },
+    });
+    expect(events).toEqual([
+      `storage:${objectPath}`,
+      "prisma:delete-notifications",
+      "prisma:delete",
+    ]);
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("deleteCertificatePj does not delete a certificate from another organization", async () => {
+    const { storage, crypto } = createCertificateFileDeps();
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => null),
+        delete: vi.fn(),
+      },
+    };
+    const service = new CertificatePjService(prisma as never, {
+      fileStorage: storage,
+      fileCrypto: crypto,
+      storageProvider: "local",
+      storageBucket: "Certificados",
+    });
+
+    await expect(
+      service.deleteCertificatePj({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 } satisfies Partial<ServiceError>);
+    expect(prisma.certificatePJ.findFirst).toHaveBeenCalledWith({
+      where: { id: certificateId, organization_id: certificateOrganizationId },
+    });
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    expect(prisma.certificatePJ.delete).not.toHaveBeenCalled();
+  });
+
+  it("deleteCertificatePj keeps the record when stored object removal fails", async () => {
+    const { storage, crypto } = createCertificateFileDeps();
+    const objectPath = "/certificates/pj/empresa.pfx";
+    storage.deleteObject.mockRejectedValueOnce(new Error("storage unavailable"));
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => createCertificatePjRecord({ file_path: objectPath })),
+        delete: vi.fn(),
+      },
+    };
+    const service = new CertificatePjService(prisma as never, {
+      fileStorage: storage,
+      fileCrypto: crypto,
+      storageProvider: "local",
+      storageBucket: "Certificados",
+    });
+
+    await expect(
+      service.deleteCertificatePj({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+      }),
+    ).rejects.toThrow("storage unavailable");
+    expect(prisma.certificatePJ.delete).not.toHaveBeenCalled();
+  });
+
+  it("deleteCertificatePj refuses to orphan a stored file when storage is unavailable", async () => {
+    const objectPath = "/certificates/pj/empresa.pfx";
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => createCertificatePjRecord({ file_path: objectPath })),
+        delete: vi.fn(),
+      },
+    };
+    const service = new CertificatePjService(prisma as never);
+
+    await expect(
+      service.deleteCertificatePj({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+      }),
+    ).rejects.toMatchObject({ statusCode: 500 } satisfies Partial<ServiceError>);
+
+    expect(prisma.certificatePJ.delete).not.toHaveBeenCalled();
+  });
 });

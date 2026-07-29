@@ -146,6 +146,10 @@ export function createPrismaMock(): PrismaClient {
           throw new Error("Stock category list missing Tecnologia department scope.");
         }
 
+        if (where.status === true) {
+          return [{ name: "Perifericos" }];
+        }
+
         return [];
       }),
       findFirst: vi.fn(async ({ where }) => {
@@ -166,7 +170,13 @@ export function createPrismaMock(): PrismaClient {
         };
       }),
       create: vi.fn(async ({ data }) => ({ id: "stock-cat-1", ...data })),
-      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+      update: vi.fn(async ({ where, data }) => {
+        if (data.name === "Categoria em conflito" || data.status === true) {
+          throw { code: "P2002" };
+        }
+
+        return { id: where.id, ...data };
+      }),
     },
     stock: {
       count: vi.fn(async ({ where }) => {

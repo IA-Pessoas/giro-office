@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { toast } from "react-toastify";
 import { Dialog } from "@shared/components";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import {
   useCreateRhScoreQuestionMutation,
   useUpdateRhScoreQuestionMutation,
@@ -106,7 +107,7 @@ export function RhScoreQuestionEditor({
       }
     >
       <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-        <span>Pergunta</span>
+        <RequiredFieldLabel required>Pergunta</RequiredFieldLabel>
         <textarea
           rows={4}
           value={formState.question}
@@ -118,6 +119,7 @@ export function RhScoreQuestionEditor({
           }
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           placeholder="Ex.: Como foi a colaboração do trimestre?"
+          aria-required="true"
         />
       </label>
 

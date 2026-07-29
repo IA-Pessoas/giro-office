@@ -120,6 +120,18 @@ runTest("buildClientListParams uses legacy integration filter for active and ina
   });
 });
 
+runTest("buildClientListParams keeps the Regularize active-client query out of the legacy integration filter", () => {
+  assert.deepEqual(
+    buildClientListParams({
+      status: "Ativo",
+      page: 1,
+      limit: 50,
+      legacyIntegrationStatusFilter: false,
+    }),
+    { status: "Ativo", page: 1, limit: 50 },
+  );
+});
+
 runTest("client integration filters use backend-supported not-contracted token", () => {
   const filters = readFileSync("src/modules/clients/components/ClientFilters.tsx", "utf8");
 
@@ -525,4 +537,12 @@ runTest("clients list exposes compact page jump input", () => {
   assert.doesNotMatch(clients, /w-16/);
   assert.match(clients, /onBlur=\{\(event\) => goToPage\(event\.target\.value\)\}/);
   assert.match(clients, /onKeyDown=\{\(event\) =>/);
+});
+
+runTest("client creation discloses name and document as required", () => {
+  const source = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+
+  assert.match(source, /RequiredFieldLabel/);
+  assert.match(source, /name="name"[\s\S]*aria-required/);
+  assert.match(source, /name="cpf_cnpj"[\s\S]*aria-required/);
 });

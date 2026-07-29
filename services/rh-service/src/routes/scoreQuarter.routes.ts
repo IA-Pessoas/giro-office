@@ -9,6 +9,7 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
+  canManageRh,
   RH_MANAGEMENT_PERMISSION,
   RH_SELF_SERVICE_PERMISSION,
   requireRhPermission,
@@ -114,7 +115,7 @@ router.get(
 router.get(
   "/:id",
   isAuthenticated,
-  requireRhPermission(RH_MANAGEMENT_PERMISSION),
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = req.organization_id;
@@ -131,6 +132,8 @@ router.get(
       const result = await scoreQuarterService.getDetail({
         organization_id: organizationId,
         score_id: id,
+        user_id: userId,
+        can_manage: canManageRh(req),
       });
 
       res.status(200).json(createSuccessResponse(result));

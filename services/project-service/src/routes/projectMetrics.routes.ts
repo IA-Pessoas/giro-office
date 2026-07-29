@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
   parseWithZod,
   requireAuthenticatedRequestContext,
 } from "@workspace/shared";
@@ -26,7 +27,11 @@ export function createProjectMetricsRoutes(
         parseWithZod(integracaoProjectMetricsQuerySchema, req.query);
         const auth = requireAuthenticatedRequestContext(req);
 
-        const result = await service.getGlobalMetrics(auth.organization_id);
+        const result = await service.getGlobalMetrics(auth.organization_id, {
+          userId: auth.user_id,
+          integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+          isOwner: req.user_type === "owner",
+        });
 
         res.json(createSuccessResponse(result));
       } catch (err) {

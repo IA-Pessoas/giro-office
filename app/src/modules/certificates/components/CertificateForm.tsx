@@ -9,6 +9,7 @@ import {
   CERTIFICATE_INPUT_CLASSNAME,
 } from "./certificateWorkspaceUi";
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import type {
   CertificatePf,
   CertificatePj,
@@ -543,20 +544,23 @@ export function CertificateForm({
 
       <section className={CERTIFICATE_FORM_GRID_CLASSNAME}>
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Nome</span>
+          <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
+            Nome
+          </RequiredFieldLabel>
           <input
             type="text"
             value={formState.name}
             onChange={(event) => updateField("name", event.target.value)}
             className={CERTIFICATE_INPUT_CLASSNAME}
             disabled={isSubmitting}
+            aria-required={isCreate}
           />
         </label>
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>
+          <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
             {isPj ? "CNPJ" : "CPF"}
-          </span>
+          </RequiredFieldLabel>
           <input
             type="text"
             value={formState.kind === "pj" ? formState.cnpj : formState.cpf}
@@ -565,24 +569,30 @@ export function CertificateForm({
             }
             className={CERTIFICATE_INPUT_CLASSNAME}
             disabled={isSubmitting}
+            aria-required={isCreate}
           />
         </label>
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Modelo</span>
+          <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
+            Modelo
+          </RequiredFieldLabel>
           <input
             type="text"
             value={formState.model}
             onChange={(event) => updateField("model", event.target.value)}
             className={CERTIFICATE_INPUT_CLASSNAME}
             disabled={isSubmitting}
+            aria-required={isCreate}
           />
         </label>
 
         {isPj ? (
           <>
             <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-              <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Responsável</span>
+              <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
+                Responsável
+              </RequiredFieldLabel>
               <input
                 type="text"
                 value={formState.responsible}
@@ -591,11 +601,14 @@ export function CertificateForm({
                 }
                 className={CERTIFICATE_INPUT_CLASSNAME}
                 disabled={isSubmitting}
+                aria-required={isCreate}
               />
             </label>
 
             <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-              <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Natureza jurídica</span>
+              <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
+                Natureza jurídica
+              </RequiredFieldLabel>
               <input
                 type="text"
                 value={formState.legalNature}
@@ -607,6 +620,7 @@ export function CertificateForm({
                 }
                 className={CERTIFICATE_INPUT_CLASSNAME}
                 disabled={isSubmitting}
+                aria-required={isCreate}
               />
             </label>
           </>
@@ -641,7 +655,9 @@ export function CertificateForm({
         )}
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Senha</span>
+          <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
+            Senha
+          </RequiredFieldLabel>
           <input
             type="text"
             value={formState.password}
@@ -649,17 +665,21 @@ export function CertificateForm({
             className={CERTIFICATE_INPUT_CLASSNAME}
             disabled={isSubmitting}
             placeholder={isCreate ? "Senha nova" : "Nova senha (opcional)"}
+            aria-required={isCreate}
           />
         </label>
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Vencimento</span>
+          <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
+            Vencimento
+          </RequiredFieldLabel>
           <input
             type="date"
             value={formState.expirationDate}
             onChange={(event) => updateField("expirationDate", event.target.value)}
             className={CERTIFICATE_INPUT_CLASSNAME}
             disabled={isSubmitting}
+            aria-required={isCreate}
           />
         </label>
 

@@ -1042,6 +1042,13 @@ const handlers = {
     });
   },
 
+  async certificatePjDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/certificate/pj/${requireState("certificatePjId")}`,
+    });
+  },
+
   async certificatePfList(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -1119,6 +1126,13 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/certificate/pf/${requireState("certificatePfId")}/file`,
+    });
+  },
+
+  async certificatePfDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/certificate/pf/${requireState("certificatePfId")}`,
     });
   },
 
@@ -2957,6 +2971,10 @@ const handlers = {
   },
 
   async taskDepsList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async taskDepsOptions(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
 

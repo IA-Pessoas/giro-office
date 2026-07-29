@@ -15,6 +15,7 @@ import {
   certificatePfListQueryKey,
   certificatePjListQueryKey,
 } from "./hooks/queryKeys.ts";
+import * as certificateWorkspaceUi from "./components/certificateWorkspaceUi.ts";
 
 function runTest(name, fn) {
   try {
@@ -36,6 +37,73 @@ runTest("certificate endpoints match gateway public contract", () => {
   assert.equal(CERTIFICATE_ENDPOINTS.pfDetail("id-1"), "/certificate/pf/id-1");
   assert.equal(CERTIFICATE_ENDPOINTS.pfFile("id-1"), "/certificate/pf/id-1/file");
   assert.equal(CERTIFICATE_ENDPOINTS.notifications, "/certificate/notifications");
+});
+
+runTest("certificate service exposes full-record deletion for PJ and PF", () => {
+  const serviceSource = readFileSync(
+    new URL("./services/certificateService.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    serviceSource,
+    /async deletePj\(id: string\)[\s\S]*?api\.delete\(CERTIFICATE_ENDPOINTS\.pjDetail\(id\)\)/,
+  );
+  assert.match(
+    serviceSource,
+    /async deletePf\(id: string\)[\s\S]*?api\.delete\(CERTIFICATE_ENDPOINTS\.pfDetail\(id\)\)/,
+  );
+});
+
+runTest("certificate deletion mutations invalidate lists and details", () => {
+  const hooksSource = readFileSync(
+    new URL("./hooks/useCertificates.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(hooksSource, /useDeleteCertificatePjMutation/);
+  assert.match(hooksSource, /useDeleteCertificatePfMutation/);
+  assert.match(hooksSource, /certificateService\.deletePj/);
+  assert.match(hooksSource, /certificateService\.deletePf/);
+  assert.match(
+    hooksSource,
+    /useDeleteCertificatePjMutation[\s\S]*?CERTIFICATE_QUERY_KEY[\s\S]*?certificatePjDetailQueryKey/,
+  );
+  assert.match(
+    hooksSource,
+    /useDeleteCertificatePfMutation[\s\S]*?CERTIFICATE_QUERY_KEY[\s\S]*?certificatePfDetailQueryKey/,
+  );
+});
+
+runTest("certificate table exposes admin-only full-record deletion", () => {
+  const workspaceSource = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workspaceSource, /useDeleteCertificatePjMutation/);
+  assert.match(workspaceSource, /useDeleteCertificatePfMutation/);
+  assert.match(workspaceSource, /Trash2/);
+  assert.match(workspaceSource, /window\.confirm\(`Excluir o certificado/);
+  assert.match(workspaceSource, /setVisiblePjItems\(\(current\) => current\.filter/);
+  assert.match(workspaceSource, /setVisiblePfItems\(\(current\) => current\.filter/);
+  assert.match(workspaceSource, /toast\.success\("Certificado/);
+  assert.match(workspaceSource, /toast\.error\(/);
+  assert.match(workspaceSource, /canManageCertificateModule &&/);
+});
+
+runTest("certificate record deletion uses the detail endpoints and an internal dialog", () => {
+  const clientSource = readFileSync(new URL("./services/certificateService.ts", import.meta.url), "utf8");
+  const actionsSource = readFileSync(
+    new URL("./components/CertificateFileActions.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(clientSource, /async deletePj\(id: string\): Promise<void>/);
+  assert.match(clientSource, /async deletePf\(id: string\): Promise<void>/);
+  assert.match(actionsSource, /Excluir certificado/);
+  assert.match(actionsSource, /<Dialog/);
+  assert.doesNotMatch(actionsSource, /window\.confirm/);
 });
 
 runTest("buildCertificateListParams removes empty values", () => {
@@ -168,6 +236,131 @@ runTest("certificate refresh keeps rows while a new first page is requested", ()
     workspaceSource,
     /if \(activeTab === "notifications"[\s\S]*setNotificationPage\(FIRST_PAGE\)/,
   );
+});
+
+const certificateFileActionsSource = readFileSync(
+  "src/modules/certificates/components/CertificateFileActions.tsx",
+  "utf8",
+);
+const certificatesWorkspaceSource = readFileSync(
+  "src/modules/certificates/components/CertificatesWorkspace.tsx",
+  "utf8",
+);
+
+runTest("Viewer de certificados pode consultar sem receber ações de escrita", () => {
+  assert.equal(
+    typeof certificateWorkspaceUi.resolveCertificateWorkspaceCapabilities,
+    "function",
+  );
+  assert.deepEqual(
+    certificateWorkspaceUi.resolveCertificateWorkspaceCapabilities({
+      canView: true,
+      canEdit: false,
+      isAdmin: false,
+    }),
+    {
+      canReadRecords: true,
+      canManageRecords: false,
+      canManageFiles: false,
+      canDeleteRecords: false,
+      canDeleteFiles: false,
+    },
+  );
+  assert.deepEqual(
+    certificateWorkspaceUi.resolveCertificateWorkspaceCapabilities({
+      canView: true,
+      canEdit: true,
+      isAdmin: false,
+    }),
+    {
+      canReadRecords: true,
+      canManageRecords: true,
+      canManageFiles: true,
+      canDeleteRecords: true,
+      canDeleteFiles: false,
+    },
+  );
+  assert.deepEqual(
+    certificateWorkspaceUi.resolveCertificateWorkspaceCapabilities({
+      canView: true,
+      canEdit: true,
+      isAdmin: true,
+    }),
+    {
+      canReadRecords: true,
+      canManageRecords: true,
+      canManageFiles: true,
+      canDeleteRecords: true,
+      canDeleteFiles: true,
+    },
+  );
+});
+
+runTest("workspace aplica a mesma política de acesso nas consultas e ações", () => {
+  assert.match(
+    certificatesWorkspaceSource,
+    /resolveCertificateWorkspaceCapabilities\(access\)/,
+  );
+  assert.match(
+    certificatesWorkspaceSource,
+    /const shouldFetchCertificates =\s*certificateCapabilities\.canReadRecords &&\s*!isModuleAccessLoading/,
+  );
+  assert.match(
+    certificatesWorkspaceSource,
+    /enabled: shouldFetchCertificates && activeTab === "pj"/,
+  );
+  assert.match(
+    certificatesWorkspaceSource,
+    /enabled: shouldFetchCertificates && activeTab === "pf"/,
+  );
+  assert.equal(
+    (
+      certificatesWorkspaceSource.match(
+        /canEdit=\{certificateCapabilities\.canManageFiles\}/g,
+      ) ?? []
+    ).length,
+    4,
+  );
+  assert.equal(
+    (
+      certificatesWorkspaceSource.match(
+        /canDeleteFile=\{certificateCapabilities\.canDeleteFiles\}/g,
+      ) ?? []
+    ).length,
+    4,
+  );
+  assert.equal(
+    (
+      certificatesWorkspaceSource.match(
+        /canDeleteRecord=\{certificateCapabilities\.canDeleteRecords\}/g,
+      ) ?? []
+    ).length,
+    4,
+  );
+});
+
+runTest("separa permissao de edicao e remocao de arquivos", () => {
+  assert.match(certificateFileActionsSource, /canDeleteFile: boolean/);
+  assert.match(certificateFileActionsSource, /canDeleteRecord: boolean/);
+  assert.match(certificateFileActionsSource, /\{canDeleteFile \?/);
+  assert.match(certificateFileActionsSource, /\{canDeleteRecord \?/);
+  assert.equal(
+    (
+      certificatesWorkspaceSource.match(
+        /canDeleteFile=\{certificateCapabilities\.canDeleteFiles\}/g,
+      ) ?? []
+    ).length,
+    4,
+  );
+});
+
+runTest("certificate required fields are disclosed only while creating", () => {
+  const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /RequiredFieldLabel/);
+  assert.match(source, /<RequiredFieldLabel[\s\S]*required=\{isCreate\}/);
+  assert.match(source, /aria-required=\{isCreate\}/);
+  assert.match(source, /isPj \? "CNPJ" : "CPF"/);
 });
 
 console.log("certificates contract tests passed");

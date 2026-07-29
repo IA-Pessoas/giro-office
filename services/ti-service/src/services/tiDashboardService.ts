@@ -1,4 +1,5 @@
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import type { TiDashboardSummary } from "../schemas/tiDashboard.schemas.js";
 import type { TiAuthContext } from "./tiRequestService.js";
 
@@ -12,35 +13,55 @@ function sevenDaysAgo(): Date {
 export class TiDashboardService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async getSummary(context: Pick<TiAuthContext, "organizationId">): Promise<TiDashboardSummary> {
+  async getSummary(context: TiAuthContext): Promise<TiDashboardSummary> {
     const organizationWhere = { organization_id: context.organizationId };
-    const technologyDepartment = await this.prisma.department.findFirst({
-      where: {
-        ...organizationWhere,
-        name: { equals: "Tecnologia", mode: "insensitive" },
-      },
-      select: { id: true },
-    });
+    const isViewer = context.permission < TiPermissionLevel.Technician;
+    const requesterWhere = isViewer ? { requester_id: context.userId } : {};
+    const requestWhere = { ...organizationWhere, ...requesterWhere };
 
     const openRequests = await this.prisma.tIRequest.count({
       where: {
-        ...organizationWhere,
+        ...requestWhere,
         status: { notIn: [...openRequestStatuses] },
       },
     });
     const criticalRequests = await this.prisma.tIRequest.count({
       where: {
-        ...organizationWhere,
+        ...requestWhere,
         urgency: { in: [...criticalRequestUrgencies] },
         status: { notIn: [...openRequestStatuses] },
       },
     });
     const resolvedLastSevenDays = await this.prisma.tIRequest.count({
       where: {
-        ...organizationWhere,
+        ...requestWhere,
         status: "Resolved",
         updated_at: { gte: sevenDaysAgo() },
       },
+    });
+    const closedRequests = await this.prisma.tIRequest.count({
+      where: {
+        ...requestWhere,
+        status: "Closed",
+      },
+    });
+
+    if (isViewer) {
+      return {
+        scope: "self",
+        openRequests,
+        criticalRequests,
+        resolvedLastSevenDays,
+        closedRequests,
+      };
+    }
+
+    const technologyDepartment = await this.prisma.department.findFirst({
+      where: {
+        ...organizationWhere,
+        name: { equals: "Tecnologia", mode: "insensitive" },
+      },
+      select: { id: true },
     });
     const inventoryAssets = await this.prisma.inventoryTecnologia.count({
       where: organizationWhere,
@@ -75,9 +96,11 @@ export class TiDashboardService {
     });
 
     return {
+      scope: "organization",
       openRequests,
       criticalRequests,
       resolvedLastSevenDays,
+      closedRequests,
       inventoryAssets,
       assignedInventoryAssets,
       pendingTerms,

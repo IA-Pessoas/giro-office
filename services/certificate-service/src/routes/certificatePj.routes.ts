@@ -11,6 +11,7 @@ import multer from "multer";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import {
   CERTIFICATE_ELEVATED_PERMISSION,
+  requireCertificateDeletePermission,
   requireCertificatePermission,
   requireCertificateReadPermission,
 } from "../middlewares/requireCertificatePermission.js";
@@ -167,18 +168,38 @@ export function createCertificatePjRoutes(options: CreateCertificatePjRoutesOpti
     }
   });
 
-  router.delete("/:id/file", requireCertificatePermission, async (request, response, next) => {
+  router.delete(
+    "/:id/file",
+    requireCertificateDeletePermission,
+    async (request, response, next) => {
+      try {
+        const authContext = requireAuthenticatedRequestContext(request);
+        const params = parseWithZod(certificatePjIdParamSchema, request.params);
+        const result = await service.deleteCertificatePjFile({
+          id: params.id,
+          organizationId: authContext.organization_id,
+        });
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao remover arquivo do certificado PJ", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.delete("/:id", requireCertificatePermission, async (request, response, next) => {
     try {
       const authContext = requireAuthenticatedRequestContext(request);
       const params = parseWithZod(certificatePjIdParamSchema, request.params);
-      const result = await service.deleteCertificatePjFile({
+      const result = await service.deleteCertificatePj({
         id: params.id,
         organizationId: authContext.organization_id,
       });
 
       response.status(200).json(createSuccessResponse(result));
     } catch (err: unknown) {
-      logError("Erro ao remover arquivo do certificado PJ", { err });
+      logError("Erro ao excluir certificado PJ", { err });
       next(err);
     }
   });
@@ -213,6 +234,22 @@ export function createCertificatePjRoutes(options: CreateCertificatePjRoutesOpti
       response.status(200).json(createSuccessResponse(result));
     } catch (err: unknown) {
       logError("Erro ao atualizar certificado PJ", { err });
+      next(err);
+    }
+  });
+
+  router.delete("/:id", requireCertificatePermission, async (request, response, next) => {
+    try {
+      const authContext = requireAuthenticatedRequestContext(request);
+      const params = parseWithZod(certificatePjIdParamSchema, request.params);
+      const result = await service.deleteCertificatePj({
+        id: params.id,
+        organizationId: authContext.organization_id,
+      });
+
+      response.status(200).json(createSuccessResponse(result));
+    } catch (err: unknown) {
+      logError("Erro ao excluir certificado PJ", { err });
       next(err);
     }
   });

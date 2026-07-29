@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
   parseWithZod,
   ServiceError,
 } from "@workspace/shared";
@@ -13,11 +14,34 @@ import {
   type CreateClientBody,
   clientIdParamsSchema,
   createClientBodySchema,
-  isAdminPermission,
   listClientsQuerySchema,
   updateClientBodySchema,
 } from "../schemas/client.schemas.js";
+import { hasClientListModuleAccess } from "../utils/moduleAuthorization.js";
 import { resolveOrganizationId } from "../utils/organizationContext.js";
+
+function getIntegrationAuthorization(request: Request) {
+  return {
+    userId: request.user_id,
+    level: normalizeModulePermission(request.modules?.integracao),
+    isOwner: request.user_type === "owner",
+  } as const;
+}
+
+function getClientListAuthorization(request: Request) {
+  const authorization = getIntegrationAuthorization(request);
+  if (authorization.level >= 1) return authorization;
+
+  if (
+    authorization.isOwner ||
+    (request.permission ?? 0) >= 1 ||
+    hasClientListModuleAccess(request.modules)
+  ) {
+    return { ...authorization, hasClientListAccess: true } as const;
+  }
+
+  return authorization;
+}
 
 export function createClientCoreRouter(deps: ClientRouterDeps): Router {
   const { clientService } = deps;
@@ -37,7 +61,11 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
           pageSize: query.limit ?? 20,
           search: query.search,
         };
-        const page = await clientService.listByOrganization(organizationId, listFilters);
+        const page = await clientService.listByOrganization(
+          organizationId,
+          listFilters,
+          getClientListAuthorization(request),
+        );
         response.json(createSuccessResponse(page));
       } catch (err) {
         logError("Erro ao listar clientes", { err });
@@ -53,7 +81,11 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
       try {
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const organizationId = resolveOrganizationId(request, undefined);
-        const client = await clientService.activate(params.id, organizationId);
+        const client = await clientService.activate(
+          params.id,
+          organizationId,
+          getIntegrationAuthorization(request),
+        );
         response.json(createSuccessResponse(client));
       } catch (err) {
         logError("Erro ao ativar cliente", { err });
@@ -67,12 +99,13 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        if (!isAdminPermission(request.permission)) {
-          throw new ServiceError(403, "Usuário não tem permissão para desativar cliente.");
-        }
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const organizationId = resolveOrganizationId(request, undefined);
-        const client = await clientService.deactivate(params.id, organizationId);
+        const client = await clientService.deactivate(
+          params.id,
+          organizationId,
+          getIntegrationAuthorization(request),
+        );
         response.json(createSuccessResponse(client));
       } catch (err) {
         logError("Erro ao desativar cliente", { err });
@@ -88,7 +121,11 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
       try {
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const organizationId = resolveOrganizationId(request, undefined);
-        const client = await clientService.getById(params.id, organizationId);
+        const client = await clientService.getById(
+          params.id,
+          organizationId,
+          getIntegrationAuthorization(request),
+        );
         response.json(createSuccessResponse(client));
       } catch (err) {
         logError("Erro ao obter cliente", { err });
@@ -107,7 +144,10 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
         if (body.organization_id && body.organization_id !== organizationId) {
           throw new ServiceError(403, "Não é permitido criar cliente em outra organização.");
         }
-        const client = await clientService.create({ ...body, organization_id: organizationId });
+        const client = await clientService.create(
+          { ...body, organization_id: organizationId },
+          getIntegrationAuthorization(request),
+        );
         response.status(201).json(createSuccessResponse(client));
       } catch (err) {
         logError("Erro ao criar cliente", { err });
@@ -124,7 +164,12 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const body = parseWithZod(updateClientBodySchema, request.body);
         const organizationId = resolveOrganizationId(request, undefined);
-        const client = await clientService.update(params.id, organizationId, body);
+        const client = await clientService.update(
+          params.id,
+          organizationId,
+          body,
+          getIntegrationAuthorization(request),
+        );
         response.json(createSuccessResponse(client));
       } catch (err) {
         logError("Erro ao atualizar cliente", { err });

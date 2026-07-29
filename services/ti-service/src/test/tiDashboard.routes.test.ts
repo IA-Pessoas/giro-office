@@ -31,9 +31,11 @@ describe("ti dashboard routes", () => {
     expect(response.body).toMatchObject({
       success: true,
       data: {
+        scope: "organization",
         openRequests: 2,
         criticalRequests: 1,
         resolvedLastSevenDays: 1,
+        closedRequests: 2,
         inventoryAssets: 5,
         assignedInventoryAssets: 3,
         pendingTerms: 1,
@@ -43,8 +45,29 @@ describe("ti dashboard routes", () => {
     });
   });
 
-  it("GET /ti/dashboard requires permission 2", async () => {
+  it("GET /ti/dashboard allows Viewer and returns a self-scoped summary", async () => {
     const response = await request(createTestApp()).get("/ti/dashboard").set(gatewayHeaders(1));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        scope: "self",
+        openRequests: 2,
+        criticalRequests: 1,
+        resolvedLastSevenDays: 1,
+        closedRequests: 2,
+      },
+    });
+    expect(response.body.data).not.toHaveProperty("inventoryAssets");
+    expect(response.body.data).not.toHaveProperty("assignedInventoryAssets");
+    expect(response.body.data).not.toHaveProperty("pendingTerms");
+    expect(response.body.data).not.toHaveProperty("lowStockItems");
+    expect(response.body.data).not.toHaveProperty("activeRobots");
+  });
+
+  it("GET /ti/dashboard requires Viewer permission", async () => {
+    const response = await request(createTestApp()).get("/ti/dashboard").set(gatewayHeaders(0));
 
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({

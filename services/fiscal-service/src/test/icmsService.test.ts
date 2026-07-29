@@ -65,6 +65,7 @@ function createMockPrisma(): IcmsServicePrisma {
       findMany: vi.fn(async () => []),
       create: vi.fn(async () => ({})),
       update: vi.fn(async () => ({})),
+      delete: vi.fn(async () => ({})),
     },
   } as unknown as IcmsServicePrisma;
 }
@@ -191,6 +192,61 @@ describe("IcmsService", () => {
       expect.objectContaining({
         where: { id: ICMS_ID },
         data: expectedUpdateData,
+      }),
+    );
+  });
+
+  it("delete lança 404 quando ICMS não existe", async () => {
+    const prisma = createMockPrisma();
+    prisma.icms.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as IcmsServicePrisma["icms"]["findFirst"];
+    const service = new IcmsService(prisma, createMockAudit());
+
+    await expect(
+      service.delete({
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        permission: 3,
+        icms_id: ICMS_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(prisma.icms.delete).not.toHaveBeenCalled();
+  });
+
+  it("delete remove ICMS e registra auditoria quando existe", async () => {
+    const prisma = createMockPrisma();
+    const existing = { id: ICMS_ID, description: baseCreateInput.description };
+    prisma.icms.findFirst = vi.fn(
+      async () => existing,
+    ) as unknown as IcmsServicePrisma["icms"]["findFirst"];
+    prisma.icms.delete = vi.fn(
+      async () => existing,
+    ) as unknown as IcmsServicePrisma["icms"]["delete"];
+    const audit = createMockAudit();
+    const service = new IcmsService(prisma, audit);
+
+    const result = await service.delete({
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      permission: 3,
+      icms_id: ICMS_ID,
+    });
+
+    expect(result).toEqual({ deleted: existing });
+    expect(prisma.icms.findFirst).toHaveBeenCalledWith({
+      where: { id: ICMS_ID, organization_id: ORG_ID },
+      select: expect.any(Object),
+    });
+    expect(prisma.icms.delete).toHaveBeenCalledWith({
+      where: { id: ICMS_ID },
+      select: expect.any(Object),
+    });
+    expect(audit.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Exclusao",
+        referring: "fiscal.icms",
+        referringId: ICMS_ID,
       }),
     );
   });

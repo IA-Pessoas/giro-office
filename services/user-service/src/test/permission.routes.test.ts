@@ -101,6 +101,22 @@ describe("permission routes", () => {
     expect(permissionServiceMock.update).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { fiscal: null },
+    { fiscal: -1 },
+    { fiscal: 4 },
+  ])("rejeita nível modular inválido: %j", async (body) => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/user/permission/user-3")
+      .set(gatewayAuthHeaders())
+      .send(body);
+
+    expect(res.status).toBe(400);
+    expect(permissionServiceMock.update).not.toHaveBeenCalled();
+  });
+
   it("GET /user/permission/:userId permite admin RH consultar permissoes modulares", async () => {
     permissionServiceMock.getByUserId.mockResolvedValue({ comercial: 2 });
     const app = createTestApp();

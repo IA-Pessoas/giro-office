@@ -42,24 +42,33 @@ const createTaskRequestBody = createObjectRequestBody({
     project_id: "project-uuid",
     client_id: "client-uuid",
     prospecting_status: "Analise Financeira",
+    name: "Contato com cliente",
+    status: "Em Andamento",
+    department_id: "department-uuid",
     observations: "Priorizar validacao documental.",
+    billing: "Realizar",
     urgency: "ALTA",
+    responsible_id: "user-uuid",
+    responsible2_id: "backup-user-uuid",
+    responsible3_id: null,
+    prevision_date: "2026-04-10",
   },
-  required: [
-    "model_id",
-    "project_id",
-    "client_id",
-    "prospecting_status",
-    "observations",
-    "urgency",
-  ],
+  required: ["model_id", "project_id", "client_id", "prospecting_status", "urgency"],
   properties: {
     model_id: { type: "string" },
     project_id: { type: "string" },
     client_id: { type: "string" },
     prospecting_status: { type: "string" },
+    name: { type: "string" },
+    status: { type: "string" },
+    department_id: { type: "string" },
     observations: { type: "string" },
+    billing: { type: "string" },
     urgency: { type: "string" },
+    responsible_id: { type: "string" },
+    responsible2_id: { type: ["string", "null"] },
+    responsible3_id: { type: ["string", "null"] },
+    prevision_date: { type: "string", format: "date" },
   },
 });
 
@@ -328,7 +337,9 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       title: "task-service",
       version: "1.0.0",
       description:
-        "Tarefas, modelos, integracao Regularize, financeiro e comercial. Endpoints marcados exigem JWT.",
+        "Tarefas, modelos, integracao Regularize, financeiro e comercial. Endpoints marcados exigem JWT. " +
+        "modules.integracao aplica tarefas próprias nos níveis 0–1, leitura organizacional a partir de 1, " +
+        "criação/edição a partir de 2 e administração/exclusão a partir de 3; modelos são consultáveis a partir de 2.",
     },
     servers: [{ url: baseUrl }],
     tags: [
@@ -434,7 +445,17 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                         type: "object",
                         required: ["data", "total", "hasMore", "summary"],
                         properties: {
-                          data: { type: "array", items: { type: "object" } },
+                          data: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              required: ["id", "isOwn"],
+                              properties: {
+                                id: { type: "string" },
+                                isOwn: { type: "boolean" },
+                              },
+                            },
+                          },
                           total: { type: "integer", minimum: 0 },
                           hasMore: { type: "boolean" },
                           summary: {
@@ -708,6 +729,14 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           summary: "Listar departamentos com modelos de tarefa",
           security: bearer,
           responses: { "200": { description: "Lista", ...successJson } },
+        },
+      },
+      "/task/deps/options": {
+        get: {
+          tags: ["TaskDependent"],
+          summary: "Listar opções ativas para modelos de tarefa",
+          security: bearer,
+          responses: { "200": { description: "Opções", ...successJson } },
         },
       },
     },
