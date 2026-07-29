@@ -226,6 +226,7 @@ const readOrganization = [
 const writeUser = [INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN] as const;
 const admin = [INTEGRACAO_PERMISSION_LEVEL.ADMIN] as const;
 const taskModelRead = [
+  INTEGRACAO_PERMISSION_LEVEL.VIEWER,
   INTEGRACAO_PERMISSION_LEVEL.USER,
   INTEGRACAO_PERMISSION_LEVEL.ADMIN,
 ] as const;
@@ -408,7 +409,7 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     "/task/model/dependent",
     "taskModel",
     "manageDependencies",
-    [readRule(admin)],
+    [readRule(taskModelRead)],
     {
       test: "taskModel.dependent.list",
     },

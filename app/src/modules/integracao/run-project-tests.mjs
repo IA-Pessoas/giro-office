@@ -42,6 +42,7 @@ import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
   TASK_MODEL_CONFIG_ENTRY,
   canManageTaskModelConfig,
+  canViewTaskModelConfig,
 } from "./navigation/taskModelConfigNavigation.ts";
 import {
   TASK_TABLE_ACTION_BUTTON_CLASSNAME,
@@ -553,6 +554,9 @@ runTest("task model config entry is discoverable in product workflows", () => {
   assert.equal(canManageTaskModelConfig(null), false);
   assert.equal(canManageTaskModelConfig({ isAdmin: false }), false);
   assert.equal(canManageTaskModelConfig({ isAdmin: true }), true);
+  assert.equal(canViewTaskModelConfig(null), false);
+  assert.equal(canViewTaskModelConfig({ canView: false }), false);
+  assert.equal(canViewTaskModelConfig({ canView: true }), true);
 });
 
 runTest("integration write actions use the modular access level", () => {

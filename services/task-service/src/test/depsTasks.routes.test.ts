@@ -98,13 +98,13 @@ describe("depsTasks routes", () => {
     expect(response.status).toBe(401);
   });
 
-  it("GET /task/deps/options exige nível 2 da Integração", async () => {
+  it("GET /task/deps/options exige ao menos nível 1 da Integração", async () => {
     const app = createTestApp();
     const response = await request(app)
       .get("/task/deps/options")
       .set({
         ...gatewayHeaders(),
-        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 1 }),
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 0 }),
       });
 
     expect(response.status).toBe(403);

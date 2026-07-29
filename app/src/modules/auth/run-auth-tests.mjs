@@ -88,8 +88,8 @@ await runTest("integration routes preserve the level 0 own-tasks exception", () 
   ];
   const expectedByProfile = {
     level0: [true, false, false, false],
-    level1: [true, true, true, false],
-    level2: [true, true, true, false],
+    level1: [true, true, true, true],
+    level2: [true, true, true, true],
     level3: [true, true, true, true],
     owner: [true, true, true, true],
   };
