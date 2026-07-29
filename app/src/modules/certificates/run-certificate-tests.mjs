@@ -65,7 +65,7 @@ runTest("buildCertificateListPage infers hasMore from page size", () => {
 runTest("buildCertificateListPage falls back to default page and page_size", () => {
   const items = [{ id: "1" }];
   assert.equal(buildCertificateListPage(items).page, 1);
-  assert.equal(buildCertificateListPage(items).page_size, 50);
+  assert.equal(buildCertificateListPage(items).page_size, 20);
   assert.equal(buildCertificateListPage(items).hasMore, false);
 });
 

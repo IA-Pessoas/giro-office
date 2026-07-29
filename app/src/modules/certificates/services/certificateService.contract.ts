@@ -27,7 +27,7 @@ export const CERTIFICATE_ENDPOINTS = {
   notifications: "/certificate/notifications",
 } as const;
 
-export const DEFAULT_CERTIFICATE_PAGE_SIZE = 50;
+export const DEFAULT_CERTIFICATE_PAGE_SIZE = 20;
 export const DEFAULT_CERTIFICATE_PAGE = 1;
 export const CERTIFICATE_FILE_ACCEPT = ".pfx,.p12";
 export const ACCEPTED_CERTIFICATE_FILE_EXTENSIONS = [".pfx", ".p12"] as const;

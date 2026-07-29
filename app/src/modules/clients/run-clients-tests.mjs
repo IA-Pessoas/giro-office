@@ -501,6 +501,8 @@ runTest("client create modal binds person type to document validation and payloa
 runTest("clients list exposes compact page jump input", () => {
   const clients = readFileSync("src/shared/components/newLayout/Clients.tsx", "utf8");
 
+  assert.match(clients, /import \{ DEFAULT_PAGE_SIZE \} from "@shared\/pagination\/pagination";/);
+  assert.match(clients, /const limit = DEFAULT_PAGE_SIZE;/);
   assert.match(clients, /useEffect/);
   assert.match(clients, /const \[pageInputValue, setPageInputValue\] = useState\(String\(page\)\)/);
   assert.match(clients, /setPageInputValue\(String\(currentPage\)\)/);

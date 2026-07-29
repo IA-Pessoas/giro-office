@@ -8,7 +8,7 @@ import {
 
 import { useFetch } from "@shared/hooks";
 
-import { certificateService } from "../services";
+import { certificateService, DEFAULT_CERTIFICATE_PAGE_SIZE } from "../services";
 import type {
   CertificateDownloadResult,
   CertificateFileMetadata,
@@ -40,7 +40,7 @@ type CertificateQueryOptions<TData> = Pick<
 
 export const CERTIFICATE_PJ_LIST_DEFAULTS: CertificatePjListParams = {
   page: 1,
-  page_size: 50,
+  page_size: DEFAULT_CERTIFICATE_PAGE_SIZE,
 };
 
 export function useCertificatePjList(
