@@ -45,6 +45,7 @@ export interface GatewayServiceDefinition {
   routePrefixes: string[];
   internalServiceToken?: string;
   permissionModule?: string;
+  fallbackToGlobalPermission?: boolean;
 }
 
 export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDefinition[] {
@@ -129,6 +130,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       routePrefixes: [...CERTIFICATE_SERVICE_PREFIXES],
       internalServiceToken: env.certificateServiceInternalToken,
       permissionModule: "certificado",
+      fallbackToGlobalPermission: false,
     },
     {
       key: "pessoal-service",

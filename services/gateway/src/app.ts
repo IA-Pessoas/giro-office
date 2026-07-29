@@ -13,9 +13,8 @@ import {
 import { mountOpenApiDocs } from "@workspace/shared/http";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
-
-import type { GatewayEnv } from "./config/env.js";
 import { isGatewayRouteDisabled } from "./config/disabledRoutes.js";
+import type { GatewayEnv } from "./config/env.js";
 import { getGatewayServiceDefinitions, resolveGatewayService } from "./config/serviceRegistry.js";
 import {
   buildAuditErrorCaptureMiddleware,
@@ -360,6 +359,7 @@ function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
       buildHttpProxyMiddleware(service.targetUrl, {
         internalServiceToken: service.internalServiceToken,
         permissionModule: service.permissionModule,
+        fallbackToGlobalPermission: service.fallbackToGlobalPermission,
       }),
     );
   }
