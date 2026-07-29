@@ -6,6 +6,7 @@ const { prismaMock, bcryptMock, jwtMock } = vi.hoisted(() => ({
       findFirst: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
     },
     organization: {
       findFirst: vi.fn(),
@@ -43,6 +44,7 @@ vi.mock("jsonwebtoken", () => ({
 }));
 
 import { AuthService } from "../services/authService.js";
+import { UserService } from "../services/userService.js";
 
 describe("AuthService", () => {
   beforeEach(() => {
@@ -157,6 +159,53 @@ describe("AuthService", () => {
     expect(result.organization_id).toBe("org-b");
     expect(result.modules.fiscal).toBe(1);
     expect(result.modules.comercial).toBe(0);
+  });
+
+  it("login autentica a nova senha persistida pelo fluxo de atualização", async () => {
+    const user = {
+      id: "user-1",
+      name: "Usuário",
+      login: "user",
+      password: "hash:senha-antiga",
+      permission: 0,
+      type: "user",
+      status: "active",
+      department_id: "dep-1",
+      organization_id: "org-1",
+      photo_url: null,
+      joined_at: null,
+      first_owner_flag: false,
+      permission_id: "permission-1",
+      session_version: 1,
+      department: { organization_id: "org-1" },
+      permissions: [{ organization_id: "org-1" }],
+    };
+    prismaMock.user.findFirst.mockResolvedValue(user);
+    prismaMock.user.update.mockImplementation(
+      async ({ data }: { data: Record<string, unknown> }) => {
+        Object.assign(user, data);
+        return user;
+      },
+    );
+    bcryptMock.hash.mockImplementation(async (password: string) => `hash:${password}`);
+    bcryptMock.compare.mockImplementation(
+      async (password: string, hash: string) => hash === `hash:${password}`,
+    );
+    jwtMock.sign.mockReturnValue("jwt-token");
+
+    await new UserService().update("user-1", { password: "nova-senha" }, "org-1", "user-1");
+
+    await expect(
+      new AuthService().login({ login: "user", password: "nova-senha" }),
+    ).resolves.toMatchObject({
+      id: "user-1",
+      token: "jwt-token",
+    });
+    await expect(
+      new AuthService().login({ login: "user", password: "senha-antiga" }),
+    ).rejects.toMatchObject({
+      statusCode: 401,
+    });
   });
 
   it("firstCreate cria admin inicial quando banco está vazio", async () => {

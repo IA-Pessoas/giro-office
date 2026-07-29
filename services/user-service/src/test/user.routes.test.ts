@@ -357,6 +357,48 @@ describe("user routes", () => {
     );
   });
 
+  it("PATCH /user/:id permite ao usuario comum alterar somente a propria senha", async () => {
+    userServiceMock.update.mockResolvedValue({ id: "user-1" });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-1")
+      .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
+      .send({ password: "nova-senha-segura" });
+
+    expect(res.status).toBe(200);
+    expect(userServiceMock.update).toHaveBeenCalledWith(
+      "user-1",
+      { password: "nova-senha-segura" },
+      "a0000000-0000-4000-8000-000000000001",
+      "user-1",
+    );
+  });
+
+  it("PATCH /user/:id bloqueia usuario comum ao alterar a senha de outra pessoa", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-2")
+      .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
+      .send({ password: "nova-senha-segura" });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /user/:id bloqueia usuario comum ao combinar senha com outro campo", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-1")
+      .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
+      .send({ password: "nova-senha-segura", name: "Nome indevido" });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
   it("PATCH /user/:id rejeita promocao para owner quando solicitante nao e owner", async () => {
     const app = createTestApp();
 
