@@ -1184,7 +1184,7 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(tabSource, /useTiExtension/);
   assert.match(
     tabSource,
-    /const canManageExtensions = access\.canEdit \|\| access\.isAdmin/,
+    /const canManageExtensions = access\.isAdmin/,
   );
   assert.match(
     tabSource,
@@ -1201,6 +1201,20 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(tabSource, /placeholder="Ex: 1001"/);
   assert.doesNotMatch(tabSource, /placeholder="1001"/);
   assert.match(tabSource, /className=\{tiFiveRowTableClassName\}/);
+});
+
+await runTest("ti extension controls stay hidden for technician level 2", async () => {
+  const { resolveModuleAccess } = await import("../auth/utils/moduleAccess.ts");
+  const technicianAccess = resolveModuleAccess({
+    module: "ti",
+    additionalModulePermissions: { ti: 2 },
+  });
+  const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
+
+  assert.equal(technicianAccess.canView, true);
+  assert.equal(technicianAccess.canEdit, true);
+  assert.equal(technicianAccess.isAdmin, false);
+  assert.match(tabSource, /const canManageExtensions = access\.isAdmin;/);
 });
 
 await runTest("ti visible copy stays product-facing and avoids implementation handoff terms", async () => {
