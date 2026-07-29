@@ -13,12 +13,14 @@ import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   getRhPermissionLevel,
   RH_MANAGEMENT_PERMISSION,
+  RH_SELF_SERVICE_PERMISSION,
 } from "../middlewares/requireRhPermission.js";
 import { OperationalUserService } from "../services/operationalUserService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const operationalUserService = new OperationalUserService();
 const OPERATIONAL_USER_CATALOG_MODULES = ["rh", "contabil"] as const;
+const OPERATIONAL_USER_CATALOG_MIN_PERMISSION = RH_SELF_SERVICE_PERMISSION;
 
 function getSingleHeaderValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -40,7 +42,7 @@ function requireOperationalUserCatalogPermission(
     ),
   );
   const canReadCatalog = OPERATIONAL_USER_CATALOG_MODULES.some(
-    (moduleKey) => (modules?.[moduleKey] ?? 0) >= 1,
+    (moduleKey) => (modules?.[moduleKey] ?? 0) >= OPERATIONAL_USER_CATALOG_MIN_PERMISSION,
   );
 
   if (!canReadCatalog) {
