@@ -28,6 +28,20 @@ Os comandos de contexto do Graphify inicialmente reportaram ausência de grafos 
 
 As três posições de ownership foram exercitadas pelo mesmo registro semeado: nível 0, nível 1 e nível 2 receberam `isOwn: true` ao consultar `/task/list`; nível 3 e owner receberam a tarefa administrativa sem ownership próprio. O teste de fixture também valida os três mapeamentos de IDs.
 
+### Usuário adicional criado no ambiente descartável
+
+Para ampliar a prova manual, o owner criou pelo endpoint de administração o usuário `QA Manual 622` (`qa.alfa.manual.622`, ID `4ad589c0-4c5e-45d1-8ba9-a94ac35ea96d`) na organização Alfa, com `modules.integracao = 1`. O login foi concluído pela tela visível do app e os seguintes fluxos foram observados:
+
+- `/dashboard`: navegação de Dashboard, Clientes, Projetos, Tarefas e Configurações; sem Administração, Departamentos ou módulos administrativos.
+- `/tasks`: a tarefa QA carregou, sem ação de edição para tarefa não própria.
+- `/clients`: listagem em leitura, sem ação “Novo cliente”.
+- `/clients/integration/new`: estado explícito informando que criação exige nível 2/3, sem formulário de criação.
+- `/projects` e `/projects?clientId=34000000-0000-4000-8000-000000000001`: projeto visível em leitura, sem Novo, Editar ou Recalcular.
+- `/configs/integracao/tasks`: modelos visíveis em leitura, sem Novo, Editar ou Excluir.
+- `/administracao`: estado explícito de área restrita, sem conteúdo administrativo.
+
+Na mesma sessão descartável, o backend respondeu `201` na criação do usuário, `GET /user/permission/:id` com Integração nível 1, `200` para listagens de tarefas/clientes, `403` para `PATCH /client/:id`, e `404` para detalhes cross-org e atualização de tarefa não própria. Uma tentativa de alteração válida de projeto excedeu o timeout local do gateway descartável; a matriz de projeto nível 1 já possui cobertura automatizada e evidência manual anterior de `403`.
+
 ## Limitação de ambiente
 
 O modelo atual de sessão carrega uma única `organization_id` no usuário/token e a UI não oferece seletor de organização para trocar de A para B sem logout/login. Assim, a parte “trocar A→B mantendo a sessão” da issue #622 não é reproduzível neste ambiente sem introduzir uma capacidade de associação/sessão multi-organização fora do escopo desta issue. O isolamento cross-org direto foi validado por 404 e a limitação deve permanecer explícita; não recomendo fechar #551 com essa lacuna de ambiente ainda aberta.
@@ -41,7 +55,11 @@ pnpm qa:integracao
 
 As evidências HTTP foram coletadas contra o gateway local com os usuários reais semeados (`qa.alfa.level0`, `qa.alfa.level1`, `qa.alfa.level2`, `qa.alfa.level3` e `qa.alfa.owner`) e senha descartável local. Tokens não foram registrados neste documento.
 
-A suíte de política compartilhada também valida as três posições de ownership para tarefas próprias e não-próprias, incluindo as decisões `403/404`: `pnpm --filter @workspace/shared test -- tests/integracao-policy.test.ts` passou com 32/32.
+A suíte de política compartilhada também valida as três posições de ownership para tarefas próprias e não-próprias, incluindo as decisões `403/404`: a execução direta com `tsx --test tests/integracao-policy.test.ts` passou com 9/9.
+
+Na reexecução final, a suite focada de tarefas passou em 51/51, usuário em 28/28, clientes em 35/35 com 2 cenários skip, e gateway em 14/14. A suite focada de projetos reproduziu o baseline atual de autenticação dos testes de rota: 11 falhas e 11 aprovados, com respostas 401 antes das expectativas de matriz.
+
+Build/typecheck dos serviços não-UI passaram em 18/19 e 20/21 alvos, respectivamente; o app passou diretamente com `next build --webpack`, `tsc --noEmit` e `tsc -p tsconfig.usefetch-types.json --noEmit`. O `pnpm test` completo executou e reproduziu falhas fora do escopo em project/contabil/fiscal. `biome lint .` passou com o warning baseline de `shared/src/auth/token.ts`; `biome format .` continua falhando com quatro arquivos preexistentes e o JSON grande de transformações.
 
 ## Roteiro reproduzível
 
