@@ -1604,6 +1604,60 @@ it("forwards modular certificate permission and internal token to certificate-se
   }
 });
 
+it("allows certificate Viewers to list, filter and open PJ and PF records", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    type: "user",
+    modules: { certificado: 1 },
+  });
+  const seenRequests: Array<{ path: string; permission?: string }> = [];
+  const certificateService = createServer((request, response) => {
+    seenRequests.push({
+      path: request.url ?? "",
+      permission: request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined,
+    });
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const certificateServiceUrl = await startServer(certificateService);
+  const app = createApp(createEnv({ certificateServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const certificateId = "20000000-0000-4000-8000-000000000001";
+
+  try {
+    const paths = [
+      "/certificate/pj/list?name=Castelo",
+      `/certificate/pj/${certificateId}`,
+      "/certificate/pf/list?search=Joao",
+      `/certificate/pf/${certificateId}`,
+    ];
+    const statuses: number[] = [];
+    for (const path of paths) {
+      const response = await fetch(`${gatewayUrl}${path}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      statuses.push(response.status);
+    }
+
+    expect(statuses).toEqual([200, 200, 200, 200]);
+    expect(seenRequests).toEqual(
+      paths.map((path) => ({
+        path,
+        permission: "1",
+      })),
+    );
+  } finally {
+    await stopServer(gateway);
+    await stopServer(certificateService);
+  }
+});
+
 it("forwards elevated certificate permission for global admins without modular certificate permission", async () => {
   const token = createToken({
     user_id: "user-1",
@@ -2802,6 +2856,40 @@ it("allows Integration viewers to proxy client list", async () => {
     user_id: "user-1",
     organization_id: "org-1",
     permission: 1,
+    modules: { integracao: 1 },
+  });
+  let seenUrl = "";
+
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const clientServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ clientServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/client/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenUrl).toBe("/client/list");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("allows Integration viewers without global permission to proxy client list", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 0,
     modules: { integracao: 1 },
   });
   let seenUrl = "";

@@ -138,6 +138,24 @@ export function useUpdateCertificatePjMutation(
   });
 }
 
+export function useDeleteCertificatePjMutation(): UseMutationResult<
+  void,
+  Error,
+  { id: string }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id }) => certificateService.deletePj(id),
+    onSuccess: async (_, { id }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CERTIFICATE_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: certificatePjDetailQueryKey(id) }),
+      ]);
+    },
+  });
+}
+
 export function useUploadCertificatePjFileMutation(): UseMutationResult<
   CertificateFileMetadata,
   Error,
@@ -216,6 +234,24 @@ export function useUpdateCertificatePfMutation(
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: CERTIFICATE_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: certificatePfDetailQueryKey(id) });
+    },
+  });
+}
+
+export function useDeleteCertificatePfMutation(): UseMutationResult<
+  void,
+  Error,
+  { id: string }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id }) => certificateService.deletePf(id),
+    onSuccess: async (_, { id }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CERTIFICATE_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: certificatePfDetailQueryKey(id) }),
+      ]);
     },
   });
 }

@@ -57,8 +57,8 @@ function hasAnyRequiredModulePermission(
 }
 
 export function canAccessRoute(context: AuthContext, policy: AuthPolicy): boolean {
-  if (policy.anyOf && !policy.anyOf.some((alternative) => canAccessRoute(context, alternative))) {
-    return false;
+  if (policy.anyOf) {
+    return policy.anyOf.some((alternative) => canAccessRoute(context, alternative));
   }
 
   if (policy.special === "ownerOnly") {

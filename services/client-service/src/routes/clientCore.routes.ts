@@ -17,6 +17,7 @@ import {
   listClientsQuerySchema,
   updateClientBodySchema,
 } from "../schemas/client.schemas.js";
+import { hasClientListModuleAccess } from "../utils/moduleAuthorization.js";
 import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 function getIntegrationAuthorization(request: Request) {
@@ -25,6 +26,21 @@ function getIntegrationAuthorization(request: Request) {
     level: normalizeModulePermission(request.modules?.integracao),
     isOwner: request.user_type === "owner",
   } as const;
+}
+
+function getClientListAuthorization(request: Request) {
+  const authorization = getIntegrationAuthorization(request);
+  if (authorization.level >= 1) return authorization;
+
+  if (
+    authorization.isOwner ||
+    (request.permission ?? 0) >= 1 ||
+    hasClientListModuleAccess(request.modules)
+  ) {
+    return { ...authorization, hasClientListAccess: true } as const;
+  }
+
+  return authorization;
 }
 
 export function createClientCoreRouter(deps: ClientRouterDeps): Router {
@@ -48,7 +64,7 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
         const page = await clientService.listByOrganization(
           organizationId,
           listFilters,
-          getIntegrationAuthorization(request),
+          getClientListAuthorization(request),
         );
         response.json(createSuccessResponse(page));
       } catch (err) {

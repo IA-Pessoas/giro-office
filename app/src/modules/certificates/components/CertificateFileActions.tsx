@@ -36,7 +36,8 @@ type CertificateFileActionsProps = {
   certificateId: string;
   hasCertificate: boolean;
   canEdit: boolean;
-  canDelete: boolean;
+  canDeleteFile: boolean;
+  canDeleteRecord: boolean;
   variant?: CertificateFileActionsVariant;
   onUploadSuccess?: () => void | Promise<void>;
   onDownloadSuccess?: () => void | Promise<void>;
@@ -96,7 +97,8 @@ export function CertificateFileActions({
   certificateId,
   hasCertificate,
   canEdit,
-  canDelete,
+  canDeleteFile,
+  canDeleteRecord,
   variant = "panel",
   onUploadSuccess,
   onDownloadSuccess,
@@ -274,12 +276,12 @@ export function CertificateFileActions({
         >
           {isDownloading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
         </button>
-        {canDelete ? (
+        {canDeleteFile ? (
           <button
             type="button"
             onClick={() => void handleDelete()}
             className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
-            disabled={!(canDelete && hasCertificate) || isBusy}
+            disabled={!(canDeleteFile && hasCertificate) || isBusy}
             title="Remover arquivo"
           >
             {isDeleting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
@@ -326,18 +328,18 @@ export function CertificateFileActions({
           {isDownloading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           {isDownloading ? "Baixando..." : "Baixar"}
         </button>
-        {canDelete ? (
+        {canDeleteFile ? (
           <button
             type="button"
             onClick={() => void handleDelete()}
             className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}
-            disabled={!(canDelete && hasCertificate) || isBusy}
+            disabled={!(canDeleteFile && hasCertificate) || isBusy}
           >
             {isDeleting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
             {isDeleting ? "Removendo..." : "Remover"}
           </button>
         ) : null}
-        {canDelete ? (
+        {canDeleteRecord ? (
           <button
             type="button"
             onClick={() => setIsRecordDeleteDialogOpen(true)}

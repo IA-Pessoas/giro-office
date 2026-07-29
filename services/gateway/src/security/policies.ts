@@ -32,24 +32,6 @@ const pessoalEditPolicy: AuthPolicy = {
   },
 };
 
-const clientListPolicy: AuthPolicy = {
-  anyOf: [
-    { minPermission: moduleAccessPermission },
-    {
-      modulePermission: {
-        module: "pessoal",
-        minPermission: moduleAccessPermission,
-      },
-    },
-    {
-      modulePermission: {
-        module: "regularize",
-        minPermission: moduleAccessPermission,
-      },
-    },
-  ],
-};
-
 const clientRelatedModules = [
   "comercial",
   "contabil",
@@ -59,9 +41,11 @@ const clientRelatedModules = [
   "regularize",
 ] as const;
 
+const clientDetailModules = ["comercial", "contabil", "financeiro", "fiscal"] as const;
+
 const clientModulePolicy: AuthPolicy = {
   anyModulePermission: {
-    modules: [...clientRelatedModules],
+    modules: [...clientDetailModules],
     minPermission: moduleAccessPermission,
   },
 };
@@ -85,6 +69,18 @@ const integracaoClientPolicy: AuthPolicy = {
     module: "integracao",
     minPermission: moduleAccessPermission,
   },
+};
+
+const clientListPolicy: AuthPolicy = {
+  anyOf: [
+    { minPermission: moduleAccessPermission },
+    {
+      anyModulePermission: {
+        modules: [...clientRelatedModules, "integracao"],
+        minPermission: moduleAccessPermission,
+      },
+    },
+  ],
 };
 
 const integracaoClientPath =

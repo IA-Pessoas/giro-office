@@ -13,6 +13,12 @@ const CLIENT_DOMAIN_MODULES = [
 const CLIENT_DOMAIN_READ_PERMISSION = 1;
 export const CLIENT_DOMAIN_EDIT_PERMISSION = 2;
 
+const CLIENT_LIST_MODULES = [...CLIENT_DOMAIN_MODULES, "integracao"] as const;
+
+export function hasClientListModuleAccess(modules: Record<string, number> | undefined): boolean {
+  return CLIENT_LIST_MODULES.some((module) => normalizeModulePermission(modules?.[module]) >= 1);
+}
+
 function requireModules(request: Request): Record<string, number> {
   if (request.user_type === "owner") {
     return request.modules ?? {};
