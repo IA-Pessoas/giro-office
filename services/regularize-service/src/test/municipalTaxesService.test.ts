@@ -140,7 +140,13 @@ describe("MunicipalTaxesService.list", () => {
 
     expect(prisma.client.findMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        where: { organization_id: organizationId, status: "Ativo" },
+        where: {
+          organization_id: organizationId,
+          status: "Ativo",
+          municipalTaxes: {
+            some: { organization_id: organizationId, year: 2026, [applicabilityField]: true },
+          },
+        },
         select: expect.objectContaining({
           municipalTaxes: expect.objectContaining({
             where: { organization_id: organizationId, year: 2026, [applicabilityField]: true },

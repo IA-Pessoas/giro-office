@@ -181,7 +181,13 @@ export class MunicipalTaxesService {
           }
         : {}),
       ...(params.status === "Todos"
-        ? {}
+        ? params.type
+          ? {
+              municipalTaxes: {
+                some: municipalTaxesWhere,
+              },
+            }
+          : {}
         : {
             municipalTaxes: {
               [params.status === "Criado" ? "some" : "none"]: {
