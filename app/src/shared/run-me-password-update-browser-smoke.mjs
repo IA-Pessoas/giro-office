@@ -8,7 +8,6 @@ const PLAYWRIGHT_PORT = process.env.ME_PASSWORD_SMOKE_PORT || "3102";
 const configuredBaseUrl = process.env.ME_PASSWORD_SMOKE_BASE_URL?.replace(/\/$/, "");
 let baseUrl = configuredBaseUrl || `http://localhost:${PLAYWRIGHT_PORT}`;
 const appRoot = fileURLToPath(new URL("../..", import.meta.url));
-const profileAccessStorageKey = "@cw.me-profile-from-config";
 const pageDiagnostics = new WeakMap();
 
 const viewer = {
@@ -61,10 +60,6 @@ async function openProfile(user, modules, onPatch) {
     },
   ]);
 
-  await context.addInitScript((storageKey) => {
-    window.sessionStorage.setItem(storageKey, "1");
-  }, profileAccessStorageKey);
-
   const page = await context.newPage();
   pageDiagnostics.set(page, diagnostics);
   page.on("console", (message) => {
@@ -85,7 +80,7 @@ async function openProfile(user, modules, onPatch) {
   });
 
   await page.route(`**/user/${user.id}`, async (route) => {
-    assert.equal(route.request().method(), "PATCH");
+    assert.equal(route.request().method(), "PUT");
     onPatch(route.request().postDataJSON());
     await route.fulfill({
       status: 200,
@@ -100,6 +95,8 @@ async function openProfile(user, modules, onPatch) {
 
   try {
     await page.goto("/me", { waitUntil: "networkidle", timeout: 15_000 });
+    await page.waitForTimeout(250);
+    assert.equal(new URL(page.url()).pathname, "/me", "O perfil não pode depender de sessionStorage.");
     await assertVisible(page.getByRole("heading", { name: "Meu perfil" }), page, "heading Meu perfil");
     await assertVisible(page.getByLabel("Login"), page, "input Login");
 

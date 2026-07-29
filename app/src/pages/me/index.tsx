@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { useRouter } from "next/router";
 import { User } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
 import { canCreateUsers } from "@modules/auth";
 import { useMe, useUpdateCurrentUser } from "@shared/hooks";
-import { clearMeProfileAccess, hasMeProfileAccess } from "@shared/utils/meProfileAccessGate";
 import { buildSelfProfileUpdatePayload } from "@shared/utils/meProfileUpdate";
 
 const inputClass =
@@ -15,7 +13,6 @@ const inputClass =
 const labelClass = "block text-sm font-medium text-gray-700 dark:text-gray-300";
 
 export default function Me() {
-  const router = useRouter();
   const { user, logoutUser } = useAuth();
   const profileQuery = useMe();
   const updateUserMutation = useUpdateCurrentUser();
@@ -23,7 +20,6 @@ export default function Me() {
   const [name, setName] = useState("");
   const [login, setLogin] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [profileAccess, setProfileAccess] = useState<"pending" | "ok">("pending");
   const canManageUsers = canCreateUsers(user);
   const updatePayload = buildSelfProfileUpdatePayload({
     canManageUsers,
@@ -31,27 +27,6 @@ export default function Me() {
     name,
     password: newPassword,
   });
-
-  useEffect(() => {
-    if (!hasMeProfileAccess()) {
-      void router.replace("/dashboard");
-      return;
-    }
-    setProfileAccess("ok");
-  }, [router]);
-
-  useEffect(() => {
-    const onRouteChangeStart = (url: string) => {
-      const nextPath = url.split(/[?#]/)[0];
-      if (nextPath !== "/me") {
-        clearMeProfileAccess();
-      }
-    };
-    router.events.on("routeChangeStart", onRouteChangeStart);
-    return () => {
-      router.events.off("routeChangeStart", onRouteChangeStart);
-    };
-  }, [router]);
 
   useEffect(() => {
     if (profileQuery.data) {
@@ -72,19 +47,6 @@ export default function Me() {
     updateUserMutation.mutate(updatePayload, {
       onSuccess: () => setNewPassword(""),
     });
-  }
-
-  if (profileAccess !== "ok") {
-    return (
-      <>
-        <Head>
-          <title>Meu Perfil - Office</title>
-        </Head>
-        <div className="space-y-6 max-w-4xl">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Carregando…</p>
-        </div>
-      </>
-    );
   }
 
   return (
