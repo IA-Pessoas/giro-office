@@ -18,10 +18,7 @@ import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 import { useDebouncedValue } from "@shared/hooks";
 
 import { INTEGRACAO_TASK_STATUS_VALUES, type IntegracaoTaskListItem } from "../types";
-import {
-  useDeleteIntegracaoTaskMutation,
-  useIntegracaoTasksList,
-} from "../hooks";
+import { useDeleteIntegracaoTaskMutation, useIntegracaoTasksList } from "../hooks";
 import { TASK_MODEL_CONFIG_ENTRY } from "../navigation/taskModelConfigNavigation";
 import { TaskFormModal } from "./TaskFormModal";
 import {
@@ -46,6 +43,7 @@ import {
   TASK_TABLE_NAME_CELL_CLASSNAME,
   TASK_TABLE_NAME_HEAD_CELL_CLASSNAME,
   TASK_TABLE_SCROLL_AREA_CLASSNAME,
+  canEditIntegracaoTask,
   formatTasksFooterSummary,
 } from "./taskWorkspaceUi";
 
@@ -77,7 +75,10 @@ function getBillingTone(value: string) {
     : "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
 }
 
-function mergeTaskPages(currentTasks: IntegracaoTaskListItem[], nextTasks: IntegracaoTaskListItem[]) {
+function mergeTaskPages(
+  currentTasks: IntegracaoTaskListItem[],
+  nextTasks: IntegracaoTaskListItem[],
+) {
   const taskById = new Map(currentTasks.map((task) => [task.id, task]));
 
   nextTasks.forEach((task) => {
@@ -114,7 +115,8 @@ export function TasksWorkspace() {
   const tasksQuery = useIntegracaoTasksList(listParams);
   const deleteTaskMutation = useDeleteIntegracaoTaskMutation();
   const canDelete = integracaoAccess.isAdmin;
-  const canManageTaskModels = integracaoAccess.canEdit;
+  const canCreate = integracaoAccess.canEdit;
+  const canManageTaskModels = integracaoAccess.isAdmin;
 
   useEffect(() => {
     setPage(1);
@@ -154,7 +156,7 @@ export function TasksWorkspace() {
 
   async function handleDelete(task: IntegracaoTaskListItem) {
     if (!canDelete) {
-      toast.error("Somente usuários com permissão 2 podem excluir tarefas.");
+      toast.error("Somente usuários com permissão administrativa na Integração podem excluir tarefas.");
       return;
     }
 
@@ -164,7 +166,9 @@ export function TasksWorkspace() {
 
     try {
       await deleteTaskMutation.mutateAsync({ taskId: task.id });
-      setVisibleTasks((currentTasks) => currentTasks.filter((currentTask) => currentTask.id !== task.id));
+      setVisibleTasks((currentTasks) =>
+        currentTasks.filter((currentTask) => currentTask.id !== task.id),
+      );
       toast.success("Tarefa excluída com sucesso.");
     } catch (error) {
       const statusCode =
@@ -176,7 +180,7 @@ export function TasksWorkspace() {
           : null;
 
       if (statusCode === 403) {
-        toast.error("Somente usuários com permissão 2 podem excluir tarefas.");
+        toast.error("Somente usuários com permissão administrativa na Integração podem excluir tarefas.");
         return;
       }
 
@@ -199,12 +203,15 @@ export function TasksWorkspace() {
 
   return (
     <div className="space-y-6">
-      <TaskFormModal
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-        onSuccess={handleTaskSaved}
-        selectedClient={selectedClient}
-      />
+      {canCreate ? (
+        <TaskFormModal
+          open={isCreateModalOpen}
+          onOpenChange={setIsCreateModalOpen}
+          onSuccess={handleTaskSaved}
+          selectedClient={selectedClient}
+          integracaoAccess={integracaoAccess}
+        />
+      ) : null}
 
       <TaskFormModal
         open={Boolean(editingTaskId)}
@@ -216,6 +223,7 @@ export function TasksWorkspace() {
         taskId={editingTaskId}
         onSuccess={handleTaskSaved}
         selectedClient={selectedClient}
+        integracaoAccess={integracaoAccess}
       />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -232,15 +240,20 @@ export function TasksWorkspace() {
         </div>
 
         <div className="flex flex-col gap-2 sm:items-end">
-          <ClientPickerModal
-            selectedClient={selectedClient}
-            onSelectClient={setSelectedClient}
-            filters={{}}
-            allowClearSelection
-          />
+          {canCreate ? (
+            <ClientPickerModal
+              selectedClient={selectedClient}
+              onSelectClient={setSelectedClient}
+              filters={{}}
+              allowClearSelection
+            />
+          ) : null}
           <div className="flex flex-col gap-2 sm:flex-row">
             {canManageTaskModels ? (
-              <Link href={TASK_MODEL_CONFIG_ENTRY.href} className={PROJECT_COMPACT_BUTTON_CLASSNAME}>
+              <Link
+                href={TASK_MODEL_CONFIG_ENTRY.href}
+                className={PROJECT_COMPACT_BUTTON_CLASSNAME}
+              >
                 <Settings2 className="h-3.5 w-3.5" />
                 {TASK_MODEL_CONFIG_ENTRY.label}
               </Link>
@@ -258,16 +271,20 @@ export function TasksWorkspace() {
               )}
               Atualizar
             </button>
-            <button
-              type="button"
-              onClick={() => setIsCreateModalOpen(true)}
-              className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-              disabled={!selectedClient}
-              title={!selectedClient ? "Selecione um cliente antes de criar uma tarefa." : undefined}
-            >
-              <Plus className="h-4 w-4" />
-              Nova tarefa
-            </button>
+            {canCreate ? (
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(true)}
+                className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
+                disabled={!selectedClient}
+                title={
+                  !selectedClient ? "Selecione um cliente antes de criar uma tarefa." : undefined
+                }
+              >
+                <Plus className="h-4 w-4" />
+                Nova tarefa
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -276,7 +293,9 @@ export function TasksWorkspace() {
         {stats.map((stat) => (
           <section key={stat.label} className={`${PROJECT_PANEL_CLASSNAME} p-5`}>
             <p className="text-sm text-slate-500 dark:text-slate-400">{stat.label}</p>
-            <p className="mt-1 text-3xl font-semibold text-slate-900 dark:text-white">{stat.value}</p>
+            <p className="mt-1 text-3xl font-semibold text-slate-900 dark:text-white">
+              {stat.value}
+            </p>
             <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{stat.description}</p>
           </section>
         ))}
@@ -382,7 +401,10 @@ export function TasksWorkspace() {
                     className="border-b border-slate-200/80 align-top last:border-b-0 dark:border-slate-800"
                   >
                     <td className={TASK_TABLE_NAME_CELL_CLASSNAME}>
-                      <p className="line-clamp-2 font-semibold text-slate-900 dark:text-white" title={task.name}>
+                      <p
+                        className="line-clamp-2 font-semibold text-slate-900 dark:text-white"
+                        title={task.name}
+                      >
                         {task.name}
                       </p>
                     </td>
@@ -397,9 +419,7 @@ export function TasksWorkspace() {
                     </td>
                     <td className={TASK_TABLE_CELL_CLASSNAME}>
                       <span
-                        className={`${TASK_TABLE_BADGE_CLASSNAME} ${getBillingTone(
-                          task.billing,
-                        )}`}
+                        className={`${TASK_TABLE_BADGE_CLASSNAME} ${getBillingTone(task.billing)}`}
                       >
                         {task.billing}
                       </span>
@@ -425,9 +445,7 @@ export function TasksWorkspace() {
                     <td className={TASK_TABLE_CELL_CLASSNAME}>
                       {formatNullable(task.hiring_status)}
                     </td>
-                    <td className={TASK_TABLE_CELL_CLASSNAME}>
-                      {formatNullable(task.payment)}
-                    </td>
+                    <td className={TASK_TABLE_CELL_CLASSNAME}>{formatNullable(task.payment)}</td>
                     <td className={TASK_TABLE_CELL_CLASSNAME}>
                       <p className="line-clamp-3" title={formatNullable(task.billing_description)}>
                         {formatNullable(task.billing_description)}
@@ -435,16 +453,18 @@ export function TasksWorkspace() {
                     </td>
                     <td className={TASK_TABLE_ACTION_CELL_CLASSNAME}>
                       <div className="flex justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setEditingTaskId(task.id)}
-                          className={TASK_TABLE_ACTION_BUTTON_CLASSNAME}
-                          disabled={deleteTaskMutation.isPending}
-                          aria-label={`Editar tarefa ${task.name}`}
-                          title="Editar tarefa"
-                        >
-                          <Edit3 className="h-4 w-4" />
-                        </button>
+                        {canEditIntegracaoTask(integracaoAccess, task) ? (
+                          <button
+                            type="button"
+                            onClick={() => setEditingTaskId(task.id)}
+                            className={TASK_TABLE_ACTION_BUTTON_CLASSNAME}
+                            disabled={deleteTaskMutation.isPending}
+                            aria-label={`Editar tarefa ${task.name}`}
+                            title="Editar tarefa"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </button>
+                        ) : null}
 
                         {canDelete ? (
                           <button

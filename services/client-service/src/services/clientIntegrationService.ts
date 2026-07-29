@@ -1,4 +1,9 @@
-import { ServiceError } from "@workspace/shared";
+import {
+  INTEGRACAO_PERMISSION_LEVEL,
+  type IntegracaoServiceAuthorization,
+  requireIntegracaoRouteAccess,
+  ServiceError,
+} from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type {
   CreateIntegrationBody,
@@ -6,13 +11,29 @@ import type {
 } from "../schemas/clientVerticals.schemas.js";
 import { cleanDocument } from "../utils/documents.js";
 
+type ClientAuthorization = IntegracaoServiceAuthorization & { userId: string };
+
 export async function createIntegrationClient(
   prisma: PrismaClient,
   input: CreateIntegrationBody & { organization_id: string },
+  authorization: ClientAuthorization = {
+    userId: "",
+    level: INTEGRACAO_PERMISSION_LEVEL.BASIC,
+    isOwner: false,
+  },
 ): Promise<{ id: string; name: string; cpf_cnpj: string }> {
+  requireIntegracaoRouteAccess("POST", "/client/integration", {
+    userId: authorization.userId,
+    level: authorization.level,
+    organizationId: input.organization_id,
+    resourceOrganizationId: input.organization_id,
+    isOwner: authorization.isOwner,
+    requestedFields: Object.keys(input).filter((field) => field !== "organization_id"),
+  });
+
   const cleanedCpf = cleanDocument(input.cpf_cnpj);
   const exists = await prisma.client.findFirst({
-    where: { cpf_cnpj: cleanedCpf },
+    where: { cpf_cnpj: cleanedCpf, organization_id: input.organization_id },
     select: { id: true },
   });
   if (exists) {
@@ -61,6 +82,11 @@ export async function updateIntegrationClient(
   clientId: string,
   organizationId: string,
   input: UpdateIntegrationBody,
+  authorization: ClientAuthorization = {
+    userId: "",
+    level: INTEGRACAO_PERMISSION_LEVEL.BASIC,
+    isOwner: false,
+  },
 ): Promise<Record<string, unknown>> {
   const exists = await prisma.client.findFirst({
     where: { id: clientId, organization_id: organizationId },
@@ -69,6 +95,15 @@ export async function updateIntegrationClient(
   if (!exists) {
     throw new ServiceError(404, "Cliente não encontrado.");
   }
+
+  requireIntegracaoRouteAccess("PATCH", "/client/:id/integration", {
+    userId: authorization.userId,
+    level: authorization.level,
+    organizationId,
+    resourceOrganizationId: organizationId,
+    isOwner: authorization.isOwner,
+    requestedFields: Object.keys(input),
+  });
 
   const cleanedCpfCnpj = input.cpf_cnpj !== undefined ? cleanDocument(input.cpf_cnpj) : undefined;
   const cleanedCpfResponsible =

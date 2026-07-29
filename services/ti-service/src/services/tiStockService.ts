@@ -48,6 +48,19 @@ export type TiStockListResult = {
   hasMore: boolean;
 };
 
+function normalizeStockCategoryName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function isPrismaUniqueConstraintError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "P2002"
+  );
+}
+
 function normalizeStockLocationName(value: string): string {
   return value
     .normalize("NFD")
@@ -418,14 +431,19 @@ export class TiStockService {
   ): Promise<unknown> {
     try {
       const departmentId = await this.resolveDepartment(context.organizationId);
-      const existing = await this.prisma.categoryStock.findFirst({
+      const name = body.name.trim().replace(/\s+/g, " ");
+      const normalizedName = normalizeStockCategoryName(name);
+      const activeCategories = await this.prisma.categoryStock.findMany({
         where: {
           organization_id: context.organizationId,
           department_id: departmentId,
-          name: body.name,
           status: true,
         },
+        select: { name: true },
       });
+      const existing = activeCategories.some(
+        (category) => normalizeStockCategoryName(category.name) === normalizedName,
+      );
 
       if (existing) {
         throw new ServiceError(
@@ -434,9 +452,9 @@ export class TiStockService {
         );
       }
 
-      return this.prisma.categoryStock.create({
+      return await this.prisma.categoryStock.create({
         data: {
-          name: body.name,
+          name,
           department_id: departmentId,
           status: true,
           organization_id: context.organizationId,
@@ -445,6 +463,12 @@ export class TiStockService {
     } catch (err: unknown) {
       logError("Erro ao criar categoria de estoque de TI", { err });
       if (err instanceof ServiceError) throw err;
+      if (isPrismaUniqueConstraintError(err)) {
+        throw new ServiceError(
+          409,
+          "Ja existe uma categoria de estoque de TI ativa com este nome.",
+        );
+      }
       throw new ServiceError(500, "Erro ao criar categoria de estoque de TI.", err);
     }
   }
@@ -464,13 +488,19 @@ export class TiStockService {
         throw new ServiceError(404, "Categoria de estoque de TI nao encontrada.");
       }
 
-      return this.prisma.categoryStock.update({
+      return await this.prisma.categoryStock.update({
         where: { id },
         data: body,
       });
     } catch (err: unknown) {
       logError("Erro ao atualizar categoria de estoque de TI", { err });
       if (err instanceof ServiceError) throw err;
+      if (isPrismaUniqueConstraintError(err)) {
+        throw new ServiceError(
+          409,
+          "Ja existe uma categoria de estoque de TI ativa com este nome.",
+        );
+      }
       throw new ServiceError(500, "Erro ao atualizar categoria de estoque de TI.", err);
     }
   }

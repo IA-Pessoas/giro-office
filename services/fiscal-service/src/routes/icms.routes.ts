@@ -7,16 +7,21 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import { isAuthenticated, requireFiscalWritePermission } from "../middlewares/isAuthenticated.js";
+import {
+  isAuthenticated,
+  requireFiscalAdminPermission,
+  requireFiscalWritePermission,
+} from "../middlewares/isAuthenticated.js";
 import {
   createIcmsBodySchema,
+  deleteIcmsQuerySchema,
   detailIcmsQuerySchema,
   listIcmsQuerySchema,
   updateIcmsBodySchema,
 } from "../schemas/icms.schemas.js";
 import type { IcmsService } from "../services/icmsService.js";
 
-export type IcmsRouteDeps = Pick<IcmsService, "create" | "update" | "detail" | "list">;
+export type IcmsRouteDeps = Pick<IcmsService, "create" | "update" | "delete" | "detail" | "list">;
 
 function firstQueryValue(value: unknown): unknown {
   return Array.isArray(value) ? value[0] : value;
@@ -68,6 +73,31 @@ export function createIcmsRoutes(service: IcmsRouteDeps): ReturnType<typeof Rout
         res.json(createSuccessResponse(result));
       } catch (err) {
         logError("Erro ao atualizar ICMS", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.delete(
+    "/icms",
+    isAuthenticated,
+    requireFiscalAdminPermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const rawObj = { icms_id: firstQueryValue(req.query.icms_id) };
+        const query = parseWithZod(deleteIcmsQuerySchema, rawObj);
+        const auth = requireAuthenticatedRequestContext(req);
+
+        const result = await service.delete({
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+          icms_id: query.icms_id,
+        });
+
+        res.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao excluir ICMS", { err });
         next(err);
       }
     },

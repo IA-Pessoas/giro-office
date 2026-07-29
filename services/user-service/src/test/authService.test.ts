@@ -132,6 +132,33 @@ describe("AuthService", () => {
     );
   });
 
+  it("login carrega somente a permissão da organização ativa", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      name: "Usuário",
+      login: "user",
+      password: "hash",
+      permission: 0,
+      type: "user",
+      department_id: "dep-1",
+      organization_id: "org-b",
+      department: { organization_id: "org-b" },
+      permissions: [
+        { organization_id: "org-a", fiscal: 3 },
+        { organization_id: "org-b", fiscal: 1 },
+      ],
+    });
+    bcryptMock.compare.mockResolvedValue(true);
+    jwtMock.sign.mockReturnValue("jwt-token");
+    const service = new AuthService();
+
+    const result = await service.login({ login: "user", password: "secret" });
+
+    expect(result.organization_id).toBe("org-b");
+    expect(result.modules.fiscal).toBe(1);
+    expect(result.modules.comercial).toBe(0);
+  });
+
   it("firstCreate cria admin inicial quando banco está vazio", async () => {
     prismaMock.user.findFirst.mockResolvedValueOnce(null);
     prismaMock.organization.findFirst.mockResolvedValue({ id: "org-1" });

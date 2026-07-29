@@ -13,7 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { canSSRAdmin } from "@modules/auth";
+import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import {
   TaskModelModal,
   canManageTaskModelConfig,
@@ -73,8 +73,9 @@ export default function TaskModelsConfig() {
     page,
     limit: TASK_MODEL_PAGE_SIZE,
   });
+  const { access: integracaoAccess } = useModuleAccess("integracao");
   const meQuery = useMe();
-  const canManageTaskModels = canManageTaskModelConfig(meQuery.data?.permission);
+  const canManageTaskModels = canManageTaskModelConfig(integracaoAccess);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<TaskModel | null>(null);
   const [modelToDelete, setModelToDelete] = useState<TaskModel | null>(null);
@@ -182,7 +183,11 @@ export default function TaskModelsConfig() {
           </div>
 
           {canManageTaskModels ? (
-            <button type="button" onClick={handleOpenCreate} className={PROJECT_PRIMARY_BUTTON_CLASSNAME}>
+            <button
+              type="button"
+              onClick={handleOpenCreate}
+              className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
+            >
               <Plus className="h-4 w-4" />
               Novo modelo
             </button>
@@ -196,7 +201,9 @@ export default function TaskModelsConfig() {
                 <ShieldAlert className="h-5 w-5" />
               </div>
               <div>
-                <p className="font-semibold text-slate-900 dark:text-white">Acesso somente leitura</p>
+                <p className="font-semibold text-slate-900 dark:text-white">
+                  Acesso somente leitura
+                </p>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   A criação e manutenção de modelos exige permissão administrativa.
                 </p>
@@ -209,7 +216,9 @@ export default function TaskModelsConfig() {
           {stats.map((stat) => (
             <section key={stat.label} className={`${PROJECT_PANEL_CLASSNAME} p-5`}>
               <p className="text-sm text-slate-500 dark:text-slate-400">{stat.label}</p>
-              <p className="mt-1 text-3xl font-semibold text-slate-900 dark:text-white">{stat.value}</p>
+              <p className="mt-1 text-3xl font-semibold text-slate-900 dark:text-white">
+                {stat.value}
+              </p>
               <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{stat.description}</p>
             </section>
           ))}
@@ -270,14 +279,20 @@ export default function TaskModelsConfig() {
               <tbody>
                 {showLoading ? (
                   <tr>
-                    <td colSpan={3} className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400">
+                    <td
+                      colSpan={3}
+                      className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400"
+                    >
                       <LoaderCircle className="mr-2 inline h-4 w-4 animate-spin" />
                       Carregando modelos...
                     </td>
                   </tr>
                 ) : showEmptyState ? (
                   <tr>
-                    <td colSpan={3} className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400">
+                    <td
+                      colSpan={3}
+                      className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400"
+                    >
                       {getTaskModelEmptyStateMessage({ hasSearch, isError })}
                     </td>
                   </tr>
@@ -288,7 +303,10 @@ export default function TaskModelsConfig() {
                       className="border-b border-slate-200/80 last:border-b-0 dark:border-slate-800"
                     >
                       <td className={`${TASK_TABLE_CELL_CLASSNAME} pl-5`}>
-                        <p className="font-semibold text-slate-900 dark:text-white" title={model.name}>
+                        <p
+                          className="font-semibold text-slate-900 dark:text-white"
+                          title={model.name}
+                        >
                           {model.name}
                         </p>
                       </td>
@@ -379,8 +397,7 @@ export default function TaskModelsConfig() {
         }
       >
         <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Tem certeza que deseja excluir o modelo
-          {" "}
+          Tem certeza que deseja excluir o modelo{" "}
           <span className="font-semibold text-slate-900 dark:text-white">
             {modelToDelete?.name}
           </span>
@@ -391,6 +408,6 @@ export default function TaskModelsConfig() {
   );
 }
 
-export const getServerSideProps = canSSRAdmin(async () => {
+export const getServerSideProps = canSSRAuth(async () => {
   return { props: {} };
 });

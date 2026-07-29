@@ -93,12 +93,16 @@ router.get(
 router.get(
   "/:id",
   isAuthenticated,
-  requireRhPermission(RH_MANAGEMENT_PERMISSION),
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = req.organization_id;
+      const requesterId = req.user_id;
       if (!organizationId) {
         throw new ServiceError(400, "organization_id e obrigatorio.");
+      }
+      if (!requesterId) {
+        throw new ServiceError(400, "user_id e obrigatorio.");
       }
 
       const { id } = parseWithZod(timeSheetIdParamsSchema, req.params);
@@ -107,6 +111,12 @@ router.get(
         organization_id: organizationId,
         timesheet_id: id,
       });
+      if (!canManageRh(req) && result.user_id !== requesterId) {
+        throw new ServiceError(
+          403,
+          "Permissao insuficiente para acessar folha de ponto de terceiro.",
+        );
+      }
 
       res.status(200).json(createSuccessResponse(result));
     } catch (err) {

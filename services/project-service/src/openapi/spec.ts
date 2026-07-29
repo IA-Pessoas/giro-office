@@ -43,7 +43,10 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
     info: {
       title: "project-service",
       version: "1.0.0",
-      description: "API de projetos (integração). Requer JWT válido nos endpoints autenticados.",
+      description:
+        "API de projetos (integração). Requer JWT válido nos endpoints autenticados. " +
+        "modules.integracao aplica leitura a partir de 1, criação/edição e progresso a partir de 2 " +
+        "e exclusão a partir de 3; progresso concluinte que inativa cliente exige nível 3.",
     },
     servers: [{ url: baseUrl }],
     tags: [

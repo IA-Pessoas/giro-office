@@ -717,4 +717,28 @@ describe("CertificatePfService", () => {
     ).rejects.toMatchObject({ statusCode: 500 } satisfies Partial<ServiceError>);
     expect(prisma.certificatePF.delete).not.toHaveBeenCalled();
   });
+
+  it("deleteCertificatePf deletes a tenant record without a stored file", async () => {
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () => createCertificatePfRecord({ file_path: null })),
+        delete: vi.fn(async () => createCertificatePfRecord({ file_path: null })),
+      },
+      certificateNotification: {
+        deleteMany: vi.fn(async () => ({ count: 0 })),
+      },
+    };
+    const service = new CertificatePfService(prisma as never);
+
+    await expect(
+      service.deleteCertificatePf({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(prisma.certificatePF.delete).toHaveBeenCalledWith({
+      where: { id: certificateId, organization_id: certificateOrganizationId },
+    });
+  });
 });

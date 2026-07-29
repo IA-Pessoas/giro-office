@@ -119,6 +119,11 @@ export const certificateService = {
     await api.delete(CERTIFICATE_ENDPOINTS.pjFile(id));
   },
 
+  async deletePj(id: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.delete(CERTIFICATE_ENDPOINTS.pjDetail(id));
+  },
+
   async listPf(params: CertificatePfListParams = {}): Promise<
     CertificateListPage<CertificatePf>
   > {
@@ -196,6 +201,11 @@ export const certificateService = {
   async deletePfFile(id: string): Promise<void> {
     const api = setupAPIClient();
     await api.delete(CERTIFICATE_ENDPOINTS.pfFile(id));
+  },
+
+  async deletePf(id: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.delete(CERTIFICATE_ENDPOINTS.pfDetail(id));
   },
 
   async listNotifications(

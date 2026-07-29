@@ -1,4 +1,10 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import {
+  INTEGRACAO_PERMISSION_LEVEL,
+  type IntegracaoPermissionLevel,
+  error as logError,
+  requireIntegracaoRouteAccess,
+  ServiceError,
+} from "@workspace/shared";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
@@ -48,6 +54,8 @@ export class TaskLifecycleService {
     user_id: string;
     organization_id: string;
     body: IntegracaoTaskConclusionBody;
+    integracaoLevel?: IntegracaoPermissionLevel;
+    isOwner?: boolean;
   }): Promise<TaskConclusionRow> {
     try {
       const { user_id, organization_id, body } = params;
@@ -60,15 +68,47 @@ export class TaskLifecycleService {
         throw new ServiceError(404, "Tarefa não existe.");
       }
 
+      requireIntegracaoRouteAccess("PUT", "/task/conclusion", {
+        userId: user_id,
+        level: params.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId: organization_id,
+        resourceOrganizationId: exists.organization_id,
+        responsibleId: exists.responsible_id,
+        responsible2Id: exists.responsible2_id,
+        responsible3Id: exists.responsible3_id,
+        isOwner: params.isOwner === true,
+        requestedFields: ["status", "observations"],
+      });
+
+      const isOwnPatchUnchanged =
+        params.isOwner === true ||
+        (params.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) >=
+          INTEGRACAO_PERMISSION_LEVEL.USER ||
+        (body.responsible_id === exists.responsible_id &&
+          (body.responsible2_id === undefined || body.responsible2_id === exists.responsible2_id) &&
+          (body.responsible3_id === undefined || body.responsible3_id === exists.responsible3_id) &&
+          (body.prevision_date === undefined ||
+            parseOptionalDate(body.prevision_date)?.getTime() ===
+              exists.prevision_date?.getTime()) &&
+          (body.end_date === undefined ||
+            parseOptionalDate(body.end_date)?.getTime() === exists.end_date?.getTime()));
+      if (!isOwnPatchUnchanged) {
+        throw new ServiceError(403, "Tarefa própria só permite alterar status e observações.");
+      }
+
       const permSpecific = await prismaClient.permissionSpecific.findFirst({
         where: { user_id, organization_id },
       });
 
       let newStatus = body.status;
       let newPendingApproval = exists.pending_approval ?? false;
+      const level = params.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC;
 
       if (body.status === "Concluída") {
-        if (!permSpecific || permSpecific.task_completion !== true) {
+        const canCompleteDirectly =
+          (params.isOwner === true || level >= INTEGRACAO_PERMISSION_LEVEL.USER) &&
+          permSpecific?.task_completion === true;
+        if (!canCompleteDirectly) {
           newStatus = "Em Andamento";
           newPendingApproval = true;
         }
@@ -136,6 +176,8 @@ export class TaskLifecycleService {
     user_id: string;
     organization_id: string;
     task_id: string;
+    integracaoLevel?: IntegracaoPermissionLevel;
+    isOwner?: boolean;
   }): Promise<TaskCompleteApprovalRow> {
     try {
       const { user_id, organization_id, task_id } = params;
@@ -148,22 +190,18 @@ export class TaskLifecycleService {
         throw new ServiceError(404, "Tarefa não existe.");
       }
 
-      const perm = await prismaClient.permission.findFirst({
-        where: { user_id, organization_id },
-      });
-      const integrationLevel = perm?.integracao ?? 0;
-
-      if (integrationLevel < 2) {
-        throw new ServiceError(403, "Sem cargo para completar.");
-      }
-
       const permConclusion = await prismaClient.permissionSpecific.findFirst({
         where: { user_id, organization_id },
       });
 
-      if (integrationLevel < 3 && (!permConclusion || permConclusion.task_completion !== true)) {
-        throw new ServiceError(403, "Sem permissão para completar.");
-      }
+      requireIntegracaoRouteAccess("PUT", "/task/complete-request", {
+        userId: user_id,
+        level: params.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId: organization_id,
+        resourceOrganizationId: exists.organization_id,
+        isOwner: params.isOwner === true,
+        hasTaskCompletionPermission: permConclusion?.task_completion === true,
+      });
 
       const updated = await prismaClient.task.update({
         where: { id: task_id },

@@ -91,6 +91,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.clientServiceUrl,
       auditTarget: "client-service",
       routePrefixes: [...CLIENT_SERVICE_PREFIXES],
+      internalServiceToken: env.clientServiceInternalToken,
     },
     {
       key: "regularize-service",
@@ -111,6 +112,8 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.contabilServiceUrl,
       auditTarget: "contabil-service",
       routePrefixes: [...CONTABIL_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
+      permissionModule: "contabil",
     },
     {
       key: "ti-service",

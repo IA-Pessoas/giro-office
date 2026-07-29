@@ -2,6 +2,32 @@ import type { CSSProperties } from "react";
 
 const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 
+type CertificateWorkspaceAccess = {
+  canView: boolean;
+  canEdit: boolean;
+  isAdmin: boolean;
+};
+
+export type CertificateWorkspaceCapabilities = {
+  canReadRecords: boolean;
+  canManageRecords: boolean;
+  canManageFiles: boolean;
+  canDeleteRecords: boolean;
+  canDeleteFiles: boolean;
+};
+
+export function resolveCertificateWorkspaceCapabilities(
+  access: CertificateWorkspaceAccess,
+): CertificateWorkspaceCapabilities {
+  return {
+    canReadRecords: access.canView,
+    canManageRecords: access.canEdit,
+    canManageFiles: access.canEdit,
+    canDeleteRecords: access.canEdit,
+    canDeleteFiles: access.isAdmin,
+  };
+}
+
 export const CERTIFICATE_PANEL_CLASSNAME =
   "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900";
 

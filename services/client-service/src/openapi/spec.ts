@@ -33,7 +33,9 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
       title: "client-service",
       version: "1.0.0",
       description:
-        "API de clientes. Endpoints autenticados usam JWT e a rota interna usa token dedicado.",
+        "API de clientes. Endpoints autenticados usam JWT e a rota interna usa token dedicado. " +
+        "As rotas de Integração aplicam modules.integracao 0–3 no backend: leitura a partir de 1, " +
+        "criação/edição a partir de 2 e ativação/inativação a partir de 3.",
     },
     servers: [{ url: baseUrl }],
     tags: [

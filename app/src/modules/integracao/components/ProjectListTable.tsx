@@ -20,6 +20,7 @@ interface ProjectListTableProps {
   onEdit?: (project: ProjectListItem) => void;
   onDelete?: (project: ProjectListItem) => void;
   onRecalculateProgress?: (project: ProjectListItem) => void;
+  canEdit?: boolean;
   canDelete?: boolean;
   actionsDisabled?: boolean;
 }
@@ -33,6 +34,7 @@ export function ProjectListTable({
   onEdit,
   onDelete,
   onRecalculateProgress,
+  canEdit = true,
   canDelete = false,
   actionsDisabled = false,
 }: ProjectListTableProps) {
@@ -117,7 +119,7 @@ export function ProjectListTable({
                         </Link>
                       ) : null}
 
-                      {onEdit ? (
+                      {canEdit && onEdit ? (
                         <button
                           type="button"
                           onClick={() => onEdit(project)}
@@ -129,7 +131,7 @@ export function ProjectListTable({
                         </button>
                       ) : null}
 
-                      {onRecalculateProgress ? (
+                      {canEdit && onRecalculateProgress ? (
                         <button
                           type="button"
                           onClick={() => onRecalculateProgress(project)}

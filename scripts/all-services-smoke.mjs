@@ -2974,6 +2974,10 @@ const handlers = {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
+  async taskDepsOptions(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
   async taskModelCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

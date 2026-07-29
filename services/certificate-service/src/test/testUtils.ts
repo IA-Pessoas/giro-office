@@ -86,7 +86,10 @@ export function createCertificatePrismaMock(): PrismaClient {
         organization_id: certificateOrganizationId,
         ...data,
       })),
-      delete: vi.fn(async () => undefined),
+      delete: vi.fn(async ({ where }) => ({
+        id: where.id,
+        organization_id: where.organization_id,
+      })),
     },
     certificatePF: {
       count: vi.fn(async () => 1),
@@ -140,7 +143,10 @@ export function createCertificatePrismaMock(): PrismaClient {
         organization_id: certificateOrganizationId,
         ...data,
       })),
-      delete: vi.fn(async () => undefined),
+      delete: vi.fn(async ({ where }) => ({
+        id: where.id,
+        organization_id: where.organization_id,
+      })),
     },
     certificateNotification: {
       findMany: vi.fn(async () => [

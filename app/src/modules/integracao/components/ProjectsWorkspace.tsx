@@ -109,6 +109,7 @@ function formatDeadlineHint(daysUntil: number | null) {
 export function ProjectsWorkspace() {
   const router = useRouter();
   const { access: integracaoAccess } = useModuleAccess("integracao");
+  const canEdit = integracaoAccess.canEdit;
   const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
   const [projectSearch, setProjectSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -158,7 +159,9 @@ export function ProjectsWorkspace() {
   }, [projectSearch, projects, statusFilter]);
 
   const highlightedProjects = useMemo(() => {
-    return [...filteredProjects].sort((left, right) => getHighlightScore(right) - getHighlightScore(left));
+    return [...filteredProjects].sort(
+      (left, right) => getHighlightScore(right) - getHighlightScore(left),
+    );
   }, [filteredProjects]);
 
   const highlightedProjectsGridClassName = useMemo(() => {
@@ -174,13 +177,15 @@ export function ProjectsWorkspace() {
   }, [highlightedProjects.length]);
 
   const upcomingProject = useMemo(() => {
-    return [...projects]
-      .filter((project) => !isCompletedStatus(project.status) && project.end_date)
-      .sort((left, right) => {
-        const leftDays = resolveDaysUntil(left.end_date) ?? Number.POSITIVE_INFINITY;
-        const rightDays = resolveDaysUntil(right.end_date) ?? Number.POSITIVE_INFINITY;
-        return leftDays - rightDays;
-      })[0] ?? null;
+    return (
+      [...projects]
+        .filter((project) => !isCompletedStatus(project.status) && project.end_date)
+        .sort((left, right) => {
+          const leftDays = resolveDaysUntil(left.end_date) ?? Number.POSITIVE_INFINITY;
+          const rightDays = resolveDaysUntil(right.end_date) ?? Number.POSITIVE_INFINITY;
+          return leftDays - rightDays;
+        })[0] ?? null
+    );
   }, [projects]);
 
   const averageProgress = useMemo(() => {
@@ -194,10 +199,7 @@ export function ProjectsWorkspace() {
 
   const pausedProjects = useMemo(
     () =>
-      countByStatus(
-        projects,
-        (status) => status.includes("paus") || status.includes("paralis"),
-      ),
+      countByStatus(projects, (status) => status.includes("paus") || status.includes("paralis")),
     [projects],
   );
 
@@ -281,7 +283,7 @@ export function ProjectsWorkspace() {
           : null;
 
       if (statusCode === 403) {
-        toast.error("Somente usuários com permissão 2 podem excluir projetos.");
+      toast.error("Somente usuários com permissão administrativa na Integração podem excluir projetos.");
         return;
       }
 
@@ -323,11 +325,13 @@ export function ProjectsWorkspace() {
 
   return (
     <div className="space-y-6">
-      <ProjectFormModal
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-        clientId={selectedClientId}
-      />
+      {canEdit ? (
+        <ProjectFormModal
+          open={isCreateModalOpen}
+          onOpenChange={setIsCreateModalOpen}
+          clientId={selectedClientId}
+        />
+      ) : null}
 
       <ProjectFormModal
         open={Boolean(editingProjectId)}
@@ -360,18 +364,19 @@ export function ProjectsWorkspace() {
             filters={{}}
             allowClearSelection
           />
-          <button
-            type="button"
-            disabled={!selectedClientId}
-            onClick={() => setIsCreateModalOpen(true)}
-            className={`${PROJECT_PRIMARY_BUTTON_CLASSNAME} min-h-10 px-3.5 py-2 text-sm shadow-none`}
-          >
-            <Plus className="h-4 w-4" />
-            Novo projeto
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              disabled={!selectedClientId}
+              onClick={() => setIsCreateModalOpen(true)}
+              className={`${PROJECT_PRIMARY_BUTTON_CLASSNAME} min-h-10 px-3.5 py-2 text-sm shadow-none`}
+            >
+              <Plus className="h-4 w-4" />
+              Novo projeto
+            </button>
+          ) : null}
         </div>
       </header>
-
 
       <section className={`${PROJECT_PANEL_CLASSNAME} p-5`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -505,7 +510,9 @@ export function ProjectsWorkspace() {
                     Status atual
                   </p>
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-white">{upcomingProject.status}</span>
+                    <span className="text-sm font-semibold text-white">
+                      {upcomingProject.status}
+                    </span>
                     <span className="text-xs text-slate-200/75">
                       Início em {formatProjectDate(upcomingProject.start_date)}
                     </span>
@@ -516,7 +523,8 @@ export function ProjectsWorkspace() {
                 </div>
               ) : (
                 <div className="mt-auto rounded-2xl border border-dashed border-white/15 px-4 py-5 text-sm leading-6 text-slate-200/70">
-                  Defina datas finais nos projetos para transformar este painel em um radar real de prazo.
+                  Defina datas finais nos projetos para transformar este painel em um radar real de
+                  prazo.
                 </div>
               )}
             </div>
@@ -682,24 +690,28 @@ export function ProjectsWorkspace() {
                         Detalhe
                       </Link>
 
-                      <button
-                        type="button"
-                        onClick={() => setEditingProjectId(project.id)}
-                        className={PROJECT_COMPACT_BUTTON_CLASSNAME}
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                        Editar
-                      </button>
+                      {canEdit ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setEditingProjectId(project.id)}
+                            className={PROJECT_COMPACT_BUTTON_CLASSNAME}
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                            Editar
+                          </button>
 
-                      <button
-                        type="button"
-                        onClick={() => void handleRecalculate(project)}
-                        disabled={recalculateProgressMutation.isPending}
-                        className={PROJECT_COMPACT_BUTTON_CLASSNAME}
-                      >
-                        <RefreshCcw className="h-3.5 w-3.5" />
-                        Recalcular
-                      </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleRecalculate(project)}
+                            disabled={recalculateProgressMutation.isPending}
+                            className={PROJECT_COMPACT_BUTTON_CLASSNAME}
+                          >
+                            <RefreshCcw className="h-3.5 w-3.5" />
+                            Recalcular
+                          </button>
+                        </>
+                      ) : null}
 
                       {integracaoAccess.isAdmin ? (
                         <button

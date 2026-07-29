@@ -24,7 +24,6 @@ import {
   DEFAULT_CERTIFICATE_PAGE,
   DEFAULT_CERTIFICATE_PAGE_SIZE,
 } from "@modules/certificates/services/certificateService.contract";
-import { MODULE_ADMIN_PERMISSION } from "@modules/auth/utils/moduleAccess";
 import {
   useCertificateNotificationsList,
   useCertificatePjDetail,
@@ -84,6 +83,7 @@ import {
   CERTIFICATE_SUMMARY_ITEM_CLASSNAME,
   formatDateBR,
   getExpirationTone,
+  resolveCertificateWorkspaceCapabilities,
 } from "./certificateWorkspaceUi";
 
 type CertificateTab = "pj" | "pf" | "notifications";
@@ -245,7 +245,7 @@ function AccessDeniedCard() {
 }
 
 export function CertificatesWorkspace() {
-  const { access, isLoading: isModuleAccessLoading, user } = useModuleAccess("certificado");
+  const { access, isLoading: isModuleAccessLoading } = useModuleAccess("certificado");
   const [activeTab, setActiveTab] = useState<CertificateTab>("pj");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("view");
   const [selected, setSelected] = useState<DetailTarget>(null);
@@ -324,11 +324,10 @@ export function CertificatesWorkspace() {
   const deferredPjQueryParams = useDeferredValue(pjQueryParams);
   const deferredPfQueryParams = useDeferredValue(pfQueryParams);
   const deferredNotificationsParams = useDeferredValue(notificationsParams);
-  const shouldFetchCertificates = access.canView && !isModuleAccessLoading;
-  const canManageCertificateModule =
-    access.isAdmin ||
-    (typeof user?.modules?.certificado === "number" &&
-      user.modules?.certificado >= MODULE_ADMIN_PERMISSION);
+  const certificateCapabilities = resolveCertificateWorkspaceCapabilities(access);
+  const shouldFetchCertificates =
+    certificateCapabilities.canReadRecords && !isModuleAccessLoading;
+  const canManageCertificateModule = certificateCapabilities.canManageRecords;
 
   const pjListQuery = useCertificatePjList(deferredPjQueryParams, {
     enabled: shouldFetchCertificates && activeTab === "pj",
@@ -1383,7 +1382,9 @@ export function CertificatesWorkspace() {
                               kind="pj"
                               certificateId={item.id}
                               hasCertificate={item.has_certificate}
-                              canEdit={access.canEdit}
+                              canEdit={certificateCapabilities.canManageFiles}
+                              canDeleteFile={certificateCapabilities.canDeleteFiles}
+                              canDeleteRecord={certificateCapabilities.canDeleteRecords}
                               variant="inline"
                               onUploadSuccess={() => handlePjFileActionSuccess(item.id)}
                               onDeleteSuccess={() => handlePjFileActionSuccess(item.id)}
@@ -1486,7 +1487,9 @@ export function CertificatesWorkspace() {
                               kind="pf"
                               certificateId={item.id}
                               hasCertificate={item.has_certificate}
-                              canEdit={access.canEdit}
+                              canEdit={certificateCapabilities.canManageFiles}
+                              canDeleteFile={certificateCapabilities.canDeleteFiles}
+                              canDeleteRecord={certificateCapabilities.canDeleteRecords}
                               variant="inline"
                               onUploadSuccess={() => handlePfFileActionSuccess(item.id)}
                               onDeleteSuccess={() => handlePfFileActionSuccess(item.id)}
@@ -1772,7 +1775,9 @@ export function CertificatesWorkspace() {
                   kind="pj"
                   certificateId={pjDetail.id}
                   hasCertificate={pjDetail.has_certificate}
-                  canEdit={access.canEdit}
+                  canEdit={certificateCapabilities.canManageFiles}
+                  canDeleteFile={certificateCapabilities.canDeleteFiles}
+                  canDeleteRecord={certificateCapabilities.canDeleteRecords}
                   onUploadSuccess={() => handlePjFileActionSuccess(pjDetail.id)}
                   onDeleteSuccess={() => handlePjFileActionSuccess(pjDetail.id)}
                 />
@@ -1864,7 +1869,9 @@ export function CertificatesWorkspace() {
                   kind="pf"
                   certificateId={pfDetail.id}
                   hasCertificate={pfDetail.has_certificate}
-                  canEdit={access.canEdit}
+                  canEdit={certificateCapabilities.canManageFiles}
+                  canDeleteFile={certificateCapabilities.canDeleteFiles}
+                  canDeleteRecord={certificateCapabilities.canDeleteRecords}
                   onUploadSuccess={() => handlePfFileActionSuccess(pfDetail.id)}
                   onDeleteSuccess={() => handlePfFileActionSuccess(pfDetail.id)}
                 />

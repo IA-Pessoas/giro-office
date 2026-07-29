@@ -7,16 +7,21 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import { isAuthenticated, requireFiscalWritePermission } from "../middlewares/isAuthenticated.js";
+import {
+  isAuthenticated,
+  requireFiscalAdminPermission,
+  requireFiscalWritePermission,
+} from "../middlewares/isAuthenticated.js";
 import {
   createIpiBodySchema,
+  deleteIpiQuerySchema,
   detailIpiQuerySchema,
   listIpiQuerySchema,
   updateIpiBodySchema,
 } from "../schemas/ipi.schemas.js";
 import type { IpiService } from "../services/ipiService.js";
 
-export type IpiRouteDeps = Pick<IpiService, "create" | "update" | "detail" | "list">;
+export type IpiRouteDeps = Pick<IpiService, "create" | "update" | "delete" | "detail" | "list">;
 
 function firstQueryValue(value: unknown): unknown {
   return Array.isArray(value) ? value[0] : value;
@@ -68,6 +73,31 @@ export function createIpiRoutes(service: IpiRouteDeps): ReturnType<typeof Router
         res.json(createSuccessResponse(result));
       } catch (err) {
         logError("Erro ao atualizar IPI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.delete(
+    "/ipi",
+    isAuthenticated,
+    requireFiscalAdminPermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const rawObj = { ipi_id: firstQueryValue(req.query.ipi_id) };
+        const query = parseWithZod(deleteIpiQuerySchema, rawObj);
+        const auth = requireAuthenticatedRequestContext(req);
+
+        const result = await service.delete({
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+          ipi_id: query.ipi_id,
+        });
+
+        res.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao excluir IPI", { err });
         next(err);
       }
     },

@@ -17,7 +17,7 @@ const pointConfigService = new PointConfigService();
 router.put(
   "/",
   isAuthenticated,
-  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
+  requireRhPermission(RH_MANAGEMENT_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = req.organization_id;

@@ -715,6 +715,7 @@ describe("CertificatePjService", () => {
         organizationId: certificateOrganizationId,
       }),
     ).rejects.toMatchObject({ statusCode: 500 } satisfies Partial<ServiceError>);
+
     expect(prisma.certificatePJ.delete).not.toHaveBeenCalled();
   });
 });

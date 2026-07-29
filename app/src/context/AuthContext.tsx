@@ -15,6 +15,11 @@ import { MODULE_KEYS } from "@modules/auth/utils/moduleAccess";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
 import { ME_QUERY_KEY } from "@shared/hooks";
+import {
+    createAuthInvalidationHandler,
+    invalidateAuthSession,
+    registerAuthInvalidationHandler,
+} from "./authInvalidation";
 
 interface UserProps {
     id: string;
@@ -126,8 +131,17 @@ function buildCurrentUser(
 
 export function signOut() {
     try {
+        const { [AUTH_COOKIE_NAME]: token } = parseCookies();
+
         clearAuthCookie();
-        Router.push("/login");
+        invalidateAuthSession();
+
+        if (token) {
+            toast.error("Sessão expirada. Faça login novamente.", {
+                toastId: "auth-session-expired",
+            });
+            void Router.push("/login");
+        }
     } catch (error) {
         logAuthError("Erro ao deslogar", error);
     }
@@ -157,6 +171,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         return true;
     }
+
+    useEffect(() => {
+        return registerAuthInvalidationHandler(
+            createAuthInvalidationHandler({
+                invalidateRequests: () => {
+                    authRequestVersionRef.current += 1;
+                },
+                clearUser: () => setUser(null),
+                stopLoading: () => setLoading(false),
+                clearCache: () => queryClient.removeQueries({ queryKey: ME_QUERY_KEY }),
+            }),
+        );
+    }, [queryClient]);
 
     async function refreshSession(): Promise<UserProps | null> {
         const requestVersion = beginAuthTransition();
@@ -225,7 +252,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
                 }
             }).catch((error) => {
-                if (!isCurrentAuthTransition(requestVersion, token)) {
+                if (!isCurrentAuthTransition(requestVersion)) {
                     return;
                 }
 
@@ -234,7 +261,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 setUser(null);
                 queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             }).finally(() => {
-                if (isCurrentAuthTransition(requestVersion, token)) {
+                if (isCurrentAuthTransition(requestVersion)) {
                     setLoading(false);
                 }
             });

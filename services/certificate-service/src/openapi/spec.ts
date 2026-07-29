@@ -259,6 +259,37 @@ function certificateFileDeleteOperation({
   };
 }
 
+function certificateDeleteOperation({
+  idParameter,
+  operationIdSuffix,
+  tag,
+  typeLabel,
+}: {
+  idParameter: Record<string, unknown>;
+  operationIdSuffix: "Pj" | "Pf";
+  tag: "Certificate PJ" | "Certificate PF";
+  typeLabel: "PJ" | "PF";
+}) {
+  return {
+    operationId: `deleteCertificate${operationIdSuffix}`,
+    tags: [tag],
+    summary: `Exclui certificado ${typeLabel}`,
+    security: [{ bearerAuth: [] }],
+    parameters: [idParameter],
+    responses: {
+      "200": successResponse(
+        `Certificado ${typeLabel} excluido`,
+        componentRef("CertificateFileDeleteResult"),
+      ),
+      "400": errorResponse("Requisicao invalida"),
+      "401": errorResponse("Autenticacao obrigatoria"),
+      "403": errorResponse("Permissao insuficiente"),
+      "404": errorResponse(`Certificado ${typeLabel} nao encontrado`),
+      "500": errorResponse("Erro interno"),
+    },
+  };
+}
+
 function certificateNotificationListOperation() {
   return {
     operationId: "listCertificateNotifications",
@@ -432,14 +463,11 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           parameters: [certificatePjIdParameter()],
           requestBody: certificatePjRequestBody(false),
         }),
-        delete: publicCertificateOperation({
-          operationId: "deleteCertificatePj",
+        delete: certificateDeleteOperation({
+          idParameter: certificatePjIdParameter(),
+          operationIdSuffix: "Pj",
           tag: "Certificate PJ",
-          summary: "Exclui certificado PJ",
-          successDescription: "Certificado PJ excluido",
-          successDataSchema: componentRef("CertificateFileDeleteResult"),
-          notFoundDescription: "Certificado PJ nao encontrado",
-          parameters: [certificatePjIdParameter()],
+          typeLabel: "PJ",
         }),
       },
       "/certificate/pj/{id}/file": {
@@ -546,14 +574,11 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           parameters: [certificatePfIdParameter()],
           requestBody: certificatePfRequestBody(false),
         }),
-        delete: publicCertificateOperation({
-          operationId: "deleteCertificatePf",
+        delete: certificateDeleteOperation({
+          idParameter: certificatePfIdParameter(),
+          operationIdSuffix: "Pf",
           tag: "Certificate PF",
-          summary: "Exclui certificado PF",
-          successDescription: "Certificado PF excluido",
-          successDataSchema: componentRef("CertificateFileDeleteResult"),
-          notFoundDescription: "Certificado PF nao encontrado",
-          parameters: [certificatePfIdParameter()],
+          typeLabel: "PF",
         }),
       },
       "/certificate/pf/{id}/file": {

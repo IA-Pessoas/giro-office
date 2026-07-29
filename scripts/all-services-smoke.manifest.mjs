@@ -1255,6 +1255,14 @@ const baseManifest = [
   }),
   op({
     service: "task-service",
+    method: "GET",
+    path: "/task/deps/options",
+    action: "taskDepsOptions",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
     method: "POST",
     path: "/task/model",
     action: "taskModelCreateForbidden",

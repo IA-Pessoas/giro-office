@@ -125,7 +125,7 @@ const uuidSchema = { type: "string", format: "uuid" } as const;
 const textSchema = { type: "string", minLength: 1 } as const;
 const nullableTextSchema = { type: "string", minLength: 1, nullable: true } as const;
 const nullableDateSchema = { type: "string", format: "date-time", nullable: true } as const;
-const nullableNumberSchema = { type: "number", nullable: true } as const;
+const nullableNonNegativeNumberSchema = { type: "number", minimum: 0, nullable: true } as const;
 const nullableBooleanSchema = { type: "boolean", nullable: true } as const;
 const competenceSchema = { type: "string", pattern: "^\\d{4}-\\d{2}$" } as const;
 
@@ -135,7 +135,7 @@ const createLddRequestSchema = strictObjectSchema(
     type: textSchema,
     period: nullableTextSchema,
     due_date: nullableDateSchema,
-    balance_amount: nullableNumberSchema,
+    balance_amount: nullableNonNegativeNumberSchema,
     registration_status: nullableTextSchema,
     status: nullableTextSchema,
   },
@@ -146,7 +146,7 @@ const updateLddRequestSchema = strictObjectSchema({
   type: textSchema,
   period: nullableTextSchema,
   due_date: nullableDateSchema,
-  balance_amount: nullableNumberSchema,
+  balance_amount: nullableNonNegativeNumberSchema,
   registration_status: nullableTextSchema,
   status: nullableTextSchema,
 });
@@ -187,13 +187,13 @@ const createPayrollRequestSchema = strictObjectSchema(
     responsible_id: { ...uuidSchema, nullable: true },
     advance: { type: "boolean" },
     advance_type: nullableTextSchema,
-    advance_amount: nullableNumberSchema,
+    advance_amount: nullableNonNegativeNumberSchema,
     info: textSchema,
     previous: { type: "boolean" },
     onvio: { type: "boolean" },
     group: textSchema,
     vt: { type: "boolean" },
-    vt_value: nullableNumberSchema,
+    vt_value: nullableNonNegativeNumberSchema,
     vt_type: nullableTextSchema,
     va: { type: "boolean" },
     assistance_fee: { type: "boolean" },
@@ -225,13 +225,13 @@ const updatePayrollRequestSchema = strictObjectSchema({
   responsible_id: { ...uuidSchema, nullable: true },
   advance: { type: "boolean" },
   advance_type: nullableTextSchema,
-  advance_amount: nullableNumberSchema,
+  advance_amount: nullableNonNegativeNumberSchema,
   info: textSchema,
   previous: { type: "boolean" },
   onvio: { type: "boolean" },
   group: textSchema,
   vt: { type: "boolean" },
-  vt_value: nullableNumberSchema,
+  vt_value: nullableNonNegativeNumberSchema,
   vt_type: nullableTextSchema,
   va: { type: "boolean" },
   assistance_fee: { type: "boolean" },
