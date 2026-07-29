@@ -10,6 +10,9 @@ const CLIENT_DOMAIN_MODULES = [
   "regularize",
 ] as const;
 
+const CLIENT_DOMAIN_READ_PERMISSION = 1;
+export const CLIENT_DOMAIN_EDIT_PERMISSION = 2;
+
 const CLIENT_LIST_MODULES = [...CLIENT_DOMAIN_MODULES, "integracao"] as const;
 
 export function hasClientListModuleAccess(modules: Record<string, number> | undefined): boolean {
@@ -31,16 +34,20 @@ function requireModules(request: Request): Record<string, number> {
 export function requireClientDomainModule(
   request: Request,
   module: "comercial" | "financeiro" | "regularize",
+  minPermission = CLIENT_DOMAIN_READ_PERMISSION,
 ): void {
-  if (normalizeModulePermission(requireModules(request)[module]) < 1) {
+  if (normalizeModulePermission(requireModules(request)[module]) < minPermission) {
     throw new ServiceError(403, "Usuário não possui permissão para este domínio.");
   }
 }
 
-export function requireClientDomainAccess(request: Request): void {
+export function requireClientDomainAccess(
+  request: Request,
+  minPermission = CLIENT_DOMAIN_READ_PERMISSION,
+): void {
   const modules = requireModules(request);
   const hasDomainPermission = CLIENT_DOMAIN_MODULES.some(
-    (module) => normalizeModulePermission(modules[module]) >= 1,
+    (module) => normalizeModulePermission(modules[module]) >= minPermission,
   );
 
   if (!hasDomainPermission && request.user_type !== "owner") {

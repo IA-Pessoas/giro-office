@@ -2,6 +2,7 @@ import type { AuthPolicy } from "@workspace/shared";
 
 const userManagementPolicy: AuthPolicy = { special: "manageUsers" };
 const moduleAccessPermission = 1;
+const moduleEditPermission = 2;
 
 const rhModulePolicy: AuthPolicy = {
   modulePermission: {
@@ -24,6 +25,13 @@ const pessoalModulePolicy: AuthPolicy = {
   },
 };
 
+const pessoalEditPolicy: AuthPolicy = {
+  modulePermission: {
+    module: "pessoal",
+    minPermission: moduleEditPermission,
+  },
+};
+
 const clientRelatedModules = [
   "comercial",
   "contabil",
@@ -33,10 +41,19 @@ const clientRelatedModules = [
   "regularize",
 ] as const;
 
+const clientDetailModules = ["comercial", "contabil", "financeiro", "fiscal"] as const;
+
 const clientModulePolicy: AuthPolicy = {
   anyModulePermission: {
-    modules: [...clientRelatedModules],
+    modules: [...clientDetailModules],
     minPermission: moduleAccessPermission,
+  },
+};
+
+const clientEditPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: [...clientRelatedModules],
+    minPermission: moduleEditPermission,
   },
 };
 
@@ -82,9 +99,11 @@ const routePolicyMatchers: Array<{
   policy: AuthPolicy;
 }> = [
   { method: "ANY", path: integracaoClientPath, policy: integracaoClientPolicy },
-  { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
+  { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
+  { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientEditPolicy },
   { method: "ANY", path: /^\/project(?:\/|$)/, policy: integracaoProjectPolicy },
-  { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
+  { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
+  { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },
   { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: { special: "ownerOnly" } },
