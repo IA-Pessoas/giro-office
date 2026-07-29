@@ -39,9 +39,15 @@ export const updateMunicipalTaxesBodySchema = createMunicipalTaxesBodySchema
 
 export const municipalTaxesDetailQuerySchema = idQuerySchema;
 
+export const municipalTaxesRegistrationStatusSchema = z.enum(["Todos", "Criado", "Pendente"]);
+
 export const listMunicipalTaxesQuerySchema = z
   .object({
     year: z.coerce.number().int(),
+    search: z.string().trim().default(""),
+    status: municipalTaxesRegistrationStatusSchema.default("Todos"),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
   })
   .strict();
 
