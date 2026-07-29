@@ -3185,6 +3185,47 @@ it("allows limited users with pessoal module permission to proxy /pessoal", asyn
   }
 });
 
+it("blocks pessoal mutations from Viewers before reaching the upstream", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 1,
+    modules: { pessoal: 1 },
+  });
+  let upstreamHits = 0;
+
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 201;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { proxied: true } }));
+  });
+  const pessoalServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ pessoalServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/pessoal/unions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Sindicato", cnpj: "123" }),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(403);
+    expect(body.code).toBe("FORBIDDEN");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("proxies /regularize to the regularize microservice", async () => {
   const token = createToken({
     user_id: "user-1",

@@ -2,6 +2,7 @@ import type { AuthPolicy } from "@workspace/shared";
 
 const userManagementPolicy: AuthPolicy = { special: "manageUsers" };
 const moduleAccessPermission = 1;
+const moduleEditPermission = 2;
 
 const rhModulePolicy: AuthPolicy = {
   modulePermission: {
@@ -14,6 +15,13 @@ const pessoalModulePolicy: AuthPolicy = {
   modulePermission: {
     module: "pessoal",
     minPermission: moduleAccessPermission,
+  },
+};
+
+const pessoalEditPolicy: AuthPolicy = {
+  modulePermission: {
+    module: "pessoal",
+    minPermission: moduleEditPermission,
   },
 };
 
@@ -53,7 +61,6 @@ const integracaoClientPath =
 const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /client/list", { minPermission: moduleAccessPermission }],
   ["GET /user", userManagementPolicy],
-  ["GET /client/list", integracaoClientPolicy],
   ["POST /user", userManagementPolicy],
 ]);
 
@@ -65,7 +72,8 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: integracaoClientPath, policy: integracaoClientPolicy },
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
   { method: "ANY", path: /^\/project(?:\/|$)/, policy: integracaoProjectPolicy },
-  { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
+  { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
+  { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },
   { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: { special: "ownerOnly" } },

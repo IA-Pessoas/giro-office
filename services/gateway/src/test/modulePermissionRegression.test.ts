@@ -87,6 +87,32 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ modules: { integracao: 1 } }), policy)).toBe(true);
   });
 
+  it.each([
+    "/pessoal",
+    "/pessoal/unions",
+    "/pessoal/payroll/client-1",
+    "/pessoal/obligations",
+    "/pessoal/ldd",
+    "/pessoal/situations",
+    "/pessoal/passwords",
+  ])("permite Viewer de Pessoal consultar %s", (path) => {
+    const policy = requiredRoutePolicy("GET", path);
+
+    expect(canAccessRoute(authContext({ modules: { pessoal: 1 } }), policy)).toBe(true);
+  });
+
+  it.each([
+    ["POST", "/pessoal/unions"],
+    ["PATCH", "/pessoal/payroll/client-1"],
+    ["PUT", "/pessoal/obligations/obligation-1"],
+    ["DELETE", "/pessoal/situations/situation-1"],
+  ])("reserva %s %s para Editor de Pessoal", (method, path) => {
+    const policy = requiredRoutePolicy(method, path);
+
+    expect(canAccessRoute(authContext({ modules: { pessoal: 1 } }), policy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { pessoal: 2 } }), policy)).toBe(true);
+  });
+
   it("mantém owner como único bypass global explícito", () => {
     const policy = requiredRoutePolicy("GET", "/client/123");
     expect(
