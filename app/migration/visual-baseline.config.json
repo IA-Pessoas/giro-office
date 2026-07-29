@@ -1,0 +1,25 @@
+{
+  "routes": [
+    "/dashboard",
+    "/users",
+    "/users/[id]",
+    "/clients",
+    "/clients/[id]",
+    "/organizations",
+    "/configs/integracao",
+    "/configs/integracao/tasks",
+    "/triagem",
+    "/contabil",
+    "/fiscal",
+    "/regularize",
+    "/rh",
+    "/login",
+    "/me"
+  ],
+  "viewports": [
+    { "name": "mobile", "width": 390, "height": 844 },
+    { "name": "tablet", "width": 768, "height": 1024 },
+    { "name": "desktop", "width": 1440, "height": 900 }
+  ],
+  "themes": ["light", "dark"]
+}

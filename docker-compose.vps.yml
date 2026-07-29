@@ -1,0 +1,594 @@
+# Tag local das imagens `workspace-*` (isolamento por stack na mesma VPS). Definir
+# `WORKSPACE_VPS_IMAGE_TAG` no ambiente ou em `.env` na raiz; omissão = `vps`.
+x-service-defaults: &service_defaults
+  dns:
+    - 1.1.1.1
+    - 8.8.8.8
+  dns_opt:
+    - use-vc
+
+services:
+  reverse-proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    command:
+      [
+        "/bin/sh",
+        "-c",
+        "sh /opt/generate-nginx-config.sh && exec nginx -g 'daemon off;'",
+      ]
+    depends_on:
+      gateway:
+        condition: service_healthy
+    env_file:
+      - .env.vps.reverse-proxy
+    ports:
+      - "8085:80"
+      # - "443:443"
+    volumes:
+      - ./docker/nginx/generate-nginx-config.sh:/opt/generate-nginx-config.sh:ro
+      - ./docker/nginx/certs:/etc/nginx/certs:ro
+    networks:
+      - edge
+      - backend
+
+  web:
+    <<: *service_defaults
+    image: workspace-web:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3010}
+        NEXT_PUBLIC_AUTH_COOKIE_SECURE: ${NEXT_PUBLIC_AUTH_COOKIE_SECURE:-}
+        NEXT_PUBLIC_ENABLE_SOCKET: ${NEXT_PUBLIC_ENABLE_SOCKET:-false}
+        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-}
+        API_INTERNAL_URL: ${API_INTERNAL_URL:-http://gateway:3010}
+    env_file:
+      - .env.vps.web
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - edge
+      - backend
+
+  gateway:
+    <<: *service_defaults
+    image: workspace-gateway:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    command: ["node", "dist/services/gateway/src/server.js"]
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/gateway"
+        SERVICE_DIR: services/gateway
+    env_file:
+      - .env.vps.gateway
+    environment:
+      PARCELAMENTO_SERVICE_URL: http://parcelamento-service:3043
+    ports:
+      - "3010:3010"
+    depends_on:
+      organization-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      department-service:
+        condition: service_healthy
+      task-service:
+        condition: service_healthy
+      project-service:
+        condition: service_healthy
+      client-service:
+        condition: service_healthy
+      fiscal-service:
+        condition: service_healthy
+      contabil-service:
+        condition: service_healthy
+      regularize-service:
+        condition: service_healthy
+      rh-service:
+        condition: service_healthy
+      ti-service:
+        condition: service_healthy
+      certificate-service:
+        condition: service_healthy
+      pessoal-service:
+        condition: service_healthy
+      parcelamento-service:
+        condition: service_healthy
+      audit-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3010/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - edge
+      - backend
+
+  organization-service:
+    <<: *service_defaults
+    image: workspace-organization-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/organization-service"
+        SERVICE_DIR: services/organization-service
+    env_file:
+      - .env.vps.organization-service
+    expose:
+      - "3031"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3031/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  user-service:
+    <<: *service_defaults
+    image: workspace-user-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/user-service"
+        SERVICE_DIR: services/user-service
+    env_file:
+      - .env.vps.user-service
+    expose:
+      - "3030"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3030/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  department-service:
+    <<: *service_defaults
+    image: workspace-department-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/department-service"
+        SERVICE_DIR: services/department-service
+    env_file:
+      - .env.vps.department-service
+    expose:
+      - "3036"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3036/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  task-service:
+    <<: *service_defaults
+    image: workspace-task-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/task-service"
+        SERVICE_DIR: services/task-service
+    env_file:
+      - .env.vps.task-service
+    expose:
+      - "3032"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3032/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  project-service:
+    <<: *service_defaults
+    image: workspace-project-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/project-service"
+        SERVICE_DIR: services/project-service
+    env_file:
+      - .env.vps.project-service
+    expose:
+      - "3033"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3033/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  client-service:
+    <<: *service_defaults
+    image: workspace-client-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/client-service"
+        SERVICE_DIR: services/client-service
+    env_file:
+      - .env.vps.client-service
+    expose:
+      - "3035"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3035/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  fiscal-service:
+    <<: *service_defaults
+    image: workspace-fiscal-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/fiscal-service"
+        SERVICE_DIR: services/fiscal-service
+    env_file:
+      - .env.vps.fiscal-service
+    expose:
+      - "3037"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3037/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  contabil-service:
+    <<: *service_defaults
+    image: workspace-contabil-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/contabil-service"
+        SERVICE_DIR: services/contabil-service
+    env_file:
+      - .env.vps.contabil-service
+    expose:
+      - "3038"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3038/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  regularize-service:
+    <<: *service_defaults
+    image: workspace-regularize-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/regularize-service"
+        SERVICE_DIR: services/regularize-service
+    env_file:
+      - .env.vps.regularize-service
+    expose:
+      - "3039"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3039/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  rh-service:
+    <<: *service_defaults
+    image: workspace-rh-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/rh-service"
+        SERVICE_DIR: services/rh-service
+    env_file:
+      - .env.vps.rh-service
+    expose:
+      - "3034"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3034/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  ti-service:
+    <<: *service_defaults
+    image: workspace-ti-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/ti-service"
+        SERVICE_DIR: services/ti-service
+    env_file:
+      - .env.vps.ti-service
+    expose:
+      - "3040"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3040/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  certificate-service:
+    <<: *service_defaults
+    image: workspace-certificate-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/certificate-service"
+        SERVICE_DIR: services/certificate-service
+    env_file:
+      - .env.vps.certificate-service
+    expose:
+      - "3041"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3041/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  pessoal-service:
+    <<: *service_defaults
+    image: workspace-pessoal-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/pessoal-service"
+        SERVICE_DIR: services/pessoal-service
+    env_file:
+      - .env.vps.pessoal-service
+    expose:
+      - "3042"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3042/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  parcelamento-service:
+    <<: *service_defaults
+    image: workspace-parcelamento-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/parcelamento-service"
+        SERVICE_DIR: services/parcelamento-service
+    env_file:
+      - .env.vps.parcelamento-service
+    expose:
+      - "3043"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3043/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  audit-service:
+    <<: *service_defaults
+    image: workspace-audit-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/audit-service"
+        SERVICE_DIR: services/audit-service
+    env_file:
+      - .env.vps.audit-service
+    command: ["node", "dist/src/server.js"]
+    expose:
+      - "3020"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3020/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+networks:
+  edge:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+  egress:
+    driver: bridge
+    internal: false

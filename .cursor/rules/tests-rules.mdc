@@ -1,0 +1,215 @@
+---
+description: Padrao de testes em servicos Node.js/Express com Vitest
+globs:
+  - "**/*.test.ts"
+alwaysApply: false
+---
+
+# Testes
+
+## Decisao padrao do workspace
+
+- O padrao atual do monorepo para testes em servicos Node.js + Express + TypeScript e **Vitest**.
+- Nao introduzir `node:test`, Jest ou outro runner como novo padrao sem necessidade explicita.
+- Se um pacote ja usar Vitest, manter Vitest.
+
+## Runner e scripts
+
+- O script padrao dos pacotes deve usar `vitest run`.
+- Watch local pode usar `vitest`.
+- O pacote pode usar `pnpm exec vitest run` ou `vitest run`, conforme a forma ja adotada nele.
+- Type-check continua separado com `tsc --noEmit` ou script equivalente.
+
+Exemplos validos:
+
+```json
+{
+  "scripts": {
+    "test": "pnpm exec vitest run",
+    "test:watch": "pnpm exec vitest"
+  }
+}
+```
+
+ou
+
+```json
+{
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}
+```
+
+## Imports e estilo
+
+- Usar imports do `vitest` quando necessario:
+
+```ts
+import { describe, expect, it, vi } from "vitest";
+```
+
+- Imports locais devem seguir o padrao ESM do workspace, incluindo extensao `.js` quando aplicavel.
+- Formatação e lint seguem o padrao do workspace.
+
+## Organizacao dos testes
+
+- O padrao oficial do workspace para servicos e `*.test.ts`.
+- Nao criar novos arquivos `*.spec.ts`.
+- A descricao dos casos deve refletir comportamento observavel.
+- Pode ser em portugues ou ingles, mas manter consistencia no arquivo e no pacote.
+- Em servicos, os testes devem ficar em `src/test/`.
+- O formato de referencia e o `project-service`.
+- Evitar misturar `src/test/`, `tests/` e outras pastas no mesmo pacote.
+
+## Estrutura por modulo
+
+- Para cada modulo principal com rota HTTP, criar dois arquivos separados:
+  - um teste de service
+  - um teste de route
+- O par padrao deve seguir o formato:
+  - `camelCaseService.test.ts`
+  - `camelCase.routes.test.ts`
+- Exemplo de referencia real:
+  - `projectCrudService.test.ts`
+  - `projectCrud.routes.test.ts`
+- Nao concentrar todos os testes de um servico em um unico arquivo monolitico.
+- Nao misturar testes de service e testes de rota no mesmo arquivo.
+- Helpers compartilhados de teste podem ficar em `src/test/`, por exemplo:
+  - `envBootstrap.ts`
+  - `camelCaseTestUtils.ts`
+
+## Escopo dos testes por tipo
+
+### `camelCaseService.test.ts`
+
+- Deve testar regra de negocio da classe ou modulo de service.
+- Deve mockar dependencias de borda, como Prisma, HTTP, storage, fila ou providers externos.
+- Nao deve subir app HTTP nem depender de `supertest` salvo necessidade muito especifica.
+
+### `camelCase.routes.test.ts`
+
+- Deve testar o contrato HTTP da rota.
+- Deve exercitar o `app.ts` ou o router montado no `app.ts`, preferindo `supertest`.
+- Deve validar status, body, headers relevantes, autenticacao, validacao e serializacao de erro.
+- Deve mockar services e middlewares externos quando isso isolar melhor o contrato da rota.
+
+## Bootstrap para testes
+
+- Quando o pacote precisar de variaveis minimas antes de importar modulos de producao, criar `src/test/envBootstrap.ts`.
+- Importar esse bootstrap no topo dos testes que dependem desse ambiente, como no `project-service`.
+- O objetivo e impedir acoplamento acidental a `.env` real ou infraestrutura externa.
+
+## O que cobrir
+
+### Services e application layer
+
+- Regras de negocio.
+- Casos de sucesso.
+- Ramos de erro.
+- Validacoes.
+- Mapeamentos e normalizacoes.
+- Comportamento com dependencias mockadas ou stubadas.
+- Lancamento de `ServiceError` quando isso fizer parte do contrato.
+
+### Rotas e app HTTP
+
+- Status HTTP.
+- Body.
+- Headers relevantes.
+- Comportamento para entrada invalida.
+- Fluxo via `createApp()` ou app factory equivalente, sem infraestrutura real desnecessaria.
+- Servidor em porta efemera apenas quando realmente necessario.
+
+## Smoke end-to-end do workspace
+
+- O smoke oficial do workspace vive em:
+  - `scripts/all-services-smoke.mjs`
+  - `scripts/all-services-smoke.manifest.mjs`
+  - `scripts/check-smoke-spec-coverage.mjs`
+- Toda rota nova descrita no `spec.ts` do servico deve ser adicionada ao manifesto do smoke.
+- Ao criar um servico novo exposto via HTTP, incluir tambem seu `spec.ts` em `specFiles` no manifesto para que `pnpm smoke:coverage` compare OpenAPI x smoke.
+- O padrao por rota (`service|method|path`) e:
+  - exatamente 1 expectativa `good`
+  - ao menos 1 expectativa `bad`
+  - so usar `pairCoverageExempt` nas excecoes ja existentes de infraestrutura/bootstrap
+- O caso `good` deve representar o caminho feliz real da rota:
+  - usar o status de sucesso correto do contrato (`200` por padrao, `201` em criacoes, ou excecao documentada)
+  - manter `expectEnvelope` ativo quando a rota segue o envelope padrao de sucesso
+  - validar o path publico real (`gateway`) ou interno (`direct`) conforme o contrato
+- O caso `bad` deve cobrir pelo menos uma falha real do contrato HTTP, priorizando:
+  - `400` para body/query/params invalidos
+  - `401` para ausencia de autenticacao ou token invalido
+  - `403` para permissao insuficiente
+  - `404` para recurso inexistente
+  - `409` para conflito de dominio
+- Respostas de sucesso do smoke devem seguir o envelope compartilhado do workspace:
+  - `{ success: true, data: ... }`
+- Respostas de erro do contrato continuam seguindo o envelope compartilhado do workspace:
+  - `{ success: false, error: string, code: string, requestId?: string }`
+- No smoke, todo caso `bad` deve ao menos deixar `expectedStatus` e `expectedLabel` coerentes com esse contrato; quando for necessario validar o corpo de erro em detalhe, complementar com teste de rota.
+- So usar `expectEnvelope: false` quando a rota realmente nao seguir o envelope compartilhado atual e isso fizer parte do contrato existente.
+- Preserve a geracao automatica de casos negativos ja existente para autenticacao/autorizacao quando ela representar corretamente o contrato; so criar handler `bad` explicito quando a falha for especifica da rota ou quando o caso automatico nao for suficiente.
+- Em entradas explicitas do manifesto, manter claro:
+  - `expectedStatus` com o(s) status aceito(s)
+  - `expectedLabel` descrevendo o resultado esperado
+  - `specOperation: false` para cenarios negativos ou excecoes fora do contrato OpenAPI principal
+- Depois de alterar o manifesto ou qualquer `spec.ts`, rodar `pnpm smoke:coverage`.
+
+## O que evitar
+
+- Banco real.
+- Rede real.
+- Fila real.
+- Servicos externos reais.
+- Dependencia de tempo sem controle explicito.
+- `console.log` no lugar de assert.
+- Testes acoplados a detalhes internos triviais.
+- Mockar agressivamente o que poderia ser exercitado de forma simples e deterministica.
+
+## Mocks e spies
+
+- Preferir `vi.fn()`, `vi.spyOn()` e injeção de dependencias nas bordas do sistema.
+- Mockar banco, HTTP, storage, filas e providers externos.
+- Nao transformar o teste em uma reimplementacao do sistema com mocks frageis.
+
+## Isolamento e limpeza
+
+- Cada teste deve rodar isoladamente.
+- Liberar servidores, timers, listeners e estado global alterado.
+- Evitar vazamento entre casos.
+- Preferir fixtures locais e explicitas.
+
+## Qualidade da suite
+
+- Testes devem ser rapidos, deterministicos, legiveis e independentes.
+- Cobertura e sinal auxiliar; priorizar risco, contrato e comportamento critico.
+- Cada teste deve ter motivo claro para existir.
+
+## Execucao no monorepo
+
+- Rodar testes de um pacote:
+
+```bash
+pnpm --filter @workspace/<nome-do-pacote> test
+```
+
+- Rodar type-check separadamente no pacote ou no workspace.
+
+## Diretriz pratica para geracao de codigo
+
+Ao criar ou alterar testes neste workspace:
+
+- use Vitest;
+- use `*.test.ts`;
+- coloque os testes em `src/test/`;
+- siga o modelo do `project-service`;
+- para cada modulo principal de rota, crie um par:
+  - `camelCaseService.test.ts`
+  - `camelCase.routes.test.ts`
+- prefira `describe`, `it`, `expect` e `vi` quando fizer sentido;
+- mantenha os testes focados em comportamento observavel;
+- para codigo HTTP, teste contrato;
+- para services, teste regra de negocio, falhas e integracoes mockadas nas bordas;
+- ao criar rota nova em servico HTTP, atualize tambem o smoke manifesto do workspace e preserve o pareamento `good`/`bad` por rota.
