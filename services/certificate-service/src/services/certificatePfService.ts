@@ -431,9 +431,7 @@ export class CertificatePfService {
     return { ok: true };
   }
 
-  async deleteCertificatePf(
-    input: CertificatePfFileInput,
-  ): Promise<CertificatePfFileDeleteResult> {
+  async deleteCertificatePf(input: CertificatePfFileInput): Promise<CertificatePfFileDeleteResult> {
     const record = await this.findCertificatePfForFile(input);
 
     if (record.file_path) {

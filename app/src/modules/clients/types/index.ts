@@ -105,6 +105,7 @@ export interface ClientListFilters {
   status?: string;
   page?: number;
   limit?: number;
+  legacyIntegrationStatusFilter?: boolean;
 }
 
 export interface ClientFormValues {

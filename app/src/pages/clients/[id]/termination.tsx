@@ -5,7 +5,7 @@ import { useMemo, useState, type ChangeEvent } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { canSSRAuth } from "@modules/auth";
+import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientTerminationForm } from "@modules/clients/components/ClientTerminationForm";
 import { useClient, useTerminateClientMutation } from "@modules/clients/hooks/useClients";
 import type { ClientTerminationFormValues } from "@modules/clients/types";
@@ -20,6 +20,7 @@ const PANEL_CLASSNAME =
 
 export default function ClientTerminationPage() {
   const router = useRouter();
+  const { access: integracaoAccess } = useModuleAccess("integracao");
   const clientId = typeof router.query.id === "string" ? router.query.id : undefined;
   const clientQuery = useClient(clientId);
   const terminateClientMutation = useTerminateClientMutation(clientId ?? "");
@@ -112,6 +113,10 @@ export default function ClientTerminationPage() {
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
             Cliente não encontrado.
           </section>
+        ) : !integracaoAccess.isAdmin ? (
+          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-600 dark:text-slate-300`}>
+            A inativação de clientes exige permissão administrativa na Integração.
+          </section>
         ) : (
           <section className={`${PANEL_CLASSNAME} p-6`}>
             <ClientTerminationForm
@@ -119,7 +124,9 @@ export default function ClientTerminationPage() {
               onChange={handleInputChange}
               onSubmit={() => void handleSubmit()}
               onCancel={() => setFormValues(createTerminationInitialValues())}
-              submitLabel={terminateClientMutation.isPending ? "Confirmando..." : "Confirmar inativação"}
+              submitLabel={
+                terminateClientMutation.isPending ? "Confirmando..." : "Confirmar inativação"
+              }
               disabled={terminateClientMutation.isPending}
               submitDisabled={!isValid}
             />

@@ -40,6 +40,10 @@ const fiscalSources = {
   ncmRoute: await readSource("../../../../services/fiscal-service/src/routes/ncm.routes.ts"),
   icmsRoute: await readSource("../../../../services/fiscal-service/src/routes/icms.routes.ts"),
   ipiRoute: await readSource("../../../../services/fiscal-service/src/routes/ipi.routes.ts"),
+  ncmRouteTest: await readSource("../../../../services/fiscal-service/src/test/ncm.routes.test.ts"),
+  icmsRouteTest: await readSource("../../../../services/fiscal-service/src/test/icms.routes.test.ts"),
+  ipiRouteTest: await readSource("../../../../services/fiscal-service/src/test/ipi.routes.test.ts"),
+  authMiddleware: await readSource("../../../../services/fiscal-service/src/middlewares/isAuthenticated.ts"),
   ncmService: await readSource("../../../../services/fiscal-service/src/services/ncmService.ts"),
   icmsService: await readSource("../../../../services/fiscal-service/src/services/icmsService.ts"),
   ipiService: await readSource("../../../../services/fiscal-service/src/services/ipiService.ts"),
@@ -96,6 +100,19 @@ await runTest("fiscal clients and hooks expose DELETE endpoints", () => {
   assert.match(fiscalSources.icmsMutations, /mutationFn: \(id\) => fiscalIcmsService\.delete\(id\)/);
   assert.match(fiscalSources.ipiMutations, /useDeleteFiscalIpiMutation/);
   assert.match(fiscalSources.ipiMutations, /mutationFn: \(id\) => fiscalIpiService\.delete\(id\)/);
+});
+
+await runTest("fiscal-service blocks viewer writes and allows editor writes", () => {
+  assert.match(fiscalSources.authMiddleware, /const FISCAL_WRITE_PERMISSION = 2;/);
+
+  for (const source of [
+    fiscalSources.ncmRouteTest,
+    fiscalSources.icmsRouteTest,
+    fiscalSources.ipiRouteTest,
+  ]) {
+    assert.match(source, /function gatewayHeaders\(permission = 2\)/);
+    assert.match(source, /\.set\(gatewayHeaders\(1\)\)/);
+  }
 });
 
 await runTest("fiscal list hooks stay enabled for initial paginated listing", () => {

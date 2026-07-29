@@ -206,4 +206,32 @@ describe("ProjectCrudService", () => {
 
     expect(result).toEqual({ response: { id: PROJECT_ID } });
   });
+
+  it("delete devolve 409 quando o projeto possui dependências", async () => {
+    const prisma = createMockPrisma();
+    prisma.project.findFirst = vi.fn(async () => ({ id: PROJECT_ID }));
+    prisma.project.delete = vi.fn(async () => {
+      throw { code: "P2003" };
+    });
+    const audit = {
+      createLog: vi.fn(async () => {}),
+      logUpdateIfChanged: vi.fn(async () => {}),
+    };
+    const service = new ProjectCrudService(prisma, audit);
+
+    await expect(
+      service.delete({
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        permission: 3,
+        integracaoLevel: 3,
+        project_id: PROJECT_ID,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Não é possível excluir projeto com dependências.",
+    });
+    expect(prisma.project.delete).toHaveBeenCalledTimes(1);
+    expect(audit.createLog).not.toHaveBeenCalled();
+  });
 });

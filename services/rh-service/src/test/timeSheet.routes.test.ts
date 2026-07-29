@@ -52,6 +52,31 @@ describe("timeSheet routes", () => {
     });
   });
 
+  it("GET /rh/timesheets/:id permite visualizador abrir a propria folha", async () => {
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).get(`/rh/timesheets/${itemId}`);
+
+    expect(res.status).toBe(200);
+    expect(timeSheetServiceMock.getById).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      timesheet_id: itemId,
+    });
+  });
+
+  it("GET /rh/timesheets/:id bloqueia visualizador em folha de terceiro", async () => {
+    timeSheetServiceMock.getById.mockResolvedValueOnce({
+      id: itemId,
+      user_id: "00000000-0000-4000-8000-000000000099",
+      status: "Gerada",
+      days: [],
+      totals: { absence_count: 0 },
+    });
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).get(`/rh/timesheets/${itemId}`);
+
+    expect(res.status).toBe(403);
+  });
+
   it("PUT /rh/timesheets/sign assina folha", async () => {
     const app = createTestApp();
     const res = await request(app).put("/rh/timesheets/sign").send({

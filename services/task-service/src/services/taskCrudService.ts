@@ -64,6 +64,9 @@ const TASK_LIST_SELECT = {
   payment: true,
   billing_description: true,
   charge_financeiro: true,
+  responsible_id: true,
+  responsible2_id: true,
+  responsible3_id: true,
 } as const;
 
 const TASK_UPDATE_SELECT = {
@@ -89,7 +92,13 @@ const ACTIVE_TASK_STATUSES = ["Em Andamento", "A Realizar", "Em Espera"];
 
 export type TaskDetailRow = TaskGetPayload<{ select: typeof TASK_DETAIL_SELECT }>;
 export type TaskCreateRow = TaskGetPayload<{ select: typeof TASK_CREATE_SELECT }>;
-export type TaskListRow = TaskGetPayload<{ select: typeof TASK_LIST_SELECT }>;
+type TaskListDatabaseRow = TaskGetPayload<{ select: typeof TASK_LIST_SELECT }>;
+export type TaskListRow = Omit<
+  TaskListDatabaseRow,
+  "responsible_id" | "responsible2_id" | "responsible3_id"
+> & {
+  isOwn: boolean;
+};
 
 export type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracaoTask.js";
 export { INTEGRACAO_TASK_STATUS_VALUES } from "../constants/integracaoTask.js";
@@ -528,9 +537,13 @@ export class TaskCrudService {
       ]);
 
       const hasMore = params.page * params.limit < total;
+      const data = list.map(({ responsible_id, responsible2_id, responsible3_id, ...task }) => ({
+        ...task,
+        isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
+      }));
 
       return {
-        data: list,
+        data,
         total,
         hasMore,
         summary: { inProgress, billable },

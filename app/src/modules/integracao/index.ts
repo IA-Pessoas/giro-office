@@ -43,6 +43,7 @@ export {
 } from "./services";
 export {
   TASK_MODEL_CONFIG_ENTRY,
+  canViewTaskModelConfig,
   canManageTaskModelConfig,
 } from "./navigation/taskModelConfigNavigation";
 

@@ -5,7 +5,7 @@ import { useState, type ChangeEvent } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { canSSRAuth } from "@modules/auth";
+import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientIntegrationForm } from "@modules/clients/components/ClientIntegrationForm";
 import { useCreateClientIntegrationMutation } from "@modules/clients/hooks/useClients";
 import {
@@ -23,6 +23,7 @@ const PANEL_CLASSNAME =
 
 export default function NewClientIntegrationPage() {
   const router = useRouter();
+  const { access: integracaoAccess } = useModuleAccess("integracao");
   const meQuery = useMe();
   const createIntegrationMutation = useCreateClientIntegrationMutation();
   const [formValues, setFormValues] = useState(createClientIntegrationInitialValues);
@@ -123,17 +124,23 @@ export default function NewClientIntegrationPage() {
           </div>
         </div>
 
-        <section className={`${PANEL_CLASSNAME} p-6`}>
-          <ClientIntegrationForm
-            mode="create"
-            values={formValues}
-            onChange={handleInputChange}
-            onSubmit={() => void handleSubmit()}
-            onCancel={() => void router.push("/clients")}
-            submitLabel={createIntegrationMutation.isPending ? "Salvando..." : "Salvar"}
-            disabled={createIntegrationMutation.isPending || meQuery.isLoading}
-          />
-        </section>
+        {!integracaoAccess.canEdit ? (
+          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-600 dark:text-slate-300`}>
+            A criação de clientes exige permissão de usuário ou administrador da Integração.
+          </section>
+        ) : (
+          <section className={`${PANEL_CLASSNAME} p-6`}>
+            <ClientIntegrationForm
+              mode="create"
+              values={formValues}
+              onChange={handleInputChange}
+              onSubmit={() => void handleSubmit()}
+              onCancel={() => void router.push("/clients")}
+              submitLabel={createIntegrationMutation.isPending ? "Salvando..." : "Salvar"}
+              disabled={createIntegrationMutation.isPending || meQuery.isLoading}
+            />
+          </section>
+        )}
       </div>
     </>
   );

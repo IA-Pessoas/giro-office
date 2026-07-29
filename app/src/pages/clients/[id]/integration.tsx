@@ -5,12 +5,9 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { canSSRAuth } from "@modules/auth";
+import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientIntegrationForm } from "@modules/clients/components/ClientIntegrationForm";
-import {
-  useClient,
-  useUpdateClientIntegrationMutation,
-} from "@modules/clients/hooks/useClients";
+import { useClient, useUpdateClientIntegrationMutation } from "@modules/clients/hooks/useClients";
 import type { UpdateClientIntegrationFormValues } from "@modules/clients/types";
 import {
   buildUpdateClientIntegrationPayload,
@@ -27,6 +24,7 @@ const PANEL_CLASSNAME =
 
 export default function ClientIntegrationPage() {
   const router = useRouter();
+  const { access: integracaoAccess } = useModuleAccess("integracao");
   const clientId = typeof router.query.id === "string" ? router.query.id : undefined;
   const clientQuery = useClient(clientId);
   const updateIntegrationMutation = useUpdateClientIntegrationMutation(clientId ?? "");
@@ -169,6 +167,10 @@ export default function ClientIntegrationPage() {
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
             Este cliente ainda não possui dados mínimos de integração para edição.
           </section>
+        ) : !integracaoAccess.canEdit ? (
+          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-600 dark:text-slate-300`}>
+            Esta tela é somente leitura para o nível atual da Integração.
+          </section>
         ) : formValues ? (
           <section className={`${PANEL_CLASSNAME} p-6`}>
             <ClientIntegrationForm
@@ -177,7 +179,9 @@ export default function ClientIntegrationPage() {
               onChange={handleInputChange}
               onSubmit={() => void handleSubmit()}
               onCancel={() => setFormValues(createUpdateClientIntegrationInitialValues(client))}
-              submitLabel={updateIntegrationMutation.isPending ? "Salvando..." : "Salvar alterações"}
+              submitLabel={
+                updateIntegrationMutation.isPending ? "Salvando..." : "Salvar alterações"
+              }
               disabled={updateIntegrationMutation.isPending}
               submitDisabled={!hasChanges}
             />
