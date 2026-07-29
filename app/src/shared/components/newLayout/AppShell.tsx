@@ -337,6 +337,7 @@ export function AppShell({
   const canManageOrganization = canCreateOrganizationOwner(accessUser);
   const canManageUsers = canAccessAdministration(accessUser, { rhAccess });
   const isAdministrationAccessLoading = !canManageOrganization && isModuleAccessLoading;
+  const isSelfProfileRoute = normalizeRoutePath(pathname) === "/me";
   const currentModuleKey = getModuleKeyFromRoutePath(pathname);
   const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
   const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;
@@ -347,6 +348,7 @@ export function AppShell({
       ? canViewIntegrationRoute(pathname, moduleAccessUser)
       : currentModuleAccess?.canView === true);
   const shouldRenderModuleAccessDenied =
+    !isSelfProfileRoute &&
     !isModuleAccessLoading &&
     ((!canViewTasksOnlyRoute && getModulePermissionLevel(moduleAccessUser, "integracao") === 0) ||
       (Boolean(currentModuleKey) && !canViewCurrentModuleRoute));
@@ -426,6 +428,7 @@ export function AppShell({
 
   useEffect(() => {
     if (
+      isSelfProfileRoute ||
       isModuleAccessLoading ||
       getModulePermissionLevel(moduleAccessUser, "integracao") !== 0 ||
       canViewTasksOnlyRoute
@@ -434,7 +437,7 @@ export function AppShell({
     }
 
     void router.replace("/tasks");
-  }, [canViewTasksOnlyRoute, isModuleAccessLoading, moduleAccessUser, router]);
+  }, [canViewTasksOnlyRoute, isModuleAccessLoading, isSelfProfileRoute, moduleAccessUser, router]);
 
   useEffect(() => {
     setHasUserPhotoLoadError(false);
