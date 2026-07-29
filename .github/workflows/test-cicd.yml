@@ -1,0 +1,546 @@
+﻿# TEMPORARIAMENTE DESATIVADO: workflow de CI/CD comentado para nao executar por enquanto.
+# CI para a branch feature/CICD_test (dispara em push apÃ³s merge de PR; combine com branch protection para exigir aprovaÃ§Ã£o).
+#
+# SeguranÃ§a: `.env.vps.*` estÃ¡ em `.gitignore` na raiz; os arquivos sÃ³ existem no runner durante o job.
+# Segredos vazios no GitHub viram env definida com string vazia â€” `set -u` nÃ£o detecta isso; por isso
+# validamos nÃ£o-vazio antes de gravar.
+#
+# Segredos do repositÃ³rio â†’ arquivos na raiz (gitignored). Pares: scripts/ci/vps-secrets.manifest.
+#
+# ENV_VPS_AUDIT_SERVICE â†’ .env.vps.audit-service
+# ENV_VPS_CERTIFICATE_SERVICE â†’ .env.vps.certificate-service
+#
+# PÃ³s-merge: cadastrar todos os segredos em Settings â†’ Secrets and variables â†’ Actions,
+# garantir DATABASE_URL/SUPABASE acessÃ­veis a partir dos runners do GitHub e validar na aba Actions.
+#
+# name: Teste CICD
+
+# on:
+#   push:
+#     branches:
+#       - feature/CICD-test
+#   pull_request:
+#     types: [opened, synchronize, reopened, ready_for_review]
+#     branches:
+#       - feature/CICD
+#   workflow_dispatch:
+
+# concurrency:
+#   group: test-cicd-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+#   cancel-in-progress: true
+
+# permissions:
+#   contents: read
+#   actions: write
+
+# jobs:
+#   quality:
+#     name: Qualidade (Biome, typecheck, testes)
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 30
+    # prisma.config.ts (infra) exige DATABASE_URL. Use placeholder (nÃ£o use secret vazio): `prisma generate` nÃ£o conecta ao DB.
+#     env:
+#       DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci_ci_typecheck?schema=public
+#     steps:
+#       - uses: actions/checkout@v4
+
+      # `setup-node` com `cache: pnpm` exige que `pnpm` jÃ¡ exista no PATH (documentaÃ§Ã£o setup-node).
+#       - uses: pnpm/action-setup@v4
+#         with:
+#           version: 9.15.0
+
+#       - uses: actions/setup-node@v4
+#         with:
+#           node-version: "22"
+#           cache: pnpm
+
+#       - name: Instalar dependÃªncias
+#         run: pnpm install --frozen-lockfile
+
+#       - name: Auditoria de dependÃªncias
+#         run: pnpm audit:ci
+
+#       - name: Harness de serviÃ§os
+#         run: pnpm harness:test
+
+#       - name: Cobertura smoke/OpenAPI
+#         run: pnpm smoke:coverage
+
+#       - name: SeguranÃ§a Docker Compose
+#         run: pnpm security:compose
+
+#       - name: Biome check
+#         run: pnpm check
+
+#       - name: Typecheck
+#         run: pnpm typecheck
+
+#       - name: Testes
+#         run: pnpm test
+
+#   docker-stack:
+#     name: Docker Compose (stack VPS)
+#     needs: quality
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 45
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - name: Configurar Docker Buildx
+#         uses: docker/setup-buildx-action@v3
+
+#       - name: Materializar .env.vps.* a partir dos segredos
+#         env:
+#           ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+#           ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+#           ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+#           ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+#           ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+#           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+#           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+#           ENV_VPS_DEPARTMENT_SERVICE: ${{ secrets.ENV_VPS_DEPARTMENT_SERVICE }}
+#           ENV_VPS_FISCAL_SERVICE: ${{ secrets.ENV_VPS_FISCAL_SERVICE }}
+#           ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
+#           ENV_VPS_REGULARIZE_SERVICE: ${{ secrets.ENV_VPS_REGULARIZE_SERVICE }}
+#           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+#           ENV_VPS_TI_SERVICE: ${{ secrets.ENV_VPS_TI_SERVICE }}
+#           ENV_VPS_CERTIFICATE_SERVICE: ${{ secrets.ENV_VPS_CERTIFICATE_SERVICE }}
+#           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
+#           ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
+#         run: bash scripts/ci/materialize-vps-env.sh
+
+      # BuildKit acelera builds; `docker compose build` nos runners do GHA nÃ£o aceita
+      # --cache-to/--cache-from (versÃ£o do plugin Compose). Cache entre jobs: bake ou registry.
+#       - name: Build imagens Compose
+#         env:
+#           DOCKER_BUILDKIT: 1
+#           COMPOSE_DOCKER_CLI_BUILD: 1
+#         uses: jlumbroso/free-disk-space@v1.3.1
+#         with:
+#           tool-cache: true
+#           android: true
+#           dotnet: true
+#           haskell: true
+#           large-packages: true
+#           swap-storage: true
+#       - name: "Liberar espaÃ§o no runner (Docker)"
+#         run: |
+#           set -euxo pipefail
+#           docker system df || true
+#           docker builder prune -af || true
+#           docker system prune -af || true
+#           docker system df || true
+#       - name: Build imagens Compose (docker compose build)
+#         env:
+#           DOCKER_BUILDKIT: 1
+#           COMPOSE_DOCKER_CLI_BUILD: 1
+#         run: |
+#           set -eo pipefail
+#           set -a
+          # shellcheck disable=SC1091
+#           . ./.env.vps.web
+#           set +a
+#           echo "::group::docker compose build"
+#           docker compose -f docker-compose.vps.yml build
+#           echo "::endgroup::"
+
+#       - name: Subir stack e aguardar healthchecks
+#         env:
+#           DOCKER_BUILDKIT: 1
+#           COMPOSE_DOCKER_CLI_BUILD: 1
+#         run: |
+#           set -eo pipefail
+#           docker compose version
+#           docker compose -f docker-compose.vps.yml up -d --wait --wait-timeout 900
+
+#       - name: Docker Compose down
+#         if: always()
+#         run: |
+          # -v remove volumes nomeados; Ãºtil tambÃ©m em runner self-hosted (evita nomes/dados presos).
+#           docker compose -f docker-compose.vps.yml down -v || true
+
+#   staging-environment:
+#     name: Staging â€” Docker, scan, integraÃ§Ã£o, smoke, E2E
+#     needs: quality
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 60
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - uses: pnpm/action-setup@v4
+#         with:
+#           version: 9.15.0
+
+#       - uses: actions/setup-node@v4
+#         with:
+#           node-version: "22"
+#           cache: pnpm
+
+#       - name: Instalar dependÃªncias (pnpm smoke / Playwright em app)
+#         run: pnpm install --frozen-lockfile
+
+#       - uses: docker/setup-buildx-action@v3
+
+#       - name: Materializar .env.vps.* a partir dos segredos
+#         env:
+#           ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+#           ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+#           ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+#           ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+#           ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+#           ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+#           ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+#           ENV_VPS_DEPARTMENT_SERVICE: ${{ secrets.ENV_VPS_DEPARTMENT_SERVICE }}
+#           ENV_VPS_FISCAL_SERVICE: ${{ secrets.ENV_VPS_FISCAL_SERVICE }}
+#           ENV_VPS_CONTABIL_SERVICE: ${{ secrets.ENV_VPS_CONTABIL_SERVICE }}
+#           ENV_VPS_REGULARIZE_SERVICE: ${{ secrets.ENV_VPS_REGULARIZE_SERVICE }}
+#           ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+#           ENV_VPS_TI_SERVICE: ${{ secrets.ENV_VPS_TI_SERVICE }}
+#           ENV_VPS_CERTIFICATE_SERVICE: ${{ secrets.ENV_VPS_CERTIFICATE_SERVICE }}
+#           ENV_VPS_WEB: ${{ secrets.ENV_VPS_WEB }}
+#           ENV_VPS_AUDIT_SERVICE: ${{ secrets.ENV_VPS_AUDIT_SERVICE }}
+#         run: bash scripts/ci/materialize-vps-env.sh
+
+#       - name: "[Build] Imagens Docker (docker-compose.vps.yml)"
+#         env:
+#           DOCKER_BUILDKIT: 1
+#           COMPOSE_DOCKER_CLI_BUILD: 1
+#         run: |
+#           set -eo pipefail
+#           set -a
+          # shellcheck disable=SC1091
+#           . ./.env.vps.web
+#           set +a
+#           docker compose -f docker-compose.vps.yml build
+
+      # Docker Hub oficial: aquasec/trivy (aquasecurity/trivy nÃ£o existe como repo no Hub).
+      # Lista de imagens: scripts/ci/list-workspace-vps-images.sh (deriva de docker-compose.vps.yml).
+      # PolÃ­tica: CRITICAL quebra o pipeline; HIGH Ã© reportado no log (informativo) para monitoramento.
+      # Cache do DB em /tmp/trivy-cache evita baixar ~91 MiB por imagem escaneada.
+#       - name: "[Scan] Trivy â€” imagens workspace (gate: CRITICAL; HIGH Ã© informativo)"
+#         run: |
+#           set -eo pipefail
+#           mkdir -p /tmp/trivy-cache
+#           mapfile -t images < <(bash scripts/ci/list-workspace-vps-images.sh)
+#           scan() {
+#             local img="$1"
+#             local severity="$2"
+#             local exit_code="$3"
+#             docker run --rm \
+#               -v /var/run/docker.sock:/var/run/docker.sock \
+#               -v /tmp/trivy-cache:/root/.cache/trivy \
+#               aquasec/trivy:0.58.2 image \
+#               --scanners vuln \
+#               --severity "$severity" \
+#               --exit-code "$exit_code" \
+#               --ignore-unfixed \
+#               "$img"
+#           }
+#           for img in "${images[@]}"; do
+#             echo "::group::Trivy (informativo HIGH,CRITICAL) â€” $img"
+#             scan "$img" "HIGH,CRITICAL" 0 || true
+#             echo "::endgroup::"
+#           done
+#           for img in "${images[@]}"; do
+#             echo "::group::Trivy (gate CRITICAL) â€” $img"
+#             scan "$img" "CRITICAL" 1
+#             echo "::endgroup::"
+#           done
+
+#       - name: "[Deploy temporÃ¡rio] Subir stack e aguardar healthchecks"
+#         env:
+#           DOCKER_BUILDKIT: 1
+#           COMPOSE_DOCKER_CLI_BUILD: 1
+#         run: |
+#           set -eo pipefail
+#           docker compose version
+#           docker compose -f docker-compose.vps.yml up -d --wait --wait-timeout 900
+
+#       - name: "[Integration] Vitest â€” client-service com Postgres (opcional)"
+#         env:
+#           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+#           CLIENT_SERVICE_INTEGRATION: "1"
+#         run: |
+#           set -eo pipefail
+#           if [ -z "$DATABASE_URL" ]; then
+#             echo "::notice::Secret STAGING_DATABASE_URL nÃ£o configurado â€” pulando testes de integraÃ§Ã£o com Postgres."
+#             exit 0
+#           fi
+#           pnpm --filter @workspace/client-service test
+
+#       - name: "[Smoke + integraÃ§Ã£o HTTP] Contrato pÃºblico via gateway (pnpm smoke)"
+#         run: pnpm smoke
+
+#       - name: "[E2E] Playwright (executa quando @playwright/test existir no workspace)"
+#         run: |
+#           set -eo pipefail
+#           if [ ! -d app/node_modules/@playwright/test ] && [ ! -d node_modules/@playwright/test ]; then
+#             echo "::notice::Playwright nÃ£o instalado â€” adicione @playwright/test ao app e playwright.config.ts para ativar E2E."
+#             exit 0
+#           fi
+#           cd app
+#           pnpm exec playwright install --with-deps chromium
+#           pnpm exec playwright test
+
+#       - name: Encerrar stack
+#         if: always()
+#         run: |
+#           docker compose -f docker-compose.vps.yml down -v || true
+
+  # â”€â”€ SimulaÃ§Ã£o da fase Main/Production (espelha main-cicd.yml) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # `production` (GitHub Environment) Ã© omitida aqui para o job nÃ£o exigir aprovaÃ§Ã£o em teste.
+  # Risco de schema: migrate â†’ candidato+smoke; sem rollback de DDL (ver comentÃ¡rio no main-cicd).
+
+  # main-promote-image:
+  #   name: Main (teste) â€” promote imutÃ¡vel
+  #   needs: staging-environment
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 45
+  #   outputs:
+  #     promoted_tag: ${{ steps.version.outputs.tag }}
+  #     has_registry: ${{ steps.check.outputs.has }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #     - id: check
+  #       name: Registro de imagem?
+  #       env:
+  #         R: ${{ secrets.DOCKER_REGISTRY_URL }}
+  #       run: |
+  #         if [ -n "$R" ]; then echo "has=true" >> "$GITHUB_OUTPUT"
+  #         else echo "has=false" >> "$GITHUB_OUTPUT" && echo "::notice::Sem registry: 1x build e TAR; jobs seguintes nÃ£o rebuildam."
+  #         fi
+  #     - uses: docker/setup-buildx-action@v3
+  #     - name: Materializar .env.vps.* a partir dos segredos
+  #       env:
+  #         ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+  #         ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+  #         ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+  #         ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+  #         ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+  #         ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+  #         ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+  #         ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+  #       run: bash scripts/ci/materialize-vps-env.sh
+  #     - name: Calcular tag de origem (staging) no registry
+  #       id: staging_tag
+  #       env:
+  #         S_STAGING: ${{ secrets.DOCKER_STAGING_TAG }}
+  #       run: |
+  #         if [ -n "$S_STAGING" ]; then echo "resolved=$S_STAGING" >> "$GITHUB_OUTPUT"; exit 0; fi
+  #         RES=$(bash scripts/ci/resolve-docker-staging-source-tag.sh)
+  #         echo "resolved=$RES" >> "$GITHUB_OUTPUT"
+  #     - name: Tag promovida (teste = short sha)
+  #       id: version
+  #       run: |
+  #         echo "tag=sha-$(echo "${GITHUB_SHA}" | cut -c1-7)" >> "$GITHUB_OUTPUT"
+  #     - name: Login no registry
+  #       if: steps.check.outputs.has == 'true'
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: ${{ secrets.DOCKER_REGISTRY_URL }}
+  #         username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+  #         password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+  #     - name: "Pull+retag (registry)"
+  #       if: steps.check.outputs.has == 'true'
+  #       env:
+  #         DOCKER_STAGING_RESOLVED_TAG: ${{ steps.staging_tag.outputs.resolved }}
+  #         DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+  #       run: bash scripts/ci/compose-vps-pull-and-tag.sh
+  #     - name: "Build (sem registry)"
+  #       if: steps.check.outputs.has != 'true'
+  #       env:
+  #         DOCKER_BUILDKIT: 1
+  #         COMPOSE_DOCKER_CLI_BUILD: 1
+  #       run: docker compose -f docker-compose.vps.yml build
+  #     - if: steps.check.outputs.has != 'true'
+  #       run: bash scripts/ci/compose-vps-image-save.sh
+  #     - if: steps.check.outputs.has != 'true'
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: workspace-vps-images
+  #         path: /tmp/workspace-vps-images.tar
+  #         retention-days: 2
+  #         if-no-files-found: error
+  #     - name: Push
+  #       if: steps.check.outputs.has == 'true'
+  #       env:
+  #         DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+  #         PROMOTED_TAG: ${{ steps.version.outputs.tag }}
+  #       run: bash scripts/ci/compose-vps-promote-push.sh
+
+  # main-database-migrations:
+  #   name: Main (teste) â€” prisma migrate
+  #   needs: main-promote-image
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 25
+  #   concurrency:
+  #     group: ${{ github.repository }}-prisma-migrate-test
+  #     cancel-in-progress: false
+  #   env:
+  #     DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+  #   steps:
+  #     - name: HÃ¡ PROD_DATABASE_URL? (secrets nÃ£o podem ir em if:)
+  #       id: prod_check
+  #       env:
+  #         P: ${{ secrets.PROD_DATABASE_URL }}
+  #       run: |
+  #         if [ -n "$P" ]; then echo "has_prod=true" >> "$GITHUB_OUTPUT"
+  #         else echo "has_prod=false" >> "$GITHUB_OUTPUT"
+  #         fi
+  #     - name: Pular migrations (sem PROD nesta simulaÃ§Ã£o)
+  #       if: steps.prod_check.outputs.has_prod == 'false'
+  #       run: echo "::notice::PROD_DATABASE_URL vazio â€” migrations de teste ignoradas (em main real seria erro)."
+  #     - uses: actions/checkout@v4
+  #       if: steps.prod_check.outputs.has_prod == 'true'
+  #     - uses: pnpm/action-setup@v4
+  #       if: steps.prod_check.outputs.has_prod == 'true'
+  #       with:
+  #         version: 9.15.0
+  #     - uses: actions/setup-node@v4
+  #       if: steps.prod_check.outputs.has_prod == 'true'
+  #       with:
+  #         node-version: "22"
+  #         cache: pnpm
+  #     - if: steps.prod_check.outputs.has_prod == 'true'
+  #       name: pnpm
+  #       run: pnpm install --frozen-lockfile
+  #     - if: steps.prod_check.outputs.has_prod == 'true'
+  #       name: migrate
+  #       run: |
+  #         echo "::notice::Migrations antes do smoke: falha no deploy nÃ£o reverte DDL (expand/contract)."
+  #         pnpm --filter @workspace/infra exec prisma migrate deploy
+
+  # main-candidate:
+  #   name: Main (teste) â€” candidato + smoke
+  #   needs: [main-database-migrations, main-promote-image]
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 45
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: pnpm/action-setup@v4
+  #       with:
+  #         version: 9.15.0
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "22"
+  #         cache: pnpm
+  #     - run: pnpm install --frozen-lockfile
+  #     - uses: docker/setup-buildx-action@v3
+  #     - name: Materializar .env.vps.* a partir dos segredos
+  #       env:
+  #         ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+  #         ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+  #         ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+  #         ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+  #         ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+  #         ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+  #         ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+  #         ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+  #       run: bash scripts/ci/materialize-vps-env.sh
+  #     - name: Login
+  #       if: needs.main-promote-image.outputs.has_registry == 'true'
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: ${{ secrets.DOCKER_REGISTRY_URL }}
+  #         username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+  #         password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+  #     - name: TAR
+  #       if: needs.main-promote-image.outputs.has_registry != 'true'
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: workspace-vps-images
+  #     - name: load
+  #       if: needs.main-promote-image.outputs.has_registry != 'true'
+  #       run: |
+  #         set -eo pipefail
+  #         TAR=$(find . -maxdepth 2 -name 'workspace-vps-images.tar' 2>/dev/null | head -1)
+  #         if [ -z "$TAR" ]; then find . -maxdepth 3 -type f; echo "::error::TAR do artefato"; exit 1; fi
+  #         docker load -i "$TAR"
+  #     - name: pull
+  #       if: needs.main-promote-image.outputs.has_registry == 'true'
+  #       env:
+  #         DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+  #         DOCKER_IMAGE_TAG: ${{ needs.main-promote-image.outputs.promoted_tag }}
+  #       run: bash scripts/ci/compose-vps-pull-by-tag.sh
+  #     - name: up
+  #       env:
+  #         DOCKER_BUILDKIT: 1
+  #       run: |
+  #         set -eo pipefail
+  #         docker compose -p workspace-main -f docker-compose.vps.yml up -d --wait --wait-timeout 900 --no-build
+  #     - name: Log em falha
+  #       if: failure()
+  #       run: |
+  #         docker compose -p workspace-main -f docker-compose.vps.yml ps -a || true
+  #         docker compose -p workspace-main -f docker-compose.vps.yml logs --tail=200 || true
+  #     - if: success()
+  #       name: smoke
+  #       run: |
+  #         set -eo pipefail
+  #         timeout 20m pnpm smoke
+  #     - if: always()
+  #       run: docker compose -p workspace-main -f docker-compose.vps.yml down -v || true
+
+  # main-dast:
+  #   name: Main (teste) â€” DAST
+  #   needs: [main-candidate, main-promote-image]
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 45
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Resolver modo DAST
+  #       id: dast_mode
+  #       env:
+  #         DAST_TARGET_URL: ${{ secrets.DAST_TARGET_URL }}
+  #       run: bash scripts/ci/dast-resolve-mode.sh
+  #     - if: steps.dast_mode.outputs.use_local_stack == 'true'
+  #       uses: docker/setup-buildx-action@v3
+  #     - name: Artefato TAR (sem registry)
+  #       if: steps.dast_mode.outputs.use_local_stack == 'true' && needs.main-promote-image.outputs.has_registry != 'true'
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: workspace-vps-images
+  #     - name: Stack local para ZAP
+  #       id: local_dast
+  #       if: steps.dast_mode.outputs.use_local_stack == 'true'
+  #       env:
+  #         DAST_COMPOSE_PROJECT: workspace-dast
+  #         HAS_REGISTRY: ${{ needs.main-promote-image.outputs.has_registry }}
+  #         DOCKER_IMAGE_TAG: ${{ needs.main-promote-image.outputs.promoted_tag }}
+  #         DOCKER_REGISTRY_URL: ${{ secrets.DOCKER_REGISTRY_URL }}
+  #         DOCKER_REGISTRY_USERNAME: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+  #         DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+  #         ENV_VPS_REVERSE_PROXY: ${{ secrets.ENV_VPS_REVERSE_PROXY }}
+  #         ENV_VPS_GATEWAY: ${{ secrets.ENV_VPS_GATEWAY }}
+  #         ENV_VPS_ORGANIZATION_SERVICE: ${{ secrets.ENV_VPS_ORGANIZATION_SERVICE }}
+  #         ENV_VPS_USER_SERVICE: ${{ secrets.ENV_VPS_USER_SERVICE }}
+  #         ENV_VPS_TASK_SERVICE: ${{ secrets.ENV_VPS_TASK_SERVICE }}
+  #         ENV_VPS_PROJECT_SERVICE: ${{ secrets.ENV_VPS_PROJECT_SERVICE }}
+  #         ENV_VPS_CLIENT_SERVICE: ${{ secrets.ENV_VPS_CLIENT_SERVICE }}
+  #         ENV_VPS_RH_SERVICE: ${{ secrets.ENV_VPS_RH_SERVICE }}
+  #       run: bash scripts/ci/dast-local-stack.sh
+  #     - name: Logs DAST em falha
+  #       if: failure() && steps.dast_mode.outputs.use_local_stack == 'true'
+  #       run: |
+  #         docker compose -p workspace-dast -f docker-compose.vps.yml ps -a || true
+  #         docker compose -p workspace-dast -f docker-compose.vps.yml logs --tail=200 || true
+  #     - name: "ZAP (URL pÃºblica)"
+  #       if: success() && steps.dast_mode.outputs.has_public_url == 'true'
+  #       uses: zaproxy/action-baseline@v0.12.0
+  #       with:
+  #         target: ${{ secrets.DAST_TARGET_URL }}
+  #         fail_action: true
+  #         allow_issue_writing: false
+  #         cmd_options: "-a -T 5"
+  #     - name: "ZAP (stack no runner)"
+  #       if: success() && steps.dast_mode.outputs.use_local_stack == 'true'
+  #       uses: zaproxy/action-baseline@v0.12.0
+  #       with:
+  #         target: ${{ steps.local_dast.outputs.dast_url }}
+  #         fail_action: true
+  #         allow_issue_writing: false
+  #         cmd_options: "-a -T 5"
+  #     - if: always() && steps.dast_mode.outputs.use_local_stack == 'true'
+  #       run: docker compose -p workspace-dast -f docker-compose.vps.yml down -v || true

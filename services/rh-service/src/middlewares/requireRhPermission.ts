@@ -1,0 +1,24 @@
+import { ServiceError } from "@workspace/shared";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
+
+export const RH_SELF_SERVICE_PERMISSION = 1;
+export const RH_MANAGEMENT_PERMISSION = 3;
+
+export function getRhPermissionLevel(request: Request): number {
+  return typeof request.rh_permission === "number" ? request.rh_permission : 0;
+}
+
+export function canManageRh(request: Request): boolean {
+  return getRhPermissionLevel(request) >= RH_MANAGEMENT_PERMISSION;
+}
+
+export function requireRhPermission(minPermission: number): RequestHandler {
+  return (request: Request, _response: Response, next: NextFunction): void => {
+    if (getRhPermissionLevel(request) < minPermission) {
+      next(new ServiceError(403, "Permissao insuficiente para acessar o modulo RH."));
+      return;
+    }
+
+    next();
+  };
+}
