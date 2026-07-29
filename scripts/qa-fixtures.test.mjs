@@ -63,6 +63,16 @@ test("as fixtures QA cobrem duas organizações isoladas e a matriz 0–3/owner"
   }
 });
 
+test("as fixtures QA exercitam as três posições de ownership da tarefa", async () => {
+  const { INTEGRACAO_QA_FIXTURES: fixtures } = await import("./qa/integracao-fixtures.mjs");
+
+  for (const fixture of fixtures) {
+    assert.equal(fixture.task.responsibleId, fixture.users[0].id);
+    assert.equal(fixture.task.responsible2Id, fixture.users[1].id);
+    assert.equal(fixture.task.responsible3Id, fixture.users[2].id);
+  }
+});
+
 test("o seed QA e o roteiro usam as fixtures declarativas", async () => {
   const seedQaSource = await readFile(
     new URL("../infra/prisma/seed-qa.ts", import.meta.url),

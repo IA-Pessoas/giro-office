@@ -15,6 +15,8 @@ function buildFixture({ organization, department, users, client, project, taskMo
       modelId: taskModel.id,
       departmentId: department.id,
       responsibleId: users[0].id,
+      responsible2Id: users[1].id,
+      responsible3Id: users[2].id,
       organizationId: organization.id,
     },
   };
