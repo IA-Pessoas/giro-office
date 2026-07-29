@@ -54,11 +54,23 @@ const integracaoClientPolicy: AuthPolicy = {
   },
 };
 
+const clientListPolicy: AuthPolicy = {
+  anyOf: [
+    { minPermission: moduleAccessPermission },
+    {
+      anyModulePermission: {
+        modules: [...clientRelatedModules, "integracao"],
+        minPermission: moduleAccessPermission,
+      },
+    },
+  ],
+};
+
 const integracaoClientPath =
   /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
-  ["GET /client/list", { minPermission: moduleAccessPermission }],
+  ["GET /client/list", clientListPolicy],
   ["GET /user", userManagementPolicy],
   ["GET /rh/operational-users", operationalUsersCatalogPolicy],
   ["POST /user", userManagementPolicy],

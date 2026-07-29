@@ -10,6 +10,12 @@ const CLIENT_DOMAIN_MODULES = [
   "regularize",
 ] as const;
 
+const CLIENT_LIST_MODULES = [...CLIENT_DOMAIN_MODULES, "integracao"] as const;
+
+export function hasClientListModuleAccess(modules: Record<string, number> | undefined): boolean {
+  return CLIENT_LIST_MODULES.some((module) => normalizeModulePermission(modules?.[module]) >= 1);
+}
+
 function requireModules(request: Request): Record<string, number> {
   if (request.user_type === "owner") {
     return request.modules ?? {};
