@@ -32,6 +32,7 @@ import {
 import {
   APP_ROUTE_MODULE_MAP,
   canViewIntegrationRoute,
+  canViewTasksOnlyIntegrationRoute,
   MODULE_KEYS,
   getModulePermissionLevel,
   canAccessAdministration,
@@ -213,7 +214,13 @@ function getNavigationModuleName(
   return module.name;
 }
 
-function ModuleAccessDeniedState() {
+function ModuleAccessDeniedState({
+  fallbackHref = "/dashboard",
+  fallbackLabel = "Voltar para o dashboard",
+}: {
+  fallbackHref?: string;
+  fallbackLabel?: string;
+}) {
   return (
     <section className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center">
       <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -227,10 +234,10 @@ function ModuleAccessDeniedState() {
           {MODULE_ACCESS_DENIED_MESSAGE}
         </p>
         <Link
-          href="/dashboard"
+          href={fallbackHref}
           className="mt-6 inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
         >
-          Voltar para o dashboard
+          {fallbackLabel}
         </Link>
       </div>
     </section>
@@ -333,12 +340,16 @@ export function AppShell({
   const currentModuleKey = getModuleKeyFromRoutePath(pathname);
   const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
   const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;
+  const canViewTasksOnlyRoute = canViewTasksOnlyIntegrationRoute(pathname, moduleAccessUser);
   const canViewCurrentModuleRoute =
-    currentModuleKey === "integracao"
+    canViewTasksOnlyRoute &&
+    (currentModuleKey === "integracao"
       ? canViewIntegrationRoute(pathname, moduleAccessUser)
-      : currentModuleAccess?.canView === true;
+      : currentModuleAccess?.canView === true);
   const shouldRenderModuleAccessDenied =
-    Boolean(currentModuleKey) && !isModuleAccessLoading && !canViewCurrentModuleRoute;
+    !isModuleAccessLoading &&
+    ((!canViewTasksOnlyRoute && getModulePermissionLevel(moduleAccessUser, "integracao") === 0) ||
+      (Boolean(currentModuleKey) && !canViewCurrentModuleRoute));
 
   const canViewModuleFromPath = (modulePath: string): boolean => {
     if (modulePath === "/departments") {
@@ -361,6 +372,10 @@ export function AppShell({
 
     if (isModuleAccessLoading) {
       return true;
+    }
+
+    if (!canViewTasksOnlyIntegrationRoute(modulePath, moduleAccessUser)) {
+      return false;
     }
 
     if (moduleKey === "integracao") {
@@ -395,10 +410,31 @@ export function AppShell({
   const mainContent = shouldRenderModuleAccessLoading ? (
     <ModuleAccessLoadingState />
   ) : shouldRenderModuleAccessDenied ? (
-    <ModuleAccessDeniedState />
+    <ModuleAccessDeniedState
+      fallbackHref={
+        getModulePermissionLevel(moduleAccessUser, "integracao") === 0 ? "/tasks" : "/dashboard"
+      }
+      fallbackLabel={
+        getModulePermissionLevel(moduleAccessUser, "integracao") === 0
+          ? "Ir para Minhas tarefas"
+          : "Voltar para o dashboard"
+      }
+    />
   ) : (
     children
   );
+
+  useEffect(() => {
+    if (
+      isModuleAccessLoading ||
+      getModulePermissionLevel(moduleAccessUser, "integracao") !== 0 ||
+      canViewTasksOnlyRoute
+    ) {
+      return;
+    }
+
+    void router.replace("/tasks");
+  }, [canViewTasksOnlyRoute, isModuleAccessLoading, moduleAccessUser, router]);
 
   useEffect(() => {
     setHasUserPhotoLoadError(false);
@@ -760,15 +796,17 @@ export function AppShell({
                           {displayUserLogin}
                         </p>
                       </div>
-                      <Link
-                        href="/configuracoes"
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                        onClick={() => setShowUserMenu(false)}
-                        role="menuitem"
-                      >
-                        <Settings className="w-4 h-4" />
-                        Configurações
-                      </Link>
+                      {getModulePermissionLevel(moduleAccessUser, "integracao") !== 0 ? (
+                        <Link
+                          href="/configuracoes"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                          onClick={() => setShowUserMenu(false)}
+                          role="menuitem"
+                        >
+                          <Settings className="w-4 h-4" />
+                          Configurações
+                        </Link>
+                      ) : null}
                       <div className="border-t border-gray-100 dark:border-gray-700 mt-2 pt-2">
                         <button
                           onClick={handleLogout}

@@ -19,6 +19,7 @@ import {
 import {
   APP_ROUTE_MODULE_MAP,
   canViewIntegrationRoute,
+  canViewTasksOnlyIntegrationRoute,
   getModulePermissionLevel,
   resolveAccessLevelFromAdditionalPermission,
   resolveDepartmentModuleKey,
@@ -106,6 +107,19 @@ await runTest("integration routes preserve the level 0 own-tasks exception", () 
       );
     });
   }
+});
+
+await runTest("level 0 is restricted to the tasks surface", () => {
+  const level0 = { type: "user", modules: { integracao: 0 } };
+  const level1 = { type: "user", modules: { integracao: 1 } };
+  const owner = { type: "owner", modules: { integracao: 0 } };
+
+  assert.equal(canViewTasksOnlyIntegrationRoute("/tasks", level0), true);
+  assert.equal(canViewTasksOnlyIntegrationRoute("/tasks/123", level0), true);
+  assert.equal(canViewTasksOnlyIntegrationRoute("/dashboard", level0), false);
+  assert.equal(canViewTasksOnlyIntegrationRoute("/configuracoes", level0), false);
+  assert.equal(canViewTasksOnlyIntegrationRoute("/dashboard", level1), true);
+  assert.equal(canViewTasksOnlyIntegrationRoute("/configuracoes", owner), true);
 });
 
 async function runTest(name, fn) {
@@ -649,7 +663,7 @@ await (async () => {
     );
     assert.match(
       appShellSource,
-      /:\s*shouldRenderModuleAccessDenied\s*\?\s*\(\s*<ModuleAccessDeniedState\s*\/>/,
+      /:\s*shouldRenderModuleAccessDenied\s*\?\s*\(\s*<ModuleAccessDeniedState/,
     );
   });
 
