@@ -4,6 +4,7 @@ import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildRegularizeClientPfListParams,
+  buildRegularizeMunicipalTaxesListParams,
   buildRegularizeProcessListParams,
   buildRegularizeSitePasswordListParams,
   unwrapRegularizePage,
@@ -283,6 +284,53 @@ await runTest("regularize list params carry server search and pagination", async
   );
   const page = { data: [{ id: "row-21" }], total: 21, page: 2, limit: 20, hasMore: false };
   assert.deepEqual(unwrapRegularizePage({ data: page }, { page: 2, limit: 20 }), page);
+});
+
+await runTest("regularize municipal tax contract carries filters and unwraps a page", async () => {
+  assert.deepEqual(
+    buildRegularizeMunicipalTaxesListParams({
+      year: 2026,
+      search: " Castelo ",
+      status: "Criado",
+      page: 2,
+      limit: 20,
+    }),
+    { year: 2026, search: "Castelo", status: "Criado", page: 2, limit: 20 },
+  );
+
+  const [queryKeysSource, serviceSource, hookSource] = await Promise.all([
+    readModuleSource("hooks/queryKeys.ts"),
+    readModuleSource("services/regularizeService.ts"),
+    readModuleSource("hooks/useRegularizeOperations.ts"),
+  ]);
+
+  assert.match(
+    queryKeysSource,
+    /"municipal-taxes",\s*filters\.year,\s*filters\.search \?\? "",\s*filters\.status \?\? "Todos",\s*filters\.page \?\? 1,\s*filters\.limit \?\? 20/,
+  );
+  assert.match(serviceSource, /Promise<RegularizeMunicipalTaxesPage>/);
+  assert.match(serviceSource, /unwrapRegularizeEnvelope<RegularizeMunicipalTaxesPage>\(response\.data\)/);
+  assert.match(hookSource, /UseQueryResult<RegularizeMunicipalTaxesPage, Error>/);
+});
+
+await runTest("regularize municipal tax tab uses debounced filters and paginated rows", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /const \[taxSearch, setTaxSearch\] = useState\(""\)/);
+  assert.match(
+    pageSource,
+    /const \[taxStatus, setTaxStatus\] = useState(?:<"Todos" \| "Criado" \| "Pendente">)?\("Todos"\)/,
+  );
+  assert.match(pageSource, /const \[taxYear, setTaxYear\] = useState\(\(\) => new Date\(\)\.getFullYear\(\)\)/);
+  assert.match(pageSource, /useDebouncedValue\(taxSearch\.trim\(\), 300\)/);
+  assert.match(pageSource, /setTaxPage\(1\)/);
+  assert.match(pageSource, /year: taxYear/);
+  assert.match(pageSource, /search: debouncedTaxSearch/);
+  assert.match(pageSource, /status: taxStatus/);
+  assert.match(pageSource, /limit: REGULARIZE_PAGE_SIZE/);
+  assert.match(pageSource, /data: isTaxSearchPending \? undefined : taxQuery\.data\?\.data/);
+  assert.match(pageSource, /total=\{taxQuery\.data\?\.total \?\? 0\}/);
+  assert.match(pageSource, /hasMore=\{taxQuery\.data\?\.hasMore \?\? false\}/);
 });
 
 await runTest("regularize management tables use debounced paginated hooks", async () => {
