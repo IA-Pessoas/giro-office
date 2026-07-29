@@ -34,7 +34,6 @@ describe("matriz de regressão das políticas modulares", () => {
   it("permite Viewer global consultar a lista de clientes sem módulo", () => {
     const policy = requiredRoutePolicy("GET", "/client/list");
 
-    expect(policy).toEqual({ minPermission: 1 });
     expect(
       canAccessRoute(
         authContext({
@@ -44,6 +43,40 @@ describe("matriz de regressão das políticas modulares", () => {
         policy,
       ),
     ).toBe(true);
+    expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
+  });
+
+  it("permite Viewer de Pessoal listar clientes sem ampliar outros acessos de cliente", () => {
+    const listPolicy = requiredRoutePolicy("GET", "/client/list");
+    const clientDetailPolicy = requiredRoutePolicy("GET", "/client/client-1");
+
+    expect(
+      canAccessRoute(
+        authContext({
+          permission: 0,
+          modules: { pessoal: 1 },
+        }),
+        listPolicy,
+      ),
+    ).toBe(true);
+    expect(
+      canAccessRoute(
+        authContext({
+          permission: 0,
+          modules: { integracao: 1 },
+        }),
+        listPolicy,
+      ),
+    ).toBe(false);
+    expect(
+      canAccessRoute(
+        authContext({
+          permission: 0,
+          modules: { pessoal: 1 },
+        }),
+        clientDetailPolicy,
+      ),
+    ).toBe(false);
   });
 
   it.each([0, 1, 2, 3])("avalia o módulo Integração no nível %i", (level) => {

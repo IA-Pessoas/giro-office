@@ -25,6 +25,18 @@ const pessoalEditPolicy: AuthPolicy = {
   },
 };
 
+const clientListPolicy: AuthPolicy = {
+  anyOf: [
+    { minPermission: moduleAccessPermission },
+    {
+      modulePermission: {
+        module: "pessoal",
+        minPermission: moduleAccessPermission,
+      },
+    },
+  ],
+};
+
 const clientRelatedModules = [
   "comercial",
   "contabil",
@@ -59,7 +71,7 @@ const integracaoClientPath =
   /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
-  ["GET /client/list", { minPermission: moduleAccessPermission }],
+  ["GET /client/list", clientListPolicy],
   ["GET /user", userManagementPolicy],
   ["POST /user", userManagementPolicy],
 ]);
