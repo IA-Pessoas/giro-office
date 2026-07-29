@@ -452,7 +452,7 @@ export class TiStockService {
         );
       }
 
-      return this.prisma.categoryStock.create({
+      return await this.prisma.categoryStock.create({
         data: {
           name,
           department_id: departmentId,
@@ -488,7 +488,7 @@ export class TiStockService {
         throw new ServiceError(404, "Categoria de estoque de TI nao encontrada.");
       }
 
-      return this.prisma.categoryStock.update({
+      return await this.prisma.categoryStock.update({
         where: { id },
         data: body,
       });
