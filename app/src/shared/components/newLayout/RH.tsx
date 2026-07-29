@@ -17,7 +17,7 @@ type RhMainTab = "dashboard" | "requests" | "evaluations" | "point";
 export function RH() {
   const [activeTab, setActiveTab] = useState<RhMainTab>("dashboard");
   const [isHolidaysManagerOpen, setIsHolidaysManagerOpen] = useState(false);
-  const { canManageRh, canManageRhRequests, canViewRhDashboard, permissionQuery } =
+  const { canAccessRhPortal, canManageRh, canManageRhRequests, canViewRhDashboard, permissionQuery } =
     useRhPermissions("rh-shell");
   const newRequestsQuery = useRhRequests(
     { status: "New" },
@@ -43,6 +43,19 @@ export function RH() {
       setActiveTab("requests");
     }
   }, [activeTab, canViewRhDashboard, permissionQuery.isLoading]);
+
+  if (!permissionQuery.isLoading && !canAccessRhPortal) {
+    return (
+      <div className="mx-auto max-w-[1600px]">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Recursos Humanos</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Seu perfil não possui acesso ao portal de RH.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
