@@ -1327,6 +1327,7 @@ export function CertificatesWorkspace() {
                               certificateId={item.id}
                               hasCertificate={item.has_certificate}
                               canEdit={access.canEdit}
+                              canDelete={access.isAdmin}
                               variant="inline"
                               onUploadSuccess={() => handlePjFileActionSuccess(item.id)}
                               onDeleteSuccess={() => handlePjFileActionSuccess(item.id)}
@@ -1415,6 +1416,7 @@ export function CertificatesWorkspace() {
                               certificateId={item.id}
                               hasCertificate={item.has_certificate}
                               canEdit={access.canEdit}
+                              canDelete={access.isAdmin}
                               variant="inline"
                               onUploadSuccess={() => handlePfFileActionSuccess(item.id)}
                               onDeleteSuccess={() => handlePfFileActionSuccess(item.id)}
@@ -1686,6 +1688,7 @@ export function CertificatesWorkspace() {
                   certificateId={pjDetail.id}
                   hasCertificate={pjDetail.has_certificate}
                   canEdit={access.canEdit}
+                  canDelete={access.isAdmin}
                   onUploadSuccess={() => handlePjFileActionSuccess(pjDetail.id)}
                   onDeleteSuccess={() => handlePjFileActionSuccess(pjDetail.id)}
                 />
@@ -1778,6 +1781,7 @@ export function CertificatesWorkspace() {
                   certificateId={pfDetail.id}
                   hasCertificate={pfDetail.has_certificate}
                   canEdit={access.canEdit}
+                  canDelete={access.isAdmin}
                   onUploadSuccess={() => handlePfFileActionSuccess(pfDetail.id)}
                   onDeleteSuccess={() => handlePfFileActionSuccess(pfDetail.id)}
                 />

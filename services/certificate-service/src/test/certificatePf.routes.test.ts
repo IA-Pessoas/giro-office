@@ -465,6 +465,20 @@ describe("certificate PF routes", () => {
     });
   });
 
+  it("DELETE /certificate/pf/:id/file rejects module users", async () => {
+    const app = createCertificateTestApp();
+
+    const response = await request(app)
+      .delete(`/certificate/pf/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "FORBIDDEN",
+    });
+  });
+
   it("DELETE /certificate/pf/:id/file clears metadata and deletes the object", async () => {
     const objectPath =
       "organizations/10000000-0000-4000-8000-000000000001/certificate-pf/30000000-0000-4000-8000-000000000001/file.pfx.enc";
@@ -487,7 +501,7 @@ describe("certificate PF routes", () => {
 
     const response = await request(app)
       .delete(`/certificate/pf/${certificateId}/file`)
-      .set(certificateGatewayHeaders(2));
+      .set(certificateGatewayHeaders(3));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
