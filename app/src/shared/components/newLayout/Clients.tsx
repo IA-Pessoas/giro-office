@@ -202,26 +202,25 @@ export function Clients() {
                 <th className="px-6 py-4 font-medium">Cliente</th>
                 <th className="px-6 py-4 font-medium">Cpf/Cnpj</th>
                 <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium">Organização</th>
                 <th className="px-6 py-4 font-medium text-center">Ação</th>
               </tr>
             </thead>
             <tbody>
               {clientsQuery.isLoading ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={4}>
                     Carregando clientes...
                   </td>
                 </tr>
               ) : clientsQuery.isError ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={4}>
                     Não foi possível carregar a listagem no momento.
                   </td>
                 </tr>
               ) : clients.length === 0 ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={4}>
                     Nenhum cliente encontrado para os filtros atuais.
                   </td>
                 </tr>
@@ -257,9 +256,6 @@ export function Clients() {
                         >
                           {uiStatus}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
-                        {client.organization?.name ?? "Organização atual"}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <Link
