@@ -351,6 +351,23 @@ await (async () => {
     assert.equal(CONTABIL_RELATIONSHIP_FIELDS[0].requiredOnCreate, true);
   });
 
+  await runTest("relationship bidding checkbox uses compact form proportions", () => {
+    const source = readFileSync(
+      new URL("./components/ContabilRelationshipSection.tsx", import.meta.url),
+      "utf8",
+    );
+    const checkboxStart = source.indexOf("{CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS.map");
+    const textFieldsStart = source.indexOf("{CONTABIL_RELATIONSHIP_TEXT_FIELDS.map");
+    const checkboxSource = source.slice(checkboxStart, textFieldsStart);
+
+    assert.match(checkboxSource, /className="flex h-11 items-center gap-3/);
+    assert.match(checkboxSource, /className="h-4 w-4/);
+    assert.doesNotMatch(
+      checkboxSource,
+      /rounded-xl border border-gray-200 bg-gray-50\/70 px-4 py-3/,
+    );
+  });
+
   await runTest("responsible and relationship form helpers normalize nullable backend values", () => {
     assert.deepEqual(buildContabilResponsibleFormValues(null), {
       person_responsible_id: "",
