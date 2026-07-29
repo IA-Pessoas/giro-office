@@ -537,6 +537,15 @@ runTest("clients list exposes compact page jump input", () => {
   assert.match(clients, /onKeyDown=\{\(event\) =>/);
 });
 
+runTest("clients list hides organization from the main table", () => {
+  const clients = readFileSync("src/shared/components/newLayout/Clients.tsx", "utf8");
+
+  assert.doesNotMatch(clients, /<th[^>]*>Organiza\u00e7\u00e3o<\/th>/);
+  assert.doesNotMatch(clients, /client\.organization\?\.name/);
+  assert.match(clients, /colSpan=\{4\}/);
+  assert.doesNotMatch(clients, /colSpan=\{5\}/);
+});
+
 runTest("client creation discloses name and document as required", () => {
   const source = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
 
