@@ -35,6 +35,10 @@ export type RegularizePartnerListFilters = {
 
 export type RegularizeMunicipalTaxesListFilters = {
   year: number;
+  search?: string;
+  status?: "Todos" | "Criado" | "Pendente";
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizeProcessListFilters = {
@@ -199,6 +203,14 @@ export type RegularizeMunicipalTaxesClientSummary = {
   cpf_cnpj?: string | null;
   city?: string | null;
   municipalTaxes?: Array<{ id: RegularizeId }> | null;
+};
+
+export type RegularizeMunicipalTaxesPage = {
+  data: RegularizeMunicipalTaxesClientSummary[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
 };
 
 export type RegularizeMunicipalTaxesDetail = {

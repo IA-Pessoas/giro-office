@@ -88,6 +88,10 @@ export function buildRegularizeMunicipalTaxesListParams(
 ) {
   return {
     year: filters.year,
+    ...(filters.search ? { search: filters.search.trim() } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.page !== undefined ? { page: filters.page } : {}),
+    ...(filters.limit !== undefined ? { limit: filters.limit } : {}),
   };
 }
 

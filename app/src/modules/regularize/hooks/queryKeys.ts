@@ -55,7 +55,15 @@ export const regularizeQueryKeys = {
     [...regularizeQueryKeys.people(), "partners", "detail", id ?? ""] as const,
   operations: () => [...regularizeQueryKeys.root, "operations"] as const,
   municipalTaxes: (filters: RegularizeMunicipalTaxesListFilters) =>
-    [...regularizeQueryKeys.operations(), "municipal-taxes", filters.year] as const,
+    [
+      ...regularizeQueryKeys.operations(),
+      "municipal-taxes",
+      filters.year,
+      filters.search ?? "",
+      filters.status ?? "Todos",
+      filters.page ?? 1,
+      filters.limit ?? 20,
+    ] as const,
   municipalTaxDetail: (id?: RegularizeId | null) =>
     [...regularizeQueryKeys.operations(), "municipal-taxes", "detail", id ?? ""] as const,
   processes: (filters: RegularizeProcessListFilters) =>
