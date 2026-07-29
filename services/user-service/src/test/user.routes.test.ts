@@ -1,13 +1,40 @@
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { getUserServiceEnv } from "../config/env.js";
 import {
+  authServiceMock,
   createTestApp,
   gatewayAuthHeaders,
   resetUserRouteMocks,
   storageServiceMock,
   userServiceMock,
 } from "./userTestUtils.js";
+
+function bearerAuthHeaders(overrides?: {
+  userId?: string;
+  organizationId?: string;
+  permission?: number;
+  type?: "owner" | "admin" | "user";
+  modules?: Record<string, number>;
+}): Record<string, string> {
+  const userId = overrides?.userId ?? "c0000000-0000-4000-8000-000000000001";
+  const token = jwt.sign(
+    {
+      user_id: userId,
+      organization_id: overrides?.organizationId ?? "a0000000-0000-4000-8000-000000000001",
+      permission: overrides?.permission ?? 0,
+      type: overrides?.type ?? "user",
+      modules: overrides?.modules ?? {},
+      session_version: 1,
+    },
+    getUserServiceEnv().jwtSecret,
+    { subject: userId },
+  );
+
+  return { Authorization: `Bearer ${token}` };
+}
 
 describe("user routes", () => {
   beforeEach(() => {
@@ -375,6 +402,30 @@ describe("user routes", () => {
     );
   });
 
+  it("PATCH /user/:id permite a propria senha com Authorization Bearer direto", async () => {
+    userServiceMock.update.mockResolvedValue({ id: "user-1" });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-1")
+      .set(bearerAuthHeaders({ userId: "user-1" }))
+      .send({ password: "nova-senha-segura" });
+
+    expect(res.status).toBe(200);
+    expect(userServiceMock.update).toHaveBeenCalledWith(
+      "user-1",
+      { password: "nova-senha-segura" },
+      "a0000000-0000-4000-8000-000000000001",
+      "user-1",
+    );
+    expect(authServiceMock.validateSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "user-1",
+        organization_id: "a0000000-0000-4000-8000-000000000001",
+      }),
+    );
+  });
+
   it("PATCH /user/:id bloqueia usuario comum ao alterar a senha de outra pessoa", async () => {
     const app = createTestApp();
 
@@ -387,12 +438,36 @@ describe("user routes", () => {
     expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
+  it("PATCH /user/:id bloqueia outra pessoa com Authorization Bearer direto", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-2")
+      .set(bearerAuthHeaders({ userId: "user-1" }))
+      .send({ password: "nova-senha-segura" });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
   it("PATCH /user/:id bloqueia usuario comum ao combinar senha com outro campo", async () => {
     const app = createTestApp();
 
     const res = await request(app)
       .patch("/user/user-1")
       .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
+      .send({ password: "nova-senha-segura", name: "Nome indevido" });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /user/:id bloqueia payload misto com Authorization Bearer direto", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .patch("/user/user-1")
+      .set(bearerAuthHeaders({ userId: "user-1" }))
       .send({ password: "nova-senha-segura", name: "Nome indevido" });
 
     expect(res.status).toBe(403);

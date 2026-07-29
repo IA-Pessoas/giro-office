@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import { updateCurrentUser } from "../../../packages/api/src/services/userService.ts";
 import {
@@ -51,6 +53,42 @@ assert.equal(
   }),
   null,
 );
+assert.deepEqual(
+  buildSelfProfileUpdatePayload({
+    canManageUsers: true,
+    currentName: "Administradora RH",
+    name: "Administradora de Pessoas",
+    password: "nova-senha-segura",
+  }),
+  { name: "Administradora de Pessoas", password: "nova-senha-segura" },
+);
 assert.equal(PROFILE_UPDATE_ERROR_MESSAGE, "Nao foi possivel atualizar o perfil.");
+
+const mePageSource = await readFile(
+  fileURLToPath(new URL("../pages/me/index.tsx", import.meta.url)),
+  "utf8",
+);
+const settingsSource = await readFile(
+  fileURLToPath(new URL("../shared/components/newLayout/Configuracoes.tsx", import.meta.url)),
+  "utf8",
+);
+const meMutationSource = await readFile(
+  fileURLToPath(new URL("hooks/useMeMutations.ts", import.meta.url)),
+  "utf8",
+);
+
+assert.match(mePageSource, /useMe\(\)/);
+assert.doesNotMatch(mePageSource, /useUserProfile/);
+assert.match(mePageSource, /id="me-new-password"[\s\S]*?type="password"/);
+assert.match(mePageSource, /disabled=\{!canManageUsers \|\| updateUserMutation\.isPending\}/);
+assert.match(mePageSource, /onSuccess:\s*\(\)\s*=>\s*setNewPassword\(""\)/);
+
+assert.match(settingsSource, /import \{ useAuth \} from "@\/context\/AuthContext"/);
+assert.match(settingsSource, /const \{ user \} = useAuth\(\);/);
+assert.match(settingsSource, /const canManageUsers = canCreateUsers\(user\);/);
+assert.match(settingsSource, /id="settings-access-password"[\s\S]*?type="password"/);
+assert.match(settingsSource, /disabled=\{isSaving \|\| !canManageUsers\}/);
+assert.match(settingsSource, /await updateMeMutation\.mutateAsync\(accessUpdatePayload\);\s*setPassword\(""\);/);
+assert.match(meMutationSource, /toast\.error\(PROFILE_UPDATE_ERROR_MESSAGE\)/);
 
 console.log("me password update contract tests passed");

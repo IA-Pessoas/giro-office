@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
+import { useAuth } from "@/context/AuthContext";
 import { canCreateOrganizationOwner, canCreateUsers, useModuleAccess } from "@modules/auth";
 import {
   TASK_MODEL_CONFIG_ENTRY,
@@ -90,6 +91,7 @@ function applyTheme(nextTheme: "light" | "dark"): void {
 
 export function Configuracoes() {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
   const meQuery = useMe();
   const { access: integracaoAccess } = useModuleAccess("integracao");
   const updateMeMutation = useUpdateMe();
@@ -133,7 +135,7 @@ export function Configuracoes() {
   const currentName = meQuery.data?.name ?? "";
   const currentLogin = meQuery.data?.login ?? "";
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
-  const canManageUsers = canCreateUsers(meQuery.data);
+  const canManageUsers = canCreateUsers(user);
   const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário";
   const managedOrganizationId =
     canCreateOrganizationOwner(meQuery.data) && meQuery.data.organization_id

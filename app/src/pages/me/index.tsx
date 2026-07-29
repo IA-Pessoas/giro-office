@@ -5,7 +5,7 @@ import { User } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
 import { canCreateUsers } from "@modules/auth";
-import { useUpdateCurrentUser, useUserProfile } from "@shared/hooks";
+import { useMe, useUpdateCurrentUser } from "@shared/hooks";
 import { clearMeProfileAccess, hasMeProfileAccess } from "@shared/utils/meProfileAccessGate";
 import { buildSelfProfileUpdatePayload } from "@shared/utils/meProfileUpdate";
 
@@ -17,7 +17,7 @@ const labelClass = "block text-sm font-medium text-gray-700 dark:text-gray-300";
 export default function Me() {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
-  const profileQuery = useUserProfile(user?.id);
+  const profileQuery = useMe();
   const updateUserMutation = useUpdateCurrentUser();
 
   const [name, setName] = useState("");
