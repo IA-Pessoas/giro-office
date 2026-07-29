@@ -38,6 +38,31 @@ describe("request routes", () => {
     });
   });
 
+  it("POST /rh/requests permite Usuario criar solicitacao propria sem atribuicao de gestao", async () => {
+    const app = createTestApp({ rhPermission: 2 });
+    const res = await request(app).post("/rh/requests").send({
+      title: "Solicitacao",
+      description: "Descricao",
+      category_id: itemId,
+      urgency: "High",
+      assigned_to_user_id: "00000000-0000-4000-8000-000000000099",
+    });
+
+    expect(res.status).toBe(200);
+    expect(requestServiceMock.create).toHaveBeenCalledTimes(1);
+    expect(requestServiceMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: organizationId,
+        requester_user_id: userId,
+        title: "Solicitacao",
+        description: "Descricao",
+        category_id: itemId,
+        urgency: "High",
+      }),
+    );
+    expect(requestServiceMock.create.mock.calls[0]?.[0]).not.toHaveProperty("assigned_to_user_id");
+  });
+
   it("GET /rh/operational-users lista colaboradores elegiveis para operacao RH", async () => {
     const app = createTestApp();
     const res = await request(app).get("/rh/operational-users");
@@ -86,11 +111,52 @@ describe("request routes", () => {
     });
   });
 
+  it("GET /rh/requests restringe Usuario RH as proprias solicitacoes", async () => {
+    const app = createTestApp({ rhPermission: 2 });
+    const res = await request(app).get("/rh/requests").query({
+      requester_user_id: "00000000-0000-4000-8000-000000000099",
+      assigned_to_user_id: "00000000-0000-4000-8000-000000000098",
+      status: "New",
+    });
+
+    expect(res.status).toBe(200);
+    expect(requestServiceMock.list).toHaveBeenCalledWith(organizationId, {
+      requester_user_id: userId,
+      status: "New",
+    });
+  });
+
   it("GET /rh/requests/:id detalha solicitacao", async () => {
     const app = createTestApp();
     const res = await request(app).get(`/rh/requests/${itemId}`);
 
     expect(res.status).toBe(200);
+    expect(requestServiceMock.getById).toHaveBeenCalledWith(itemId, organizationId);
+  });
+
+  it("GET /rh/requests/:id permite Usuario RH ver solicitacao propria", async () => {
+    const app = createTestApp({ rhPermission: 2 });
+    requestServiceMock.getById.mockResolvedValueOnce({
+      id: itemId,
+      requester_user_id: userId,
+    });
+
+    const res = await request(app).get(`/rh/requests/${itemId}`);
+
+    expect(res.status).toBe(200);
+    expect(requestServiceMock.getById).toHaveBeenCalledWith(itemId, organizationId);
+  });
+
+  it("GET /rh/requests/:id bloqueia Usuario RH ao acessar solicitacao de terceiro", async () => {
+    const app = createTestApp({ rhPermission: 2 });
+    requestServiceMock.getById.mockResolvedValueOnce({
+      id: itemId,
+      requester_user_id: "00000000-0000-4000-8000-000000000099",
+    });
+
+    const res = await request(app).get(`/rh/requests/${itemId}`);
+
+    expect(res.status).toBe(403);
     expect(requestServiceMock.getById).toHaveBeenCalledWith(itemId, organizationId);
   });
 
@@ -113,11 +179,27 @@ describe("request routes", () => {
     expect(requestServiceMock.update).not.toHaveBeenCalled();
   });
 
+  it("PUT /rh/requests bloqueia Usuario RH", async () => {
+    const app = createTestApp({ rhPermission: 2 });
+    const res = await request(app).put("/rh/requests").send({ id: itemId, status: "Resolved" });
+
+    expect(res.status).toBe(403);
+    expect(requestServiceMock.update).not.toHaveBeenCalled();
+  });
+
   it("DELETE /rh/requests remove solicitacao", async () => {
     const app = createTestApp();
     const res = await request(app).delete("/rh/requests").send({ id: itemId });
 
     expect(res.status).toBe(200);
     expect(requestServiceMock.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it("DELETE /rh/requests bloqueia Usuario RH", async () => {
+    const app = createTestApp({ rhPermission: 2 });
+    const res = await request(app).delete("/rh/requests").send({ id: itemId });
+
+    expect(res.status).toBe(403);
+    expect(requestServiceMock.delete).not.toHaveBeenCalled();
   });
 });

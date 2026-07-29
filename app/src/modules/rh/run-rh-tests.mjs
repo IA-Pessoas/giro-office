@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const { getRhQuarterOptions } = await import("./utils/rhScoreUi.ts");
 const { formatRhDate } = await import("./utils/rhDate.ts");
+const { resolveRhPermissionCapabilities } = await import("./utils/rhPermissions.ts");
 
 const rhSources = {
   requestFormModal: readFileSync("src/modules/rh/components/RhRequestFormModal.tsx", "utf8"),
@@ -105,6 +106,41 @@ runTest("RH viewer self-service flow stays enabled and scoped", () => {
   assert.match(
     rhSources.timeBankReleaseRoute,
     /"\/list"[\s\S]*requireRhPermission\(RH_SELF_SERVICE_PERMISSION\)[\s\S]*user_id:\s*canManageTimeBankReleases\s*\?\s*getSingleTrimmedQueryValue\(req\.query\.user_id\)\s*:\s*user_id[\s\S]*canManageTimeBankReleases \? parsed\.user_id : user_id/,
+  );
+});
+
+runTest("RH Usuario mantem autosservico e nao recebe gestao", () => {
+  const capabilities = resolveRhPermissionCapabilities(2, false);
+
+  assert.equal(capabilities.canAccessRhPortal, true);
+  assert.equal(capabilities.canManageRhRequests, false);
+  assert.equal(capabilities.canManageRhScore, false);
+  assert.equal(capabilities.canManageRhTimeBank, false);
+  assert.equal(capabilities.canManageRhTimesheets, false);
+  assert.equal(capabilities.canManageRhWorkday, false);
+});
+
+runTest("RH sem acesso nao e tratado como usuario autorizado", () => {
+  const capabilities = resolveRhPermissionCapabilities(0, false);
+
+  assert.equal(capabilities.canAccessRhPortal, false);
+  assert.equal(capabilities.canManageRhRequests, false);
+});
+
+runTest("RH shell distingue erro de permissao de ausencia de acesso", () => {
+  const shellSource = readFileSync("src/shared/components/newLayout/RH.tsx", "utf8");
+
+  assert.match(
+    shellSource,
+    /if \(!permissionQuery\.isLoading && permissionQuery\.error\) \{/,
+  );
+  assert.match(
+    shellSource,
+    /validar o acesso ao RH agora\./,
+  );
+  assert.match(
+    shellSource,
+    /if \(!permissionQuery\.isLoading && !permissionQuery\.error && !canAccessRhPortal\) \{/,
   );
 });
 
