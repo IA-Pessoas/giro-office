@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 
 import { ClientSelectionField, type ClientPickerOption } from "@modules/clients";
 import { departmentService, type DepItem } from "@modules/departments";
-import { listAdminUsers, type UserItem } from "@modules/users";
+import { useAssignableUsers } from "@modules/rh";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { useFetch } from "@shared/hooks";
 
@@ -173,13 +173,11 @@ export function TaskFormModal({
       enabled: open,
     },
   );
-  const usersQuery = useFetch<UserItem[]>(
-    ["task-form-users"],
-    () => listAdminUsers("active"),
-    {
-      enabled: open,
-    },
-  );
+  const usersQuery = useAssignableUsers({
+    enabled: open,
+    module: "integracao",
+    departmentId: isEditing ? editValues.department_id || undefined : createValues.department_id || undefined,
+  });
   const taskDetailQuery = useIntegracaoTaskDetail(open && taskId ? taskId : undefined);
   const createMutation = useCreateIntegracaoTaskMutation();
   const updateMutation = useUpdateIntegracaoTaskMutation();

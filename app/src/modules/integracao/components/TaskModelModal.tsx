@@ -3,7 +3,7 @@ import { FileText, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
-import { listAdminUsers, type UserItem } from "@modules/users";
+import { useAssignableUsers } from "@modules/rh";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
@@ -89,7 +89,6 @@ export function TaskModelModal({
 }: TaskModelModalProps) {
   const isEditing = Boolean(initialData?.id);
   const [formData, setFormData] = useState<CreateTaskModelData>(EMPTY_FORM_DATA);
-  const [users, setUsers] = useState<UserItem[]>([]);
   const [departments, setDepartments] = useState<DepItem[]>([]);
   const [allTasks, setAllTasks] = useState<TaskModelListItem[]>([]);
   const [dependents, setDependents] = useState<TaskDependent[]>([]);
@@ -104,6 +103,12 @@ export function TaskModelModal({
   const [saving, setSaving] = useState(false);
   const [detailError, setDetailError] = useState(false);
   const [optionsWarning, setOptionsWarning] = useState<string | null>(null);
+  const usersQuery = useAssignableUsers({
+    enabled: isOpen,
+    module: "integracao",
+    departmentId: formData.department_id || undefined,
+  });
+  const users = usersQuery.data ?? [];
 
   const availableDependentTasks = useMemo(
     () => allTasks.filter((task) => task.id !== initialData?.id),
@@ -126,8 +131,7 @@ export function TaskModelModal({
       setLoadingOptions(true);
       setOptionsWarning(null);
 
-      const [usersResult, departmentsResult, taskModelsResult] = await Promise.allSettled([
-        listAdminUsers("active"),
+      const [departmentsResult, taskModelsResult] = await Promise.allSettled([
         departmentService.list({ status: "Ativo" }),
         taskModelService.list({ type: "Projeto" }),
       ]);
@@ -137,13 +141,6 @@ export function TaskModelModal({
       }
 
       const failedLists: string[] = [];
-
-      if (usersResult.status === "fulfilled") {
-        setUsers(usersResult.value);
-      } else {
-        setUsers([]);
-        failedLists.push("usuários");
-      }
 
       if (departmentsResult.status === "fulfilled") {
         setDepartments(departmentsResult.value);

@@ -59,6 +59,7 @@ export function ContabilResponsibleSection({
   const responsible = responsibleQuery.data ?? null;
   const assignableUsersQuery = useAssignableUsers({
     enabled: canEdit && isEditorOpen,
+    module: "contabil",
   });
 
   const assignableOptions = useMemo(

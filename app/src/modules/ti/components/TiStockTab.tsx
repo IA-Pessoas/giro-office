@@ -318,7 +318,7 @@ export function TiStockTab() {
   });
   const stockCategoriesQuery = useTiStockCategories();
   const stockLocationsQuery = useTiStockLocations();
-  const assignableUsersQuery = useAssignableUsers({ enabled: canEditStock });
+  const assignableUsersQuery = useAssignableUsers({ enabled: canEditStock, module: "ti" });
 
   const createItemMutation = useCreateTiStockItemMutation();
   const updateItemMutation = useUpdateTiStockItemMutation();

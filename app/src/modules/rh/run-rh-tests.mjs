@@ -24,6 +24,34 @@ runTest("assignable RH users are loaded from rh-service, not user-service", () =
   assert.doesNotMatch(hookSource, /listAdminUsers/);
 });
 
+runTest("assignable RH users keep context in cache keys and request params", () => {
+  const hookSource = readFileSync("src/modules/rh/hooks/useAssignableUsers.ts", "utf8");
+
+  assert.match(hookSource, /options\.module/);
+  assert.match(hookSource, /options\.departmentId/);
+  assert.match(hookSource, /options\.departmentName/);
+  assert.match(hookSource, /params:\s*\{/);
+  assert.match(hookSource, /department_id:\s*options\?\.departmentId/);
+  assert.match(hookSource, /department_name:\s*options\?\.departmentName/);
+});
+
+runTest("task assignment selectors use the contextual RH source", () => {
+  const taskFormSource = readFileSync(
+    "src/modules/integracao/components/TaskFormModal.tsx",
+    "utf8",
+  );
+  const taskModelSource = readFileSync(
+    "src/modules/integracao/components/TaskModelModal.tsx",
+    "utf8",
+  );
+
+  for (const source of [taskFormSource, taskModelSource]) {
+    assert.match(source, /useAssignableUsers/);
+    assert.doesNotMatch(source, /listAdminUsers/);
+    assert.match(source, /departmentId:/);
+  }
+});
+
 runTest("RH modal fields disclose required inputs before submission", () => {
   const sources = [
     "components/RhRequestFormModal.tsx",

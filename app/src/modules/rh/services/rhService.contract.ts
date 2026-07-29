@@ -45,6 +45,12 @@ export const RH_ENDPOINTS = {
   scoreNitroUpdate: "/rh/score/nitro/update",
 } as const;
 
+export interface RhOperationalUserQueryParams {
+  module?: string;
+  department_id?: string;
+  department_name?: string;
+}
+
 export function buildRhCategoryListParams(filters: RhCategoryListFilters = {}) {
   return {
     activeOnly: filters.activeOnly ? "true" : undefined,

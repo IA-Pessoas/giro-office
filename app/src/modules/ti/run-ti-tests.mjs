@@ -1104,7 +1104,7 @@ await runTest("ti user selects reuse the operational users source", async () => 
   const rhTypesSource = await readAppSource("src/modules/rh/types.ts");
   const userTypesSource = await readAppSource("src/modules/users/types/index.ts");
 
-  assert.match(hookSource, /api\.get\(RH_ENDPOINTS\.operationalUsers\)/);
+  assert.match(hookSource, /api\.get\(RH_ENDPOINTS\.operationalUsers(?:,|\))/);
   assert.match(hookSource, /unwrapRhEnvelope<RhOperationalUser\[\]>/);
   assert.doesNotMatch(hookSource, /cpf: user\.cpf \?\? null/);
   assert.doesNotMatch(rhTypesSource, /cpf\?: string \| null/);

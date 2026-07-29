@@ -155,7 +155,7 @@ export function TiPasswordsTab() {
     revealPasswordId,
     Boolean(revealPasswordId) && canRevealPasswords,
   );
-  const assignableUsersQuery = useAssignableUsers({ enabled: canManagePasswords });
+  const assignableUsersQuery = useAssignableUsers({ enabled: canManagePasswords, module: "ti" });
   const clearPasswordRevealCache = useClearTiPasswordRevealCache();
   const createPasswordMutation = useCreateTiPasswordMutation();
   const updatePasswordMutation = useUpdateTiPasswordMutation();

@@ -21,6 +21,7 @@ const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
     },
     user: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
   },
   auditMock: {
@@ -49,7 +50,10 @@ import { TaskCrudService } from "../services/taskCrudService.js";
 
 describe("TaskCrudService", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    prismaMock.user.findMany.mockImplementation(async (args) =>
+      ((args as { where?: { id?: { in?: string[] } } }).where?.id?.in ?? []).map((id) => ({ id })),
+    );
   });
 
   it("createTask lança 409 quando já existe tarefa em andamento", async () => {
@@ -70,6 +74,37 @@ describe("TaskCrudService", () => {
         integracaoLevel: 2,
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it("createTask rejeita responsaveis ativos fora do departamento da tarefa", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      name: "Modelo",
+      department_id: "dep-1",
+      billing: "Realizar",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.user.findMany.mockResolvedValue([]);
+    const service = new TaskCrudService();
+
+    await expect(
+      service.createTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        model_id: "model-1",
+        project_id: "project-1",
+        client_id: "client-1",
+        department_id: "dep-1",
+        responsible_id: "user-1",
+        prospecting_status: "Fechado",
+        observations: "obs",
+        urgency: "Alta",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 422 });
   });
 
   it("createTask rejeita projeto de outro cliente antes de criar a tarefa", async () => {
@@ -188,6 +223,7 @@ describe("TaskCrudService", () => {
       responsible2_id: "user-2",
       responsible3_id: "user-3",
       prevision_date: "2026-08-15",
+      integracaoLevel: 2,
     });
 
     expect(prismaMock.task.create).toHaveBeenCalledWith(
@@ -227,7 +263,7 @@ describe("TaskCrudService", () => {
 
     await new TaskCrudService().createTask({
       user_id: "user-creator", organization_id: "org-1", model_id: "model-1", project_id: "project-1",
-      client_id: "client-1", prospecting_status: "Fechado", observations: "obs", urgency: "Alta", billing: "Realizar",
+      client_id: "client-1", prospecting_status: "Fechado", observations: "obs", urgency: "Alta", billing: "Realizar", integracaoLevel: 2,
     });
 
     expect(prismaMock.task.create).toHaveBeenCalledWith(expect.objectContaining({
@@ -248,7 +284,7 @@ describe("TaskCrudService", () => {
 
     await new TaskCrudService().createTask({
       user_id: "user-creator", organization_id: "org-1", model_id: "model-1", project_id: "project-1",
-      client_id: "client-1", prospecting_status: "Fechado", observations: "obs", urgency: "Alta", status: "Em Espera",
+      client_id: "client-1", prospecting_status: "Fechado", observations: "obs", urgency: "Alta", status: "Em Espera", integracaoLevel: 2,
     });
 
     expect(prismaMock.task.create).toHaveBeenCalledWith(expect.objectContaining({
@@ -269,7 +305,7 @@ describe("TaskCrudService", () => {
 
     await new TaskCrudService().createTask({
       user_id: "user-creator", organization_id: "org-1", model_id: "model-1", project_id: "project-1",
-      client_id: "client-1", prospecting_status: "Fechado", observations: "obs", urgency: "Alta",
+      client_id: "client-1", prospecting_status: "Fechado", observations: "obs", urgency: "Alta", integracaoLevel: 2,
     });
 
     expect(prismaMock.task.create).toHaveBeenCalledWith(expect.objectContaining({

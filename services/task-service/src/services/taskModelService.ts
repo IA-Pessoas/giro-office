@@ -11,6 +11,7 @@ import type { TaskModelGetPayload } from "../generated/prisma/models/TaskModel.j
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { parseTaskModelResponsibleSequence } from "../schemas/taskModelResponsibleSequence.schemas.js";
+import { assertResponsibleUsersInDepartment } from "./responsibleUserContext.js";
 
 export interface CreateModelRequest {
   user_id: string;
@@ -129,6 +130,12 @@ export class TaskModelService {
         throw new ServiceError(409, "Tarefa com esse nome nesse departamento já foi cadastrada.");
       }
 
+      await assertResponsibleUsersInDepartment(prismaClient, data.organization_id, data.department_id, [
+        responsibleSequence.responsible_id,
+        responsibleSequence.responsible2_id,
+        responsibleSequence.responsible3_id,
+      ]);
+
       const create = await prismaClient.taskModel.create({
         data: {
           name: data.name,
@@ -231,6 +238,12 @@ export class TaskModelService {
           "type",
         ],
       });
+
+      await assertResponsibleUsersInDepartment(prismaClient, organizationId, data.department_id, [
+        responsibleSequence.responsible_id,
+        responsibleSequence.responsible2_id,
+        responsibleSequence.responsible3_id,
+      ]);
 
       const updated = await prismaClient.taskModel.update({
         where: { id: data.task_id, organization_id: organizationId },

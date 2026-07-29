@@ -262,7 +262,7 @@ export function TiTermsTab() {
     { status: "available", page_size: 100 },
     { enabled: canManage },
   );
-  const assignableUsersQuery = useAssignableUsers({ enabled: canManage });
+  const assignableUsersQuery = useAssignableUsers({ enabled: canManage, module: "ti" });
   const departmentsQuery = useFetch<DepItem[]>(
     ["ti-terms", "departments"],
     () => departmentService.list(),

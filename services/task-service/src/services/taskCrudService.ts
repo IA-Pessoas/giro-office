@@ -12,6 +12,7 @@ import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { TaskWorkflowService } from "./taskWorkflowService.js";
+import { assertResponsibleUsersInDepartment } from "./responsibleUserContext.js";
 
 const TASK_DETAIL_SELECT = {
   id: true,
@@ -217,6 +218,13 @@ export class TaskCrudService {
       throw new ServiceError(404, "Tarefa modelo não existe.");
     }
 
+    await assertResponsibleUsersInDepartment(
+      params.prisma,
+      params.organization_id,
+      model.department_id,
+      [model.responsible_id, model.responsible2_id, model.responsible3_id],
+    );
+
     let charge_comercial = model.billing !== "Não Realizar";
     let charge_financeiro = model.billing !== "Não Realizar";
 
@@ -299,6 +307,10 @@ export class TaskCrudService {
       }
 
       const status = data.status ?? defaultStatus;
+      const departmentId = data.department_id ?? model.department_id;
+      const responsibleId = data.responsible_id ?? model.responsible_id;
+      const responsible2Id = data.responsible2_id ?? model.responsible2_id;
+      const responsible3Id = data.responsible3_id ?? model.responsible3_id;
       const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
       const previsionDate =
         data.prevision_date === undefined || data.prevision_date === null
@@ -308,6 +320,13 @@ export class TaskCrudService {
             : data.prevision_date;
 
       const { create, dependentCreates } = await this.#runTransaction(async (tx) => {
+        await assertResponsibleUsersInDepartment(
+          tx,
+          data.organization_id,
+          departmentId,
+          [responsibleId, responsible2Id, responsible3Id],
+        );
+
         const create = await tx.task.create({
           data: {
             organization_id: data.organization_id,
@@ -316,13 +335,13 @@ export class TaskCrudService {
             client_id: data.client_id,
             name: data.name ?? model.name,
             status,
-            department_id: data.department_id ?? model.department_id,
+            department_id: departmentId,
             observations: data.observations,
             billing,
             urgency: data.urgency,
-            responsible_id: data.responsible_id ?? model.responsible_id,
-            responsible2_id: data.responsible2_id ?? model.responsible2_id,
-            responsible3_id: data.responsible3_id ?? model.responsible3_id,
+            responsible_id: responsibleId,
+            responsible2_id: responsible2Id,
+            responsible3_id: responsible3Id,
             start_date: status === "Em Andamento" ? new Date() : null,
             prevision_date: previsionDate,
             pending_approval: false,
@@ -596,6 +615,12 @@ export class TaskCrudService {
         data.responsible2_id !== undefined ? data.responsible2_id : exists.responsible2_id;
       const responsible3_id =
         data.responsible3_id !== undefined ? data.responsible3_id : exists.responsible3_id;
+
+      await assertResponsibleUsersInDepartment(prismaClient, data.organization_id, department_id, [
+        responsible_id,
+        responsible2_id,
+        responsible3_id,
+      ]);
 
       let prevision_date: Date | null;
       if (data.prevision_date === undefined) {
