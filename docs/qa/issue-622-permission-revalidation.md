@@ -57,9 +57,11 @@ As evidências HTTP foram coletadas contra o gateway local com os usuários reai
 
 A suíte de política compartilhada também valida as três posições de ownership para tarefas próprias e não-próprias, incluindo as decisões `403/404`: a execução direta com `tsx --test tests/integracao-policy.test.ts` passou com 9/9.
 
-Na reexecução final, a suite focada de tarefas passou em 51/51, usuário em 28/28, clientes em 35/35 com 2 cenários skip, e gateway em 14/14. A suite focada de projetos reproduziu o baseline atual de autenticação dos testes de rota: 11 falhas e 11 aprovados, com respostas 401 antes das expectativas de matriz.
+Na reexecução após os ajustes dos bloqueios, as suítes afetadas passaram: project-service 40/40 (3 testes skip), contabil-service 68/68, fiscal-service 59/59, task-service 116/116, ti-service 219/219 e gateway 152/152. O teste de imagens dinâmicas do app passou 6/6. O `CI=true pnpm test` completo passou com 37/37 tarefas Turbo e o gate `qa:integracao` passou com 5/5.
 
-Build/typecheck dos serviços não-UI passaram em 18/19 e 20/21 alvos, respectivamente; o app passou diretamente com `next build --webpack`, `tsc --noEmit` e `tsc -p tsconfig.usefetch-types.json --noEmit`. O `pnpm test` completo executou e reproduziu falhas fora do escopo em project/contabil/fiscal. `biome lint .` passou com o warning baseline de `shared/src/auth/token.ts`; `biome format .` continua falhando com quatro arquivos preexistentes e o JSON grande de transformações.
+Os 401 eram causados por testes herdando `AUDIT_SERVICE_TOKEN` do `.env` local; os bootstraps e testes de rota agora fixam tokens de teste herméticos. A suíte Contábil também corrigiu o nível do cenário de escrita para 2, conforme a matriz. O `tiStockService` passou a aguardar as operações Prisma para que conflitos assíncronos retornem 409. No gateway, usuário não-owner sem claim modular recebe nível 0; somente owner mantém o bypass global nível 3, conforme #551/#562. O uso de imagens dinâmicas do módulo TI foi registrado no teste de otimização com `decoding="async"`.
+
+Os gates finais passaram: `pnpm build` em 19/19 targets, `pnpm typecheck` em 21/21, `pnpm format:check` sem falhas e `pnpm lint` com exit 0. O format emite apenas informação sobre o JSON baseline de 4 MiB; o lint mantém um warning baseline em `shared/src/auth/token.ts`.
 
 ## Roteiro reproduzível
 
