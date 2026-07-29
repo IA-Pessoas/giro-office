@@ -37,6 +37,10 @@ export interface CertificatePfUpdateInput extends CertificatePfContext {
   data: UpdateCertificatePfInput;
 }
 
+export interface CertificatePfDeleteInput extends CertificatePfContext {
+  id: string;
+}
+
 export interface CertificatePfFileInput extends CertificatePfContext {
   id: string;
 }
@@ -87,6 +91,10 @@ export interface CertificatePfFileDownloadResult {
 }
 
 export interface CertificatePfFileDeleteResult {
+  ok: true;
+}
+
+export interface CertificatePfDeleteResult {
   ok: true;
 }
 
@@ -307,6 +315,27 @@ export class CertificatePfService {
       }
       throw new ServiceError(500, "Erro ao atualizar certificado PF.", err);
     }
+  }
+
+  async deleteCertificatePf(input: CertificatePfDeleteInput): Promise<CertificatePfDeleteResult> {
+    const record = await this.prisma.certificatePF.findFirst({
+      where: { id: input.id, organization_id: input.organizationId },
+    });
+
+    if (!record) {
+      throw new ServiceError(404, "Certificado PF nao encontrado.");
+    }
+
+    if (record.file_path) {
+      const deps = this.requireFileDeps();
+      await deps.fileStorage.deleteObject(record.file_path);
+    }
+
+    await this.prisma.certificatePF.delete({
+      where: { id: input.id, organization_id: input.organizationId },
+    });
+
+    return { ok: true };
   }
 
   async uploadCertificatePfFile(

@@ -217,5 +217,21 @@ export function createCertificatePjRoutes(options: CreateCertificatePjRoutesOpti
     }
   });
 
+  router.delete("/:id", requireCertificatePermission, async (request, response, next) => {
+    try {
+      const authContext = requireAuthenticatedRequestContext(request);
+      const params = parseWithZod(certificatePjIdParamSchema, request.params);
+      const result = await service.deleteCertificatePj({
+        id: params.id,
+        organizationId: authContext.organization_id,
+      });
+
+      response.status(200).json(createSuccessResponse(result));
+    } catch (err: unknown) {
+      logError("Erro ao excluir certificado PJ", { err });
+      next(err);
+    }
+  });
+
   return router;
 }

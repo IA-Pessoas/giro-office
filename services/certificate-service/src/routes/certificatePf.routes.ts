@@ -217,5 +217,21 @@ export function createCertificatePfRoutes(options: CreateCertificatePfRoutesOpti
     }
   });
 
+  router.delete("/:id", requireCertificatePermission, async (request, response, next) => {
+    try {
+      const authContext = requireAuthenticatedRequestContext(request);
+      const params = parseWithZod(certificatePfIdParamSchema, request.params);
+      const result = await service.deleteCertificatePf({
+        id: params.id,
+        organizationId: authContext.organization_id,
+      });
+
+      response.status(200).json(createSuccessResponse(result));
+    } catch (err: unknown) {
+      logError("Erro ao excluir certificado PF", { err });
+      next(err);
+    }
+  });
+
   return router;
 }

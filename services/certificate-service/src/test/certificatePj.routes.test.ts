@@ -232,6 +232,44 @@ describe("certificate PJ routes", () => {
     });
   });
 
+  it("DELETE /certificate/pj/:id requires elevated certificate permission", async () => {
+    const app = createCertificateTestApp();
+
+    const response = await request(app)
+      .delete(`/certificate/pj/${certificateId}`)
+      .set(certificateGatewayHeaders(1));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("DELETE /certificate/pj/:id removes the file before the record", async () => {
+    const prisma = createCertificatePrismaMock();
+    const fileStorage = {
+      putObject: vi.fn(),
+      getObject: vi.fn(),
+      deleteObject: vi.fn(async () => undefined),
+    };
+    const app = createCertificateTestApp(prisma, { fileStorage });
+
+    const response = await request(app)
+      .delete(`/certificate/pj/${certificateId}`)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: { ok: true },
+    });
+    expect(fileStorage.deleteObject).toHaveBeenCalledWith("/certificates/pj/empresa.pfx");
+    expect(prisma.certificatePJ.delete).toHaveBeenCalledWith({
+      where: { id: certificateId, organization_id: certificateOrganizationId },
+    });
+  });
+
   it("POST /certificate/pj/:id/file rejects missing file", async () => {
     const app = createCertificateTestApp(createCertificatePrismaMock());
 

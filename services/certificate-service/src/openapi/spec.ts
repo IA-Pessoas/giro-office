@@ -431,6 +431,15 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           parameters: [certificatePjIdParameter()],
           requestBody: certificatePjRequestBody(false),
         }),
+        delete: publicCertificateOperation({
+          operationId: "deleteCertificatePj",
+          tag: "Certificate PJ",
+          summary: "Exclui certificado PJ",
+          successDescription: "Certificado PJ excluido",
+          successDataSchema: componentRef("CertificateFileDeleteResult"),
+          notFoundDescription: "Certificado PJ nao encontrado",
+          parameters: [certificatePjIdParameter()],
+        }),
       },
       "/certificate/pj/{id}/file": {
         post: certificateFileUploadOperation({
@@ -535,6 +544,15 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           notFoundDescription: "Certificado PF nao encontrado",
           parameters: [certificatePfIdParameter()],
           requestBody: certificatePfRequestBody(false),
+        }),
+        delete: publicCertificateOperation({
+          operationId: "deleteCertificatePf",
+          tag: "Certificate PF",
+          summary: "Exclui certificado PF",
+          successDescription: "Certificado PF excluido",
+          successDataSchema: componentRef("CertificateFileDeleteResult"),
+          notFoundDescription: "Certificado PF nao encontrado",
+          parameters: [certificatePfIdParameter()],
         }),
       },
       "/certificate/pf/{id}/file": {

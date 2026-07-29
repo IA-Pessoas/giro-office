@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
+import { toast } from "react-toastify";
 import {
   Bell,
   CalendarClock,
@@ -14,6 +15,7 @@ import {
   Search,
   ShieldCheck,
   ShieldAlert,
+  Trash2,
 } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
@@ -31,6 +33,8 @@ import {
   useCertificatePfList,
   useCreateCertificatePjMutation,
   useCreateCertificatePfMutation,
+  useDeleteCertificatePjMutation,
+  useDeleteCertificatePfMutation,
   useUpdateCertificatePjMutation,
   useUpdateCertificatePfMutation,
 } from "@modules/certificates/hooks";
@@ -68,6 +72,7 @@ import {
   CERTIFICATE_TABLE_ACTION_CELL_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_GROUP_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME,
+  CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME,
   CERTIFICATE_TABLE_CELL_CLASSNAME,
   CERTIFICATE_TABLE_CLASSNAME,
   CERTIFICATE_TABLE_EMPTY_CELL_CLASSNAME,
@@ -345,6 +350,8 @@ export function CertificatesWorkspace() {
   );
   const createPjMutation = useCreateCertificatePjMutation();
   const createPfMutation = useCreateCertificatePfMutation();
+  const deletePjMutation = useDeleteCertificatePjMutation();
+  const deletePfMutation = useDeleteCertificatePfMutation();
   const updatePjMutation = useUpdateCertificatePjMutation(selected?.type === "pj" ? selected.id : "");
   const updatePfMutation = useUpdateCertificatePfMutation(selected?.type === "pf" ? selected.id : "");
 
@@ -647,6 +654,56 @@ export function CertificatesWorkspace() {
     void pfListQuery.refetch();
     if (selected?.type === "pf" && selected.id === certificateId) {
       void pfDetailQuery.refetch();
+    }
+  }
+
+  async function handleDeletePj(certificate: CertificatePj) {
+    if (
+      !canManageCertificateModule ||
+      (typeof window !== "undefined" &&
+        !window.confirm(`Excluir o certificado PJ "${certificate.name}"?`))
+    ) {
+      return;
+    }
+
+    try {
+      await deletePjMutation.mutateAsync({ id: certificate.id });
+      setVisiblePjItems((current) => current.filter((item) => item.id !== certificate.id));
+      setSelected((current) =>
+        current?.type === "pj" && current.id === certificate.id ? null : current,
+      );
+      setWorkspaceMode("view");
+      setShowDetailPassword(false);
+      toast.success("Certificado PJ excluído com sucesso.");
+    } catch (error) {
+      toast.error(
+        getCertificateErrorMessage(error, "Não foi possível excluir o certificado PJ."),
+      );
+    }
+  }
+
+  async function handleDeletePf(certificate: CertificatePf) {
+    if (
+      !canManageCertificateModule ||
+      (typeof window !== "undefined" &&
+        !window.confirm(`Excluir o certificado PF "${certificate.name}"?`))
+    ) {
+      return;
+    }
+
+    try {
+      await deletePfMutation.mutateAsync({ id: certificate.id });
+      setVisiblePfItems((current) => current.filter((item) => item.id !== certificate.id));
+      setSelected((current) =>
+        current?.type === "pf" && current.id === certificate.id ? null : current,
+      );
+      setWorkspaceMode("view");
+      setShowDetailPassword(false);
+      toast.success("Certificado PF excluído com sucesso.");
+    } catch (error) {
+      toast.error(
+        getCertificateErrorMessage(error, "Não foi possível excluir o certificado PF."),
+      );
     }
   }
 
@@ -1331,6 +1388,21 @@ export function CertificatesWorkspace() {
                               onUploadSuccess={() => handlePjFileActionSuccess(item.id)}
                               onDeleteSuccess={() => handlePjFileActionSuccess(item.id)}
                             />
+                            {canManageCertificateModule ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleDeletePj(item)}
+                                className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
+                                disabled={deletePjMutation.isPending}
+                                title="Excluir certificado"
+                              >
+                                {deletePjMutation.isPending ? (
+                                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -1419,6 +1491,21 @@ export function CertificatesWorkspace() {
                               onUploadSuccess={() => handlePfFileActionSuccess(item.id)}
                               onDeleteSuccess={() => handlePfFileActionSuccess(item.id)}
                             />
+                            {canManageCertificateModule ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleDeletePf(item)}
+                                className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
+                                disabled={deletePfMutation.isPending}
+                                title="Excluir certificado"
+                              >
+                                {deletePfMutation.isPending ? (
+                                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
