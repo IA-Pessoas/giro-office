@@ -7,6 +7,7 @@ import {
   FORWARDED_AUTH_SESSION_VERSION_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  INTEGRACAO_PERMISSION_LEVEL,
   INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
   ServiceError,
@@ -94,7 +95,7 @@ function resolveForwardedPermission(
   }
 
   if (modulePermissionsPresent === false) {
-    return permission;
+    return INTEGRACAO_PERMISSION_LEVEL.BASIC;
   }
 
   const modulePermission = modules?.[permissionModule];

@@ -15,7 +15,7 @@ import { createTestApp } from "./tiServiceTestUtils.js";
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const passwordId = "40000000-0000-4000-8000-000000000001";
-const TI_REQUESTER_PERMISSION = 1;
+const TI_VIEWER_PERMISSION = 1;
 const TI_ADMIN_PERMISSION = 3;
 const encryption = new EncryptionService("MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=");
 
@@ -78,10 +78,10 @@ function createPasswordPrismaMock(): Parameters<typeof createTestApp>[0] {
 }
 
 describe("ti password routes", () => {
-  it("GET /ti/passwords/list requires admin permission", async () => {
+  it("GET /ti/passwords/list rejects viewer permission", async () => {
     const response = await request(createTestApp(createPasswordPrismaMock()))
       .get("/ti/passwords/list")
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION));
 
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
@@ -157,10 +157,10 @@ describe("ti password routes", () => {
     expect(response.status).toBe(400);
   });
 
-  it("GET /ti/passwords/:id requires admin permission", async () => {
+  it("GET /ti/passwords/:id rejects viewer permission", async () => {
     const response = await request(createTestApp(createPasswordPrismaMock()))
       .get(`/ti/passwords/${passwordId}`)
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION));
 
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
@@ -198,7 +198,7 @@ describe("ti password routes", () => {
   it("POST /ti/passwords/:id/deactivate requires admin permission", async () => {
     const response = await request(createTestApp(createPasswordPrismaMock()))
       .post(`/ti/passwords/${passwordId}/deactivate`)
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
       .send({ reason: "Vendor retired" });
 
     expect(response.status).toBe(403);

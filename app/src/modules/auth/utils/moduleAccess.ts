@@ -120,6 +120,17 @@ export function canViewIntegrationRoute(
   return integrationLevel >= MODULE_VIEW_PERMISSION;
 }
 
+export function canViewTasksOnlyIntegrationRoute(
+  routePath: string,
+  subject: ModulePermissionSubject,
+): boolean {
+  if (getModulePermissionLevel(subject, "integracao") !== 0) {
+    return true;
+  }
+
+  return isWithinRoute(normalizeRoutePath(routePath), "/tasks");
+}
+
 const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
   certificado: "certificado",
   comercial: "comercial",

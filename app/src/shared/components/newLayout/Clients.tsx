@@ -6,6 +6,7 @@ import { useModuleAccess } from "@modules/auth";
 import { ClientCreateModal } from "@modules/clients/components/ClientCreateModal";
 import { useClients } from "@modules/clients/hooks/useClients";
 import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 
 const CLIENTS_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
@@ -57,7 +58,7 @@ export function Clients() {
   const [page, setPage] = useState(1);
   const [pageInputValue, setPageInputValue] = useState(String(page));
   const deferredSearch = useDeferredValue(search);
-  const limit = 10;
+  const limit = DEFAULT_PAGE_SIZE;
 
   const filters = useMemo(
     () => ({

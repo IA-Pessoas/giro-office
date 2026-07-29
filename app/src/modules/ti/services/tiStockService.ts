@@ -1,4 +1,5 @@
 import {
+  DEFAULT_PAGE_SIZE,
   normalizePaginatedResult,
   type PaginatedResult,
 } from "@shared/pagination/pagination";
@@ -39,7 +40,7 @@ export const tiStockService = {
     );
     const fallback = {
       page: Number(filters?.page ?? 1),
-      limit: Number(filters?.page_size ?? 50),
+      limit: Number(filters?.page_size ?? DEFAULT_PAGE_SIZE),
     };
 
     return normalizePaginatedResult(

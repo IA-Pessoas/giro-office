@@ -43,6 +43,29 @@ describe("LddService", () => {
     vi.clearAllMocks();
   });
 
+  it("bloqueia mutacoes de LDD para Viewer antes de acessar a persistencia", async () => {
+    const prisma = createPrismaMock();
+    const audit = createAuditMock();
+    const service = new LddService(prisma as never, audit);
+    const viewerContext = { organizationId, userId, permission: 1 };
+    const operations = [
+      () => service.create(viewerContext, { client_id: clientId, type: "FGTS" }),
+      () => service.update(viewerContext, recordId, { status: "Regular" }),
+      () => service.delete(viewerContext, recordId),
+    ];
+
+    for (const operation of operations) {
+      await expect(operation()).rejects.toMatchObject({ statusCode: 403 });
+    }
+
+    expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    expect(prisma.lddPessoal.findFirst).not.toHaveBeenCalled();
+    expect(prisma.lddPessoal.create).not.toHaveBeenCalled();
+    expect(prisma.lddPessoal.update).not.toHaveBeenCalled();
+    expect(prisma.lddPessoal.delete).not.toHaveBeenCalled();
+    expect(audit.recordChange).not.toHaveBeenCalled();
+  });
+
   it("cria LDD com organization_id e registra auditoria", async () => {
     const prisma = createPrismaMock();
     const audit = createAuditMock();
@@ -104,7 +127,9 @@ describe("LddService", () => {
     const prisma = createPrismaMock();
     const service = new LddService(prisma as never, createAuditMock());
 
-    await service.update({ organizationId, userId }, recordId, { status: "Regular" });
+    await service.update({ organizationId, userId, permission: 2 }, recordId, {
+      status: "Regular",
+    });
 
     expect(prisma.lddPessoal.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: recordId, organization_id: organizationId } }),
@@ -119,7 +144,7 @@ describe("LddService", () => {
     const audit = createAuditMock();
     const service = new LddService(prisma as never, audit);
 
-    await service.delete({ organizationId, userId }, recordId);
+    await service.delete({ organizationId, userId, permission: 2 }, recordId);
 
     expect(prisma.lddPessoal.delete).toHaveBeenCalledWith({ where: { id: recordId } });
     expect(audit.recordChange).toHaveBeenCalledWith(
@@ -136,7 +161,10 @@ describe("LddService", () => {
     const service = new LddService(prisma as never, createAuditMock());
 
     await expect(
-      service.create({ organizationId, userId }, { client_id: clientId, type: "FGTS" }),
+      service.create(
+        { organizationId, userId, permission: 2 },
+        { client_id: clientId, type: "FGTS" },
+      ),
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 });

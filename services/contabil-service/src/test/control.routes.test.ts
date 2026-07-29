@@ -127,7 +127,7 @@ describe("control routes", () => {
     const res = await request(app)
       .patch(`/contabil/controls/${CONTROL_ID}`)
       .set("Content-Type", "application/json")
-      .set("Authorization", bearerToken(1))
+      .set("Authorization", bearerToken(2))
       .send({ field: "depreciation", value: true });
 
     expect(res.status).toBe(200);

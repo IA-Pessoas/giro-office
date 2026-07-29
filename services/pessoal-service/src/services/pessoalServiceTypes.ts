@@ -1,5 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 
+export const PESSOAL_WRITE_PERMISSION = 2;
+
 export interface PessoalAuthContext {
   organizationId: string;
   userId?: string;

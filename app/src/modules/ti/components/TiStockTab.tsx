@@ -24,6 +24,7 @@ import { useAssignableUsers } from "@modules/rh";
 import { PaginationControls } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -134,7 +135,7 @@ const STOCK_STATUS_FILTER_OPTIONS = [
   { value: "false", label: "Inativos" },
 ] as const;
 
-const STOCK_PAGE_SIZE = 50;
+const STOCK_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 function formatText(value: unknown, fallback = "-"): string {
   if (value === null || value === undefined || value === "") {

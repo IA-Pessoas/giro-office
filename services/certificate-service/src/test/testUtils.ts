@@ -171,6 +171,7 @@ export function createCertificatePrismaMock(): PrismaClient {
         organization_id: certificateOrganizationId,
         ...data,
       })),
+      deleteMany: vi.fn(async () => ({ count: 0 })),
     },
   } as unknown as PrismaClient;
 }

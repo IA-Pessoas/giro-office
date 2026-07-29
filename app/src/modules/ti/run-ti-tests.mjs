@@ -459,7 +459,7 @@ await runTest("ti stock list preserves server pagination metadata", async () => 
   assert.match(serviceSource, /PaginatedResult<TiStockItem>/);
   assert.match(serviceSource, /normalizePaginatedResult/);
   assert.match(serviceSource, /page:\s*Number\(filters\?\.page\s*\?\?\s*1\)/);
-  assert.match(serviceSource, /limit:\s*Number\(filters\?\.page_size\s*\?\?\s*50\)/);
+  assert.match(serviceSource, /limit:\s*Number\(filters\?\.page_size\s*\?\?\s*DEFAULT_PAGE_SIZE\)/);
   assert.match(hookSource, /UseQueryResult<PaginatedResult<TiStockItem>, Error>/);
 });
 
@@ -616,7 +616,8 @@ await runTest("ti stock locations filter progressively and identify normalized a
 await runTest("ti stock filters reset and render server pagination", async () => {
   const tabSource = await readModuleSource("components/TiStockTab.tsx");
 
-  assert.match(tabSource, /const STOCK_PAGE_SIZE = 50/);
+  assert.match(tabSource, /import \{ DEFAULT_PAGE_SIZE \} from "@shared\/pagination\/pagination";/);
+  assert.match(tabSource, /const STOCK_PAGE_SIZE = DEFAULT_PAGE_SIZE;/);
   assert.match(tabSource, /const \[stockPage, setStockPage\] = useState\(1\)/);
   assert.match(tabSource, /page:\s*stockPage/);
   assert.match(tabSource, /page_size:\s*STOCK_PAGE_SIZE/);
@@ -1182,6 +1183,15 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(hookSource, /tiQueryKeys\.extensions\.all\(\)/);
   assert.match(tabSource, /useTiExtensions/);
   assert.match(tabSource, /useTiExtension/);
+  assert.match(
+    tabSource,
+    /const canManageExtensions = access\.isAdmin/,
+  );
+  assert.match(
+    tabSource,
+    /assignableUsersQuery = useAssignableUsers\(\{ enabled: canManageExtensions \}\)/,
+  );
+  assert.match(tabSource, /\{!canManageExtensions \? \(/);
   assert.match(tabSource, /<TiEmptyState/);
   const sectionHeaderMatch = tabSource.match(/<TiSectionHeader[\s\S]*?\/>/);
   assert.ok(sectionHeaderMatch);
@@ -1192,6 +1202,20 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(tabSource, /placeholder="Ex: 1001"/);
   assert.doesNotMatch(tabSource, /placeholder="1001"/);
   assert.match(tabSource, /className=\{tiFiveRowTableClassName\}/);
+});
+
+await runTest("ti extension controls stay hidden for technician level 2", async () => {
+  const { resolveModuleAccess } = await import("../auth/utils/moduleAccess.ts");
+  const technicianAccess = resolveModuleAccess({
+    module: "ti",
+    additionalModulePermissions: { ti: 2 },
+  });
+  const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
+
+  assert.equal(technicianAccess.canView, true);
+  assert.equal(technicianAccess.canEdit, true);
+  assert.equal(technicianAccess.isAdmin, false);
+  assert.match(tabSource, /const canManageExtensions = access\.isAdmin;/);
 });
 
 await runTest("ti visible copy stays product-facing and avoids implementation handoff terms", async () => {
@@ -1231,14 +1255,21 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.doesNotMatch(`${pageSource}\n${workspaceUiSource}`, /indigo-/);
 });
 
-await runTest("ti shell exposes dashboard for self-service users", async () => {
+await runTest("ti shell exposes ramais but hides sensitive tabs for self-service users", async () => {
   const pageSource = await readModuleSource("components/TiPage.tsx");
+  const selfServiceTabsSource =
+    pageSource.match(/const SELF_SERVICE_TI_TABS[\s\S]*?\n\];/)?.[0] ?? "";
 
   assert.match(pageSource, /SELF_SERVICE_TI_TABS/);
   assert.match(pageSource, /const canManageTi = access\.isAdmin/);
   assert.match(pageSource, /const visibleTabs = canManageTi \? TI_TABS : SELF_SERVICE_TI_TABS/);
-  assert.match(pageSource, /SELF_SERVICE_TI_TABS[\s\S]*id: "dashboard"/);
-  assert.match(pageSource, /label: "Meus termos"/);
+  assert.match(selfServiceTabsSource, /id: "dashboard"/);
+  assert.match(selfServiceTabsSource, /id: "extensions"[\s\S]*label: "Ramais"/);
+  assert.match(selfServiceTabsSource, /label: "Meus termos"/);
+
+  for (const sensitiveTabId of ["inventory", "stock", "passwords", "robots"]) {
+    assert.doesNotMatch(selfServiceTabsSource, new RegExp(`id: "${sensitiveTabId}"`));
+  }
 });
 
 await runTest("ti requests hooks expose mutations and invalidate requests plus dashboard caches", async () => {
@@ -1751,7 +1782,8 @@ await runTest("ti terms list paginates locally and keeps actions compact", async
   const controlsSource = await readModuleSource("components/tiFormControls.tsx");
 
   assert.match(source, /import \{ PaginationControls \} from "@shared\/components";/);
-  assert.match(source, /const TERMS_PAGE_SIZE = 10;/);
+  assert.match(source, /import \{ DEFAULT_PAGE_SIZE \} from "@shared\/pagination\/pagination";/);
+  assert.match(source, /const TERMS_PAGE_SIZE = DEFAULT_PAGE_SIZE;/);
   assert.match(source, /const \[termsPage, setTermsPage\] = useState\(1\);/);
   assert.match(source, /useEffect\(\(\) => \{\s*setTermsPage\(1\);/);
   assert.match(source, /const paginatedTerms = useMemo\(/);

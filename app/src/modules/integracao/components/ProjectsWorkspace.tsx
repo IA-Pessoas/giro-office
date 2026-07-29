@@ -651,7 +651,7 @@ export function ProjectsWorkspace() {
                           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                             {project.name}
                           </h3>
-                          <p className="mt-1 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
                             {project.objective || "Sem objetivo detalhado para este projeto."}
                           </p>
                         </div>
