@@ -94,7 +94,7 @@ function resolveForwardedPermission(
   }
 
   if (modulePermissionsPresent === false) {
-    return permission;
+    return 0;
   }
 
   const modulePermission = modules?.[permissionModule];
