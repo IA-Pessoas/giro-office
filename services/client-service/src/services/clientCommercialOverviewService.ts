@@ -2,7 +2,20 @@ import { ServiceError } from "@workspace/shared";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 
 const LEGACY_PROSPECTING_STATUS = "Migrado do legado";
-const MONTH_LABELS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const MONTH_LABELS = [
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
+];
 const SOURCE_COLORS: Record<string, string> = {
   Website: "#3b82f6",
   Indicação: "#10b981",
@@ -218,8 +231,11 @@ export class ClientCommercialOverviewService {
 
     const leads = rows.map(toLead);
     const wonLeads = leads.filter((lead) => lead.status === "won").length;
-    const activeLeads = leads.filter((lead) => !["won", "lost", "paused"].includes(lead.status)).length;
-    const conversionRate = leads.length > 0 ? Number(((wonLeads / leads.length) * 100).toFixed(1)) : 0;
+    const activeLeads = leads.filter(
+      (lead) => !["won", "lost", "paused"].includes(lead.status),
+    ).length;
+    const conversionRate =
+      leads.length > 0 ? Number(((wonLeads / leads.length) * 100).toFixed(1)) : 0;
 
     return {
       summary: {
