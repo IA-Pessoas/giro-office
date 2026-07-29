@@ -4,8 +4,10 @@ import { useRouter } from "next/router";
 import { User } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
+import { canCreateUsers } from "@modules/auth";
 import { useUpdateCurrentUser, useUserProfile } from "@shared/hooks";
 import { clearMeProfileAccess, hasMeProfileAccess } from "@shared/utils/meProfileAccessGate";
+import { buildSelfProfileUpdatePayload } from "@shared/utils/meProfileUpdate";
 
 const inputClass =
   "w-full mt-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30";
@@ -22,6 +24,13 @@ export default function Me() {
   const [login, setLogin] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [profileAccess, setProfileAccess] = useState<"pending" | "ok">("pending");
+  const canManageUsers = canCreateUsers(user);
+  const updatePayload = buildSelfProfileUpdatePayload({
+    canManageUsers,
+    currentName: profileQuery.data?.name ?? "",
+    name,
+    password: newPassword,
+  });
 
   useEffect(() => {
     if (!hasMeProfileAccess()) {
@@ -56,13 +65,12 @@ export default function Me() {
   }
 
   function handleUpdate() {
-    if (name === "") {
+    if (!updatePayload) {
       return;
     }
 
-    updateUserMutation.mutate({
-      name,
-      ...(newPassword.trim() ? { password: newPassword } : {}),
+    updateUserMutation.mutate(updatePayload, {
+      onSuccess: () => setNewPassword(""),
     });
   }
 
@@ -137,6 +145,7 @@ export default function Me() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={!canManageUsers || updateUserMutation.isPending}
               />
             </div>
 
@@ -160,7 +169,7 @@ export default function Me() {
                 type="button"
                 className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                 onClick={handleUpdate}
-                disabled={updateUserMutation.isPending}
+                disabled={updateUserMutation.isPending || !updatePayload}
               >
                 {updateUserMutation.isPending ? "Salvando…" : "Salvar alterações"}
               </button>

@@ -159,7 +159,11 @@ export async function updateCurrentUser(
   payload: UpdateCurrentUserPayload,
 ): Promise<MeSessionUser> {
   const currentUser = await getInternalMeRecord(client);
-  const body: Record<string, string> = { name: payload.name };
+  const body: Record<string, string> = {};
+
+  if ("name" in payload && payload.name !== undefined) {
+    body.name = payload.name;
+  }
 
   if (payload.password !== undefined && payload.password !== "") {
     body.password = payload.password;
