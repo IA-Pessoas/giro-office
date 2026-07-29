@@ -1,10 +1,10 @@
 import "./envBootstrap.js";
 
 import {
-  FORWARDED_AUTH_MODULES_HEADER,
   createLogger,
-  FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -15,10 +15,12 @@ import { describe, expect, it, vi } from "vitest";
 import { createProjectApplication } from "../app.js";
 import { getProjectServiceEnv } from "../config/env.js";
 import type { ProjectCrudRouteDeps } from "../routes/projectCrud.routes.js";
-import { ProjectCrudService, type ProjectCrudPrisma } from "../services/projectCrudService.js";
+import { type ProjectCrudPrisma, ProjectCrudService } from "../services/projectCrudService.js";
 
 const ORG_ID = "a0000000-0000-4000-8000-000000000001";
 const USER_ID = "c0000000-0000-4000-8000-000000000001";
+const PROJECT_ID = "d0000000-0000-4000-8000-000000000001";
+const CROSS_ORG_PROJECT_ID = "d0000000-0000-4000-8000-000000000002";
 const INTERNAL_TOKEN = "audit-service-token";
 const env = getProjectServiceEnv();
 const logger = createLogger({
@@ -32,12 +34,13 @@ function gatewayHeaders(
   level = 2,
   organizationId = ORG_ID,
   type: "owner" | "admin" | "user" = "user",
+  permission = 0,
 ): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: organizationId,
-    [FORWARDED_AUTH_PERMISSION_HEADER]: String(level),
+    [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
     [FORWARDED_AUTH_TYPE_HEADER]: type,
     [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: level }),
   };
@@ -154,7 +157,7 @@ describe("projectcrud routes", () => {
 
   it("PUT /project permite edição no nível 2 e bloqueia nível 1", async () => {
     const blocked = createProjectService();
-    blocked.prisma.project.findFirst = vi.fn(async () => ({ id: "project-1" }));
+    blocked.prisma.project.findFirst = vi.fn(async () => ({ id: PROJECT_ID }));
     const body = {
       project_id: "d0000000-0000-4000-8000-000000000001",
       name: "Atualizado",
@@ -174,7 +177,7 @@ describe("projectcrud routes", () => {
     expect(blockedResponse.status).toBe(403);
 
     const allowed = createProjectService();
-    allowed.prisma.project.findFirst = vi.fn(async () => ({ id: "project-1" }));
+    allowed.prisma.project.findFirst = vi.fn(async () => ({ id: PROJECT_ID }));
     const allowedResponse = await request(
       createProjectApplication({ env, logger, projectCrudService: allowed.service }),
     )
@@ -186,9 +189,28 @@ describe("projectcrud routes", () => {
     expect(allowedResponse.status).toBe(200);
   });
 
+  it.each([
+    { label: "nível 0", level: 0, type: "user" as const, expected: 403 },
+    { label: "nível 1", level: 1, type: "user" as const, expected: 200 },
+    { label: "nível 2", level: 2, type: "user" as const, expected: 200 },
+    { label: "nível 3", level: 3, type: "user" as const, expected: 200 },
+    { label: "owner", level: 0, type: "owner" as const, expected: 200 },
+  ])("GET /project aplica a matriz para $label", async ({ level, type, expected }) => {
+    const project = createProjectService();
+    project.prisma.project.findFirst = vi.fn(async () => ({ id: PROJECT_ID }));
+    const response = await request(
+      createProjectApplication({ env, logger, projectCrudService: project.service }),
+    )
+      .get("/project")
+      .query({ project_id: "d0000000-0000-4000-8000-000000000001" })
+      .set(gatewayHeaders(level, ORG_ID, type));
+
+    expect(response.status).toBe(expected);
+  });
+
   it("DELETE /project exige nível 3 e mantém isolamento de organização", async () => {
     const blocked = createProjectService();
-    blocked.prisma.project.findFirst = vi.fn(async () => ({ id: "project-1" }));
+    blocked.prisma.project.findFirst = vi.fn(async () => ({ id: PROJECT_ID }));
     const app = createProjectApplication({ env, logger, projectCrudService: blocked.service });
     const body = { project_id: "d0000000-0000-4000-8000-000000000001" };
 
@@ -201,21 +223,27 @@ describe("projectcrud routes", () => {
     expect(blockedResponse.status).toBe(403);
 
     const crossOrg = createProjectService();
-    crossOrg.prisma.project.findFirst = vi.fn(async () => null);
+    crossOrg.prisma.project.findFirst = vi.fn(async (args: { where: unknown }) => {
+      expect(args.where).toEqual({
+        id: CROSS_ORG_PROJECT_ID,
+        organization_id: ORG_ID,
+      });
+      return null;
+    });
     const crossOrgResponse = await request(
       createProjectApplication({ env, logger, projectCrudService: crossOrg.service }),
     )
       .delete("/project")
       .set("Content-Type", "application/json")
-      .set(gatewayHeaders(3, "b0000000-0000-4000-8000-000000000099"))
-      .send(body);
+      .set(gatewayHeaders(1, ORG_ID))
+      .send({ project_id: CROSS_ORG_PROJECT_ID });
 
     expect(crossOrgResponse.status).toBe(404);
   });
 
   it("POST /project retorna 409 para duplicidade de projeto", async () => {
     const duplicate = createProjectService();
-    duplicate.prisma.project.findFirst = vi.fn(async () => ({ id: "project-1" }));
+    duplicate.prisma.project.findFirst = vi.fn(async () => ({ id: PROJECT_ID }));
     const response = await request(
       createProjectApplication({ env, logger, projectCrudService: duplicate.service }),
     )

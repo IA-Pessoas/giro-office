@@ -64,6 +64,9 @@ const {
 } = await import(
   "../../context/authInvalidation.ts",
 );
+const { INTEGRACAO_QA_FIXTURES } = await import(
+  "../../../../scripts/qa/integracao-fixtures.mjs",
+);
 
 await runTest("integration routes preserve the level 0 own-tasks exception", () => {
   const users = {
@@ -313,28 +316,32 @@ await (async () => {
 
   await runTest("access store isolates snapshots by active organization", () => {
     const initialState = getAccessStoreState();
+    const [fixtureA, fixtureB] = INTEGRACAO_QA_FIXTURES;
     const organizationA = {
       ...initialState,
       isInitialized: true,
       user: createAccessStoreUserSnapshot({
-        id: "user-1",
-        permission: 0,
-        organization_id: "org-a",
+        id: fixtureA.users[1].id,
+        permission: fixtureA.users[1].level,
+        organization_id: fixtureA.organization.id,
+        modules: { integracao: fixtureA.users[1].level },
       }),
     };
     const organizationB = {
       ...organizationA,
       user: createAccessStoreUserSnapshot({
-        ...organizationA.user,
-        organization_id: "org-b",
+        id: fixtureB.users[1].id,
+        permission: fixtureB.users[1].level,
+        organization_id: fixtureB.organization.id,
+        modules: { integracao: fixtureB.users[1].level },
       }),
     };
 
     assert.equal(shouldSyncAccessStore(organizationA, organizationB), true);
     setAccessStoreState(organizationA);
-    assert.equal(getAccessStoreState().user?.organization_id, "org-a");
+    assert.equal(getAccessStoreState().user?.organization_id, fixtureA.organization.id);
     setAccessStoreState(organizationB);
-    assert.equal(getAccessStoreState().user?.organization_id, "org-b");
+    assert.equal(getAccessStoreState().user?.organization_id, fixtureB.organization.id);
     resetAccessStoreState();
   });
 
