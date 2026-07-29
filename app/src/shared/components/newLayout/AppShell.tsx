@@ -39,6 +39,7 @@ import {
 } from "@modules/auth";
 import { useMe } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
+import { useOrganizationSwitcher } from "@modules/organizations/hooks/useOrganizationSwitcher";
 import { useAuth } from "../../../context/AuthContext";
 
 function getInitials(name: string): string {
@@ -284,6 +285,7 @@ export function AppShell({
 }) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
+  const { organizations, isSwitching, switchOrganization } = useOrganizationSwitcher();
   const meQuery = useMe();
   const { accessMap: moduleAccessMap, isLoading: isModuleAccessLoading } =
     useModuleAccessMap(MODULE_KEYS);
@@ -396,6 +398,14 @@ export function AppShell({
 
   const handleLogout = () => {
     logoutUser();
+  };
+
+  const handleOrganizationChange = (organizationId: string) => {
+    if (!organizationId || organizationId === user?.organization_id || isSwitching) {
+      return;
+    }
+
+    void switchOrganization(organizationId).catch(() => undefined);
   };
 
   const getTimeLabel = () =>
@@ -626,6 +636,25 @@ export function AppShell({
             </div>
 
             <div className="flex items-center gap-3">
+              {organizations.length > 1 ? (
+                <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
+                  <span className="sr-only">Organização ativa</span>
+                  <select
+                    aria-label="Organização ativa"
+                    value={user?.organization_id ?? ""}
+                    disabled={isSwitching}
+                    onChange={(event) => handleOrganizationChange(event.target.value)}
+                    className="max-w-52 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    {organizations.map((organization) => (
+                      <option key={organization.organization_id} value={organization.organization_id}>
+                        {organization.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
               <button
                 onClick={() => setShowNotifications((v) => !v)}
                 className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"

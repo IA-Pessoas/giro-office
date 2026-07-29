@@ -115,6 +115,43 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/user/organizations": {
+        get: {
+          tags: ["Auth"],
+          summary: "Listar organizações associadas ao usuário autenticado",
+          security: bearer,
+          responses: {
+            "200": { description: "Organizações ativas", ...successJson },
+            "401": { description: "Não autenticado" },
+          },
+        },
+      },
+      "/user/organization/switch": {
+        post: {
+          tags: ["Auth"],
+          summary: "Trocar organização ativa",
+          security: bearer,
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["organization_id"],
+                  additionalProperties: false,
+                  properties: { organization_id: { type: "string", format: "uuid" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Nova sessão", ...successJson },
+            "400": { description: "Payload inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Organização não associada ou sem permissões" },
+          },
+        },
+      },
       "/user": {
         get: {
           tags: ["Users"],

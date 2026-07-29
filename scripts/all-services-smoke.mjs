@@ -1773,6 +1773,24 @@ const handlers = {
       resolveDepartmentIdFromResponse(response.body) || state.baselineDepartmentId;
   },
 
+  async userOrganizations(op) {
+    const response = await httpRequest(op, { expectedStatus: [200] });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    if (!Array.isArray(response.body?.data)) {
+      throw new Error("userOrganizations response must contain an array in data.");
+    }
+  },
+
+  async userOrganizationSwitch(op) {
+    const session = requireState("session");
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { organization_id: session.organization_id },
+    });
+  },
+
   async userList(op) {
     const response = await httpRequest(op, {
       expectedStatus: [200],

@@ -14,6 +14,20 @@ function unwrapApiData<T>(body: unknown): T {
 }
 
 export const organizationService = {
+  listMine: async (): Promise<import("../types").UserOrganization[]> => {
+    const api = setupAPIClient();
+    const response = await api.get("/user/organizations");
+    return unwrapApiData<import("../types").UserOrganization[]>(response.data);
+  },
+
+  switchActive: async (organizationId: string): Promise<import("../types").OrganizationSession> => {
+    const api = setupAPIClient();
+    const response = await api.post("/user/organization/switch", {
+      organization_id: organizationId,
+    });
+    return unwrapApiData<import("../types").OrganizationSession>(response.data);
+  },
+
   list: async (filters?: { status?: string }): Promise<OrganizationItem[]> => {
     const api = setupAPIClient();
     const response = await api.get("/organizations", { params: filters });

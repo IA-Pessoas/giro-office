@@ -22,6 +22,26 @@ export interface OrganizationItem {
   subscription_plan: string;
 }
 
+export interface UserOrganization {
+  organization_id: string;
+  name: string;
+  slug: string;
+  status: OrganizationStatus;
+  department_id: string | null;
+}
+
+export interface OrganizationSession {
+  id: string;
+  name: string;
+  login: string;
+  permission: number;
+  department_id: string;
+  organization_id: string;
+  type?: "owner" | "admin" | "user";
+  modules: Record<string, number>;
+  token: string;
+}
+
 /** Payload for POST /organizations (matches organization-service create body). */
 export interface OrganizationCreatePayload {
   name: string;

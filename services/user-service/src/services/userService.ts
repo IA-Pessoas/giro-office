@@ -116,9 +116,16 @@ type UserCreateRow = Prisma.UserGetPayload<{ select: typeof USER_CREATE_SELECT }
 function userOrganizationWhere(id: string, organizationId: string): Prisma.UserWhereInput {
   return {
     id,
+    ...userOrganizationScope(organizationId),
+  };
+}
+
+function userOrganizationScope(organizationId: string): Prisma.UserWhereInput {
+  return {
     OR: [
       { organization_id: organizationId },
       { organization_id: null, department: { organization_id: organizationId } },
+      { organizations: { some: { organization_id: organizationId, status: "active" } } },
     ],
   };
 }
@@ -129,7 +136,7 @@ function normalizeUserOrganization<T extends { organization_id: string | null }>
 ): Omit<T, "organization_id"> & { organization_id: string } {
   return {
     ...user,
-    organization_id: user.organization_id ?? organizationId,
+    organization_id: organizationId,
   };
 }
 
@@ -229,7 +236,7 @@ class UserService {
     skip: number;
     take: number;
   }> {
-    const where = { organization_id: organizationId };
+    const where = userOrganizationScope(organizationId);
     const [users, total] = await Promise.all([
       prismaClient.user.findMany({
         where,
@@ -247,14 +254,28 @@ class UserService {
   async getById(id: string, organizationId: string): Promise<UserPublicRow> {
     const user = await prismaClient.user.findFirst({
       where: userOrganizationWhere(id, organizationId),
-      select: USER_PUBLIC_SELECT,
+      select: {
+        ...USER_PUBLIC_SELECT,
+        organizations: {
+          where: { organization_id: organizationId, status: "active" },
+          select: { department_id: true },
+          take: 1,
+        },
+      },
     });
 
     if (!user) {
       throw new ServiceError(404, "Usuario nao encontrado.");
     }
 
-    return normalizeUserOrganization(user, organizationId);
+    const { organizations, ...publicUser } = user;
+    return normalizeUserOrganization(
+      {
+        ...publicUser,
+        department_id: organizations?.[0]?.department_id ?? publicUser.department_id,
+      },
+      organizationId,
+    );
   }
 
   async create(
@@ -300,6 +321,14 @@ class UserService {
 
       if (data.organization_id) {
         try {
+          await prismaClient.userOrganization.create({
+            data: {
+              user_id: user.id,
+              organization_id: data.organization_id,
+              department_id: data.department_id,
+              status: "active",
+            },
+          });
           const permissionService = new PermissionService();
           const permission = await permissionService.create(user.id, data.organization_id);
 
@@ -475,6 +504,16 @@ class UserService {
         } else {
           await permissionService.update(id, modulesToApply, organizationId);
         }
+      }
+
+      if (data.department_id !== undefined || data.status !== undefined) {
+        await prismaClient.userOrganization.updateMany({
+          where: { user_id: id, organization_id: organizationId },
+          data: {
+            ...(data.department_id !== undefined ? { department_id: data.department_id } : {}),
+            ...(data.status !== undefined ? { status: data.status } : {}),
+          },
+        });
       }
 
       return normalizeUserOrganization(user, organizationId);

@@ -17,6 +17,26 @@ interface LoginRequest {
   password: string;
 }
 
+export interface CreateSessionRequest {
+  userId: string;
+  organizationId: string;
+  departmentId: string;
+}
+
+type SessionUser = {
+  id: string;
+  name: string;
+  login: string;
+  permission: number;
+  type: unknown;
+  session_version: number;
+  permissions: Array<
+    {
+      organization_id: string;
+    } & Partial<Record<ModulePermissionKey, number | null>>
+  >;
+};
+
 const MODULE_PERMISSION_KEYS: readonly ModulePermissionKey[] = ACTIVE_MODULE_KEYS;
 
 function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
@@ -69,6 +89,31 @@ class AuthService {
       throw new ServiceError(400, "Usuario sem organizacao vinculada.");
     }
 
+    return this.createSessionFromUser(user, organizationId, user.department_id);
+  }
+
+  async createSession({
+    userId,
+    organizationId,
+    departmentId,
+  }: CreateSessionRequest): Promise<LoginResult> {
+    const user = await prismaClient.user.findUnique({
+      where: { id: userId },
+      include: { permissions: true },
+    });
+
+    if (!user || user.status !== "active") {
+      throw new ServiceError(401, "Usuário não está ativo.");
+    }
+
+    return this.createSessionFromUser(user, organizationId, departmentId);
+  }
+
+  private createSessionFromUser(
+    user: SessionUser,
+    organizationId: string,
+    departmentId: string,
+  ): LoginResult {
     const jwtSecret = getUserServiceEnv().jwtSecret;
     const permissionRecord = user.permissions.find(
       (permission) => permission.organization_id === organizationId,
@@ -78,7 +123,6 @@ class AuthService {
       return acc;
     }, {} as ModulePermissions);
     const type = normalizeAuthUserType(user.type);
-
     const token = jwt.sign(
       {
         user_id: user.id,
@@ -91,10 +135,7 @@ class AuthService {
         modules,
       },
       jwtSecret,
-      {
-        subject: user.id,
-        expiresIn: "1d",
-      },
+      { subject: user.id, expiresIn: "1d" },
     );
 
     return {
@@ -104,7 +145,7 @@ class AuthService {
       permission: user.permission,
       type,
       modules,
-      department_id: user.department_id,
+      department_id: departmentId,
       organization_id: organizationId,
       token,
     };

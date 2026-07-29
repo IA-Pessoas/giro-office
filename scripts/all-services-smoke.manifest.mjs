@@ -440,6 +440,22 @@ const baseManifest = [
   op({
     service: "user-service",
     method: "GET",
+    path: "/user/organizations",
+    action: "userOrganizations",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user/organization/switch",
+    action: "userOrganizationSwitch",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "GET",
     path: "/user",
     action: "userList",
     target: "gateway",

@@ -7,6 +7,9 @@ const { prismaMock, bcryptMock, jwtMock } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       create: vi.fn(),
     },
+    userOrganization: {
+      create: vi.fn(),
+    },
     organization: {
       findFirst: vi.fn(),
     },
@@ -157,6 +160,44 @@ describe("AuthService", () => {
     expect(result.organization_id).toBe("org-b");
     expect(result.modules.fiscal).toBe(1);
     expect(result.modules.comercial).toBe(0);
+  });
+
+  it("createSession emite token com a organização e o departamento selecionados", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      name: "Usuário",
+      login: "user",
+      password: "hash",
+      permission: 1,
+      status: "active",
+      type: "user",
+      session_version: 4,
+      permissions: [{ organization_id: "org-b", fiscal: 2 }],
+    });
+    jwtMock.sign.mockReturnValue("jwt-org-b");
+    const service = new AuthService();
+
+    const result = await service.createSession({
+      userId: "user-1",
+      organizationId: "org-b",
+      departmentId: "dep-b",
+    });
+
+    expect(result).toMatchObject({
+      organization_id: "org-b",
+      department_id: "dep-b",
+      token: "jwt-org-b",
+      modules: { fiscal: 2 },
+    });
+    expect(jwtMock.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org-b",
+        session_version: 4,
+        modules: expect.objectContaining({ fiscal: 2 }),
+      }),
+      "jwt-secret",
+      expect.any(Object),
+    );
   });
 
   it("firstCreate cria admin inicial quando banco está vazio", async () => {

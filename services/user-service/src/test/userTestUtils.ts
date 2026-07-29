@@ -16,6 +16,10 @@ interface UserRouteMocks {
     login: Mock;
     firstCreate: Mock;
   };
+  userOrganizationServiceMock: {
+    listForUser: Mock;
+    switchOrganization: Mock;
+  };
   userServiceMock: {
     list: Mock;
     getById: Mock;
@@ -40,6 +44,10 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
       login: vi.fn(),
       firstCreate: vi.fn(),
     },
+    userOrganizationServiceMock: {
+      listForUser: vi.fn(),
+      switchOrganization: vi.fn(),
+    },
     userServiceMock: {
       list: vi.fn(),
       getById: vi.fn(),
@@ -62,6 +70,12 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
 vi.mock("../services/authService.js", () => ({
   AuthService: vi.fn(function AuthService() {
     return userRouteMocks.authServiceMock;
+  }),
+}));
+
+vi.mock("../services/userOrganizationService.js", () => ({
+  UserOrganizationService: vi.fn(function UserOrganizationService() {
+    return userRouteMocks.userOrganizationServiceMock;
   }),
 }));
 
@@ -147,9 +161,17 @@ export function resetUserRouteMocks() {
 }
 
 const authServiceMock: UserRouteMocks["authServiceMock"] = userRouteMocks.authServiceMock;
+const userOrganizationServiceMock: UserRouteMocks["userOrganizationServiceMock"] =
+  userRouteMocks.userOrganizationServiceMock;
 const userServiceMock: UserRouteMocks["userServiceMock"] = userRouteMocks.userServiceMock;
 const permissionServiceMock: UserRouteMocks["permissionServiceMock"] =
   userRouteMocks.permissionServiceMock;
 const storageServiceMock: UserRouteMocks["storageServiceMock"] = userRouteMocks.storageServiceMock;
 
-export { authServiceMock, permissionServiceMock, storageServiceMock, userServiceMock };
+export {
+  authServiceMock,
+  permissionServiceMock,
+  storageServiceMock,
+  userOrganizationServiceMock,
+  userServiceMock,
+};

@@ -50,6 +50,23 @@ async function installApiMocks(page) {
     });
   });
 
+  await page.route("**/user/organizations", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: [{
+          organization_id: smokeUser.organization_id,
+          name: "Castelo Smoke",
+          slug: "castelo-smoke",
+          status: "active",
+          department_id: smokeUser.department_id,
+        }],
+      }),
+    });
+  });
+
   await page.route("**/organizations/org-smoke", async (route) => {
     await route.fulfill({
       status: 200,

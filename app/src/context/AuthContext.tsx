@@ -15,6 +15,7 @@ import { MODULE_KEYS } from "@modules/auth/utils/moduleAccess";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
 import { ME_QUERY_KEY } from "@shared/hooks";
+import { organizationService } from "@modules/organizations/services/organizationService";
 
 interface UserProps {
     id: string;
@@ -43,6 +44,7 @@ interface AuthContextData {
     signIn: (credentials: SignInProps) => Promise<void>;
     logoutUser: () => Promise<void>;
     refreshSession: () => Promise<UserProps | null>;
+    switchOrganization: (organizationId: string) => Promise<void>;
     loading: boolean;
 }
 
@@ -202,6 +204,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
     }
 
+    async function switchOrganization(organizationId: string): Promise<void> {
+        const requestVersion = beginAuthTransition();
+        setLoading(true);
+
+        try {
+            const response = await organizationService.switchActive(organizationId);
+            const sessionData = response;
+
+            if (!isValidAuthSessionData(sessionData)) {
+                throw new Error("Invalid organization switch response");
+            }
+
+            setCookie(undefined, AUTH_COOKIE_NAME, sessionData.token, getAuthCookieOptions());
+            api.defaults.headers.common.Authorization = `Bearer ${sessionData.token}`;
+            const currentUser = buildCurrentUser(sessionData);
+
+            if (!isCurrentAuthTransition(requestVersion, sessionData.token)) {
+                return;
+            }
+
+            queryClient.clear();
+            setUser(currentUser);
+            toast.success("Organização alterada!");
+            await wait(SESSION_TRANSITION_MIN_DURATION_MS);
+        } catch (error: any) {
+            if (isCurrentAuthTransition(requestVersion)) {
+                toast.error(error.response?.data?.error || "Não foi possível trocar de organização.");
+                logAuthError("Erro ao trocar organização:", error);
+            }
+            throw error;
+        } finally {
+            if (isCurrentAuthTransition(requestVersion)) {
+                setLoading(false);
+            }
+        }
+    }
+
     useEffect(() => {
         const { "cw.token": token } = parseCookies();
         const fallbackModules = getModulePermissionsFromToken(token);
@@ -338,7 +377,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading }}>
+        <AuthContext.Provider value={{ user, isAuthenticated, signIn, logoutUser, refreshSession, switchOrganization, loading }}>
             {children}
         </AuthContext.Provider>
     );

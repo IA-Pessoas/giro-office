@@ -6,6 +6,7 @@ import {
   createTestApp,
   gatewayAuthHeaders,
   resetUserRouteMocks,
+  userOrganizationServiceMock,
   userServiceMock,
 } from "./userTestUtils.js";
 
@@ -61,5 +62,62 @@ describe("auth routes", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.valid).toBe(true);
+  });
+
+  it("GET /user/organizations retorna somente organizações associadas ao usuário", async () => {
+    userOrganizationServiceMock.listForUser.mockResolvedValue([
+      {
+        organization_id: "a0000000-0000-4000-8000-000000000002",
+        name: "Organização B",
+        slug: "org-b",
+        status: "active",
+        department_id: "b0000000-0000-4000-8000-000000000002",
+      },
+    ]);
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/user/organizations")
+      .set(gatewayAuthHeaders({ userId: "user-1" }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(userOrganizationServiceMock.listForUser).toHaveBeenCalledWith("user-1");
+  });
+
+  it("POST /user/organization/switch emite a sessão da organização selecionada", async () => {
+    userOrganizationServiceMock.switchOrganization.mockResolvedValue({
+      token: "jwt-org-b",
+      organization_id: "a0000000-0000-4000-8000-000000000002",
+      modules: { ti: 2 },
+    });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user/organization/switch")
+      .set(gatewayAuthHeaders({ userId: "user-1" }))
+      .send({ organization_id: "a0000000-0000-4000-8000-000000000002" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.token).toBe("jwt-org-b");
+    expect(userOrganizationServiceMock.switchOrganization).toHaveBeenCalledWith(
+      "user-1",
+      "a0000000-0000-4000-8000-000000000002",
+    );
+  });
+
+  it("POST /user/organization/switch rejeita chaves desconhecidas", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user/organization/switch")
+      .set(gatewayAuthHeaders({ userId: "user-1" }))
+      .send({
+        organization_id: "a0000000-0000-4000-8000-000000000002",
+        extra: true,
+      });
+
+    expect(res.status).toBe(400);
+    expect(userOrganizationServiceMock.switchOrganization).not.toHaveBeenCalled();
   });
 });

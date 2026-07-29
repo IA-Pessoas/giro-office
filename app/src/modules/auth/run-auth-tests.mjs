@@ -127,6 +127,10 @@ const authContextSource = await readFile(
   new URL("../../context/AuthContext.tsx", import.meta.url),
   "utf8",
 );
+const organizationSwitcherSource = await readFile(
+  new URL("../organizations/hooks/useOrganizationSwitcher.ts", import.meta.url),
+  "utf8",
+);
 const appShellSource = await readFile(
   new URL("../../shared/components/newLayout/AppShell.tsx", import.meta.url),
   "utf8",
@@ -739,7 +743,7 @@ await (async () => {
     assert.match(authContextSource, /async function refreshSession\(\)/);
     assert.match(
       authContextSource,
-      /<AuthContext\.Provider value=\{\{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading \}\}/,
+      /<AuthContext\.Provider value=\{\{ user, isAuthenticated, signIn, logoutUser, refreshSession, switchOrganization, loading \}\}/,
     );
     assert.match(administracaoSource, /const \{ user, refreshSession \} = useAuth\(\);/);
     assert.match(
@@ -749,6 +753,25 @@ await (async () => {
     assert.match(authContextSource, /await queryClient\.invalidateQueries\(\{ queryKey: ME_QUERY_KEY \}\);/);
     assert.equal(authContextSource.includes("queryClient.setQueryData(ME_QUERY_KEY, currentUser)"), false);
     assert.equal(administracaoSource.includes("accessStoreActions.syncFromToken"), false);
+  });
+
+  await runTest("active organization switching replaces the session and clears remote cache", () => {
+    assert.match(authContextSource, /switchOrganization:\s*\(organizationId: string\)\s*=>\s*Promise<void>/);
+    assert.match(authContextSource, /async function switchOrganization\(organizationId: string\)/);
+    assert.match(authContextSource, /organizationService\.switchActive\(organizationId\)/);
+    assert.match(authContextSource, /setCookie\(undefined, AUTH_COOKIE_NAME, sessionData\.token, getAuthCookieOptions\(\)\)/);
+    assert.match(authContextSource, /queryClient\.clear\(\)/);
+    assert.match(authContextSource, /SessionTransitionScreen/);
+    assert.match(
+      authContextSource,
+      /<AuthContext\.Provider value=\{\{ user, isAuthenticated, signIn, logoutUser, refreshSession, switchOrganization, loading \}\}/,
+    );
+    assert.match(organizationSwitcherSource, /queryKey: organizationSwitcherQueryKey\(user\?\.id\)/);
+    assert.match(organizationSwitcherSource, /useMutation/);
+    assert.match(organizationSwitcherSource, /invalidateQueries/);
+    assert.match(appShellSource, /organizations\.length > 1/);
+    assert.match(appShellSource, /aria-label="Organização ativa"/);
+    assert.match(appShellSource, /handleOrganizationChange/);
   });
 
   await runTest("admin permission updates invalidate cached permission data after save", () => {
