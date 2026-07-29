@@ -57,6 +57,7 @@ const {
   setAccessStoreState,
   shouldSyncAccessStore,
 } = await import("./store/accessStore.ts");
+const { resolveRhPermissionCapabilities } = await import("../rh/utils/rhPermissions.ts");
 const {
   createAuthInvalidationHandler,
   invalidateAuthSession,
@@ -998,9 +999,37 @@ await (async () => {
       /<select[\s\S]*disabled=\{isSelectedPermissionOwner \|\| isSavingPermissions\}/,
     );
   });
-  await runTest("RH module user permission does not grant administrative dashboard", () => {
-    assert.doesNotMatch(rhPermissionsSource, /explicitRhPermission[\s\S]*>=\s*1/);
-    assert.match(rhPermissionsSource, /canViewRhDashboard\s*=\s*canManageRh/);
-    assert.match(rhPermissionsSource, /canManageRh\s*=\s*hasRhAdminPermission \|\| isGlobalAdmin/);
+  await runTest("RH permissions hook delegates to the shared capability contract", () => {
+    const userCapabilities = resolveRhPermissionCapabilities(2, false);
+    const noAccessCapabilities = resolveRhPermissionCapabilities(0, false);
+    const adminCapabilities = resolveRhPermissionCapabilities(3, false);
+    const globalAdminCapabilities = resolveRhPermissionCapabilities(0, true);
+
+    assert.match(rhPermissionsSource, /resolveRhPermissionCapabilities/);
+    assert.match(
+      rhPermissionsSource,
+      /const capabilities = resolveRhPermissionCapabilities\(explicitRhPermission, isGlobalAdmin\);/,
+    );
+    assert.match(
+      rhPermissionsSource,
+      /canViewRhDashboard:\s*capabilities\.canViewRhDashboard/,
+    );
+
+    assert.deepEqual(userCapabilities, {
+      canAccessRhPortal: true,
+      canViewRhDashboard: false,
+      canManageRh: false,
+      canManageRhRequests: false,
+      canManageRhScore: false,
+      canManageRhTimeBank: false,
+      canManageRhTimesheets: false,
+      canManageRhWorkday: false,
+    });
+    assert.equal(noAccessCapabilities.canAccessRhPortal, false);
+    assert.equal(noAccessCapabilities.canManageRh, false);
+    assert.equal(adminCapabilities.canViewRhDashboard, true);
+    assert.equal(adminCapabilities.canManageRh, true);
+    assert.equal(globalAdminCapabilities.canAccessRhPortal, true);
+    assert.equal(globalAdminCapabilities.canManageRh, true);
   });
 })();
