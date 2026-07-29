@@ -894,3 +894,18 @@ runTest("project and task model forms disclose their required fields", () => {
     assert.match(source, /aria-required/);
   }
 });
+
+runTest("project date fields handle native input events", () => {
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+
+  assert.equal(
+    (projectForm.match(/onInput=\{\(event\) => updateValue\("start_date", event\.currentTarget\.value\)\}/g) ?? [])
+      .length,
+    1,
+  );
+  assert.equal(
+    (projectForm.match(/onInput=\{\(event\) => updateValue\("end_date", event\.currentTarget\.value\)\}/g) ?? [])
+      .length,
+    1,
+  );
+});
