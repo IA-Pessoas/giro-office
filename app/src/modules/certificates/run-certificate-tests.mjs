@@ -10,6 +10,11 @@ import {
   parseCertificateFilename,
   unwrapCertificateEnvelope,
 } from "./services/certificateService.contract.ts";
+import {
+  certificateNotificationsQueryKey,
+  certificatePfListQueryKey,
+  certificatePjListQueryKey,
+} from "./hooks/queryKeys.ts";
 import * as certificateWorkspaceUi from "./components/certificateWorkspaceUi.ts";
 
 function runTest(name, fn) {
@@ -133,8 +138,26 @@ runTest("buildCertificateListPage infers hasMore from page size", () => {
 runTest("buildCertificateListPage falls back to default page and page_size", () => {
   const items = [{ id: "1" }];
   assert.equal(buildCertificateListPage(items).page, 1);
-  assert.equal(buildCertificateListPage(items).page_size, 50);
+  assert.equal(buildCertificateListPage(items).page_size, 20);
   assert.equal(buildCertificateListPage(items).hasMore, false);
+});
+
+runTest("certificate PJ query key defaults omitted page_size to 20", () => {
+  assert.equal(certificatePjListQueryKey({ page: 2 })[4], 20);
+});
+
+runTest("certificate PF query key defaults omitted page_size to 20", () => {
+  assert.equal(certificatePfListQueryKey({ page: 2 })[4], 20);
+});
+
+runTest("certificate notifications query key defaults omitted page_size to 20", () => {
+  assert.equal(certificateNotificationsQueryKey({ page: 2 })[4], 20);
+});
+
+runTest("certificate list query keys preserve explicit page_size", () => {
+  assert.equal(certificatePjListQueryKey({ page_size: 35 })[4], 35);
+  assert.equal(certificatePfListQueryKey({ page_size: 35 })[4], 35);
+  assert.equal(certificateNotificationsQueryKey({ page_size: 35 })[4], 35);
 });
 
 runTest("buildCertificateFileFormData sends file in multipart field", () => {

@@ -24,6 +24,7 @@ assert.deepEqual(getPaginationRange(2, 20, 7), { start: 21, end: 27 });
 
 const hookSource = readFileSync("src/shared/hooks/useDebouncedValue.ts", "utf8");
 const controlsSource = readFileSync("src/shared/components/ui/PaginationControls.tsx", "utf8");
+const paginationSource = readFileSync("src/shared/pagination/pagination.ts", "utf8");
 
 assert.match(hookSource, /setTimeout/);
 assert.match(hookSource, /clearTimeout/);
@@ -41,5 +42,6 @@ assert.match(controlsSource, /max=\{totalPages\}/);
 assert.match(controlsSource, /h-6 w-8/);
 assert.doesNotMatch(controlsSource, /type="number"/);
 assert.doesNotMatch(controlsSource, /getPaginationRange\(page, limit, count\)/);
+assert.match(paginationSource, /export const DEFAULT_PAGE_SIZE = 20;/);
 
 console.log("pagination contract tests passed");

@@ -1,3 +1,5 @@
+export const DEFAULT_PAGE_SIZE = 20;
+
 export interface PaginatedResult<T> {
   data: T[];
   total: number;
