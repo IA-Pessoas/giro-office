@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock } = vi.hoisted(() => ({
+const { prismaMock, auditMock } = vi.hoisted(() => ({
   prismaMock: {
     permission: {
       findFirst: vi.fn(),
@@ -18,6 +18,7 @@ const { prismaMock } = vi.hoisted(() => ({
       callback(prismaMock),
     ),
   },
+  auditMock: vi.fn(),
 }));
 
 vi.mock("../prisma/index.js", () => ({
@@ -152,7 +153,7 @@ describe("PermissionService", () => {
         fiscal: 2,
       });
     prismaMock.permission.updateMany.mockResolvedValue({ count: 1 });
-    const service = new PermissionService();
+    const service = new PermissionService(auditMock);
 
     await service.update("user-1", { fiscal: 2 }, "org-1", { actorUserId: "actor-1" });
 
@@ -174,6 +175,21 @@ describe("PermissionService", () => {
             previous: expect.objectContaining({ fiscal: 1 }),
             next: expect.objectContaining({ fiscal: 2 }),
           }),
+        }),
+      }),
+    );
+    expect(auditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: "actor-1",
+        organizationId: "org-1",
+        action: "UPDATE",
+        referring: "Permission",
+        referringId: "user-1",
+        outcome: "success",
+        changes: expect.objectContaining({
+          affected_user_id: "user-1",
+          previous: expect.objectContaining({ fiscal: 1 }),
+          next: expect.objectContaining({ fiscal: 2 }),
         }),
       }),
     );
