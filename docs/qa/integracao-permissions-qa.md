@@ -88,3 +88,34 @@ isolamento de usuários comuns.
 
 O fechamento da #621 deve anexar os resultados observados. A reexecução completa
 da matriz ponta a ponta da #551 permanece no escopo da issue dependente #622.
+
+## Execução manual — 2026-07-29
+
+QA executado no navegador visível, contra serviços locais e um Postgres descartável,
+com as contas QA Alfa. Foram observados os seguintes resultados:
+
+- `qa.alfa.level1`: Dashboard, Clientes, Projetos e Tarefas ficaram visíveis; a
+  lista de projetos exibiu leitura sem ações de escrita. Evidências:
+  `docs/qa/evidence/01-dashboard-level1.png` e
+  `docs/qa/evidence/02-project-list-level1.png`.
+- `qa.alfa.level2`: “Novo projeto” e o formulário de projeto ficaram disponíveis.
+  Foi encontrado um bug real: a data nativa aparecia preenchida, mas a submissão
+  ainda dizia “Preencha a data de início.”. A correção adiciona sincronização do
+  evento nativo de input e um contrato regressivo; após a correção, a criação
+  passou e o projeto apareceu na lista. Evidência do bug reproduzido:
+  `docs/qa/evidence/04-level2-create-date-validation.png`.
+- `qa.alfa.level0`: a navegação ficou restrita a Dashboard e Minhas tarefas;
+  `/projects` e o detalhe protegido por URL direta exibiram acesso indisponível.
+  Evidências: `docs/qa/evidence/05-dashboard-level0-navigation.png` e
+  `docs/qa/evidence/06-level0-protected-url.png`.
+- `qa.alfa.level3`: o detalhe direto exibiu Recalcular, Editar e Excluir, além do
+  projeto e da tarefa dependente. Evidência:
+  `docs/qa/evidence/07-level3-project-actions.png`. O conflito `409` da exclusão
+  com dependência foi validado pela suíte backend; o diálogo nativo do navegador
+  não foi usado como evidência do status HTTP.
+
+O ambiente não expôs seletor de organização para validar a troca A → B na mesma
+sessão. A suíte `qa:integracao` e os testes de autorização cobrem as duas
+organizações e o isolamento. A suíte HTTP contra Prisma real foi tentada no banco
+descartável, mas o ambiente ficou instável e os hooks do Vitest excederam 10 s;
+isso foi registrado como limitação de infraestrutura, não como falha funcional.
