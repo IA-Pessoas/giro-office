@@ -74,6 +74,25 @@ runTest("AppShell menu triggers expose expanded state and controlled panels", ()
   assert.match(appShellSource, /id=\{USER_MENU_PANEL_ID\}/);
 });
 
+runTest("AppShell sidebar toggle sits in the header and exposes an accessible name", () => {
+  const toggleStart = appShellSource.indexOf("onClick={toggleSidebar}");
+  const toggleSource = appShellSource.slice(toggleStart - 500, toggleStart + 700);
+
+  assert.notEqual(toggleStart, -1);
+  assert.match(
+    toggleSource,
+    /aria-label=\{isSidebarOpen \? "Recolher sidebar" : "Expandir sidebar"\}/,
+  );
+  assert.match(
+    toggleSource,
+    /title=\{isSidebarOpen \? "Recolher sidebar" : "Expandir sidebar"\}/,
+  );
+  assert.match(toggleSource, /h-9 w-9/);
+  assert.match(toggleSource, /justify-center px-2/);
+  assert.match(toggleSource, /\{isSidebarOpen \? <Logo showText \/> : null\}/);
+  assert.doesNotMatch(toggleSource, /absolute -right-3 top-20/);
+});
+
 runTest("AppShell header notifications do not embed mock notification rows", () => {
   assert.equal(appShellSource.includes("Novo chamado crítico aberto"), false);
   assert.equal(appShellSource.includes("Prazo de tarefa próximo do vencimento"), false);

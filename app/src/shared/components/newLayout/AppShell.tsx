@@ -574,21 +574,26 @@ export function AppShell({
           isSidebarOpen ? "w-64" : "w-20"
         } ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
       >
-        <div className="h-16 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-4">
-          <Logo showText={isSidebarOpen} />
-        </div>
-
-        <button
-          onClick={toggleSidebar}
-          className="hidden lg:flex absolute -right-3 top-20 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-full p-1 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors z-50"
-          type="button"
+        <div
+          className={`h-16 border-b border-gray-200 dark:border-slate-800 flex items-center ${
+            isSidebarOpen ? "justify-between gap-2 px-4" : "justify-center px-2"
+          }`}
         >
-          {isSidebarOpen ? (
-            <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-          )}
-        </button>
+          {isSidebarOpen ? <Logo showText /> : null}
+          <button
+            onClick={toggleSidebar}
+            className="hidden h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 dark:border-slate-800 dark:bg-slate-900 dark:text-gray-400 dark:hover:bg-slate-800 lg:inline-flex"
+            type="button"
+            aria-label={isSidebarOpen ? "Recolher sidebar" : "Expandir sidebar"}
+            title={isSidebarOpen ? "Recolher sidebar" : "Expandir sidebar"}
+          >
+            {isSidebarOpen ? (
+              <ChevronLeft className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+          </button>
+        </div>
 
         <nav className="p-3 space-y-6 overflow-y-auto h-[calc(100vh-4rem)]">
           {filteredModuleCategories.map((category) => {
