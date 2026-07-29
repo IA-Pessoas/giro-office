@@ -1182,6 +1182,15 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(hookSource, /tiQueryKeys\.extensions\.all\(\)/);
   assert.match(tabSource, /useTiExtensions/);
   assert.match(tabSource, /useTiExtension/);
+  assert.match(
+    tabSource,
+    /const canManageExtensions = access\.canEdit \|\| access\.isAdmin/,
+  );
+  assert.match(
+    tabSource,
+    /assignableUsersQuery = useAssignableUsers\(\{ enabled: canManageExtensions \}\)/,
+  );
+  assert.match(tabSource, /\{!canManageExtensions \? \(/);
   assert.match(tabSource, /<TiEmptyState/);
   const sectionHeaderMatch = tabSource.match(/<TiSectionHeader[\s\S]*?\/>/);
   assert.ok(sectionHeaderMatch);
@@ -1231,14 +1240,21 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.doesNotMatch(`${pageSource}\n${workspaceUiSource}`, /indigo-/);
 });
 
-await runTest("ti shell exposes dashboard for self-service users", async () => {
+await runTest("ti shell exposes ramais but hides sensitive tabs for self-service users", async () => {
   const pageSource = await readModuleSource("components/TiPage.tsx");
+  const selfServiceTabsSource =
+    pageSource.match(/const SELF_SERVICE_TI_TABS[\s\S]*?\n\];/)?.[0] ?? "";
 
   assert.match(pageSource, /SELF_SERVICE_TI_TABS/);
   assert.match(pageSource, /const canManageTi = access\.isAdmin/);
   assert.match(pageSource, /const visibleTabs = canManageTi \? TI_TABS : SELF_SERVICE_TI_TABS/);
-  assert.match(pageSource, /SELF_SERVICE_TI_TABS[\s\S]*id: "dashboard"/);
-  assert.match(pageSource, /label: "Meus termos"/);
+  assert.match(selfServiceTabsSource, /id: "dashboard"/);
+  assert.match(selfServiceTabsSource, /id: "extensions"[\s\S]*label: "Ramais"/);
+  assert.match(selfServiceTabsSource, /label: "Meus termos"/);
+
+  for (const sensitiveTabId of ["inventory", "stock", "passwords", "robots"]) {
+    assert.doesNotMatch(selfServiceTabsSource, new RegExp(`id: "${sensitiveTabId}"`));
+  }
 });
 
 await runTest("ti requests hooks expose mutations and invalidate requests plus dashboard caches", async () => {

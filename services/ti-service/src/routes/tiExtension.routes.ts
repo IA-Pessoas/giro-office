@@ -35,7 +35,7 @@ export function createTiExtensionRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/list",
-    requireTiPermission(TiPermissionLevel.Technician),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -52,7 +52,7 @@ export function createTiExtensionRoutes(prisma: PrismaClient): Router {
 
   router.get(
     "/:id",
-    requireTiPermission(TiPermissionLevel.Technician),
+    requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
       try {
         const context = getContext(request);

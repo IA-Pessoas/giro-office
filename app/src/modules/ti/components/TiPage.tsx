@@ -114,6 +114,12 @@ const SELF_SERVICE_TI_TABS: TiTabConfig[] = [
     icon: FileCheck2,
     panel: TiTermsTab,
   },
+  {
+    id: "extensions",
+    label: "Ramais",
+    icon: Phone,
+    panel: TiExtensionsTab,
+  },
 ];
 
 function TiAccessDenied() {

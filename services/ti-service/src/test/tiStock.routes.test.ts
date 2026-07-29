@@ -16,7 +16,7 @@ const userId = "00000000-0000-4000-8000-000000000001";
 const categoryId = "60000000-0000-4000-8000-000000000001";
 const locationId = "70000000-0000-4000-8000-000000000001";
 const stockId = "80000000-0000-4000-8000-000000000001";
-const TI_REQUESTER_PERMISSION = 1;
+const TI_VIEWER_PERMISSION = 1;
 const TI_ADMIN_PERMISSION = 3;
 
 function gatewayHeaders(permission: number): Record<string, string> {
@@ -29,10 +29,16 @@ function gatewayHeaders(permission: number): Record<string, string> {
 }
 
 describe("ti stock routes", () => {
-  it("GET /ti/stock/items/list requires admin permission", async () => {
+  it.each([
+    "/ti/stock/items/list",
+    `/ti/stock/items/${stockId}`,
+    `/ti/stock/items/${stockId}/movements/list`,
+    "/ti/stock/categories/list",
+    "/ti/stock/locations/list",
+  ])("GET %s rejects viewer permission", async (path) => {
     const response = await request(createTestApp())
-      .get("/ti/stock/items/list")
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+      .get(path)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION));
 
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
@@ -88,7 +94,7 @@ describe("ti stock routes", () => {
   it("POST /ti/stock/items requires admin permission", async () => {
     const response = await request(createTestApp())
       .post("/ti/stock/items")
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
       .send({
         name: "Notebook",
         category_id: categoryId,
