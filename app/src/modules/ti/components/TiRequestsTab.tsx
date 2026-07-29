@@ -1204,6 +1204,7 @@ export function TiRequestsTab() {
                             src={attachmentUrl}
                             alt="Imagem anexada à mensagem"
                             loading="lazy"
+                            decoding="async"
                             className="max-h-64 max-w-full rounded-md border border-slate-200 object-contain dark:border-slate-700"
                           />
                           <span className="mt-1 block text-xs font-medium text-blue-700 dark:text-blue-300">
@@ -1253,6 +1254,7 @@ export function TiRequestsTab() {
                       <img
                         src={messageAttachmentPreviewUrl}
                         alt={`Prévia de ${messageAttachment.name}`}
+                        decoding="async"
                         className="h-16 w-16 rounded object-cover"
                       />
                     ) : null}

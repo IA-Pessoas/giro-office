@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Landmark, Loader2, Pencil, Plus, Search } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Landmark,
+  Loader2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { toast } from "react-toastify";
 
-import { useFiscalIcmsList } from "../hooks";
+import { Dialog } from "@shared/components";
+import { PaginationControls } from "@shared/components/ui/PaginationControls";
+
+import { useDeleteFiscalIcmsMutation, useFiscalIcmsList } from "../hooks";
 import { FISCAL_LIST_PAGE_SIZE } from "../hooks/queryKeys";
 import type { FiscalIcms } from "../types";
 import {
@@ -10,7 +23,6 @@ import {
 } from "../utils";
 import { FiscalIcmsFormPanel } from "./FiscalIcmsFormPanel";
 import { FiscalStateBox } from "./FiscalStateBox";
-import { PaginationControls } from "@shared/components/ui/PaginationControls";
 
 type FiscalIcmsPanelIntent =
   | { mode: "create" }
@@ -19,6 +31,12 @@ type FiscalIcmsPanelIntent =
 
 const ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+
+const DIALOG_SECONDARY_BUTTON_CLASSNAME =
+  "inline-flex h-9 items-center justify-center rounded-md border border-gray-300 px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800";
+
+const DIALOG_DANGER_BUTTON_CLASSNAME =
+  "inline-flex h-9 items-center justify-center gap-2 rounded-md bg-red-600 px-3 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60";
 
 const TABLE_HEADER_CLASSNAME =
   "px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-700 dark:text-slate-300";
@@ -32,11 +50,19 @@ const TABLE_CENTER_CELL_CLASSNAME =
 const TABLE_CODE_CELL_CLASSNAME =
   "px-4 py-2.5 text-center text-sm font-medium leading-5 text-gray-900 dark:text-white";
 
-export function FiscalIcmsSection({ canEdit }: { canEdit: boolean }) {
+export function FiscalIcmsSection({
+  canEdit,
+  canDelete,
+}: {
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
   const [filterValue, setFilterValue] = useState("");
   const [searchTerms, setSearchTerms] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [panelIntent, setPanelIntent] = useState<FiscalIcmsPanelIntent>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FiscalIcms | null>(null);
+  const deleteMutation = useDeleteFiscalIcmsMutation();
 
   const listQuery = useFiscalIcmsList({
     icmsCodes: searchTerms,
@@ -59,6 +85,26 @@ export function FiscalIcmsSection({ canEdit }: { canEdit: boolean }) {
     event.preventDefault();
     setSearchTerms(parseCommaSeparatedValues(filterValue));
     setPage(1);
+  }
+
+  function handleDeleteDialogOpenChange(open: boolean) {
+    if (!open && !deleteMutation.isPending) {
+      setDeleteTarget(null);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!canDelete || !deleteTarget) {
+      return;
+    }
+
+    try {
+      await deleteMutation.mutateAsync(deleteTarget.id);
+      setDeleteTarget(null);
+      toast.success("ICMS excluído com sucesso.");
+    } catch (error) {
+      toast.error(getFiscalErrorMessage(error));
+    }
   }
 
   if (panelIntent && canEdit) {
@@ -237,6 +283,8 @@ export function FiscalIcmsSection({ canEdit }: { canEdit: boolean }) {
             <FiscalIcmsTable
               items={listQuery.data.data}
               onEdit={canEdit ? (item) => setPanelIntent({ mode: "edit", icmsId: item.id }) : undefined}
+              onDelete={canDelete ? (item) => setDeleteTarget(item) : undefined}
+              isDeleting={deleteMutation.isPending}
             />
           ) : (
             <FiscalStateBox icon={Landmark} title="Nenhum ICMS encontrado" compact>
@@ -256,6 +304,49 @@ export function FiscalIcmsSection({ canEdit }: { canEdit: boolean }) {
           />
         </div>
       ) : null}
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={handleDeleteDialogOpenChange}
+        title="Excluir ICMS"
+        description="Confirmação de exclusão de ICMS"
+        contentClassName="w-[min(92vw,520px)]"
+        bodyClassName="space-y-3"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleteMutation.isPending}
+              className={DIALOG_SECONDARY_BUTTON_CLASSNAME}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={deleteMutation.isPending}
+              className={DIALOG_DANGER_BUTTON_CLASSNAME}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Confirmar exclusão
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-700 dark:text-slate-300">
+          Esta ação remove o cadastro fiscal selecionado.
+        </p>
+        {deleteTarget ? (
+          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
+            {deleteTarget.state} · {deleteTarget.description}
+          </p>
+        ) : null}
+      </Dialog>
     </section>
   );
 }
@@ -263,9 +354,13 @@ export function FiscalIcmsSection({ canEdit }: { canEdit: boolean }) {
 function FiscalIcmsTable({
   items,
   onEdit,
+  onDelete,
+  isDeleting = false,
 }: {
   items: FiscalIcms[];
   onEdit?: (item: FiscalIcms) => void;
+  onDelete?: (item: FiscalIcms) => void;
+  isDeleting?: boolean;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
@@ -296,7 +391,7 @@ function FiscalIcmsTable({
               <th className={`${TABLE_HEADER_CLASSNAME} w-[8%]`}>
                 MVA orig.
               </th>
-              {onEdit ? (
+              {onEdit || onDelete ? (
                 <th className={`${TABLE_HEADER_CLASSNAME} w-[6%] px-3`}>
                   Ação
                 </th>
@@ -330,18 +425,33 @@ function FiscalIcmsTable({
                 <td className={TABLE_CENTER_CELL_CLASSNAME}>
                   {item.original_mva ?? "—"}
                 </td>
-                {onEdit ? (
+                {onEdit || onDelete ? (
                   <td className="px-3 py-2.5 text-center">
-                    <div className="flex justify-center">
-                      <button
-                        type="button"
-                        onClick={() => onEdit(item)}
-                        aria-label={`Editar ICMS ${item.description}`}
-                        title="Editar"
-                        className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
-                      >
-                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                      </button>
+                    <div className="flex justify-center gap-1">
+                      {onEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => onEdit(item)}
+                          disabled={isDeleting}
+                          aria-label={`Editar ICMS ${item.description}`}
+                          title="Editar"
+                          className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                      ) : null}
+                      {onDelete ? (
+                        <button
+                          type="button"
+                          onClick={() => onDelete(item)}
+                          disabled={isDeleting}
+                          aria-label={`Excluir ICMS ${item.description}`}
+                          title="Excluir"
+                          className={`${ACTION_BUTTON_CLASSNAME} border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-900/20`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 ) : null}

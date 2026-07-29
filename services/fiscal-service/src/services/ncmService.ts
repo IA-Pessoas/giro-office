@@ -53,6 +53,10 @@ export interface UpdateNcmRequest extends NcmAuthContext {
   validity_end_date?: Date;
 }
 
+export interface DeleteNcmRequest extends NcmAuthContext {
+  ncm_id: string;
+}
+
 export interface ListNcmRequest extends PaginationQuery {
   ncmCodes?: string[];
 }
@@ -187,6 +191,40 @@ export class NcmService {
       logError("Erro ao atualizar NCM", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao atualizar.", err);
+    }
+  }
+
+  async delete(data: DeleteNcmRequest): Promise<{ deleted: unknown }> {
+    try {
+      const exists = await this.prisma.ncm.findFirst({
+        where: { id: data.ncm_id, organization_id: data.organizationId },
+        select: NCM_SELECT,
+      });
+
+      if (!exists) {
+        throw new ServiceError(404, "NCM nao existe.");
+      }
+
+      const deleted = await this.prisma.ncm.delete({
+        where: { id: data.ncm_id },
+        select: NCM_SELECT,
+      });
+
+      await this.audit.createLog({
+        userId: data.userId,
+        organizationId: data.organizationId,
+        permission: data.permission ?? null,
+        action: "Exclusao",
+        referring: "fiscal.ncm",
+        referringId: data.ncm_id,
+        changes: exists as unknown as Record<string, unknown>,
+      });
+
+      return { deleted };
+    } catch (err: unknown) {
+      logError("Erro ao excluir NCM", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro ao excluir.", err);
     }
   }
 

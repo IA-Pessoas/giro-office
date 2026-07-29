@@ -81,7 +81,7 @@ isolamento de usuários comuns.
 | Conta | Organização | URL/request | Esperado | Observado | Evidência |
 | --- | --- | --- | --- | --- | --- |
 | níveis 0–3/owner | A/B | `projectCrud.routes.test.ts` | 403/200 conforme matriz | 22 testes verdes | saída do Vitest |
-| fixtures | A/B | `qa:integracao` | dois orgs, UUIDs, dependências | 4 testes verdes | saída do Node test |
+| fixtures | A/B | `qa:integracao` | dois orgs, UUIDs, dependências | 5 testes verdes | saída do Node test |
 | UI auth/rotas | A/B | `app test:auth`, `test:clients`, `test:projects` | menus/rotas protegidos | testes verdes | saída dos scripts |
 | Postgres real | A/B | `PROJECT_SERVICE_INTEGRATION=1 ...projectCrud.integration.test.ts` | CRUD/403/404/409 sem mock | executar com banco descartável | saída do Vitest |
 | usuário não-owner | A → B | troca de organização na mesma sessão | escopo/navegação/dados mudam | pendente de ambiente com seletor | registrar screenshot/request |

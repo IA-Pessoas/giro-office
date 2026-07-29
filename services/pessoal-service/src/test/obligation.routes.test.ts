@@ -8,7 +8,10 @@ import { createRouteTestApp, gatewayHeaders, recordId } from "./pessoalCoreTestU
 describe("obligation routes", () => {
   it("retorna sucesso com data null quando obrigacao ainda nao existe", async () => {
     const service = { detail: vi.fn(async () => null) };
-    const app = createRouteTestApp("/pessoal/obrigations", createObligationRoutes(service as never));
+    const app = createRouteTestApp(
+      "/pessoal/obrigations",
+      createObligationRoutes(service as never),
+    );
 
     const response = await request(app)
       .get("/pessoal/obrigations")

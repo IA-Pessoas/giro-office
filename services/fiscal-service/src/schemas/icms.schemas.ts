@@ -38,6 +38,8 @@ export const detailIcmsQuerySchema = z
   })
   .strict();
 
+export const deleteIcmsQuerySchema = detailIcmsQuerySchema;
+
 export const listIcmsQuerySchema = z
   .object({
     ...paginationQuerySchema.shape,

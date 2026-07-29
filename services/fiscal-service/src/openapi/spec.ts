@@ -271,6 +271,30 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
             },
           },
         },
+        delete: {
+          tags: ["NCM"],
+          summary: "Excluir NCM",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "ncm_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Excluido",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Permissao fiscal admin requerida" },
+          },
+        },
       },
       "/fiscal/ncm/list": {
         get: {
@@ -400,6 +424,30 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
             },
           },
         },
+        delete: {
+          tags: ["ICMS"],
+          summary: "Excluir ICMS",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "icms_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Excluido",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Permissao fiscal admin requerida" },
+          },
+        },
       },
       "/fiscal/icms/list": {
         get: {
@@ -519,6 +567,30 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                 },
               },
             },
+          },
+        },
+        delete: {
+          tags: ["IPI"],
+          summary: "Excluir IPI",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "ipi_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Excluido",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Permissao fiscal admin requerida" },
           },
         },
       },
