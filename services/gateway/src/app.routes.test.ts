@@ -3292,7 +3292,7 @@ it("forwards the Contabil module permission and internal token", async () => {
   }
 });
 
-it("forwards legacy global permission to Contabil when module claims are absent", async () => {
+it("does not forward legacy global permission to Contabil when module claims are absent", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -3317,7 +3317,7 @@ it("forwards legacy global permission to Contabil when module claims are absent"
     });
 
     expect(response.status).toBe(200);
-    expect(seenPermission).toBe("1");
+    expect(seenPermission).toBe("0");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

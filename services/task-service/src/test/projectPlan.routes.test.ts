@@ -17,7 +17,7 @@ import {
 
 process.env.DATABASE_URL ??= "postgresql://localhost:5432/task-service-test";
 process.env.JWT_SECRET ??= "task-service-secret";
-process.env.AUDIT_SERVICE_TOKEN ??= "audit-service-token";
+process.env.AUDIT_SERVICE_TOKEN = "audit-service-token";
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
