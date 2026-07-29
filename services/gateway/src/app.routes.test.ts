@@ -2759,7 +2759,7 @@ it("blocks disabled commercial routes before proxying even for global admins", a
   }
 });
 
-it("blocks limited users without client-related module permission before proxying /client", async () => {
+it("allows Viewers without client-related module permission to proxy /client/list", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -2768,10 +2768,10 @@ it("blocks limited users without client-related module permission before proxyin
       atendimento: 2,
     },
   });
-  let upstreamHits = 0;
+  let seenUrl = "";
 
-  const upstream = createServer((_request, response) => {
-    upstreamHits += 1;
+  const upstream = createServer((request, response) => {
+    seenUrl = request.url ?? "";
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ success: true, data: { proxied: true } }));
@@ -2788,9 +2788,9 @@ it("blocks limited users without client-related module permission before proxyin
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    expect(response.status).toBe(403);
-    expect(body.code).toBe("FORBIDDEN");
-    expect(upstreamHits).toBe(0);
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(seenUrl).toBe("/client/list");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
