@@ -193,7 +193,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             "200": { description: "Usuário", ...successJson },
           },
         },
-        patch: {
+        put: {
           tags: ["Users"],
           summary: "Atualizar usuário",
           security: bearer,

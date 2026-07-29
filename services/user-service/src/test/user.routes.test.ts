@@ -54,7 +54,7 @@ describe("user routes", () => {
       { method: "get", path: "/user" },
       { method: "get", path: "/user/user-3" },
       { method: "get", path: "/user/user-3/photo" },
-      { method: "patch", path: "/user/user-3" },
+      { method: "put", path: "/user/user-3" },
       { method: "post", path: "/user/user-3/photo" },
       { method: "delete", path: "/user/user-3/photo" },
       { method: "delete", path: "/user/user-3" },
@@ -365,11 +365,11 @@ describe("user routes", () => {
     expect(userServiceMock.create).not.toHaveBeenCalled();
   });
 
-  it("PATCH /user/:id atualiza usuario", async () => {
+  it("PUT /user/:id atualiza usuario", async () => {
     userServiceMock.update.mockResolvedValue({ id: "user-3" });
     const app = createTestApp();
 
-    const res = await request(app).patch("/user/user-3").set(gatewayAuthHeaders()).send({
+    const res = await request(app).put("/user/user-3").set(gatewayAuthHeaders()).send({
       name: "Usuario Atualizado",
     });
 
@@ -384,12 +384,12 @@ describe("user routes", () => {
     );
   });
 
-  it("PATCH /user/:id permite ao usuario comum alterar somente a propria senha", async () => {
+  it("PUT /user/:id permite ao usuario comum alterar somente a propria senha", async () => {
     userServiceMock.update.mockResolvedValue({ id: "user-1" });
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-1")
+      .put("/user/user-1")
       .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
       .send({ password: "nova-senha-segura" });
 
@@ -402,12 +402,12 @@ describe("user routes", () => {
     );
   });
 
-  it("PATCH /user/:id permite a propria senha com Authorization Bearer direto", async () => {
+  it("PUT /user/:id permite a propria senha com Authorization Bearer direto", async () => {
     userServiceMock.update.mockResolvedValue({ id: "user-1" });
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-1")
+      .put("/user/user-1")
       .set(bearerAuthHeaders({ userId: "user-1" }))
       .send({ password: "nova-senha-segura" });
 
@@ -426,11 +426,11 @@ describe("user routes", () => {
     );
   });
 
-  it("PATCH /user/:id bloqueia usuario comum ao alterar a senha de outra pessoa", async () => {
+  it("PUT /user/:id bloqueia usuario comum ao alterar a senha de outra pessoa", async () => {
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-2")
+      .put("/user/user-2")
       .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
       .send({ password: "nova-senha-segura" });
 
@@ -438,11 +438,11 @@ describe("user routes", () => {
     expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
-  it("PATCH /user/:id bloqueia outra pessoa com Authorization Bearer direto", async () => {
+  it("PUT /user/:id bloqueia outra pessoa com Authorization Bearer direto", async () => {
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-2")
+      .put("/user/user-2")
       .set(bearerAuthHeaders({ userId: "user-1" }))
       .send({ password: "nova-senha-segura" });
 
@@ -450,11 +450,11 @@ describe("user routes", () => {
     expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
-  it("PATCH /user/:id bloqueia usuario comum ao combinar senha com outro campo", async () => {
+  it("PUT /user/:id bloqueia usuario comum ao combinar senha com outro campo", async () => {
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-1")
+      .put("/user/user-1")
       .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
       .send({ password: "nova-senha-segura", name: "Nome indevido" });
 
@@ -462,11 +462,11 @@ describe("user routes", () => {
     expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
-  it("PATCH /user/:id bloqueia payload misto com Authorization Bearer direto", async () => {
+  it("PUT /user/:id bloqueia payload misto com Authorization Bearer direto", async () => {
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-1")
+      .put("/user/user-1")
       .set(bearerAuthHeaders({ userId: "user-1" }))
       .send({ password: "nova-senha-segura", name: "Nome indevido" });
 
@@ -474,11 +474,11 @@ describe("user routes", () => {
     expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
-  it("PATCH /user/:id rejeita promocao para owner quando solicitante nao e owner", async () => {
+  it("PUT /user/:id rejeita promocao para owner quando solicitante nao e owner", async () => {
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-3")
+      .put("/user/user-3")
       .set(gatewayAuthHeaders({ permission: 2, type: "admin", modules: { rh: 3 } }))
       .send({
         type: "owner",
@@ -489,12 +489,12 @@ describe("user routes", () => {
     expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
-  it("PATCH /user/:id permite admin RH atualizar permissoes modulares", async () => {
+  it("PUT /user/:id permite admin RH atualizar permissoes modulares", async () => {
     userServiceMock.update.mockResolvedValue({ id: "user-3" });
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-3")
+      .put("/user/user-3")
       .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 3 } }))
       .send({
         modules: { comercial: 1 },
@@ -504,12 +504,12 @@ describe("user routes", () => {
     expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
-  it("PATCH /user/:id permite admin RH alterar acesso sem promover owner", async () => {
+  it("PUT /user/:id permite admin RH alterar acesso sem promover owner", async () => {
     userServiceMock.update.mockResolvedValue({ id: "user-3" });
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-3")
+      .put("/user/user-3")
       .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 3 } }))
       .send({
         permission: 1,
@@ -528,11 +528,11 @@ describe("user routes", () => {
     );
   });
 
-  it("PATCH /user/:id rejeita permissao de modulo TI fora do intervalo permitido", async () => {
+  it("PUT /user/:id rejeita permissao de modulo TI fora do intervalo permitido", async () => {
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-3")
+      .put("/user/user-3")
       .set(gatewayAuthHeaders())
       .send({
         modules: { ti: 999 },

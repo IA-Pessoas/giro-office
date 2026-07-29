@@ -169,7 +169,7 @@ export async function updateCurrentUser(
     body.password = payload.password;
   }
 
-  const { data } = await client.patch(`/user/${currentUser.id}`, body);
+  const { data } = await client.put(`/user/${currentUser.id}`, body);
   return toMeSessionUser(extractMeRecord(data));
 }
 

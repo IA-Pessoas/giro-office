@@ -135,7 +135,7 @@ router.post(
   },
 );
 
-router.patch(
+router.put(
   "/:id",
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {

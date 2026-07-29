@@ -378,7 +378,7 @@ it("requires admin permission for user-management routes", async () => {
   }
 });
 
-it("proxies authenticated self password updates to user-service", async () => {
+it("proxies authenticated self password updates with PUT to user-service", async () => {
   let seenHeaders: {
     userId?: string;
     organizationId?: string;
@@ -413,7 +413,7 @@ it("proxies authenticated self password updates to user-service", async () => {
 
   try {
     const response = await fetch(`${gatewayUrl}/user/user-1`, {
-      method: "PATCH",
+      method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
         "content-type": "application/json",
@@ -422,7 +422,7 @@ it("proxies authenticated self password updates to user-service", async () => {
     });
 
     expect(response.status).toBe(200);
-    expect(seenMethod).toBe("PATCH");
+    expect(seenMethod).toBe("PUT");
     expect(seenHeaders).toEqual({
       userId: "user-1",
       organizationId: "org-1",
