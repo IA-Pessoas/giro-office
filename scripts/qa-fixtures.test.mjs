@@ -67,9 +67,13 @@ test("as fixtures QA exercitam as três posições de ownership da tarefa", asyn
   const { INTEGRACAO_QA_FIXTURES: fixtures } = await import("./qa/integracao-fixtures.mjs");
 
   for (const fixture of fixtures) {
-    assert.equal(fixture.task.responsibleId, fixture.users[0].id);
-    assert.equal(fixture.task.responsible2Id, fixture.users[1].id);
-    assert.equal(fixture.task.responsible3Id, fixture.users[2].id);
+    const userByLevel = new Map(
+      fixture.users.filter(({ type }) => type === "user").map((user) => [user.level, user]),
+    );
+
+    assert.equal(fixture.task.responsibleId, userByLevel.get(0)?.id);
+    assert.equal(fixture.task.responsible2Id, userByLevel.get(1)?.id);
+    assert.equal(fixture.task.responsible3Id, userByLevel.get(2)?.id);
   }
 });
 
@@ -86,6 +90,8 @@ test("o seed QA e o roteiro usam as fixtures declarativas", async () => {
   assert.match(seedQaSource, /INTEGRACAO_QA_FIXTURES/);
   assert.match(seedQaSource, /moduleName === "integracao" \? level : 0/);
   assert.match(seedQaSource, /permission: 0/);
+  assert.equal(seedQaSource.match(/responsible2_id:\s*fixture\.task\.responsible2Id/g)?.length, 2);
+  assert.equal(seedQaSource.match(/responsible3_id:\s*fixture\.task\.responsible3Id/g)?.length, 2);
   assert.match(qaGuide, /prisma:seed:qa/);
   assert.match(qaGuide, /PROJECT_SERVICE_INTEGRATION=1/);
   assert.match(qaGuide, /403/);

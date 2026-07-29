@@ -1,6 +1,17 @@
 export const INTEGRACAO_QA_PASSWORD = "senha123";
 
 function buildFixture({ organization, department, users, client, project, taskModel, task }) {
+  const userByLevel = new Map(
+    users.filter((user) => user.type === "user").map((user) => [user.level, user]),
+  );
+  const requiredUserAtLevel = (level) => {
+    const user = userByLevel.get(level);
+    if (!user) {
+      throw new Error(`Fixture QA sem usuário nível ${level}.`);
+    }
+    return user;
+  };
+
   return {
     organization,
     department,
@@ -14,9 +25,9 @@ function buildFixture({ organization, department, users, client, project, taskMo
       projectId: project.id,
       modelId: taskModel.id,
       departmentId: department.id,
-      responsibleId: users[0].id,
-      responsible2Id: users[1].id,
-      responsible3Id: users[2].id,
+      responsibleId: requiredUserAtLevel(0).id,
+      responsible2Id: requiredUserAtLevel(1).id,
+      responsible3Id: requiredUserAtLevel(2).id,
       organizationId: organization.id,
     },
   };
