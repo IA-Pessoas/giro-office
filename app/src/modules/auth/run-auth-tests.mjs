@@ -57,6 +57,13 @@ const {
   setAccessStoreState,
   shouldSyncAccessStore,
 } = await import("./store/accessStore.ts");
+const {
+  createAuthInvalidationHandler,
+  invalidateAuthSession,
+  registerAuthInvalidationHandler,
+} = await import(
+  "../../context/authInvalidation.ts",
+);
 
 await runTest("integration routes preserve the level 0 own-tasks exception", () => {
   const users = {
@@ -81,8 +88,8 @@ await runTest("integration routes preserve the level 0 own-tasks exception", () 
   ];
   const expectedByProfile = {
     level0: [true, false, false, false],
-    level1: [true, true, true, false],
-    level2: [true, true, true, false],
+    level1: [true, true, true, true],
+    level2: [true, true, true, true],
     level3: [true, true, true, true],
     owner: [true, true, true, true],
   };
@@ -831,6 +838,61 @@ await (async () => {
     assert.equal(authContextSource.includes('console.error("Erro de conex'), false);
     assert.equal(authContextSource.includes('console.error("Erro do servidor'), false);
     assert.equal(authContextSource.includes('console.error("Erro de autentica'), false);
+  });
+
+  await runTest("sessão inválida encerra o loading e orienta o retorno ao login", () => {
+    assert.match(
+      authContextSource,
+      /toast\.error\("Sessão expirada\. Faça login novamente\.",\s*\{\s*toastId: "auth-session-expired"/,
+    );
+    assert.match(authContextSource, /registerAuthInvalidationHandler/);
+    assert.match(authContextSource, /setUser\(null\);/);
+    assert.match(
+      authContextSource,
+      /queryClient\.removeQueries\(\{ queryKey: ME_QUERY_KEY \}\);/,
+    );
+    assert.match(authContextSource, /isCurrentAuthTransition\(requestVersion\)\)/);
+    assert.match(authContextSource, /finally[\s\S]*setLoading\(false\)/);
+  });
+
+  await runTest("invalidação de sessão notifica o estado autenticado em runtime", () => {
+    let invalidationCount = 0;
+    const unregister = registerAuthInvalidationHandler(() => {
+      invalidationCount += 1;
+    });
+
+    try {
+      invalidateAuthSession();
+      assert.equal(invalidationCount, 1);
+    } finally {
+      unregister();
+    }
+  });
+
+  await runTest("invalidação de sessão aplica todas as transições em runtime", () => {
+    const events = [];
+    const handler = createAuthInvalidationHandler({
+      invalidateRequests: () => events.push("invalidate-requests"),
+      clearUser: () => events.push("clear-user"),
+      stopLoading: () => events.push("stop-loading"),
+      clearCache: () => events.push("clear-cache"),
+    });
+
+    handler();
+
+    assert.deepEqual(events, [
+      "invalidate-requests",
+      "clear-user",
+      "stop-loading",
+      "clear-cache",
+    ]);
+  });
+
+  await runTest("rotas protegidas redirecionam quando não há sessão", () => {
+    assert.match(
+      appSource,
+      /useEffect\(\(\) => \{[\s\S]*if \(isPublicRoute \|\| loading \|\| user\) \{[\s\S]*return;[\s\S]*\}[\s\S]*void router\.push\("\/login"\)/,
+    );
   });
 
   await runTest(

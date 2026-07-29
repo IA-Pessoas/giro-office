@@ -22,6 +22,14 @@ function AppLayout({ children, isIframeView = false }) {
     router.pathname === "/" ||
     router.pathname === "/solicitar-acesso";
 
+  useEffect(() => {
+    if (isPublicRoute || loading || user) {
+      return;
+    }
+
+    void router.push("/login");
+  }, [isPublicRoute, loading, router, user]);
+
   // Se está na página de login ou index, não mostra layout
   if (isPublicRoute) {
     return <>{children}</>;

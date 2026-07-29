@@ -218,6 +218,12 @@ test("all-services smoke includes certificate-service state and handlers", () =>
   assert.match(generatedCertificateSmoke, /certificatePfFileDeleteForbidden/);
 });
 
+test("all-services smoke includes the task model dependency options handler", () => {
+  const source = fs.readFileSync(new URL("./all-services-smoke.mjs", import.meta.url), "utf8");
+
+  assert.match(source, /async taskDepsOptions\(op\)/);
+});
+
 test("all-services smoke exits non-zero when continue-on-failure collects failures", () => {
   const result = runSmoke(["--filter=gatewayHealth"]);
   const output = `${result.stdout}\n${result.stderr}`;

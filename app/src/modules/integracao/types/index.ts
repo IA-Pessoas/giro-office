@@ -22,6 +22,8 @@ export type {
   TaskModelDetail,
   TaskModelListItem,
   TaskModelListParams,
+  TaskModelOption,
+  TaskModelOptions,
   UpdateTaskModelData,
 } from "./taskModel";
 

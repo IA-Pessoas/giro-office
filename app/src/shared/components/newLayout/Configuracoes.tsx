@@ -19,7 +19,11 @@ import {
 import { toast } from "react-toastify";
 
 import { canCreateOrganizationOwner, useModuleAccess } from "@modules/auth";
-import { TASK_MODEL_CONFIG_ENTRY, canManageTaskModelConfig } from "@modules/integracao";
+import {
+  TASK_MODEL_CONFIG_ENTRY,
+  canManageTaskModelConfig,
+  canViewTaskModelConfig,
+} from "@modules/integracao";
 import { MyOrganizationSection } from "@modules/organizations";
 import { Dialog } from "@shared/components";
 import { useDeleteMePhoto, useMe, useUpdateMe, useUploadMePhoto } from "@shared/hooks";
@@ -134,6 +138,7 @@ export function Configuracoes() {
       ? meQuery.data.organization_id
       : null;
   const canManageTaskModels = canManageTaskModelConfig(integracaoAccess);
+  const canViewTaskModels = canViewTaskModelConfig(integracaoAccess);
   const resolvedCurrentPhotoUrl = resolvePhotoUrl(currentPhotoUrl);
 
   const displayedAvatar = pendingPhotoPreviewUrl ?? resolvedCurrentPhotoUrl;
@@ -544,7 +549,7 @@ export function Configuracoes() {
           <MyOrganizationSection organizationId={managedOrganizationId} userEmail={currentLogin} />
         ) : null}
 
-        {canManageTaskModels ? (
+        {canViewTaskModels ? (
           <section className={`${SETTINGS_PANEL_CLASSNAME} p-6 lg:p-8`}>
             <div className="space-y-5">
               <div className="space-y-1">
@@ -555,7 +560,7 @@ export function Configuracoes() {
                   </h2>
                 </div>
                 <p className={SETTINGS_MUTED_CLASSNAME}>
-                  Ajustes administrativos usados pelos fluxos de tarefas e projetos.
+                  Ajustes usados pelos fluxos de tarefas e projetos.
                 </p>
               </div>
 
@@ -572,7 +577,9 @@ export function Configuracoes() {
                       {TASK_MODEL_CONFIG_ENTRY.label}
                     </p>
                     <p className={SETTINGS_MUTED_CLASSNAME}>
-                      {TASK_MODEL_CONFIG_ENTRY.description}
+                      {canManageTaskModels
+                        ? TASK_MODEL_CONFIG_ENTRY.description
+                        : "Consulte os modelos usados na criação das tarefas de integração."}
                     </p>
                   </div>
                 </div>

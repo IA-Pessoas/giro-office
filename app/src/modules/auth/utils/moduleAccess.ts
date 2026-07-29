@@ -114,7 +114,7 @@ export function canViewIntegrationRoute(
   }
 
   if (isWithinRoute(normalizedPath, "/configs/integracao")) {
-    return integrationLevel >= MODULE_ADMIN_PERMISSION;
+    return integrationLevel >= MODULE_VIEW_PERMISSION;
   }
 
   return integrationLevel >= MODULE_VIEW_PERMISSION;

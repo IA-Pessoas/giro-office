@@ -8,6 +8,7 @@ import type {
   TaskModelDetail,
   TaskModelListItem,
   TaskModelListParams,
+  TaskModelOptions,
   UpdateTaskModelData,
 } from "../types/taskModel";
 import {
@@ -23,6 +24,7 @@ import {
   unwrapTaskDependentList,
   unwrapTaskModelDetail,
   unwrapTaskModelList,
+  unwrapTaskModelOptions,
   unwrapTaskModelPage,
   unwrapUpdatedTaskModel,
 } from "./taskModelService.contract";
@@ -35,6 +37,13 @@ export const taskModelService = {
     });
 
     return unwrapTaskModelList(response.data);
+  },
+
+  async listOptions(): Promise<TaskModelOptions> {
+    const api = setupAPIClient();
+    const response = await api.get(TASK_MODEL_ENDPOINTS.options);
+
+    return unwrapTaskModelOptions(response.data);
   },
 
   async listPage(

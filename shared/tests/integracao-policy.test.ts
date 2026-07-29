@@ -33,6 +33,7 @@ const expectedRoutes = [
   "PUT /task/complete-request",
   "GET /task/model/list",
   "GET /task/deps/list",
+  "GET /task/deps/options",
   "GET /task/model",
   "POST /task/model",
   "PUT /task/model",
@@ -206,13 +207,14 @@ test("a matriz de níveis mantém leitura, edição e administração separadas"
       allowedLevels: [2, 3],
       hasTaskCompletionPermission: true,
     },
-    { method: "GET", path: "/task/model/list", allowedLevels: [2, 3] },
-    { method: "GET", path: "/task/deps/list", allowedLevels: [2, 3] },
-    { method: "GET", path: "/task/model", allowedLevels: [2, 3] },
+    { method: "GET", path: "/task/model/list", allowedLevels: [1, 2, 3] },
+    { method: "GET", path: "/task/deps/list", allowedLevels: [1, 2, 3] },
+    { method: "GET", path: "/task/deps/options", allowedLevels: [1, 2, 3] },
+    { method: "GET", path: "/task/model", allowedLevels: [1, 2, 3] },
     { method: "POST", path: "/task/model", allowedLevels: [3] },
     { method: "PUT", path: "/task/model", allowedLevels: [3] },
     { method: "DELETE", path: "/task/model", allowedLevels: [3] },
-    { method: "GET", path: "/task/model/dependent", allowedLevels: [3] },
+    { method: "GET", path: "/task/model/dependent", allowedLevels: [1, 2, 3] },
     { method: "POST", path: "/task/model/dependent", allowedLevels: [3] },
     { method: "DELETE", path: "/task/model/dependent", allowedLevels: [3] },
   ] as const;
@@ -278,21 +280,25 @@ test("nível 2 exige task_completion para aprovar conclusão", () => {
   );
 });
 
-test("nível 2 pode consultar modelos, mas não administrá-los", () => {
+test("níveis 1 e 2 podem consultar modelos, mas não administrá-los", () => {
   const listPolicy = requirePolicy("GET", "/task/model/list");
   const dependenciesPolicy = requirePolicy("GET", "/task/deps/list");
+  const optionsPolicy = requirePolicy("GET", "/task/deps/options");
   const createPolicy = requirePolicy("POST", "/task/model");
-  const input = {
-    userId: "user-1",
-    level: 2 as const,
-    organizationId: "org-1",
-    resourceOrganizationId: "org-1",
-    isOwner: false,
-  };
+  for (const level of [1, 2] as const) {
+    const input = {
+      userId: "user-1",
+      level,
+      organizationId: "org-1",
+      resourceOrganizationId: "org-1",
+      isOwner: false,
+    };
 
-  assert.equal(evaluateIntegracaoAction(listPolicy, input), "allow");
-  assert.equal(evaluateIntegracaoAction(dependenciesPolicy, input), "allow");
-  assert.equal(evaluateIntegracaoAction(createPolicy, input), "forbidden");
+    assert.equal(evaluateIntegracaoAction(listPolicy, input), "allow");
+    assert.equal(evaluateIntegracaoAction(dependenciesPolicy, input), "allow");
+    assert.equal(evaluateIntegracaoAction(optionsPolicy, input), "allow");
+    assert.equal(evaluateIntegracaoAction(createPolicy, input), "forbidden");
+  }
 });
 
 test("helper traduz a decisão de política em 403 ou 404", () => {

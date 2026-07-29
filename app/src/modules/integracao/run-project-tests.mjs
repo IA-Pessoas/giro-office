@@ -22,6 +22,7 @@ import {
   unwrapCreatedTaskModel,
   unwrapTaskModelDetail,
   unwrapTaskModelList,
+  unwrapTaskModelOptions,
   unwrapTaskModelPage,
 } from "./services/taskModelService.contract.ts";
 import {
@@ -41,6 +42,7 @@ import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
   TASK_MODEL_CONFIG_ENTRY,
   canManageTaskModelConfig,
+  canViewTaskModelConfig,
 } from "./navigation/taskModelConfigNavigation.ts";
 import {
   TASK_TABLE_ACTION_BUTTON_CLASSNAME,
@@ -341,6 +343,27 @@ runTest("task model endpoints match task-service contract", () => {
   assert.equal(TASK_MODEL_ENDPOINTS.crud, "/task/model");
   assert.equal(TASK_MODEL_ENDPOINTS.list, "/task/model/list");
   assert.equal(TASK_MODEL_ENDPOINTS.dependent, "/task/model/dependent");
+  assert.equal(TASK_MODEL_ENDPOINTS.options, "/task/deps/options");
+});
+
+runTest("task model options keep active users and departments in one response", () => {
+  const options = {
+    users: [{ id: "user-1", name: "Ana" }],
+    departments: [{ id: "dep-1", name: "Fiscal" }],
+  };
+
+  assert.deepEqual(unwrapTaskModelOptions({ success: true, data: options }), options);
+  assert.doesNotMatch(
+    readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8"),
+    /listAdminUsers|departmentService\.list/,
+  );
+});
+
+runTest("task model deletion preserves actionable dependency conflicts", () => {
+  const source = readFileSync(new URL("./hooks/useTaskModels.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /response\?\.status === 409/);
+  assert.match(source, /response\.data\?\.error \?\? response\.data\?\.message/);
 });
 
 runTest("task model list params include remote search and pagination", () => {
@@ -466,14 +489,29 @@ runTest("task model modal gates dependent responsible controls", () => {
 
   assert.match(
     source,
-    /disabled=\{!formData\.responsible_id \|\| \(loadingOptions && users\.length === 0\)\}/,
+    /disabled=\{!formData\.responsible_id \|\| optionsUnavailable\}/,
   );
   assert.match(
     source,
-    /disabled=\{!formData\.responsible2_id \|\| \(loadingOptions && users\.length === 0\)\}/,
+    /disabled=\{!formData\.responsible2_id \|\| optionsUnavailable\}/,
   );
   assert.match(source, /Selecione o responsável antes de definir o responsável 2\./);
   assert.match(source, /Selecione o responsável 2 antes de definir o responsável 3\./);
+});
+
+runTest("task model modal allows retrying failed options before saving", () => {
+  const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /const \[optionsRetryKey, setOptionsRetryKey\] = useState\(0\)/);
+  assert.match(source, /const \[requiredOptionsWarning, setRequiredOptionsWarning\] = useState\(false\)/);
+  assert.match(source, /const \[taskModelsWarning, setTaskModelsWarning\] = useState\(false\)/);
+  assert.match(source, /onClick=\{\(\) => setOptionsRetryKey\(\(currentKey\) => currentKey \+ 1\)\}/);
+  assert.match(source, />\s*Tentar novamente\s*<\/button>/);
+  assert.match(
+    source,
+    /const optionsUnavailable = loadingOptions \|\| requiredOptionsWarning;[\s\S]*const taskModelsUnavailable = loadingOptions \|\| taskModelsWarning;[\s\S]*const saveDisabled = saving \|\| loadingDetail \|\| detailError \|\| optionsUnavailable;/,
+  );
+  assert.match(source, /disabled=\{taskModelsUnavailable\}/);
 });
 
 runTest("buildDeleteTaskModelPayload maps task_id body", () => {
@@ -516,6 +554,9 @@ runTest("task model config entry is discoverable in product workflows", () => {
   assert.equal(canManageTaskModelConfig(null), false);
   assert.equal(canManageTaskModelConfig({ isAdmin: false }), false);
   assert.equal(canManageTaskModelConfig({ isAdmin: true }), true);
+  assert.equal(canViewTaskModelConfig(null), false);
+  assert.equal(canViewTaskModelConfig({ canView: false }), false);
+  assert.equal(canViewTaskModelConfig({ canView: true }), true);
 });
 
 runTest("integration write actions use the modular access level", () => {

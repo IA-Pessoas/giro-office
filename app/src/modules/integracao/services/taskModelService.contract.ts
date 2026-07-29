@@ -5,6 +5,7 @@ import type {
   TaskModelDetail,
   TaskModelListItem,
   TaskModelListParams,
+  TaskModelOptions,
   UpdateTaskModelData,
 } from "../types/taskModel";
 import { unwrapServiceEnvelope } from "./envelope.contract.js";
@@ -14,6 +15,7 @@ export const TASK_MODEL_ENDPOINTS = {
   crud: "/task/model",
   list: "/task/model/list",
   dependent: "/task/model/dependent",
+  options: "/task/deps/options",
 } as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -88,6 +90,10 @@ export function buildDeleteDependentPayload(id: string) {
 
 export function unwrapTaskModelList(body: unknown): TaskModelListItem[] {
   return unwrapServiceEnvelope(body) as TaskModelListItem[];
+}
+
+export function unwrapTaskModelOptions(body: unknown): TaskModelOptions {
+  return unwrapServiceEnvelope(body) as TaskModelOptions;
 }
 
 export function unwrapTaskModelPage(
