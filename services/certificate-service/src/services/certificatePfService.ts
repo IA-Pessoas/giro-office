@@ -331,6 +331,14 @@ export class CertificatePfService {
       await deps.fileStorage.deleteObject(record.file_path);
     }
 
+    await this.prisma.certificateNotification.deleteMany({
+      where: {
+        certificate_id: input.id,
+        organization_id: input.organizationId,
+        type: "PF",
+      },
+    });
+
     await this.prisma.certificatePF.delete({
       where: { id: input.id, organization_id: input.organizationId },
     });

@@ -591,6 +591,9 @@ describe("CertificatePfService", () => {
     const { storage, crypto } = createCertificateFileDeps();
     const objectPath = "/certificates/pf/joao.pfx";
     const events: string[] = [];
+    const deleteNotifications = vi.fn(async () => {
+      events.push("prisma:delete-notifications");
+    });
     storage.deleteObject.mockImplementation(async (path) => {
       events.push(`storage:${path}`);
     });
@@ -606,6 +609,9 @@ describe("CertificatePfService", () => {
         delete: vi.fn(async () => {
           events.push("prisma:delete");
         }),
+      },
+      certificateNotification: {
+        deleteMany: deleteNotifications,
       },
     };
     const service = new CertificatePfService(prisma as never, {
@@ -624,7 +630,18 @@ describe("CertificatePfService", () => {
     expect(prisma.certificatePF.delete).toHaveBeenCalledWith({
       where: { id: certificateId, organization_id: certificateOrganizationId },
     });
-    expect(events).toEqual([`storage:${objectPath}`, "prisma:delete"]);
+    expect(deleteNotifications).toHaveBeenCalledWith({
+      where: {
+        certificate_id: certificateId,
+        organization_id: certificateOrganizationId,
+        type: "PF",
+      },
+    });
+    expect(events).toEqual([
+      `storage:${objectPath}`,
+      "prisma:delete-notifications",
+      "prisma:delete",
+    ]);
     expect(result).toEqual({ ok: true });
   });
 

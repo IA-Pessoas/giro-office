@@ -96,6 +96,8 @@ describe("certificate-service OpenAPI", () => {
     expect(spec.paths["/certificate/pf/{id}/file"]?.post).toBeDefined();
     expect(spec.paths["/certificate/pf/{id}/file"]?.get).toBeDefined();
     expect(spec.paths["/certificate/pf/{id}/file"]?.delete).toBeDefined();
+    expect(spec.paths["/certificate/pj/{id}"]?.delete?.responses["500"]).toBeDefined();
+    expect(spec.paths["/certificate/pf/{id}"]?.delete?.responses["500"]).toBeDefined();
 
     expect(spec.paths["/certificate/pj/{id}/file"]?.post?.requestBody?.content).toHaveProperty(
       "multipart/form-data",
