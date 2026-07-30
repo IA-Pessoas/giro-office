@@ -20,7 +20,7 @@ import {
 
 import { useModuleAccess } from "@modules/auth";
 import { Dialog } from "@shared/components/ui/Dialog";
-import { formatCnpjInput, formatCpfInput, normalizeDigits } from "@shared/utils/inputFormatting";
+import { formatCnpjInput, formatCpfInput } from "@shared/utils/inputFormatting";
 import {
   DEFAULT_CERTIFICATE_PAGE,
   DEFAULT_CERTIFICATE_PAGE_SIZE,
@@ -51,6 +51,7 @@ import type {
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
 import { CertificateFileActions } from "./CertificateFileActions";
 import { CertificateForm } from "./CertificateForm";
+import { normalizeCertificateDocumentFilter } from "./certificateInputNormalization";
 import {
   CERTIFICATE_COMPACT_BUTTON_CLASSNAME,
   CERTIFICATE_DATE_STATUS_OK_CLASSNAME,
@@ -286,7 +287,7 @@ export function CertificatesWorkspace() {
       page: pjPage,
       page_size: PAGE_SIZE,
       name: trimValue(pjFilters.name) || undefined,
-      cnpj: normalizeDigits(pjFilters.cnpj) || undefined,
+      cnpj: normalizeCertificateDocumentFilter(pjFilters.cnpj),
       responsible: trimValue(pjFilters.responsible) || undefined,
       model: trimValue(pjFilters.model) || undefined,
       client_castelo_status: pjFilters.clientCasteloStatus,
@@ -302,9 +303,9 @@ export function CertificatesWorkspace() {
       page: pfPage,
       page_size: PAGE_SIZE,
       search: trimValue(pfFilters.search) || undefined,
-      cpf: normalizeDigits(pfFilters.cpf) || undefined,
+      cpf: normalizeCertificateDocumentFilter(pfFilters.cpf),
       enterprise: trimValue(pfFilters.enterprise) || undefined,
-      cnpj: normalizeDigits(pfFilters.cnpj) || undefined,
+      cnpj: normalizeCertificateDocumentFilter(pfFilters.cnpj),
       model: trimValue(pfFilters.model) || undefined,
       client_castelo_status: pfFilters.clientCasteloStatus,
       client_focus_status: pfFilters.clientFocusStatus,

@@ -16,6 +16,13 @@ import {
   certificatePjListQueryKey,
 } from "./hooks/queryKeys.ts";
 import * as certificateWorkspaceUi from "./components/certificateWorkspaceUi.ts";
+import {
+  getCreatePfPayload,
+  getCreatePjPayload,
+  getUpdatePfPayload,
+  getUpdatePjPayload,
+  normalizeCertificateDocumentFilter,
+} from "./components/certificateInputNormalization.ts";
 
 function runTest(name, fn) {
   try {
@@ -363,18 +370,17 @@ runTest("certificate required fields are disclosed only while creating", () => {
   assert.match(source, /isPj \? "CNPJ" : "CPF"/);
 });
 
-runTest("certificate form keeps masked values in the UI and canonical values at the API boundary", () => {
+runTest("certificate form connects UI masks to the pure boundary builders", () => {
   const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
 
   assert.match(
     source,
-    /import \{[\s\S]*formatBrazilianPhoneInput,[\s\S]*formatBrlInput,[\s\S]*formatCnpjInput,[\s\S]*formatCpfInput,[\s\S]*normalizeDigits,[\s\S]*parseBrlInput,[\s\S]*\} from "@shared\/utils\/inputFormatting"/,
+    /import \{[\s\S]*formatBrazilianPhoneInput,[\s\S]*formatBrlInput,[\s\S]*formatCnpjInput,[\s\S]*formatCpfInput,[\s\S]*parseBrlInput,[\s\S]*\} from "@shared\/utils\/inputFormatting"/,
   );
-  assert.match(source, /cnpj: normalizeDigits\(state\.cnpj\)/);
-  assert.match(source, /cpf: normalizeDigits\(state\.cpf\)/);
-  assert.match(source, /payment_amount: state\.wasPaid \? parseBrlInput\(state\.paymentAmount\) : null/);
-  assert.match(source, /normalizeDigits\(current\.cnpj\) !== normalizeDigits\(initial\.cnpj\)/);
-  assert.match(source, /normalizeDigits\(current\.cpf\) !== normalizeDigits\(initial\.cpf\)/);
+  assert.match(source, /getCreatePjPayload/);
+  assert.match(source, /getCreatePfPayload/);
+  assert.match(source, /getUpdatePjPayload/);
+  assert.match(source, /getUpdatePfPayload/);
   assert.match(source, /formatBrazilianPhoneInput\(event\.target\.value\)/);
   assert.match(source, /updateField\("paymentAmount", formatBrlInput\(event\.target\.value\)\)/);
 });
@@ -385,11 +391,103 @@ runTest("certificate workspace formats document filters and sends digit-only que
     "utf8",
   );
 
-  assert.match(source, /cnpj: normalizeDigits\(pjFilters\.cnpj\) \|\| undefined/);
-  assert.match(source, /cpf: normalizeDigits\(pfFilters\.cpf\) \|\| undefined/);
-  assert.match(source, /cnpj: normalizeDigits\(pfFilters\.cnpj\) \|\| undefined/);
+  assert.match(source, /normalizeCertificateDocumentFilter\(pjFilters\.cnpj\)/);
+  assert.match(source, /normalizeCertificateDocumentFilter\(pfFilters\.cpf\)/);
+  assert.match(source, /normalizeCertificateDocumentFilter\(pfFilters\.cnpj\)/);
   assert.match(source, /cnpj: formatCnpjInput\(event\.target\.value\)/);
   assert.match(source, /cpf: formatCpfInput\(event\.target\.value\)/);
+});
+
+runTest("certificate payload builders normalize masked documents and BRL amounts", () => {
+  const pjPayload = getCreatePjPayload({
+    kind: "pj",
+    clientCasteloStatus: true,
+    clientFocusStatus: false,
+    name: " Cliente PJ ",
+    cnpj: "12.345.678/0001-90",
+    responsible: " Responsável ",
+    model: " A1 ",
+    legalNature: " LTDA ",
+    password: " segredo ",
+    expirationDate: "2026-12-31",
+    notes: " nota ",
+    wasPaid: true,
+    paymentDate: "2026-01-02",
+    paymentAmount: "R$ 1.234,56",
+    contactInfo: "(11) 99999-9999",
+  });
+  const pfPayload = getCreatePfPayload({
+    kind: "pf",
+    clientCasteloStatus: false,
+    clientFocusStatus: true,
+    name: " Cliente PF ",
+    cpf: "123.456.789-01",
+    enterprise: " Empresa ",
+    model: " A3 ",
+    cnpj: "12.345.678/0001-90",
+    password: " segredo ",
+    expirationDate: "2026-12-31",
+    notes: "",
+    wasPaid: true,
+    paymentDate: "2026-01-02",
+    paymentAmount: "",
+    contactInfo: "(11) 99999-9999",
+  });
+
+  assert.equal(pjPayload.cnpj, "12345678000190");
+  assert.equal(pjPayload.payment_amount, 1234.56);
+  assert.equal(pfPayload.cpf, "12345678901");
+  assert.equal(pfPayload.cnpj, "12345678000190");
+  assert.equal(pfPayload.payment_amount, null);
+});
+
+runTest("certificate update builders ignore document mask-only changes", () => {
+  const pjState = {
+    kind: "pj",
+    clientCasteloStatus: false,
+    clientFocusStatus: false,
+    name: "Cliente",
+    cnpj: "12.345.678/0001-90",
+    responsible: "Responsável",
+    model: "A1",
+    legalNature: "LTDA",
+    password: "",
+    expirationDate: "2026-12-31",
+    notes: "",
+    wasPaid: false,
+    paymentDate: "",
+    paymentAmount: "",
+    contactInfo: "",
+  };
+  const pfState = {
+    kind: "pf",
+    clientCasteloStatus: false,
+    clientFocusStatus: false,
+    name: "Cliente",
+    cpf: "123.456.789-01",
+    enterprise: "",
+    model: "A1",
+    cnpj: "12.345.678/0001-90",
+    password: "",
+    expirationDate: "2026-12-31",
+    notes: "",
+    wasPaid: false,
+    paymentDate: "",
+    paymentAmount: "",
+    contactInfo: "",
+  };
+
+  assert.equal(getUpdatePjPayload(pjState, { ...pjState, cnpj: "12345678000190" }), null);
+  assert.equal(
+    getUpdatePfPayload(pfState, { ...pfState, cpf: "12345678901", cnpj: "12345678000190" }),
+    null,
+  );
+});
+
+runTest("certificate document filters normalize masked values and omit empty inputs", () => {
+  assert.equal(normalizeCertificateDocumentFilter("12.345.678/0001-90"), "12345678000190");
+  assert.equal(normalizeCertificateDocumentFilter("123.456.789-01"), "12345678901");
+  assert.equal(normalizeCertificateDocumentFilter(" .-/ "), undefined);
 });
 
 console.log("certificates contract tests passed");
