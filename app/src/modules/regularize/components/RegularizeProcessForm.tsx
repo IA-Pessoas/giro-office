@@ -363,7 +363,7 @@ export function RegularizeProcessForm({
                 type="search"
                 value={taskSearch}
                 onChange={(event) => setTaskSearch(event.target.value)}
-                placeholder="Buscar task por nome ou status"
+                placeholder="Buscar task por nome ou identificador"
                 className={regularizeTextFieldClassName}
               />
             </RegularizeFormField>
