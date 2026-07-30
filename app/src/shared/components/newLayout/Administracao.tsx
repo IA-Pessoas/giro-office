@@ -54,13 +54,16 @@ const ADMIN_ACTIVE_TAB_CLASSNAME =
   "bg-[var(--colors-brand-soft)] text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300";
 
 const ADMIN_PANEL_CLASSNAME =
-  "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
+  "rounded-3xl bg-white shadow-sm dark:bg-slate-900";
 
 const ADMIN_SUBPANEL_CLASSNAME =
-  "rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-950/40";
+  "rounded-2xl bg-slate-50/70 dark:bg-slate-950/40";
 
 const ADMIN_FEEDBACK_PANEL_CLASSNAME =
-  "rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40";
+  "rounded-2xl bg-slate-50/70 p-4 dark:bg-slate-950/40";
+
+const ADMIN_EMPTY_STATE_CLASSNAME =
+  "rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-center dark:border-slate-700 dark:bg-slate-950/30";
 
 const ADMIN_LABEL_CLASSNAME = "dialog-neutral-label block text-sm font-medium text-slate-700 dark:text-white";
 
@@ -693,7 +696,7 @@ export function Administracao() {
         </button>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-2xl bg-white p-1 shadow-sm dark:bg-slate-900">
         <div className="flex items-center gap-1 overflow-x-auto">
           {adminTabs.map((tab) => {
             const Icon = tab.icon;
@@ -726,7 +729,7 @@ export function Administracao() {
             return (
               <div
                 key={card.title}
-                className="h-full rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"
+                className="h-full rounded-2xl bg-white p-5 shadow-sm dark:bg-slate-900"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -770,7 +773,7 @@ export function Administracao() {
               ) : !isDepartmentsLoading && departments.length === 0 ? (
                 <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    Nenhum departamento foi retornado pelo backend. A criação de usuários está indisponível.
+                    Ainda não há departamentos cadastrados. Cadastre um departamento para criar usuários.
                   </p>
                   <button
                     type="button"
@@ -837,17 +840,17 @@ export function Administracao() {
 
                 <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
                   {isUsersLoading ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuários...</p>
                     </div>
                   ) : usersError ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>
                         A listagem não está disponível no momento.
                       </p>
                     </div>
                   ) : filteredUsers.length === 0 ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_TEXT_CLASSNAME}>
                         Nenhum usuário encontrado.
                       </p>
@@ -865,10 +868,10 @@ export function Administracao() {
                           key={candidate.id}
                           type="button"
                           onClick={() => setSelectedUserId(candidate.id)}
-                          className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                          className={`w-full rounded-2xl p-4 text-left transition-all ${
                             isSelected
-                              ? "border-[var(--colors-brand-gradient-end)] bg-slate-50 shadow-sm dark:bg-slate-950/60"
-                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800/70"
+                              ? "bg-slate-50 shadow-sm ring-1 ring-[var(--colors-brand-gradient-end)] dark:bg-slate-950/60"
+                              : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/70"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -959,21 +962,21 @@ export function Administracao() {
 
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                   {isPermissionUsersLoading ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuários ativos...</p>
                     </div>
                   ) : permissionUsersError ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>
                         A listagem de usuários ativos não está disponível.
                       </p>
                     </div>
                   ) : permissionUsers.length === 0 ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_TEXT_CLASSNAME}>Nenhum usuário ativo encontrado.</p>
                     </div>
                   ) : filteredPermissionUsers.length === 0 ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_TEXT_CLASSNAME}>
                         Nenhum usuário ativo corresponde à busca.
                       </p>
@@ -987,10 +990,10 @@ export function Administracao() {
                           key={candidate.id}
                           type="button"
                           onClick={() => handleSelectPermissionUser(candidate.id)}
-                          className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                          className={`w-full rounded-2xl p-4 text-left transition-all ${
                             isSelected
-                              ? "border-[var(--colors-brand-gradient-end)] bg-slate-50 shadow-sm dark:bg-slate-950/60"
-                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800/70"
+                              ? "bg-slate-50 shadow-sm ring-1 ring-[var(--colors-brand-gradient-end)] dark:bg-slate-950/60"
+                              : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/70"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">

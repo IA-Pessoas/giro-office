@@ -90,6 +90,12 @@ const permissionConfigSource = readFileSync(
 );
 const userTypesSource = readFileSync(new URL("./types/index.ts", import.meta.url), "utf8");
 
+function extractClassConstant(source, constantName) {
+  const match = source.match(new RegExp(`const ${constantName} =\\s*\\n\\s*"([^"]+)";`));
+
+  return match?.[1] ?? "";
+}
+
 runTest("create user password visibility control remains explicit and accessible", () => {
   assert.match(createUserModalSource, /const \[isPasswordVisible, setIsPasswordVisible\] = useState\(false\);/);
   assert.match(createUserModalSource, /aria-label=\{isPasswordVisible \? 'Ocultar senha' : 'Mostrar senha'\}/);
@@ -591,6 +597,43 @@ runTest("admin permission editor uses module-specific options and normalization"
     administracaoSource,
     /\{PERMISSION_SELECT_OPTIONS\.map\(\(option\) => \(/,
   );
+});
+
+runTest("administration neutral panels avoid stacked borders", () => {
+  const panelClassName = extractClassConstant(administracaoSource, "ADMIN_PANEL_CLASSNAME");
+  const subpanelClassName = extractClassConstant(administracaoSource, "ADMIN_SUBPANEL_CLASSNAME");
+  const feedbackClassName = extractClassConstant(
+    administracaoSource,
+    "ADMIN_FEEDBACK_PANEL_CLASSNAME",
+  );
+
+  assert.match(panelClassName, /rounded-3xl/);
+  assert.match(subpanelClassName, /bg-slate-50\/70/);
+  assert.match(feedbackClassName, /p-4/);
+  assert.doesNotMatch(panelClassName, /\bborder\b/);
+  assert.doesNotMatch(subpanelClassName, /\bborder\b/);
+  assert.doesNotMatch(feedbackClassName, /\bborder\b/);
+  assert.doesNotMatch(administracaoSource, /\$\{ADMIN_FEEDBACK_PANEL_CLASSNAME\} border-dashed/);
+});
+
+runTest("administration empty states avoid backend wording", () => {
+  assert.doesNotMatch(administracaoSource, /backend/i);
+  assert.doesNotMatch(adminUserDetailsPanelSource, /backend/i);
+});
+
+runTest("admin user details panels avoid stacked borders while keeping empty states clear", () => {
+  const panelClassName = extractClassConstant(adminUserDetailsPanelSource, "PANEL_CLASSNAME");
+  const feedbackClassName = extractClassConstant(
+    adminUserDetailsPanelSource,
+    "FEEDBACK_PANEL_CLASSNAME",
+  );
+
+  assert.match(panelClassName, /rounded-2xl/);
+  assert.match(feedbackClassName, /p-4/);
+  assert.doesNotMatch(panelClassName, /\bborder\b/);
+  assert.doesNotMatch(feedbackClassName, /\bborder\b/);
+  assert.doesNotMatch(adminUserDetailsPanelSource, /\$\{PANEL_CLASSNAME\} border-dashed/);
+  assert.match(adminUserDetailsPanelSource, /border border-dashed border-slate-300/);
 });
 
 runTest("create user modal discloses required account fields", () => {
