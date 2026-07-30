@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  formatBrazilianPhoneInput,
+  formatCnpjInput,
+  formatCpfInput,
+} from "../../shared/utils/inputFormatting.ts";
+import {
   buildClientListParams,
   CLIENT_ENDPOINTS,
   unwrapClientEnvelope,
@@ -52,6 +57,35 @@ function runTest(name, fn) {
     console.error(`FAIL ${name}`);
     throw error;
   }
+}
+
+function assertFormattedInputEventContract(format, rawValue, expectedValue) {
+  const originalTarget = {
+    name: "cpf_cnpj",
+    type: "text",
+    value: rawValue,
+  };
+  const originalCurrentTarget = {
+    name: "cpf_cnpj",
+    type: "text",
+    value: rawValue,
+  };
+  const originalEvent = {
+    type: "change",
+    target: originalTarget,
+    currentTarget: originalCurrentTarget,
+  };
+  const formattedValue = format(originalEvent.target.value);
+  originalEvent.target.value = formattedValue;
+  originalEvent.currentTarget.value = formattedValue;
+
+  assert.equal(originalEvent.type, "change");
+  assert.equal(originalEvent.target.name, "cpf_cnpj");
+  assert.equal(originalEvent.target.type, "text");
+  assert.equal(originalEvent.target.value, expectedValue);
+  assert.equal(originalEvent.currentTarget.name, "cpf_cnpj");
+  assert.equal(originalEvent.currentTarget.type, "text");
+  assert.equal(originalEvent.currentTarget.value, expectedValue);
 }
 
 runTest("mapClientStatusFromApi converts prospecting status to Prospect", () => {
@@ -273,6 +307,70 @@ runTest("document input formatter masks and limits by person type", () => {
   assert.equal(formatCpfCnpjInput("123456789101112", "PJ"), "12.345.678/9101-11");
   assert.equal(formatCpfCnpjInput("abc1234", "PF"), "123.4");
   assert.equal(formatCpfCnpjInput("1234567", "PJ"), "12.345.67");
+});
+
+runTest("client input masks forward formatted document and phone values through event-compatible targets", () => {
+  assertFormattedInputEventContract(
+    formatCpfInput,
+    "12345678910",
+    "123.456.789-10",
+  );
+  assertFormattedInputEventContract(
+    formatCnpjInput,
+    "12345678000190",
+    "12.345.678/0001-90",
+  );
+  assertFormattedInputEventContract(
+    formatBrazilianPhoneInput,
+    "11999999999",
+    "(11) 99999-9999",
+  );
+});
+
+runTest("client creation fields route type-specific documents and phones through local mask adapters", () => {
+  const source = readFileSync("src/modules/clients/components/ClientCreateFormFields.tsx", "utf8");
+
+  assert.match(source, /from "@shared\/utils\/inputFormatting"/);
+  assert.match(source, /formatCpfInput/);
+  assert.match(source, /formatCnpjInput/);
+  assert.match(source, /formatBrazilianPhoneInput/);
+  assert.match(source, /formData\.type === "PJ" \? formatCnpjInput : formatCpfInput/);
+  assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
+  assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
+  assert.match(source, /name="cpf_agent"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
+  assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
+  assert.match(source, /event\.target\.value = value/);
+  assert.match(source, /event\.currentTarget\.value = value/);
+});
+
+runTest("client integration fields route type-specific documents and phones through local mask adapters", () => {
+  const source = readFileSync("src/modules/clients/components/ClientIntegrationForm.tsx", "utf8");
+
+  assert.match(source, /from "@shared\/utils\/inputFormatting"/);
+  assert.match(source, /formatCpfInput/);
+  assert.match(source, /formatCnpjInput/);
+  assert.match(source, /formatBrazilianPhoneInput/);
+  assert.match(source, /values\.type === "PJ" \? formatCnpjInput : formatCpfInput/);
+  assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
+  assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
+  assert.match(source, /name="cpf_agent"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
+  assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
+  assert.match(source, /event\.target\.value = value/);
+  assert.match(source, /event\.currentTarget\.value = value/);
+});
+
+runTest("client Regularize fields route generic documents, CPF, and phones through local mask adapters", () => {
+  const source = readFileSync("src/modules/clients/components/ClientRegularizeForm.tsx", "utf8");
+
+  assert.match(source, /from "@shared\/utils\/inputFormatting"/);
+  assert.match(source, /formatCpfCnpjInput/);
+  assert.match(source, /formatCpfInput/);
+  assert.match(source, /formatBrazilianPhoneInput/);
+  assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
+  assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
+  assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
+  assert.match(source, /event\.target\.value = value/);
+  assert.match(source, /event\.currentTarget\.value = value/);
 });
 
 runTest("optional cpf validation accepts empty values and rejects invalid lengths", () => {

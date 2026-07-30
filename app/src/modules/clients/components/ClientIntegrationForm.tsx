@@ -1,5 +1,11 @@
 import type { ChangeEvent } from "react";
 
+import {
+  formatBrazilianPhoneInput,
+  formatCnpjInput,
+  formatCpfInput,
+} from "@shared/utils/inputFormatting";
+
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type {
@@ -28,6 +34,16 @@ interface ClientIntegrationFormProps {
 
 const labelClassName = "block text-sm font-medium text-slate-700 dark:text-white";
 
+function createFormattedInputChangeEvent(
+  event: ChangeEvent<HTMLInputElement>,
+  value: string,
+): ChangeEvent<HTMLInputElement> {
+  event.target.value = value;
+  event.currentTarget.value = value;
+
+  return event;
+}
+
 function isCreateValues(
   values: IntegrationFormValues,
 ): values is CreateClientIntegrationFormValues {
@@ -47,6 +63,17 @@ export function ClientIntegrationForm({
   const isCreate = mode === "create" && isCreateValues(values);
   const createValues = isCreate ? values : null;
   const editValues = !isCreate ? (values as UpdateClientIntegrationFormValues) : null;
+  const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const formatDocument = values.type === "PJ" ? formatCnpjInput : formatCpfInput;
+
+    onChange(createFormattedInputChangeEvent(event, formatDocument(event.target.value)));
+  };
+  const handleCpfChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onChange(createFormattedInputChangeEvent(event, formatCpfInput(event.target.value)));
+  };
+  const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onChange(createFormattedInputChangeEvent(event, formatBrazilianPhoneInput(event.target.value)));
+  };
 
   return (
     <div className="space-y-6">
@@ -83,7 +110,7 @@ export function ClientIntegrationForm({
           <input
             name="cpf_cnpj"
             value={values.cpf_cnpj}
-            onChange={onChange}
+            onChange={handleCpfCnpjChange}
             disabled={disabled}
             placeholder="Somente números"
             className={clientTextFieldClassName}
@@ -142,7 +169,7 @@ export function ClientIntegrationForm({
           <input
             name="number"
             value={values.number}
-            onChange={onChange}
+            onChange={handlePhoneChange}
             disabled={disabled}
             className={clientTextFieldClassName}
           />
@@ -176,7 +203,7 @@ export function ClientIntegrationForm({
           <input
             name="cpf_responsible"
             value={values.cpf_responsible}
-            onChange={onChange}
+            onChange={handleCpfChange}
             disabled={disabled}
             placeholder="Somente números"
             className={clientTextFieldClassName}
@@ -199,7 +226,7 @@ export function ClientIntegrationForm({
           <input
             name="cpf_agent"
             value={values.cpf_agent}
-            onChange={onChange}
+            onChange={handleCpfChange}
             disabled={disabled}
             placeholder="Somente números"
             className={clientTextFieldClassName}

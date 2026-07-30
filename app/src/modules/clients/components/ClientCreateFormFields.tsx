@@ -1,10 +1,26 @@
 import type { ChangeEvent } from "react";
 
+import {
+  formatBrazilianPhoneInput,
+  formatCnpjInput,
+  formatCpfInput,
+} from "@shared/utils/inputFormatting";
+
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type { ClientCreateFormState, IbgeCity, IbgeState } from "./clientCreateFormState";
 
 const labelClass = "block text-sm font-medium text-slate-700 dark:text-white";
+
+function createFormattedInputChangeEvent(
+  event: ChangeEvent<HTMLInputElement>,
+  value: string,
+): ChangeEvent<HTMLInputElement> {
+  event.target.value = value;
+  event.currentTarget.value = value;
+
+  return event;
+}
 
 interface ClientCreateFormFieldsProps {
   formData: ClientCreateFormState;
@@ -23,6 +39,18 @@ export function ClientCreateFormFields({
   isSearchingCnpj,
   onSearchCnpj,
 }: ClientCreateFormFieldsProps) {
+  const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const formatDocument = formData.type === "PJ" ? formatCnpjInput : formatCpfInput;
+
+    onChange(createFormattedInputChangeEvent(event, formatDocument(event.target.value)));
+  };
+  const handleCpfChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onChange(createFormattedInputChangeEvent(event, formatCpfInput(event.target.value)));
+  };
+  const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onChange(createFormattedInputChangeEvent(event, formatBrazilianPhoneInput(event.target.value)));
+  };
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       <label className="flex flex-col gap-1.5">
@@ -53,7 +81,7 @@ export function ClientCreateFormFields({
             className={`${clientTextFieldClassName} flex-1`}
             name="cpf_cnpj"
             value={formData.cpf_cnpj}
-            onChange={onChange}
+            onChange={handleCpfCnpjChange}
             placeholder="Apenas números"
           />
           {formData.type === "PJ" ? (
@@ -154,7 +182,12 @@ export function ClientCreateFormFields({
       </label>
       <label className="flex flex-col gap-1.5">
         <span className={labelClass}>Telefone</span>
-        <input className={clientTextFieldClassName} name="number" value={formData.number} onChange={onChange} />
+        <input
+          className={clientTextFieldClassName}
+          name="number"
+          value={formData.number}
+          onChange={handlePhoneChange}
+        />
       </label>
       <label className="flex flex-col gap-1.5 md:col-span-2 xl:col-span-2">
         <span className={labelClass}>E-mail</span>
@@ -181,7 +214,7 @@ export function ClientCreateFormFields({
           className={clientTextFieldClassName}
           name="cpf_responsible"
           value={formData.cpf_responsible}
-          onChange={onChange}
+          onChange={handleCpfChange}
         />
       </label>
       <label className="flex flex-col gap-1.5">
@@ -194,7 +227,7 @@ export function ClientCreateFormFields({
           className={clientTextFieldClassName}
           name="cpf_agent"
           value={formData.cpf_agent}
-          onChange={onChange}
+          onChange={handleCpfChange}
         />
       </label>
       <label className="flex flex-col gap-1.5">

@@ -1,5 +1,11 @@
 import type { ChangeEvent } from "react";
 
+import {
+  formatBrazilianPhoneInput,
+  formatCpfCnpjInput,
+  formatCpfInput,
+} from "@shared/utils/inputFormatting";
+
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type { ClientRegularizeFormValues } from "../types";
@@ -22,6 +28,16 @@ interface ClientRegularizeFormProps {
 const labelClassName = "block text-sm font-medium text-slate-700 dark:text-white";
 const sectionClassName =
   "rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40";
+
+function createFormattedInputChangeEvent(
+  event: ChangeEvent<HTMLInputElement>,
+  value: string,
+): ChangeEvent<HTMLInputElement> {
+  event.target.value = value;
+  event.currentTarget.value = value;
+
+  return event;
+}
 
 function TextField({
   label,
@@ -93,6 +109,16 @@ export function ClientRegularizeForm({
   onSubmit,
   onCancel,
 }: ClientRegularizeFormProps) {
+  const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onChange(createFormattedInputChangeEvent(event, formatCpfCnpjInput(event.target.value)));
+  };
+  const handleCpfChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onChange(createFormattedInputChangeEvent(event, formatCpfInput(event.target.value)));
+  };
+  const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onChange(createFormattedInputChangeEvent(event, formatBrazilianPhoneInput(event.target.value)));
+  };
+
   return (
     <div className="space-y-6">
       <section className={sectionClassName}>
@@ -102,7 +128,7 @@ export function ClientRegularizeForm({
           <TextField label="Nome / Apelido" name="name" value={values.name} onChange={onChange} disabled={disabled} />
           <TextField label="Razão Social" name="company_name" value={values.company_name} onChange={onChange} disabled={disabled} />
           <TextField label="Nome Fantasia" name="fantasy_name" value={values.fantasy_name} onChange={onChange} disabled={disabled} />
-          <TextField label="CPF/CNPJ" name="cpf_cnpj" value={values.cpf_cnpj} onChange={onChange} disabled={disabled} />
+          <TextField label="CPF/CNPJ" name="cpf_cnpj" value={values.cpf_cnpj} onChange={handleCpfCnpjChange} disabled={disabled} />
           <TextField label="CNAE Principal" name="cnae" value={values.cnae} onChange={onChange} disabled={disabled} />
           <TextField label="CNAE Secundário" name="cnae_secondary" value={values.cnae_secondary} onChange={onChange} disabled={disabled} />
           <TextField label="Data de Abertura" name="opening_date" value={values.opening_date} onChange={onChange} disabled={disabled} type="date" />
@@ -114,8 +140,8 @@ export function ClientRegularizeForm({
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Contato e Endereço</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <TextField label="Responsável" name="responsible" value={values.responsible} onChange={onChange} disabled={disabled} />
-          <TextField label="CPF do Responsável" name="cpf_responsible" value={values.cpf_responsible} onChange={onChange} disabled={disabled} />
-          <TextField label="Telefone" name="number" value={values.number} onChange={onChange} disabled={disabled} />
+          <TextField label="CPF do Responsável" name="cpf_responsible" value={values.cpf_responsible} onChange={handleCpfChange} disabled={disabled} />
+          <TextField label="Telefone" name="number" value={values.number} onChange={handlePhoneChange} disabled={disabled} />
           <TextField label="E-mail" name="email" value={values.email} onChange={onChange} disabled={disabled} type="email" />
           <div className="md:col-span-2 xl:col-span-2">
             <TextField label="Endereço" name="address" value={values.address} onChange={onChange} disabled={disabled} />
