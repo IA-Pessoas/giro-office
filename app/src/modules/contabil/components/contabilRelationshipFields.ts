@@ -12,30 +12,30 @@ interface ContabilRelationshipFieldDefinition {
 
 export const CONTABIL_RELATIONSHIP_FIELDS: ContabilRelationshipFieldDefinition[] = [
   {
-    field: "bidding",
-    label: "Participa de licitação",
-    kind: "boolean",
-    requiredOnCreate: true,
-    order: 1,
-  },
-  {
     field: "chart_accounts",
     label: "Plano de contas",
     kind: "text",
     requiredOnCreate: true,
-    order: 2,
+    order: 1,
   },
   {
     field: "tool",
     label: "Ferramenta",
     kind: "text",
     requiredOnCreate: true,
-    order: 3,
+    order: 2,
   },
   {
     field: "system",
     label: "Sistema",
     kind: "text",
+    requiredOnCreate: true,
+    order: 3,
+  },
+  {
+    field: "bidding",
+    label: "Participa de licitação",
+    kind: "boolean",
     requiredOnCreate: true,
     order: 4,
   },

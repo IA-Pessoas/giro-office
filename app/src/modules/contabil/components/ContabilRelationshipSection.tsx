@@ -294,24 +294,6 @@ export function ContabilRelationshipSection({
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
-            {CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS.map((field) => (
-              <label
-                key={field.field}
-                className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-3 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300"
-              >
-                <input
-                  type="checkbox"
-                  checked={formValues[field.field]}
-                  onChange={(event) =>
-                    handleFieldChange(field.field, event.target.checked)
-                  }
-                  disabled={!canEdit}
-                  className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
-                />
-                <span>{field.label}</span>
-              </label>
-            ))}
-
             {CONTABIL_RELATIONSHIP_TEXT_FIELDS.map((field) => (
               <label
                 key={field.field}
@@ -329,12 +311,30 @@ export function ContabilRelationshipSection({
                 />
               </label>
             ))}
+
+            {CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS.map((field) => (
+              <label
+                key={field.field}
+                className="flex h-11 items-center gap-3 self-end rounded-lg bg-gray-50/70 px-3 text-sm text-gray-700 dark:bg-slate-900/40 dark:text-slate-300"
+              >
+                <input
+                  type="checkbox"
+                  checked={formValues[field.field]}
+                  onChange={(event) =>
+                    handleFieldChange(field.field, event.target.checked)
+                  }
+                  disabled={!canEdit}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+                />
+                <span>{field.label}</span>
+              </label>
+            ))}
           </div>
 
           {CONTABIL_RELATIONSHIP_TEXTAREA_FIELDS.map((field) => (
             <label
               key={field.field}
-              className="flex flex-col gap-2 text-sm text-gray-700 dark:text-slate-300"
+              className="flex flex-col gap-2 pt-2 text-sm text-gray-700 dark:text-slate-300"
             >
               <span>{field.label}</span>
               <textarea

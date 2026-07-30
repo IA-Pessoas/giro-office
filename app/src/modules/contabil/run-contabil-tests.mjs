@@ -343,12 +343,37 @@ await (async () => {
     ]);
   });
 
-  await runTest("relationship field registry matches the backend contract", () => {
+  await runTest("relationship field registry keeps bidding beside system in the UI order", () => {
     assert.deepEqual(
       CONTABIL_RELATIONSHIP_FIELDS.map((field) => field.field),
-      ["bidding", "chart_accounts", "tool", "system", "note"],
+      ["chart_accounts", "tool", "system", "bidding", "note"],
     );
-    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[0].requiredOnCreate, true);
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.field, "bidding");
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.requiredOnCreate, true);
+  });
+
+  await runTest("relationship bidding checkbox uses compact form proportions", () => {
+    const source = readFileSync(
+      new URL("./components/ContabilRelationshipSection.tsx", import.meta.url),
+      "utf8",
+    );
+    const textFieldsStart = source.indexOf("{CONTABIL_RELATIONSHIP_TEXT_FIELDS.map");
+    const textareaStart = source.indexOf("{CONTABIL_RELATIONSHIP_TEXTAREA_FIELDS.map");
+    const checkboxStart = source.indexOf("{CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS.map");
+    const checkboxSource = source.slice(
+      checkboxStart,
+      source.indexOf("{submitError", checkboxStart),
+    );
+
+    assert.ok(textFieldsStart < textareaStart);
+    assert.ok(textFieldsStart < checkboxStart);
+    assert.ok(checkboxStart < textareaStart);
+    assert.match(checkboxSource, /className="flex h-11 items-center gap-3/);
+    assert.match(checkboxSource, /className="h-4 w-4/);
+    assert.doesNotMatch(
+      checkboxSource,
+      /rounded-xl border border-gray-200 bg-gray-50\/70 px-4 py-3/,
+    );
   });
 
   await runTest("responsible and relationship form helpers normalize nullable backend values", () => {
