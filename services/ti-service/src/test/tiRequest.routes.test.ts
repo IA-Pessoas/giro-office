@@ -167,6 +167,7 @@ describe("ti request routes", () => {
           organization_id: where.organization_id,
         })),
         update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+        updateMany: vi.fn(async () => ({ count: 1 })),
       },
     };
 
@@ -182,6 +183,47 @@ describe("ti request routes", () => {
         id: requestId,
         assigned_to_id: userId,
       },
+    });
+    expect(prisma.tIRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: requestId, organization_id: organizationId },
+      data: { assigned_to_id: userId },
+    });
+  });
+
+  it("PATCH /ti/requests/:id/assign returns 409 when the assignee became stale", async () => {
+    const prisma = {
+      department: {
+        findFirst: vi.fn(async () => ({ id: "50000000-0000-4000-8000-000000000001" })),
+      },
+      user: {
+        findFirst: vi.fn(async ({ where }) => ({
+          id: where.id,
+          organization_id: where.organization_id,
+          department_id: "50000000-0000-4000-8000-000000000001",
+          status: "active",
+        })),
+      },
+      tIRequest: {
+        findFirst: vi.fn(async ({ where }) => ({
+          id: where.id,
+          assigned_to_id: userId,
+          organization_id: where.organization_id,
+        })),
+        update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+        updateMany: vi.fn(async () => ({ count: 0 })),
+      },
+    };
+
+    const response = await request(createTestApp(prisma as never))
+      .patch(`/ti/requests/${requestId}/assign`)
+      .set(gatewayHeaders(TiPermissionLevel.Requester))
+      .send({ assigned_to_id: otherUserId });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Chamado de TI foi transferido por outro usuario.",
+      code: "CONFLICT",
     });
   });
 

@@ -191,10 +191,24 @@ export class TiRequestService {
       throw new ServiceError(400, "Responsavel deve pertencer ao departamento Tecnologia.");
     }
 
-    return this.prisma.tIRequest.update({
-      where: { id },
+    const updateResult = await this.prisma.tIRequest.updateMany({
+      where: {
+        id,
+        organization_id: context.organizationId,
+        ...(request.assigned_to_id === context.userId &&
+        context.permission < TiPermissionLevel.Admin &&
+        !context.isOrganizationOwner
+          ? { assigned_to_id: request.assigned_to_id }
+          : {}),
+      },
       data: { assigned_to_id: body.assigned_to_id },
     });
+
+    if (updateResult.count === 0) {
+      throw new ServiceError(409, "Chamado de TI foi transferido por outro usuario.");
+    }
+
+    return { id, assigned_to_id: body.assigned_to_id };
   }
 
   async listTransferCandidates(
@@ -223,6 +237,12 @@ export class TiRequestService {
         organization_id: context.organizationId,
         department_id: technologyDepartmentId,
         status: "active",
+        permissions: {
+          some: {
+            organization_id: context.organizationId,
+            ti: { gte: TiPermissionLevel.Requester },
+          },
+        },
       },
       select: TRANSFER_CANDIDATE_SELECT,
       orderBy: { full_name: "asc" },
@@ -257,10 +277,7 @@ export class TiRequestService {
     }
   }
 
-  private assertTransferorPermission(
-    context: TiAuthContext,
-    assignedToId: string | null,
-  ): void {
+  private assertTransferorPermission(context: TiAuthContext, assignedToId: string | null): void {
     if (
       assignedToId !== context.userId &&
       context.permission < TiPermissionLevel.Admin &&

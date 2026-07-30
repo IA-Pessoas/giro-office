@@ -1256,7 +1256,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Chamado de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiRequestAssignInput"),
           successDescription: "Chamado atribuido",
-          errors: [400, 401, 403, 404],
+          errors: [400, 401, 403, 404, 409],
         }),
       },
       "/ti/requests/{id}/transfer-candidates": {

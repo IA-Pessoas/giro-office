@@ -377,6 +377,7 @@ export function createPrismaMock(): PrismaClient {
       })),
       create: vi.fn(async ({ data }) => ({ id: "req-1", ...data })),
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     tIMessage: {
       findMany: vi.fn(async () => []),

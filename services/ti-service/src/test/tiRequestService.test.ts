@@ -47,6 +47,7 @@ function createAssignPrismaMock(destination: {
         organization_id: organizationId,
       })),
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
   };
 }
@@ -373,6 +374,12 @@ describe("TiRequestService", () => {
         organization_id: organizationId,
         department_id: technologyDepartmentId,
         status: "active",
+        permissions: {
+          some: {
+            organization_id: organizationId,
+            ti: { gte: TiPermissionLevel.Requester },
+          },
+        },
       },
       select: {
         id: true,
@@ -381,6 +388,50 @@ describe("TiRequestService", () => {
         department_id: true,
       },
       orderBy: { full_name: "asc" },
+    });
+  });
+
+  it("rejects a transfer when the current assignee changed after authorization", async () => {
+    const prisma = {
+      department: {
+        findFirst: vi.fn(async () => ({ id: technologyDepartmentId })),
+      },
+      user: {
+        findFirst: vi.fn(async () => ({
+          id: tiUserId,
+          department_id: technologyDepartmentId,
+          status: "active",
+          organization_id: organizationId,
+        })),
+      },
+      tIRequest: {
+        findFirst: vi.fn(async () => ({
+          id: requestId,
+          assigned_to_id: userId,
+          organization_id: organizationId,
+        })),
+        update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+        updateMany: vi.fn(async () => ({ count: 0 })),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign({ ...context, permission: TiPermissionLevel.Requester }, requestId, {
+        assigned_to_id: tiUserId,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Chamado de TI foi transferido por outro usuario.",
+    });
+
+    expect(prisma.tIRequest.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: requestId,
+        organization_id: organizationId,
+        assigned_to_id: userId,
+      },
+      data: { assigned_to_id: tiUserId },
     });
   });
 
