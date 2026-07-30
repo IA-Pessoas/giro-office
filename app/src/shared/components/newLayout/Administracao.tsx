@@ -62,6 +62,9 @@ const ADMIN_SUBPANEL_CLASSNAME =
 const ADMIN_FEEDBACK_PANEL_CLASSNAME =
   "rounded-2xl bg-slate-50/70 p-4 dark:bg-slate-950/40";
 
+const ADMIN_EMPTY_STATE_CLASSNAME =
+  "rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-center dark:border-slate-700 dark:bg-slate-950/30";
+
 const ADMIN_LABEL_CLASSNAME = "dialog-neutral-label block text-sm font-medium text-slate-700 dark:text-white";
 
 const ADMIN_TEXT_CLASSNAME = "dialog-neutral-text text-sm text-slate-700 dark:text-white";
@@ -837,17 +840,17 @@ export function Administracao() {
 
                 <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
                   {isUsersLoading ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuários...</p>
                     </div>
                   ) : usersError ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>
                         A listagem não está disponível no momento.
                       </p>
                     </div>
                   ) : filteredUsers.length === 0 ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_TEXT_CLASSNAME}>
                         Nenhum usuário encontrado.
                       </p>
@@ -959,21 +962,21 @@ export function Administracao() {
 
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                   {isPermissionUsersLoading ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuários ativos...</p>
                     </div>
                   ) : permissionUsersError ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>
                         A listagem de usuários ativos não está disponível.
                       </p>
                     </div>
                   ) : permissionUsers.length === 0 ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_TEXT_CLASSNAME}>Nenhum usuário ativo encontrado.</p>
                     </div>
                   ) : filteredPermissionUsers.length === 0 ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_TEXT_CLASSNAME}>
                         Nenhum usuário ativo corresponde à busca.
                       </p>

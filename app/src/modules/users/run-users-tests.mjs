@@ -613,6 +613,22 @@ runTest("administration neutral panels avoid stacked borders", () => {
   assert.doesNotMatch(panelClassName, /\bborder\b/);
   assert.doesNotMatch(subpanelClassName, /\bborder\b/);
   assert.doesNotMatch(feedbackClassName, /\bborder\b/);
+  assert.doesNotMatch(administracaoSource, /\$\{ADMIN_FEEDBACK_PANEL_CLASSNAME\} border-dashed/);
+});
+
+runTest("admin user details panels avoid stacked borders while keeping empty states clear", () => {
+  const panelClassName = extractClassConstant(adminUserDetailsPanelSource, "PANEL_CLASSNAME");
+  const feedbackClassName = extractClassConstant(
+    adminUserDetailsPanelSource,
+    "FEEDBACK_PANEL_CLASSNAME",
+  );
+
+  assert.match(panelClassName, /rounded-2xl/);
+  assert.match(feedbackClassName, /p-4/);
+  assert.doesNotMatch(panelClassName, /\bborder\b/);
+  assert.doesNotMatch(feedbackClassName, /\bborder\b/);
+  assert.doesNotMatch(adminUserDetailsPanelSource, /\$\{PANEL_CLASSNAME\} border-dashed/);
+  assert.match(adminUserDetailsPanelSource, /border border-dashed border-slate-300/);
 });
 
 runTest("create user modal discloses required account fields", () => {

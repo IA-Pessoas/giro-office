@@ -42,10 +42,13 @@ const PASSWORD_CONFIRM_DIALOG_CLASSNAME =
 const PASSWORD_CONFIRM_ACTION_CLASSNAME = "!rounded-lg !px-3.5 !py-2";
 
 const PANEL_CLASSNAME =
-  "rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-950/40";
+  "rounded-2xl bg-slate-50/70 dark:bg-slate-950/40";
 
 const FEEDBACK_PANEL_CLASSNAME =
-  "rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40";
+  "rounded-2xl bg-slate-50/70 p-4 dark:bg-slate-950/40";
+
+const EMPTY_STATE_CLASSNAME =
+  "flex h-full min-h-[480px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-center dark:border-slate-700 dark:bg-slate-950/30";
 
 const LABEL_CLASSNAME = "dialog-neutral-label block text-sm font-medium text-slate-700 dark:text-white";
 
@@ -224,7 +227,7 @@ export function AdminUserDetailsPanel({
 
   if (!userId) {
     return (
-      <div className={`flex h-full min-h-[480px] items-center justify-center ${PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+      <div className={EMPTY_STATE_CLASSNAME}>
         <div className="space-y-2">
           <p className={TEXT_CLASSNAME}>Nenhum usuário selecionado.</p>
           <p className={MUTED_CLASSNAME}>
@@ -241,7 +244,7 @@ export function AdminUserDetailsPanel({
 
   if (loadError) {
     return (
-      <div className={`flex h-full min-h-[480px] items-center justify-center ${PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+      <div className={EMPTY_STATE_CLASSNAME}>
         <div className="space-y-2">
           <p className={TEXT_CLASSNAME}>{loadError}</p>
           <button
@@ -258,7 +261,7 @@ export function AdminUserDetailsPanel({
 
   if (isLoadingUser || !formData) {
     return (
-      <div className={`flex h-full min-h-[480px] items-center justify-center ${PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+      <div className={EMPTY_STATE_CLASSNAME}>
         <p className={MUTED_CLASSNAME}>Carregando detalhes do usuário...</p>
       </div>
     );
