@@ -83,6 +83,10 @@ function toInputDate(value: string | null | undefined): string {
   return value.slice(0, 10);
 }
 
+function hasText(value: string): boolean {
+  return value.trim().length > 0;
+}
+
 function buildInitialFormState(formKind: "pj", initial?: CertificatePj): PjFormState;
 function buildInitialFormState(formKind: "pf", initial?: CertificatePf): PfFormState;
 function buildInitialFormState(

@@ -368,6 +368,7 @@ runTest("certificate required fields are disclosed only while creating", () => {
   assert.match(source, /<RequiredFieldLabel[\s\S]*required=\{isCreate\}/);
   assert.match(source, /aria-required=\{isCreate\}/);
   assert.match(source, /isPj \? "CNPJ" : "CPF"/);
+  assert.match(source, /function hasText\(value: string\): boolean/);
 });
 
 runTest("certificate form connects UI masks to the pure boundary builders", () => {
