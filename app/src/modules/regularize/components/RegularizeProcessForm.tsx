@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
 import { ClientSelectionField } from "@modules/clients";
+import { useIntegracaoTasksList } from "@modules/integracao";
 
 import type {
   CreateRegularizeProcessPayload,
@@ -132,6 +133,21 @@ export function RegularizeProcessForm({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const isEditing = mode === "edit";
+  const tasksQuery = useIntegracaoTasksList({ status: "Todos", limit: 100 });
+  const taskOptions = (tasksQuery.data?.data ?? []).map((task) => ({
+    id: task.id,
+    label: `${task.name} — ${task.status}`,
+  }));
+
+  if (formState.task_id && !taskOptions.some((task) => task.id === formState.task_id)) {
+    taskOptions.push({ id: formState.task_id, label: "Task vinculada (fora da lista)" });
+  }
+
+  const taskQueryMessage = tasksQuery.isLoading
+    ? "Carregando tasks..."
+    : tasksQuery.error
+      ? `Erro ao carregar tasks: ${tasksQuery.error.message}`
+      : null;
 
   useEffect(() => {
     if (open) {
@@ -338,11 +354,21 @@ export function RegularizeProcessForm({
             </RegularizeFormField>
 
             <RegularizeFormField label="Task ID">
-              <input
+              <RegularizeNativeSelect
                 value={formState.task_id}
                 onChange={(event) => handleChange("task_id", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
+                disabled={tasksQuery.isLoading || Boolean(tasksQuery.error)}
+              >
+                <option value="">Sem task vinculada</option>
+                {taskOptions.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.label}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+              {taskQueryMessage ? (
+                <span className="text-xs text-gray-500 dark:text-slate-400">{taskQueryMessage}</span>
+              ) : null}
             </RegularizeFormField>
 
             <RegularizeFormField label="Descrição" required className="md:col-span-3">
