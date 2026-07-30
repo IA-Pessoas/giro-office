@@ -10,6 +10,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import type { UserAuditRecorder } from "../integrations/audit.js";
 import {
   createUserBodySchema,
   listUsersQuerySchema,
@@ -24,10 +25,11 @@ import {
 import { StorageService } from "../services/storageService.js";
 import { UserService } from "../services/userService.js";
 
-const router: ReturnType<typeof Router> = Router();
+export function createUserRoutes(options: { audit?: UserAuditRecorder } = {}): ReturnType<typeof Router> {
+  const router: ReturnType<typeof Router> = Router();
 const upload = createPhotoUploadMiddleware();
-const userService = new UserService();
-const storageService = new StorageService();
+  const userService = new UserService(options.audit);
+  const storageService = new StorageService();
 
 function requireManageUsersAuthMiddleware(
   request: Request,
@@ -180,7 +182,13 @@ router.post(
 
       validateUploadFileSignature(request.file);
       const photoUrl = await storageService.uploadUserPhoto(request.file, id);
-      const user = await userService.update(id, { photo_url: photoUrl }, auth.organization_id);
+      const user = await userService.update(
+        id,
+        { photo_url: photoUrl },
+        auth.organization_id,
+        auth.user_id,
+        "UPDATE_PHOTO",
+      );
 
       response.json(createSuccessResponse(user));
     } catch (err) {
@@ -199,7 +207,13 @@ router.delete(
       const { id } = parseWithZod(userIdParamsSchema, request.params);
 
       await storageService.deleteUserPhoto(id);
-      const user = await userService.update(id, { photo_url: null }, auth.organization_id);
+      const user = await userService.update(
+        id,
+        { photo_url: null },
+        auth.organization_id,
+        auth.user_id,
+        "UPDATE_PHOTO",
+      );
 
       response.json(createSuccessResponse(user));
     } catch (err) {
@@ -217,7 +231,7 @@ router.delete(
       const auth = requireManageUsersAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
 
-      await userService.delete(id, auth.organization_id);
+      await userService.delete(id, auth.organization_id, auth.user_id);
 
       response.json(createSuccessResponse({ message: "Usuario desativado com sucesso." }));
     } catch (err) {
@@ -227,4 +241,7 @@ router.delete(
   },
 );
 
-export { router as userRoutes };
+  return router;
+}
+
+export const userRoutes: ReturnType<typeof Router> = createUserRoutes();

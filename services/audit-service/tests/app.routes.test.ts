@@ -44,6 +44,12 @@ function createTestRepository(): AuditRequestRepository {
         serviceSource: payload.serviceSource,
         createdAt: payload.createdAt,
         finishedAt: payload.finishedAt ?? null,
+        action: payload.action ?? null,
+        referring: payload.referring ?? null,
+        referringId: payload.referringId ?? null,
+        changes:
+          payload.changes && typeof payload.changes !== "string" ? payload.changes : null,
+        department: payload.department ?? null,
         metadata: payload.metadata ?? null,
       });
     },
@@ -54,6 +60,10 @@ function createTestRepository(): AuditRequestRepository {
         .filter((record) => (filters.userId ? record.userId === filters.userId : true))
         .filter((record) => (filters.method ? record.method === filters.method : true))
         .filter((record) => (filters.path ? record.path.includes(filters.path) : true))
+        .filter((record) => (filters.referring ? record.referring === filters.referring : true))
+        .filter((record) =>
+          filters.referringId ? record.referringId === filters.referringId : true,
+        )
         .filter((record) =>
           typeof filters.statusCode === "number" ? record.statusCode === filters.statusCode : true,
         )
@@ -292,6 +302,79 @@ it("scopes audit search results to the forwarded organization", async () => {
     expect(response.status).toBe(200);
     expect(body.data.total).toBe(1);
     expect(body.data.items[0]?.requestId).toBe("req-1");
+  } finally {
+    await stopServer(server);
+  }
+});
+
+it("searches administrative audits by independent entity filters and organization", async () => {
+  const repository = createTestRepository();
+  await repository.create({
+    requestId: "req-user",
+    organizationId: "org-1",
+    userId: "actor-1",
+    method: "ENTITY_CHANGE",
+    path: "/user",
+    outcome: "success",
+    serviceSource: "user-service",
+    createdAt: new Date("2026-03-10T12:00:00.000Z").toISOString(),
+    action: "UPDATE",
+    referring: "user",
+    referringId: "user-1",
+    changes: { name: { previous: "Before", next: "After" } },
+  });
+  await repository.create({
+    requestId: "req-permission",
+    organizationId: "org-1",
+    userId: "actor-1",
+    method: "ENTITY_CHANGE",
+    path: "/Permission",
+    outcome: "success",
+    serviceSource: "user-service",
+    createdAt: new Date("2026-03-10T12:01:00.000Z").toISOString(),
+    action: "UPDATE",
+    referring: "Permission",
+    referringId: "user-1",
+    changes: { previous: { fiscal: 1 }, next: { fiscal: 2 } },
+  });
+  await repository.create({
+    requestId: "req-other-org",
+    organizationId: "org-2",
+    userId: "actor-2",
+    method: "ENTITY_CHANGE",
+    path: "/user",
+    outcome: "success",
+    serviceSource: "user-service",
+    createdAt: new Date("2026-03-10T12:02:00.000Z").toISOString(),
+    action: "UPDATE",
+    referring: "user",
+    referringId: "user-1",
+    changes: { name: { previous: "Other", next: "Org" } },
+  });
+
+  const app = createApp({
+    env: createEnv(),
+    logger: createTestLogger(),
+    repository,
+  });
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const response = await fetch(
+      `${baseUrl}/audit/requests?referring=user&referringId=user-1`,
+      { headers: withReadHeaders("2", "org-1") },
+    );
+    const body = (await response.json()) as { success: true; data: AuditSearchResult };
+
+    expect(response.status).toBe(200);
+    expect(body.data.total).toBe(1);
+    expect(body.data.items[0]).toMatchObject({
+      requestId: "req-user",
+      referring: "user",
+      referringId: "user-1",
+      changes: { name: { previous: "Before", next: "After" } },
+    });
   } finally {
     await stopServer(server);
   }
