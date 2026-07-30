@@ -49,6 +49,7 @@ function createMockPrisma(): IpiServicePrisma {
       findMany: vi.fn(async () => []),
       create: vi.fn(async () => ({})),
       update: vi.fn(async () => ({})),
+      delete: vi.fn(async () => ({})),
     },
   } as unknown as IpiServicePrisma;
 }
@@ -183,6 +184,59 @@ describe("IpiService", () => {
       expect.objectContaining({
         where: { id: IPI_ID },
         data: expectedUpdateData,
+      }),
+    );
+  });
+
+  it("delete lança 404 quando IPI não existe", async () => {
+    const prisma = createMockPrisma();
+    prisma.ipi.findFirst = vi.fn(
+      async () => null,
+    ) as unknown as IpiServicePrisma["ipi"]["findFirst"];
+    const service = new IpiService(prisma, createMockAudit());
+
+    await expect(
+      service.delete({
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        permission: 3,
+        ipi_id: IPI_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(prisma.ipi.delete).not.toHaveBeenCalled();
+  });
+
+  it("delete remove IPI e registra auditoria quando existe", async () => {
+    const prisma = createMockPrisma();
+    const existing = { id: IPI_ID, ncm: baseCreateInput.ncm };
+    prisma.ipi.findFirst = vi.fn(
+      async () => existing,
+    ) as unknown as IpiServicePrisma["ipi"]["findFirst"];
+    prisma.ipi.delete = vi.fn(async () => existing) as unknown as IpiServicePrisma["ipi"]["delete"];
+    const audit = createMockAudit();
+    const service = new IpiService(prisma, audit);
+
+    const result = await service.delete({
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      permission: 3,
+      ipi_id: IPI_ID,
+    });
+
+    expect(result).toEqual({ deleted: existing });
+    expect(prisma.ipi.findFirst).toHaveBeenCalledWith({
+      where: { id: IPI_ID, organization_id: ORG_ID },
+      select: expect.any(Object),
+    });
+    expect(prisma.ipi.delete).toHaveBeenCalledWith({
+      where: { id: IPI_ID },
+      select: expect.any(Object),
+    });
+    expect(audit.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Exclusao",
+        referring: "fiscal.ipi",
+        referringId: IPI_ID,
       }),
     );
   });

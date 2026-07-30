@@ -54,6 +54,37 @@ async function runTest(name, fn) {
   }
 }
 
+function readWorkspaceSource(relativePath) {
+  return readFileSync(new URL(relativePath, import.meta.url), "utf8");
+}
+
+const contabilServiceSources = {
+  authMiddleware: readWorkspaceSource(
+    "../../../../services/contabil-service/src/middlewares/isAuthenticated.ts",
+  ),
+  controlRoute: readWorkspaceSource(
+    "../../../../services/contabil-service/src/routes/control.routes.ts",
+  ),
+  responsibleRoute: readWorkspaceSource(
+    "../../../../services/contabil-service/src/routes/responsible.routes.ts",
+  ),
+  relationshipRoute: readWorkspaceSource(
+    "../../../../services/contabil-service/src/routes/relationship.routes.ts",
+  ),
+  controlRouteTest: readWorkspaceSource(
+    "../../../../services/contabil-service/src/test/control.routes.test.ts",
+  ),
+  responsibleRouteTest: readWorkspaceSource(
+    "../../../../services/contabil-service/src/test/responsible.routes.test.ts",
+  ),
+  relationshipRouteTest: readWorkspaceSource(
+    "../../../../services/contabil-service/src/test/relationship.routes.test.ts",
+  ),
+  gatewayServiceRegistry: readWorkspaceSource(
+    "../../../../services/gateway/src/config/serviceRegistry.ts",
+  ),
+};
+
 await (async () => {
   await runTest("contabil page filters the client picker by accounting department", () => {
     const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
@@ -77,6 +108,38 @@ await (async () => {
     assert.equal(
       CONTABIL_ENDPOINTS.relationshipByClient("30"),
       "/contabil/relationships/client/30",
+    );
+  });
+
+  await runTest("contabil-service blocks viewer writes and allows editor writes", () => {
+    assert.match(contabilServiceSources.authMiddleware, /const CONTABIL_WRITE_PERMISSION = 2;/);
+    assert.match(contabilServiceSources.authMiddleware, /requireContabilWritePermission/);
+
+    assert.equal(
+      contabilServiceSources.controlRoute.match(/requireContabilWritePermission/g)?.length,
+      3,
+    );
+    assert.equal(
+      contabilServiceSources.responsibleRoute.match(/requireContabilWritePermission/g)?.length,
+      4,
+    );
+    assert.equal(
+      contabilServiceSources.relationshipRoute.match(/requireContabilWritePermission/g)?.length,
+      4,
+    );
+
+    for (const source of [
+      contabilServiceSources.controlRouteTest,
+      contabilServiceSources.responsibleRouteTest,
+      contabilServiceSources.relationshipRouteTest,
+    ]) {
+      assert.match(source, /function gatewayHeaders\(permission = 2\)/);
+      assert.match(source, /gatewayHeaders\(1\)/);
+    }
+
+    assert.match(
+      contabilServiceSources.gatewayServiceRegistry,
+      /key:\s*"contabil-service",[\s\S]*internalServiceToken:\s*env\.auditServiceToken,[\s\S]*permissionModule:\s*"contabil"/,
     );
   });
 
@@ -304,7 +367,7 @@ await (async () => {
     });
   });
 
-  await runTest("assignable user helper maps active users into select labels", () => {
+  await runTest("assignable user helper limits selector options to accounting users", () => {
     const options = mapAssignableUsersToContabilOptions([
       {
         id: "user-1",
@@ -317,6 +380,20 @@ await (async () => {
         id: "user-2",
         name: "Bruno",
         status: "active",
+        departmentName: "RH",
+        photoUrl: null,
+      },
+      {
+        id: "user-3",
+        name: "Carla",
+        status: "active",
+        departmentName: "Contabil Fiscal",
+        photoUrl: null,
+      },
+      {
+        id: "user-4",
+        name: "Diego",
+        status: "active",
         departmentName: null,
         photoUrl: null,
       },
@@ -327,13 +404,46 @@ await (async () => {
         value: "user-1",
         label: "Ana - Contábil",
       },
-      {
-        value: "user-2",
-        label: "Bruno",
-      },
+      { value: "user-3", label: "Carla - Contabil Fiscal" },
     ]);
     assert.equal(getContabilSelectLabel("user-1", options), "Ana - Contábil");
     assert.equal(getContabilSelectLabel(null, options), "Não informado");
+    assert.equal(getContabilSelectLabel("missing-user", options), "Usuário não encontrado");
+    assert.deepEqual(
+      mapAssignableUsersToContabilOptions([
+        {
+          id: "user-2",
+          name: "Bruno",
+          status: "active",
+          departmentName: "RH",
+          photoUrl: null,
+        },
+      ], ["user-2"]),
+      [{ value: "user-2", label: "Bruno - RH" }],
+    );
+  });
+
+  await runTest("responsible display loads user labels without exposing IDs", () => {
+    const source = readFileSync(
+      new URL("./components/ContabilResponsibleSection.tsx", import.meta.url),
+      "utf8",
+    );
+
+    assert.match(source, /enabled:\s*Boolean\([\s\S]*responsible\?\./);
+    assert.doesNotMatch(source, /return options\.find\(\(option\) => option\.value === value\)\?\.label \?\? value/);
+  });
+
+  await runTest("client accounting page shows unavailable service before opening the shell", () => {
+    const source = readFileSync(
+      new URL("../../pages/clients/[id]/contabil.tsx", import.meta.url),
+      "utf8",
+    );
+    const unavailableIndex = source.indexOf("client.contabil === false");
+    const shellIndex = source.indexOf("<ContabilShell");
+
+    assert.ok(unavailableIndex >= 0);
+    assert.ok(shellIndex >= 0);
+    assert.ok(unavailableIndex < shellIndex);
   });
 
   await runTest("text helper distinguishes filled and blank values", () => {

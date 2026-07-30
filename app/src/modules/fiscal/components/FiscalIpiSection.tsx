@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Loader2, Pencil, Percent, Plus, Search } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Loader2,
+  Pencil,
+  Percent,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { toast } from "react-toastify";
 
-import { useFiscalIpiList } from "../hooks";
+import { Dialog } from "@shared/components";
+import { PaginationControls } from "@shared/components/ui/PaginationControls";
+
+import { useDeleteFiscalIpiMutation, useFiscalIpiList } from "../hooks";
 import { FISCAL_LIST_PAGE_SIZE } from "../hooks/queryKeys";
 import type { FiscalIpi } from "../types";
 import {
@@ -10,7 +23,6 @@ import {
 } from "../utils";
 import { FiscalIpiFormPanel } from "./FiscalIpiFormPanel";
 import { FiscalStateBox } from "./FiscalStateBox";
-import { PaginationControls } from "@shared/components/ui/PaginationControls";
 
 type FiscalIpiPanelIntent =
   | { mode: "create" }
@@ -19,6 +31,12 @@ type FiscalIpiPanelIntent =
 
 const ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+
+const DIALOG_SECONDARY_BUTTON_CLASSNAME =
+  "inline-flex h-9 items-center justify-center rounded-md border border-gray-300 px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800";
+
+const DIALOG_DANGER_BUTTON_CLASSNAME =
+  "inline-flex h-9 items-center justify-center gap-2 rounded-md bg-red-600 px-3 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60";
 
 const TABLE_HEADER_CLASSNAME =
   "px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-700 dark:text-slate-300";
@@ -32,11 +50,19 @@ const TABLE_CENTER_CELL_CLASSNAME =
 const TABLE_CODE_CELL_CLASSNAME =
   "px-4 py-2.5 text-center text-sm font-medium leading-5 text-gray-900 dark:text-white";
 
-export function FiscalIpiSection({ canEdit }: { canEdit: boolean }) {
+export function FiscalIpiSection({
+  canEdit,
+  canDelete,
+}: {
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
   const [filterValue, setFilterValue] = useState("");
   const [searchCodes, setSearchCodes] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [panelIntent, setPanelIntent] = useState<FiscalIpiPanelIntent>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FiscalIpi | null>(null);
+  const deleteMutation = useDeleteFiscalIpiMutation();
 
   const listQuery = useFiscalIpiList({
     ipiCodes: searchCodes,
@@ -59,6 +85,26 @@ export function FiscalIpiSection({ canEdit }: { canEdit: boolean }) {
     event.preventDefault();
     setSearchCodes(parseCommaSeparatedCodes(filterValue));
     setPage(1);
+  }
+
+  function handleDeleteDialogOpenChange(open: boolean) {
+    if (!open && !deleteMutation.isPending) {
+      setDeleteTarget(null);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!canDelete || !deleteTarget) {
+      return;
+    }
+
+    try {
+      await deleteMutation.mutateAsync(deleteTarget.id);
+      setDeleteTarget(null);
+      toast.success("IPI excluído com sucesso.");
+    } catch (error) {
+      toast.error(getFiscalErrorMessage(error));
+    }
   }
 
   if (panelIntent && canEdit) {
@@ -238,6 +284,8 @@ export function FiscalIpiSection({ canEdit }: { canEdit: boolean }) {
             <FiscalIpiTable
               items={listQuery.data.data}
               onEdit={canEdit ? (item) => setPanelIntent({ mode: "edit", ipiId: item.id }) : undefined}
+              onDelete={canDelete ? (item) => setDeleteTarget(item) : undefined}
+              isDeleting={deleteMutation.isPending}
             />
           ) : (
             <FiscalStateBox icon={Percent} title="Nenhum IPI encontrado" compact>
@@ -257,6 +305,49 @@ export function FiscalIpiSection({ canEdit }: { canEdit: boolean }) {
           />
         </div>
       ) : null}
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={handleDeleteDialogOpenChange}
+        title="Excluir IPI"
+        description="Confirmação de exclusão de IPI"
+        contentClassName="w-[min(92vw,520px)]"
+        bodyClassName="space-y-3"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleteMutation.isPending}
+              className={DIALOG_SECONDARY_BUTTON_CLASSNAME}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={deleteMutation.isPending}
+              className={DIALOG_DANGER_BUTTON_CLASSNAME}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Confirmar exclusão
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-700 dark:text-slate-300">
+          Esta ação remove o cadastro fiscal selecionado.
+        </p>
+        {deleteTarget ? (
+          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
+            {deleteTarget.ncm} · {deleteTarget.description ?? "Sem descrição"}
+          </p>
+        ) : null}
+      </Dialog>
     </section>
   );
 }
@@ -264,9 +355,13 @@ export function FiscalIpiSection({ canEdit }: { canEdit: boolean }) {
 function FiscalIpiTable({
   items,
   onEdit,
+  onDelete,
+  isDeleting = false,
 }: {
   items: FiscalIpi[];
   onEdit?: (item: FiscalIpi) => void;
+  onDelete?: (item: FiscalIpi) => void;
+  isDeleting?: boolean;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
@@ -285,7 +380,7 @@ function FiscalIpiTable({
             <th className={`${TABLE_HEADER_CLASSNAME} w-[16%]`}>
               Alíq.
             </th>
-            {onEdit ? (
+            {onEdit || onDelete ? (
               <th className={`${TABLE_HEADER_CLASSNAME} w-[10%] px-3`}>
                 Ação
               </th>
@@ -307,18 +402,33 @@ function FiscalIpiTable({
               <td className={TABLE_CENTER_CELL_CLASSNAME}>
                 {item.aliquot ?? "—"}
               </td>
-              {onEdit ? (
+              {onEdit || onDelete ? (
                 <td className="px-3 py-2.5 text-center">
-                  <div className="flex justify-center">
-                    <button
-                      type="button"
-                      onClick={() => onEdit(item)}
-                      aria-label={`Editar IPI ${item.ncm}`}
-                      title="Editar"
-                      className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
-                    >
-                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
+                  <div className="flex justify-center gap-1">
+                    {onEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(item)}
+                        disabled={isDeleting}
+                        aria-label={`Editar IPI ${item.ncm}`}
+                        title="Editar"
+                        className={`${ACTION_BUTTON_CLASSNAME} border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    ) : null}
+                    {onDelete ? (
+                      <button
+                        type="button"
+                        onClick={() => onDelete(item)}
+                        disabled={isDeleting}
+                        aria-label={`Excluir IPI ${item.ncm}`}
+                        title="Excluir"
+                        className={`${ACTION_BUTTON_CLASSNAME} border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-900/20`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    ) : null}
                   </div>
                 </td>
               ) : null}

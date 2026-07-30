@@ -101,7 +101,7 @@ function buildExtensionFormState(item?: TiExtension | null): ExtensionFormState 
 
 export function TiExtensionsTab() {
   const { access } = useModuleAccess("ti");
-  const canManageExtensions = access.canEdit || access.isAdmin;
+  const canManageExtensions = access.isAdmin;
   const [selectedExtensionId, setSelectedExtensionId] = useState<TiId | undefined>();
   const [editingExtension, setEditingExtension] = useState<TiExtension | null>(null);
   const [extensionForm, setExtensionForm] = useState<ExtensionFormState>(

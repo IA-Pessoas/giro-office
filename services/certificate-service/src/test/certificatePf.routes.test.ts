@@ -119,6 +119,50 @@ describe("certificate PF routes", () => {
     expect(response.body.data).not.toHaveProperty("file_storage_bucket");
   });
 
+  it("GET /certificate/pf/:id allows Viewer without exposing private fields", async () => {
+    const app = createCertificateTestApp();
+
+    const response = await request(app)
+      .get(`/certificate/pf/${certificateId}`)
+      .set(certificateGatewayHeaders(1));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: certificateId,
+        name: "Joao Silva",
+        cpf: "12345678901",
+      },
+    });
+    expect(response.body.data).not.toHaveProperty("password");
+    expect(response.body.data).not.toHaveProperty("file_path");
+    expect(response.body.data).not.toHaveProperty("file_encryption_iv");
+    expect(response.body.data).not.toHaveProperty("file_encryption_tag");
+  });
+
+  it("blocks every certificate PF write and file access for Viewer", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+    const viewerHeaders = certificateGatewayHeaders(1);
+
+    const responses = await Promise.all([
+      request(app).post("/certificate/pf").set(viewerHeaders),
+      request(app).patch(`/certificate/pf/${certificateId}`).set(viewerHeaders),
+      request(app).delete(`/certificate/pf/${certificateId}`).set(viewerHeaders),
+      request(app).post(`/certificate/pf/${certificateId}/file`).set(viewerHeaders),
+      request(app).get(`/certificate/pf/${certificateId}/file`).set(viewerHeaders),
+      request(app).delete(`/certificate/pf/${certificateId}/file`).set(viewerHeaders),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([403, 403, 403, 403, 403, 403]);
+    for (const response of responses) {
+      expect(response.body).toMatchObject({
+        success: false,
+        code: "FORBIDDEN",
+      });
+    }
+  });
+
   it("POST /certificate/pf preserves explicit string false booleans", async () => {
     const prisma = {
       certificatePF: {
@@ -258,6 +302,44 @@ describe("certificate PF routes", () => {
     expect(response.body).toMatchObject({
       success: false,
       code: "BAD_REQUEST",
+    });
+  });
+
+  it("DELETE /certificate/pf/:id requires elevated certificate permission", async () => {
+    const app = createCertificateTestApp();
+
+    const response = await request(app)
+      .delete(`/certificate/pf/${certificateId}`)
+      .set(certificateGatewayHeaders(1));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("DELETE /certificate/pf/:id removes the file before the record", async () => {
+    const prisma = createCertificatePrismaMock();
+    const fileStorage = {
+      putObject: vi.fn(),
+      getObject: vi.fn(),
+      deleteObject: vi.fn(async () => undefined),
+    };
+    const app = createCertificateTestApp(prisma, { fileStorage });
+
+    const response = await request(app)
+      .delete(`/certificate/pf/${certificateId}`)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: { ok: true },
+    });
+    expect(fileStorage.deleteObject).toHaveBeenCalledWith("/certificates/pf/joao.pfx");
+    expect(prisma.certificatePF.delete).toHaveBeenCalledWith({
+      where: { id: certificateId, organization_id: certificateOrganizationId },
     });
   });
 
@@ -465,6 +547,20 @@ describe("certificate PF routes", () => {
     });
   });
 
+  it("DELETE /certificate/pf/:id/file rejects module users", async () => {
+    const app = createCertificateTestApp();
+
+    const response = await request(app)
+      .delete(`/certificate/pf/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "FORBIDDEN",
+    });
+  });
+
   it("DELETE /certificate/pf/:id/file clears metadata and deletes the object", async () => {
     const objectPath =
       "organizations/10000000-0000-4000-8000-000000000001/certificate-pf/30000000-0000-4000-8000-000000000001/file.pfx.enc";
@@ -487,7 +583,7 @@ describe("certificate PF routes", () => {
 
     const response = await request(app)
       .delete(`/certificate/pf/${certificateId}/file`)
-      .set(certificateGatewayHeaders(2));
+      .set(certificateGatewayHeaders(3));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({

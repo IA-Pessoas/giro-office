@@ -60,6 +60,16 @@ export interface TaskModelListParams {
   limit?: number;
 }
 
+export interface TaskModelOption {
+  id: string;
+  name: string;
+}
+
+export interface TaskModelOptions {
+  users: TaskModelOption[];
+  departments: TaskModelOption[];
+}
+
 export interface TaskDependent {
   id: string;
   task_id: string;

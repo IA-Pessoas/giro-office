@@ -9,6 +9,7 @@ import { PaginationControls } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -52,7 +53,7 @@ const TERM_STATUS_OPTIONS = [
   { value: "signed", label: "Assinado" },
 ];
 
-const TERMS_PAGE_SIZE = 10;
+const TERMS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 function getText(value: unknown, fallback = "-"): string {
   if (value === null || value === undefined || value === "") {

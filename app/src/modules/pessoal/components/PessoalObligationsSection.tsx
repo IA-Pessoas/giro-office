@@ -1,6 +1,18 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AlertCircle, CheckSquare, Loader2, PlusCircle, RefreshCw, Save } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  AlertCircle,
+  CheckSquare,
+  ChevronDown,
+  Loader2,
+  PlusCircle,
+  RefreshCw,
+  Save,
+} from "lucide-react";
 
+import { resolveDepartmentModuleKey } from "@modules/auth";
+import { departmentService } from "@modules/departments";
+import { listAdminUsers } from "@modules/users";
+import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -9,6 +21,7 @@ import {
   usePessoalObligation,
   useUpdatePessoalObligationMutation,
 } from "../hooks/usePessoalObligations";
+import { pessoalQueryKey } from "../hooks/queryKeys";
 import type { PessoalObligationUpdatePayload } from "../types/obligations";
 import { formatPessoalObligationGenerationSummary } from "../utils/obligationGenerationSummary";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
@@ -60,6 +73,16 @@ export function PessoalObligationsSection({
     selectedClientId,
     competence,
   );
+  const responsibleUsersQuery = useFetch(
+    pessoalQueryKey("obligations", "users", "active"),
+    () => listAdminUsers("active"),
+    { enabled: canEdit && Boolean(obligation) },
+  );
+  const departmentsQuery = useFetch(
+    pessoalQueryKey("obligations", "departments"),
+    () => departmentService.list(),
+    { enabled: canEdit && Boolean(obligation) },
+  );
   const [responsibleId, setResponsibleId] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -67,6 +90,28 @@ export function PessoalObligationsSection({
   const isMutating =
     createMutation.isPending || updateMutation.isPending || generateMutation.isPending;
   const isFormDisabled = !canEdit || obligationQuery.isLoading || isMutating;
+  const departmentNameById = useMemo(
+    () =>
+      new Map(
+        (departmentsQuery.data ?? []).map((department) => [department.id, department.name]),
+      ),
+    [departmentsQuery.data],
+  );
+  const responsibleUsers = useMemo(
+    () =>
+      (responsibleUsersQuery.data ?? []).filter((user) => {
+        const departmentName =
+          departmentNameById.get(user.department_id) ?? user.department?.name ?? null;
+
+        return resolveDepartmentModuleKey(departmentName) === "pessoal";
+      }),
+    [departmentNameById, responsibleUsersQuery.data],
+  );
+  const hasSelectedResponsible = responsibleUsers.some((user) => user.id === responsibleId);
+  const areResponsibleOptionsLoading =
+    responsibleUsersQuery.isLoading || departmentsQuery.isLoading;
+  const hasResponsibleOptionsError =
+    responsibleUsersQuery.isError || departmentsQuery.isError;
 
   function clearSuccessTimeout() {
     if (successTimeoutRef.current !== null) {
@@ -158,6 +203,18 @@ export function PessoalObligationsSection({
   function handleResponsibleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void updateField({ responsavel_id: optional(responsibleId) });
+  }
+
+  function getResponsiblePlaceholder() {
+    if (areResponsibleOptionsLoading) {
+      return "Carregando responsáveis";
+    }
+
+    if (hasResponsibleOptionsError) {
+      return "Responsáveis indisponíveis";
+    }
+
+    return "Sem responsável";
   }
 
   return (
@@ -291,14 +348,30 @@ export function PessoalObligationsSection({
               className="grid gap-3 md:grid-cols-[1fr_auto]"
             >
               <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-                Responsável ID
-                <input
-                  type="text"
-                  value={responsibleId}
-                  onChange={(event) => setResponsibleId(event.target.value)}
-                  disabled={isFormDisabled}
-                  className={pessoalTextFieldClassName}
-                />
+                Responsável
+                <div className="relative">
+                  <select
+                    value={responsibleId}
+                    onChange={(event) => setResponsibleId(event.target.value)}
+                    disabled={
+                      isFormDisabled ||
+                      areResponsibleOptionsLoading ||
+                      hasResponsibleOptionsError
+                    }
+                    className={`${pessoalTextFieldClassName} appearance-none pr-12`}
+                  >
+                    <option value="">{getResponsiblePlaceholder()}</option>
+                    {responsibleId && !hasSelectedResponsible ? (
+                      <option value={responsibleId}>Responsável atual</option>
+                    ) : null}
+                    {responsibleUsers.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name || user.login}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                </div>
               </label>
               {canEdit ? (
                 <button

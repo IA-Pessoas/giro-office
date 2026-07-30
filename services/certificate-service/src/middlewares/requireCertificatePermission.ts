@@ -2,6 +2,7 @@ import { requireAuthenticatedRequestContext, ServiceError } from "@workspace/sha
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 export const CERTIFICATE_ELEVATED_PERMISSION = 2;
+export const CERTIFICATE_DELETE_PERMISSION = 3;
 export const CERTIFICATE_READ_PERMISSION = 1;
 
 export function requireCertificatePermissionLevel(minPermission: number): RequestHandler {
@@ -33,4 +34,7 @@ export const requireCertificateReadPermission: RequestHandler = requireCertifica
 );
 export const requireCertificatePermission: RequestHandler = requireCertificatePermissionLevel(
   CERTIFICATE_ELEVATED_PERMISSION,
+);
+export const requireCertificateDeletePermission: RequestHandler = requireCertificatePermissionLevel(
+  CERTIFICATE_DELETE_PERMISSION,
 );

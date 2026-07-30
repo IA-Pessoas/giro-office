@@ -1,11 +1,9 @@
-import React from "react";
 import Link from "next/link";
 import "react-toastify/dist/ReactToastify.css";
 import { ArrowLeft, Save } from "lucide-react";
 
 import { canSSRAdmin } from "@modules/auth";
 import { useDepForm, departmentService, type DepItem } from "@modules/departments";
-import { DepartmentColorField } from "@modules/departments/components/DepartmentColorField";
 import { AdminAccessDeniedState } from "@shared/components/AdminAccessDeniedState";
 
 const PANEL_CLASSNAME =
@@ -41,15 +39,6 @@ export default function Department({ dep, forbidden = false }: Props) {
 function DepartmentForm({ dep }: { dep: DepItem }) {
   const { formData, isDirty, isLoading, handleInputChange, handleUpdate } = useDepForm(dep);
 
-  const handleColorChange = (color: string) => {
-    handleInputChange({
-      target: {
-        name: "color",
-        value: color,
-      },
-    } as React.ChangeEvent<HTMLInputElement>);
-  };
-
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <div className="space-y-2">
@@ -66,7 +55,7 @@ function DepartmentForm({ dep }: { dep: DepItem }) {
             {dep.name}
           </h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Atualize nome, status e cor do departamento.
+            Atualize nome e status do departamento.
           </p>
         </div>
       </div>
@@ -79,7 +68,7 @@ function DepartmentForm({ dep }: { dep: DepItem }) {
             handleUpdate();
           }}
         >
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_220px_minmax(260px,320px)] lg:items-start">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
             <label className="space-y-2">
               <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">
                 Nome
@@ -108,8 +97,6 @@ function DepartmentForm({ dep }: { dep: DepItem }) {
                 <option value="Inativo">Inativo</option>
               </select>
             </label>
-
-            <DepartmentColorField value={formData.color} onChange={handleColorChange} />
           </div>
 
           <div className="flex justify-end pt-1">

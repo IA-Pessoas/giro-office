@@ -337,6 +337,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/task\/deps\/options$/,
+    description: { action: "consultou", item: "as opções de modelos de tarefa" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/regularize\/guidance\/detail$/,
     description: { action: "consultou", item: "os detalhes de uma orientação de regularização" },
   },

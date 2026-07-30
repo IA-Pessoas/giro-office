@@ -162,6 +162,7 @@ export function ProjectFormModal({
                   type="date"
                   value={values.start_date}
                   onChange={(event) => updateValue("start_date", event.target.value)}
+                  onInput={(event) => updateValue("start_date", event.currentTarget.value)}
                   className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
                   aria-required="true"
                 />
@@ -179,6 +180,7 @@ export function ProjectFormModal({
                 type="date"
                 value={values.end_date}
                 onChange={(event) => updateValue("end_date", event.target.value)}
+                onInput={(event) => updateValue("end_date", event.currentTarget.value)}
                 className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
               />
             </div>

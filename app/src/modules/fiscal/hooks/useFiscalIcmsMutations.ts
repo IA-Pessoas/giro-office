@@ -41,3 +41,14 @@ export function useUpdateFiscalIcmsMutation(): UseMutationResult<
     },
   });
 }
+
+export function useDeleteFiscalIcmsMutation(): UseMutationResult<void, Error, string> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => fiscalIcmsService.delete(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: FISCAL_QUERY_KEY });
+    },
+  });
+}

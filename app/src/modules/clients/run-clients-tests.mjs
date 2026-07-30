@@ -120,6 +120,18 @@ runTest("buildClientListParams uses legacy integration filter for active and ina
   });
 });
 
+runTest("buildClientListParams keeps the Regularize active-client query out of the legacy integration filter", () => {
+  assert.deepEqual(
+    buildClientListParams({
+      status: "Ativo",
+      page: 1,
+      limit: 50,
+      legacyIntegrationStatusFilter: false,
+    }),
+    { status: "Ativo", page: 1, limit: 50 },
+  );
+});
+
 runTest("client integration filters use backend-supported not-contracted token", () => {
   const filters = readFileSync("src/modules/clients/components/ClientFilters.tsx", "utf8");
 
@@ -501,6 +513,8 @@ runTest("client create modal binds person type to document validation and payloa
 runTest("clients list exposes compact page jump input", () => {
   const clients = readFileSync("src/shared/components/newLayout/Clients.tsx", "utf8");
 
+  assert.match(clients, /import \{ DEFAULT_PAGE_SIZE \} from "@shared\/pagination\/pagination";/);
+  assert.match(clients, /const limit = DEFAULT_PAGE_SIZE;/);
   assert.match(clients, /useEffect/);
   assert.match(clients, /const \[pageInputValue, setPageInputValue\] = useState\(String\(page\)\)/);
   assert.match(clients, /setPageInputValue\(String\(currentPage\)\)/);
@@ -523,6 +537,15 @@ runTest("clients list exposes compact page jump input", () => {
   assert.doesNotMatch(clients, /w-16/);
   assert.match(clients, /onBlur=\{\(event\) => goToPage\(event\.target\.value\)\}/);
   assert.match(clients, /onKeyDown=\{\(event\) =>/);
+});
+
+runTest("clients list hides organization from the main table", () => {
+  const clients = readFileSync("src/shared/components/newLayout/Clients.tsx", "utf8");
+
+  assert.doesNotMatch(clients, /<th[^>]*>Organiza\u00e7\u00e3o<\/th>/);
+  assert.doesNotMatch(clients, /client\.organization\?\.name/);
+  assert.match(clients, /colSpan=\{4\}/);
+  assert.doesNotMatch(clients, /colSpan=\{5\}/);
 });
 
 runTest("client creation discloses name and document as required", () => {

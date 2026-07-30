@@ -14,7 +14,7 @@ import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const robotId = "90000000-0000-4000-8000-000000000001";
-const TI_REQUESTER_PERMISSION = 1;
+const TI_VIEWER_PERMISSION = 1;
 const TI_ADMIN_PERMISSION = 3;
 
 function gatewayHeaders(permission: number): Record<string, string> {
@@ -27,10 +27,14 @@ function gatewayHeaders(permission: number): Record<string, string> {
 }
 
 describe("ti robot routes", () => {
-  it("GET /ti/robots/list requires admin permission", async () => {
+  it.each([
+    "/ti/robots/list",
+    `/ti/robots/${robotId}`,
+    `/ti/robots/${robotId}/runs/list`,
+  ])("GET %s rejects viewer permission", async (path) => {
     const response = await request(createTestApp())
-      .get("/ti/robots/list")
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+      .get(path)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION));
 
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
@@ -81,7 +85,7 @@ describe("ti robot routes", () => {
   it("POST /ti/robots requires admin permission", async () => {
     const response = await request(createTestApp())
       .post("/ti/robots")
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
       .send({
         name: "Backup diario",
         type: "Backup",

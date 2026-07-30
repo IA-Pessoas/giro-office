@@ -17,7 +17,7 @@ type RhMainTab = "dashboard" | "requests" | "evaluations" | "point";
 export function RH() {
   const [activeTab, setActiveTab] = useState<RhMainTab>("dashboard");
   const [isHolidaysManagerOpen, setIsHolidaysManagerOpen] = useState(false);
-  const { canManageRh, canManageRhRequests, canViewRhDashboard, permissionQuery } =
+  const { canAccessRhPortal, canManageRh, canManageRhRequests, canViewRhDashboard, permissionQuery } =
     useRhPermissions("rh-shell");
   const newRequestsQuery = useRhRequests(
     { status: "New" },
@@ -43,6 +43,41 @@ export function RH() {
       setActiveTab("requests");
     }
   }, [activeTab, canViewRhDashboard, permissionQuery.isLoading]);
+
+  if (!permissionQuery.isLoading && permissionQuery.error) {
+    return (
+      <div className="mx-auto max-w-[1600px] space-y-6">
+        <div>
+          <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
+              <Users className="h-6 w-6 text-white" />
+            </div>
+            Recursos Humanos
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Não foi possível validar o acesso ao RH agora.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">
+          Tente recarregar a página para verificar suas permissões novamente.
+        </div>
+      </div>
+    );
+  }
+
+  if (!permissionQuery.isLoading && !permissionQuery.error && !canAccessRhPortal) {
+    return (
+      <div className="mx-auto max-w-[1600px]">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Recursos Humanos</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Seu perfil não possui acesso ao portal de RH.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">

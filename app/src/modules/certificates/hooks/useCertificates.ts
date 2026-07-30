@@ -8,7 +8,7 @@ import {
 
 import { useFetch } from "@shared/hooks";
 
-import { certificateService } from "../services";
+import { certificateService, DEFAULT_CERTIFICATE_PAGE_SIZE } from "../services";
 import type {
   CertificateDownloadResult,
   CertificateFileMetadata,
@@ -40,7 +40,7 @@ type CertificateQueryOptions<TData> = Pick<
 
 export const CERTIFICATE_PJ_LIST_DEFAULTS: CertificatePjListParams = {
   page: 1,
-  page_size: 50,
+  page_size: DEFAULT_CERTIFICATE_PAGE_SIZE,
 };
 
 export function useCertificatePjList(
@@ -138,6 +138,24 @@ export function useUpdateCertificatePjMutation(
   });
 }
 
+export function useDeleteCertificatePjMutation(): UseMutationResult<
+  void,
+  Error,
+  { id: string }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id }) => certificateService.deletePj(id),
+    onSuccess: async (_, { id }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CERTIFICATE_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: certificatePjDetailQueryKey(id) }),
+      ]);
+    },
+  });
+}
+
 export function useUploadCertificatePjFileMutation(): UseMutationResult<
   CertificateFileMetadata,
   Error,
@@ -180,17 +198,6 @@ export function useDeleteCertificatePjFileMutation(): UseMutationResult<
   });
 }
 
-export function useDeleteCertificatePjMutation(): UseMutationResult<void, Error, { id: string }> {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id }) => certificateService.deletePj(id),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: CERTIFICATE_QUERY_KEY });
-    },
-  });
-}
-
 export function useCreateCertificatePfMutation(): UseMutationResult<
   CertificatePf,
   Error,
@@ -216,6 +223,24 @@ export function useUpdateCertificatePfMutation(
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: CERTIFICATE_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: certificatePfDetailQueryKey(id) });
+    },
+  });
+}
+
+export function useDeleteCertificatePfMutation(): UseMutationResult<
+  void,
+  Error,
+  { id: string }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id }) => certificateService.deletePf(id),
+    onSuccess: async (_, { id }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CERTIFICATE_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: certificatePfDetailQueryKey(id) }),
+      ]);
     },
   });
 }
@@ -258,17 +283,6 @@ export function useDeleteCertificatePfFileMutation(): UseMutationResult<
     onSuccess: async (_, { id }) => {
       await queryClient.invalidateQueries({ queryKey: CERTIFICATE_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: certificatePfDetailQueryKey(id) });
-    },
-  });
-}
-
-export function useDeleteCertificatePfMutation(): UseMutationResult<void, Error, { id: string }> {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id }) => certificateService.deletePf(id),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: CERTIFICATE_QUERY_KEY });
     },
   });
 }

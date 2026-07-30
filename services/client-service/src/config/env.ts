@@ -141,7 +141,9 @@ export function getClientServiceEnv(): ClientServiceEnv {
     historyStorageMode: process.env.CLIENT_HISTORY_STORAGE_MODE,
     historyStorageBucket: process.env.CLIENT_HISTORY_STORAGE_BUCKET,
     historyStorageDir: process.env.CLIENT_HISTORY_STORAGE_DIR,
-    internalServiceToken: process.env.CLIENT_SERVICE_INTERNAL_TOKEN,
+    internalServiceToken:
+      process.env.CLIENT_SERVICE_INTERNAL_TOKEN ||
+      (process.env.NODE_ENV === "production" ? undefined : process.env.AUDIT_SERVICE_TOKEN),
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
     uploadRateLimitMax: process.env.UPLOAD_RATE_LIMIT_MAX,

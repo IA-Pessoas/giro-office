@@ -46,6 +46,7 @@ import {
 
 import { useCommercialOverview } from "../../../modules/commercial/hooks/useCommercialOverview";
 import type { CommercialLead } from "../../../modules/commercial/types";
+import { getSummaryItems } from "../../utils/summaryItems";
 
 export function Commercial() {
   const [activeTab, setActiveTab] = useState<
@@ -199,6 +200,13 @@ export function Commercial() {
       return matchesSearch && matchesStatus && matchesSource;
     });
   }, [leads, searchTerm, filterStatus, filterSource]);
+
+  const pendingFollowUpsSummary = getSummaryItems(
+    leads
+      .filter((lead) => lead.nextFollowUp && !["won", "lost"].includes(lead.status))
+      .sort((a, b) => new Date(a.nextFollowUp ?? 0).getTime() - new Date(b.nextFollowUp ?? 0).getTime()),
+    5,
+  );
 
   const getLeadsByStatus = (status: CommercialLead["status"]) => {
     return leads.filter((l) => l.status === status);
@@ -511,10 +519,7 @@ export function Commercial() {
                 </h3>
               </div>
               <div className="space-y-3">
-                {leads
-                  .filter((l) => l.nextFollowUp && !["won", "lost"].includes(l.status))
-                  .sort((a, b) => new Date(a.nextFollowUp ?? 0).getTime() - new Date(b.nextFollowUp ?? 0).getTime())
-                  .slice(0, 5)
+                {pendingFollowUpsSummary.items
                   .map((lead) => {
                     const StatusIcon = leadStatusConfig[lead.status].icon;
                     return (
@@ -545,6 +550,15 @@ export function Commercial() {
                       </div>
                     );
                   })}
+                {pendingFollowUpsSummary.hasHiddenItems ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("leads")}
+                    className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium"
+                  >
+                    Ver todos ({pendingFollowUpsSummary.total})
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>

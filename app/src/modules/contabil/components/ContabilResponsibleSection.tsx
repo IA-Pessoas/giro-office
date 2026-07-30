@@ -57,14 +57,21 @@ export function ContabilResponsibleSection({
   );
 
   const responsible = responsibleQuery.data ?? null;
+  const hasResponsibleUserIds = Boolean(
+    responsible?.person_responsible_id || responsible?.posted_by_id,
+  );
   const assignableUsersQuery = useAssignableUsers({
-    enabled: canEdit && isEditorOpen,
+    enabled: Boolean((canEdit && isEditorOpen) || hasResponsibleUserIds),
     module: "contabil",
   });
 
   const assignableOptions = useMemo(
-    () => mapAssignableUsersToContabilOptions(assignableUsersQuery.data ?? []),
-    [assignableUsersQuery.data],
+    () =>
+      mapAssignableUsersToContabilOptions(assignableUsersQuery.data ?? [], [
+        formValues.person_responsible_id,
+        formValues.posted_by_id,
+      ]),
+    [assignableUsersQuery.data, formValues.person_responsible_id, formValues.posted_by_id],
   );
 
   useEffect(() => {

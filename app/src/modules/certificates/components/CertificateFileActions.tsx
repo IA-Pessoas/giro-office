@@ -36,6 +36,8 @@ type CertificateFileActionsProps = {
   certificateId: string;
   hasCertificate: boolean;
   canEdit: boolean;
+  canDeleteFile: boolean;
+  canDeleteRecord: boolean;
   variant?: CertificateFileActionsVariant;
   onUploadSuccess?: () => void | Promise<void>;
   onDownloadSuccess?: () => void | Promise<void>;
@@ -95,6 +97,8 @@ export function CertificateFileActions({
   certificateId,
   hasCertificate,
   canEdit,
+  canDeleteFile,
+  canDeleteRecord,
   variant = "panel",
   onUploadSuccess,
   onDownloadSuccess,
@@ -272,15 +276,17 @@ export function CertificateFileActions({
         >
           {isDownloading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
         </button>
-        <button
-          type="button"
-          onClick={() => void handleDelete()}
-          className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
-          disabled={!hasCertificate || isBusy}
-          title="Remover arquivo"
-        >
-          {isDeleting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-        </button>
+        {canDeleteFile ? (
+          <button
+            type="button"
+            onClick={() => void handleDelete()}
+            className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
+            disabled={!(canDeleteFile && hasCertificate) || isBusy}
+            title="Remover arquivo"
+          >
+            {isDeleting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -322,24 +328,28 @@ export function CertificateFileActions({
           {isDownloading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           {isDownloading ? "Baixando..." : "Baixar"}
         </button>
-        <button
-          type="button"
-          onClick={() => void handleDelete()}
-          className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}
-          disabled={!hasCertificate || isBusy}
-        >
-          {isDeleting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-          {isDeleting ? "Removendo..." : "Remover"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsRecordDeleteDialogOpen(true)}
-          className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}
-          disabled={isBusy}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Excluir certificado
-        </button>
+        {canDeleteFile ? (
+          <button
+            type="button"
+            onClick={() => void handleDelete()}
+            className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}
+            disabled={!(canDeleteFile && hasCertificate) || isBusy}
+          >
+            {isDeleting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            {isDeleting ? "Removendo..." : "Remover"}
+          </button>
+        ) : null}
+        {canDeleteRecord ? (
+          <button
+            type="button"
+            onClick={() => setIsRecordDeleteDialogOpen(true)}
+            className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}
+            disabled={isBusy}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Excluir certificado
+          </button>
+        ) : null}
       </div>
 
       {localError ? (

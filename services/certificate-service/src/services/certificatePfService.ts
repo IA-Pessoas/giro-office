@@ -37,6 +37,10 @@ export interface CertificatePfUpdateInput extends CertificatePfContext {
   data: UpdateCertificatePfInput;
 }
 
+export interface CertificatePfDeleteInput extends CertificatePfContext {
+  id: string;
+}
+
 export interface CertificatePfFileInput extends CertificatePfContext {
   id: string;
 }
@@ -87,6 +91,10 @@ export interface CertificatePfFileDownloadResult {
 }
 
 export interface CertificatePfFileDeleteResult {
+  ok: true;
+}
+
+export interface CertificatePfDeleteResult {
   ok: true;
 }
 
@@ -309,6 +317,35 @@ export class CertificatePfService {
     }
   }
 
+  async deleteCertificatePf(input: CertificatePfDeleteInput): Promise<CertificatePfDeleteResult> {
+    const record = await this.prisma.certificatePF.findFirst({
+      where: { id: input.id, organization_id: input.organizationId },
+    });
+
+    if (!record) {
+      throw new ServiceError(404, "Certificado PF nao encontrado.");
+    }
+
+    if (record.file_path) {
+      const deps = this.requireFileDeps();
+      await deps.fileStorage.deleteObject(record.file_path);
+    }
+
+    await this.prisma.certificateNotification.deleteMany({
+      where: {
+        certificate_id: input.id,
+        organization_id: input.organizationId,
+        type: "PF",
+      },
+    });
+
+    await this.prisma.certificatePF.delete({
+      where: { id: input.id, organization_id: input.organizationId },
+    });
+
+    return { ok: true };
+  }
+
   async uploadCertificatePfFile(
     input: CertificatePfFileUploadInput,
   ): Promise<CertificatePfFileMetadataResult> {
@@ -426,22 +463,6 @@ export class CertificatePfService {
         file_encryption_key_version: null,
         has_certificate: false,
       },
-    });
-
-    return { ok: true };
-  }
-
-  async deleteCertificatePf(
-    input: CertificatePfFileInput,
-  ): Promise<CertificatePfFileDeleteResult> {
-    const record = await this.findCertificatePfForFile(input);
-
-    if (record.file_path) {
-      await this.requireFileDeps().fileStorage.deleteObject(record.file_path);
-    }
-
-    await this.prisma.certificatePF.delete({
-      where: { id: input.id, organization_id: input.organizationId },
     });
 
     return { ok: true };

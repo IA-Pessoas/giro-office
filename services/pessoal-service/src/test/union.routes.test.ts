@@ -16,7 +16,7 @@ describe("union routes", () => {
     const service = { list: vi.fn(async () => []) };
     const app = createRouteTestApp("/pessoal/unions", createUnionRoutes(service as never));
 
-    const response = await request(app).get("/pessoal/unions").set(gatewayHeaders());
+    const response = await request(app).get("/pessoal/unions").set(gatewayHeaders(1));
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ success: true, data: [] });

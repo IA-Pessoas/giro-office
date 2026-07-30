@@ -25,6 +25,20 @@ describe("timeBankRelease routes", () => {
     expect(timeBankReleaseServiceMock.list).toHaveBeenCalledTimes(1);
   });
 
+  it("GET /rh/time-bank-releases/list limita visualizador ao proprio usuario", async () => {
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).get("/rh/time-bank-releases/list").query({
+      user_id: "abc",
+      is_approved: "false",
+    });
+
+    expect(res.status).toBe(200);
+    expect(timeBankReleaseServiceMock.list).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({ user_id: userId, is_approved: false }),
+    );
+  });
+
   it("POST /rh/time-bank-releases cria lancamento", async () => {
     const app = createTestApp();
     const res = await request(app).post("/rh/time-bank-releases").send({

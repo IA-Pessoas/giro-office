@@ -45,6 +45,10 @@ export interface UpdateIcmsRequest extends IcmsAuthContext {
   original_mva?: string;
 }
 
+export interface DeleteIcmsRequest extends IcmsAuthContext {
+  icms_id: string;
+}
+
 export interface ListIcmsRequest extends PaginationQuery {
   icmsCodes?: string[];
 }
@@ -163,6 +167,40 @@ export class IcmsService {
       logError("Erro ao atualizar ICMS", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao atualizar.", err);
+    }
+  }
+
+  async delete(data: DeleteIcmsRequest): Promise<{ deleted: unknown }> {
+    try {
+      const exists = await this.prisma.icms.findFirst({
+        where: { id: data.icms_id, organization_id: data.organizationId },
+        select: ICMS_SELECT,
+      });
+
+      if (!exists) {
+        throw new ServiceError(404, "ICMS nao existe.");
+      }
+
+      const deleted = await this.prisma.icms.delete({
+        where: { id: data.icms_id },
+        select: ICMS_SELECT,
+      });
+
+      await this.audit.createLog({
+        userId: data.userId,
+        organizationId: data.organizationId,
+        permission: data.permission ?? null,
+        action: "Exclusao",
+        referring: "fiscal.icms",
+        referringId: data.icms_id,
+        changes: exists as unknown as Record<string, unknown>,
+      });
+
+      return { deleted };
+    } catch (err: unknown) {
+      logError("Erro ao excluir ICMS", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro ao excluir.", err);
     }
   }
 

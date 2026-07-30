@@ -109,6 +109,9 @@ export function TaskModelModal({
     departmentId: formData.department_id || undefined,
   });
   const users = usersQuery.data ?? [];
+  const [optionsRetryKey, setOptionsRetryKey] = useState(0);
+  const [requiredOptionsWarning, setRequiredOptionsWarning] = useState(false);
+  const [taskModelsWarning, setTaskModelsWarning] = useState(false);
 
   const availableDependentTasks = useMemo(
     () => allTasks.filter((task) => task.id !== initialData?.id),
@@ -122,6 +125,9 @@ export function TaskModelModal({
       setNewDependent({ dependent_id: "", wait: false, observation: "" });
       setDetailError(false);
       setOptionsWarning(null);
+      setOptionsRetryKey(0);
+      setRequiredOptionsWarning(false);
+      setTaskModelsWarning(false);
       return;
     }
 
@@ -130,6 +136,8 @@ export function TaskModelModal({
     async function loadOptions() {
       setLoadingOptions(true);
       setOptionsWarning(null);
+      setRequiredOptionsWarning(false);
+      setTaskModelsWarning(false);
 
       const [departmentsResult, taskModelsResult] = await Promise.allSettled([
         departmentService.list({ status: "Ativo" }),
@@ -146,6 +154,7 @@ export function TaskModelModal({
         setDepartments(departmentsResult.value);
       } else {
         setDepartments([]);
+        setRequiredOptionsWarning(true);
         failedLists.push("departamentos");
       }
 
@@ -153,6 +162,7 @@ export function TaskModelModal({
         setAllTasks(taskModelsResult.value);
       } else {
         setAllTasks([]);
+        setTaskModelsWarning(true);
         failedLists.push("modelos");
       }
 
@@ -169,7 +179,7 @@ export function TaskModelModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [isOpen, optionsRetryKey]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -295,8 +305,12 @@ export function TaskModelModal({
   }
 
   function getUserPlaceholder(optional: boolean) {
-    if (loadingOptions && users.length === 0) {
+    if (usersQuery.isLoading) {
       return "Carregando usuários...";
+    }
+
+    if (usersQuery.isError) {
+      return "Usuários indisponíveis";
     }
 
     if (users.length === 0) {
@@ -409,7 +423,10 @@ export function TaskModelModal({
     }
   }
 
-  const saveDisabled = saving || loadingDetail || detailError;
+  const optionsUnavailable =
+    loadingOptions || requiredOptionsWarning || usersQuery.isLoading || usersQuery.isError;
+  const taskModelsUnavailable = loadingOptions || taskModelsWarning;
+  const saveDisabled = saving || loadingDetail || detailError || optionsUnavailable;
 
   return (
     <Dialog
@@ -463,7 +480,19 @@ export function TaskModelModal({
           }}
         >
           {optionsWarning ? (
-            <div className={TASK_FORM_AUXILIARY_WARNING_CLASSNAME}>{optionsWarning}</div>
+            <div
+              className={`${TASK_FORM_AUXILIARY_WARNING_CLASSNAME} flex items-center justify-between gap-3`}
+            >
+              <span>{optionsWarning}</span>
+              <button
+                type="button"
+                onClick={() => setOptionsRetryKey((currentKey) => currentKey + 1)}
+                className="shrink-0 rounded-lg border border-current px-2.5 py-1 text-xs font-semibold"
+                disabled={loadingOptions}
+              >
+                Tentar novamente
+              </button>
+            </div>
           ) : null}
 
           <div className={TASK_FORM_GRID_CLASSNAME}>
@@ -490,7 +519,7 @@ export function TaskModelModal({
                 onChange={(event) => updateFormValue("department_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={loadingOptions && departments.length === 0}
+                disabled={optionsUnavailable}
                 aria-required="true"
               >
                 <option value="">{getDepartmentPlaceholder()}</option>
@@ -516,7 +545,7 @@ export function TaskModelModal({
                 onChange={(event) => updateFormValue("responsible_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={loadingOptions && users.length === 0}
+                disabled={optionsUnavailable}
                 aria-required="true"
               >
                 <option value="">{getUserPlaceholder(false)}</option>
@@ -540,7 +569,7 @@ export function TaskModelModal({
                 onChange={(event) => updateFormValue("responsible2_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={!formData.responsible_id || (loadingOptions && users.length === 0)}
+                disabled={!formData.responsible_id || optionsUnavailable}
                 aria-describedby={
                   !formData.responsible_id ? "task-model-responsible2-help" : undefined
                 }
@@ -574,7 +603,7 @@ export function TaskModelModal({
                 onChange={(event) => updateFormValue("responsible3_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={!formData.responsible2_id || (loadingOptions && users.length === 0)}
+                disabled={!formData.responsible2_id || optionsUnavailable}
                 aria-describedby={
                   !formData.responsible2_id ? "task-model-responsible3-help" : undefined
                 }
@@ -675,7 +704,7 @@ export function TaskModelModal({
                     }
                     className={PROJECT_SELECT_CLASSNAME}
                     style={PROJECT_SELECT_ARROW_STYLE}
-                    disabled={loadingOptions && allTasks.length === 0}
+                    disabled={taskModelsUnavailable}
                   >
                     <option value="">{getDependentPlaceholder()}</option>
                     {availableDependentTasks.map((task) => (

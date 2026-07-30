@@ -332,6 +332,23 @@ runTest("obligation params map client and competence", () => {
   });
 });
 
+runTest("obligations responsible field uses a pessoal user selector instead of raw IDs", () => {
+  const obligations = readFileSync(
+    "src/modules/pessoal/components/PessoalObligationsSection.tsx",
+    "utf8",
+  );
+
+  assert.match(obligations, /listAdminUsers\("active"\)/);
+  assert.match(obligations, /departmentService\.list\(\)/);
+  assert.match(obligations, /departmentNameById\.get\(user\.department_id\)/);
+  assert.match(obligations, /resolveDepartmentModuleKey\(departmentName\) === "pessoal"/);
+  assert.match(obligations, /<select[\s\S]*value=\{responsibleId\}/);
+  assert.match(obligations, /responsibleUsersQuery\.isError \|\| departmentsQuery\.isError/);
+  assert.match(obligations, /Respons.veis indispon.veis/);
+  assert.match(obligations, /<option value=\{responsibleId\}>Respons.vel atual<\/option>/);
+  assert.doesNotMatch(obligations, /Respons.vel ID/);
+});
+
 runTest("obligation generation copy explains global scope and no-payroll count", () => {
   const section = readFileSync(
     "src/modules/pessoal/components/PessoalObligationsSection.tsx",
