@@ -363,4 +363,33 @@ runTest("certificate required fields are disclosed only while creating", () => {
   assert.match(source, /isPj \? "CNPJ" : "CPF"/);
 });
 
+runTest("certificate form keeps masked values in the UI and canonical values at the API boundary", () => {
+  const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
+
+  assert.match(
+    source,
+    /import \{[\s\S]*formatBrazilianPhoneInput,[\s\S]*formatBrlInput,[\s\S]*formatCnpjInput,[\s\S]*formatCpfInput,[\s\S]*normalizeDigits,[\s\S]*parseBrlInput,[\s\S]*\} from "@shared\/utils\/inputFormatting"/,
+  );
+  assert.match(source, /cnpj: normalizeDigits\(state\.cnpj\)/);
+  assert.match(source, /cpf: normalizeDigits\(state\.cpf\)/);
+  assert.match(source, /payment_amount: state\.wasPaid \? parseBrlInput\(state\.paymentAmount\) : null/);
+  assert.match(source, /normalizeDigits\(current\.cnpj\) !== normalizeDigits\(initial\.cnpj\)/);
+  assert.match(source, /normalizeDigits\(current\.cpf\) !== normalizeDigits\(initial\.cpf\)/);
+  assert.match(source, /formatBrazilianPhoneInput\(event\.target\.value\)/);
+  assert.match(source, /updateField\("paymentAmount", formatBrlInput\(event\.target\.value\)\)/);
+});
+
+runTest("certificate workspace formats document filters and sends digit-only query parameters", () => {
+  const source = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /cnpj: normalizeDigits\(pjFilters\.cnpj\) \|\| undefined/);
+  assert.match(source, /cpf: normalizeDigits\(pfFilters\.cpf\) \|\| undefined/);
+  assert.match(source, /cnpj: normalizeDigits\(pfFilters\.cnpj\) \|\| undefined/);
+  assert.match(source, /cnpj: formatCnpjInput\(event\.target\.value\)/);
+  assert.match(source, /cpf: formatCpfInput\(event\.target\.value\)/);
+});
+
 console.log("certificates contract tests passed");
