@@ -6,6 +6,7 @@ import {
   formatCnpjInput,
   formatCpfInput,
 } from "../../shared/utils/inputFormatting.ts";
+import { forwardFormattedInputChange } from "./components/formattedInputChange.ts";
 import {
   buildClientListParams,
   CLIENT_ENDPOINTS,
@@ -63,11 +64,13 @@ function assertFormattedInputEventContract(format, rawValue, expectedValue) {
   const originalTarget = {
     name: "cpf_cnpj",
     type: "text",
+    checked: false,
     value: rawValue,
   };
   const originalCurrentTarget = {
     name: "cpf_cnpj",
     type: "text",
+    checked: false,
     value: rawValue,
   };
   const originalEvent = {
@@ -75,17 +78,22 @@ function assertFormattedInputEventContract(format, rawValue, expectedValue) {
     target: originalTarget,
     currentTarget: originalCurrentTarget,
   };
-  const formattedValue = format(originalEvent.target.value);
-  originalEvent.target.value = formattedValue;
-  originalEvent.currentTarget.value = formattedValue;
+  let receivedEvent;
 
-  assert.equal(originalEvent.type, "change");
-  assert.equal(originalEvent.target.name, "cpf_cnpj");
-  assert.equal(originalEvent.target.type, "text");
-  assert.equal(originalEvent.target.value, expectedValue);
-  assert.equal(originalEvent.currentTarget.name, "cpf_cnpj");
-  assert.equal(originalEvent.currentTarget.type, "text");
-  assert.equal(originalEvent.currentTarget.value, expectedValue);
+  forwardFormattedInputChange(originalEvent, format, (event) => {
+    receivedEvent = event;
+  });
+
+  assert.strictEqual(receivedEvent, originalEvent);
+  assert.equal(receivedEvent.type, "change");
+  assert.equal(receivedEvent.target.name, "cpf_cnpj");
+  assert.equal(receivedEvent.target.type, "text");
+  assert.equal(receivedEvent.target.checked, false);
+  assert.equal(receivedEvent.target.value, expectedValue);
+  assert.equal(receivedEvent.currentTarget.name, "cpf_cnpj");
+  assert.equal(receivedEvent.currentTarget.type, "text");
+  assert.equal(receivedEvent.currentTarget.checked, false);
+  assert.equal(receivedEvent.currentTarget.value, expectedValue);
 }
 
 runTest("mapClientStatusFromApi converts prospecting status to Prospect", () => {
@@ -334,13 +342,13 @@ runTest("client creation fields route type-specific documents and phones through
   assert.match(source, /formatCpfInput/);
   assert.match(source, /formatCnpjInput/);
   assert.match(source, /formatBrazilianPhoneInput/);
+  assert.match(source, /from "\.\/formattedInputChange"/);
+  assert.match(source, /forwardFormattedInputChange/);
   assert.match(source, /formData\.type === "PJ" \? formatCnpjInput : formatCpfInput/);
   assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
   assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
   assert.match(source, /name="cpf_agent"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
   assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
-  assert.match(source, /event\.target\.value = value/);
-  assert.match(source, /event\.currentTarget\.value = value/);
 });
 
 runTest("client integration fields route type-specific documents and phones through local mask adapters", () => {
@@ -350,13 +358,13 @@ runTest("client integration fields route type-specific documents and phones thro
   assert.match(source, /formatCpfInput/);
   assert.match(source, /formatCnpjInput/);
   assert.match(source, /formatBrazilianPhoneInput/);
+  assert.match(source, /from "\.\/formattedInputChange"/);
+  assert.match(source, /forwardFormattedInputChange/);
   assert.match(source, /values\.type === "PJ" \? formatCnpjInput : formatCpfInput/);
   assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
   assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
   assert.match(source, /name="cpf_agent"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
   assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
-  assert.match(source, /event\.target\.value = value/);
-  assert.match(source, /event\.currentTarget\.value = value/);
 });
 
 runTest("client Regularize fields route generic documents, CPF, and phones through local mask adapters", () => {
@@ -366,11 +374,11 @@ runTest("client Regularize fields route generic documents, CPF, and phones throu
   assert.match(source, /formatCpfCnpjInput/);
   assert.match(source, /formatCpfInput/);
   assert.match(source, /formatBrazilianPhoneInput/);
+  assert.match(source, /from "\.\/formattedInputChange"/);
+  assert.match(source, /forwardFormattedInputChange/);
   assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
   assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
   assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
-  assert.match(source, /event\.target\.value = value/);
-  assert.match(source, /event\.currentTarget\.value = value/);
 });
 
 runTest("optional cpf validation accepts empty values and rejects invalid lengths", () => {

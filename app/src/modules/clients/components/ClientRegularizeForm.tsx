@@ -6,6 +6,7 @@ import {
   formatCpfInput,
 } from "@shared/utils/inputFormatting";
 
+import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type { ClientRegularizeFormValues } from "../types";
@@ -28,16 +29,6 @@ interface ClientRegularizeFormProps {
 const labelClassName = "block text-sm font-medium text-slate-700 dark:text-white";
 const sectionClassName =
   "rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40";
-
-function createFormattedInputChangeEvent(
-  event: ChangeEvent<HTMLInputElement>,
-  value: string,
-): ChangeEvent<HTMLInputElement> {
-  event.target.value = value;
-  event.currentTarget.value = value;
-
-  return event;
-}
 
 function TextField({
   label,
@@ -110,13 +101,13 @@ export function ClientRegularizeForm({
   onCancel,
 }: ClientRegularizeFormProps) {
   const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange(createFormattedInputChangeEvent(event, formatCpfCnpjInput(event.target.value)));
+    forwardFormattedInputChange(event, formatCpfCnpjInput, onChange);
   };
   const handleCpfChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange(createFormattedInputChangeEvent(event, formatCpfInput(event.target.value)));
+    forwardFormattedInputChange(event, formatCpfInput, onChange);
   };
   const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange(createFormattedInputChangeEvent(event, formatBrazilianPhoneInput(event.target.value)));
+    forwardFormattedInputChange(event, formatBrazilianPhoneInput, onChange);
   };
 
   return (

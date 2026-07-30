@@ -6,21 +6,12 @@ import {
   formatCpfInput,
 } from "@shared/utils/inputFormatting";
 
+import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type { ClientCreateFormState, IbgeCity, IbgeState } from "./clientCreateFormState";
 
 const labelClass = "block text-sm font-medium text-slate-700 dark:text-white";
-
-function createFormattedInputChangeEvent(
-  event: ChangeEvent<HTMLInputElement>,
-  value: string,
-): ChangeEvent<HTMLInputElement> {
-  event.target.value = value;
-  event.currentTarget.value = value;
-
-  return event;
-}
 
 interface ClientCreateFormFieldsProps {
   formData: ClientCreateFormState;
@@ -42,13 +33,13 @@ export function ClientCreateFormFields({
   const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
     const formatDocument = formData.type === "PJ" ? formatCnpjInput : formatCpfInput;
 
-    onChange(createFormattedInputChangeEvent(event, formatDocument(event.target.value)));
+    forwardFormattedInputChange(event, formatDocument, onChange);
   };
   const handleCpfChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange(createFormattedInputChangeEvent(event, formatCpfInput(event.target.value)));
+    forwardFormattedInputChange(event, formatCpfInput, onChange);
   };
   const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange(createFormattedInputChangeEvent(event, formatBrazilianPhoneInput(event.target.value)));
+    forwardFormattedInputChange(event, formatBrazilianPhoneInput, onChange);
   };
 
   return (
