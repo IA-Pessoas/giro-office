@@ -37,6 +37,7 @@ function getContext(request: Request): TiAuthContext {
     userId: request.user_id,
     organizationId: request.organization_id,
     permission: Number(request.permission ?? 0),
+    isOrganizationOwner: request.user_type === "owner",
   };
 }
 
@@ -149,7 +150,7 @@ export function createTiRequestRoutes(
 
   router.patch(
     "/:id/assign",
-    requireTiPermission(TiPermissionLevel.Admin),
+    requireTiPermission(TiPermissionLevel.Requester),
     async (request, response, next) => {
       try {
         const context = getContext(request);

@@ -9,13 +9,47 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const otherUserId = "00000000-0000-4000-8000-000000000002";
 const categoryId = "20000000-0000-4000-8000-000000000001";
+const requestId = "30000000-0000-4000-8000-000000000001";
+const technologyDepartmentId = "40000000-0000-4000-8000-000000000001";
+const financeDepartmentId = "40000000-0000-4000-8000-000000000002";
+const tiUserId = "00000000-0000-4000-8000-000000000003";
+const financeUserId = "00000000-0000-4000-8000-000000000004";
+const inactiveTiUserId = "00000000-0000-4000-8000-000000000005";
 const TI_ADMIN_PERMISSION = 3;
 
 const context = {
   organizationId,
   userId,
   permission: TI_ADMIN_PERMISSION,
+  isOrganizationOwner: false,
 };
+
+function createAssignPrismaMock(destination: {
+  id: string;
+  department_id: string;
+  status: string;
+}) {
+  return {
+    department: {
+      findFirst: vi.fn(async () => ({ id: technologyDepartmentId })),
+    },
+    user: {
+      findFirst: vi.fn(async () => ({
+        ...destination,
+        organization_id: organizationId,
+      })),
+    },
+    tIRequest: {
+      findFirst: vi.fn(async () => ({
+        id: requestId,
+        requester_id: otherUserId,
+        assigned_to_id: userId,
+        organization_id: organizationId,
+      })),
+      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+    },
+  };
+}
 
 describe("TiRequestService", () => {
   it("documents admin TI permission as level 3", () => {
@@ -275,5 +309,98 @@ describe("TiRequestService", () => {
     const result = await service.updateStatus(context, "req-1", { status: "In_Progress" });
 
     expect(result).toMatchObject({ id: "req-1", status: "In_Progress" });
+  });
+
+  it("allows the current assignee to transfer a request to an active TI user", async () => {
+    const prisma = createAssignPrismaMock({
+      id: tiUserId,
+      department_id: technologyDepartmentId,
+      status: "active",
+    });
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign({ ...context, permission: TiPermissionLevel.Technician }, requestId, {
+        assigned_to_id: tiUserId,
+      }),
+    ).resolves.toEqual({ id: requestId, assigned_to_id: tiUserId });
+  });
+
+  it("rejects a TI technician who is not the current assignee", async () => {
+    const prisma = createAssignPrismaMock({
+      id: tiUserId,
+      department_id: technologyDepartmentId,
+      status: "active",
+    });
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign(
+        {
+          ...context,
+          userId: otherUserId,
+          permission: TiPermissionLevel.Technician,
+        },
+        requestId,
+        { assigned_to_id: tiUserId },
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      message: "Permissao insuficiente para transferir chamado.",
+    });
+  });
+
+  it("allows an organization owner to transfer a request", async () => {
+    const prisma = createAssignPrismaMock({
+      id: tiUserId,
+      department_id: technologyDepartmentId,
+      status: "active",
+    });
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign(
+        {
+          ...context,
+          userId: otherUserId,
+          permission: TiPermissionLevel.Viewer,
+          isOrganizationOwner: true,
+        },
+        requestId,
+        { assigned_to_id: tiUserId },
+      ),
+    ).resolves.toEqual({ id: requestId, assigned_to_id: tiUserId });
+  });
+
+  it("rejects an assignee outside the resolved Technology department", async () => {
+    const prisma = createAssignPrismaMock({
+      id: financeUserId,
+      department_id: financeDepartmentId,
+      status: "active",
+    });
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign(context, requestId, { assigned_to_id: financeUserId }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Responsavel deve pertencer ao departamento Tecnologia.",
+    });
+  });
+
+  it("rejects an inactive assignee in the resolved Technology department", async () => {
+    const prisma = createAssignPrismaMock({
+      id: inactiveTiUserId,
+      department_id: technologyDepartmentId,
+      status: "inactive",
+    });
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign(context, requestId, { assigned_to_id: inactiveTiUserId }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Responsavel deve pertencer ao departamento Tecnologia.",
+    });
   });
 });

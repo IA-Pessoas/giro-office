@@ -3,12 +3,14 @@ import "./envBootstrap.js";
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
+import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
@@ -21,11 +23,15 @@ const TI_ADMIN_PERMISSION = 3;
 const otherUserId = "00000000-0000-4000-8000-000000000002";
 const validPng = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 
-function gatewayHeaders(permission: number): Record<string, string> {
+function gatewayHeaders(
+  permission: number,
+  overrides?: { userId?: string; userType?: "owner" | "admin" | "user" },
+): Record<string, string> {
   return {
-    [FORWARDED_AUTH_USER_ID_HEADER]: userId,
+    [FORWARDED_AUTH_USER_ID_HEADER]: overrides?.userId ?? userId,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: organizationId,
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
+    ...(overrides?.userType ? { [FORWARDED_AUTH_TYPE_HEADER]: overrides.userType } : {}),
     [INTERNAL_SERVICE_TOKEN_HEADER]: "ti-service-internal-token-test",
   };
 }
@@ -100,10 +106,64 @@ describe("ti request routes", () => {
     });
   });
 
-  it("PATCH /ti/requests/:id/assign requires admin permission", async () => {
+  it("PATCH /ti/requests/:id/assign reaches the service for the current assignee", async () => {
     const response = await request(createTestApp())
       .patch(`/ti/requests/${requestId}/assign`)
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
+      .set(gatewayHeaders(TiPermissionLevel.Requester))
+      .send({ assigned_to_id: userId });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: requestId,
+        assigned_to_id: userId,
+      },
+    });
+  });
+
+  it("PATCH /ti/requests/:id/assign allows an organization owner who is not the assignee", async () => {
+    const prisma = {
+      department: {
+        findFirst: vi.fn(async () => ({ id: "50000000-0000-4000-8000-000000000001" })),
+      },
+      user: {
+        findFirst: vi.fn(async ({ where }) => ({
+          id: where.id,
+          organization_id: where.organization_id,
+          department_id: "50000000-0000-4000-8000-000000000001",
+          status: "active",
+        })),
+      },
+      tIRequest: {
+        findFirst: vi.fn(async ({ where }) => ({
+          id: where.id,
+          assigned_to_id: otherUserId,
+          organization_id: where.organization_id,
+        })),
+        update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+      },
+    };
+
+    const response = await request(createTestApp(prisma as never))
+      .patch(`/ti/requests/${requestId}/assign`)
+      .set(gatewayHeaders(TiPermissionLevel.Requester, { userType: "owner" }))
+      .send({ assigned_to_id: userId });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: requestId,
+        assigned_to_id: userId,
+      },
+    });
+  });
+
+  it("PATCH /ti/requests/:id/assign rejects a non-TI request before the service", async () => {
+    const response = await request(createTestApp())
+      .patch(`/ti/requests/${requestId}/assign`)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
       .send({ assigned_to_id: userId });
 
     expect(response.status).toBe(403);
@@ -111,6 +171,19 @@ describe("ti request routes", () => {
       success: false,
       error: "Permissao insuficiente para acessar o ti-service.",
       code: "FORBIDDEN",
+    });
+  });
+
+  it("PATCH /ti/requests/:id/assign requires forwarded auth context", async () => {
+    const response = await request(createTestApp())
+      .patch(`/ti/requests/${requestId}/assign`)
+      .send({ assigned_to_id: userId });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Token interno do ti-service invalido.",
+      code: "UNAUTHORIZED",
     });
   });
 

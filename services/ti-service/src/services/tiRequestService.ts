@@ -10,11 +10,13 @@ import type {
   UpdateTiRequestBody,
   UpdateTiRequestStatusBody,
 } from "../schemas/tiRequest.schemas.js";
+import { TiDepartmentResolverService } from "./tiDepartmentResolverService.js";
 
 export interface TiAuthContext {
   organizationId: string;
   userId: string;
   permission: number;
+  isOrganizationOwner?: boolean;
 }
 
 const allowedTransitions = new Map<string, string[]>([
@@ -158,16 +160,35 @@ export class TiRequestService {
   }
 
   async assign(context: TiAuthContext, id: string, body: AssignTiRequestBody): Promise<unknown> {
-    if (context.permission < TiPermissionLevel.Admin) {
-      throw new ServiceError(403, "Permissao insuficiente para atribuir chamado.");
+    const request = await this.prisma.tIRequest.findFirst({
+      where: { id, organization_id: context.organizationId },
+      select: { assigned_to_id: true },
+    });
+
+    if (!request) {
+      throw new ServiceError(404, "Chamado de TI nao encontrado.");
     }
 
-    await this.getById(context, id);
-    await this.ensureUser(
+    if (
+      request.assigned_to_id !== context.userId &&
+      context.permission < TiPermissionLevel.Admin &&
+      !context.isOrganizationOwner
+    ) {
+      throw new ServiceError(403, "Permissao insuficiente para transferir chamado.");
+    }
+
+    const destination = await this.ensureUser(
       context.organizationId,
       body.assigned_to_id,
       "Responsavel nao encontrado.",
     );
+    const technologyDepartmentId = await new TiDepartmentResolverService(
+      this.prisma,
+    ).resolveTechnologyDepartmentId(context.organizationId);
+
+    if (destination.status !== "active" || destination.department_id !== technologyDepartmentId) {
+      throw new ServiceError(400, "Responsavel deve pertencer ao departamento Tecnologia.");
+    }
 
     return this.prisma.tIRequest.update({
       where: { id },
@@ -203,7 +224,11 @@ export class TiRequestService {
     }
   }
 
-  private async ensureUser(organizationId: string, userId: string, message: string): Promise<void> {
+  private async ensureUser(
+    organizationId: string,
+    userId: string,
+    message: string,
+  ): Promise<{ status: string; department_id: string }> {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, organization_id: organizationId },
     });
@@ -211,5 +236,7 @@ export class TiRequestService {
     if (!user) {
       throw new ServiceError(404, message);
     }
+
+    return user;
   }
 }
