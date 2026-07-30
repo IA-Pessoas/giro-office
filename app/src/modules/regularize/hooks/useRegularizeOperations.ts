@@ -24,9 +24,9 @@ import type {
   RegularizeLicenseDetail,
   RegularizeLicenseListFilters,
   RegularizeLicenseListItem,
-  RegularizeMunicipalTaxesClientSummary,
   RegularizeMunicipalTaxesDetail,
   RegularizeMunicipalTaxesListFilters,
+  RegularizeMunicipalTaxesPage,
   RegularizeProcessDetail,
   RegularizeProcessListFilters,
   RegularizeProcessListItem,
@@ -57,7 +57,7 @@ async function invalidateRegularizeOperations(
 export function useRegularizeMunicipalTaxes(
   filters: RegularizeMunicipalTaxesListFilters,
   options?: RegularizeReadQueryOptions,
-): UseQueryResult<RegularizeMunicipalTaxesClientSummary[], Error> {
+): UseQueryResult<RegularizeMunicipalTaxesPage, Error> {
   return useFetch(
     regularizeQueryKeys.municipalTaxes(filters),
     () => regularizeService.listMunicipalTaxes(filters),
