@@ -19,6 +19,7 @@ import * as certificateWorkspaceUi from "./components/certificateWorkspaceUi.ts"
 import {
   getCreatePfPayload,
   getCreatePjPayload,
+  getPaymentAmountValidationError,
   getUpdatePfPayload,
   getUpdatePjPayload,
   normalizeCertificateDocumentFilter,
@@ -371,19 +372,37 @@ runTest("certificate required fields are disclosed only while creating", () => {
   assert.match(source, /function hasText\(value: string\): boolean/);
 });
 
-runTest("certificate form connects UI masks to the pure boundary builders", () => {
+runTest("certificate form masks documents and BRL while preserving generic contact input", () => {
   const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
 
   assert.match(
     source,
-    /import \{[\s\S]*formatBrazilianPhoneInput,[\s\S]*formatBrlInput,[\s\S]*formatCnpjInput,[\s\S]*formatCpfInput,[\s\S]*parseBrlInput,[\s\S]*\} from "@shared\/utils\/inputFormatting"/,
+    /import \{[\s\S]*formatBrlInput,[\s\S]*formatCnpjInput,[\s\S]*formatCpfInput,[\s\S]*\} from "@shared\/utils\/inputFormatting"/,
   );
   assert.match(source, /getCreatePjPayload/);
   assert.match(source, /getCreatePfPayload/);
   assert.match(source, /getUpdatePjPayload/);
   assert.match(source, /getUpdatePfPayload/);
-  assert.match(source, /formatBrazilianPhoneInput\(event\.target\.value\)/);
+  assert.doesNotMatch(source, /formatBrazilianPhoneInput/);
+  assert.match(
+    source,
+    /value=\{formState\.contactInfo\}[\s\S]{0,160}updateField\("contactInfo", event\.target\.value\)/,
+  );
   assert.match(source, /updateField\("paymentAmount", formatBrlInput\(event\.target\.value\)\)/);
+});
+
+runTest("certificate payment validation distinguishes empty from invalid BRL input", () => {
+  assert.equal(getPaymentAmountValidationError("", true), null);
+  assert.equal(getPaymentAmountValidationError("R$ 12,34", true), null);
+  assert.equal(
+    getPaymentAmountValidationError("9007199254740992", true),
+    "Informe um valor de pagamento válido.",
+  );
+  assert.equal(
+    getPaymentAmountValidationError("valor inválido", true),
+    "Informe um valor de pagamento válido.",
+  );
+  assert.equal(getPaymentAmountValidationError("9007199254740992", false), null);
 });
 
 runTest("certificate workspace formats document filters and sends digit-only query parameters", () => {

@@ -11,15 +11,14 @@ import {
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import {
-  formatBrazilianPhoneInput,
   formatBrlInput,
   formatCnpjInput,
   formatCpfInput,
-  parseBrlInput,
 } from "@shared/utils/inputFormatting";
 import {
   getCreatePfPayload,
   getCreatePjPayload,
+  getPaymentAmountValidationError,
   getUpdatePfPayload,
   getUpdatePjPayload,
   type CertificateFormState,
@@ -114,7 +113,7 @@ function buildInitialFormState(formKind: "pj" | "pf", initial?: CertificatePj | 
         initialPj?.payment_amount != null
           ? formatBrlInput(String(Math.round(initialPj.payment_amount * 100)))
           : "",
-      contactInfo: formatBrazilianPhoneInput(initialPj?.contact_info ?? ""),
+      contactInfo: initialPj?.contact_info ?? "",
     };
   }
 
@@ -137,7 +136,7 @@ function buildInitialFormState(formKind: "pj" | "pf", initial?: CertificatePj | 
       initialPf?.payment_amount != null
         ? formatBrlInput(String(Math.round(initialPf.payment_amount * 100)))
         : "",
-    contactInfo: formatBrazilianPhoneInput(initialPf?.contact_info ?? ""),
+    contactInfo: initialPf?.contact_info ?? "",
   };
 }
 
@@ -146,14 +145,6 @@ function getHasChanges(
   initial: CertificateFormState,
 ): boolean {
   return JSON.stringify(current) !== JSON.stringify(initial);
-}
-
-function getInvalidAmountMessage(payloadAmount: number | null, original: string): string | null {
-  if (original.trim() && Number.isNaN(payloadAmount)) {
-    return "Informe um valor de pagamento válido.";
-  }
-
-  return null;
 }
 
 function boolToLabel(value: boolean) {
@@ -195,8 +186,10 @@ export function CertificateForm({
 
     if (isPj) {
       const state = formState as PjFormState;
-      const normalizedAmount = state.wasPaid ? parseBrlInput(state.paymentAmount) : null;
-      const invalidAmountMessage = getInvalidAmountMessage(normalizedAmount, state.paymentAmount);
+      const invalidAmountMessage = getPaymentAmountValidationError(
+        state.paymentAmount,
+        state.wasPaid,
+      );
 
       if (invalidAmountMessage) {
         setErrorMessage(invalidAmountMessage);
@@ -262,8 +255,10 @@ export function CertificateForm({
     }
 
     const state = formState as PfFormState;
-    const normalizedAmount = state.wasPaid ? parseBrlInput(state.paymentAmount) : null;
-    const invalidAmountMessage = getInvalidAmountMessage(normalizedAmount, state.paymentAmount);
+    const invalidAmountMessage = getPaymentAmountValidationError(
+      state.paymentAmount,
+      state.wasPaid,
+    );
 
     if (invalidAmountMessage) {
       setErrorMessage(invalidAmountMessage);
@@ -483,7 +478,7 @@ export function CertificateForm({
           <input
             type="text"
             value={formState.contactInfo}
-            onChange={(event) => updateField("contactInfo", formatBrazilianPhoneInput(event.target.value))}
+            onChange={(event) => updateField("contactInfo", event.target.value)}
             className={CERTIFICATE_INPUT_CLASSNAME}
             disabled={isSubmitting}
           />

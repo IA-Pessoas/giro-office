@@ -53,6 +53,17 @@ export function normalizeCertificateDocumentFilter(value: string): string | unde
   return normalizeDigits(value) || undefined;
 }
 
+export function getPaymentAmountValidationError(
+  value: string,
+  wasPaid: boolean,
+): string | null {
+  if (!wasPaid || !value.trim()) {
+    return null;
+  }
+
+  return parseBrlInput(value) === null ? "Informe um valor de pagamento válido." : null;
+}
+
 export function getCreatePjPayload(state: PjFormState): CreateCertificatePjBody {
   return {
     client_castelo_status: state.clientCasteloStatus,

@@ -1,3 +1,8 @@
+import {
+  formatBrazilianPhoneInput,
+  formatCnpjInput,
+  formatCpfInput,
+} from "../../../shared/utils/inputFormatting.ts";
 import type {
   Client,
   CreateClientIntegrationFormValues,
@@ -9,7 +14,6 @@ const nullableTextFieldNames = [
   "company_name",
   "fantasy_name",
   "responsible",
-  "number",
   "email",
   "agent",
   "instagram",
@@ -67,18 +71,23 @@ export function createClientIntegrationInitialValues(): CreateClientIntegrationF
 export function createUpdateClientIntegrationInitialValues(
   client: Client,
 ): UpdateClientIntegrationFormValues {
+  const type = client.type ?? "PJ";
+
   return {
-    type: client.type ?? "PJ",
+    type,
     name: client.name ?? "",
-    cpf_cnpj: client.cpf_cnpj ?? "",
+    cpf_cnpj:
+      type === "PJ"
+        ? formatCnpjInput(client.cpf_cnpj ?? "")
+        : formatCpfInput(client.cpf_cnpj ?? ""),
     company_name: client.company_name ?? "",
     fantasy_name: client.fantasy_name ?? "",
     responsible: client.responsible ?? "",
-    cpf_responsible: client.cpf_responsible ?? "",
-    number: client.number ?? "",
+    cpf_responsible: formatCpfInput(client.cpf_responsible ?? ""),
+    number: formatBrazilianPhoneInput(client.number ?? ""),
     email: client.email ?? "",
     agent: client.agent ?? "",
-    cpf_agent: client.cpf_agent ?? "",
+    cpf_agent: formatCpfInput(client.cpf_agent ?? ""),
     instagram: client.instagram ?? "",
     indication: client.indication ?? "",
     type_registration: client.type_registration ?? "Existente",
@@ -105,7 +114,7 @@ export function buildCreateClientIntegrationPayload(
     opening_date: normalizeNullableTextValue(values.opening_date),
     responsible: normalizeNullableTextValue(values.responsible),
     cpf_responsible: normalizeDocumentValue(values.cpf_responsible) || null,
-    number: normalizeNullableTextValue(values.number),
+    number: normalizeDocumentValue(values.number) || null,
     email: normalizeNullableTextValue(values.email),
     agent: normalizeNullableTextValue(values.agent),
     cpf_agent: normalizeDocumentValue(values.cpf_agent) || null,
@@ -145,6 +154,13 @@ export function buildUpdateClientIntegrationPayload(
 
   if (values.service_unique !== currentValues.service_unique) {
     payload.service_unique = values.service_unique;
+  }
+
+  const nextNumber = normalizeDocumentValue(values.number) || null;
+  const currentNumber = normalizeDocumentValue(currentValues.number) || null;
+
+  if (nextNumber !== currentNumber) {
+    payload.number = nextNumber;
   }
 
   for (const fieldName of nullableTextFieldNames) {

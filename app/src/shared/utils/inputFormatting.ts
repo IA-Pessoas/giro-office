@@ -83,7 +83,7 @@ export function formatBrazilianPhoneInput(value: string): string {
     return `(${areaCode}) ${phoneNumber}`;
   }
 
-  const firstGroupLength = digits.length === 10 ? 4 : 5;
+  const firstGroupLength = digits.length <= 10 ? 4 : 5;
 
   return `(${areaCode}) ${phoneNumber.slice(0, firstGroupLength)}-${phoneNumber.slice(
     firstGroupLength,
@@ -94,7 +94,7 @@ export function formatBrlInput(value: string): string {
   const cents = parseBrlCents(value);
 
   if (cents === null) {
-    return "";
+    return value.trim() ? value : "";
   }
 
   return brlFormatter.format(cents / 100).replace(/\u00A0/g, " ");
