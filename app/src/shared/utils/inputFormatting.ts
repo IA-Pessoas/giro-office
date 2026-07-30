@@ -3,6 +3,18 @@ const brlFormatter = new Intl.NumberFormat("pt-BR", {
   currency: "BRL",
 });
 
+function parseBrlCents(value: string): number | null {
+  const digits = normalizeDigits(value);
+
+  if (!digits) {
+    return null;
+  }
+
+  const cents = Number(digits);
+
+  return Number.isSafeInteger(cents) ? cents : null;
+}
+
 export function normalizeDigits(value: string | null | undefined): string {
   return value?.replace(/\D/g, "") ?? "";
 }
@@ -71,21 +83,25 @@ export function formatBrazilianPhoneInput(value: string): string {
     return `(${areaCode}) ${phoneNumber}`;
   }
 
-  return `(${areaCode}) ${phoneNumber.slice(0, 5)}-${phoneNumber.slice(5, 9)}`;
+  const firstGroupLength = digits.length === 10 ? 4 : 5;
+
+  return `(${areaCode}) ${phoneNumber.slice(0, firstGroupLength)}-${phoneNumber.slice(
+    firstGroupLength,
+  )}`;
 }
 
 export function formatBrlInput(value: string): string {
-  const digits = normalizeDigits(value);
+  const cents = parseBrlCents(value);
 
-  if (!digits) {
+  if (cents === null) {
     return "";
   }
 
-  return brlFormatter.format(Number(digits) / 100).replace(/\u00A0/g, " ");
+  return brlFormatter.format(cents / 100).replace(/\u00A0/g, " ");
 }
 
 export function parseBrlInput(value: string): number | null {
-  const digits = normalizeDigits(value);
+  const cents = parseBrlCents(value);
 
-  return digits ? Number(digits) / 100 : null;
+  return cents === null ? null : cents / 100;
 }
