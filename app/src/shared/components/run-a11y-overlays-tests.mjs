@@ -31,6 +31,10 @@ const myOrganizationSectionSource = readFileSync(
   "utf8",
 );
 const dialogSource = readFileSync(new URL("./ui/Dialog.tsx", import.meta.url), "utf8");
+const confirmationDialogSource = readFileSync(
+  new URL("./ui/ConfirmationDialog.tsx", import.meta.url),
+  "utf8",
+);
 const legacyAiChatBackdrop = [
   'className="fixed inset-0 z-[60] bg-black/40"',
   " onClick",
@@ -126,6 +130,48 @@ runTest("shared Dialog constrains content and scrolls only its body", () => {
     /<div\s+className=\{`[^`]*min-h-0[^`]*flex-1[^`]*overflow-y-auto[^`]*overscroll-contain[^`]*\$\{bodyClassName\}[^`]*`\}/,
   );
   assert.match(dialogSource, /<footer className="[^"]*shrink-0[^"]*"/);
+});
+
+runTest("ConfirmationDialog composes the shared Dialog with explicit action controls", () => {
+  assert.match(confirmationDialogSource, /import \{ Dialog \} from "\.\/Dialog";/);
+  assert.match(confirmationDialogSource, /<Dialog[\s\S]*preventClose=\{isConfirming\}/);
+  assert.match(
+    confirmationDialogSource,
+    /<button[\s\S]*type="button"[\s\S]*onClick=\{handleCancel\}[\s\S]*disabled=\{isConfirming\}[\s\S]*\{cancelLabel\}[\s\S]*<\/button>/,
+  );
+  assert.match(
+    confirmationDialogSource,
+    /<button[\s\S]*type="button"[\s\S]*onClick=\{handleConfirm\}[\s\S]*disabled=\{isConfirming\}[\s\S]*\{isConfirming \? "Confirmando\.\.\." : confirmLabel\}[\s\S]*<\/button>/,
+  );
+});
+
+runTest("ConfirmationDialog reports failures without closing the dialog", () => {
+  assert.match(
+    confirmationDialogSource,
+    /try \{[\s\S]*await onConfirm\(\);[\s\S]*onOpenChange\(false\);[\s\S]*\} catch \{[\s\S]*setLocalError\(/,
+  );
+  const rejectionHandler = confirmationDialogSource.match(/\} catch \{([\s\S]*?)\n {4}\}/)?.[1];
+  assert.ok(rejectionHandler);
+  assert.equal(rejectionHandler.includes("onOpenChange(false)"), false);
+  assert.match(confirmationDialogSource, /role="alert"/);
+  assert.match(confirmationDialogSource, /\{localError \?\? errorMessage\}/);
+});
+
+runTest("shared Dialog blocks every dismissal path while close prevention is active", () => {
+  assert.match(dialogSource, /preventClose\?: boolean;/);
+  assert.match(
+    dialogSource,
+    /if \(preventClose && !nextOpen\) \{[\s\S]*return;[\s\S]*\}[\s\S]*onOpenChange\(nextOpen\);/,
+  );
+  assert.match(
+    dialogSource,
+    /onEscapeKeyDown=\{\(event\) => \{[\s\S]*if \(preventClose\) \{[\s\S]*event\.preventDefault\(\);/,
+  );
+  assert.match(
+    dialogSource,
+    /onPointerDownOutside=\{\(event\) => \{[\s\S]*if \(preventClose\) \{[\s\S]*event\.preventDefault\(\);/,
+  );
+  assert.match(dialogSource, /<DialogPrimitive\.Close[\s\S]*disabled=\{preventClose\}/);
 });
 
 runTest("MyOrganizationSection opens organization editing in a shared Dialog", () => {
