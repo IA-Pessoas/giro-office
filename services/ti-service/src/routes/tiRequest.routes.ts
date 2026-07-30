@@ -37,6 +37,7 @@ function getContext(request: Request): TiAuthContext {
     userId: request.user_id,
     organizationId: request.organization_id,
     permission: Number(request.permission ?? 0),
+    isOrganizationOwner: request.user_type === "owner",
   };
 }
 
@@ -96,6 +97,23 @@ export function createTiRequestRoutes(
   );
 
   router.get(
+    "/:id/transfer-candidates",
+    requireTiPermission(TiPermissionLevel.Requester),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const params = parseWithZod(tiRequestIdParamsSchema, request.params);
+        const result = await requestService.listTransferCandidates(context, params.id);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao listar candidatos para transferencia de chamado de TI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
     "/:id",
     requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
@@ -149,7 +167,7 @@ export function createTiRequestRoutes(
 
   router.patch(
     "/:id/assign",
-    requireTiPermission(TiPermissionLevel.Admin),
+    requireTiPermission(TiPermissionLevel.Requester),
     async (request, response, next) => {
       try {
         const context = getContext(request);

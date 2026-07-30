@@ -1237,6 +1237,13 @@ const handlers = {
     });
   },
 
+  async tiRequestTransferCandidates(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/requests/${requireState("tiRequestId")}/transfer-candidates`,
+    });
+  },
+
   async tiRequestStatusPatch(op) {
     await httpRequest(op, {
       expectedStatus: [200],

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
@@ -28,6 +29,10 @@ function parsePermission(value: string | undefined): number | undefined {
   return Number.isInteger(parsed) ? parsed : undefined;
 }
 
+function parseUserType(value: string | undefined): "owner" | "admin" | "user" | undefined {
+  return value === "owner" || value === "admin" || value === "user" ? value : undefined;
+}
+
 export function requestContext(request: Request, response: Response, next: NextFunction): void {
   const requestId = getHeaderValue(request.headers[REQUEST_ID_HEADER]) ?? randomUUID();
   const userId = getHeaderValue(request.headers[FORWARDED_AUTH_USER_ID_HEADER]);
@@ -39,6 +44,7 @@ export function requestContext(request: Request, response: Response, next: NextF
   request.permission = parsePermission(
     getHeaderValue(request.headers[FORWARDED_AUTH_PERMISSION_HEADER]),
   );
+  request.user_type = parseUserType(getHeaderValue(request.headers[FORWARDED_AUTH_TYPE_HEADER]));
   response.setHeader(REQUEST_ID_HEADER, requestId);
 
   next();
