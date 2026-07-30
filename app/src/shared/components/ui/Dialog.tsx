@@ -29,10 +29,10 @@ export function Dialog({
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
-          className={`fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm ${overlayClassName}`}
+          className={`fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:duration-150 data-[state=closed]:duration-150 motion-reduce:animate-none ${overlayClassName}`}
         />
         <DialogPrimitive.Content
-          className={`fixed left-1/2 top-1/2 z-[1500] flex max-h-[calc(100dvh-2rem)] w-[min(92vw,680px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark] ${contentClassName}`}
+          className={`fixed left-1/2 top-1/2 z-[1500] flex max-h-[calc(100dvh-2rem)] w-[min(92vw,680px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:pointer-events-none data-[state=open]:duration-200 data-[state=closed]:duration-150 motion-reduce:animate-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark] ${contentClassName}`}
         >
           <header className="flex shrink-0 items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
             <DialogPrimitive.Title className="dialog-neutral-title text-lg font-semibold text-black dark:text-white">
