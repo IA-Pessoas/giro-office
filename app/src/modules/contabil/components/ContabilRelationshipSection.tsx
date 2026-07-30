@@ -334,7 +334,7 @@ export function ContabilRelationshipSection({
           {CONTABIL_RELATIONSHIP_TEXTAREA_FIELDS.map((field) => (
             <label
               key={field.field}
-              className="flex flex-col gap-2 text-sm text-gray-700 dark:text-slate-300"
+              className="flex flex-col gap-1 text-sm text-gray-700 dark:text-slate-300"
             >
               <span>{field.label}</span>
               <textarea
