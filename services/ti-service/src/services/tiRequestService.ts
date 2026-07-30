@@ -35,6 +35,13 @@ const SAFE_USER_SELECT = {
   organization_id: true,
 } as const;
 
+const TRANSFER_CANDIDATE_SELECT = {
+  id: true,
+  name: true,
+  full_name: true,
+  department_id: true,
+} as const;
+
 export class TiRequestService {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -169,13 +176,7 @@ export class TiRequestService {
       throw new ServiceError(404, "Chamado de TI nao encontrado.");
     }
 
-    if (
-      request.assigned_to_id !== context.userId &&
-      context.permission < TiPermissionLevel.Admin &&
-      !context.isOrganizationOwner
-    ) {
-      throw new ServiceError(403, "Permissao insuficiente para transferir chamado.");
-    }
+    this.assertTransferorPermission(context, request.assigned_to_id);
 
     const destination = await this.ensureUser(
       context.organizationId,
@@ -193,6 +194,38 @@ export class TiRequestService {
     return this.prisma.tIRequest.update({
       where: { id },
       data: { assigned_to_id: body.assigned_to_id },
+    });
+  }
+
+  async listTransferCandidates(
+    context: TiAuthContext,
+    id: string,
+  ): Promise<
+    Array<{ id: string; name: string | null; full_name: string | null; department_id: string }>
+  > {
+    const request = await this.prisma.tIRequest.findFirst({
+      where: { id, organization_id: context.organizationId },
+      select: { assigned_to_id: true },
+    });
+
+    if (!request) {
+      throw new ServiceError(404, "Chamado de TI nao encontrado.");
+    }
+
+    this.assertTransferorPermission(context, request.assigned_to_id);
+
+    const technologyDepartmentId = await new TiDepartmentResolverService(
+      this.prisma,
+    ).resolveTechnologyDepartmentId(context.organizationId);
+
+    return this.prisma.user.findMany({
+      where: {
+        organization_id: context.organizationId,
+        department_id: technologyDepartmentId,
+        status: "active",
+      },
+      select: TRANSFER_CANDIDATE_SELECT,
+      orderBy: { full_name: "asc" },
     });
   }
 
@@ -221,6 +254,19 @@ export class TiRequestService {
 
     if (!category) {
       throw new ServiceError(404, "Categoria de TI nao encontrada.");
+    }
+  }
+
+  private assertTransferorPermission(
+    context: TiAuthContext,
+    assignedToId: string | null,
+  ): void {
+    if (
+      assignedToId !== context.userId &&
+      context.permission < TiPermissionLevel.Admin &&
+      !context.isOrganizationOwner
+    ) {
+      throw new ServiceError(403, "Permissao insuficiente para transferir chamado.");
     }
   }
 

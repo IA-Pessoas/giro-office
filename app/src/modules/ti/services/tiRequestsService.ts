@@ -6,6 +6,7 @@ import type {
   TiListFilters,
   TiRequest,
   TiRequestAssignPayload,
+  TiTransferCandidate,
   TiRequestCategory,
   TiRequestCategoryPayload,
   TiRequestMessage,
@@ -61,6 +62,14 @@ export const tiRequestsService = {
     );
 
     return unwrapTiEnvelope<TiRequest>(response.data);
+  },
+
+  async listTransferCandidates(id: TiId): Promise<TiTransferCandidate[]> {
+    const response = await api.get<TiEnvelope<TiTransferCandidate[]>>(
+      buildTiPath(TI_ENDPOINTS.requests.transferCandidates, id),
+    );
+
+    return unwrapTiEnvelope<TiTransferCandidate[]>(response.data);
   },
 
   async updateStatus(id: TiId, payload: TiRequestStatusPayload): Promise<TiRequest> {

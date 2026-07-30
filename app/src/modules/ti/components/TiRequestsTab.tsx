@@ -16,11 +16,8 @@ import { toast } from "react-toastify";
 import { Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";
 import { useModuleAccess } from "@modules/auth";
-import { departmentService } from "@modules/departments";
-import { listAdminUsers } from "@modules/users";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
-import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -30,6 +27,7 @@ import {
   useAssignTiRequest,
   useTiRequest,
   useTiRequestCategories,
+  useTiRequestTransferCandidates,
   useTiRequestMessages,
   useTiRequests,
   useUpdateTiRequest,
@@ -325,20 +323,13 @@ export function TiRequestsTab() {
 
   const requestsQuery = useTiRequests(filters);
   const categoriesQuery = useTiRequestCategories();
-  const transferUsersQuery = useFetch(
-    ["ti-requests", "transfer", "users", "active"],
-    () => listAdminUsers("active"),
-    { enabled: isTransferDialogOpen },
-  );
-  const transferDepartmentsQuery = useFetch(
-    ["ti-requests", "transfer", "departments"],
-    () => departmentService.list(),
-    { enabled: isTransferDialogOpen },
-  );
   const requests = requestsQuery.data ?? [];
   const selectedRequest = requests.find((request) => request.id === selectedRequestId);
   const activeRequestId = selectedRequestId;
   const requestDetailQuery = useTiRequest(activeRequestId);
+  const transferCandidatesQuery = useTiRequestTransferCandidates(activeRequestId, {
+    enabled: isTransferDialogOpen,
+  });
   const messagesQuery = useTiRequestMessages(activeRequestId);
   const activeRequest = requestDetailQuery.data ?? selectedRequest;
   const categories = categoriesQuery.data ?? [];
@@ -358,36 +349,21 @@ export function TiRequestsTab() {
     );
   }, [categories]);
 
-  const technologyDepartmentId = useMemo(
-    () =>
-      (transferDepartmentsQuery.data ?? []).find(
-        (department) => department.name.toLowerCase() === "tecnologia",
-      )?.id,
-    [transferDepartmentsQuery.data],
-  );
-
   const transferAssigneeOptions = useMemo(
     () => [
       {
         value: "",
         label:
-          transferUsersQuery.isLoading || transferDepartmentsQuery.isLoading
+          transferCandidatesQuery.isLoading
             ? "Carregando responsáveis..."
             : "Selecione um responsável",
       },
-      ...(transferUsersQuery.data ?? [])
-        .filter(
-          (user) =>
-            technologyDepartmentId !== undefined && user.department_id === technologyDepartmentId,
-        )
-        .map((user) => ({ value: user.id, label: user.name || user.login })),
+      ...(transferCandidatesQuery.data ?? []).map((user) => ({
+        value: String(user.id),
+        label: user.full_name || user.name || "Usuário sem nome",
+      })),
     ],
-    [
-      transferDepartmentsQuery.isLoading,
-      transferUsersQuery.data,
-      transferUsersQuery.isLoading,
-      technologyDepartmentId,
-    ],
+    [transferCandidatesQuery.data, transferCandidatesQuery.isLoading],
   );
 
   const filteredRequests = useMemo(() => {
@@ -434,10 +410,8 @@ export function TiRequestsTab() {
   const isRequestsLoading = requestsQuery.isLoading || requestsQuery.isFetching;
   const isDetailLoading = requestDetailQuery.isLoading || requestDetailQuery.isFetching;
   const isMessagesLoading = messagesQuery.isLoading || messagesQuery.isFetching;
-  const isTransferAssigneeOptionsLoading =
-    transferUsersQuery.isLoading || transferDepartmentsQuery.isLoading;
-  const isTransferAssigneeOptionsUnavailable =
-    transferUsersQuery.isError || transferDepartmentsQuery.isError;
+  const isTransferAssigneeOptionsLoading = transferCandidatesQuery.isLoading;
+  const isTransferAssigneeOptionsUnavailable = transferCandidatesQuery.isError;
   const isSaving =
     createRequestMutation.isPending ||
     updateRequestMutation.isPending ||

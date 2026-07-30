@@ -36,6 +36,31 @@ function gatewayHeaders(
   };
 }
 
+function createTransferCandidatesPrismaMock(assignedToId = userId) {
+  return {
+    department: {
+      findFirst: vi.fn(async () => ({ id: "50000000-0000-4000-8000-000000000001" })),
+    },
+    user: {
+      findMany: vi.fn(async () => [
+        {
+          id: "00000000-0000-4000-8000-000000000003",
+          name: "Tecnica responsavel",
+          full_name: "Tecnica responsavel da Silva",
+          department_id: "50000000-0000-4000-8000-000000000001",
+        },
+      ]),
+    },
+    tIRequest: {
+      findFirst: vi.fn(async () => ({
+        id: requestId,
+        assigned_to_id: assignedToId,
+        organization_id: organizationId,
+      })),
+    },
+  };
+}
+
 describe("ti request routes", () => {
   it("GET /ti/requests/list allows Viewer to list only own requests", async () => {
     const response = await request(createTestApp())
@@ -201,6 +226,61 @@ describe("ti request routes", () => {
         assigned_to_id: userId,
       },
     });
+  });
+
+  it("GET /ti/requests/:id/transfer-candidates lets the current assignee list active TI users", async () => {
+    const response = await request(createTestApp(createTransferCandidatesPrismaMock() as never))
+      .get(`/ti/requests/${requestId}/transfer-candidates`)
+      .set(gatewayHeaders(TiPermissionLevel.Technician));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: [
+        {
+          id: "00000000-0000-4000-8000-000000000003",
+          name: "Tecnica responsavel",
+          full_name: "Tecnica responsavel da Silva",
+          department_id: "50000000-0000-4000-8000-000000000001",
+        },
+      ],
+    });
+  });
+
+  it("GET /ti/requests/:id/transfer-candidates rejects an unrelated technician", async () => {
+    const response = await request(createTestApp(createTransferCandidatesPrismaMock() as never))
+      .get(`/ti/requests/${requestId}/transfer-candidates`)
+      .set(gatewayHeaders(TiPermissionLevel.Technician, { userId: otherUserId }));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para transferir chamado.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("GET /ti/requests/:id/transfer-candidates lets an admin list candidates", async () => {
+    const response = await request(createTestApp(createTransferCandidatesPrismaMock() as never))
+      .get(`/ti/requests/${requestId}/transfer-candidates`)
+      .set(gatewayHeaders(TiPermissionLevel.Admin, { userId: otherUserId }));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
+  });
+
+  it("GET /ti/requests/:id/transfer-candidates lets an organization owner list candidates", async () => {
+    const response = await request(createTestApp(createTransferCandidatesPrismaMock() as never))
+      .get(`/ti/requests/${requestId}/transfer-candidates`)
+      .set(
+        gatewayHeaders(TiPermissionLevel.Technician, {
+          userId: otherUserId,
+          userType: "owner",
+        }),
+      );
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
   });
 
   it("POST /ti/requests validates body", async () => {

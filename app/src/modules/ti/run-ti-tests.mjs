@@ -115,11 +115,14 @@ await runTest("ti request attachment UI retains the accessible upload flow and c
   );
 });
 
-await runTest("ti request transfer UI limits assignees to Tecnologia and authorized actors", async () => {
+await runTest("ti request transfer UI uses request-scoped candidates and preserves authorized actors", async () => {
   const tiRequestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
+  const tiRequestsServiceSource = await readModuleSource("services/tiRequestsService.ts");
 
   assert.match(tiRequestsTabSource, /Transferir responsabilidade/);
-  assert.match(tiRequestsTabSource, /department_id/);
+  assert.match(tiRequestsTabSource, /useTiRequestTransferCandidates/);
+  assert.doesNotMatch(tiRequestsTabSource, /listAdminUsers/);
+  assert.doesNotMatch(tiRequestsTabSource, /departmentService/);
   assert.match(tiRequestsTabSource, /Tecnologia/);
   assert.match(tiRequestsTabSource, /assigned_to_id/);
   assert.match(tiRequestsTabSource, /assignRequestMutation\.mutateAsync/);
@@ -129,10 +132,8 @@ await runTest("ti request transfer UI limits assignees to Tecnologia and authori
   );
   assert.match(tiRequestsTabSource, /<TiNativeSelect[\s\S]*label="Novo responsável"/);
   assert.doesNotMatch(tiRequestsTabSource, /type="text"[^>]*name="assigned_to_id"/);
-  assert.match(
-    tiRequestsTabSource,
-    /const technologyDepartmentId = useMemo\([\s\S]*department\.name\.toLowerCase\(\) === "tecnologia"[\s\S]*user\.department_id === technologyDepartmentId/,
-  );
+  assert.match(tiRequestsServiceSource, /listTransferCandidates\(id: TiId\)/);
+  assert.match(tiRequestsServiceSource, /TI_ENDPOINTS\.requests\.transferCandidates/);
   assert.doesNotMatch(tiRequestsTabSource, /resolveDepartmentModuleKey\(departmentName\)/);
   assert.match(
     tiRequestsTabSource,
@@ -1395,8 +1396,12 @@ await runTest("ti request detail loads transfer candidates only when the dialog 
   assert.doesNotMatch(tabSource, /useTiAssignableUsers/);
   assert.doesNotMatch(tabSource, /assignableUserOptions/);
   assert.doesNotMatch(tabSource, /Atribuir à equipe de TI/);
-  assert.match(tabSource, /\(\) => listAdminUsers\("active"\)/);
-  assert.match(tabSource, /\{ enabled: isTransferDialogOpen \}/);
+  assert.match(
+    tabSource,
+    /useTiRequestTransferCandidates\(activeRequestId,\s*\{\s*enabled: isTransferDialogOpen,?\s*\}\)/,
+  );
+  assert.doesNotMatch(tabSource, /listAdminUsers\("active"\)/);
+  assert.doesNotMatch(tabSource, /departmentService\.list\(\)/);
   assert.doesNotMatch(tabSource, /placeholder="ID do usuário"/);
   assert.doesNotMatch(tabSource, /assignedUserId/);
 });

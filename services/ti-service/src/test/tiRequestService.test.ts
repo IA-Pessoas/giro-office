@@ -51,6 +51,31 @@ function createAssignPrismaMock(destination: {
   };
 }
 
+function createTransferCandidatesPrismaMock(assignedToId = userId) {
+  return {
+    department: {
+      findFirst: vi.fn(async () => ({ id: technologyDepartmentId })),
+    },
+    user: {
+      findMany: vi.fn(async () => [
+        {
+          id: tiUserId,
+          name: "Tecnica responsavel",
+          full_name: "Tecnica responsavel da Silva",
+          department_id: technologyDepartmentId,
+        },
+      ]),
+    },
+    tIRequest: {
+      findFirst: vi.fn(async () => ({
+        id: requestId,
+        assigned_to_id: assignedToId,
+        organization_id: organizationId,
+      })),
+    },
+  };
+}
+
 describe("TiRequestService", () => {
   it("documents admin TI permission as level 3", () => {
     expect(TiPermissionLevel.Admin).toBe(TI_ADMIN_PERMISSION);
@@ -324,6 +349,72 @@ describe("TiRequestService", () => {
         assigned_to_id: tiUserId,
       }),
     ).resolves.toEqual({ id: requestId, assigned_to_id: tiUserId });
+  });
+
+  it("lists only active users from the resolved Technology department for the current assignee", async () => {
+    const prisma = createTransferCandidatesPrismaMock();
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.listTransferCandidates(
+        { ...context, permission: TiPermissionLevel.Technician },
+        requestId,
+      ),
+    ).resolves.toEqual([
+      {
+        id: tiUserId,
+        name: "Tecnica responsavel",
+        full_name: "Tecnica responsavel da Silva",
+        department_id: technologyDepartmentId,
+      },
+    ]);
+    expect(prisma.user.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: organizationId,
+        department_id: technologyDepartmentId,
+        status: "active",
+      },
+      select: {
+        id: true,
+        name: true,
+        full_name: true,
+        department_id: true,
+      },
+      orderBy: { full_name: "asc" },
+    });
+  });
+
+  it("rejects a TI technician who is not the current assignee from listing transfer candidates", async () => {
+    const prisma = createTransferCandidatesPrismaMock(userId);
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.listTransferCandidates(
+        { ...context, userId: otherUserId, permission: TiPermissionLevel.Technician },
+        requestId,
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      message: "Permissao insuficiente para transferir chamado.",
+    });
+  });
+
+  it.each([
+    ["admin", { ...context, userId: otherUserId, permission: TiPermissionLevel.Admin }],
+    [
+      "organization owner",
+      {
+        ...context,
+        userId: otherUserId,
+        permission: TiPermissionLevel.Technician,
+        isOrganizationOwner: true,
+      },
+    ],
+  ])("allows %s to list transfer candidates", async (_actor, actorContext) => {
+    const prisma = createTransferCandidatesPrismaMock(userId);
+    const service = new TiRequestService(prisma as never);
+
+    await expect(service.listTransferCandidates(actorContext, requestId)).resolves.toHaveLength(1);
   });
 
   it("rejects a TI technician who is not the current assignee", async () => {

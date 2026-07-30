@@ -97,6 +97,23 @@ export function createTiRequestRoutes(
   );
 
   router.get(
+    "/:id/transfer-candidates",
+    requireTiPermission(TiPermissionLevel.Requester),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const params = parseWithZod(tiRequestIdParamsSchema, request.params);
+        const result = await requestService.listTransferCandidates(context, params.id);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao listar candidatos para transferencia de chamado de TI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
     "/:id",
     requireTiPermission(TiPermissionLevel.Viewer),
     async (request, response, next) => {
