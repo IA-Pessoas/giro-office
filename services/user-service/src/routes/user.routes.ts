@@ -2,6 +2,7 @@ import {
   createSuccessResponse,
   error as logError,
   parseWithZod,
+  requireAuthenticatedRequestContext,
   ServiceError,
 } from "@workspace/shared";
 import { createPhotoUploadMiddleware, validateUploadFileSignature } from "@workspace/shared/upload";
@@ -39,6 +40,12 @@ function requireManageUsersAuthMiddleware(
   } catch (err) {
     next(err);
   }
+}
+
+function isSelfPasswordUpdate(request: Request, id: string, body: object): boolean {
+  const keys = Object.keys(body);
+
+  return request.user_id === id && keys.length === 1 && keys[0] === "password";
 }
 
 router.get(
@@ -128,15 +135,22 @@ router.post(
   },
 );
 
-router.patch(
+router.put(
   "/:id",
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireManageUsersAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
       const body = parseWithZod(updateUserBodySchema, request.body);
-      if (isOwnerMutationPayload(body)) {
+      const selfPasswordUpdate = isSelfPasswordUpdate(request, id, body);
+      const auth = selfPasswordUpdate
+        ? requireAuthenticatedRequestContext(request, {
+            userIdMessage: "Não autenticado.",
+            organizationIdMessage: "Não autenticado.",
+          })
+        : requireManageUsersAuth(request);
+
+      if (!selfPasswordUpdate && isOwnerMutationPayload(body)) {
         requireOwnerUserAuth(request);
       }
 

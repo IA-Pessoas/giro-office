@@ -15,6 +15,7 @@ interface UserRouteMocks {
   authServiceMock: {
     login: Mock;
     firstCreate: Mock;
+    validateSession: Mock;
   };
   userServiceMock: {
     list: Mock;
@@ -39,6 +40,7 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
     authServiceMock: {
       login: vi.fn(),
       firstCreate: vi.fn(),
+      validateSession: vi.fn(),
     },
     userServiceMock: {
       list: vi.fn(),
