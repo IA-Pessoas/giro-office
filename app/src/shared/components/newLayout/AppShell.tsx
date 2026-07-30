@@ -312,6 +312,7 @@ export function AppShell({
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarPreviewOpen, setIsSidebarPreviewOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAiChat, setShowAiChat] = useState(false);
@@ -321,6 +322,12 @@ export function AppShell({
   const [hasUserPhotoLoadError, setHasUserPhotoLoadError] = useState(false);
   const notifications: AppShellNotification[] = [];
   const hasUnreadNotifications = notifications.some((item) => item.unread);
+  const shouldExpandSidebar = isSidebarOpen || isSidebarPreviewOpen;
+  const sidebarToggleLabel = isSidebarOpen
+    ? "Recolher sidebar"
+    : isSidebarPreviewOpen
+      ? "Fixar sidebar aberta"
+      : "Expandir sidebar";
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
@@ -494,7 +501,34 @@ export function AppShell({
     setChatInput("");
   };
 
-  const toggleSidebar = () => setIsSidebarOpen((v) => !v);
+  const openSidebarPreview = () => {
+    if (!isSidebarOpen) {
+      setIsSidebarPreviewOpen(true);
+    }
+  };
+
+  const closeSidebarPreview = () => {
+    if (!isSidebarOpen) {
+      setIsSidebarPreviewOpen(false);
+    }
+  };
+
+  const pinSidebarOpen = () => {
+    if (!isSidebarOpen) {
+      setIsSidebarOpen(true);
+      setIsSidebarPreviewOpen(false);
+    }
+  };
+
+  const toggleSidebar = () => {
+    if (isSidebarOpen) {
+      setIsSidebarOpen(false);
+      setIsSidebarPreviewOpen(false);
+      return;
+    }
+
+    pinSidebarOpen();
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -505,12 +539,16 @@ export function AppShell({
         !mobileMenuButtonRef.current.contains(event.target as Node)
       ) {
         if (isMobileMenuOpen) setIsMobileMenuOpen(false);
+        if (isSidebarPreviewOpen) setIsSidebarPreviewOpen(false);
       }
     };
 
-    if (isMobileMenuOpen) document.addEventListener("mousedown", handleClickOutside);
+    if (isMobileMenuOpen || isSidebarPreviewOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isMobileMenuOpen]);
+  }, [isMobileMenuOpen, isSidebarPreviewOpen]);
 
   useEffect(() => {
     if (!showNotifications && !showUserMenu && !showAiChat) {
@@ -573,25 +611,42 @@ export function AppShell({
 
       <aside
         ref={sidebarRef}
+        onMouseEnter={openSidebarPreview}
+        onMouseLeave={closeSidebarPreview}
+        onFocus={openSidebarPreview}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            closeSidebarPreview();
+          }
+        }}
+        onClick={pinSidebarOpen}
         className={`fixed top-0 left-0 h-full bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 transition-all duration-300 z-40 ${
-          isSidebarOpen ? "w-64" : "w-20"
-        } ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
+          shouldExpandSidebar ? "w-64" : "w-20"
+        } ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} ${isSidebarPreviewOpen ? "lg:z-50 lg:shadow-xl" : ""} lg:translate-x-0`}
       >
-        <div className="h-16 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-4">
-          <Logo showText={isSidebarOpen} />
-        </div>
-
-        <button
-          onClick={toggleSidebar}
-          className="hidden lg:flex absolute -right-3 top-20 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-full p-1 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors z-50"
-          type="button"
+        <div
+          className={`h-16 border-b border-gray-200 dark:border-slate-800 flex items-center ${
+            shouldExpandSidebar ? "justify-between gap-2 px-4" : "justify-center px-2"
+          }`}
         >
-          {isSidebarOpen ? (
-            <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-          )}
-        </button>
+          {shouldExpandSidebar ? <Logo showText /> : null}
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleSidebar();
+            }}
+            className="hidden h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 dark:border-slate-800 dark:bg-slate-900 dark:text-gray-400 dark:hover:bg-slate-800 lg:inline-flex"
+            type="button"
+            aria-label={sidebarToggleLabel}
+            title={sidebarToggleLabel}
+          >
+            {isSidebarOpen ? (
+              <ChevronLeft className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+          </button>
+        </div>
 
         <nav className="p-3 space-y-6 overflow-y-auto h-[calc(100vh-4rem)]">
           {filteredModuleCategories.map((category) => {
@@ -600,7 +655,7 @@ export function AppShell({
 
             return (
               <div key={category.name}>
-                {isSidebarOpen ? (
+                {shouldExpandSidebar ? (
                   <div className="px-3 mb-2">
                     <span className="text-xs font-semibold text-black dark:text-white uppercase tracking-wider">
                       {category.name}
@@ -610,7 +665,7 @@ export function AppShell({
 
                 <div className="space-y-1">
                   {shouldRenderModuleNavLoading ? (
-                    <ModuleNavLoadingItem showText={isSidebarOpen} />
+                    <ModuleNavLoadingItem showText={shouldExpandSidebar} />
                   ) : (
                     category.modules.map((module) => {
                       const Icon = module.icon;
@@ -624,11 +679,11 @@ export function AppShell({
                             isActive
                               ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
                               : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
-                          } ${!isSidebarOpen ? "justify-center" : ""}`}
-                          title={!isSidebarOpen ? module.name : undefined}
+                          } ${!shouldExpandSidebar ? "justify-center" : ""}`}
+                          title={!shouldExpandSidebar ? module.name : undefined}
                         >
                           <Icon className="w-5 h-5 flex-shrink-0" />
-                          {isSidebarOpen ? (
+                          {shouldExpandSidebar ? (
                             <span className="text-sm font-medium">
                               {getNavigationModuleName(module, moduleAccessUser)}
                             </span>
