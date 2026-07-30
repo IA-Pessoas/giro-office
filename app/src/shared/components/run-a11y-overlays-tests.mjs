@@ -75,22 +75,34 @@ runTest("AppShell menu triggers expose expanded state and controlled panels", ()
 });
 
 runTest("AppShell sidebar toggle sits in the header and exposes an accessible name", () => {
-  const toggleStart = appShellSource.indexOf("onClick={toggleSidebar}");
+  const toggleStart = appShellSource.indexOf("toggleSidebar();");
   const toggleSource = appShellSource.slice(toggleStart - 500, toggleStart + 700);
 
   assert.notEqual(toggleStart, -1);
-  assert.match(
-    toggleSource,
-    /aria-label=\{isSidebarOpen \? "Recolher sidebar" : "Expandir sidebar"\}/,
-  );
-  assert.match(
-    toggleSource,
-    /title=\{isSidebarOpen \? "Recolher sidebar" : "Expandir sidebar"\}/,
-  );
+  assert.match(toggleSource, /event\.stopPropagation\(\);/);
+  assert.match(toggleSource, /aria-label=\{sidebarToggleLabel\}/);
+  assert.match(toggleSource, /title=\{sidebarToggleLabel\}/);
   assert.match(toggleSource, /h-9 w-9/);
   assert.match(toggleSource, /justify-center px-2/);
-  assert.match(toggleSource, /\{isSidebarOpen \? <Logo showText \/> : null\}/);
+  assert.match(toggleSource, /\{shouldExpandSidebar \? <Logo showText \/> : null\}/);
   assert.doesNotMatch(toggleSource, /absolute -right-3 top-20/);
+});
+
+runTest("AppShell sidebar preview opens temporarily and pins only by click", () => {
+  assert.match(appShellSource, /const \[isSidebarPreviewOpen, setIsSidebarPreviewOpen\] = useState\(false\);/);
+  assert.match(appShellSource, /const shouldExpandSidebar = isSidebarOpen \|\| isSidebarPreviewOpen;/);
+  assert.match(appShellSource, /const sidebarToggleLabel = isSidebarOpen/);
+  assert.match(appShellSource, /\? "Fixar sidebar aberta"/);
+  assert.match(appShellSource, /const openSidebarPreview = \(\) => \{/);
+  assert.match(appShellSource, /const closeSidebarPreview = \(\) => \{/);
+  assert.match(appShellSource, /const pinSidebarOpen = \(\) => \{/);
+  assert.match(appShellSource, /onMouseEnter=\{openSidebarPreview\}/);
+  assert.match(appShellSource, /onMouseLeave=\{closeSidebarPreview\}/);
+  assert.match(appShellSource, /onFocus=\{openSidebarPreview\}/);
+  assert.match(appShellSource, /onClick=\{pinSidebarOpen\}/);
+  assert.match(appShellSource, /if \(isMobileMenuOpen \|\| isSidebarPreviewOpen\)/);
+  assert.match(appShellSource, /if \(isSidebarPreviewOpen\) setIsSidebarPreviewOpen\(false\);/);
+  assert.match(appShellSource, /className=\{`flex flex-col min-h-screen transition-all duration-300 \$\{isSidebarOpen \? "lg:ml-64" : "lg:ml-20"\}`\}/);
 });
 
 runTest("AppShell header notifications do not embed mock notification rows", () => {
