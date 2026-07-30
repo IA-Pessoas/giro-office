@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  formatBrazilianPhoneInput,
+  formatCnpjInput,
+  formatCpfInput,
+} from "../../shared/utils/inputFormatting.ts";
+import { forwardFormattedInputChange } from "./components/formattedInputChange.ts";
+import {
   buildClientListParams,
   CLIENT_ENDPOINTS,
   unwrapClientEnvelope,
@@ -24,6 +30,7 @@ import {
   hasFinanceChanges,
 } from "./utils/financeForm.ts";
 import {
+  buildCreateClientIntegrationPayload,
   buildUpdateClientIntegrationPayload,
   createUpdateClientIntegrationInitialValues,
   hasUsableIntegrationData,
@@ -52,6 +59,42 @@ function runTest(name, fn) {
     console.error(`FAIL ${name}`);
     throw error;
   }
+}
+
+function assertFormattedInputEventContract(format, rawValue, expectedValue) {
+  const originalTarget = {
+    name: "cpf_cnpj",
+    type: "text",
+    checked: false,
+    value: rawValue,
+  };
+  const originalCurrentTarget = {
+    name: "cpf_cnpj",
+    type: "text",
+    checked: false,
+    value: rawValue,
+  };
+  const originalEvent = {
+    type: "change",
+    target: originalTarget,
+    currentTarget: originalCurrentTarget,
+  };
+  let receivedEvent;
+
+  forwardFormattedInputChange(originalEvent, format, (event) => {
+    receivedEvent = event;
+  });
+
+  assert.strictEqual(receivedEvent, originalEvent);
+  assert.equal(receivedEvent.type, "change");
+  assert.equal(receivedEvent.target.name, "cpf_cnpj");
+  assert.equal(receivedEvent.target.type, "text");
+  assert.equal(receivedEvent.target.checked, false);
+  assert.equal(receivedEvent.target.value, expectedValue);
+  assert.equal(receivedEvent.currentTarget.name, "cpf_cnpj");
+  assert.equal(receivedEvent.currentTarget.type, "text");
+  assert.equal(receivedEvent.currentTarget.checked, false);
+  assert.equal(receivedEvent.currentTarget.value, expectedValue);
 }
 
 runTest("mapClientStatusFromApi converts prospecting status to Prospect", () => {
@@ -159,20 +202,49 @@ runTest("unwrapClientPaDetail returns nested detail payload", () => {
   assert.deepEqual(unwrapClientPaDetail({ detail }), detail);
 });
 
-runTest("integration edit hydration reuses client detail values", () => {
+runTest("integration create payload sends a canonical phone", () => {
+  assert.equal(
+    buildCreateClientIntegrationPayload(
+      {
+        type: "PJ",
+        name: "Acme",
+        cpf_cnpj: "12.345.678/0001-90",
+        company_name: "",
+        fantasy_name: "",
+        opening_date: "",
+        responsible: "",
+        cpf_responsible: "",
+        number: "(11) 99999-9999",
+        email: "",
+        agent: "",
+        cpf_agent: "",
+        instagram: "",
+        indication: "",
+        participants_meet: "",
+        meet_type: "",
+        type_registration: "Existente",
+        service_unique: false,
+      },
+      "organization-1",
+    ).number,
+    "11999999999",
+  );
+});
+
+runTest("integration edit hydration masks client documents and phone", () => {
   const client = {
     id: "123",
     type: "PJ",
     name: "Acme",
-    cpf_cnpj: "12.345.678/0001-90",
+    cpf_cnpj: "12345678000190",
     company_name: "Acme LTDA",
     fantasy_name: "Acme",
     responsible: "Maria",
-    cpf_responsible: "123.456.789-10",
+    cpf_responsible: "12345678910",
     number: "11999999999",
     email: "contato@acme.com",
     agent: "Joao",
-    cpf_agent: "987.654.321-00",
+    cpf_agent: "98765432100",
     instagram: "@acme",
     indication: "Google",
     type_registration: "Existente",
@@ -192,7 +264,7 @@ runTest("integration edit hydration reuses client detail values", () => {
     fantasy_name: "Acme",
     responsible: "Maria",
     cpf_responsible: "123.456.789-10",
-    number: "11999999999",
+    number: "(11) 99999-9999",
     email: "contato@acme.com",
     agent: "Joao",
     cpf_agent: "987.654.321-00",
@@ -206,6 +278,15 @@ runTest("integration edit hydration reuses client detail values", () => {
     state: "SP",
     city: "Sao Paulo",
   });
+
+  assert.equal(
+    createUpdateClientIntegrationInitialValues({
+      ...client,
+      type: "PF",
+      cpf_cnpj: "12345678910",
+    }).cpf_cnpj,
+    "123.456.789-10",
+  );
 });
 
 runTest("integration update payload includes only changed supported fields", () => {
@@ -248,6 +329,48 @@ runTest("integration update payload includes only changed supported fields", () 
   });
 });
 
+runTest("integration phone comparison and payload use canonical digits", () => {
+  const client = {
+    id: "123",
+    type: "PJ",
+    name: "Acme",
+    cpf_cnpj: "12345678000190",
+    company_name: "",
+    fantasy_name: "",
+    responsible: "",
+    cpf_responsible: "",
+    number: "11999999999",
+    email: "",
+    agent: "",
+    cpf_agent: "",
+    instagram: "",
+    indication: "",
+    type_registration: "Existente",
+    service_unique: false,
+    address: "",
+    cep: "",
+    neighborhood: "",
+    state: "",
+    city: "",
+  };
+  const initialValues = createUpdateClientIntegrationInitialValues(client);
+
+  assert.deepEqual(
+    buildUpdateClientIntegrationPayload(
+      { ...initialValues, number: "11 99999.9999" },
+      client,
+    ),
+    {},
+  );
+  assert.deepEqual(
+    buildUpdateClientIntegrationPayload(
+      { ...initialValues, number: "(11) 98888-7777" },
+      client,
+    ),
+    { number: "11988887777" },
+  );
+});
+
 runTest("integration edit guard blocks when normalized cpf_cnpj is missing", () => {
   assert.equal(hasUsableIntegrationData({ cpf_cnpj: "12.345.678/0001-90" }), true);
   assert.equal(hasUsableIntegrationData({ cpf_cnpj: "   " }), false);
@@ -273,6 +396,54 @@ runTest("document input formatter masks and limits by person type", () => {
   assert.equal(formatCpfCnpjInput("123456789101112", "PJ"), "12.345.678/9101-11");
   assert.equal(formatCpfCnpjInput("abc1234", "PF"), "123.4");
   assert.equal(formatCpfCnpjInput("1234567", "PJ"), "12.345.67");
+});
+
+runTest("client input masks forward formatted document and phone values through event-compatible targets", () => {
+  assertFormattedInputEventContract(
+    formatCpfInput,
+    "12345678910",
+    "123.456.789-10",
+  );
+  assertFormattedInputEventContract(
+    formatCnpjInput,
+    "12345678000190",
+    "12.345.678/0001-90",
+  );
+  assertFormattedInputEventContract(
+    formatBrazilianPhoneInput,
+    "11999999999",
+    "(11) 99999-9999",
+  );
+});
+
+runTest("client integration fields route type-specific documents and phones through local mask adapters", () => {
+  const source = readFileSync("src/modules/clients/components/ClientIntegrationForm.tsx", "utf8");
+
+  assert.match(source, /from "@shared\/utils\/inputFormatting"/);
+  assert.match(source, /formatCpfInput/);
+  assert.match(source, /formatCnpjInput/);
+  assert.match(source, /formatBrazilianPhoneInput/);
+  assert.match(source, /from "\.\/formattedInputChange"/);
+  assert.match(source, /forwardFormattedInputChange/);
+  assert.match(source, /values\.type === "PJ" \? formatCnpjInput : formatCpfInput/);
+  assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
+  assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
+  assert.match(source, /name="cpf_agent"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
+  assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
+});
+
+runTest("client Regularize fields route generic documents, CPF, and phones through local mask adapters", () => {
+  const source = readFileSync("src/modules/clients/components/ClientRegularizeForm.tsx", "utf8");
+
+  assert.match(source, /from "@shared\/utils\/inputFormatting"/);
+  assert.match(source, /formatCpfCnpjInput/);
+  assert.match(source, /formatCpfInput/);
+  assert.match(source, /formatBrazilianPhoneInput/);
+  assert.match(source, /from "\.\/formattedInputChange"/);
+  assert.match(source, /forwardFormattedInputChange/);
+  assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
+  assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
+  assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
 });
 
 runTest("optional cpf validation accepts empty values and rejects invalid lengths", () => {
@@ -401,6 +572,36 @@ runTest("regularize payload normalizes documents, nullable text, and dates", () 
     customer_since: "2026-04-02",
   });
   assert.equal(hasRegularizeChanges(values, client), true);
+});
+
+runTest("regularize hydration masks documents and phone while phone payload stays canonical", () => {
+  const client = {
+    id: "client-1",
+    type: "PJ",
+    name: "Acme",
+    cpf_cnpj: "12345678000190",
+    cpf_responsible: "12345678910",
+    number: "11999999999",
+  };
+  const initialValues = createRegularizeInitialValues(client);
+
+  assert.equal(initialValues.cpf_cnpj, "12.345.678/0001-90");
+  assert.equal(initialValues.cpf_responsible, "123.456.789-10");
+  assert.equal(initialValues.number, "(11) 99999-9999");
+  assert.deepEqual(
+    buildRegularizePayload(
+      { ...initialValues, number: "11 99999.9999" },
+      client,
+    ),
+    {},
+  );
+  assert.deepEqual(
+    buildRegularizePayload(
+      { ...initialValues, number: "(11) 98888-7777" },
+      client,
+    ),
+    { number: "11988887777" },
+  );
 });
 
 runTest("regularize blocks clearing non-nullable dates and ignores invalid clear as effective change", () => {

@@ -137,6 +137,35 @@ await runTest("regularize PF forms search every paginated PF option and preserve
   assert.match(selectSource, /listQuery\.refetch/);
 });
 
+await runTest("regularize document inputs keep masks while payloads use canonical digits", async () => {
+  const [processFormSource, guidancePartnerFormSource] = await Promise.all([
+    readModuleSource("components/RegularizeProcessForm.tsx"),
+    readModuleSource("components/RegularizeGuidancePartnerForm.tsx"),
+  ]);
+
+  assert.match(processFormSource, /formatCpfCnpjInput/);
+  assert.match(processFormSource, /normalizeDigits/);
+  assert.match(
+    processFormSource,
+    /handleChange\("cpf_cnpj", formatCpfCnpjInput\(event\.target\.value\)\)/,
+  );
+  assert.match(
+    processFormSource,
+    /cpf_cnpj: normalizeDigits\(trimRegularizeText\(formState\.cpf_cnpj\)\)/,
+  );
+
+  assert.match(guidancePartnerFormSource, /formatCpfInput/);
+  assert.match(guidancePartnerFormSource, /normalizeDigits/);
+  assert.match(
+    guidancePartnerFormSource,
+    /handleChange\("cpf", formatCpfInput\(event\.target\.value\)\)/,
+  );
+  assert.match(
+    guidancePartnerFormSource,
+    /cpf: normalizeDigits\(trimRegularizeText\(formState\.cpf\)\)/,
+  );
+});
+
 await runTest("regularize dashboard has a centralized aggregate data contract", async () => {
   const contractSource = await readModuleSource("services/regularizeService.contract.ts");
   const serviceSource = await readModuleSource("services/regularizeService.ts");

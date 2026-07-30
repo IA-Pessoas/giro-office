@@ -10,6 +10,21 @@ import {
 } from "./certificateWorkspaceUi";
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
+import {
+  formatBrlInput,
+  formatCnpjInput,
+  formatCpfInput,
+} from "@shared/utils/inputFormatting";
+import {
+  getCreatePfPayload,
+  getCreatePjPayload,
+  getPaymentAmountValidationError,
+  getUpdatePfPayload,
+  getUpdatePjPayload,
+  type CertificateFormState,
+  type PfFormState,
+  type PjFormState,
+} from "./certificateInputNormalization";
 import type {
   CertificatePf,
   CertificatePj,
@@ -18,40 +33,6 @@ import type {
   UpdateCertificatePfBody,
   UpdateCertificatePjBody,
 } from "../types";
-
-type BaseFormState = {
-  clientCasteloStatus: boolean;
-  clientFocusStatus: boolean;
-  name: string;
-  model: string;
-  password: string;
-  expirationDate: string;
-  notes: string;
-  wasPaid: boolean;
-  paymentDate: string;
-  paymentAmount: string;
-  contactInfo: string;
-};
-
-type PjFormState = BaseFormState & {
-  kind: "pj";
-  cnpj: string;
-  responsible: string;
-  legalNature: string;
-  enterprise?: never;
-  cpf?: never;
-};
-
-type PfFormState = BaseFormState & {
-  kind: "pf";
-  cpf: string;
-  enterprise: string;
-  cnpj: string;
-  legalNature?: never;
-  responsible?: never;
-};
-
-type CertificateFormState = PjFormState | PfFormState;
 
 type CreateFormPayload = CreateCertificatePjBody | CreateCertificatePfBody;
 type UpdateFormPayload = UpdateCertificatePjBody | UpdateCertificatePfBody;
@@ -101,25 +82,6 @@ function toInputDate(value: string | null | undefined): string {
   return value.slice(0, 10);
 }
 
-function normalizeOptionalText(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function parsePaymentAmount(value: string): number | null {
-  const trimmed = value.trim().replace(",", ".");
-  if (!trimmed) {
-    return null;
-  }
-
-  const amount = Number(trimmed);
-  if (Number.isNaN(amount)) {
-    return Number.NaN;
-  }
-
-  return amount;
-}
-
 function hasText(value: string): boolean {
   return value.trim().length > 0;
 }
@@ -138,7 +100,7 @@ function buildInitialFormState(formKind: "pj" | "pf", initial?: CertificatePj | 
       clientCasteloStatus: initialPj?.client_castelo_status ?? false,
       clientFocusStatus: initialPj?.client_focus_status ?? false,
       name: initialPj?.name ?? "",
-      cnpj: initialPj?.cnpj ?? "",
+      cnpj: formatCnpjInput(initialPj?.cnpj ?? ""),
       responsible: initialPj?.responsible ?? "",
       model: initialPj?.model ?? "",
       legalNature: initialPj?.legal_nature ?? "",
@@ -147,7 +109,10 @@ function buildInitialFormState(formKind: "pj" | "pf", initial?: CertificatePj | 
       notes: initialPj?.notes ?? "",
       wasPaid: initialPj?.was_paid ?? false,
       paymentDate: toInputDate(initialPj?.payment_date),
-      paymentAmount: initialPj?.payment_amount != null ? String(initialPj.payment_amount) : "",
+      paymentAmount:
+        initialPj?.payment_amount != null
+          ? formatBrlInput(String(Math.round(initialPj.payment_amount * 100)))
+          : "",
       contactInfo: initialPj?.contact_info ?? "",
     };
   }
@@ -158,16 +123,19 @@ function buildInitialFormState(formKind: "pj" | "pf", initial?: CertificatePj | 
     clientCasteloStatus: initialPf?.client_castelo_status ?? false,
     clientFocusStatus: initialPf?.client_focus_status ?? false,
     name: initialPf?.name ?? "",
-    cpf: initialPf?.cpf ?? "",
+    cpf: formatCpfInput(initialPf?.cpf ?? ""),
     enterprise: initialPf?.enterprise ?? "",
     model: initialPf?.model ?? "",
-    cnpj: initialPf?.cnpj ?? "",
+    cnpj: formatCnpjInput(initialPf?.cnpj ?? ""),
     password: "",
     expirationDate: toInputDate(initialPf?.expiration_date),
     notes: initialPf?.notes ?? "",
     wasPaid: initialPf?.was_paid ?? false,
     paymentDate: toInputDate(initialPf?.payment_date),
-    paymentAmount: initialPf?.payment_amount != null ? String(initialPf.payment_amount) : "",
+    paymentAmount:
+      initialPf?.payment_amount != null
+        ? formatBrlInput(String(Math.round(initialPf.payment_amount * 100)))
+        : "",
     contactInfo: initialPf?.contact_info ?? "",
   };
 }
@@ -177,191 +145,6 @@ function getHasChanges(
   initial: CertificateFormState,
 ): boolean {
   return JSON.stringify(current) !== JSON.stringify(initial);
-}
-
-function getCreatePjPayload(state: PjFormState): CreateCertificatePjBody {
-  return {
-    client_castelo_status: state.clientCasteloStatus,
-    client_focus_status: state.clientFocusStatus,
-    name: state.name.trim(),
-    cnpj: state.cnpj.trim(),
-    responsible: state.responsible.trim(),
-    model: state.model.trim(),
-    legal_nature: state.legalNature.trim(),
-    password: state.password.trim(),
-    expiration_date: state.expirationDate,
-    notes: normalizeOptionalText(state.notes),
-    was_paid: state.wasPaid,
-    payment_date: state.wasPaid ? normalizeOptionalText(state.paymentDate) : null,
-    payment_amount: state.wasPaid ? parsePaymentAmount(state.paymentAmount) : null,
-    contact_info: normalizeOptionalText(state.contactInfo),
-  };
-}
-
-function getCreatePfPayload(state: PfFormState): CreateCertificatePfBody {
-  return {
-    client_castelo_status: state.clientCasteloStatus,
-    client_focus_status: state.clientFocusStatus,
-    name: state.name.trim(),
-    cpf: state.cpf.trim(),
-    model: state.model.trim(),
-    password: state.password.trim(),
-    expiration_date: state.expirationDate,
-    notes: normalizeOptionalText(state.notes),
-    enterprise: normalizeOptionalText(state.enterprise),
-    cnpj: normalizeOptionalText(state.cnpj),
-    was_paid: state.wasPaid,
-    payment_date: state.wasPaid ? normalizeOptionalText(state.paymentDate) : null,
-    payment_amount: state.wasPaid ? parsePaymentAmount(state.paymentAmount) : null,
-    contact_info: normalizeOptionalText(state.contactInfo),
-  };
-}
-
-function getUpdatePjPayload(
-  current: PjFormState,
-  initial: PjFormState,
-): UpdateCertificatePjBody | null {
-  const payload: UpdateCertificatePjBody = {};
-
-  if (current.name.trim() && current.name !== initial.name) {
-    payload.name = current.name.trim();
-  }
-
-  if (current.cnpj.trim() && current.cnpj !== initial.cnpj) {
-    payload.cnpj = current.cnpj.trim();
-  }
-
-  if (current.responsible.trim() && current.responsible !== initial.responsible) {
-    payload.responsible = current.responsible.trim();
-  }
-
-  if (current.model.trim() && current.model !== initial.model) {
-    payload.model = current.model.trim();
-  }
-
-  if (current.legalNature.trim() && current.legalNature !== initial.legalNature) {
-    payload.legal_nature = current.legalNature.trim();
-  }
-
-  if (hasText(current.password) && current.password !== "") {
-    payload.password = current.password.trim();
-  }
-
-  if (current.expirationDate && current.expirationDate !== initial.expirationDate) {
-    payload.expiration_date = current.expirationDate;
-  }
-
-  if (current.notes !== initial.notes) {
-    payload.notes = normalizeOptionalText(current.notes);
-  }
-
-  if (current.contactInfo !== initial.contactInfo) {
-    payload.contact_info = normalizeOptionalText(current.contactInfo);
-  }
-
-  if (current.clientCasteloStatus !== initial.clientCasteloStatus) {
-    payload.client_castelo_status = current.clientCasteloStatus;
-  }
-
-  if (current.clientFocusStatus !== initial.clientFocusStatus) {
-    payload.client_focus_status = current.clientFocusStatus;
-  }
-
-  if (current.wasPaid !== initial.wasPaid) {
-    payload.was_paid = current.wasPaid;
-  }
-
-  if (current.wasPaid) {
-    if (current.paymentDate !== initial.paymentDate) {
-      payload.payment_date = normalizeOptionalText(current.paymentDate);
-    }
-    if (current.paymentAmount !== initial.paymentAmount) {
-      payload.payment_amount = current.paymentAmount ? parsePaymentAmount(current.paymentAmount) : null;
-    }
-  } else if (current.wasPaid === false && initial.wasPaid) {
-    payload.payment_date = null;
-    payload.payment_amount = null;
-  }
-
-  return Object.keys(payload).length === 0 ? null : payload;
-}
-
-function getUpdatePfPayload(
-  current: PfFormState,
-  initial: PfFormState,
-): UpdateCertificatePfBody | null {
-  const payload: UpdateCertificatePfBody = {};
-
-  if (current.name.trim() && current.name !== initial.name) {
-    payload.name = current.name.trim();
-  }
-
-  if (hasText(current.cpf) && current.cpf !== initial.cpf) {
-    payload.cpf = current.cpf.trim();
-  }
-
-  if (current.model.trim() && current.model !== initial.model) {
-    payload.model = current.model.trim();
-  }
-
-  if (current.cnpj !== initial.cnpj) {
-    payload.cnpj = normalizeOptionalText(current.cnpj);
-  }
-
-  if (current.enterprise !== initial.enterprise) {
-    payload.enterprise = normalizeOptionalText(current.enterprise);
-  }
-
-  if (hasText(current.password) && current.password !== "") {
-    payload.password = current.password.trim();
-  }
-
-  if (current.expirationDate && current.expirationDate !== initial.expirationDate) {
-    payload.expiration_date = current.expirationDate;
-  }
-
-  if (current.notes !== initial.notes) {
-    payload.notes = normalizeOptionalText(current.notes);
-  }
-
-  if (current.contactInfo !== initial.contactInfo) {
-    payload.contact_info = normalizeOptionalText(current.contactInfo);
-  }
-
-  if (current.clientCasteloStatus !== initial.clientCasteloStatus) {
-    payload.client_castelo_status = current.clientCasteloStatus;
-  }
-
-  if (current.clientFocusStatus !== initial.clientFocusStatus) {
-    payload.client_focus_status = current.clientFocusStatus;
-  }
-
-  if (current.wasPaid !== initial.wasPaid) {
-    payload.was_paid = current.wasPaid;
-  }
-
-  if (current.wasPaid) {
-    if (current.paymentDate !== initial.paymentDate) {
-      payload.payment_date = normalizeOptionalText(current.paymentDate);
-    }
-
-    if (current.paymentAmount !== initial.paymentAmount) {
-      payload.payment_amount = current.paymentAmount ? parsePaymentAmount(current.paymentAmount) : null;
-    }
-  } else if (current.wasPaid === false && initial.wasPaid) {
-    payload.payment_date = null;
-    payload.payment_amount = null;
-  }
-
-  return Object.keys(payload).length === 0 ? null : payload;
-}
-
-function getInvalidAmountMessage(payloadAmount: number | null, original: string): string | null {
-  if (original.trim() && Number.isNaN(payloadAmount)) {
-    return "Informe um valor de pagamento válido.";
-  }
-
-  return null;
 }
 
 function boolToLabel(value: boolean) {
@@ -403,8 +186,10 @@ export function CertificateForm({
 
     if (isPj) {
       const state = formState as PjFormState;
-      const normalizedAmount = state.wasPaid ? parsePaymentAmount(state.paymentAmount) : null;
-      const invalidAmountMessage = getInvalidAmountMessage(normalizedAmount, state.paymentAmount);
+      const invalidAmountMessage = getPaymentAmountValidationError(
+        state.paymentAmount,
+        state.wasPaid,
+      );
 
       if (invalidAmountMessage) {
         setErrorMessage(invalidAmountMessage);
@@ -470,8 +255,10 @@ export function CertificateForm({
     }
 
     const state = formState as PfFormState;
-    const normalizedAmount = state.wasPaid ? parsePaymentAmount(state.paymentAmount) : null;
-    const invalidAmountMessage = getInvalidAmountMessage(normalizedAmount, state.paymentAmount);
+    const invalidAmountMessage = getPaymentAmountValidationError(
+      state.paymentAmount,
+      state.wasPaid,
+    );
 
     if (invalidAmountMessage) {
       setErrorMessage(invalidAmountMessage);
@@ -565,7 +352,10 @@ export function CertificateForm({
             type="text"
             value={formState.kind === "pj" ? formState.cnpj : formState.cpf}
             onChange={(event) =>
-              updateField((isPj ? "cnpj" : "cpf") as keyof CertificateFormState, event.target.value)
+              updateField(
+                (isPj ? "cnpj" : "cpf") as keyof CertificateFormState,
+                isPj ? formatCnpjInput(event.target.value) : formatCpfInput(event.target.value),
+              )
             }
             className={CERTIFICATE_INPUT_CLASSNAME}
             disabled={isSubmitting}
@@ -645,7 +435,7 @@ export function CertificateForm({
                 type="text"
                 value={formState.cnpj}
                 onChange={(event) =>
-                  updateField("cnpj", event.target.value as CertificateFormState["cnpj"])
+                  updateField("cnpj", formatCnpjInput(event.target.value) as CertificateFormState["cnpj"])
                 }
                 className={CERTIFICATE_INPUT_CLASSNAME}
                 disabled={isSubmitting}
@@ -746,10 +536,10 @@ export function CertificateForm({
           <input
             type="text"
             value={formState.paymentAmount}
-            onChange={(event) => updateField("paymentAmount", event.target.value)}
+            onChange={(event) => updateField("paymentAmount", formatBrlInput(event.target.value))}
             className={CERTIFICATE_INPUT_CLASSNAME}
             disabled={isSubmitting || !formState.wasPaid}
-            placeholder="0.00"
+            placeholder="R$ 0,00"
           />
         </label>
 
