@@ -668,9 +668,18 @@ await runTest("regularize finite status and urgency fields use native selects", 
 
 await runTest("regularize process task id uses the real task selector", async () => {
   const processSource = await readModuleSource("components/RegularizeProcessForm.tsx");
+  const tasksHookSource = await readFile(
+    join(appRoot, "src/modules/integracao/hooks/useIntegracaoTasks.ts"),
+    "utf8",
+  );
 
+  assert.match(tasksHookSource, /options\??: \{\s*enabled\??: boolean/);
+  assert.match(tasksHookSource, /enabled: options\.enabled \?\? true/);
   assert.match(processSource, /useIntegracaoTasksList/);
-  assert.match(processSource, /useIntegracaoTasksList\(\{\s*status: "Todos",\s*limit: 100\s*\}\)/);
+  assert.match(processSource, /status: "Todos",\s*limit: 100,\s*search: taskSearch/);
+  assert.match(processSource, /\{\s*enabled: open\s*\}/);
+  assert.match(processSource, /value=\{taskSearch\}/);
+  assert.match(processSource, /taskSearch/);
   assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.task_id\}/);
   assert.match(processSource, /taskOptions\.map/);
   assert.match(processSource, /tasksQuery\.isLoading/);

@@ -132,8 +132,12 @@ export function RegularizeProcessForm({
     buildProcessFormState(process, defaultClientId),
   );
   const [formError, setFormError] = useState<string | null>(null);
+  const [taskSearch, setTaskSearch] = useState("");
   const isEditing = mode === "edit";
-  const tasksQuery = useIntegracaoTasksList({ status: "Todos", limit: 100 });
+  const tasksQuery = useIntegracaoTasksList(
+    { status: "Todos", limit: 100, search: taskSearch },
+    { enabled: open },
+  );
   const taskOptions = (tasksQuery.data?.data ?? []).map((task) => ({
     id: task.id,
     label: `${task.name} — ${task.status}`,
@@ -153,6 +157,7 @@ export function RegularizeProcessForm({
     if (open) {
       setFormState(buildProcessFormState(process, defaultClientId));
       setFormError(null);
+      setTaskSearch("");
     }
   }, [defaultClientId, open, process]);
 
@@ -349,6 +354,16 @@ export function RegularizeProcessForm({
               <input
                 value={formState.locking_type}
                 onChange={(event) => handleChange("locking_type", event.target.value)}
+                className={regularizeTextFieldClassName}
+              />
+            </RegularizeFormField>
+
+            <RegularizeFormField label="Buscar task">
+              <input
+                type="search"
+                value={taskSearch}
+                onChange={(event) => setTaskSearch(event.target.value)}
+                placeholder="Buscar task por nome ou status"
                 className={regularizeTextFieldClassName}
               />
             </RegularizeFormField>
