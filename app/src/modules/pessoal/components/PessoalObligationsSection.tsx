@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   AlertCircle,
   CheckSquare,
@@ -9,10 +9,7 @@ import {
   Save,
 } from "lucide-react";
 
-import { resolveDepartmentModuleKey } from "@modules/auth";
-import { departmentService } from "@modules/departments";
-import { listAdminUsers } from "@modules/users";
-import { useFetch } from "@shared/hooks";
+import { useAssignableUsers } from "@modules/rh";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -21,7 +18,6 @@ import {
   usePessoalObligation,
   useUpdatePessoalObligationMutation,
 } from "../hooks/usePessoalObligations";
-import { pessoalQueryKey } from "../hooks/queryKeys";
 import type { PessoalObligationUpdatePayload } from "../types/obligations";
 import { formatPessoalObligationGenerationSummary } from "../utils/obligationGenerationSummary";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
@@ -73,16 +69,10 @@ export function PessoalObligationsSection({
     selectedClientId,
     competence,
   );
-  const responsibleUsersQuery = useFetch(
-    pessoalQueryKey("obligations", "users", "active"),
-    () => listAdminUsers("active"),
-    { enabled: canEdit && Boolean(obligation) },
-  );
-  const departmentsQuery = useFetch(
-    pessoalQueryKey("obligations", "departments"),
-    () => departmentService.list(),
-    { enabled: canEdit && Boolean(obligation) },
-  );
+  const responsibleUsersQuery = useAssignableUsers({
+    enabled: canEdit && Boolean(obligation),
+    module: "pessoal",
+  });
   const [responsibleId, setResponsibleId] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -90,28 +80,12 @@ export function PessoalObligationsSection({
   const isMutating =
     createMutation.isPending || updateMutation.isPending || generateMutation.isPending;
   const isFormDisabled = !canEdit || obligationQuery.isLoading || isMutating;
-  const departmentNameById = useMemo(
-    () =>
-      new Map(
-        (departmentsQuery.data ?? []).map((department) => [department.id, department.name]),
-      ),
-    [departmentsQuery.data],
-  );
-  const responsibleUsers = useMemo(
-    () =>
-      (responsibleUsersQuery.data ?? []).filter((user) => {
-        const departmentName =
-          departmentNameById.get(user.department_id) ?? user.department?.name ?? null;
-
-        return resolveDepartmentModuleKey(departmentName) === "pessoal";
-      }),
-    [departmentNameById, responsibleUsersQuery.data],
-  );
+  const responsibleUsers = responsibleUsersQuery.data ?? [];
   const hasSelectedResponsible = responsibleUsers.some((user) => user.id === responsibleId);
   const areResponsibleOptionsLoading =
-    responsibleUsersQuery.isLoading || departmentsQuery.isLoading;
+    responsibleUsersQuery.isLoading;
   const hasResponsibleOptionsError =
-    responsibleUsersQuery.isError || departmentsQuery.isError;
+    responsibleUsersQuery.isError;
 
   function clearSuccessTimeout() {
     if (successTimeoutRef.current !== null) {
@@ -366,7 +340,7 @@ export function PessoalObligationsSection({
                     ) : null}
                     {responsibleUsers.map((user) => (
                       <option key={user.id} value={user.id}>
-                        {user.name || user.login}
+                        {user.name}
                       </option>
                     ))}
                   </select>

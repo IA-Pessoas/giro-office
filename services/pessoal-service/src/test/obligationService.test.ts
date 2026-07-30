@@ -184,7 +184,15 @@ describe("ObligationService", () => {
     });
 
     expect(prisma.user.findFirst).toHaveBeenCalledWith({
-      where: { id: responsibleId, organization_id: organizationId },
+      where: {
+        id: responsibleId,
+        status: "active",
+        OR: [
+          { organization_id: organizationId },
+          { organization_id: null, department: { organization_id: organizationId } },
+        ],
+        permissions: { some: { organization_id: organizationId, pessoal: { gt: 0 } } },
+      },
       select: { id: true },
     });
     expect(prisma.obrigationsPessoal.update).toHaveBeenCalledWith(

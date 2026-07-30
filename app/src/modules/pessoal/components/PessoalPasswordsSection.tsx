@@ -17,9 +17,8 @@ import {
   X,
 } from "lucide-react";
 
-import { listAdminUsers, type UserItem } from "@modules/users";
+import { useAssignableUsers } from "@modules/rh";
 import { Dialog } from "@shared/components";
-import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -29,7 +28,6 @@ import {
   usePessoalPasswords,
   useUpdatePessoalPasswordMutation,
 } from "../hooks/usePessoalPasswords";
-import { pessoalQueryKey } from "../hooks/queryKeys";
 import { hasPessoalPasswordSecretFields } from "../services/pessoalService";
 import type {
   PessoalPasswordDetail,
@@ -232,13 +230,10 @@ export function PessoalPasswordsSection({
   );
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const usersQuery = useFetch<UserItem[]>(
-    pessoalQueryKey("passwords", "users", "active"),
-    () => listAdminUsers("active"),
-    {
-      enabled: isFormOpen && canEdit,
-    },
-  );
+  const usersQuery = useAssignableUsers({
+    enabled: isFormOpen && canEdit,
+    module: "pessoal",
+  });
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [revealedFields, setRevealedFields] = useState<Set<SecretFieldName>>(new Set());

@@ -105,6 +105,17 @@ describe("request routes", () => {
     expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);
   });
 
+  it("GET /rh/operational-users aceita modulo Pessoal para seletores de responsavel", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .get("/rh/operational-users")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "0")
+      .set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify({ pessoal: 1, rh: 0 }));
+
+    expect(res.status).toBe(200);
+    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);
+  });
+
   it("GET /rh/requests lista solicitacoes", async () => {
     const app = createTestApp();
     const res = await request(app).get("/rh/requests").query({

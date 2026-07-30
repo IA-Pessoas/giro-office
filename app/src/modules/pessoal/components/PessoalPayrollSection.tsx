@@ -1,10 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AlertCircle, ChevronDown, Loader2, RefreshCw, Save, WalletCards } from "lucide-react";
 
-import { resolveDepartmentModuleKey } from "@modules/auth";
-import { departmentService } from "@modules/departments";
-import { listAdminUsers } from "@modules/users";
-import { useFetch } from "@shared/hooks";
+import { useAssignableUsers } from "@modules/rh";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -12,7 +9,6 @@ import {
   usePessoalPayroll,
   useUpdatePessoalPayrollMutation,
 } from "../hooks/usePessoalPayroll";
-import { pessoalQueryKey } from "../hooks/queryKeys";
 import { usePessoalUnions } from "../hooks/usePessoalUnions";
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
@@ -166,39 +162,14 @@ export function PessoalPayrollSection({
   const hasClient = selectedClientId.length > 0;
   const payrollQuery = usePessoalPayroll(selectedClientId, hasClient);
   const unionsQuery = usePessoalUnions();
-  const responsibleUsersQuery = useFetch(
-    pessoalQueryKey("payroll", "users", "active"),
-    () => listAdminUsers("active"),
-    { enabled: canEdit },
-  );
-  const departmentsQuery = useFetch(
-    pessoalQueryKey("payroll", "departments"),
-    () => departmentService.list(),
-    { enabled: canEdit },
-  );
+  const responsibleUsersQuery = useAssignableUsers({ enabled: canEdit, module: "pessoal" });
   const createMutation = useCreatePessoalPayrollMutation();
   const updateMutation = useUpdatePessoalPayrollMutation(selectedClientId);
   const [formValues, setFormValues] = useState<PayrollFormValues>(emptyPayrollFormValues);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const payroll = payrollQuery.data ?? null;
-  const departmentNameById = useMemo(
-    () =>
-      new Map(
-        (departmentsQuery.data ?? []).map((department) => [department.id, department.name]),
-      ),
-    [departmentsQuery.data],
-  );
-  const responsibleUsers = useMemo(
-    () =>
-      (responsibleUsersQuery.data ?? []).filter((user) => {
-        const departmentName =
-          departmentNameById.get(user.department_id) ?? user.department?.name ?? null;
-
-        return resolveDepartmentModuleKey(departmentName) === "pessoal";
-      }),
-    [departmentNameById, responsibleUsersQuery.data],
-  );
+  const responsibleUsers = responsibleUsersQuery.data ?? [];
   const hasSelectedResponsible = responsibleUsers.some(
     (user) => user.id === formValues.responsible_id,
   );
@@ -362,21 +333,23 @@ export function PessoalPayrollSection({
                 value={formValues.responsible_id}
                 onChange={(event) => handleFieldChange("responsible_id", event.target.value)}
                 disabled={
-                  isFormDisabled || responsibleUsersQuery.isLoading || departmentsQuery.isLoading
+                  isFormDisabled || responsibleUsersQuery.isLoading || responsibleUsersQuery.isError
                 }
                 className={`${pessoalTextFieldClassName} appearance-none pr-12`}
               >
                 <option value="">
-                  {responsibleUsersQuery.isLoading || departmentsQuery.isLoading
+                  {responsibleUsersQuery.isLoading
                     ? "Carregando responsáveis"
-                    : "Sem responsável"}
+                    : responsibleUsersQuery.isError
+                      ? "Responsáveis indisponíveis"
+                      : "Sem responsável"}
                 </option>
                 {formValues.responsible_id && !hasSelectedResponsible ? (
                   <option value={formValues.responsible_id}>Responsável atual</option>
                 ) : null}
                 {responsibleUsers.map((user) => (
                   <option key={user.id} value={user.id}>
-                    {user.name || user.login}
+                    {user.name}
                   </option>
                 ))}
               </select>

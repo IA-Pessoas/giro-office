@@ -21,7 +21,7 @@ import { operationalUserListQuerySchema } from "../schemas/operationalUser.schem
 
 const router: ReturnType<typeof Router> = Router();
 const operationalUserService = new OperationalUserService();
-const OPERATIONAL_USER_CATALOG_MODULES = ["rh", "contabil"] as const;
+const OPERATIONAL_USER_CATALOG_MODULES = ["rh", "contabil", "pessoal", "regularize"] as const;
 const OPERATIONAL_USER_CATALOG_MIN_PERMISSION = RH_SELF_SERVICE_PERMISSION;
 
 function getSingleHeaderValue(value: string | string[] | undefined): string | undefined {

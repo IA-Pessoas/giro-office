@@ -1189,7 +1189,7 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   );
   assert.match(
     tabSource,
-    /assignableUsersQuery = useAssignableUsers\(\{ enabled: canManageExtensions \}\)/,
+    /assignableUsersQuery = useAssignableUsers\(\{ enabled: canManageExtensions, module: "ti" \}\)/,
   );
   assert.match(tabSource, /\{!canManageExtensions \? \(/);
   assert.match(tabSource, /<TiEmptyState/);
