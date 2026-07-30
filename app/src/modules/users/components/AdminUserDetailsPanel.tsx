@@ -272,7 +272,7 @@ export function AdminUserDetailsPanel({
       <div className="space-y-1 pb-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{user?.name}</h2>
         <p className={MUTED_CLASSNAME}>
-          Atualize os dados do usuário selecionado usando os contratos atuais do backend.
+          Revise e atualize os dados do usuário selecionado.
         </p>
       </div>
 

@@ -773,7 +773,7 @@ export function Administracao() {
               ) : !isDepartmentsLoading && departments.length === 0 ? (
                 <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    Nenhum departamento foi retornado pelo backend. A criação de usuários está indisponível.
+                    Ainda não há departamentos cadastrados. Cadastre um departamento para criar usuários.
                   </p>
                   <button
                     type="button"

@@ -616,6 +616,11 @@ runTest("administration neutral panels avoid stacked borders", () => {
   assert.doesNotMatch(administracaoSource, /\$\{ADMIN_FEEDBACK_PANEL_CLASSNAME\} border-dashed/);
 });
 
+runTest("administration empty states avoid backend wording", () => {
+  assert.doesNotMatch(administracaoSource, /backend/i);
+  assert.doesNotMatch(adminUserDetailsPanelSource, /backend/i);
+});
+
 runTest("admin user details panels avoid stacked borders while keeping empty states clear", () => {
   const panelClassName = extractClassConstant(adminUserDetailsPanelSource, "PANEL_CLASSNAME");
   const feedbackClassName = extractClassConstant(
