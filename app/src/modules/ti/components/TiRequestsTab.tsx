@@ -15,9 +15,12 @@ import { toast } from "react-toastify";
 
 import { Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";
-import { useModuleAccess } from "@modules/auth";
+import { resolveDepartmentModuleKey, useModuleAccess } from "@modules/auth";
+import { departmentService } from "@modules/departments";
+import { listAdminUsers } from "@modules/users";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
+import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -293,6 +296,8 @@ export function TiRequestsTab() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
   const [requestDraft, setRequestDraft] = useState<RequestDraft>(INITIAL_REQUEST_DRAFT);
   const [categoryDraft, setCategoryDraft] = useState<CategoryDraft>(INITIAL_CATEGORY_DRAFT);
   const [createFormError, setCreateFormError] = useState<string | null>(null);
@@ -304,8 +309,32 @@ export function TiRequestsTab() {
   );
   const [actionError, setActionError] = useState<string | null>(null);
 
+  function canTransferRequest(request: TiRequest) {
+    const hasElevatedAccess = access.isAdmin || currentUser?.type === "owner";
+
+    return (
+      hasElevatedAccess ||
+      Boolean(
+        currentUser?.id &&
+          request.assigned_to_id !== undefined &&
+          request.assigned_to_id !== null &&
+          String(request.assigned_to_id) === currentUser.id,
+      )
+    );
+  }
+
   const requestsQuery = useTiRequests(filters);
   const categoriesQuery = useTiRequestCategories();
+  const transferUsersQuery = useFetch(
+    ["ti-requests", "transfer", "users", "active"],
+    () => listAdminUsers("active"),
+    { enabled: isTransferDialogOpen },
+  );
+  const transferDepartmentsQuery = useFetch(
+    ["ti-requests", "transfer", "departments"],
+    () => departmentService.list(),
+    { enabled: isTransferDialogOpen },
+  );
   const requests = requestsQuery.data ?? [];
   const selectedRequest = requests.find((request) => request.id === selectedRequestId);
   const activeRequestId = selectedRequestId;
@@ -328,6 +357,45 @@ export function TiRequestsTab() {
       categories.map((category) => [String(category.id), category] as const),
     );
   }, [categories]);
+
+  const transferDepartmentNameById = useMemo(
+    () =>
+      new Map(
+        (transferDepartmentsQuery.data ?? []).map((department) => [
+          String(department.id),
+          department.name,
+        ]),
+      ),
+    [transferDepartmentsQuery.data],
+  );
+
+  const transferAssigneeOptions = useMemo(
+    () => [
+      {
+        value: "",
+        label:
+          transferUsersQuery.isLoading || transferDepartmentsQuery.isLoading
+            ? "Carregando responsáveis..."
+            : "Selecione um responsável",
+      },
+      ...(transferUsersQuery.data ?? [])
+        .filter((user) => {
+          const departmentName =
+            transferDepartmentNameById.get(String(user.department_id)) ??
+            user.department?.name ??
+            null;
+
+          return resolveDepartmentModuleKey(departmentName) === "ti";
+        })
+        .map((user) => ({ value: user.id, label: user.name || user.login })),
+    ],
+    [
+      transferDepartmentsQuery.isLoading,
+      transferDepartmentNameById,
+      transferUsersQuery.data,
+      transferUsersQuery.isLoading,
+    ],
+  );
 
   const filteredRequests = useMemo(() => {
     const normalizedSearchTerm = normalizeSearchText(searchTerm);
@@ -373,6 +441,10 @@ export function TiRequestsTab() {
   const isRequestsLoading = requestsQuery.isLoading || requestsQuery.isFetching;
   const isDetailLoading = requestDetailQuery.isLoading || requestDetailQuery.isFetching;
   const isMessagesLoading = messagesQuery.isLoading || messagesQuery.isFetching;
+  const isTransferAssigneeOptionsLoading =
+    transferUsersQuery.isLoading || transferDepartmentsQuery.isLoading;
+  const isTransferAssigneeOptionsUnavailable =
+    transferUsersQuery.isError || transferDepartmentsQuery.isError;
   const isSaving =
     createRequestMutation.isPending ||
     updateRequestMutation.isPending ||
@@ -551,6 +623,41 @@ export function TiRequestsTab() {
         id: activeRequestId,
         payload: { assigned_to_id: currentUser.id },
       });
+    } catch (error) {
+      setActionError(getErrorMessage(error));
+    }
+  }
+
+  function handleOpenTransferDialog() {
+    setSelectedAssigneeId("");
+    setActionError(null);
+    setIsTransferDialogOpen(true);
+  }
+
+  function handleCloseTransferDialog() {
+    setIsTransferDialogOpen(false);
+    setSelectedAssigneeId("");
+    setActionError(null);
+  }
+
+  async function handleTransferRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setActionError(null);
+
+    if (!activeRequestId || !selectedAssigneeId) {
+      setActionError("Selecione o novo responsável pelo chamado.");
+      return;
+    }
+
+    try {
+      await assignRequestMutation.mutateAsync({
+        id: activeRequestId,
+        payload: { assigned_to_id: selectedAssigneeId },
+      });
+      setIsTransferDialogOpen(false);
+      setSelectedAssigneeId("");
+      setActionError(null);
+      toast.success("Responsabilidade transferida com sucesso.");
     } catch (error) {
       setActionError(getErrorMessage(error));
     }
@@ -1072,6 +1179,20 @@ export function TiRequestsTab() {
                             </span>
                           </button>
                         ) : null}
+                        {canTransferRequest(activeRequest) ? (
+                          <button
+                            type="button"
+                            className={cn(
+                              tiSecondaryButtonClassName,
+                              "h-8 min-w-[104px] justify-center px-3 text-xs whitespace-nowrap",
+                            )}
+                            disabled={assignRequestMutation.isPending}
+                            onClick={handleOpenTransferDialog}
+                          >
+                            <UserCheck className="h-3.5 w-3.5" />
+                            <span>Transferir responsabilidade</span>
+                          </button>
+                        ) : null}
                       </dd>
                     </div>
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
@@ -1284,6 +1405,67 @@ export function TiRequestsTab() {
             </div>
           ) : null}
           </div>
+        </Dialog>
+
+        <Dialog
+          open={isTransferDialogOpen}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              handleCloseTransferDialog();
+            }
+          }}
+          title="Transferir responsabilidade"
+          description="Selecione um usuário ativo do departamento Tecnologia."
+          contentClassName="w-[min(94vw,460px)]"
+        >
+          <form className="space-y-4" onSubmit={handleTransferRequest}>
+            {actionError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
+                {actionError}
+              </div>
+            ) : null}
+
+            {isTransferAssigneeOptionsUnavailable ? (
+              <p className="text-sm text-red-600 dark:text-red-300">
+                Não foi possível carregar os responsáveis disponíveis.
+              </p>
+            ) : null}
+
+            <TiNativeSelect
+              label="Novo responsável"
+              value={selectedAssigneeId}
+              options={transferAssigneeOptions}
+              disabled={
+                assignRequestMutation.isPending ||
+                isTransferAssigneeOptionsLoading ||
+                isTransferAssigneeOptionsUnavailable
+              }
+              onChange={(event) => setSelectedAssigneeId(event.target.value)}
+            />
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className={tiSecondaryButtonClassName}
+                onClick={handleCloseTransferDialog}
+                disabled={assignRequestMutation.isPending}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className={tiPrimaryButtonClassName}
+                disabled={
+                  assignRequestMutation.isPending ||
+                  !selectedAssigneeId ||
+                  isTransferAssigneeOptionsLoading ||
+                  isTransferAssigneeOptionsUnavailable
+                }
+              >
+                {assignRequestMutation.isPending ? "Transferindo..." : "Transferir"}
+              </button>
+            </div>
+          </form>
         </Dialog>
       </div>
     </TiPanel>

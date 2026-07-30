@@ -115,6 +115,26 @@ await runTest("ti request attachment UI retains the accessible upload flow and c
   );
 });
 
+await runTest("ti request transfer UI limits assignees to Tecnologia and authorized actors", async () => {
+  const tiRequestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(tiRequestsTabSource, /Transferir responsabilidade/);
+  assert.match(tiRequestsTabSource, /department_id/);
+  assert.match(tiRequestsTabSource, /Tecnologia/);
+  assert.match(tiRequestsTabSource, /assigned_to_id/);
+  assert.match(tiRequestsTabSource, /assignRequestMutation\.mutateAsync/);
+  assert.match(
+    tiRequestsTabSource,
+    /function canTransferRequest\(request: TiRequest\)[\s\S]*access\.isAdmin[\s\S]*currentUser\?\.type === "owner"[\s\S]*assigned_to_id/,
+  );
+  assert.match(tiRequestsTabSource, /<TiNativeSelect[\s\S]*label="Novo responsável"/);
+  assert.doesNotMatch(tiRequestsTabSource, /type="text"[^>]*name="assigned_to_id"/);
+  assert.match(
+    tiRequestsTabSource,
+    /await assignRequestMutation\.mutateAsync\([\s\S]*setIsTransferDialogOpen\(false\);[\s\S]*setSelectedAssigneeId\(""\);[\s\S]*setActionError\(null\);/,
+  );
+});
+
 async function readModuleSource(relativePath) {
   return readFile(join(moduleRoot, relativePath), "utf8");
 }
@@ -1359,7 +1379,7 @@ await runTest("ti request detail keeps secondary actions compact", async () => {
   assert.doesNotMatch(tabSource, /Editar t.tulo/);
 });
 
-await runTest("ti request detail does not fetch admin users for assignment automatically", async () => {
+await runTest("ti request detail loads transfer candidates only when the dialog opens", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 
   assert.match(tabSource, /useAssignTiRequest/);
@@ -1370,7 +1390,8 @@ await runTest("ti request detail does not fetch admin users for assignment autom
   assert.doesNotMatch(tabSource, /useTiAssignableUsers/);
   assert.doesNotMatch(tabSource, /assignableUserOptions/);
   assert.doesNotMatch(tabSource, /Atribuir à equipe de TI/);
-  assert.doesNotMatch(tabSource, /listAdminUsers/);
+  assert.match(tabSource, /\(\) => listAdminUsers\("active"\)/);
+  assert.match(tabSource, /\{ enabled: isTransferDialogOpen \}/);
   assert.doesNotMatch(tabSource, /placeholder="ID do usuário"/);
   assert.doesNotMatch(tabSource, /assignedUserId/);
 });
