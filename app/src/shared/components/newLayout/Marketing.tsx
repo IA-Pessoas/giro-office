@@ -582,7 +582,7 @@ export function Marketing() {
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-1">
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto u-scrollbar-system">
           {(
             [
               { id: "dashboard", label: "Dashboard", icon: BarChart3 },
@@ -915,7 +915,7 @@ export function Marketing() {
           </div>
 
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                   <tr>
@@ -1196,7 +1196,7 @@ export function Marketing() {
       {activeTab === "requests" ? (
         <div className="space-y-5">
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                   <tr>

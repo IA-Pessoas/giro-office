@@ -232,7 +232,7 @@ export function Commercial() {
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-1">
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto u-scrollbar-system">
           <button
             onClick={() => setActiveTab("dashboard")}
             className={`flex-1 min-w-fit px-4 py-2.5 rounded-lg font-medium transition-all ${
@@ -615,7 +615,7 @@ export function Commercial() {
           </div>
 
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                   <tr>
@@ -774,7 +774,7 @@ export function Commercial() {
           </div>
 
           {pipelineView === "kanban" ? (
-            <div className="overflow-x-auto pb-4">
+            <div className="overflow-x-auto u-scrollbar-system pb-4">
               <div className="flex gap-4 min-w-max">
                 {(["new", "contacted", "qualified", "proposal", "negotiation"] as CommercialLead["status"][]).map(
                   (status) => {
@@ -873,7 +873,7 @@ export function Commercial() {
             </div>
           ) : (
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto u-scrollbar-system">
                 <table className="w-full">
                   <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                     <tr>
@@ -1056,7 +1056,7 @@ export function Commercial() {
       {!isInitialLoading && !hasOverviewError && activeTab === "contracts" ? (
         <div className="space-y-5">
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                   <tr>
