@@ -343,12 +343,13 @@ await (async () => {
     ]);
   });
 
-  await runTest("relationship field registry matches the backend contract", () => {
+  await runTest("relationship field registry keeps bidding last in the UI order", () => {
     assert.deepEqual(
       CONTABIL_RELATIONSHIP_FIELDS.map((field) => field.field),
-      ["bidding", "chart_accounts", "tool", "system", "note"],
+      ["chart_accounts", "tool", "system", "note", "bidding"],
     );
-    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[0].requiredOnCreate, true);
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS.at(-1)?.field, "bidding");
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS.at(-1)?.requiredOnCreate, true);
   });
 
   await runTest("relationship bidding checkbox uses compact form proportions", () => {
@@ -356,10 +357,16 @@ await (async () => {
       new URL("./components/ContabilRelationshipSection.tsx", import.meta.url),
       "utf8",
     );
-    const checkboxStart = source.indexOf("{CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS.map");
     const textFieldsStart = source.indexOf("{CONTABIL_RELATIONSHIP_TEXT_FIELDS.map");
-    const checkboxSource = source.slice(checkboxStart, textFieldsStart);
+    const textareaStart = source.indexOf("{CONTABIL_RELATIONSHIP_TEXTAREA_FIELDS.map");
+    const checkboxStart = source.indexOf("{CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS.map");
+    const checkboxSource = source.slice(
+      checkboxStart,
+      source.indexOf("{submitError", checkboxStart),
+    );
 
+    assert.ok(textFieldsStart < textareaStart);
+    assert.ok(textareaStart < checkboxStart);
     assert.match(checkboxSource, /className="flex h-11 items-center gap-3/);
     assert.match(checkboxSource, /className="h-4 w-4/);
     assert.doesNotMatch(
