@@ -1881,6 +1881,19 @@ await runTest("ti inventory category form keeps a stable form reference", async 
   assert.doesNotMatch(source, /locationForm\.reset\(\)/);
 });
 
+await runTest("ti inventory user fields use the contextual user catalog", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /module: "ti"/);
+  assert.match(source, /name="user_id"/);
+  assert.match(source, /name="responsible_it_staff_id"/);
+  assert.match(source, /Usuário atual/);
+  assert.match(source, /Responsável atual/);
+  assert.doesNotMatch(source, /<TiTextField\s+label="ID do usuário"/);
+  assert.doesNotMatch(source, /<TiTextField\s+label="ID do responsável TI"/);
+});
+
 await runTest("ti inventory category status supports is_active fallback", async () => {
   const source = await readModuleSource("components/TiInventoryTab.tsx");
 

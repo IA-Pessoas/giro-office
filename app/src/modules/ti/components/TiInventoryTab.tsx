@@ -3,6 +3,7 @@ import { Boxes, Eye, Pencil, Plus, RotateCcw, Save, Tags, UserPlus, X } from "lu
 
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
+import { useAssignableUsers } from "@modules/rh";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
@@ -220,6 +221,10 @@ export function TiInventoryTab() {
   const [dialogState, setDialogState] = useState<InventoryDialogState | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<TiInventoryCategory | null>(null);
+  const assignableUsersQuery = useAssignableUsers({
+    enabled: canManage && (dialogState?.type === "asset" || dialogState?.type === "assign"),
+    module: "ti",
+  });
 
   const filters = useMemo(
     () =>
@@ -286,6 +291,21 @@ export function TiInventoryTab() {
     () => [{ value: "", label: "Selecione" }, ...departmentOptions],
     [departmentOptions],
   );
+
+  const assignableUserOptions = useMemo(
+    () => [
+      { value: "", label: "NÃ£o atribuir" },
+      ...(assignableUsersQuery.data ?? []).map((user) => ({
+        value: user.id,
+        label: user.name,
+      })),
+    ],
+    [assignableUsersQuery.data],
+  );
+
+  function hasAssignableUser(userId: unknown): boolean {
+    return Boolean(userId) && (assignableUsersQuery.data ?? []).some((user) => user.id === userId);
+  }
 
   const filteredInventory = useMemo(() => {
     const assets = inventoryQuery.data ?? [];
@@ -710,22 +730,38 @@ export function TiInventoryTab() {
               }
               options={departmentFormOptions}
             />
-            <TiTextField
-              label="ID do usuário"
+            <TiNativeSelect
+              label="Usuário"
               name="user_id"
-              defaultValue={
-                dialogState?.type === "asset" ? getText(dialogState.asset?.user_id, "") : ""
-              }
-            />
-            <TiTextField
-              label="ID do responsável TI"
+              defaultValue={dialogState?.type === "asset" ? getText(dialogState.asset?.user_id, "") : ""}
+              options={assignableUserOptions}
+              disabled={assignableUsersQuery.isLoading || assignableUsersQuery.isError}
+            >
+              {dialogState?.type === "asset" &&
+              dialogState.mode === "edit" &&
+              dialogState.asset?.user_id &&
+              !hasAssignableUser(dialogState.asset.user_id) ? (
+                <option value={dialogState.asset.user_id}>Usuário atual</option>
+              ) : null}
+            </TiNativeSelect>
+            <TiNativeSelect
+              label="Responsável TI"
               name="responsible_it_staff_id"
               defaultValue={
                 dialogState?.type === "asset"
                   ? getText(dialogState.asset?.responsible_it_staff_id, "")
                   : ""
               }
-            />
+              options={assignableUserOptions}
+              disabled={assignableUsersQuery.isLoading || assignableUsersQuery.isError}
+            >
+              {dialogState?.type === "asset" &&
+              dialogState.mode === "edit" &&
+              dialogState.asset?.responsible_it_staff_id &&
+              !hasAssignableUser(dialogState.asset.responsible_it_staff_id) ? (
+                <option value={dialogState.asset.responsible_it_staff_id}>Responsável atual</option>
+              ) : null}
+            </TiNativeSelect>
           </div>
           <TiTextarea
             label="Notas"
@@ -762,7 +798,13 @@ export function TiInventoryTab() {
           <TiInlineNotice tone="warning">
             A atribuição será registrada no ativo selecionado após a confirmação.
           </TiInlineNotice>
-          <TiTextField label="ID do usuário" name="user_id" required />
+          <TiNativeSelect
+            label="Usuário"
+            name="user_id"
+            required
+            options={assignableUserOptions}
+            disabled={assignableUsersQuery.isLoading || assignableUsersQuery.isError}
+          />
           <div className="flex justify-end gap-2">
             <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
               Cancelar
