@@ -15,7 +15,7 @@ import { toast } from "react-toastify";
 
 import { Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";
-import { resolveDepartmentModuleKey, useModuleAccess } from "@modules/auth";
+import { useModuleAccess } from "@modules/auth";
 import { departmentService } from "@modules/departments";
 import { listAdminUsers } from "@modules/users";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
@@ -358,14 +358,11 @@ export function TiRequestsTab() {
     );
   }, [categories]);
 
-  const transferDepartmentNameById = useMemo(
+  const technologyDepartmentId = useMemo(
     () =>
-      new Map(
-        (transferDepartmentsQuery.data ?? []).map((department) => [
-          String(department.id),
-          department.name,
-        ]),
-      ),
+      (transferDepartmentsQuery.data ?? []).find(
+        (department) => department.name.toLowerCase() === "tecnologia",
+      )?.id,
     [transferDepartmentsQuery.data],
   );
 
@@ -379,21 +376,17 @@ export function TiRequestsTab() {
             : "Selecione um responsável",
       },
       ...(transferUsersQuery.data ?? [])
-        .filter((user) => {
-          const departmentName =
-            transferDepartmentNameById.get(String(user.department_id)) ??
-            user.department?.name ??
-            null;
-
-          return resolveDepartmentModuleKey(departmentName) === "ti";
-        })
+        .filter(
+          (user) =>
+            technologyDepartmentId !== undefined && user.department_id === technologyDepartmentId,
+        )
         .map((user) => ({ value: user.id, label: user.name || user.login })),
     ],
     [
       transferDepartmentsQuery.isLoading,
-      transferDepartmentNameById,
       transferUsersQuery.data,
       transferUsersQuery.isLoading,
+      technologyDepartmentId,
     ],
   );
 

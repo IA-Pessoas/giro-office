@@ -131,6 +131,11 @@ await runTest("ti request transfer UI limits assignees to Tecnologia and authori
   assert.doesNotMatch(tiRequestsTabSource, /type="text"[^>]*name="assigned_to_id"/);
   assert.match(
     tiRequestsTabSource,
+    /const technologyDepartmentId = useMemo\([\s\S]*department\.name\.toLowerCase\(\) === "tecnologia"[\s\S]*user\.department_id === technologyDepartmentId/,
+  );
+  assert.doesNotMatch(tiRequestsTabSource, /resolveDepartmentModuleKey\(departmentName\)/);
+  assert.match(
+    tiRequestsTabSource,
     /await assignRequestMutation\.mutateAsync\([\s\S]*setIsTransferDialogOpen\(false\);[\s\S]*setSelectedAssigneeId\(""\);[\s\S]*setActionError\(null\);/,
   );
 });
