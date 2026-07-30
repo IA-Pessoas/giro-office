@@ -11,6 +11,7 @@ import {
   useProjectDetail,
   useRecalculateProjectProgressMutation,
 } from "../hooks/useProjects";
+import { getProjectDeleteErrorMessage } from "../services/projectService.contract";
 import { ProjectFormModal } from "./ProjectFormModal";
 import { ProjectProgressBar } from "./ProjectProgressBar";
 import {
@@ -51,20 +52,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       toast.success("Projeto excluído com sucesso.");
       await router.push(backClientId ? `/projects?clientId=${backClientId}` : "/projects");
     } catch (error) {
-      const statusCode =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { status?: number } }).response?.status === "number"
-          ? (error as { response?: { status?: number } }).response?.status
-          : null;
-
-      if (statusCode === 403) {
-      toast.error("Somente usuários com permissão administrativa na Integração podem excluir projetos.");
-        return;
-      }
-
-      toast.error("Não foi possível excluir o projeto.");
+      toast.error(getProjectDeleteErrorMessage(error));
     }
   }
 
